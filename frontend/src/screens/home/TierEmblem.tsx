@@ -19,16 +19,21 @@ export const EMBLEM_OPTICAL_SCALE: Record<HomeTier, number> = {
 };
 
 export default function TierEmblem({ tier, size }: { tier: HomeTier; size: number }) {
-  // Keep the prepared intrinsic ratio; no new circle correction or asset edits.
-  const layout = preparation[tier].displayAt160;
+  // Keep the reviewed slot, silhouette area and optical scale. New originals
+  // include transparent padding: position the complete canvas around the same
+  // visible silhouette without cropping/resampling pixels or correcting rims.
+  const asset = preparation[tier];
+  const layout = asset.displayAt160;
   const scale = size / 160 * EMBLEM_OPTICAL_SCALE[tier];
   const width = layout.width * scale;
   const height = layout.height * scale;
+  const image = 'imageAt160' in asset ? asset.imageAt160 : { ...layout, left: 0, top: 0 };
   return (
     <View testID={`home-emblem-${tier}`} style={{ width, height, flexShrink: 0 }}
       accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden pointerEvents="none">
       <Image testID="home-tier-image" source={EMBLEMS[tier]} resizeMode="contain"
-        style={{ width, height }} accessible={false} />
+        style={{ position: 'absolute', left: image.left * scale, top: image.top * scale,
+          width: image.width * scale, height: image.height * scale }} accessible={false} />
     </View>
   );
 }

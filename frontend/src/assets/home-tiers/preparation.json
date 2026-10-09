@@ -1,27 +1,25 @@
 {
   "bronze": {
-    "source": "청동 원형 엠블럼의 개미 실루엣.png",
-    "sha256": "ecdc8adffc2ab5c1279d38278c78d87e40373ca3a4c4c58d46937bc4f97596da",
+    "source": "Bronze_Balanced_Legs.png",
+    "preparation": "verbatim supplied PNG; no crop, resampling or rim correction",
+    "sha256": "8cd73500e378501573ebf4f476bdaf90f332fd460d3fefc8025c7703d0a835bd",
     "sourceSize": [
       1254,
       1254
     ],
     "sourceAspectRatio": 1,
-    "sourceMetrics": {
-      "bounds": [
-        98,
-        67,
-        1232,
-        1184
-      ],
-      "alphaArea": 768935.2274524214,
-      "centroid": [
-        625.3827296045858,
-        574.6883414347889
-      ],
-      "transparentPixels": 785994
+    "outputSize": [
+      1254,
+      1254
+    ],
+    "outputSha256": "8cd73500e378501573ebf4f476bdaf90f332fd460d3fefc8025c7703d0a835bd",
+    "displayAt160": {
+      "width": 154.73589511295123,
+      "height": 163.49453068538241,
+      "visibleArea": 16384,
+      "equivalentSize": 128
     },
-    "visibleAlphaAbove8": {
+    "outputMetrics": {
       "bounds": [
         101,
         74,
@@ -29,113 +27,36 @@
         1153
       ],
       "alphaArea": 768864.8156877282,
-      "centroid": [
-        625.3811915561271,
-        574.6891089460755
-      ],
-      "transparentPixels": 785994
+      "alphaThreshold": 8
     },
-    "crop": {
-      "x": 89,
-      "y": 62,
-      "width": 1074,
-      "height": 1104
-    },
-    "sourceRim": {
-      "center": [
-        624.8896110427035,
-        546.558143203324
-      ],
-      "radii": [
-        392.5618537583071,
-        381.6145248691905
-      ],
-      "diameters": [
-        785.1237075166142,
-        763.229049738381
-      ],
-      "axisRatio": 0.9721131108784282,
-      "eccentricity": 0.2345124722872214,
-      "samples": 151,
-      "radialRms": 0.8203636006843291
-    },
-    "correction": {
-      "x": 0.9859579660809218,
-      "y": 1.0142420208590572
-    },
-    "correctionPasses": 1,
-    "downsampleScale": 0.5,
-    "preparedRim": {
-      "center": [
-        264.24493371550784,
-        245.64970138793237
-      ],
-      "radii": [
-        193.6359967349962,
-        193.6062311746413
-      ],
-      "diameters": [
-        387.2719934699924,
-        387.2124623492826
-      ],
-      "axisRatio": 0.9998462808524406,
-      "eccentricity": 0.017533244581152567,
-      "samples": 151,
-      "radialRms": 0.48711803018326516
-    },
-    "outputSize": [
-      530,
-      560
-    ],
-    "outputMetrics": {
-      "bounds": [
-        6,
-        6,
-        524,
-        554
-      ],
-      "alphaArea": 192216.00000028976,
-      "centroid": [
-        264.69500102785776,
-        260.064130283595
-      ],
-      "transparentPixels": 99554
-    },
-    "outputSha256": "02454a8f8f1079c8ab91cab58da0289af029c5cc4e1a52eef58232c0d988c879",
-    "displayAt160": {
-      "width": 154.73589511295123,
-      "height": 163.49453068538241,
-      "visibleArea": 16384,
-      "equivalentSize": 128,
-      "rimDiameters": [
-        113.06580860708732,
-        113.04842822737012
-      ]
+    "imageAt160": {
+      "width": 183.0553863622568,
+      "height": 183.0553863622568,
+      "left": -14.013768442545725,
+      "top": -7.809735879991848
     }
   },
   "silver": {
-    "source": "실버 개미 엠블럼.png",
-    "sha256": "d96118679b340d98b72a16bc9201cd01e900e07a63d4769dda6ee3ddc4aeae1d",
+    "source": "Silver_Balanced_Legs.png",
+    "preparation": "verbatim supplied PNG; no crop, resampling or rim correction",
+    "sha256": "ebb1e353bf74b40e06299f15b7f1bacd26a4ef9e163a8b8b6d19dec1d78ca6a8",
     "sourceSize": [
       1254,
       1254
     ],
     "sourceAspectRatio": 1,
-    "sourceMetrics": {
-      "bounds": [
-        0,
-        74,
-        1238,
-        1254
-      ],
-      "alphaArea": 731636.4431385489,
-      "centroid": [
-        627.0926769316179,
-        568.1755921353973
-      ],
-      "transparentPixels": 826495
+    "outputSize": [
+      1254,
+      1254
+    ],
+    "outputSha256": "ebb1e353bf74b40e06299f15b7f1bacd26a4ef9e163a8b8b6d19dec1d78ca6a8",
+    "displayAt160": {
+      "width": 162.33209595546762,
+      "height": 162.33209595546762,
+      "visibleArea": 16713.3184,
+      "equivalentSize": 129.28
     },
-    "visibleAlphaAbove8": {
+    "outputMetrics": {
       "bounds": [
         99,
         77,
@@ -143,113 +64,36 @@
         1118
       ],
       "alphaArea": 731583.6705895388,
-      "centroid": [
-        627.0919200436788,
-        568.1744741602172
-      ],
-      "transparentPixels": 826495
+      "alphaThreshold": 8
     },
-    "crop": {
-      "x": 87,
-      "y": 65,
-      "width": 1080,
-      "height": 1066
-    },
-    "sourceRim": {
-      "center": [
-        627.2068053514713,
-        535.951519037973
-      ],
-      "radii": [
-        377.63660008202635,
-        371.9158747645735
-      ],
-      "diameters": [
-        755.2732001640527,
-        743.831749529147
-      ],
-      "axisRatio": 0.9848512423949103,
-      "eccentricity": 0.1734013562611375,
-      "samples": 121,
-      "radialRms": 0.5281372378730889
-    },
-    "correction": {
-      "x": 0.9926900466442314,
-      "y": 1.0073637822606156
-    },
-    "correctionPasses": 2,
-    "downsampleScale": 0.5,
-    "preparedRim": {
-      "center": [
-        268.41748366612273,
-        237.2379542176166
-      ],
-      "radii": [
-        187.6399471446715,
-        187.61384976498852
-      ],
-      "diameters": [
-        375.279894289343,
-        375.22769952997703
-      ],
-      "axisRatio": 0.9998609177838721,
-      "eccentricity": 0.016677682344767422,
-      "samples": 121,
-      "radialRms": 0.3565052290992416
-    },
-    "outputSize": [
-      537,
-      537
-    ],
-    "outputMetrics": {
-      "bounds": [
-        6,
-        6,
-        531,
-        531
-      ],
-      "alphaArea": 182895.2666669211,
-      "centroid": [
-        268.5457735231051,
-        253.47730888184446
-      ],
-      "transparentPixels": 101070
-    },
-    "outputSha256": "3e912ab90bb6b8cfaa5fc184236789fd7f052742dd2869e618fe2d1446327df7",
-    "displayAt160": {
-      "width": 162.33209595546762,
-      "height": 162.33209595546762,
-      "visibleArea": 16713.3184,
-      "equivalentSize": 129.28,
-      "rimDiameters": [
-        113.4450126814439,
-        113.42923449767152
-      ]
+    "imageAt160": {
+      "width": 189.53825517216643,
+      "height": 189.53825517216643,
+      "left": -13.603079608349404,
+      "top": -9.144245056851076
     }
   },
   "gold": {
-    "source": "매끈해진 황금 개미 엠블럼.png",
-    "sha256": "78e1d60965575101462b76b7f7a59ecb0f4167f5566c009e5177707d3df6bde1",
+    "source": "Gold_Balanced_Legs.png",
+    "preparation": "verbatim supplied PNG; no crop, resampling or rim correction",
+    "sha256": "3180988727792c49ab579e612d82b4142d8658721676cc7715953d17a768acdb",
     "sourceSize": [
       1254,
       1254
     ],
     "sourceAspectRatio": 1,
-    "sourceMetrics": {
-      "bounds": [
-        27,
-        16,
-        1230,
-        1220
-      ],
-      "alphaArea": 772655.4196091789,
-      "centroid": [
-        626.4399789301972,
-        582.5913758302648
-      ],
-      "transparentPixels": 781549
+    "outputSize": [
+      1254,
+      1254
+    ],
+    "outputSha256": "3180988727792c49ab579e612d82b4142d8658721676cc7715953d17a768acdb",
+    "displayAt160": {
+      "width": 169.92805894511557,
+      "height": 166.06605760545386,
+      "visibleArea": 17045.9136,
+      "equivalentSize": 130.56
     },
-    "visibleAlphaAbove8": {
+    "outputMetrics": {
       "bounds": [
         66,
         70,
@@ -257,113 +101,36 @@
         1160
       ],
       "alphaArea": 772579.2000013501,
-      "centroid": [
-        626.4378929783273,
-        582.5869434398451
-      ],
-      "transparentPixels": 781549
+      "alphaThreshold": 8
     },
-    "crop": {
-      "x": 54,
-      "y": 58,
-      "width": 1146,
-      "height": 1114
-    },
-    "sourceRim": {
-      "center": [
-        626.2642097514932,
-        540.5117297176665
-      ],
-      "radii": [
-        378.29735823148843,
-        377.067254187615
-      ],
-      "diameters": [
-        756.5947164629769,
-        754.13450837523
-      ],
-      "axisRatio": 0.9967483144750889,
-      "eccentricity": 0.08057789765853508,
-      "samples": 115,
-      "radialRms": 0.8144276921802582
-    },
-    "correction": {
-      "x": 0.9976724301302038,
-      "y": 1.002333000090513
-    },
-    "correctionPasses": 2,
-    "downsampleScale": 0.5,
-    "preparedRim": {
-      "center": [
-        285.38095801521746,
-        241.6449141366105
-      ],
-      "radii": [
-        188.82871737056877,
-        188.83473808406487
-      ],
-      "diameters": [
-        377.65743474113754,
-        377.66947616812973
-      ],
-      "axisRatio": 0.9999681164940456,
-      "eccentricity": 0.007985361316243725,
-      "samples": 115,
-      "radialRms": 0.3045036064030912
-    },
-    "outputSize": [
-      572,
-      559
-    ],
-    "outputMetrics": {
-      "bounds": [
-        6,
-        6,
-        566,
-        553
-      ],
-      "alphaArea": 193144.4117649773,
-      "centroid": [
-        285.71927587413325,
-        263.25522888709315
-      ],
-      "transparentPixels": 121425
-    },
-    "outputSha256": "b29e951d62af8e9193c6875e2ecda5f550790612d89e981a42428b571f4f3844",
-    "displayAt160": {
-      "width": 169.92805894511557,
-      "height": 166.06605760545386,
-      "visibleArea": 17045.9136,
-      "equivalentSize": 130.56,
-      "rimDiameters": [
-        112.19334760796006,
-        112.19692483928125
-      ]
+    "imageAt160": {
+      "width": 186.2671081765187,
+      "height": 186.2671081765187,
+      "left": -8.169524615701562,
+      "top": -8.31806492020688
     }
   },
   "platinum": {
-    "source": "플래티넘 날개개미 엠블럼.png",
-    "sha256": "49f01ffed1278aca0553e06751eadf8f55a6bc67a411489a35c5a1d6e5dbdb44",
+    "source": "Platinum_Balanced_Legs.png",
+    "preparation": "verbatim supplied PNG; no crop, resampling or rim correction",
+    "sha256": "0a577db99c98ebbaf3ad4943e6efaec9fdf2f4d69cfce6596c885846aad7ba51",
     "sourceSize": [
       1254,
       1254
     ],
     "sourceAspectRatio": 1,
-    "sourceMetrics": {
-      "bounds": [
-        0,
-        23,
-        1239,
-        1210
-      ],
-      "alphaArea": 871372.4470603602,
-      "centroid": [
-        627.4405818189266,
-        619.3219812834078
-      ],
-      "transparentPixels": 679376
+    "outputSize": [
+      1254,
+      1254
+    ],
+    "outputSha256": "0a577db99c98ebbaf3ad4943e6efaec9fdf2f4d69cfce6596c885846aad7ba51",
+    "displayAt160": {
+      "width": 174.57705384268124,
+      "height": 165.25497815205262,
+      "visibleArea": 17381.7856,
+      "equivalentSize": 131.84
     },
-    "visibleAlphaAbove8": {
+    "outputMetrics": {
       "bounds": [
         18,
         66,
@@ -371,113 +138,36 @@
         1202
       ],
       "alphaArea": 871279.5529427314,
-      "centroid": [
-        627.4375875817227,
-        619.3189805855081
-      ],
-      "transparentPixels": 679376
+      "alphaThreshold": 8
     },
-    "crop": {
-      "x": 6,
-      "y": 54,
-      "width": 1244,
-      "height": 1160
-    },
-    "sourceRim": {
-      "center": [
-        626.8549301991638,
-        537.3274940050816
-      ],
-      "radii": [
-        377.6564072325059,
-        371.5654508086096
-      ],
-      "diameters": [
-        755.3128144650118,
-        743.1309016172193
-      ],
-      "axisRatio": 0.9838716984347459,
-      "eccentricity": 0.17887560207901063,
-      "samples": 119,
-      "radialRms": 0.5417397531170696
-    },
-    "correction": {
-      "x": 0.9929184475393837,
-      "y": 1.0071320585070862
-    },
-    "correctionPasses": 3,
-    "downsampleScale": 0.5,
-    "preparedRim": {
-      "center": [
-        308.2434009613192,
-        244.02599890084682
-      ],
-      "radii": [
-        187.73800258423807,
-        187.78111039464358
-      ],
-      "diameters": [
-        375.47600516847615,
-        375.56222078928715
-      ],
-      "axisRatio": 0.9997704358531329,
-      "eccentricity": 0.02142604942672758,
-      "samples": 119,
-      "radialRms": 0.35207521546259213
-    },
-    "outputSize": [
-      618,
-      585
-    ],
-    "outputMetrics": {
-      "bounds": [
-        6,
-        6,
-        612,
-        579
-      ],
-      "alphaArea": 217819.63137286657,
-      "centroid": [
-        308.72139285334737,
-        285.1069123277696
-      ],
-      "transparentPixels": 137542
-    },
-    "outputSha256": "62313f038756db440008a55c16e921c5109a473b7daf33dd8490a333ee1eaed2",
-    "displayAt160": {
-      "width": 174.57705384268124,
-      "height": 165.25497815205262,
-      "visibleArea": 17381.7856,
-      "equivalentSize": 131.84,
-      "rimDiameters": [
-        106.06714364228465,
-        106.0914984466154
-      ]
+    "imageAt160": {
+      "width": 177.11933368838731,
+      "height": 177.11933368838731,
+      "left": -1.341761666747928,
+      "top": -6.92088218269582
     }
   },
   "diamond": {
-    "source": "장엄한 다이아몬드 여왕개미 엠블럼.png",
-    "sha256": "d105de13a74d5866e696646a9a177df1ec102e1866daf4ad6130c810be61243e",
+    "source": "Diamond_Depth_Legs.png",
+    "preparation": "verbatim supplied PNG; no crop, resampling or rim correction",
+    "sha256": "da98d41eddd602fbadceb52d55cd8998d33f4bf8bc1d0c1e70e136c2565c26bc",
     "sourceSize": [
       1377,
       1142
     ],
     "sourceAspectRatio": 1.2057793345008756,
-    "sourceMetrics": {
-      "bounds": [
-        0,
-        17,
-        1377,
-        1142
-      ],
-      "alphaArea": 828066.0078441681,
-      "centroid": [
-        684.983123391626,
-        594.0654093155368
-      ],
-      "transparentPixels": 641348
+    "outputSize": [
+      1377,
+      1142
+    ],
+    "outputSha256": "da98d41eddd602fbadceb52d55cd8998d33f4bf8bc1d0c1e70e136c2565c26bc",
+    "displayAt160": {
+      "width": 200.49745473830384,
+      "height": 163.9103279612411,
+      "visibleArea": 17720.934400000002,
+      "equivalentSize": 133.12
     },
-    "visibleAlphaAbove8": {
+    "outputMetrics": {
       "bounds": [
         5,
         53,
@@ -485,88 +175,13 @@
         1132
       ],
       "alphaArea": 827385.2901972344,
-      "centroid": [
-        684.9771527279469,
-        594.0514938525899
-      ],
-      "transparentPixels": 641348
+      "alphaThreshold": 8
     },
-    "crop": {
-      "x": -7,
-      "y": 41,
-      "width": 1388,
-      "height": 1104
-    },
-    "sourceRim": {
-      "center": [
-        682.3374341427761,
-        509.0530719841303
-      ],
-      "radii": [
-        360.28613844104945,
-        350.19972965457987
-      ],
-      "diameters": [
-        720.5722768820989,
-        700.3994593091597
-      ],
-      "axisRatio": 0.9720044494908595,
-      "eccentricity": 0.23496244416921427,
-      "samples": 147,
-      "radialRms": 0.8907096735591999
-    },
-    "correction": {
-      "x": 0.9859028600683029,
-      "y": 1.0142987108595267
-    },
-    "correctionPasses": 1,
-    "downsampleScale": 0.5,
-    "preparedRim": {
-      "center": [
-        340.00158182270707,
-        237.24312562538273
-      ],
-      "radii": [
-        177.95987183783336,
-        177.8173777145203
-      ],
-      "diameters": [
-        355.9197436756667,
-        355.6347554290406
-      ],
-      "axisRatio": 0.9991992907061491,
-      "eccentricity": 0.04000971697386086,
-      "samples": 147,
-      "radialRms": 0.6081149499271635
-    },
-    "outputSize": [
-      685,
-      560
-    ],
-    "outputMetrics": {
-      "bounds": [
-        6,
-        6,
-        678,
-        553
-      ],
-      "alphaArea": 206847.3843140376,
-      "centroid": [
-        341.5035901428563,
-        280.532848467182
-      ],
-      "transparentPixels": 151153
-    },
-    "outputSha256": "75efa96ba6633907b739b1d22118e960b646fd612ab1b38fe684daf9515b0e01",
-    "displayAt160": {
-      "width": 200.49745473830384,
-      "height": 163.9103279612411,
-      "visibleArea": 17720.934400000002,
-      "equivalentSize": 133.12,
-      "rimDiameters": [
-        104.17664627457036,
-        104.09323106569609
-      ]
+    "imageAt160": {
+      "width": 201.52241150432695,
+      "height": 167.1304240653169,
+      "left": -0.21978061757317846,
+      "top": -4.756549030500523
     }
   },
   "whale": {

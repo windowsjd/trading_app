@@ -6,8 +6,9 @@ import { TEST_IDS } from '../../constants/testIds.ts';
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
 
-function setup() {
+function setup({ visual = false, width = 390, fontScale = 1 } = {}) {
   const h = interactionHarness('android');
+  h.dimensions = { width, height: 844, fontScale };
   const general = { id: 'general-1', mode: 'general', status: 'active', season: null };
   const season = {
     id: 'season-1', mode: 'season', status: 'active',
@@ -32,11 +33,61 @@ function setup() {
       __esModule: true,
     },
   }).default;
-  const render = () => React.createElement(Switcher, { home: true });
+  const render = () => React.createElement(Switcher, { home: true,
+    ...(visual ? {
+      homeVisual: React.createElement('View', { testID: 'test-emblem', style: { width: 172, height: 168 } }),
+      homeVisualCaption: React.createElement('Text', { testID: 'test-tier' }, 'Gold'),
+      homeBackground: React.createElement('View', { testID: 'test-background' }),
+      homeBackgroundAspectRatio: 538 / 315,
+    } : {}),
+  });
   const renderer = h.render(render());
   const text = () => renderer.root.findAllByType('Text').map((node) => node.props.children).flat().join(' ');
-  return { renderer, context, general, selected, render, text };
+  return { renderer, context, general, selected, render, text, dimensions: h.dimensions };
 }
+
+for (const width of [320, 360, 390, 430]) it(`Native season heading has intrinsic width at ${width}px and ignores a zero-width layout pass`, t => {
+  const h = setup({ visual: true, width });
+  t.after(() => act(() => h.renderer.unmount()));
+  const title = () => h.renderer.root.findByProps({ testID: 'home-account-title' });
+  const card = () => h.renderer.root.findByProps({ testID: TEST_IDS.home.accountContext });
+  const style = flatten(title().props.style);
+  // Native Yoga treats flex > 0 + auto basis as zero even with flexGrow: 0.
+  assert.equal((style.flex ?? 0) > 0, false);
+  assert.equal(style.flexShrink, 1);
+  assert.equal(title().props.numberOfLines, undefined);
+  act(() => title().props.onLayout({ nativeEvent: { layout: { width: 0, height: 243 } } }));
+  assert.equal(flatten(card().props.style).flexDirection, 'row');
+  act(() => title().props.onLayout({ nativeEvent: { layout: { width: 96, height: 27 } } }));
+  assert.equal(flatten(card().props.style).flexDirection, 'row');
+});
+
+it('a genuinely wrapped heading stacks only its content, keeps the caption with the emblem, and resets on a wider viewport', t => {
+  const h = setup({ visual: true });
+  t.after(() => act(() => h.renderer.unmount()));
+  const node = id => h.renderer.root.findByProps({ testID: id });
+  act(() => node(TEST_IDS.home.accountContext).props.onLayout({ nativeEvent: { layout: { width: 358 } } }));
+  act(() => node('home-account-title').props.onLayout({ nativeEvent: { layout: { width: 130, height: 81 } } }));
+  assert.equal(flatten(node(TEST_IDS.home.accountContext).props.style).flexDirection, 'column');
+  const visual = node('test-emblem').parent;
+  assert.equal(flatten(visual.props.style).minHeight, undefined, 'no second card-sized artwork area');
+  assert.equal(visual.findAllByProps({ testID: 'test-tier' }).length, 1);
+  assert.equal(flatten(node(TEST_IDS.home.accountContext).props.style).height, undefined);
+  h.dimensions.width = 430;
+  act(() => h.renderer.update(h.render()));
+  assert.equal(flatten(node(TEST_IDS.home.accountContext).props.style).flexDirection, 'row');
+});
+
+for (const fontScale of [1.5, 2]) it(`large fonts (${fontScale}) grow by content without a duplicate artwork minimum`, t => {
+  const h = setup({ visual: true, fontScale });
+  t.after(() => act(() => h.renderer.unmount()));
+  const node = id => h.renderer.root.findByProps({ testID: id });
+  act(() => node(TEST_IDS.home.accountContext).props.onLayout({ nativeEvent: { layout: { width: 358 } } }));
+  assert.equal(flatten(node(TEST_IDS.home.accountContext).props.style).flexDirection, 'column');
+  assert.equal(flatten(node('test-emblem').parent.props.style).minHeight, undefined);
+  assert.equal(node('home-account-title').props.allowFontScaling, undefined);
+  assert.equal(flatten(h.renderer.root.findByType('Pressable').props.style).minHeight, 44);
+});
 
 it('Home context is spacious, quiet and opens the existing account selection sheet', () => {
   const h = setup();

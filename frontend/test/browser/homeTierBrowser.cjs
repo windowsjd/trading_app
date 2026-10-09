@@ -45,7 +45,13 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
   };
   const inspectCard = async () => {
     const capture = await id('home-account-context').screenshot();
-    return id('home-account-context').evaluate(async (card, captureUrl) => {
+    // Capture the real underlay, including any text halo. Making glyph fill
+    // transparent leaves explicit text shadows and the original PNG intact.
+    const hideInk = await page.addStyleTag({ content: '[data-testid="home-account-context"] * { color: transparent !important; -webkit-text-fill-color: transparent !important; } [data-testid="home-account-context"] svg[stroke] { stroke: transparent !important; }' });
+    let underlay;
+    try { underlay = await id('home-account-context').screenshot(); }
+    finally { await hideInk.evaluate(element => element.remove()); }
+    return id('home-account-context').evaluate(async (card, { captureUrl, underlayUrl }) => {
     const box = card.getBoundingClientRect(); const clipped = [], overlaps = [], contrast = [];
     const rect = e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
     const emblem = card.querySelector('[data-testid^="home-emblem-"]') ?? card.querySelector('[data-testid="home-tier-neutral"]');
@@ -55,25 +61,19 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
     const maskCanvas = document.createElement('canvas'); maskCanvas.width = rendered.naturalWidth; maskCanvas.height = rendered.naturalHeight;
     const maskContext = maskCanvas.getContext('2d'); maskContext.drawImage(rendered, 0, 0);
     const maskPixels = maskContext.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
-    const solidBackground = luminance(getComputedStyle(card).backgroundColor);
+    const backgroundImage = new Image(); backgroundImage.src = underlayUrl; await backgroundImage.decode();
+    maskContext.clearRect(0, 0, maskCanvas.width, maskCanvas.height); maskContext.drawImage(backgroundImage, 0, 0);
+    const underlayPixels = maskContext.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
     const artwork = card.querySelector('[data-testid="home-tier-background-artwork"]');
     const backgroundBands = [...card.querySelectorAll('[data-testid^="home-tier-background-"] > svg')];
-    let pixels, sourceWidth, sourceHeight;
+    let sourceWidth, sourceHeight;
     if (artwork) {
       const source = new Image(); source.src = artwork.querySelector('image').getAttribute('href'); await source.decode();
-      const canvas = document.createElement('canvas'); canvas.width = source.naturalWidth; canvas.height = source.naturalHeight;
-      const ctx = canvas.getContext('2d'); ctx.drawImage(source, 0, 0);
-      pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data; sourceWidth = canvas.width; sourceHeight = canvas.height;
+      sourceWidth = source.naturalWidth; sourceHeight = source.naturalHeight;
     }
     const backgroundAt = (x, y) => {
-      if (!pixels) return solidBackground;
-      const band = backgroundBands.find(svg => { const r = svg.getBoundingClientRect(); return x >= r.left - .02 && x < r.right + .02 && y >= r.top - .02 && y < r.bottom + .02; });
-      if (!band) throw new Error('Text has no background band');
-      const r = band.getBoundingClientRect(), v = band.viewBox.baseVal;
-      const sx = Math.min(sourceWidth - 1, Math.max(0, Math.floor(v.x + (x - r.left) / r.width * v.width)));
-      const sy = Math.min(sourceHeight - 1, Math.max(0, Math.floor(v.y + (y - r.top) / r.height * v.height)));
-      const i = (sy * sourceWidth + sx) * 4;
-      return luminance(`rgb(${pixels[i]},${pixels[i + 1]},${pixels[i + 2]})`);
+      const i = (Math.floor(y - box.top) * maskCanvas.width + Math.floor(x - box.left)) * 4;
+      return luminance(`rgb(${underlayPixels[i]},${underlayPixels[i + 1]},${underlayPixels[i + 2]})`);
     };
     const contrastFor = (rects, color) => {
       const fg = luminance(color), rgb = color.match(/[\d.]+/g).slice(0, 3).map(Number);
@@ -81,9 +81,15 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
       for (const r of rects) for (let y = r.top; y < r.bottom; y += 1) for (let x = r.left; x < r.right; x += 1) {
         const ix = Math.floor(x - box.left), iy = Math.floor(y - box.top);
         const offset = (iy * maskCanvas.width + ix) * 4;
-        // Only opaque glyph/stroke cores from the actual screenshot. Empty
-        // line-box space and antialiased edges are not foreground pixels.
-        if (!rgb.every((v, channel) => Math.abs(v - maskPixels[offset + channel]) <= 3)) continue;
+        // Require actual glyph/stroke ink over the captured underlay. Regular
+        // 13px Korean text may have no fully opaque pixel with this host font;
+        // estimate >=50% ink coverage instead of mistaking it for missing text.
+        const delta = rgb.map((v, c) => v - underlayPixels[offset + c]);
+        const norm = delta.reduce((sum, v) => sum + v * v, 0);
+        const coverage = norm ? delta.reduce((sum, v, c) => sum + v *
+          (maskPixels[offset + c] - underlayPixels[offset + c]), 0) / norm : 0;
+        if (coverage < .5 || coverage > 1.05 || !rgb.every((v, c) => Math.abs(
+          underlayPixels[offset + c] + delta[c] * coverage - maskPixels[offset + c]) <= 5)) continue;
         const bg = backgroundAt(box.left + ix + .5, box.top + iy + .5); samples++;
         worst = Math.min(worst, (Math.max(fg, bg) + .05) / (Math.min(fg, bg) + .05));
       }
@@ -94,10 +100,17 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
     while (walk.nextNode()) {
       const t = walk.currentNode; if (!t.textContent.trim() || t.parentElement.closest('[aria-hidden="true"]')) continue;
       const range = document.createRange(); range.selectNodeContents(t);
-      for (const r of range.getClientRects()) {
-        if (r.left < box.left || r.right > box.right || r.top < box.top || r.bottom > box.bottom) clipped.push(t.textContent);
-        if (r.left < emblemBox.right && r.right > emblemBox.left && r.top < emblemBox.bottom && r.bottom > emblemBox.top) overlaps.push(t.textContent);
+      // CSS pre-wrap can hang a trailing SPACE beyond the line box. Measure
+      // every visible word, including all Korean glyphs, rather than that inkless
+      // space (430px/1.5x long neutral title had a 0.78px false overflow).
+      for (const word of t.textContent.matchAll(/\S+/gu)) {
+        range.setStart(t, word.index); range.setEnd(t, word.index + word[0].length);
+        for (const r of range.getClientRects()) {
+          if (r.left < box.left || r.right > box.right || r.top < box.top || r.bottom > box.bottom) clipped.push(word[0]);
+          if (r.left < emblemBox.right && r.right > emblemBox.left && r.top < emblemBox.bottom && r.bottom > emblemBox.top) overlaps.push(word[0]);
+        }
       }
+      range.selectNodeContents(t);
       const style = getComputedStyle(t.parentElement);
       const large = parseFloat(style.fontSize) >= 24 || (parseFloat(style.fontSize) >= 18.66 && Number(style.fontWeight) >= 700);
       contrast.push({ text: t.textContent, ratio: contrastFor([...range.getClientRects()], style.color), required: large ? 3 : 4.5 });
@@ -122,7 +135,9 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
       image = { sx, sy, fit: getComputedStyle(imageView.firstElementChild).backgroundSize,
         equivalentSize: Math.sqrt(alphaArea) * renderedScale,
         visibleWidth: (bounds[2] - bounds[0]) * renderedScale,
-        visibleHeight: (bounds[3] - bounds[1]) * renderedScale };
+        visibleHeight: (bounds[3] - bounds[1]) * renderedScale,
+        left: view.x + bounds[0] * renderedScale, top: view.y + bounds[1] * renderedScale,
+        right: view.x + bounds[2] * renderedScale, bottom: view.y + bounds[3] * renderedScale };
     }
     const typography = selector => { const e = card.querySelector(selector), c = getComputedStyle(e); return { ...rect(e), size: parseFloat(c.fontSize), weight: Number(c.fontWeight) }; };
     const button = card.querySelector('[role="button"]');
@@ -130,7 +145,7 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
     const background = artwork ? { sourceWidth, sourceHeight, borderWidth: getComputedStyle(card).borderWidth,
       bands: backgroundBands.map(svg => ({ ...rect(svg), viewBox: svg.getAttribute('viewBox') })) } : null;
     return { image, background, iconContrast: contrastFor([icon.getBoundingClientRect()], getComputedStyle(icon).stroke), title: typography('[data-testid="home-account-title"]'), nickname: typography('[data-testid="home-nickname"]'), card: rect(card), emblem: rect(emblem), button: rect(button), clipped, overlaps, contrast, text: card.textContent, label: button.getAttribute('aria-label') };
-    }, `data:image/png;base64,${capture.toString('base64')}`);
+    }, { captureUrl: `data:image/png;base64,${capture.toString('base64')}`, underlayUrl: `data:image/png;base64,${underlay.toString('base64')}` });
   };
   try {
     for (const appearance of ['light', 'dark']) for (const width of (quick ? [390] : [320, 360, 390, 430, 768, 1280])) for (const fontScale of (quick ? [1] : [1, 1.5, 2])) for (const long of (quick ? [false] : [false, true])) for (const [tier, name] of Object.entries(tiers)) {
@@ -164,6 +179,8 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
         if (tier === 'null') assert.equal(await id('home-tier-image').count(), 0);
         else assert.equal(await id(`home-emblem-${tier === 'master' ? 'whale' : tier}`).count(), 1);
         if (layout.image) {
+          assert.ok(layout.image.left >= layout.card.x && layout.image.right <= layout.card.right &&
+            layout.image.top >= layout.card.y && layout.image.bottom <= layout.card.bottom, 'the complete visible emblem stays inside the card');
           assert.ok(Math.abs(layout.image.sx / layout.image.sy - 1) < .0002, 'uniform image scaling at the raster layout precision');
           assert.equal(layout.image.fit, 'contain');
           const index = Object.keys(tiers).indexOf(tier);
@@ -176,6 +193,7 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
           assert.ok(layout.emblem.y < layout.title.bottom, 'emblem uses the top title band');
         }
         if (width === 390 && fontScale === 1 && !long) {
+          assert.ok(layout.card.height <= 235, 'normal cards stay compact without reducing emblems');
           assert.ok(layout.button.y < layout.title.bottom && layout.button.bottom > layout.title.y, 'Season 1 and the 44px change button share one row for every tier');
           await id('home-account-context').screenshot({ path: path.join(out, `${tier}-${appearance}.png`) });
           if (tier === 'master') await page.screenshot({ path: path.join(out, `home-whale-${appearance}.png`) });
@@ -191,6 +209,7 @@ const tiers = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold', platinum: 'Pla
       }
     }
     fs.writeFileSync(path.join(out, 'layout-failures.json'), JSON.stringify(failures, null, 2));
+    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ records, errors, failures }, null, 2));
     assert.deepEqual(failures, [], 'every layout must pass');
     for (const state of ['ranking-loading', 'ranking-error', 'ranking-unavailable', 'unranked']) {
       await resetPage();

@@ -1,0 +1,306 @@
+[
+  {
+    "width": 320,
+    "tier": "gold",
+    "card": {
+      "x": 16,
+      "y": 0,
+      "right": 304,
+      "bottom": 990.359375,
+      "width": 288,
+      "height": 990.359375
+    },
+    "title": {
+      "x": 24,
+      "y": 14,
+      "right": 296,
+      "bottom": 176,
+      "width": 272,
+      "height": 162,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 89.203125,
+      "y": 776,
+      "right": 230.78125,
+      "bottom": 914.359375,
+      "width": 141.578125,
+      "height": 138.359375
+    },
+    "button": {
+      "x": 24,
+      "y": 178,
+      "right": 68,
+      "bottom": 222,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 320,
+    "tier": "master",
+    "card": {
+      "x": 16,
+      "y": 0,
+      "right": 304,
+      "bottom": 1004.796875,
+      "width": 288,
+      "height": 1004.796875
+    },
+    "title": {
+      "x": 24,
+      "y": 25.265625,
+      "right": 296,
+      "bottom": 187.265625,
+      "width": 272,
+      "height": 162,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 80.96875,
+      "y": 787.265625,
+      "right": 239.015625,
+      "bottom": 928.40625,
+      "width": 158.046875,
+      "height": 141.140625
+    },
+    "button": {
+      "x": 24,
+      "y": 189.265625,
+      "right": 68,
+      "bottom": 233.265625,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 360,
+    "tier": "gold",
+    "card": {
+      "x": 16,
+      "y": 0,
+      "right": 344,
+      "bottom": 903.71875,
+      "width": 328,
+      "height": 903.71875
+    },
+    "title": {
+      "x": 24,
+      "y": 14,
+      "right": 336,
+      "bottom": 176,
+      "width": 312,
+      "height": 162,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 94.1875,
+      "y": 660,
+      "right": 265.8125,
+      "bottom": 827.71875,
+      "width": 171.625,
+      "height": 167.71875
+    },
+    "button": {
+      "x": 24,
+      "y": 178,
+      "right": 68,
+      "bottom": 222,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 360,
+    "tier": "master",
+    "card": {
+      "x": 16,
+      "y": 0,
+      "right": 344,
+      "bottom": 923.15625,
+      "width": 328,
+      "height": 923.15625
+    },
+    "title": {
+      "x": 24,
+      "y": 27.671875,
+      "right": 336,
+      "bottom": 189.671875,
+      "width": 312,
+      "height": 162,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 84.21875,
+      "y": 673.671875,
+      "right": 275.78125,
+      "bottom": 844.765625,
+      "width": 191.5625,
+      "height": 171.09375
+    },
+    "button": {
+      "x": 24,
+      "y": 191.671875,
+      "right": 68,
+      "bottom": 235.671875,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 390,
+    "tier": "gold",
+    "card": {
+      "x": 16,
+      "y": 0,
+      "right": 374,
+      "bottom": 904.03125,
+      "width": 358,
+      "height": 904.03125
+    },
+    "title": {
+      "x": 24,
+      "y": 14,
+      "right": 366,
+      "bottom": 176,
+      "width": 342,
+      "height": 162,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 109.1875,
+      "y": 660,
+      "right": 280.8125,
+      "bottom": 827.71875,
+      "width": 171.625,
+      "height": 167.71875
+    },
+    "button": {
+      "x": 24,
+      "y": 178,
+      "right": 68,
+      "bottom": 222,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 390,
+    "tier": "master",
+    "card": {
+      "x": 16,
+      "y": 0,
+      "right": 374,
+      "bottom": 926.453125,
+      "width": 358,
+      "height": 926.453125
+    },
+    "title": {
+      "x": 24,
+      "y": 29.46875,
+      "right": 366,
+      "bottom": 191.46875,
+      "width": 342,
+      "height": 162,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 99.21875,
+      "y": 675.46875,
+      "right": 290.78125,
+      "bottom": 846.5625,
+      "width": 191.5625,
+      "height": 171.09375
+    },
+    "button": {
+      "x": 24,
+      "y": 193.46875,
+      "right": 68,
+      "bottom": 237.46875,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 430,
+    "tier": "gold",
+    "card": {
+      "x": 16,
+      "y": 16,
+      "right": 414,
+      "bottom": 811.625,
+      "width": 398,
+      "height": 795.625
+    },
+    "title": {
+      "x": 24,
+      "y": 30,
+      "right": 406,
+      "bottom": 138,
+      "width": 382,
+      "height": 108,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 129.1875,
+      "y": 566,
+      "right": 300.8125,
+      "bottom": 733.71875,
+      "width": 171.625,
+      "height": 167.71875
+    },
+    "button": {
+      "x": 24,
+      "y": 140,
+      "right": 68,
+      "bottom": 184,
+      "width": 44,
+      "height": 44
+    }
+  },
+  {
+    "width": 430,
+    "tier": "master",
+    "card": {
+      "x": 16,
+      "y": 16,
+      "right": 414,
+      "bottom": 836.859375,
+      "width": 398,
+      "height": 820.859375
+    },
+    "title": {
+      "x": 24,
+      "y": 47.875,
+      "right": 406,
+      "bottom": 155.875,
+      "width": 382,
+      "height": 108,
+      "size": 38,
+      "weight": 800
+    },
+    "emblem": {
+      "x": 119.21875,
+      "y": 583.875,
+      "right": 310.78125,
+      "bottom": 754.96875,
+      "width": 191.5625,
+      "height": 171.09375
+    },
+    "button": {
+      "x": 24,
+      "y": 157.875,
+      "right": 68,
+      "bottom": 201.875,
+      "width": 44,
+      "height": 44
+    }
+  }
+]

@@ -10,6 +10,39 @@
 
 ---
 
+## 2026-10-09 홈 시즌 티어 Native 레이아웃 수정·최종 PNG 교체
+
+- **기능 구현 의도:** Android에서 시즌 티어 카드가 비정상적으로 세로 확장되는 문제를
+  해결해 기존의 컴팩트한 정보 구조를 복구하고, 사용자가 제공한 최종 배경과 앰블럼
+  디자인을 원본 비율과 시각적 정체성을 유지하면서 적용한다.
+- 원인: 시즌 제목이 상속한 `flex: 1`과 `flexGrow: 0`/`flexBasis: auto` 조합을
+  Native Yoga는 zero basis로 해석한다. 제어된 96×27dp Text measure에서 제목 0×216,
+  행 216px를 재현했고 수정 후 96×27, 행 44px를 확인했다. Web 기본값에서는 이전도
+  정상이라 Web 통과가 Native 증상의 반증이 아니었다. 실기기 원인 확정은 별도 확인 필요.
+- 시즌 제목의 flex 상속과 세로 앰블럼 영역의 중복 배경 높이를 제거했다. 긴 문구/확대
+  글꼴은 정보→앰블럼/티어명 순서로 자연스럽게 자란다. 390px 짧은 제목에서는 기존
+  가로 배치를 유지하고 카드 358×223~230px, 버튼 44×44px이다. 고정 높이/글자 잘림 없음.
+- 배경 12개와 개미 PNG 5개를 새 제공본 그대로 적용했다. Diamond는 사용자가 선택한
+  별도 `Diamond_Depth_Legs.png`; Whale PNG/metadata는 HEAD와 동일하다. 변경본이 기존과
+  같은 Diamond/Whale 배경 4개는 Git binary diff가 없다. manifest/preparation은 실제
+  PNG에 맞췄고, 원본 여백을 표시 좌표로 처리해 기존 슬롯/가시 면적/optical scale을 유지했다.
+  재생성/리샘플/원형 보정 없음. 계정·시즌·랭킹·API 정책 불변.
+- 밝은 패싯 위의 흰 글씨에는 작은 어두운 그림자, 변경 아이콘에는 얇은 외곽선을 적용했다.
+  배경 PNG/금속 테두리 자체는 수정하지 않았다. 실제 캡처 underlay로 대비를 검증한다.
+- 필수 accounts lint·typecheck PASS. 관련 Home/AccountSwitcher/tradingAccount 490 tests
+  PASS, Native Yoga 12 조건 PASS. Web 588 records PASS, JavaScript 오류 0.
+- 최종 전체 `npm run check` **PASS: 2,044 tests, fail/cancel/skip 0**, accounts/guides
+  lint와 typecheck 포함. 첫 실행은 180초 제한 종료와 별도 Futures assertion 1건이
+  있었으나 단독 58/58 및 충분한 제한 시간의 전체 최종 재실행은 통과했다.
+  관련 없는 Futures 코드/테스트는 수정하지 않았다.
+- Web 및 Android Metro/Hermes export PASS; 출력물에 티어 PNG 18개 원본 바이트 일치 확인.
+- **Android/iOS 실기기·에뮬레이터 NOT_RUN.** Yoga는 제어된 Text measure를 쓴 엔진 재현이며
+  Native 폰트/SVG/그림자/터치의 실기기 검증을 대체하지 않는다. 캡처는 실제 Web 렌더다.
+- [원인·수정·매핑·전후 치수·검증·캡처](frontend/docs/home-tier-card-android-2026-10-09.md),
+  [검증 요약](frontend/docs/artifacts/home-tier-card-android-2026-10-09/verification.json).
+  전체 production/diff/에셋 보존/테스트 실패 출력 경로를 자체 검토했다.
+  시작 HEAD `017c221a`; 기존 backend/CI 변경 보존. 커밋·push·배포 없음.
+
 ## 2026-10-09 홈 시즌 티어 최종 배경·앰블럼·계정 변경 배치
 
 - **기능 구현 의도:** 완성 패싯 배경과 금속 테두리로 시즌 등급의 시각적 정체성과

@@ -47,6 +47,11 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
     ? rankingQuery.data.myRanking : null;
   const tier = hasSeason ? getHomeTier(getRankingTier(myRanking, rankType), mode) : null;
   const background = tier ? TIER_BACKGROUNDS[tier.id][mode] : null;
+  // Light foregrounds can cross bright facets when names/fonts wrap. A small
+  // halo keeps the original artwork visible without reserving empty image rows.
+  const foreground = tier ? { color: tier.palette.color, ...(mode === 'dark' || tier.id === 'whale' ? {
+    textShadowColor: '#001124', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 3,
+  } : {}) } : undefined;
   const emblemSize = width < 360 ? 132 : 160;
   const rank = myRanking && Number.isFinite(myRanking.rank) && myRanking.rank > 0 ? `#${myRanking.rank}` : '-';
   const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패' : '티어 미정');
@@ -54,11 +59,12 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
     !loading && !!seasonId && !myRanking ? '아직 표시할 랭킹 정보가 없습니다.' : null;
   return (
     <AccountSwitcher home homeCardStyle={tier ? { backgroundColor: tier.palette.backgroundColor,
-      ...(tier.id === 'whale' ? { paddingTop: '8%' as const } : {}) } : undefined}
+      ...(tier.id === 'whale' ? { paddingTop: 8 } : {}) } : undefined}
       homeBackground={tier ? <TierCardBackground key={`${tier.id}-${mode}`} tier={tier.id} mode={mode} /> : undefined}
       homeBackgroundAspectRatio={background ? background.width / background.height : undefined}
       homeBackgroundCornerRatio={tier?.id === 'whale' ? 0.05 : 0.04}
-      homeForegroundColor={tier?.palette.color}
+      homeHeadingTopRatio={tier?.id === 'whale' ? 0.06 : 0}
+      homeForegroundStyle={foreground}
       homeVisual={hasSeason ? <View style={styles.tier}>
         {tier ? <TierEmblem tier={tier.id} size={emblemSize} /> :
           <View testID="home-tier-neutral" style={[styles.neutral, { width: emblemSize, height: emblemSize }]}
@@ -67,17 +73,17 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
           </View>}
       </View> : undefined}
       homeVisualCaption={hasSeason ? <Text testID={TEST_IDS.home.tier}
-        style={[styles.tierName, tier && { color: tier.palette.color }]}
+        style={[styles.tierName, foreground]}
         accessibilityLiveRegion="polite">{tierLabel}</Text> : undefined}>
       <View style={styles.userDetails}>
         <View style={styles.identity}>
           {meQuery.isLoading ? <SectionSkeleton lines={1} /> : meQuery.data ? <>
             <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
             <Text testID={TEST_IDS.home.nickname} style={[styles.nickname, hasSeason && styles.seasonNickname,
-              tier && { color: tier.palette.color }]}>{meQuery.data.nickname}</Text>
+              foreground]}>{meQuery.data.nickname}</Text>
           </> : <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />}
         </View>
-        {hasSeason ? <Text testID={TEST_IDS.home.rank} style={[styles.rank, tier && { color: tier.palette.color }]}
+        {hasSeason ? <Text testID={TEST_IDS.home.rank} style={[styles.rank, foreground]}
           accessibilityLabel={`${rankType === 'final' ? '최종' : '현재'} 순위 ${rank === '-' ? '확인 중 또는 정보 없음' : rank}`}>
           {loading ? '—' : rank}
         </Text> : null}

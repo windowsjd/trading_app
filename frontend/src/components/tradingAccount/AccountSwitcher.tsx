@@ -12,6 +12,7 @@ import {
   View,
   type StyleProp,
   type ViewStyle,
+  type TextStyle,
 } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
@@ -65,7 +66,9 @@ type Props = {
   homeBackground?: React.ReactNode;
   homeBackgroundAspectRatio?: number;
   homeBackgroundCornerRatio?: number;
-  homeForegroundColor?: string;
+  /** Keep text below a bright top facet without adding padding above the emblem. */
+  homeHeadingTopRatio?: number;
+  homeForegroundStyle?: TextStyle;
   /** Optional Home illustration shares the title/profile column's vertical space. */
   homeVisual?: React.ReactNode;
   homeVisualCaption?: React.ReactNode;
@@ -73,7 +76,7 @@ type Props = {
 };
 
 export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, homeBackground,
-  homeBackgroundAspectRatio, homeBackgroundCornerRatio = 0.04, homeForegroundColor, homeVisual, homeVisualCaption, children }: Props) {
+  homeBackgroundAspectRatio, homeBackgroundCornerRatio = 0.04, homeHeadingTopRatio = 0, homeForegroundStyle, homeVisual, homeVisualCaption, children }: Props) {
   const { colors } = useAppearance();
   const {
     accounts,
@@ -165,9 +168,8 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
   const headingLayoutKey = `${selectedAccount.id}/${display.title}/${width}/${fontScale}`;
   // Latch a long/wrapped heading for this title/viewport: measuring it in the
   // wider stacked column must not alternate between the two layouts.
-  const stackHomeVisual = fontScale > 1.3 || (hasHomeBackground && wrappedHeading === headingLayoutKey);
-  const artworkFirst = hasHomeBackground && stackHomeVisual;
-  const foreground = hasHomeBackground && homeForegroundColor ? { color: homeForegroundColor } : undefined;
+  const stackHomeVisual = fontScale > 1.3 || (hasHomeVisual && wrappedHeading === headingLayoutKey);
+  const foreground = hasHomeBackground ? homeForegroundStyle : undefined;
 
   return (
     <>
@@ -182,19 +184,15 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
           onLayout={({ nativeEvent }) => setHomeWidth(nativeEvent.layout.width)}
           testID={TEST_IDS.home.accountContext}>
           {hasHomeBackground ? homeBackground : null}
-          {artworkFirst ? <View style={[styles.homeArtworkVisual,
-            { minHeight: homeBackgroundAspectRatio ? homeWidth / homeBackgroundAspectRatio : undefined }]}>
-            {homeVisual}
-          </View> : null}
-          {artworkFirst ? homeVisualCaption : null}
           <View style={[styles.homeInfo, hasHomeVisual && !stackHomeVisual && styles.homeSeasonInfo]}>
-            <View style={[styles.homeHeading, hasHomeVisual && styles.homeSeasonHeading]}>
+            <View style={[styles.homeHeading, hasHomeVisual && styles.homeSeasonHeading,
+              hasHomeBackground && { paddingTop: homeWidth * homeHeadingTopRatio }]}>
               <View style={[styles.homeContextRow, hasHomeVisual && styles.homeSeasonRow]}>
                 <Text key={`${hasHomeBackground}/${headingLayoutKey}`} testID="home-account-title"
-                  style={[styles.homeTitle, selectedAccount.mode === 'season' && styles.homeSeasonTitle, foreground]}
+                  style={[selectedAccount.mode === 'season' ? styles.homeSeasonTitle : styles.homeTitle, foreground]}
                   onLayout={({ nativeEvent }) => {
-                    if (hasHomeBackground && !stackHomeVisual && (nativeEvent.layout.height > 27 * fontScale * 1.5 ||
-                      nativeEvent.layout.width > 180 * fontScale)) {
+                    if (hasHomeVisual && !stackHomeVisual && nativeEvent.layout.width > 0 &&
+                      nativeEvent.layout.height > 27 * fontScale * 1.5) {
                       setWrappedHeading(headingLayoutKey);
                     }
                   }}>{display.title}</Text>
@@ -208,6 +206,8 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
                   <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
                     <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={foreground?.color ?? colors.secondary}
                       strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+                      {foreground?.textShadowColor ? <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"
+                        stroke={foreground.textShadowColor} strokeWidth={4} /> : null}
                       <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
                     </Svg>
                   </View>
@@ -228,7 +228,7 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
             </View>
             {children}
           </View>
-          {hasHomeVisual && !artworkFirst ? <View style={styles.homeIllustration}>
+          {hasHomeVisual ? <View style={styles.homeIllustration}>
             {homeVisual}{homeVisualCaption}
           </View> : null}
         </View>
@@ -426,9 +426,8 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  homeSeasonContext: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 14, gap: 4 },
-  homeStacked: { flexDirection: 'column', gap: 16 },
-  homeArtworkVisual: { alignItems: 'center', justifyContent: 'center' },
+  homeSeasonContext: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 14, gap: 1 },
+  homeStacked: { flexDirection: 'column', justifyContent: 'space-between', gap: 16 },
   homeIllustration: { alignItems: 'center', gap: 4, flexShrink: 0, maxWidth: '100%' },
   homeInfo: { minWidth: 0, gap: 16 },
   homeSeasonInfo: { flex: 1, justifyContent: 'space-between', gap: 12 },
@@ -436,7 +435,10 @@ const styles = StyleSheet.create({
   homeSeasonHeading: { gap: 8 },
   homeSeasonRow: { gap: 2, flexWrap: 'wrap' },
   homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
-  homeSeasonTitle: { flexGrow: 0, flexShrink: 1, flexBasis: 'auto', fontSize: 19, lineHeight: 27, fontWeight: '800' },
+  // Do not inherit homeTitle's flex: 1. Native Yoga resolves a positive flex
+  // shorthand + flexBasis: auto to a zero basis even with flexGrow: 0, hiding
+  // the title and measuring a tall line box that then latches stacked layout.
+  homeSeasonTitle: { minWidth: 0, maxWidth: '100%', flexGrow: 0, flexShrink: 1, flexBasis: 'auto', fontSize: 19, lineHeight: 27, fontWeight: '800' },
   homeChange: {
     flexShrink: 0,
     minWidth: 44,

@@ -1,0 +1,161 @@
+{
+  "date": "2026-10-09",
+  "baseHead": "017c221ac5f29c22856d7a56877abdd697b7ad45",
+  "environment": {
+    "node": "v24.14.1",
+    "reactNative": "0.83.6",
+    "browser": "Playwright Chromium 1243 on WSL",
+    "fonts": "local fontconfig with Korean fonts",
+    "fontScale": "existing RN Web adapter simulation",
+    "network": "fixture HTTP/navigation; external requests blocked"
+  },
+  "native": {
+    "androidDevice": "NOT_RUN; no accessible adb/SDK/emulator",
+    "iosDevice": "NOT_RUN",
+    "yoga": {
+      "status": "PASS",
+      "version": "3.2.1",
+      "scenarios": 12,
+      "textMeasurement": "controlled 96x27dp; not OS font metrics",
+      "details": "yoga.json"
+    },
+    "androidHermesBundle": "PASS; all 18 tier PNG contents verified"
+  },
+  "assets": {
+    "details": "assets.json",
+    "suppliedPngsVerbatim": 17,
+    "whalePngAndMetadataUnchanged": true,
+    "displaySlotsAndAreaTargetsUnchanged": true,
+    "diamondSource": "Diamond_Depth_Legs.png",
+    "webAndAndroidExportedTierPngs": 18
+  },
+  "checks": {
+    "accountsLint": "PASS",
+    "guidesLint": "PASS",
+    "typecheck": "PASS",
+    "full": {
+      "command": "npm run check",
+      "tests": 2044,
+      "suites": 203,
+      "pass": 2044,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "related": {
+      "tests": 490,
+      "pass": 490,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "webExport": "PASS",
+    "androidExport": "PASS"
+  },
+  "earlierCheckAttempt": {
+    "deadlineSeconds": 180,
+    "pass": 1870,
+    "fail": 1,
+    "cancelled": 16,
+    "failure": "FuturesLimitEntry: Limit A/short/isolated/1 expected request count 1, got 0",
+    "isolatedRerun": "58/58 PASS",
+    "resolution": "No unrelated edits; full final run under 600s limit passed 2044/2044"
+  },
+  "web": {
+    "status": "PASS",
+    "records": 588,
+    "layoutRecords": 504,
+    "errors": [],
+    "widths": [
+      320,
+      360,
+      390,
+      430,
+      768,
+      1280
+    ],
+    "fontScales": [
+      1,
+      1.5,
+      2
+    ],
+    "appearances": [
+      "light",
+      "dark"
+    ],
+    "layoutDetails": "web-layouts.json",
+    "statesAndSwitches": [
+      {
+        "state": "ranking-loading"
+      },
+      {
+        "state": "ranking-error"
+      },
+      {
+        "state": "ranking-unavailable"
+      },
+      {
+        "state": "unranked"
+      },
+      {
+        "scenario": "active-past-general-active",
+        "calls": [
+          "/ranking?scope=all&seasonId=season-1&limit=1&offset=0&rankType=daily",
+          "/ranking?scope=all&seasonId=past-season&limit=1&offset=0&rankType=final"
+        ]
+      },
+      {
+        "scenario": "live-appearance",
+        "tier": "bronze"
+      },
+      {
+        "scenario": "live-appearance",
+        "tier": "silver"
+      },
+      {
+        "scenario": "live-appearance",
+        "tier": "gold"
+      },
+      {
+        "scenario": "live-appearance",
+        "tier": "platinum"
+      },
+      {
+        "scenario": "live-appearance",
+        "tier": "diamond"
+      },
+      {
+        "scenario": "live-appearance",
+        "tier": "master"
+      },
+      {
+        "scenario": "late-ranking-past-general"
+      }
+    ],
+    "statusCopyCount": 72,
+    "normal390Heights": {
+      "bronze": 224.796875,
+      "silver": 224.453125,
+      "gold": 229.03125,
+      "platinum": 229.03125,
+      "diamond": 222.75,
+      "master": 229.984375,
+      "null": 223
+    }
+  },
+  "review": {
+    "allProductionFilesReviewed": true,
+    "completeTaskDiffReviewed": true,
+    "largeObjectAssertionRiskReviewed": true,
+    "domainAndApiChanges": false,
+    "committedPushedOrDeployed": false,
+    "remaining": "Actual Android/iOS fontScale, text/SVG/shadow rendering, touch and device screenshots"
+  },
+  "sourceSha256": {
+    "frontend/src/components/tradingAccount/AccountSwitcher.tsx": "72dc3024ede27a599a77bffb1cb2e3497124206fabbec235b69c95f36a8e499e",
+    "frontend/src/screens/home/HomeAccountContext.tsx": "b322668fee42a3c6cb27e6fcc272f05d46663a74b727125e08871dec16c3f9a2",
+    "frontend/src/screens/home/TierEmblem.tsx": "ea3504e5cebaa3d3ca3f24c36e34cc374abc7f682e9ef445a9d46938ecaf1c99",
+    "frontend/src/assets/home-tiers/preparation.json": "1898c7a6f96726a77ce77d500c70272004b74898cc152b6182ad9f7999f33b55",
+    "frontend/src/assets/home-tier-backgrounds/manifest.json": "e1120d6594747180e675434d4f7d9dc894e414052628a387fd68bd977723d9d6"
+  }
+}

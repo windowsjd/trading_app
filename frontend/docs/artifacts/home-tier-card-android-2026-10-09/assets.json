@@ -1,0 +1,91 @@
+{
+  "files": [
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/01_Bronze_Light.png",
+      "supplied": "01_Bronze_Light.png",
+      "sha256": "917a44e66a6e9300cea09e5b45b30f1f4b5ab3b1666c41850197d1a32bf5fcc6"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/01_Bronze_Dark.png",
+      "supplied": "01_Bronze_Dark.png",
+      "sha256": "8019f8318c57b574fc336f36c50829df37cb508b5cd2e4d2f18fb3816c4ba85f"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/02_Silver_Light.png",
+      "supplied": "02_Silver_Light.png",
+      "sha256": "6d7c1db9b70c1af632388ae575b9f69f17074a6c85ff2c26205c23ba6a7b1aa6"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/02_Silver_Dark.png",
+      "supplied": "02_Silver_Dark.png",
+      "sha256": "0b36a1a1b2fb986d38933cdf67bb7404a029b2ee3275841153962a7468273c83"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/03_Gold_Light.png",
+      "supplied": "03_Gold_Light.png",
+      "sha256": "384eafdc5c31252f09590eacbe2ffbab6248b865f446336bb5737455d2f69deb"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/03_Gold_Dark.png",
+      "supplied": "03_Gold_Dark.png",
+      "sha256": "2d7dc0a931a36b1c53e97cc0cbc1aceef9aba8a665d31dcfa5b8feb5a5af84ca"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/04_Platinum_Light.png",
+      "supplied": "04_Platinum_Light.png",
+      "sha256": "b8c4a93444951878a97f8ab7ab37d0effc721fc0c6650ea25264cb08c82f3eed"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/04_Platinum_Dark.png",
+      "supplied": "04_Platinum_Dark.png",
+      "sha256": "3a0d1bd55f1a35821456ce6393c34bd5f2f2d51ab24537f26531bba9a2674103"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/05_Diamond_Light.png",
+      "supplied": "05_Diamond_Light.png",
+      "sha256": "24963bb30f127a2833a1f3b3ad24cc383f870c3c163bbd0e7ec5339b72259774"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/05_Diamond_Dark.png",
+      "supplied": "05_Diamond_Dark.png",
+      "sha256": "35bcc76982032ec47fb3f3dcc27223df5b132665238910b9f3f8eb93b2957908"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/06_Whale_Light.png",
+      "supplied": "06_Whale_Light.png",
+      "sha256": "36e3de2b6b5b0a92a6533728bfe31dbdd06423a7b335cc901e0a76ab5d92c5f8"
+    },
+    {
+      "asset": "frontend/src/assets/home-tier-backgrounds/06_Whale_Dark.png",
+      "supplied": "06_Whale_Dark.png",
+      "sha256": "2dd68cb7c6c0449293569525b4ee7f3bbb3c935cd259f2f2fe124ba84a1d97b6"
+    },
+    {
+      "asset": "frontend/src/assets/home-tiers/bronze.png",
+      "supplied": "Bronze_Balanced_Legs.png",
+      "sha256": "8cd73500e378501573ebf4f476bdaf90f332fd460d3fefc8025c7703d0a835bd"
+    },
+    {
+      "asset": "frontend/src/assets/home-tiers/silver.png",
+      "supplied": "Silver_Balanced_Legs.png",
+      "sha256": "ebb1e353bf74b40e06299f15b7f1bacd26a4ef9e163a8b8b6d19dec1d78ca6a8"
+    },
+    {
+      "asset": "frontend/src/assets/home-tiers/gold.png",
+      "supplied": "Gold_Balanced_Legs.png",
+      "sha256": "3180988727792c49ab579e612d82b4142d8658721676cc7715953d17a768acdb"
+    },
+    {
+      "asset": "frontend/src/assets/home-tiers/platinum.png",
+      "supplied": "Platinum_Balanced_Legs.png",
+      "sha256": "0a577db99c98ebbaf3ad4943e6efaec9fdf2f4d69cfce6596c885846aad7ba51"
+    },
+    {
+      "asset": "frontend/src/assets/home-tiers/diamond.png",
+      "supplied": "Diamond_Depth_Legs.png",
+      "sha256": "da98d41eddd602fbadceb52d55cd8998d33f4bf8bc1d0c1e70e136c2565c26bc"
+    }
+  ],
+  "whalePngAndMetadataUnchanged": true,
+  "allDisplaySlotsAndEquivalentSizesUnchanged": true
+}
