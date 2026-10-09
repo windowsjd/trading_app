@@ -370,7 +370,7 @@ export function OrderForm({
           setDiagnosticError(null);
           setDiagnosticRuntime(null);
         } else {
-          setDiagnosticRuntime(requestFailureFacts(null, { endpoint: 'POST /api/v1/trading-accounts/:accountId/orders', operation: 'order_create', contractFailure: true, outcome: 'unknown' }));
+          setDiagnosticRuntime(requestFailureFacts(null, { endpoint: 'POST /api/v1/trading-accounts/:accountId/orders', operation: 'order_create', contractFailure: true, contractInvestigation: 'frontend/src/features/order/mapper.ts', outcome: 'unknown' }));
           setDomainError(
             '주문 결과를 확인할 수 없습니다. 주문 내역을 확인해주세요.',
           );
@@ -389,6 +389,7 @@ export function OrderForm({
       setDiagnosticRuntime(requestFailureFacts(error, {
         endpoint: executeAttempted ? 'POST /api/v1/trading-accounts/:accountId/orders' : 'POST /api/v1/trading-accounts/:accountId/orders/quote',
         operation: executeAttempted ? 'order_create' : 'order_quote', contractFailure,
+        contractInvestigation: error instanceof OrderQuoteValidationError ? 'frontend/src/features/order/validateOrderQuote.ts' : undefined,
         outcome: uncertain ? 'unknown' : executeAttempted ? undefined : 'not_submitted',
       }));
       const code = getApiErrorCode(error);

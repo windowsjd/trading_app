@@ -1,0 +1,264 @@
+{
+  "initialHead": "7f6c0a2c25feadfacf0f266e5a9e7a738b8beb95",
+  "branch": "main",
+  "originMain": "7f6c0a2c25feadfacf0f266e5a9e7a738b8beb95",
+  "remoteLsRemoteVerified": true,
+  "initialWorkingTree": "clean",
+  "commitPushMerge": false,
+  "productionFiles": [
+    "frontend/src/components/states/AdminDiagnosticPanel.tsx",
+    "frontend/src/screens/order/OrderPanel.tsx",
+    "frontend/src/screens/wallet/WalletTransferScreen.tsx",
+    "frontend/src/services/api/errorMapper.ts"
+  ],
+  "financialLogicChanged": false,
+  "schemaMigrationChanged": false,
+  "newDependencies": false,
+  "resourceLimits": {
+    "memoryMaxBytes": 2147483648,
+    "swapMaxBytes": 0,
+    "tasksMax": 192,
+    "runtimeMaxSeconds": "45–240",
+    "killMode": "control-group",
+    "coreLimit": 0,
+    "coredumpFilter": 0,
+    "nodeHeapMiB": {
+      "frontend": 768,
+      "backend": 1536
+    },
+    "wrapper": "/tmp/admin-diag-qa/bounded.sh"
+  },
+  "localRuns": [
+    {
+      "name": "backend-common",
+      "cwd": "backend",
+      "commands": [
+        "npm test -- --runInBand --runTestsByPath src/common/admin-diagnostics.spec.ts"
+      ],
+      "result": "PASS",
+      "tests": 32,
+      "elapsedSeconds": 1.161,
+      "timingSource": "systemd runtime; wall clock adjusted",
+      "cgroupMemoryPeakBytes": 203657216,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/backend-common.log"
+    },
+    {
+      "name": "backend-p1",
+      "cwd": "backend",
+      "commands": [
+        "npm test -- --runInBand --runTestsByPath src/positions/positions.service.spec.ts src/records/records.service.spec.ts src/fx/fx.service.spec.ts src/wallets/trading-account-wallet-transfer.service.spec.ts src/assets/candle-serving.service.spec.ts"
+      ],
+      "result": "PASS",
+      "tests": 235,
+      "elapsedSeconds": 2.036,
+      "timingSource": "systemd runtime; wall clock adjusted",
+      "cgroupMemoryPeakBytes": 298496000,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/backend-p1.log"
+    },
+    {
+      "name": "backend-ops",
+      "cwd": "backend",
+      "commands": [
+        "npm test -- --runInBand --runTestsByPath src/ops/ops-failure.spec.ts src/ops/ops-redaction.spec.ts src/ops/ops-job-run.service.spec.ts src/ops/ops-job-runner.service.spec.ts src/ops/ops-scheduler.service.spec.ts src/orders/limit-order-matching-diagnostics.spec.ts src/futures/futures-risk-worker.spec.ts src/batch/season-lifecycle-transition-job.service.spec.ts src/batch/season-ranking-job.service.spec.ts src/batch/season-settlement-job.service.spec.ts src/portfolio/snapshot-ranking-generation.spec.ts"
+      ],
+      "result": "PASS",
+      "tests": 243,
+      "elapsedSeconds": 1.517,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 272678912,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/backend-ops.log"
+    },
+    {
+      "name": "backend-contracts",
+      "cwd": "backend",
+      "commands": [
+        "npm test -- --runInBand --runTestsByPath src/common/diagnostic-foundation.spec.ts src/common/global-http-exception.filter.spec.ts src/operator/operator.guard.spec.ts src/operator/operator-provider-ingestion.service.spec.ts src/assets/market-candle-sync.service.spec.ts"
+      ],
+      "result": "PASS",
+      "tests": 140,
+      "elapsedSeconds": 2.61,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 402890752,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/backend-contracts.log"
+    },
+    {
+      "name": "final-common-gates",
+      "cwd": "frontend",
+      "commands": [
+        "node --test --test-concurrency=1 src/components/states/AdminDiagnosticPanel.test.ts src/services/api/diagnosticSafety.test.ts src/services/api/errorMapper.test.ts src/features/auth/adminDiagnostics.test.ts",
+        "DIAGNOSTIC_AUDIT_BASE=HEAD node ../scripts/diagnostic-enforcement.cjs frontend",
+        "DIAGNOSTIC_AUDIT_BASE=HEAD node ../scripts/diagnostic-enforcement.cjs backend"
+      ],
+      "result": "PASS",
+      "tests": 29,
+      "elapsedSeconds": 1.389,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 219373568,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/final-common-gates.log"
+    },
+    {
+      "name": "frontend-regression",
+      "cwd": "frontend",
+      "commands": [
+        "node --test --test-concurrency=1 src/screens/home/financialDiagnostics.test.ts src/components/states/secondaryDiagnostics.test.ts src/services/ws/realtimeSocketManager.test.ts src/features/wallet/fxRateUpdates.test.ts src/features/auth/sessionLifecycle.test.ts src/features/tradingAccount/sessionCacheObserver.test.ts src/components/states/diagnosticEnforcement.test.ts"
+      ],
+      "result": "PASS",
+      "tests": 249,
+      "elapsedSeconds": 41.941,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 348409856,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/frontend-regression.log"
+    },
+    {
+      "name": "frontend-lint",
+      "cwd": "frontend",
+      "commands": [
+        "npm run lint:accounts:check"
+      ],
+      "result": "PASS",
+      "tests": null,
+      "elapsedSeconds": 6.958,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 1026576384,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/frontend-lint.log"
+    },
+    {
+      "name": "common-lint",
+      "cwd": "frontend",
+      "commands": [
+        "node node_modules/eslint/bin/eslint.js --no-fix --max-warnings=0 src/components/states/AdminDiagnosticPanel.tsx src/services/api/errorMapper.ts"
+      ],
+      "result": "PASS",
+      "tests": null,
+      "elapsedSeconds": 3.713,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 821592064,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/common-lint.log"
+    },
+    {
+      "name": "frontend-typecheck",
+      "cwd": "frontend",
+      "commands": [
+        "npm run typecheck"
+      ],
+      "result": "PASS",
+      "tests": null,
+      "elapsedSeconds": 8.028,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 1004417024,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/frontend-typecheck.log"
+    },
+    {
+      "name": "backend-typecheck",
+      "cwd": "backend",
+      "commands": [
+        "npm run typecheck"
+      ],
+      "result": "PASS",
+      "tests": null,
+      "elapsedSeconds": 2.478,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 703377408,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/backend-typecheck.log"
+    },
+    {
+      "name": "backend-build",
+      "cwd": "backend",
+      "commands": [
+        "npm run build"
+      ],
+      "result": "PASS",
+      "tests": null,
+      "elapsedSeconds": 13.527,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 1627582464,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/backend-build.log"
+    },
+    {
+      "name": "browser-release",
+      "cwd": "frontend",
+      "commands": [
+        "NODE_PATH=/tmp/beginner-browser-tools/node_modules LD_LIBRARY_PATH=/tmp/beginner-browser-libs/extracted/usr/lib/x86_64-linux-gnu FONTCONFIG_FILE=/tmp/beginner-browser-libs/fonts.conf ADMIN_DIAGNOSTIC_CHROMIUM=/home/nayuta/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome ADMIN_DIAGNOSTIC_BROWSER_OUTPUT=/tmp/admin-diag-qa/browser node test/browser/adminDiagnosticBrowser.cjs"
+      ],
+      "result": "PASS",
+      "tests": null,
+      "elapsedSeconds": 5.464,
+      "timingSource": "monotonic",
+      "cgroupMemoryPeakBytes": 779395072,
+      "oom": 0,
+      "oomKill": 0,
+      "log": "/tmp/admin-diag-qa/browser-release.log"
+    }
+  ],
+  "uniqueLocalTests": {
+    "backend": 650,
+    "frontend": 278,
+    "browserScenarios": 21
+  },
+  "reproductionFailures": [
+    {
+      "run": "safety-repro",
+      "pass": 3,
+      "fail": 1,
+      "resolved": true
+    },
+    {
+      "run": "financial-repro",
+      "pass": 137,
+      "fail": 3,
+      "resolved": true
+    },
+    {
+      "run": "panel-session-repro",
+      "pass": 15,
+      "fail": 2,
+      "resolved": true
+    }
+  ],
+  "verificationHarnessCorrections": [
+    "Temporary probe React Query package entrypoint mismatch corrected.",
+    "Browser waits for expanded content instead of assuming retained expansion/aria state."
+  ],
+  "suppliedGitHubCi": {
+    "source": "user-provided; not independently queried",
+    "run": 214,
+    "commit": "96fcec852c527c0284780a97932ac1240b131b30",
+    "backendUnitPass": 4004,
+    "frontendPass": 2024,
+    "releaseCriticalE2ePass": 397,
+    "postgresCoreLimit": "PASS",
+    "candleFixture": "PASS",
+    "sourceGate": "PASS"
+  },
+  "notRun": [
+    "full CI",
+    "PostgreSQL integration (no Backend/DB/financial diff)",
+    "full release-critical E2E (financial/navigation behavior unchanged)",
+    "Candle fixture smoke (unchanged backend)"
+  ],
+  "unverified": [
+    "Physical Android/iOS rendering; no adb/emulator on PATH."
+  ]
+}

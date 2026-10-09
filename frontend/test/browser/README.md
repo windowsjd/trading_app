@@ -1,5 +1,15 @@
 # Trading UI browser regression
 
+Admin diagnostics uses `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/adminDiagnosticBrowser.cjs` with the same external esbuild/Playwright
+setup. Production ErrorState/ErrorNotice/AdminDiagnosticPanel and React Query
+cover 21 scenarios: 320/390px, font scales 1/2, Light/Dark, long text and module
+paths, scrolling, expand/collapse, retry, role lookup failure, cache removal and
+another admin login. Output defaults to `/tmp/trading-admin-diagnostic-browser`;
+`ADMIN_DIAGNOSTIC_BROWSER_OUTPUT` and `ADMIN_DIAGNOSTIC_CHROMIUM` override the
+artifact directory and browser executable. These are Web checks; physical
+Android/iOS rendering remains a separate check.
+
 Futures uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/futuresBrowser.cjs`. It mounts the production Futures screen/API/query
 and themed components with fixture transport only. It checks 112 layouts across

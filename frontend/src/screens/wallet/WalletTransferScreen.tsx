@@ -110,6 +110,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
     endpoint: 'POST /api/v1/trading-accounts/:accountId/wallet-transfers',
     operation: 'wallet_transfer',
     contractFailure: failure instanceof WalletTransferContractError || isTradingAccountScopeMismatchError(failure),
+    contractInvestigation: failure instanceof WalletTransferContractError ? 'frontend/src/features/wallet/walletTransfer.ts' : undefined,
     outcome: attempt.current?.uncertain ? 'unknown' : undefined,
   }) : undefined;
   const scopedWallets = wallets.data?.tradingAccountId === account.id ? wallets.data : undefined;

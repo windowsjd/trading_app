@@ -1,8 +1,8 @@
 import { semantic } from '../../theme/tokens';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState, useSyncExternalStore } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getMe } from '../../features/me/api';
@@ -27,6 +27,24 @@ export default function AdminDiagnosticPanel({
   runtime,
   includeRuntimeWithDiagnostic = false,
 }: Props) {
+  const queryClient = useQueryClient();
+  const readMeQueryIdentity = useCallback(
+    () => queryClient.getQueryCache().find({ queryKey: QUERY_KEYS.me, exact: true }), [queryClient],
+  );
+  // QueryObserver does not notify on cache removal. Follow the same /me
+  // identity boundary as TradingAccountProvider during logout and login.
+  const meQueryIdentity = useSyncExternalStore(
+    useCallback((notify) => queryClient.getQueryCache().subscribe(event => {
+      if ((event.type === 'added' || event.type === 'removed') &&
+          event.query.queryKey.length === 1 && event.query.queryKey[0] === 'me') {
+        // useQuery can add its Query while another panel is rendering.
+        if (event.type === 'added') queueMicrotask(notify);
+        else notify();
+      }
+    }), [queryClient]),
+    readMeQueryIdentity,
+    readMeQueryIdentity,
+  );
   const [expanded, setExpanded] = useState(false);
   const resolved = useMemo(() => diagnostic ? sanitizeAdminDiagnostic(diagnostic) : getApiErrorDiagnostic(error), [diagnostic, error]);
   const runtimeFacts =
@@ -44,6 +62,10 @@ export default function AdminDiagnosticPanel({
     queryFn: getMe,
     enabled: Boolean(resolved) || hasRuntimeFacts,
   });
+  const diagnosticSource = diagnostic ?? error ?? runtime;
+  const diagnosticOwner = useMemo(
+    () => diagnosticSource == null ? undefined : readMeQueryIdentity(), [readMeQueryIdentity, diagnosticSource],
+  );
   const serializedEvidence = useMemo(
     () => formatJson(resolved?.evidence),
     [resolved?.evidence],
@@ -56,6 +78,7 @@ export default function AdminDiagnosticPanel({
   // The backend emits its diagnostic only for the current DB admin role.
   // /me also guards both backend payloads and observed client runtime facts.
   if (
+    meQueryIdentity !== diagnosticOwner ||
     meQuery.isError ||
     (!shouldShowAdminDiagnostic(meQuery.data?.role, resolved) &&
       !(meQuery.data?.role === 'admin' && hasRuntimeFacts))

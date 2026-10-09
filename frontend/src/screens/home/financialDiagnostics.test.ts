@@ -381,6 +381,7 @@ for (const kind of ['timeout', 'network', 'contract']) for (const role of ['user
   if (role === 'admin') {
     assert.match(renderedText(h), /wallet_transfer/); assert.match(renderedText(h), /unknown/);
     assert.match(renderedText(h), kind === 'contract' ? /response_validation/ : /request_transport/);
+    assert.match(renderedText(h), kind === 'contract' ? /frontend\/src\/features\/wallet\/walletTransfer\.ts/ : /frontend\/src\/services\/api\/client\.ts/);
   } else assert.equal(h.node('admin-diagnostic-panel') === undefined, true);
   const key = h.requests[0].body.idempotencyKey;
   h.failure = null; h.response = null;
@@ -424,6 +425,7 @@ for (const stage of ['quote', 'execute']) it(`order ${stage} response validation
   else h.createOverride = { execution: { state: 'unexpected' } };
   await h.mount(); await h.input(TEST_IDS.order.quantityInput, '100'); await h.press(TEST_IDS.order.executeSubmit); await h.flush(); await expandPanels(h);
   assert.match(renderedText(h), /response_validation/);
+  assert.match(renderedText(h), stage === 'quote' ? /frontend\/src\/features\/order\/validateOrderQuote\.ts/ : /frontend\/src\/features\/order\/mapper\.ts/);
   assert.match(renderedText(h), stage === 'quote' ? /not_submitted/ : /unknown/);
   assert.doesNotMatch(renderedText(h), /Backend Exception/);
   assert.equal(h.requests.length, stage === 'quote' ? 1 : 2);

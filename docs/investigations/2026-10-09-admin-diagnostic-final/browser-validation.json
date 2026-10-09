@@ -1,0 +1,169 @@
+{
+  "results": [
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "light",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "light",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "dark",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "dark",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "light",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "light",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "dark",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "dark",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "light",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "light",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "dark",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "dark",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "light",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "light",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "dark",
+      "surface": "page",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "dark",
+      "surface": "inline",
+      "layout": "pass",
+      "expandCollapse": "pass",
+      "scrollRetry": "pass"
+    },
+    {
+      "gate": "role=user",
+      "result": "pass"
+    },
+    {
+      "gate": "role=operator",
+      "result": "pass"
+    },
+    {
+      "gate": "unresolved=1",
+      "result": "pass"
+    },
+    {
+      "gate": "meFailure=1&cachedAdmin=1",
+      "result": "pass"
+    },
+    {
+      "gate": "clear /me → admin-B → new failure",
+      "result": "pass"
+    }
+  ],
+  "errors": []
+}

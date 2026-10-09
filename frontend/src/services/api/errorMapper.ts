@@ -151,7 +151,13 @@ export function getApiErrorDiagnostic(
 
 /** Treat both HTTP errors and HTTP 200 partial diagnostics as untrusted input. */
 export function sanitizeAdminDiagnostic(input: unknown): AdminDiagnosticDto | null {
-  const diagnostic = boundDiagnostic(input);
+  let diagnostic: unknown;
+  try {
+    diagnostic = boundDiagnostic(input);
+  } catch {
+    // Unreadable input must not turn an error panel into another screen failure.
+    return null;
+  }
   if (!isRecord(diagnostic)) return null;
   if (
     diagnostic.version !== 1 ||
@@ -208,9 +214,16 @@ function boundDiagnostic(input: unknown): unknown {
       return value.slice(0, 30).map(item => visit(item, depth + 1));
     }
     if (isRecord(value)) {
-      const entries = Object.entries(value);
-      if (entries.length > 30) truncated = true;
-      return Object.fromEntries(entries.slice(0, 30).map(([key, item]) => [text(key), sensitive(key) ? '[REDACTED]' : visit(item, depth + 1)]));
+      const entries: Array<[string, unknown]> = [];
+      for (const key in value) {
+        if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+        if (entries.length === 30 || nodes <= 0 || remaining <= 0) {
+          truncated = true;
+          break;
+        }
+        entries.push([text(key), sensitive(key) ? '[REDACTED]' : visit(value[key], depth + 1)]);
+      }
+      return Object.fromEntries(entries);
     }
     return null;
   };
@@ -542,6 +555,10 @@ export function requestFailureFacts(error: unknown, context: {
   endpoint: string;
   operation: string;
   contractFailure?: boolean;
+  contractInvestigation?:
+    | 'frontend/src/features/order/validateOrderQuote.ts'
+    | 'frontend/src/features/order/mapper.ts'
+    | 'frontend/src/features/wallet/walletTransfer.ts';
   outcome?: 'unknown' | 'not_submitted';
 }): import('../ws/runtimeDiagnostics').RuntimeFacts {
   const info = getApiErrorInfo(error);
@@ -561,6 +578,8 @@ export function requestFailureFacts(error: unknown, context: {
     clientFailureStage: context.contractFailure ? 'response_validation' : info.hasResponse ? 'http_response' : 'request_transport',
     outcome: context.outcome ?? 'not_observed',
     requestId: typeof requestId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(requestId) ? requestId : 'not_observed',
-    clientInvestigation: context.contractFailure ? 'frontend/src/features/tradingAccount/api.ts' : 'frontend/src/services/api/client.ts',
+    clientInvestigation: context.contractFailure
+      ? context.contractInvestigation ?? 'frontend/src/features/tradingAccount/api.ts'
+      : 'frontend/src/services/api/client.ts',
   };
 }

@@ -33,6 +33,30 @@ it('request runtime retains only observed allowlisted facts and never invents a 
   assert.equal(facts.clientFailureStage, 'request_transport'); assert.equal(facts.failureStage, undefined);
   const contract = requestFailureFacts(null, { ...context, contractFailure: true });
   assert.equal(contract.hasResponse, true); assert.equal(contract.httpStatus, 'not_observed'); assert.equal(contract.clientFailureStage, 'response_validation');
+  assert.equal(contract.clientInvestigation, 'frontend/src/features/tradingAccount/api.ts');
+  const transport = requestFailureFacts({ code: 'ERR_NETWORK' }, { ...context, contractInvestigation: 'frontend/src/features/order/validateOrderQuote.ts' });
+  assert.equal(transport.clientInvestigation, 'frontend/src/services/api/client.ts');
   const malformed = requestFailureFacts({ code: 'PRIVATE_TOKEN', response: { status: 9999, headers: { 'x-request-id': 'PRIVATE_TOKEN' }, data: { error: { code: 'PRIVATE_TOKEN' } } } }, context);
   assert.doesNotMatch(JSON.stringify(malformed), /PRIVATE_TOKEN|9999/);
+});
+
+it('bounds object reads before inspecting oversized or unreadable evidence', () => {
+  const evidence: Record<string, unknown> = Object.fromEntries(
+    Array.from({ length: 30 }, (_, index) => [`observed${index}`, true]),
+  );
+  let excessReads = 0;
+  Object.defineProperty(evidence, 'excess', { enumerable: true, get() {
+    excessReads++;
+    throw new Error('unreadable evidence');
+  } });
+  const projected = sanitizeAdminDiagnostic({ ...diagnostic(), evidence });
+  assert.equal(excessReads, 0);
+  assert.equal(projected?.truncated, true);
+  assert.equal(projected?.evidence?.observed0, true);
+
+  const unreadable = { ...diagnostic(), evidence: {} };
+  Object.defineProperty(unreadable.evidence, 'field', { enumerable: true, get() {
+    throw new Error('unreadable evidence');
+  } });
+  assert.equal(sanitizeAdminDiagnostic(unreadable), null);
 });
