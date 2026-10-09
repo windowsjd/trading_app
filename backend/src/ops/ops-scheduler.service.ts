@@ -44,6 +44,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private limitOrderMatchingInterval: NodeJS.Timeout | null = null;
   /** Prevents same-process tick overlap of the candle sync job (see below). */
   private marketCandleSyncInFlight = false;
+  private cryptoReconciliationInFlight = false;
+  private cryptoReconciliationAttemptAt: number | undefined;
   /** Guards against a slow matching cycle overlapping the next dedicated tick. */
   private limitOrderMatchingRunning = false;
   private dailySnapshotsRunning = false;
@@ -359,6 +361,23 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     config: OpsSchedulerConfig = getOpsSchedulerConfig(),
     startup = false,
   ): Promise<OpsJobRunnerResponse | undefined> {
+    if (market !== 'CRYPTO')
+      return this.runReconciliationIfDue(now, market, config, startup);
+    if (this.cryptoReconciliationInFlight) return undefined;
+    this.cryptoReconciliationInFlight = true;
+    try {
+      return await this.runReconciliationIfDue(now, market, config, startup);
+    } finally {
+      this.cryptoReconciliationInFlight = false;
+    }
+  }
+
+  private async runReconciliationIfDue(
+    now: Date,
+    market: Exclude<ReconciliationMarket, 'ALL'>,
+    config: OpsSchedulerConfig,
+    startup: boolean,
+  ): Promise<OpsJobRunnerResponse | undefined> {
     const reconciliation = config.marketCandleReconciliation;
     const enabled =
       market === 'KRX'
@@ -367,6 +386,20 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           ? reconciliation.us.enabled
           : reconciliation.crypto.enabled;
     if (!reconciliation.enabled || !enabled) return undefined;
+
+    if (market === 'CRYPTO') {
+      const attempted =
+        await this.runService.findLatestReconciliationAttempt(market);
+      const recordedAt = (
+        attempted?.finishedAt ?? attempted?.startedAt
+      )?.getTime();
+      const lastAt = Math.max(
+        recordedAt ?? -Infinity,
+        this.cryptoReconciliationAttemptAt ?? -Infinity,
+      );
+      if (now.getTime() - lastAt < reconciliation.crypto.intervalSeconds * 1000)
+        return undefined;
+    }
 
     let stockSession: MarketSessionWindow | null = null;
     let stockTimezone: string | null = null;
@@ -449,6 +482,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           : 'UTC';
     const businessDate = getSchedulerBusinessDate(now, timezone);
     const targets = this.reconciliationTargets(market, now, latest?.finishedAt);
+    if (market === 'CRYPTO') this.cryptoReconciliationAttemptAt = now.getTime();
     return this.runner.runMarketCandleReconciliationJob({
       trigger: OpsJobTrigger.scheduler,
       requestedBy: 'scheduler',
@@ -680,7 +714,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
         this.warnProviderPartialFailures(input.jobName, result);
       }
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
       this.warnProviderJobFailed(
         input.jobName,
         error && typeof error === 'object' && 'code' in error

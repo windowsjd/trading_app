@@ -24,6 +24,11 @@ export class ProviderHttpError extends Error {
     readonly provider: ProviderId,
     readonly code: string,
     message: string,
+    readonly rateLimit?: {
+      status: number;
+      retryAfterMs: number;
+      usedWeight1m?: number;
+    },
   ) {
     super(message);
   }

@@ -3,6 +3,7 @@ import { OpsJobRunService } from '../ops/ops-job-run.service';
 import { FuturesLiquidationService } from './futures-liquidation.service';
 import { FuturesRiskWorker } from './futures-risk-worker.service';
 import { FuturesMarkIngestion } from './futures-mark-ingestion.service';
+import { RedisModule } from '../redis/redis.module';
 import { Module } from '@nestjs/common';
 import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
 import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
@@ -15,7 +16,7 @@ import { FuturesLimitService } from './futures-limit.service';
 import { FuturesLimitWorker } from './futures-limit-worker.service';
 
 @Module({
-  imports: [TradingAccountsModule, GeneralPerformanceModule],
+  imports: [TradingAccountsModule, GeneralPerformanceModule, RedisModule],
   controllers: [FuturesController, FuturesLimitController],
   exports: [FuturesService],
   providers: [

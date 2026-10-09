@@ -15,6 +15,10 @@ def candle(open_time, quote, base='999999999999999999999999999'):
 
 
 class ResearchTest(unittest.TestCase):
+    def test_live_acquisition_cannot_bypass_shared_rest_limits(self):
+        with self.assertRaisesRegex(RuntimeError, "Live historical research is disabled"):
+            research.fetch('https://synthetic.invalid/api/v3/klines')
+
     def test_quote_volume_exact_beyond_float_and_default_decimal_precision(self):
         rows = [candle(research.END - 2 * research.DAY, '123456789012345678901234567890.00000001'),
                 candle(research.END - research.DAY, '0.00000002')]

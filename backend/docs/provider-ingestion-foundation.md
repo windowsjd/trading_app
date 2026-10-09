@@ -48,6 +48,8 @@ Price snapshots, stored candles, and live candle events already have internal no
 
 ### Binance Public Market Data
 
+Binance REST requires shared Redis coordination; see [Binance REST limits](binance-rest-limits.md) for 429/418 cooldown, request admission and recovery. WebSocket ingestion remains independent.
+
 - Uses public REST market data only.
 - Does not use Binance API key or secret.
 - Symbols come from ONE source of truth. When `BINANCE_CRYPTO_SYMBOLS` is unset/blank, both `ProviderConfigService.binance.symbols` (general ticker WebSocket) and `resolveEnvProviderTargets().binanceSymbols` (REST env targeting) fall back to `BINANCE_FIXED_SYMBOLS` (the fixed 25-symbol universe); there is no separate `['BTCUSDT','ETHUSDT']` default in either place. `active_assets`/`merged` targeting instead builds symbols from the registered active DB assets, so all registered coins are covered, not just BTC/ETH.

@@ -1,7 +1,10 @@
-"""One-off, public Binance research. No DB, credentials, or runtime imports.
+"""Offline replay of frozen public Binance research.
+
+Live acquisition is disabled because this historical script has no shared REST
+coordination. No DB, credentials, or runtime imports.
 
 python3 scripts/research-binance-universe-2026.py --cache-dir /tmp/binance-ytd \
-    --output-dir /tmp/binance-ytd-result
+    --output-dir /tmp/binance-ytd-result --replay
 Use --replay to recompute from an existing complete raw cache without network.
 The period and original ten are frozen research inputs, not runtime defaults.
 """
@@ -13,10 +16,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from decimal import Decimal, localcontext
 
 START = 1767225600000  # 2026-01-01T00:00:00Z
@@ -96,25 +96,7 @@ def ranked(rows):
 
 
 def fetch(url):
-    # Concurrency=1; <= 6.7 requests/s, far below the observed 6000 weight/min.
-    for attempt in range(4):
-        time.sleep(0.15)
-        try:
-            with urllib.request.urlopen(url, timeout=25) as response:
-                return response.read()
-        except urllib.error.HTTPError as error:
-            if error.code == 418 or error.code not in (429, 500, 502, 503, 504):
-                raise
-            retry_after = error.headers.get('Retry-After', '0')
-            delay = max(2 ** (attempt + 1), int(retry_after))
-            if delay > 60 or attempt == 3:
-                raise
-            time.sleep(delay)
-        except (TimeoutError, urllib.error.URLError):
-            if attempt == 3:
-                raise
-            time.sleep(2 ** (attempt + 1))
-    raise RuntimeError('request retries exhausted')
+    raise RuntimeError("Live historical research is disabled: use --replay with a complete cache; live Binance REST must use shared application coordination.")
 
 
 def run(cache, output, replay):

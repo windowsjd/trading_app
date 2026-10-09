@@ -200,6 +200,25 @@ export class OpsJobRunService {
     });
   }
 
+  findLatestReconciliationAttempt(market: 'CRYPTO') {
+    return this.prisma.opsJobRun.findFirst({
+      where: {
+        jobName: OpsJobName.market_candle_reconciliation,
+        status: {
+          in: [
+            OpsJobRunStatus.running,
+            OpsJobRunStatus.succeeded,
+            OpsJobRunStatus.failed,
+          ],
+        },
+        dryRun: false,
+        metadataJson: { path: ['reconciliationMarket'], equals: market },
+      },
+      orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }],
+      select: { startedAt: true, finishedAt: true, status: true },
+    });
+  }
+
   serializeRun(run: OpsJobRun): SerializedOpsJobRun {
     return {
       id: run.id,

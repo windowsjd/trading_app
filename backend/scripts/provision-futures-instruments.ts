@@ -3,6 +3,7 @@ import {
   parseFuturesContracts,
 } from '../src/futures/futures-instrument-coverage';
 import { loadRuntimeEnv } from './lib/load-runtime-env';
+import { ProviderHttpClient } from '../src/providers/provider-http.client';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 loadRuntimeEnv();
@@ -11,13 +12,13 @@ const unknown = process.argv.slice(2).filter((arg) => arg !== '--apply');
 if (unknown.length)
   throw new Error('Usage: pnpm futures:provision-instruments [--apply]');
 const db = new PrismaService();
+const httpClient = new ProviderHttpClient();
 async function main() {
-  const response = await fetch(FUTURES_EXCHANGE_INFO_URL, {
-    signal: AbortSignal.timeout(5000),
-  });
-  if (!response.ok)
-    throw new Error('Futures public exchange information is unavailable.');
-  const contracts = parseFuturesContracts(await response.json());
+  const { json } = await httpClient.getJson<unknown>(
+    FUTURES_EXCHANGE_INFO_URL,
+    { provider: 'binance', timeoutMs: 5000 },
+  );
+  const contracts = parseFuturesContracts(json);
   const verifiedAt = new Date();
   const candidates = await db.asset.findMany({
     where: {
@@ -63,4 +64,7 @@ main()
     console.error(error);
     process.exitCode = 1;
   })
-  .finally(() => db.$disconnect());
+  .finally(async () => {
+    await httpClient.onModuleDestroy();
+    await db.$disconnect();
+  });

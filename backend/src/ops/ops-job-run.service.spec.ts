@@ -9,6 +9,7 @@ jest.mock('../generated/prisma/client', () => ({
     season_settlement: 'season_settlement',
     reward_marker: 'reward_marker',
     market_candle_retention: 'market_candle_retention',
+    market_candle_reconciliation: 'market_candle_reconciliation',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -360,6 +361,27 @@ describe('OpsJobRunService', () => {
         startedAt: true,
         finishedAt: true,
       },
+    });
+  });
+
+  it('uses real crypto attempts including failure/running, excluding dry runs and skipped/locked records', async () => {
+    const { prisma, service } = createService();
+    await service.findLatestReconciliationAttempt('CRYPTO');
+    expect(prisma.opsJobRun.findFirst).toHaveBeenCalledWith({
+      where: {
+        jobName: OpsJobName.market_candle_reconciliation,
+        status: {
+          in: [
+            OpsJobRunStatus.running,
+            OpsJobRunStatus.succeeded,
+            OpsJobRunStatus.failed,
+          ],
+        },
+        dryRun: false,
+        metadataJson: { path: ['reconciliationMarket'], equals: 'CRYPTO' },
+      },
+      orderBy: [{ startedAt: 'desc' }, { createdAt: 'desc' }],
+      select: { startedAt: true, finishedAt: true, status: true },
     });
   });
 });

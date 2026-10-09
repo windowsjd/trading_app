@@ -138,7 +138,7 @@ async function main() {
   const locks = new RedisLockService(redis);
   const cache = new AssetCandlesCacheService(redis);
   const providerConfig = new ProviderConfigService();
-  const httpClient = new ProviderHttpClient();
+  const httpClient = new ProviderHttpClient(redis);
   const kisLimiter = new KisRateLimiterService(redis);
   const kisCoordinator = new KisRequestCoordinatorService(kisLimiter);
   const kisAuth = new KisAuthClient(providerConfig, kisCoordinator);

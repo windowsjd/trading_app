@@ -88,6 +88,7 @@ export async function runProviderIngestBinancePrices(argv: string[]) {
       process.exitCode = 1;
     }
   } finally {
+    await httpClient.onModuleDestroy();
     await prisma.$disconnect();
   }
 }

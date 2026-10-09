@@ -163,7 +163,7 @@ async function main() {
   const locks = new RedisLockService(redis);
   const cache = new AssetCandlesCacheService(redis);
   const providerConfig = new ProviderConfigService();
-  const httpClient = new ProviderHttpClient();
+  const httpClient = new ProviderHttpClient(redis);
   const binancePublic = new BinancePublicClient(providerConfig, httpClient);
   const binanceCandles = new BinanceCandleIngestionService(binancePublic);
   const kisLimiter = new KisRateLimiterService(redis);

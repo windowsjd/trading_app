@@ -126,10 +126,12 @@ describe('BatchService', () => {
         idempotencyKey: 'safe-key',
         requestPayload: { apiKey: 'synthetic-request-secret' },
         handler: () =>
-          new ProviderHttpClient().getJson(
-            'https://synthetic-private.test?key=fake-key',
-            { provider: 'binance', timeoutMs: 1000 },
-          ),
+          new ProviderHttpClient({
+            eval: jest.fn().mockResolvedValue([1, 0, 0]),
+          } as never).getJson('https://synthetic-private.test?key=fake-key', {
+            provider: 'binance',
+            timeoutMs: 1000,
+          }),
       })
       .catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(HttpException);

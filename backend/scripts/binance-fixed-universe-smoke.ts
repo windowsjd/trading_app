@@ -34,6 +34,15 @@ import { loadRuntimeEnv } from './lib/load-runtime-env';
 const WS_RECEIVE_BUDGET_MS = 15_000;
 
 async function main() {
+  const httpClient = new ProviderHttpClient();
+  try {
+    await runSmoke(httpClient);
+  } finally {
+    await httpClient.onModuleDestroy();
+  }
+}
+
+async function runSmoke(httpClient: ProviderHttpClient) {
   if ((process.env.NODE_ENV ?? '').trim().toLowerCase() === 'production') {
     console.error(
       'binance-fixed-universe-smoke is not allowed under NODE_ENV=production.',
@@ -59,8 +68,6 @@ async function main() {
   console.log(
     `Symbols (${BINANCE_FIXED_SYMBOLS.length}): ${BINANCE_FIXED_SYMBOLS.join(', ')}`,
   );
-
-  const httpClient = new ProviderHttpClient();
 
   // 1) exchangeInfo.
   const exchangeInfo = await httpClient.getJson<BinanceExchangeInfoResponse>(

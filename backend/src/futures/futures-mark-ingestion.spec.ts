@@ -44,23 +44,29 @@ describe('Mark transport failure and independent REST recovery', () => {
     sockets().length = 0;
     createMany.mockClear();
     groupBy.mockClear();
-    service = new FuturesMarkIngestion({
-      futuresInstrument: {
-        findMany: jest
-          .fn()
-          .mockResolvedValue([
-            { id: 'i', underlyingAsset: { symbol: 'BTCUSDT' } },
-          ]),
-      },
-      futuresMarkSnapshot: { createMany, groupBy },
-    } as unknown as PrismaService);
+    service = new FuturesMarkIngestion(
+      {
+        futuresInstrument: {
+          findMany: jest
+            .fn()
+            .mockResolvedValue([
+              { id: 'i', underlyingAsset: { symbol: 'BTCUSDT' } },
+            ]),
+        },
+        futuresMarkSnapshot: { createMany, groupBy },
+      } as unknown as PrismaService,
+      { eval: jest.fn().mockResolvedValue([1, 0, 0]) } as never,
+    );
     global.fetch = jest.fn().mockImplementation(() =>
       Promise.resolve({
         ok: true,
-        json: () =>
-          Promise.resolve([
-            { symbol: 'BTCUSDT', markPrice: '100', time: Date.now() },
-          ]),
+        status: 200,
+        text: () =>
+          Promise.resolve(
+            JSON.stringify([
+              { symbol: 'BTCUSDT', markPrice: '100', time: Date.now() },
+            ]),
+          ),
       }),
     );
   });
@@ -132,7 +138,10 @@ describe('Mark transport failure and independent REST recovery', () => {
   it('REST failure cannot fabricate evidence and a later recovery can resume', async () => {
     jest.spyOn(service, 'refreshCoverage').mockResolvedValueOnce();
     (global.fetch as jest.Mock).mockRejectedValueOnce(new Error('offline'));
-    await expect(service.cycle()).rejects.toThrow('offline');
+    await expect(service.cycle()).rejects.toMatchObject({
+      code: 'PROVIDER_REQUEST_FAILED',
+      message: 'binance request failed (PROVIDER_REQUEST_FAILED).',
+    });
     expect(createMany).not.toHaveBeenCalled();
     jest.setSystemTime(Date.now() + 6000);
     await service.cycle();

@@ -36,9 +36,15 @@ import { KisCandleNormalizerService } from '../providers/kis/candles/kis-candle-
 import { KisDomesticFiveMinuteBuilder } from '../providers/kis/candles/kis-domestic-five-minute.builder';
 import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-period-candle-normalizer.service';
 import { MarketCandleSyncInputError } from './market-candle-sync.types';
+import { ProviderHttpError } from '../providers/provider.types';
 import type { MarketCandleSyncConfig } from './market-candle-sync.config';
+import type { BinanceCandlePageInput } from '../providers/binance/binance-candle.types';
 import { DailyChangeRateService } from './daily-change-rate.service';
-import { type AssetType, type MarketCandle } from '../generated/prisma/client';
+import {
+  Prisma,
+  type AssetType,
+  type MarketCandle,
+} from '../generated/prisma/client';
 import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
@@ -1178,7 +1184,7 @@ describe('MarketCandleSyncService', () => {
     expect(row.coveredTo?.getTime()).toBe(to.getTime());
   });
 
-  it('includes every fixed Binance asset in 5m, daily and weekly sync targets', async () => {
+  it('includes every fixed Binance asset in the default 5m, daily and weekly sync targets', async () => {
     const assets = BINANCE_FIXED_ASSET_UNIVERSE.map((entry) => ({
       ...CRYPTO_ASSET,
       id: `asset-${entry.symbol}`,
@@ -1187,7 +1193,6 @@ describe('MarketCandleSyncService', () => {
     const harness = createHarness({ assets });
     harness.binanceCandles.fetchKlinesPage.mockResolvedValue(binancePage());
     const result = await harness.service.syncAssets({
-      targets: ['5m', '1d', '1w'],
       now: NOW,
     });
     expect(result.totalFeeds).toBe(75);
@@ -1199,6 +1204,127 @@ describe('MarketCandleSyncService', () => {
         );
       }
     }
+  });
+
+  it('includes a newly registered active Binance asset without changing a fixed universe list', async () => {
+    const newAsset = { ...CRYPTO_ASSET, id: 'new-crypto', symbol: 'NEWUSDT' };
+    const harness = createHarness({ assets: [CRYPTO_ASSET, newAsset] });
+    harness.binanceCandles.fetchKlinesPage.mockResolvedValue(binancePage());
+    const result = await harness.service.syncAssets({ now: NOW });
+    expect(result.processedAssets).toBe(2);
+    expect(harness.prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { isActive: true } }),
+    );
+    expect(harness.binanceCandles.fetchKlinesPage).toHaveBeenCalledWith(
+      expect.objectContaining({ symbol: 'NEWUSDT', interval: '1d' }),
+    );
+  });
+
+  it('preserves explicit manual asset filtering and reports missing or inactive IDs', async () => {
+    const harness = createHarness({ assets: [CRYPTO_ASSET] });
+    harness.binanceCandles.fetchKlinesPage.mockResolvedValue(binancePage());
+    const assetIds = [CRYPTO_ASSET.id, 'inactive-id', 'missing-id'];
+    const result = await harness.service.syncAssets({
+      assetIds,
+      targets: ['1d'],
+      now: NOW,
+    });
+    expect(harness.prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: { in: assetIds }, isActive: true },
+      }),
+    );
+    expect(result.processedAssets).toBe(1);
+    expect(
+      result.skippedAssets.map((asset) => [asset.assetId, asset.reason]),
+    ).toEqual([
+      ['inactive-id', 'ASSET_NOT_FOUND_OR_FILTERED'],
+      ['missing-id', 'ASSET_NOT_FOUND_OR_FILTERED'],
+    ]);
+  });
+
+  it('leaves an unclosed daily row intact during 418 and confirms it through the same incremental path after recovery', async () => {
+    const harness = createHarness();
+    const from = new Date('2026-09-18T00:00:00Z');
+    const to = new Date('2026-09-19T00:00:00Z');
+    const now = new Date('2026-09-19T03:00:00Z');
+    const row = {
+      assetId: CRYPTO_ASSET.id,
+      interval: '1d',
+      openTime: from,
+      closeTime: to,
+      open: new Prisma.Decimal(100),
+      high: new Prisma.Decimal(102),
+      low: new Prisma.Decimal(99),
+      close: new Prisma.Decimal(100),
+      volume: new Prisma.Decimal(1000),
+      amount: null,
+      isClosed: false,
+      sourceProvider: BINANCE_CANDLE_SOURCE,
+      sourceUpdatedAt: new Date(to.getTime() - 1000),
+    };
+    await harness.repository.upsertMany([row]);
+    harness.repository.findLatest.mockResolvedValue(row);
+    const daily = new DailyChangeRateService(harness.repository as never);
+    const price = { asset: CRYPTO_ASSET, price: '110', effectiveAt: now, now };
+    expect(await daily.calculate(price)).toBeNull();
+    harness.binanceCandles.fetchKlinesPage.mockRejectedValueOnce(
+      new ProviderHttpError(
+        'binance',
+        'PROVIDER_RATE_LIMITED',
+        'binance HTTP 418 (PROVIDER_RATE_LIMITED).',
+      ),
+    );
+    const failed = await harness.service.syncAsset({
+      assetId: CRYPTO_ASSET.id,
+      targets: ['1d'],
+      now,
+    });
+    expect(failed.feeds[0].status).toBe('failed');
+    expect(harness.upserted.length).toBe(1);
+    expect(
+      await new DailyChangeRateService(harness.repository as never).calculate(
+        price,
+      ),
+    ).toBeNull();
+    const ingestion = new BinanceCandleIngestionService({
+      fetchKlines: jest.fn().mockResolvedValue({
+        response: [
+          [
+            from.getTime(),
+            '100',
+            '102',
+            '99',
+            '100',
+            '1000',
+            to.getTime() - 1,
+            '100000',
+          ],
+        ],
+        receivedAt: now,
+      }),
+    } as never);
+    harness.binanceCandles.fetchKlinesPage.mockImplementation(
+      (input: BinanceCandlePageInput) => ingestion.fetchKlinesPage(input),
+    );
+    const recovered = await harness.service.syncAsset({
+      assetId: CRYPTO_ASSET.id,
+      targets: ['1d'],
+      now,
+    });
+    expect(recovered.feeds[0].writtenRows).toBe(1);
+    expect(harness.upserted[1][0]).toMatchObject({
+      isClosed: true,
+      sourceUpdatedAt: now,
+      sourceProvider: BINANCE_CANDLE_SOURCE,
+      openTime: from,
+      closeTime: to,
+    });
+    expect(
+      await new DailyChangeRateService(harness.repository as never).calculate(
+        price,
+      ),
+    ).toBe('10.00000000');
   });
 
   it('honors continueOnError=false by skipping later assets after a failure', async () => {

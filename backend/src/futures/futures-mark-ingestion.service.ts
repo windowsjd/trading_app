@@ -8,8 +8,11 @@ import {
   Logger,
   OnModuleInit,
   OnModuleDestroy,
+  Optional,
 } from '@nestjs/common';
 import WebSocket from 'ws';
+import { RedisService } from '../redis/redis.service';
+import { ProviderHttpClient } from '../providers/provider-http.client';
 import { PrismaService } from '../prisma/prisma.service';
 import { type FuturesMarkSource } from '../generated/prisma/client';
 import { futuresRiskConfig } from './futures.config';
@@ -33,7 +36,13 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
   private lastRecovery = 0;
   private lastCoverage = 0;
   private coverageTask?: Promise<void>;
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly httpClient: ProviderHttpClient;
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() redis?: RedisService,
+  ) {
+    this.httpClient = new ProviderHttpClient(redis);
+  }
   onModuleInit() {
     if (!futuresRiskConfig().ingestion) return;
     this.timer = setInterval(() => {
@@ -50,6 +59,7 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
     this.socket?.close();
     await this.coverageTask;
+    await this.httpClient.onModuleDestroy();
   }
   async persist(
     payload: unknown,
@@ -68,14 +78,11 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
     return result.count === 1;
   }
   async refreshCoverage() {
-    const reply = await fetch(FUTURES_EXCHANGE_INFO_URL, {
-      signal: AbortSignal.timeout(2500),
-    });
-    if (!reply.ok) {
-      // @diagnosticSurface internal: The cycle catches public coverage transport failure and reports coverage unavailable.
-      throw new Error('FUTURES_COVERAGE_UNAVAILABLE');
-    }
-    const contracts = parseFuturesContracts(await reply.json());
+    const { json } = await this.httpClient.getJson<unknown>(
+      FUTURES_EXCHANGE_INFO_URL,
+      { provider: 'binance', timeoutMs: 2500 },
+    );
+    const contracts = parseFuturesContracts(json);
     const capturedAt = new Date();
     const instruments = await this.prisma.futuresInstrument.findMany({
       include: { underlyingAsset: true },
@@ -224,11 +231,10 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
         Date.now() - this.lastRecovery >= 3000
       ) {
         this.lastRecovery = Date.now();
-        const response = await fetch(FUTURES_MARK_REST_URL, {
-          signal: AbortSignal.timeout(2500),
-        });
-        if (!response.ok) throw new Error('FUTURES_MARK_REST_UNAVAILABLE');
-        const payload: unknown = await response.json();
+        const { json: payload } = await this.httpClient.getJson<unknown>(
+          FUTURES_MARK_REST_URL,
+          { provider: 'binance', timeoutMs: 2500 },
+        );
         const capturedAt = new Date();
         if (!Array.isArray(payload))
           throw new Error('FUTURES_MARK_REST_INVALID');

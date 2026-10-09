@@ -452,6 +452,10 @@ jobs:
           cat "$RUNNER_TEMP/pre-fixtures.txt"
       - name: Run release fixture smoke (no provider credentials)
         run: CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture
+      - name: Binance REST shared cooldown fixture (mock HTTP)
+        run: BINANCE_REST_REDIS_FIXTURE=1 BINANCE_REST_FIXTURE_REDIS_URL=redis://localhost:6379 pnpm test --runInBand --runTestsByPath src/providers/binance/binance-rest-coordinator.integration.spec.ts
+      - name: Candle checkpoint and daily recovery DB fixture (mock providers)
+        run: MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts
       # Identify exactly the fixture JSON this run produced (files not present at
       # checkout). Runs on success and failure so a smoke that wrote a report
       # before failing still yields one debuggable file — but never falls back

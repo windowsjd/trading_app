@@ -86,6 +86,7 @@ import { KisPeriodCandleNormalizerService } from './src/providers/kis/candles/ki
 import { readMarketCandleSyncConfig } from './src/assets/market-candle-sync.config';
 import { AssetCandlesCacheService } from './src/assets/asset-candles-cache.service';
 import { DailyChangeRateService } from './src/assets/daily-change-rate.service';
+import { ProviderHttpError } from './src/providers/provider.types';
 import { readCandleCacheConfig } from './src/assets/asset-candles-cache.config';
 import { buildCandleGenerationKey } from './src/assets/asset-candles-cache.keys';
 
@@ -409,6 +410,31 @@ async function main() {
     assert.equal(cryptoPeriod.failedFeeds, 0);
     assert.ok((await countRows(crypto.id, '1d')) > 0);
     assert.ok((await countRows(crypto.id, '1w')) > 0);
+
+    // A prior unclosed UTC daily row survives rate limiting, then the existing
+    // incremental overlap updates it to official closed evidence in PostgreSQL.
+    const cryptoOpen = new Date(NOW.getTime() - DAY);
+    const dailyWhere = { assetId_interval_openTime: { assetId: crypto.id, interval: '1d', openTime: cryptoOpen } };
+    await prisma.marketCandle.update({ where: dailyWhere, data: {
+      isClosed: false, sourceUpdatedAt: new Date(NOW.getTime() - 60_000),
+    } });
+    const cryptoPrice = { asset: crypto, price: '111.1', effectiveAt: NOW, now: NOW };
+    assert.equal(await new DailyChangeRateService(repository).calculate(cryptoPrice), null);
+    const fetchCrypto = binanceStub.fetchKlinesPage;
+    binanceStub.fetchKlinesPage = async () => { throw new ProviderHttpError('binance', 'PROVIDER_RATE_LIMITED', 'binance HTTP 418 (PROVIDER_RATE_LIMITED).'); };
+    const cryptoInput = { assetId: crypto.id, targets: ['1d'] as const, now: NOW };
+    try {
+      const limitedDaily = await syncService.syncAsset(cryptoInput);
+      assert.equal(limitedDaily.failedFeeds, 1);
+      assert.equal((await prisma.marketCandle.findUnique({ where: dailyWhere }))?.isClosed, false);
+    } finally { binanceStub.fetchKlinesPage = fetchCrypto; }
+    const recoveredDaily = await syncService.syncAsset(cryptoInput);
+    assert.equal(recoveredDaily.failedFeeds, 0);
+    const confirmedDaily = await prisma.marketCandle.findUnique({ where: dailyWhere });
+    assert.equal(confirmedDaily?.isClosed, true);
+    assert.equal(confirmedDaily?.sourceProvider, 'binance_klines');
+    assert.equal(confirmedDaily?.sourceUpdatedAt.toISOString(), NOW.toISOString());
+    assert.equal(await new DailyChangeRateService(repository).calculate(cryptoPrice), '10.00000000');
 
     // 5) Domestic and US fixture pages persist 5m/1d/1w rows.
     for (const asset of [domestic, us]) {

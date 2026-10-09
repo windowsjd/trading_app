@@ -100,7 +100,7 @@ function createSyncService(prisma: PrismaService, redis: RedisService) {
   const repository = new MarketCandlesRepository(prisma);
   const cache = new AssetCandlesCacheService(redis);
   const providerConfig = new ProviderConfigService();
-  const httpClient = new ProviderHttpClient();
+  const httpClient = new ProviderHttpClient(redis);
   const coordinator = new KisRequestCoordinatorService(
     new KisRateLimiterService(redis),
   );

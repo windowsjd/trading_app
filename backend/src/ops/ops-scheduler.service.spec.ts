@@ -104,6 +104,7 @@ describe('OpsSchedulerService', () => {
       findLatestRunForJob: jest.fn().mockResolvedValue(null),
       findLatestSucceededRunForJob: jest.fn().mockResolvedValue(null),
       findLatestSucceededReconciliationRun: jest.fn().mockResolvedValue(null),
+      findLatestReconciliationAttempt: jest.fn().mockResolvedValue(null),
     };
     const providerConfigService = {
       getConfig: jest.fn().mockReturnValue({
@@ -1013,6 +1014,102 @@ describe('OpsSchedulerService', () => {
         targets: expect.arrayContaining(['5m', '1d']) as string[],
       }),
     );
+  });
+
+  it.each([
+    OpsJobRunStatus.failed,
+    OpsJobRunStatus.running,
+    OpsJobRunStatus.succeeded,
+  ])(
+    'respects recorded crypto %s attempts after restart, including startup catch-up',
+    async (status) => {
+      process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
+      process.env.CANDLE_RECONCILIATION_CRYPTO_INTERVAL_SECONDS = '300';
+      const { runner, runService, service } = createService();
+      runService.findLatestReconciliationAttempt.mockResolvedValue({
+        status,
+        startedAt: new Date('2026-07-13T00:00:00Z'),
+        finishedAt:
+          status === OpsJobRunStatus.running
+            ? null
+            : new Date('2026-07-13T00:00:01Z'),
+      });
+      await service.runMarketCandleReconciliationIfDue(
+        new Date('2026-07-13T00:01:00Z'),
+        'CRYPTO',
+      );
+      await service.runMarketCandleReconciliationIfDue(
+        new Date('2026-07-13T00:04:59Z'),
+        'CRYPTO',
+        getOpsSchedulerConfig(),
+        true,
+      );
+      expect(runner.runMarketCandleReconciliationJob).not.toHaveBeenCalled();
+      await service.runMarketCandleReconciliationIfDue(
+        new Date('2026-07-13T00:05:01Z'),
+        'CRYPTO',
+      );
+      expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('bounds consecutive crypto runner failures even before a run record is persisted', async () => {
+    process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
+    process.env.CANDLE_RECONCILIATION_CRYPTO_INTERVAL_SECONDS = '300';
+    const { runner, service } = createService();
+    runner.runMarketCandleReconciliationJob.mockRejectedValue(
+      new Error('failed'),
+    );
+    for (const minute of [0, 5]) {
+      await expect(
+        service.runMarketCandleReconciliationIfDue(
+          new Date(Date.UTC(2026, 6, 13, 0, minute)),
+          'CRYPTO',
+        ),
+      ).rejects.toThrow('failed');
+      for (const offset of [1, 2, 3, 4])
+        await service.runMarketCandleReconciliationIfDue(
+          new Date(Date.UTC(2026, 6, 13, 0, minute + offset)),
+          'CRYPTO',
+        );
+    }
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not overlap a slow crypto attempt and releases the guard after completion', async () => {
+    process.env.CANDLE_RECONCILIATION_CRYPTO_ENABLED = 'true';
+    const { runner, runService, service } = createService();
+    let finish!: (result: { success: boolean }) => void;
+    let signalStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    runner.runMarketCandleReconciliationJob.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+          signalStarted();
+        }),
+    );
+    const initial = service.runMarketCandleReconciliationIfDue(
+      new Date('2026-07-13T00:00:00Z'),
+      'CRYPTO',
+    );
+    await Promise.race([started, initial]);
+    expect(typeof finish).toBe('function');
+    await service.runMarketCandleReconciliationIfDue(
+      new Date('2026-07-13T00:10:00Z'),
+      'CRYPTO',
+    );
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
+    finish({ success: true });
+    await initial;
+    runService.findLatestReconciliationAttempt.mockResolvedValue(null);
+    await service.runMarketCandleReconciliationIfDue(
+      new Date('2026-07-13T00:10:00Z'),
+      'CRYPTO',
+    );
+    expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(2);
   });
 
   it('skips startup catch-up only when both the last success and canonical coverage are fresh', async () => {

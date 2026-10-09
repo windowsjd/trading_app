@@ -196,11 +196,11 @@ Render Dashboard 설정은 조작하지 않았다. Repository에 Render deployme
 ```sh
 cd backend
 python3 scripts/research-binance-universe-2026.py \
-  --cache-dir /tmp/binance-ytd --output-dir /tmp/binance-ytd-result
+  --cache-dir /tmp/binance-ytd --output-dir /tmp/binance-ytd-result --replay
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s scripts -p 'test_research_*.py'
 ```
 
-실행 시 현재 exchangeInfo로 eligibility를 다시 조사하되 날짜 범위는 고정된다. 미래에는 상장/상폐·provider 수정으로 결과가 바뀔 수 있다. 당시 결과는 저장소의 CSV/JSON에 고정되며, raw cache를 보존했다면 `--replay`로 정확히 재합산한다. 이번 raw cache는 `/tmp/binance-universe-2026`에 보관했고 493개 raw kline 파일은 repository에 넣지 않았다.
+현재 리서치 스크립트는 공유 REST 제한을 우회하지 않도록 live 수집을 차단하고 `--replay`만 허용한다. 당시 live 실행은 exchangeInfo로 eligibility를 다시 조사하되 날짜 범위를 고정했다. 미래에는 상장/상폐·provider 수정으로 결과가 바뀔 수 있다. 당시 결과는 저장소의 CSV/JSON에 고정되며, raw cache를 보존했다면 `--replay`로 정확히 재합산한다. 이번 raw cache는 `/tmp/binance-universe-2026`에 보관했고 493개 raw kline 파일은 repository에 넣지 않았다.
 
 ## D. 데이터 준비
 

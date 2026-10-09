@@ -4,6 +4,8 @@ import {
   buildAdminDiagnostic,
 } from '../common/admin-diagnostics';
 
+const redis = { eval: jest.fn().mockResolvedValue([1, 0, 0]) };
+
 describe('ProviderHttpClient safe failures', () => {
   afterEach(() => jest.restoreAllMocks());
 
@@ -27,7 +29,7 @@ describe('ProviderHttpClient safe failures', () => {
         text,
         body: { cancel },
       } as unknown as Response);
-      const error = await new ProviderHttpClient()
+      const error = await new ProviderHttpClient(redis as never)
         .getJson(
           'https://fake-secret.example.test/private?authkey=fake-secret',
           { provider, timeoutMs: 1000 },
@@ -61,18 +63,16 @@ describe('ProviderHttpClient safe failures', () => {
   );
 
   it('keeps HTTP status/category when stream cleanup itself fails', async () => {
-    jest
-      .spyOn(global, 'fetch')
-      .mockResolvedValue({
-        ok: false,
-        status: 500,
-        body: {
-          cancel: () =>
-            Promise.reject(new Error('synthetic-cleanup-private-message')),
-        },
-      } as unknown as Response);
+    jest.spyOn(global, 'fetch').mockResolvedValue({
+      ok: false,
+      status: 500,
+      body: {
+        cancel: () =>
+          Promise.reject(new Error('synthetic-cleanup-private-message')),
+      },
+    } as unknown as Response);
     await expect(
-      new ProviderHttpClient().getJson('https://example.test', {
+      new ProviderHttpClient(redis as never).getJson('https://example.test', {
         provider: 'binance',
         timeoutMs: 1000,
       }),
@@ -102,7 +102,7 @@ describe('ProviderHttpClient safe failures', () => {
             name: kind === 'timeout' ? 'AbortError' : 'Error',
           }),
         );
-      const error = await new ProviderHttpClient()
+      const error = await new ProviderHttpClient(redis as never)
         .getJson('https://fake-private-path.example.test', {
           provider: 'binance',
           timeoutMs: 1000,
@@ -122,7 +122,7 @@ describe('ProviderHttpClient safe failures', () => {
       text: async () => '{"price":"123.45"}',
     } as Response);
     await expect(
-      new ProviderHttpClient().getJson('https://example.test', {
+      new ProviderHttpClient(redis as never).getJson('https://example.test', {
         provider: 'binance',
         timeoutMs: 1000,
       }),

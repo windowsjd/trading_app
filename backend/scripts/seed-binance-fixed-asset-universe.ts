@@ -77,10 +77,12 @@ async function validateAgainstExchangeInfo(input: {
   const baseUrl = input.restBaseUrl.replace(/\/+$/u, '');
   const url = `${baseUrl}/api/v3/exchangeInfo`;
   const httpClient = new ProviderHttpClient();
-  const { json } = await httpClient.getJson<BinanceExchangeInfoResponse>(url, {
-    provider: 'binance',
-    timeoutMs: input.httpTimeoutMs,
-  });
+  const { json } = await httpClient
+    .getJson<BinanceExchangeInfoResponse>(url, {
+      provider: 'binance',
+      timeoutMs: input.httpTimeoutMs,
+    })
+    .finally(() => httpClient.onModuleDestroy());
 
   const expected = BINANCE_FIXED_ASSET_UNIVERSE.map((entry) => ({
     symbol: entry.symbol,
