@@ -57,7 +57,7 @@ function measure(node: QuestGuideMeasurable | null): Promise<GuideRect | null> {
     try {
       node.measureInWindow((x, y, width, height) => resolve(
         [x, y, width, height].every(Number.isFinite) && width > 0 && height > 0
-          ? { x: Math.round(x), y: Math.round(y), width: Math.round(width), height: Math.round(height) }
+          ? { x, y, width, height }
           : null,
       ));
     } catch {
@@ -199,7 +199,7 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
 
   if (view.kind === 'none') return null;
   if (view.kind === 'celebration') {
-    return <QuestCelebration title={view.title} summary={view.summary} leaving={view.leaving} reducedMotion={reducedMotion} />;
+    return <QuestCelebration key={view.key} title={view.title} summary={view.summary} leaving={view.leaving} replay={view.replay} reducedMotion={reducedMotion} />;
   }
   const current = frame?.key === view.anchor ? frame : null;
   return (

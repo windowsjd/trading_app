@@ -85,8 +85,9 @@ it('shows QUEST 01 환전하기 and QUEST 02 이체하기 as separate cards with
     assert.equal(h.start('exchange').props.accessibilityState.disabled, false);
     assert.equal(h.start('transfer').props.accessibilityState.disabled, !transferEnabled);
     assert.equal(h.has('quest-card-transfer-waiting'), count === 0);
-    assert.equal(h.has('quest-card-exchange-completed'), count > 0);
-    assert.equal(h.has('quest-card-transfer-completed'), count > 1);
+    assert.equal(h.has('quest-card-exchange-completed'), false, 'timestamp removed from UI');
+    assert.equal(h.has('quest-card-transfer-completed'), false, 'timestamp removed from UI');
+    assert.doesNotMatch(copy, /완료 ·|2026-|배우는 내용:/);
     // The removed intro sentence, and no invented rewards, levels or unlocks.
     assert.doesNotMatch(copy, /실제 거래 기능을 직접 사용해 보며 단계별로 배워요/);
     assert.doesNotMatch(copy, /\d+%|레벨|해금|잠금|경험치|보상/);
@@ -98,7 +99,7 @@ it('starts the guide directly from the card, never a text detail screen', async 
   t.after(async () => { await Renderer.act(async () => h.renderer.unmount()); });
   assert.equal(h.start('transfer').props.accessibilityLabel, '퀘스트 시작하기');
   await Renderer.act(async () => h.start('transfer').props.onPress());
-  assert.equal(h.start('exchange').props.accessibilityLabel, '다시 둘러보기');
+  assert.equal(h.start('exchange').props.accessibilityLabel, '다시하기');
   await Renderer.act(async () => h.start('exchange').props.onPress());
   assert.deepEqual(h.calls, [['start', 'transfer', true], ['start', 'exchange', true]]);
   assert.deepEqual(h.navigated, [], 'no QuestDetail route');

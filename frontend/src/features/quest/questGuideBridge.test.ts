@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   claimQuestGuideCommand,
+  captureQuestGuideCommand,
   getQuestGuideFacts,
   getQuestGuideTarget,
   getQuestGuideVersion,
@@ -19,6 +20,24 @@ const node = (): QuestGuideMeasurable => ({ measureInWindow: callback => callbac
 const command: QuestGuideCommand = { kind: 'fx', accountId: 'beginner-1', fromCurrency: 'KRW', toCurrency: 'USD', summary: '받은 금액 USD 1' };
 
 describe('quest guide bridge', () => {
+  it('pins success to the submitting session across exit/restart, switch and retries', () => {
+    let session: number | null = null;
+    let claims = 0;
+    const dispose = setQuestGuideCommandSink(() => { claims++; return true; }, () => session);
+    const outside = captureQuestGuideCommand();
+    session = 1;
+    assert.equal(outside(command), false, 'a command sent before the guide cannot complete it');
+    const first = captureQuestGuideCommand();
+    assert.equal(first(command), true);
+    session = 2;
+    assert.equal(first(command), false, 'old success cannot complete a new session');
+    const second = captureQuestGuideCommand();
+    dispose();
+    const disposeOther = setQuestGuideCommandSink(() => true, () => 2);
+    assert.equal(second(command), false, 'the same id in another provider is a different session');
+    disposeOther();
+    assert.equal(claims, 1);
+  });
   it('keeps one stable ref per target and lets only the attached view remove itself', () => {
     const ref = questGuideTarget('fx-amount');
     assert.equal(questGuideTarget('fx-amount') === ref, true, 'stable across renders');

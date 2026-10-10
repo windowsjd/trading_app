@@ -35,6 +35,8 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   } });
   const read = async (section, params = {}) => { const request = { section, ...params }; h.requests.push(request); await h.beforeRead(request); };
   const mocks = {
+    '../../features/quest/QuestGuideProvider': { useQuestGuide: () => null },
+    '../../features/quest/QuestTargetHighlight': { default: () => null, __esModule: true },
     '@react-navigation/native': { NavigationContext, useIsFocused: () => true },
     '../../features/futures/api': { getFuturesPositions: async id => {
       await read('futures', { account: id });

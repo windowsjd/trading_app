@@ -20,6 +20,7 @@ import {
   getQuestGuideVersion,
   setQuestGuideCommandSink,
   subscribeQuestGuide,
+  type QuestGuideTargetId,
 } from './questGuideBridge';
 import {
   advanceGuide,
@@ -40,6 +41,7 @@ import QuestGuideOverlay from './QuestGuideOverlay';
 /** Long enough to read "퀘스트 완료!", short enough not to hold the user. */
 const CELEBRATION_MS = 2100;
 const REDUCED_CELEBRATION_MS = 1700;
+const REPLAY_SUCCESS_MS = 1100;
 /** The overlay fades over the tab switch underneath it. */
 const LEAVE_MS = 260;
 const HIGHLIGHT_MS = 8000;
@@ -52,6 +54,7 @@ type QuestGuideContextValue = {
   returnCount: number;
   /** A quest whose completion was just celebrated, for a brief list highlight. */
   justCompleted: BeginnerQuestKey | null;
+  highlightedTarget: QuestGuideTargetId | null;
   start: (quest: BeginnerQuestKey, progress: BeginnerQuests) => void;
   resume: () => void;
   exit: () => void;
@@ -103,6 +106,7 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   const [focused, setFocused] = useState<FocusedGuideScreen>(readFocusedScreen);
   const [returnCount, setReturnCount] = useState(0);
   const [justCompleted, setJustCompleted] = useState<BeginnerQuestKey | null>(null);
+  const [foreground, setForeground] = useState(AppState.currentState == null || AppState.currentState === 'active');
   // Re-render on screen facts/targets; the view below is derived each render.
   useSyncExternalStore(subscribeQuestGuide, getQuestGuideVersion, getQuestGuideVersion);
 
@@ -140,13 +144,14 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   useEffect(() => setQuestGuideCommandSink(command => {
     const outcome = claimGuideCommand(sessionRef.current, accountId, command);
     if (outcome.session !== sessionRef.current) setSession(outcome.session);
-    if (outcome.claimed && outcome.session) verify(outcome.session.id);
+    if (outcome.claimed && outcome.session?.phase === 'verifying') verify(outcome.session.id);
     return outcome.claimed;
-  }), [accountId, setSession, verify]);
+  }, () => sessionRef.current?.id ?? null), [accountId, setSession, verify]);
 
   // Back from the background: re-read the server instead of trusting memory.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
+      setForeground(state === 'active');
       const current = sessionRef.current;
       if (state !== 'active' || !current) return;
       if (current.phase === 'verifying' || current.phase === 'unconfirmed') {
@@ -165,26 +170,27 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   const phase = session?.phase;
   const sessionId = session?.id;
   useEffect(() => {
-    if (phase !== 'celebrating' || sessionId === undefined) return;
+    if (!foreground || (phase !== 'celebrating' && phase !== 'replaySucceeded') || sessionId === undefined) return;
     const timer = setTimeout(() => {
       const current = sessionRef.current;
       if (current?.id !== sessionId) return;
       setSession({ ...current, phase: 'returning' });
-      setJustCompleted(current.quest);
+      if (!current.replay) setJustCompleted(current.quest);
       setReturnCount(count => count + 1);
       openQuestList();
-    }, reducedMotion ? REDUCED_CELEBRATION_MS : CELEBRATION_MS);
+    }, phase === 'replaySucceeded' ? REPLAY_SUCCESS_MS : reducedMotion ? REDUCED_CELEBRATION_MS : CELEBRATION_MS);
     return () => clearTimeout(timer);
-  }, [phase, sessionId, reducedMotion, setSession]);
+  }, [foreground, phase, sessionId, reducedMotion, setSession]);
 
   useEffect(() => {
-    if (phase !== 'returning' || sessionId === undefined) return;
+    if (!foreground || phase !== 'returning' || sessionId === undefined) return;
     const timer = setTimeout(() => {
+      if (sessionRef.current?.id !== sessionId) return;
       setSession(current => current?.id === sessionId ? null : current);
       popWalletStackToRoot();
     }, LEAVE_MS);
     return () => clearTimeout(timer);
-  }, [phase, sessionId, setSession]);
+  }, [foreground, phase, sessionId, setSession]);
 
   useEffect(() => {
     if (!justCompleted) return;
@@ -224,7 +230,7 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     }
   }, [setSession, verify]);
 
-  const view = resolveGuideView(session, focused, {
+  const view = resolveGuideView(session, foreground ? focused : 'other', {
     wallet: getQuestGuideFacts('wallet'),
     fx: getQuestGuideFacts('fx'),
     transfer: getQuestGuideFacts('transfer'),
@@ -232,14 +238,16 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
 
   const activeQuest = session?.quest;
   const activeReplay = session?.replay;
+  const highlightedTarget = foreground && view.kind === 'spotlight' ? view.targets[0] : null;
   const value = useMemo<QuestGuideContextValue>(() => ({
     active: activeQuest && phase && activeReplay !== undefined ? { quest: activeQuest, phase, replay: activeReplay } : null,
     returnCount,
     justCompleted,
+    highlightedTarget,
     start,
     resume,
     exit,
-  }), [activeQuest, activeReplay, exit, justCompleted, phase, resume, returnCount, start]);
+  }), [activeQuest, activeReplay, exit, highlightedTarget, justCompleted, phase, resume, returnCount, start]);
 
   return (
     <QuestGuideContext.Provider value={value}>

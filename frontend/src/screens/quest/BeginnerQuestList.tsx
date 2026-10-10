@@ -15,8 +15,7 @@ import {
 } from '../../features/quest/questProgress';
 import { useBeginnerQuestProgress } from '../../features/quest/useBeginnerQuestProgress';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
-import { formatKstDateTime } from '../../utils/format';
-import { QuestMark, QuestProgressBar, QuestStatusBadge } from './BeginnerQuestParts';
+import { QuestMark, QuestProgressBar, QuestReplayIcon, QuestStatusBadge } from './BeginnerQuestParts';
 
 /**
  * QUEST 01 환전하기 and QUEST 02 이체하기, each with its own server-proven
@@ -85,7 +84,6 @@ function QuestCard({ questKey, progress, isError, active, highlighted, onStart, 
   const content = QUEST_CARDS[questKey];
   const display = describeQuestCard(questKey, { progress, isError, active });
   const done = progress?.[questKey].completed === true;
-  const completedAt = progress?.[questKey].completedAt ?? null;
   const press = display.state === 'active' ? onResume : onStart;
   return (
     <View testID={`quest-card-${questKey}`}
@@ -102,21 +100,15 @@ function QuestCard({ questKey, progress, isError, active, highlighted, onStart, 
         </View>
       </View>
       <Text style={styles.body}>{content.summary}</Text>
-      <View style={styles.topics} accessibilityLabel={`배우는 내용: ${content.topics.join(', ')}`}>
-        {content.topics.map(topic => (
-          <View key={topic} style={styles.topic}><Text style={styles.topicText}>{topic}</Text></View>
-        ))}
-      </View>
-      {done && completedAt ? (
-        <Text style={styles.done} testID={`quest-card-${questKey}-completed`}>완료 · {formatKstDateTime(completedAt)}</Text>
-      ) : (
+      {!done ? (
         <Text style={styles.muted}>{content.condition}</Text>
-      )}
+      ) : null}
       {display.state === 'waiting' && questKey === 'transfer' ? (
         <Text style={styles.muted} testID="quest-card-transfer-waiting">{QUEST_CARDS.transfer.waiting}</Text>
       ) : null}
       <CTAButton
         label={display.actionLabel ?? '퀘스트 시작하기'}
+        leadingIcon={display.state === 'completed' ? <QuestReplayIcon /> : undefined}
         testID={`quest-card-${questKey}-start`}
         variant={display.state === 'completed' ? 'secondary' : 'primary'}
         state={display.canStart && press ? 'enabled' : 'disabled'}
@@ -148,10 +140,6 @@ const styles = StyleSheet.create({
   number: { fontSize: 13, lineHeight: 20, fontWeight: '700', color: semantic.secondary },
   title: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
   body: { fontSize: 16, lineHeight: 25, color: semantic.secondary },
-  topics: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  topic: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: semantic.raised, maxWidth: '100%' },
-  topicText: { fontSize: 13, lineHeight: 20, color: semantic.secondary, flexShrink: 1 },
-  done: { fontSize: 14, lineHeight: 22, fontWeight: '700', color: semantic.success },
   muted: { fontSize: 14, lineHeight: 22, color: semantic.secondary },
   error: { fontSize: 14, lineHeight: 22, color: semantic.error },
   exit: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },

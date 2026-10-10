@@ -121,12 +121,12 @@ describe('quest card display', () => {
       ['waiting', '대기', '퀘스트 시작하기', false],
     ]);
     assert.deepEqual(labels({ progress: progress(FX_AT, null), isError: false, active: false }), [
-      ['completed', '완료', '다시 둘러보기', true],
+      ['completed', '완료', '다시하기', true],
       ['available', '미시작', '퀘스트 시작하기', true],
     ]);
     assert.deepEqual(labels({ progress: progress(FX_AT, TRANSFER_AT), isError: false, active: false }), [
-      ['completed', '완료', '다시 둘러보기', true],
-      ['completed', '완료', '다시 둘러보기', true],
+      ['completed', '완료', '다시하기', true],
+      ['completed', '완료', '다시하기', true],
     ]);
   });
 

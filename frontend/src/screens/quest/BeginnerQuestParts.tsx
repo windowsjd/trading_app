@@ -1,9 +1,18 @@
 import React from 'react';
+import Svg, { Path } from 'react-native-svg';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
 import TabBarIcon from '../../components/navigation/TabBarIcon';
 import type { QuestCardState } from '../../features/quest/questProgress';
+
+export function QuestReplayIcon() {
+  const { colors } = useAppearance();
+  return <Svg testID="quest-replay-icon" width={16} height={16} viewBox="0 0 24 24" fill="none"
+    stroke={colors.secondaryActionForeground} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" focusable={false} aria-hidden>
+    <Path d="M3 10a9 9 0 1 1 2.6 8.4M3 4v6h6" />
+  </Svg>;
+}
 
 /** Unknown (loading/error) keeps a neutral or error tone; never the done tone. */
 export function QuestStatusBadge({ state, label, testID }: { state: QuestCardState; label: string; testID?: string }) {

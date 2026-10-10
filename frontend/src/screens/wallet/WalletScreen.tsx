@@ -38,6 +38,8 @@ import HomeAssetTrend, { type HomeEquityRange } from '../home/HomeAssetTrend';
 import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
 import FuturesPositionsSection from '../../components/tradingAccount/FuturesPositionsSection';
 import { publishQuestGuideFacts, questGuideTarget, registerQuestGuideReveal, type QuestActionState } from '../../features/quest/questGuideBridge';
+import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
+import QuestTargetHighlight from '../../features/quest/QuestTargetHighlight';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
@@ -60,6 +62,7 @@ type AccountWalletProps = {
 
 function AccountWallet({ account, capabilities, navigation }: AccountWalletProps) {
   const accountId = account.id;
+  const guide = useQuestGuide();
   const rootNavigation = useRootNavigation();
   const [trendExpanded, setTrendExpanded] = useState(false);
   const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
@@ -191,7 +194,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       )}
       <View testID="wallet-quick-actions" style={styles.quickActions}>
         {quickActions.filter((action) => !action.hidden).map((action) => (
-          <View key={action.testID} ref={action.questTarget} collapsable={false} testID={`${action.testID}-item`} style={styles.quickActionItem}>
+          <View key={action.testID} testID={`${action.testID}-item`} style={styles.quickActionItem}>
             <ActionPressable
               testID={action.testID}
               accessibilityRole="button"
@@ -202,42 +205,45 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               feedbackStyle={[styles.quickAction, styles.quickActionFeedback]}
               onPress={action.onPress}
             >
-              <View
-                testID={`${action.testID}-surface`}
-                style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
-                accessible={false}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                aria-hidden
-                pointerEvents="none"
-              >
-                <PrimaryButtonBackground shape={{ borderRadius: styles.quickAction.borderRadius }} />
-                <Svg
-                  style={styles.quickActionIcon}
-                  width={24}
-                  height={24}
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke={primaryGradient.foreground}
-                  strokeWidth={2}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  focusable={false}
+              <View ref={action.questTarget} collapsable={false} testID={`${action.testID}-guide-target`} style={styles.quickActionGroup}>
+                <View
+                  testID={`${action.testID}-surface`}
+                  style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
                   aria-hidden
+                  pointerEvents="none"
                 >
-                  <Path d={action.iconPath} />
-                </Svg>
+                  <PrimaryButtonBackground shape={{ borderRadius: styles.quickAction.borderRadius }} />
+                  <QuestTargetHighlight active={!action.disabled && guide?.highlightedTarget === action.testID} radius={styles.quickAction.borderRadius} />
+                  <Svg
+                    style={styles.quickActionIcon}
+                    width={24}
+                    height={24}
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke={primaryGradient.foreground}
+                    strokeWidth={2}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    focusable={false}
+                    aria-hidden
+                  >
+                    <Path d={action.iconPath} />
+                  </Svg>
+                </View>
+                <Text
+                  testID={`${action.testID}-label`}
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  aria-hidden
+                  style={[styles.quickActionLabel, action.disabled && styles.quickActionDisabled]}
+                >
+                  {action.label}
+                </Text>
               </View>
-              <Text
-                testID={`${action.testID}-label`}
-                accessible={false}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                aria-hidden
-                style={[styles.quickActionLabel, action.disabled && styles.quickActionDisabled]}
-              >
-                {action.label}
-              </Text>
             </ActionPressable>
           </View>
         ))}
@@ -309,6 +315,7 @@ const styles = StyleSheet.create({
   quickActions: { width: '100%', maxWidth: 440, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
   quickActionTarget: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },
+  quickActionGroup: { alignSelf: 'center', alignItems: 'center', minWidth: 52, maxWidth: '100%', gap: 8 },
   quickAction: { width: 52, height: 52, borderRadius: 12, backgroundColor: primaryGradient.colors[0], alignItems: 'center', justifyContent: 'center' },
   quickActionIcon: { position: 'relative' },
   quickActionFeedback: { top: 0, alignSelf: 'center', zIndex: 1 },

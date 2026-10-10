@@ -130,7 +130,7 @@ export function describeQuestCard(
   if (input.active) {
     return { state: 'active', statusLabel: quest.completed ? '완료' : '진행 중', actionLabel: '이어하기', canStart: true };
   }
-  if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시 둘러보기', canStart: true };
+  if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시하기', canStart: true };
   if (key === 'transfer' && !progress.exchange.completed) {
     return { state: 'waiting', statusLabel: '대기', actionLabel: '퀘스트 시작하기', canStart: false };
   }

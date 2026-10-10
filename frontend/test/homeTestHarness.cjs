@@ -92,6 +92,8 @@ function createHomeHarness(mode = 'general') {
       },
     },
     '../../features/tradingAccount/api': api,
+    '../../features/quest/QuestGuideProvider': { useQuestGuide: () => h.guide ?? null },
+    '../../features/quest/QuestTargetHighlight': { default: 'QuestTargetHighlight', __esModule: true },
     '../../features/futures/api': { getFuturesPositions: async id => {
       h.requests.push({ path: `/trading-accounts/${id}/futures/positions` });
       return require('./futuresFixtures.cjs').futuresFixture(id).positions;

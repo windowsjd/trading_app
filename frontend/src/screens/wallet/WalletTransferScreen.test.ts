@@ -6,6 +6,37 @@ const { walletTransferHarness, deferred } = createRequire(import.meta.url)('../.
 const text = h => JSON.stringify(h.renderer.toJSON());
 const wallets = ['securities', 'crypto_spot', 'crypto_futures'];
 
+test('transfer uses the same insufficient message, accepts exact availability and updates input errors', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  await h.amount('700.00000001'); assert.match(text(h), /잔액이 부족합니다\./);
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+  await h.amount('700'); assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  assert.doesNotMatch(text(h), /잔액이 부족/);
+  await h.amount('1e3'); assert.doesNotMatch(text(h), /잔액이 부족/);
+  h.wallets.A.wallets.find(w => w.id === 'A:securities').reservedAmount = '1000';
+  await h.update(); await h.amount('1'); assert.match(text(h), /잔액이 부족합니다\./);
+  assert.equal(h.requests.length, 0);
+});
+
+test('transfer rejects a fresh debit before sending a new financial command', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  await h.amount('600');
+  // Snapshot was 700; a reservation changed before the user's final press.
+  h.wallets.A.wallets.find(w => w.id === 'A:securities').reservedAmount = '500';
+  await h.press('wallet-transfer-submit');
+  assert.equal(h.requests.length, 0);
+  assert.match(text(h), /잔액이 부족합니다\./);
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+});
+
+test('transfer preflight cannot execute after unmount or an account switch', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  h.walletGate = { A: deferred() }; await h.amount('1'); await h.press('wallet-transfer-submit');
+  await h.switchAccount('B'); h.walletGate.A.resolve(); await h.flush();
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.node('wallet-transfer-success') === undefined, true);
+});
+
 for (const account of ['A', 'B']) test(`${account}: compact USD form executes directly and shows its scoped receipt`, async t => {
   const h = walletTransferHarness(); h.accountId = account; await h.start(); t.after(h.close);
   assert.match(text(h), /700/);
@@ -66,8 +97,9 @@ for (const switches of [['B'], ['B', 'A']]) for (const failure of [false, true])
 test('uncertain retry reuses the exact command even when refreshed cash reflects its debit', async t => {
   const h = walletTransferHarness(); await h.start(); t.after(h.close);
   h.failure = new Error('network'); await h.amount('500');
-  h.wallets.A.wallets.find(w => w.id === 'A:securities').balanceAmount = '600';
   await h.press('wallet-transfer-submit'); const first = h.requests[0];
+  h.wallets.A.wallets.find(w => w.id === 'A:securities').balanceAmount = '600';
+  await h.update();
   assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
   await h.amount('500.00000000'); assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
   h.failure = null; await h.press('wallet-transfer-submit'); assert.deepEqual(h.requests[1], first); assert.ok(h.node('wallet-transfer-success'));
@@ -131,7 +163,7 @@ test('Futures outgoing availability and validation use margin-aware free collate
   await h.amount('25'); assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
 });
 
-for (const refreshedCollateral of ['10.00000000', null]) test(`Futures background refresh retains validated collateral until the new ${refreshedCollateral} result`, async t => {
+for (const refreshedCollateral of ['10.00000000', null]) test(`Futures background refresh keeps its display but pauses new transfers until the new ${refreshedCollateral} result`, async t => {
   const h = walletTransferHarness(); await h.start(); t.after(h.close); await h.choose('source', 'crypto_futures'); await h.amount('20');
   const available = h.node('wallet-transfer-available').props.children;
   assert.equal(available, '이체 가능 금액: USD 25');
@@ -144,7 +176,7 @@ for (const refreshedCollateral of ['10.00000000', null]) test(`Futures backgroun
   await act(async () => { refresh = h.client.refetchQueries({ queryKey: key }); }); await h.flush();
   assert.equal(h.client.getQueryState(key).fetchStatus, 'fetching');
   assert.equal(h.node('wallet-transfer-available').props.children, available);
-  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
   assert.doesNotMatch(text(h), /이체 가능 금액을 확인하고 있습니다/);
 
   h.risk.A = { ...h.risk.A, collateral: { ...h.risk.A.collateral, freeCollateral: refreshedCollateral } };
@@ -234,8 +266,23 @@ test('unverifiable response retries with the original key and never shows a fals
 test('Futures insufficient collateral rejection uses a safe actionable product message', async t => {
   const h = walletTransferHarness(); await h.start(); t.after(h.close); await h.choose('source', 'crypto_futures');
   h.failure = { response: { status: 409, data: { error: { code: 'INSUFFICIENT_FUTURES_FREE_COLLATERAL', message: 'SQL internal http://secret env=TOKEN' } } } };
+  h.beforePost = () => { h.risk.A.collateral.freeCollateral = '0.00000000'; };
   await h.amount('10'); await h.press('wallet-transfer-submit');
-  assert.match(text(h), /선물 지갑의 이체 가능 금액이 부족/); assert.doesNotMatch(text(h), /SQL internal|http:\/\/secret|TOKEN/);
+  assert.match(text(h), /잔액이 부족합니다\./); assert.doesNotMatch(text(h), /SQL internal|http:\/\/secret|TOKEN/);
+});
+
+test('transfer clears the server insufficient error when a newer confirmed balance becomes sufficient', async t => {
+  const h = walletTransferHarness(); await h.start(); t.after(h.close);
+  h.failure = { response: { status: 409, data: { error: { code: 'INSUFFICIENT_AVAILABLE_BALANCE' } } } };
+  h.beforePost = () => { h.wallets.A.wallets.find(w => w.id === 'A:securities').reservedAmount = '1000'; };
+  await h.amount('10'); await h.press('wallet-transfer-submit');
+  assert.match(text(h), /잔액이 부족합니다\./);
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+  h.wallets.A.wallets.find(w => w.id === 'A:securities').reservedAmount = '0';
+  const { act } = createRequire(import.meta.url)('react-test-renderer');
+  await act(async () => { await h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.wallets('A') }); }); await h.flush();
+  assert.doesNotMatch(text(h), /잔액이 부족/);
+  assert.equal(h.node('wallet-transfer-submit').props.state, 'enabled');
 });
 
 for (const platform of ['web', 'android', 'ios']) test(`${platform}: focus hook measures input/CTA and dropdown blurs before dismiss`, async t => {

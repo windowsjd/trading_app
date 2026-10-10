@@ -33,6 +33,7 @@ function createTradingUiHarness(screenName) {
     '../../services/api/client': { apiClient: {
       post: async (url, body) => {
         h.requests.push({ url, body });
+        if (h.post) return { data: { success: true, data: await h.post(url, body) } };
         return { data: { success: true, data: url.endsWith('/quote') ? h.quote : h.result } };
       },
     } },
@@ -99,10 +100,14 @@ function createTradingUiHarness(screenName) {
           data: h.positionQuery.data ? { tradingAccountId: h.account.id, ...h.positionQuery.data } : undefined };
         if (resource === 'fx-rate') return { ...base, ...h.rateQuery };
         if (resource === 'detail') return { ...base, data: { feePolicy: { fxFeeRate: '0.001', tradeFeeRate: '0.001' } } };
-        if (resource === 'wallets') return { ...base, data: { wallets: [
-          { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: '1000000' }, { walletScope: 'securities', currencyCode: 'USD', balanceAmount: '100' },
-          { walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '100' }, { walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '0' },
+        if (resource === 'wallets') {
+          const result = { ...base, data: { tradingAccountId: h.account.id, wallets: [
+          { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: '1000000', reservedAmount: '0' }, { walletScope: 'securities', currencyCode: 'USD', balanceAmount: '100', reservedAmount: '0' },
+          { walletScope: 'crypto_spot', currencyCode: 'USD', balanceAmount: '100', reservedAmount: '0' }, { walletScope: 'crypto_futures', currencyCode: 'USD', balanceAmount: '0', reservedAmount: '0' },
         ] }, ...h.walletQuery };
+          result.refetch = async () => h.walletRefetch ? h.walletRefetch() : result;
+          return result;
+        }
         throw new Error(`Unexpected query: ${options.queryKey}`);
       },
       useMutation: config => ({ isPending: false, reset: () => {}, mutate: variables => {

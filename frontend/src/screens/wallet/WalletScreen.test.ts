@@ -101,8 +101,10 @@ describe('selected account Wallet and shared Home holdings', () => {
         const item = find(group, `${testID}-item`);
         const button = find(item, testID), caption = find(item, `${testID}-label`);
         const surface = find(button, `${testID}-surface`);
+        const content = find(button, `${testID}-guide-target`);
         assert.equal(item.props.children === button, true);
-        assert.equal(button.props.children.length === 2 && button.props.children[0] === surface && button.props.children[1] === caption, true, 'one button contains the icon surface, gap and label');
+        assert.equal(button.props.children === content, true);
+        assert.equal(content.props.children.length === 2 && content.props.children[0] === surface && content.props.children[1] === caption, true, 'one measured group contains the icon surface, gap and label');
         assert.equal(elements(item, 'Pressable').length, 1, 'one accessible action per item');
         const visual = Object.assign({}, ...surface.props.style.filter(Boolean));
         assert.equal(visual.backgroundColor, primaryGradient.colors[0]);

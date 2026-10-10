@@ -15,7 +15,7 @@ import { ACCOUNT_INTEGRITY_TITLE, findAccountIntegrityFailure } from '../../feat
 import { invalidateAfterWalletTransfer } from '../../features/tradingAccount/invalidation';
 import { getWalletByIdentity } from '../../features/wallet/mapper';
 import { TRANSFER_WALLETS, WALLET_SCOPE_LABELS, type TransferWalletIdentity } from '../../features/wallet/walletIdentity';
-import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError } from '../../features/wallet/walletTransfer';
+import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError, WalletBalanceCheckError } from '../../features/wallet/walletTransfer';
 import { isFxResponseInScope as isTransferResponseInScope, type FxRequestScope as TransferScope } from '../../features/wallet/fxAccountScope';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { createIdempotencyKey } from '../../utils/idempotency';
@@ -28,7 +28,7 @@ import ErrorState from '../../components/states/ErrorState';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
 import {
-  claimQuestGuideCommand,
+  captureQuestGuideCommand,
   publishQuestGuideFacts,
   questGuideTarget,
   registerQuestGuideReveal,
@@ -54,6 +54,7 @@ type TransferCommand = TransferScope & {
   running?: boolean;
   completed?: boolean;
   uncertain?: boolean;
+  reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
 };
 function TransferForm({ account, capabilities, scope, readScope }: {
   account: TradingAccountDto;
@@ -66,7 +67,9 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   const inputScroll = useFocusedInputScroll();
   const amountRef = useRef<View>(null);
   const amountInputRef = useRef<TextInput>(null);
-  const wallets = useQuery({ queryKey: QUERY_KEYS.tradingAccount.wallets(account.id), queryFn: () => getTradingAccountWallets(account.id) });
+  const wallets = useQuery({ queryKey: QUERY_KEYS.tradingAccount.wallets(account.id), queryFn: () => getTradingAccountWallets(account.id), refetchOnMount: 'always' });
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [sourceKey, setSourceKey] = useState<UsdWalletIdentity['key']>('securities');
   const [destinationKey, setDestinationKey] = useState<UsdWalletIdentity['key']>('crypto_spot');
   const [openDropdown, setOpenDropdown] = useState<'source' | 'destination' | null>(null);
@@ -76,6 +79,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   const [result, setResult] = useState<WalletTransferDto | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const attempt = useRef<TransferCommand | null>(null);
+  const balanceFailureRead = useRef({ wallets: 0, futures: 0 });
   const sourceIsFutures = sourceIdentity.scope === 'crypto_futures';
   const futures = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.futuresCollateral(account.id),
@@ -89,18 +93,32 @@ function TransferForm({ account, capabilities, scope, readScope }: {
     retry: false,
     mutationFn: async (command: TransferCommand) => {
       try {
+        if (!command.uncertain) {
+          const fresh = await wallets.refetch();
+          if (!mounted.current || !isTransferResponseInScope(command, readScope())) return null;
+          const source = fresh.data?.wallets.find(wallet => wallet.id === command.body.sourceWalletId) ?? null;
+          let available = fresh.isError ? null : transferAvailableAmount(source);
+          if (command.futuresCollateral && source?.walletScope === 'crypto_futures') {
+            const collateral = await futures.refetch();
+            if (!mounted.current || !isTransferResponseInScope(command, readScope())) return null;
+            available = fresh.isError || collateral.isError ? null : futuresTransferAvailableAmount(collateral.data, command.accountId, source);
+          }
+          if (available === null) throw new WalletBalanceCheckError(false);
+          if (!transferAmountFits(command.body.amount, available)) throw new WalletBalanceCheckError(true);
+        }
         const data = await transferTradingAccountWallets(command.accountId, command.body);
         command.completed = true;
         return data;
       } finally { command.running = false; }
     },
     onSuccess: (data, command) => {
+      if (!data) return;
       // Money may have moved in A even after A→B→A. Refresh only request A.
       void invalidateAfterWalletTransfer(queryClient, command.accountId, { futuresCollateral: command.futuresCollateral });
-      if (!isTransferResponseInScope(command, readScope())) return;
+      if (!mounted.current || !isTransferResponseInScope(command, readScope())) return;
       setResult(data); setFailure(null);
       // QUEST 02 re-reads server progress itself; the receipt stays on screen.
-      claimQuestGuideCommand({
+      command.reportQuestCommand({
         kind: 'transfer',
         accountId: command.accountId,
         source: data.source.walletScope,
@@ -110,10 +128,12 @@ function TransferForm({ account, capabilities, scope, readScope }: {
       });
     },
     onError: (error, command) => {
+      balanceFailureRead.current = { wallets: wallets.dataUpdatedAt, futures: futures.dataUpdatedAt };
       // A transport/response error may follow a committed command.
-      command.uncertain = error instanceof WalletTransferContractError || !getApiErrorInfo(error).hasResponse || (getApiErrorStatus(error) ?? 0) >= 500;
+      command.uncertain = !(error instanceof WalletBalanceCheckError) &&
+        (error instanceof WalletTransferContractError || !getApiErrorInfo(error).hasResponse || (getApiErrorStatus(error) ?? 0) >= 500);
       void invalidateAfterWalletTransfer(queryClient, command.accountId, { futuresCollateral: command.futuresCollateral });
-      if (isTransferResponseInScope(command, readScope())) setFailure(error);
+      if (mounted.current && isTransferResponseInScope(command, readScope())) setFailure(error);
     },
   });
   const integrity = findAccountIntegrityFailure([
@@ -126,7 +146,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
     operation: 'wallet_transfer',
     contractFailure: failure instanceof WalletTransferContractError || isTradingAccountScopeMismatchError(failure),
     contractInvestigation: failure instanceof WalletTransferContractError ? 'frontend/src/features/wallet/walletTransfer.ts' : undefined,
-    outcome: attempt.current?.uncertain ? 'unknown' : undefined,
+    outcome: failure instanceof WalletBalanceCheckError ? 'not_submitted' : attempt.current?.uncertain ? 'unknown' : undefined,
   }) : undefined;
   const scopedWallets = wallets.data?.tradingAccountId === account.id ? wallets.data : undefined;
   const source = getWalletByIdentity(scopedWallets, sourceIdentity.scope, 'USD');
@@ -147,9 +167,17 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   // Reconcile an uncertain commit with the pinned key even if refreshed cash
   // already reflects that debit. Unknown Futures collateral still fails closed.
   const uncertainRetry = sameIntent(attempt.current) && !!attempt.current.uncertain;
+  const balanceReady = !wallets.isFetching && !wallets.isError && (!sourceIsFutures || (!futures.isFetching && !futures.isError));
+  useEffect(() => {
+    const insufficient = failure instanceof WalletBalanceCheckError ? failure.message === '잔액이 부족합니다.'
+      : ['INSUFFICIENT_BALANCE', 'INSUFFICIENT_AVAILABLE_BALANCE', 'INSUFFICIENT_FUTURES_FREE_COLLATERAL'].includes(getApiErrorCode(failure) ?? '');
+    const refreshed = wallets.dataUpdatedAt !== balanceFailureRead.current.wallets ||
+      (sourceIsFutures && futures.dataUpdatedAt !== balanceFailureRead.current.futures);
+    if (insufficient && refreshed && balanceReady && transferAmountFits(canonicalAmount, available)) setFailure(null);
+  }, [available, balanceReady, canonicalAmount, failure, futures.dataUpdatedAt, sourceIsFutures, wallets.dataUpdatedAt]);
   const canExecute = !block && !wallets.isError && hasAllWallets && !!source?.id && !!destination?.id &&
     source.id !== destination.id && !!canonicalAmount && available !== null &&
-    (transferAmountFits(canonicalAmount, available) || uncertainRetry);
+    ((balanceReady && transferAmountFits(canonicalAmount, available)) || uncertainRetry);
   const dismissAmount = () => {
     amountInputRef.current?.blur();
     inputScroll.onInputBlur();
@@ -160,6 +188,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
         attempt.current?.running || attempt.current?.completed || !isTransferResponseInScope(scope, readScope())) return;
     const previous = attempt.current;
     const command: TransferCommand = sameIntent(previous) ? previous : { ...scope,
+      reportQuestCommand: captureQuestGuideCommand(),
       futuresCollateral: sourceIsFutures || destinationIdentity.scope === 'crypto_futures',
       body: { sourceWalletId: source.id, destinationWalletId: destination.id, amount: canonicalAmount, idempotencyKey: createIdempotencyKey('wallet-transfer') },
     };
@@ -177,8 +206,8 @@ function TransferForm({ account, capabilities, scope, readScope }: {
       source: sourceIdentity.scope,
       destination: destinationIdentity.scope,
       amountValid: !!canonicalAmount,
-      amountFits: transferAmountFits(canonicalAmount, available),
-      nothingToSend: available !== null && !/[1-9]/.test(available),
+      amountFits: balanceReady && transferAmountFits(canonicalAmount, available),
+      nothingToSend: balanceReady && available !== null && !/[1-9]/.test(available),
       canExecute,
       pending: locked,
       failed: !!failure,
@@ -251,9 +280,9 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                       </Text>}
                       {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
                       {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
-                        : canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>이체 가능 금액을 초과했습니다.</Text> : null}
+                        : balanceReady && canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>잔액이 부족합니다.</Text> : null}
                     </View>
-                    {failure ? <ErrorNotice error={failure} message={attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
+                    {failure ? <ErrorNotice error={failure} message={failure instanceof WalletBalanceCheckError ? failure.message : attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
                     <View ref={inputScroll.submitRef} collapsable={false}>
                       <View ref={questGuideTarget('transfer-submit')} collapsable={false}>
                         <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />

@@ -47,6 +47,7 @@ import {
 import {
   getFxExecuteSuccessDisplay,
   getWalletBalanceAmount,
+  getWalletByCurrency,
   getWalletViewState,
   isFxIdempotencyConflictCode,
   isFxRequoteRequiredCode,
@@ -56,10 +57,13 @@ import type { WalletFxViewState } from '../../models/enums/viewState';
 import {
   BLOCKED_REASON_MESSAGE,
   getApiErrorCode,
+  getApiErrorInfo,
+  getApiErrorStatus,
   getErrorMessageFromCode,
   mapFxErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
+import { transferAvailableAmount, transferAmountFits, WalletBalanceCheckError } from '../../features/wallet/walletTransfer';
 import {
   formatDisplayDecimal,
   formatKrw,
@@ -79,7 +83,7 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { useFxRateUpdates } from '../../features/wallet/useFxRateUpdates';
 import { FX_RATE_FALLBACK_INTERVAL_MS } from '../../features/wallet/fxRateUpdates';
 import {
-  claimQuestGuideCommand,
+  captureQuestGuideCommand,
   publishQuestGuideFacts,
   questGuideTarget,
   registerQuestGuideReveal,
@@ -112,6 +116,7 @@ function getFxDomainErrorMessage(
   code?: string | null,
   isGeneralAccount = false,
 ) {
+  if (code === ERROR_CODE.INSUFFICIENT_BALANCE || code === ERROR_CODE.INSUFFICIENT_AVAILABLE_BALANCE) return '잔액이 부족합니다.';
   if (isGeneralAccount && isSeasonNotActiveReason(code)) {
     return '환전을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
   }
@@ -196,10 +201,13 @@ export default function WalletFxScreen({ navigation }: Props) {
     scope: FxRequestScope;
     seasonUi: boolean;
     isGeneral: boolean;
+    reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
     payload: Parameters<typeof quoteTradingAccountFx>[1];
   };
-  const actionRef = useRef<QuotedAction<FxRequest, FxQuoteDto> | null>(null);
+  type FxAction = QuotedAction<FxRequest, FxQuoteDto> & { uncertain?: boolean };
+  const actionRef = useRef<FxAction | null>(null);
   const submitLockRef = useRef(false);
+  const balanceFailureRead = useRef<number | undefined>(undefined);
   const isCurrent = (request: FxRequest) => mountedRef.current &&
     isFxResponseInScope(request.scope, readScope());
   const feeQuery = useQuery({
@@ -212,6 +220,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     queryKey: QUERY_KEYS.tradingAccount.wallets(accountId),
     queryFn: () => getTradingAccountWallets(accountId),
     enabled: hasAccount,
+    refetchOnMount: 'always',
   });
 
   const rateQuery = useQuery({
@@ -229,17 +238,29 @@ export default function WalletFxScreen({ navigation }: Props) {
     ? rateQuery.data : null;
 
   const executeMutation = useMutation({
-    mutationFn: (action: QuotedAction<FxRequest, FxQuoteDto>) => runQuotedAction(action, {
-      quote: (request) => quoteTradingAccountFx(request.scope.accountId, request.payload),
-      execute: (request, quote, key) => executeTradingAccountFx(request.scope.accountId, {
-        quoteId: quote.quoteId,
-        fromCurrency: quote.fromCurrency,
-        toCurrency: quote.toCurrency,
-        sourceAmount: quote.sourceAmount,
-        idempotencyKey: key,
-      }),
-      isCurrent: () => isCurrent(action.request),
-    }),
+    mutationFn: async (action: FxAction) => {
+      // A new intent uses a fresh wallet read. A retained quote/key reconciles
+      // an earlier execution even if the refreshed wallet reflects its debit.
+      if (!action.quote) {
+        const fresh = await walletsQuery.refetch();
+        if (!isCurrent(action.request)) return null;
+        const available = fresh.isError || fresh.data?.tradingAccountId !== action.request.scope.accountId ? null
+          : transferAvailableAmount(getWalletByCurrency(fresh.data, action.request.payload.fromCurrency));
+        if (available === null) throw new WalletBalanceCheckError(false);
+        if (!transferAmountFits(action.request.payload.sourceAmount, available)) throw new WalletBalanceCheckError(true);
+      }
+      return runQuotedAction(action, {
+        quote: (request) => quoteTradingAccountFx(request.scope.accountId, request.payload),
+        execute: (request, quote, key) => executeTradingAccountFx(request.scope.accountId, {
+          quoteId: quote.quoteId,
+          fromCurrency: quote.fromCurrency,
+          toCurrency: quote.toCurrency,
+          sourceAmount: quote.sourceAmount,
+          idempotencyKey: key,
+        }),
+        isCurrent: () => isCurrent(action.request),
+      });
+    },
     retry: false,
     onSettled: () => { submitLockRef.current = false; },
     onSuccess: async (data, action) => {
@@ -248,7 +269,13 @@ export default function WalletFxScreen({ navigation }: Props) {
       if (isCurrent(request)) {
         // A beginner following QUEST 01 sees the guide's server-checked
         // completion instead of this sheet; the command itself is unchanged.
-        const adopted = claimQuestGuideCommand({
+        const committed = typeof data.result.exchangeId === 'string' && !!data.result.exchangeId &&
+          data.result.quoteId === data.quote.quoteId && data.result.fromCurrency === request.payload.fromCurrency &&
+          data.result.toCurrency === request.payload.toCurrency && typeof data.result.sourceAmount === 'string' &&
+          isPositiveInput(data.result.sourceAmount, 8) &&
+          transferAmountFits(data.result.sourceAmount, request.payload.sourceAmount) &&
+          transferAmountFits(request.payload.sourceAmount, data.result.sourceAmount);
+        const adopted = committed && request.reportQuestCommand({
           kind: 'fx',
           accountId: request.scope.accountId,
           fromCurrency: data.result.fromCurrency,
@@ -270,6 +297,9 @@ export default function WalletFxScreen({ navigation }: Props) {
     },
     onError: (error, action) => {
       if (!isCurrent(action.request)) return;
+      balanceFailureRead.current = walletsQuery.dataUpdatedAt;
+      action.uncertain = !(error instanceof WalletBalanceCheckError) && !!action.quote &&
+        (!getApiErrorInfo(error).hasResponse || (getApiErrorStatus(error) ?? 0) >= 500);
       setDiagnosticError(error);
       const code = getApiErrorCode(error);
       if (isFxRequoteRequiredCode(code)) {
@@ -282,7 +312,7 @@ export default function WalletFxScreen({ navigation }: Props) {
         setDomainError(IDEMPOTENCY_CONFLICT_MESSAGE);
       } else {
         setFxDomainState('fx_execute_rejected');
-        setDomainError(getFxDomainErrorMessage(code, action.request.isGeneral));
+        setDomainError(error instanceof WalletBalanceCheckError ? error.message : getFxDomainErrorMessage(code, action.request.isGeneral));
       }
     },
   });
@@ -328,12 +358,22 @@ export default function WalletFxScreen({ navigation }: Props) {
   }, [accountId, clearInputFocus]);
 
   const pending = executeMutation.isPending;
+  const balanceReady = !walletsQuery.isError && !walletsQuery.isLoading && !walletsQuery.isFetching;
+  const sourceAvailable = balanceReady && walletsQuery.data?.tradingAccountId === accountId
+    ? transferAvailableAmount(getWalletByCurrency(walletsQuery.data, fromCurrency)) : null;
+  const amountFits = !inputInvalidReason && transferAmountFits(amount.trim(), sourceAvailable);
+  const uncertainRetry = !!actionRef.current?.uncertain && !!actionRef.current.quote;
+  const insufficient = !inputInvalidReason && sourceAvailable !== null && !amountFits && !uncertainRetry;
+  useEffect(() => {
+    if (domainError === '잔액이 부족합니다.' && balanceReady && amountFits &&
+      walletsQuery.dataUpdatedAt !== balanceFailureRead.current) setDomainError(null);
+  }, [amountFits, balanceReady, domainError, walletsQuery.dataUpdatedAt]);
   const viewState: WalletFxViewState = walletLookupState !== 'wallet_ready'
     ? walletLookupState : pending ? 'fx_execute_submitting'
       : fxDomainState ?? (amount.trim() && inputInvalidReason ? 'fx_input_invalid' : 'fx_input_idle');
   const canExecute = walletLookupState === 'wallet_ready' && !!availableRate &&
-    !!preview && !inputInvalidReason && capabilities?.canExchange && !pending && !successData && !actionRef.current?.completed;
-  const inputErrorMessage = fieldError ?? (amount.trim() ? inputInvalidReason : null);
+    !!preview && !inputInvalidReason && (amountFits || uncertainRetry) && capabilities?.canExchange && !pending && !successData && !actionRef.current?.completed;
+  const inputErrorMessage = fieldError ?? (amount.trim() ? inputInvalidReason : null) ?? (insufficient ? '잔액이 부족합니다.' : null);
 
   // What the beginner quest guide may point at next; it reads, never drives.
   const guideRate = availableRate ? 'available' : rateQuery.isLoading ? 'loading' : 'unavailable';
@@ -343,7 +383,7 @@ export default function WalletFxScreen({ navigation }: Props) {
       accountId,
       blocked: !capabilities?.canExchange,
       fromCurrency,
-      amountValid: !inputInvalidReason,
+      amountValid: !inputInvalidReason && (amountFits || uncertainRetry),
       rate: guideRate,
       previewReady: !inputInvalidReason && !!preview && !!availableRate,
       canExecute: !!canExecute,
@@ -383,6 +423,7 @@ export default function WalletFxScreen({ navigation }: Props) {
       request: {
         scope: readScope(), seasonUi: capabilities?.isSeason ?? false,
         isGeneral: capabilities?.isGeneral === true,
+        reportQuestCommand: captureQuestGuideCommand(),
         payload: { fromCurrency, toCurrency, sourceAmount: amount.trim() },
       },
       idempotencyKey: createIdempotencyKey('fx'),

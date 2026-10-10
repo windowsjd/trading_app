@@ -11,8 +11,8 @@
  * Nothing here can execute, retry or alter a financial command. With no guide
  * mounted (general/season accounts, tests, a beginner not following a quest)
  * every call is inert and the screens behave exactly as they do without it.
- * Completion is never decided here: the guide re-reads the server's
- * ledger-derived progress after a claim.
+ * First completion requires the guide's fresh ledger-derived progress read.
+ * A replay uses only this run's already committed command.
  *
  * This file stays React- and react-native-free so `node --test` and the
  * function-call screen harnesses can load it unchanged.
@@ -106,6 +106,7 @@ const reveals = new Map<QuestGuideScreen, (node: QuestGuideMeasurable) => void>(
 const listeners = new Set<Listener>();
 let version = 0;
 let commandSink: ((command: QuestGuideCommand) => boolean) | null = null;
+let commandSession: (() => number | null) | null = null;
 
 function emit() {
   version += 1;
@@ -157,10 +158,18 @@ export function registerQuestGuideReveal(screen: QuestGuideScreen, reveal: ((nod
 /**
  * Reports a command that ALREADY succeeded for `accountId`. Returns true only
  * when an active guide for that account adopted it, i.e. the guide — not the
- * screen — will present the outcome (after re-reading server progress).
+ * screen — will present the outcome (first completion also re-reads progress).
  */
 export function claimQuestGuideCommand(command: QuestGuideCommand): boolean {
   return commandSink?.(command) ?? false;
+}
+
+/** Pin a user command to the guide that existed at submit, including retries. */
+export function captureQuestGuideCommand(): (command: QuestGuideCommand) => boolean {
+  const sink = commandSink;
+  const session = commandSession?.() ?? null;
+  return command => sink !== null && sink === commandSink &&
+    session === (commandSession?.() ?? null) ? sink(command) : false;
 }
 
 // Guide-side API (QuestGuideProvider).
@@ -191,9 +200,10 @@ export function revealQuestGuideTarget(screen: QuestGuideScreen, id: QuestGuideT
 }
 
 /** Installs the adopting guide; the returned disposer never removes a newer one. */
-export function setQuestGuideCommandSink(sink: (command: QuestGuideCommand) => boolean) {
+export function setQuestGuideCommandSink(sink: (command: QuestGuideCommand) => boolean, readSession?: () => number | null) {
   commandSink = sink;
+  commandSession = readSession ?? null;
   return () => {
-    if (commandSink === sink) commandSink = null;
+    if (commandSink === sink) { commandSink = null; commandSession = null; }
   };
 }

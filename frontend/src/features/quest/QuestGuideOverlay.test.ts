@@ -250,5 +250,26 @@ describe('QuestGuideOverlay', () => {
     const pieces = h.renderer.root.findAll((node: any) => node.type === 'Animated.View' && flat(node.props.style).borderRadius === 2);
     assert.equal(pieces.length, 26);
     assert.equal(h.find('quest-guide-celebration').props.accessibilityLiveRegion, 'assertive');
+    // Every particle has a strong upward flight before falling; horizontal
+    // spreading accelerates after launch, leaving the central badge readable.
+    for (const piece of pieces) {
+      const transforms = flat(piece.props.style).transform as any[];
+      const up = transforms[1].translateY.interpolate;
+      assert.equal(up.outputRange[0], 0);
+      assert.equal(Math.min(...up.outputRange) < -170, true);
+      assert.equal(up.outputRange.at(-1) > 0, true);
+      assert.equal(up.outputRange[1] < -50, true, 'fast initial lift');
+      const x = transforms[0].translateX.interpolate.outputRange;
+      assert.equal(Math.abs(x[2]) < Math.abs(x.at(-1)) * 0.03, true, 'narrow initial launch');
+      assert.equal(Math.abs(x[4]) > Math.abs(x.at(-1)) * 0.3, true, 'opens at the apex');
+    }
+  });
+
+  it('uses a steady success badge and no confetti for a completed quest replay', async t => {
+    const h = harness();
+    await h.render({ kind: 'celebration', key: '2:celebration', quest: 'exchange', title: '실습을 완료했어요.', summary: '받은 금액 USD 10', leaving: false, replay: true });
+    t.after(h.close);
+    assert.equal(h.find('quest-guide-celebration-title').props.children, '실습을 완료했어요.');
+    assert.equal(h.renderer.root.findAll((n: any) => n.props.testID === 'quest-confetti-piece').length, 0);
   });
 });

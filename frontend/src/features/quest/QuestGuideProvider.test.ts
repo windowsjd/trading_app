@@ -33,6 +33,10 @@ function harness() {
     getRootState: () => h.rootState,
     dispatch: (action: unknown) => h.dispatched.push(action),
   };
+  const queryClient = { fetchQuery: (options: { queryKey: unknown[] }) => {
+    h.fetches.push(options.queryKey.join('/'));
+    return new Promise((resolve, reject) => h.pending.push({ resolve, reject }));
+  } };
   const module = load(resolve('src/features/quest/QuestGuideProvider.tsx'), {
     'react-native': {
       View: 'View', StyleSheet: { create: (styles: unknown) => styles },
@@ -40,10 +44,7 @@ function harness() {
       Keyboard: { dismiss: () => { h.dismissed += 1; } },
     },
     '@react-navigation/native': { StackActions: { popToTop: () => ({ type: 'POP_TO_TOP' }) } },
-    '@tanstack/react-query': { useQueryClient: () => ({ fetchQuery: (options: { queryKey: unknown[] }) => {
-      h.fetches.push(options.queryKey.join('/'));
-      return new Promise((resolve, reject) => h.pending.push({ resolve, reject }));
-    } }) },
+    '@tanstack/react-query': { useQueryClient: () => queryClient },
     '../../app/navigation/navigationRef': { rootNavigationRef: navigationRef },
     '../tradingAccount/api': { getBeginnerQuestProgress: () => Promise.reject(new Error('not used')) },
     './questGuideBridge': bridge,
@@ -70,6 +71,64 @@ function harness() {
 }
 
 describe('QuestGuideProvider', () => {
+  for (const quest of ['exchange', 'transfer'] as const) {
+    it(`${quest}: replay returns once after its new command, without resetting progress or rewards`, async t => {
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+      const h = harness(); await h.render(); t.after(h.close);
+      const baseline = progress(true, true);
+      await h.act(() => h.guide.start(quest, baseline));
+      const command = quest === 'exchange' ? fxCommand : { kind: 'transfer', accountId: ACCOUNT,
+        source: 'securities', destination: 'crypto_spot', currency: 'USD', summary: '보낸 금액 USD 10' };
+      const report = bridge.captureQuestGuideCommand();
+      await h.act(() => t.mock.timers.tick(5000));
+      assert.equal(h.navigations.length, 1, 'past completion never causes a return');
+      let claimed = false; await h.act(() => { claimed = report(command); });
+      assert.equal(claimed, true);
+      assert.equal(h.view().replay, true);
+      assert.equal(h.guide.active.phase, 'replaySucceeded');
+      assert.equal(report(command), false, 'duplicate report');
+      await h.act(() => t.mock.timers.tick(1100));
+      assert.equal(h.navigations.length, 2); assert.equal(h.guide.returnCount, 1);
+      assert.equal(h.guide.justCompleted === null, true);
+      await h.act(() => t.mock.timers.tick(260));
+      await h.act(() => t.mock.timers.tick(5000));
+      assert.equal(h.navigations.length, 2); assert.equal(h.dispatched.length, 1);
+      assert.equal(h.fetches.length, 0, 'a replay is confirmed by the new committed command');
+      assert.equal(baseline.exchange.completedAt, '2026-10-10T01:00:00.000Z');
+      assert.equal(baseline.transfer.completedAt, '2026-10-10T01:05:00.000Z');
+    });
+  }
+
+  it('ignores old session responses and pauses success return while backgrounded', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.act(() => h.guide.start('exchange', progress(true)));
+    const old = bridge.captureQuestGuideCommand();
+    await h.act(() => h.guide.exit());
+    await h.act(() => h.guide.start('exchange', progress(true)));
+    assert.equal(old(fxCommand), false);
+    await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
+    await h.act(() => h.appState('background'));
+    await h.act(() => t.mock.timers.tick(5000));
+    assert.equal(h.navigations.length, 2, 'only the two starts');
+    await h.act(() => h.appState('active'));
+    await h.act(() => t.mock.timers.tick(1100));
+    assert.equal(h.navigations.length, 3);
+    await h.act(() => h.guide.exit());
+    await h.act(() => t.mock.timers.tick(260));
+    assert.equal(h.dispatched.length, 0, 'cancelled return cannot pop a later screen');
+  });
+
+  it('ignores a verification that settles after exit or a later start', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.act(() => h.guide.start('exchange', progress(false)));
+    await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
+    await h.act(() => h.guide.exit());
+    await h.act(() => h.guide.start('exchange', progress(false)));
+    await h.settle(0, progress(true));
+    assert.equal(h.guide.active.phase, 'guiding');
+    assert.equal(h.navigations.length, 2);
+  });
   it('runs QUEST 01 from the card to a server-proven celebration and back to the list', async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = harness();
@@ -141,7 +200,7 @@ describe('QuestGuideProvider', () => {
     assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }]);
   });
 
-  it('adopts nothing from another account, a non-matching route or a review run', async t => {
+  it('rejects other accounts and routes, and adopts a replay only after its own success', async t => {
     const h = harness();
     await h.render();
     t.after(h.close);
@@ -157,13 +216,14 @@ describe('QuestGuideProvider', () => {
     await h.act(() => h.guide.start('transfer', progress(false)));
     assert.equal(h.guide.active === null, true);
 
-    // A review of a proven quest ends on its command; the screen keeps its receipt.
+    // A replay succeeds on this command, with no progress read or new reward.
     await h.act(() => h.guide.start('exchange', progress(true)));
     assert.equal(h.guide.active.replay, true);
     let adopted = true;
     await h.act(() => { adopted = bridge.claimQuestGuideCommand(fxCommand); });
-    assert.equal(adopted, false);
-    assert.equal(h.guide.active === null, true);
+    assert.equal(adopted, true);
+    assert.equal(h.guide.active.phase, 'replaySucceeded');
+    assert.equal(h.view().replay, true);
     assert.deepEqual(h.fetches, []);
   });
 

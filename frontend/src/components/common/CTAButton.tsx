@@ -4,6 +4,7 @@ import {
   Text,
   ActivityIndicator,
   StyleSheet,
+  View,
   ViewStyle,
 } from '../../theme/native';
 import ActionPressable from './ActionPressable';
@@ -12,6 +13,7 @@ type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';
 
 interface CTAButtonProps {
   label: string;
+  leadingIcon?: React.ReactNode;
   state?: CTAState;
   onPress?: () => void;
   style?: ViewStyle;
@@ -22,6 +24,7 @@ interface CTAButtonProps {
 
 export default function CTAButton({
   label,
+  leadingIcon,
   state = 'enabled',
   onPress,
   style,
@@ -52,6 +55,11 @@ export default function CTAButton({
     >
       {state === 'loading' ? (
         <ActivityIndicator color={variant === 'secondary' ? semantic.secondaryActionForeground : primaryGradient.foreground} />
+      ) : leadingIcon ? (
+        <View style={styles.labelGroup}>
+          <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.icon}>{leadingIcon}</View>
+          <Text style={[styles.text, styles.iconLabel, variant === 'secondary' && styles.secondaryText]}>{label}</Text>
+        </View>
       ) : (
         <Text style={variant === 'secondary' ? [styles.text, styles.secondaryText] : styles.text}>{label}</Text>
       )}
@@ -60,6 +68,9 @@ export default function CTAButton({
 }
 
 const styles = StyleSheet.create({
+  labelGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' },
+  icon: { flexShrink: 0 },
+  iconLabel: { flexShrink: 1 },
   button: {
     backgroundColor: semantic.selected,
     borderRadius: 12,

@@ -177,8 +177,16 @@ describe('completion is adopted only from a matching command and proven by the s
     }
   });
 
-  it('ends a review run on its command without adopting or celebrating it', () => {
-    assert.deepEqual(claimGuideCommand(session({ replay: true }), ACCOUNT, fxCommand()), { session: null, claimed: false });
+  it('adopts the replay command once without using old completion or celebrating again', () => {
+    const baseline = session({ replay: true });
+    assert.equal(observeGuideProgress(baseline, progress(true), false).phase, 'guiding');
+    const outcome = claimGuideCommand(baseline, ACCOUNT, fxCommand());
+    assert.equal(outcome.claimed, true);
+    assert.equal(outcome.session?.phase, 'replaySucceeded');
+    assert.equal(claimGuideCommand(outcome.session, ACCOUNT, fxCommand()).claimed, false);
+    const view = resolveGuideView(outcome.session, 'fx', facts());
+    assert.equal(view.kind, 'celebration');
+    if (view.kind === 'celebration') { assert.equal(view.replay, true); assert.equal(view.title, '실습을 완료했어요.'); }
   });
 
   it('celebrates only what a fresh server read proves', () => {
@@ -192,7 +200,7 @@ describe('completion is adopted only from a matching command and proven by the s
     assert.equal(settleGuideVerification(session(), progress(true)).phase, 'guiding');
     const celebration = resolveGuideView(session({ phase: 'celebrating', summary: '받은 금액 USD 73.82' }), 'fx', facts());
     assert.deepEqual(celebration, {
-      kind: 'celebration', key: '1:celebration', quest: 'exchange', title: '환전하기 퀘스트 완료!', summary: '받은 금액 USD 73.82', leaving: false,
+      kind: 'celebration', key: '1:celebration', quest: 'exchange', title: '환전하기 퀘스트 완료!', summary: '받은 금액 USD 73.82', leaving: false, replay: false,
     });
   });
 

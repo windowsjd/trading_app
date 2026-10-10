@@ -93,7 +93,6 @@ const datetimeSources = [
   'screens/record/RecordSeasonDetailScreen.tsx',
   'screens/record/RecordSeasonListScreen.tsx',
   'screens/season/SeasonJoinScreen.tsx',
-  'screens/quest/BeginnerQuestList.tsx',
 ];
 
 describe('KST timestamp display contract', () => {
@@ -104,6 +103,9 @@ describe('KST timestamp display contract', () => {
     // The FX wallet summary no longer shows the rate capture time; the
     // execution time stays in the success sheet via features/wallet/mapper.ts.
     assert.doesNotMatch(walletFxScreen, /formatKstDateTime|capturedAt\)|수집 시각/u);
+    // Quest completion instants remain in progress data, but the card no
+    // longer renders a timestamp surface.
+    assert.doesNotMatch(read('screens/quest/BeginnerQuestList.tsx'), /formatKstDateTime|완료 ·/u);
   });
 
   it('keeps date-only fields out of the datetime formatter', () => {

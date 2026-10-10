@@ -18,24 +18,45 @@ import { QUEST_GUIDE_COPY } from './questContent';
 type Piece = { x: number; peak: number; fall: number; spin: number; width: number; height: number; color: number };
 
 /** Deterministic burst: the same quest completion always looks the same. */
-export function buildConfetti(count: number, spread: number): Piece[] {
+export function buildConfetti(count: number, spread: number, rise = spread * 1.3): Piece[] {
   let seed = 7;
   const random = () => {
     seed = (seed * 16807) % 2147483647;
     return (seed - 1) / 2147483646;
   };
   return Array.from({ length: count }, (_, index) => {
-    const angle = (-165 + (150 * index) / Math.max(1, count - 1) + (random() - 0.5) * 14) * (Math.PI / 180);
-    const distance = spread * (0.55 + random() * 0.45);
+    const fan = (2 * index) / Math.max(1, count - 1) - 1;
     return {
-      x: Math.cos(angle) * distance,
-      peak: Math.sin(angle) * distance * 0.9,
-      fall: spread * (0.7 + random() * 0.5),
+      x: fan * spread * (0.75 + random() * 0.25),
+      peak: -rise * (0.75 + random() * 0.25),
+      fall: rise + spread * (0.5 + random() * 0.45),
       spin: (random() > 0.5 ? 1 : -1) * (180 + random() * 360),
       width: 6 + Math.round(random() * 3),
       height: 9 + Math.round(random() * 5),
-      color: index % 4,
+      color: index % 9 === 0 ? 3 : index % 3,
     };
+  });
+}
+
+const FLIGHT_STOPS = [0, 0.06, 0.12, 0.2, 0.3, 0.4, 0.5, 0.65, 0.8, 1];
+/** Fast lift, zero velocity at the apex, then gravity: no abrupt reversal. */
+export function confettiFlight(piece: Pick<Piece, 'peak' | 'fall'>): number[] {
+  return FLIGHT_STOPS.map(time => {
+    if (time === 0) return 0;
+    if (time <= 0.3) {
+      const up = time / 0.3;
+      return piece.peak * (2 * up - up * up);
+    }
+    const down = (time - 0.3) / 0.7;
+    return piece.peak + piece.fall * down * down;
+  });
+}
+
+/** Launch in a narrow column, then open the fan high above the success copy. */
+function confettiSpread(x: number): number[] {
+  return FLIGHT_STOPS.map(time => {
+    const fan = Math.min(1, Math.max(0, (time - 0.1) / 0.5));
+    return x * fan * fan * (3 - 2 * fan);
   });
 }
 
@@ -44,20 +65,21 @@ export function buildConfetti(count: number, spread: number): Piece[] {
  * proved the quest; it blocks touches so nothing on the practice screen can be
  * pressed while the guide returns to the quest list underneath it.
  */
-export default function QuestCelebration({ title, summary, leaving, reducedMotion }: {
+export default function QuestCelebration({ title, summary, leaving, reducedMotion, replay = false }: {
   title: string;
   summary: string | null;
   leaving: boolean;
   reducedMotion: boolean;
+  replay?: boolean;
 }) {
   const { colors } = useAppearance();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const appear = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
   const burst = useRef(new Animated.Value(0)).current;
-  const pop = useRef(new Animated.Value(reducedMotion ? 1 : 0.6)).current;
+  const pop = useRef(new Animated.Value(reducedMotion || replay ? 1 : 0.6)).current;
   const native = Platform.OS !== 'web';
-  const pieces = useMemo(() => buildConfetti(26, Math.min(190, Math.max(120, width * 0.42))), [width]);
-  const palette = [primaryGradient.colors[0], primaryGradient.colors[1], '#F2B705', colors.success];
+  const pieces = useMemo(() => buildConfetti(26, Math.min(175, width * 0.42), Math.min(240, height * 0.28)), [width, height]);
+  const palette = [primaryGradient.colors[0], primaryGradient.colors[1], '#70AFFF', '#F2B705'];
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(title);
@@ -79,14 +101,14 @@ export default function QuestCelebration({ title, summary, leaving, reducedMotio
   }, [appear, leaving, native, reducedMotion]);
 
   useEffect(() => {
-    if (reducedMotion) return;
+    if (reducedMotion || replay) { pop.setValue(1); return; }
     const animation = Animated.parallel([
-      Animated.timing(burst, { toValue: 1, duration: 1500, easing: Easing.out(Easing.cubic), useNativeDriver: native }),
+      Animated.timing(burst, { toValue: 1, duration: 1600, easing: Easing.linear, useNativeDriver: native, isInteraction: false }),
       Animated.spring(pop, { toValue: 1, friction: 6, tension: 120, useNativeDriver: native }),
     ]);
     animation.start();
     return () => animation.stop();
-  }, [burst, native, pop, reducedMotion]);
+  }, [burst, native, pop, reducedMotion, replay]);
 
   return (
     <Animated.View
@@ -98,7 +120,7 @@ export default function QuestCelebration({ title, summary, leaving, reducedMotio
     >
       <View style={styles.center}>
         <View style={styles.burstOrigin} pointerEvents="none">
-          {reducedMotion ? null : pieces.map((piece, index) => (
+          {reducedMotion || replay ? null : pieces.map((piece, index) => (
             <Animated.View
               key={index}
               testID="quest-confetti-piece"
@@ -108,8 +130,8 @@ export default function QuestCelebration({ title, summary, leaving, reducedMotio
                 backgroundColor: palette[piece.color],
                 opacity: burst.interpolate({ inputRange: [0, 0.08, 0.7, 1], outputRange: [0, 1, 1, 0] }),
                 transform: [
-                  { translateX: burst.interpolate({ inputRange: [0, 1], outputRange: [0, piece.x] }) },
-                  { translateY: burst.interpolate({ inputRange: [0, 0.35, 1], outputRange: [0, piece.peak, piece.peak + piece.fall] }) },
+                  { translateX: burst.interpolate({ inputRange: FLIGHT_STOPS, outputRange: confettiSpread(piece.x) }) },
+                  { translateY: burst.interpolate({ inputRange: FLIGHT_STOPS, outputRange: confettiFlight(piece) }) },
                   { rotate: burst.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${piece.spin}deg`] }) },
                 ],
               }]}

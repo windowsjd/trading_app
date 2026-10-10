@@ -27,6 +27,7 @@ async function run() {
   await new Promise(resolve => server.once('listening', resolve));
   let browser, page;
   const results = [], flows = [], errors = [], compactSteps = [];
+  let shimmerMeasured = false;
   try {
     browser = await chromium.launch({ headless: true, args: ['--no-sandbox'],
       ...(process.env.BEGINNER_CHROMIUM ? { executablePath: process.env.BEGINNER_CHROMIUM } : {}) });
@@ -42,6 +43,9 @@ async function run() {
     const id = value => page.getByTestId(value).filter({ visible: true }).first();
     const tab = label => page.getByRole('tablist').getByRole('tab', { name: label, exact: true });
     const heading = label => page.getByRole('heading', { name: label, exact: true }).filter({ visible: true }).first();
+    async function waitForQuestCompletion(quest) {
+      await page.waitForFunction(quest => document.querySelector(`[data-testid="quest-card-${quest}-status"]`)?.textContent === '완료', quest, { timeout: 8000 });
+    }
     async function open(query = '') { await page.goto(`${base}/?${query}`); await id('home-account-title').waitFor(); }
     async function settled(testId) {
       await page.waitForFunction(testId => {
@@ -146,6 +150,45 @@ async function run() {
       return { ring, card, target };
     }
 
+    async function checkEntryHighlight(button, { ring, target }) {
+      const margins = [target.left - ring.left, ring.right - target.right, target.top - ring.top, ring.bottom - target.bottom];
+      assert.ok(Math.abs(margins[0] - margins[1]) <= 1 && Math.abs(margins[2] - margins[3]) <= 1, `symmetric padding ${JSON.stringify(margins)}`);
+      const group = await box(id(`${button}-guide-target`)), item = await box(id(`${button}-item`));
+      assert.ok(group.right - group.left <= item.right - item.left + 1, 'measured content never exceeds its responsive column');
+      const surface = id(`${button}-surface`);
+      assert.equal(await surface.getByTestId('quest-target-glow').count(), 1);
+      assert.equal(await page.getByTestId('quest-target-glow').count(), 1, 'only the current button glows');
+      assert.equal(await surface.getByTestId('quest-target-highlight').evaluate(el => getComputedStyle(el).pointerEvents), 'none');
+      const reduced = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+      assert.equal(await surface.getByTestId('quest-target-shimmer').count(), reduced ? 0 : 1);
+      await contentFits(`${button}-guide-target`);
+      if (!reduced && button === 'wallet-exchange' && !shimmerMeasured) {
+        const samples = await page.evaluate(() => new Promise(resolve => {
+          const samples = [], started = performance.now(); let sampledAt = -100;
+          function tick(now) {
+            if (now - sampledAt >= 40) {
+              const el = document.querySelector('[data-testid="quest-target-shimmer"]');
+              const surface = el.closest('[data-testid="wallet-exchange-surface"]');
+              const rect = surface.getBoundingClientRect();
+              samples.push({ ms: now - started, x: new DOMMatrix(getComputedStyle(el).transform).m41, width: rect.width, height: rect.height });
+              sampledAt = now;
+            }
+            if (now - started < 3000) requestAnimationFrame(tick); else resolve(samples);
+          }
+          requestAnimationFrame(tick);
+        }));
+        assert.ok(Math.max(...samples.map(s => s.x)) - Math.min(...samples.map(s => s.x)) > 100, 'shimmer crosses the whole surface');
+        assert.ok(samples.some((s, i) => i && s.x < samples[i - 1].x - 50), 'the 2.5s cycle restarts');
+        assert.ok(samples.some((s, i) => i && s.x > samples[i - 1].x + 2), 'sweep moves from left to right');
+        assert.ok(samples.filter((s, i) => i && Math.abs(s.x - samples[i - 1].x) < 0.1).length > samples.length / 2, 'most of the cycle has no moving shine');
+        assert.ok(samples.every(s => Math.abs(s.width - 52) < 1 && Math.abs(s.height - 52) < 1), 'the icon stays fixed size');
+        fs.writeFileSync(path.join(out, 'shimmer-motion.json'), JSON.stringify(samples, null, 2));
+        shimmerMeasured = true;
+        flows.push({ context: 'shimmer-motion', direction: 'left-to-right', cycleRestart: true, fixedIcon: true });
+      }
+
+    }
+
     // The completion badge shows its check above the brand gradient.
     async function expectBadgeCheck() {
       const badge = await page.evaluate(() => {
@@ -227,7 +270,8 @@ async function run() {
       assert.equal(await page.getByRole('tablist').getByRole('tab').count(), 5);
       const list = await text('beginner-quest-list');
       assert.doesNotMatch(list, /실제 거래 기능을 직접 사용해 보며 단계별로 배워요/);
-      assert.doesNotMatch(list, /\d+%|경험치|레벨|해금|잠금|보상/);
+      assert.doesNotMatch(list, /\d+%|경험치|레벨|해금|잠금|보상|배우는 내용:|완료 ·|다시 둘러보기/);
+      if (level === '1') { assert.equal(await id('quest-card-exchange-start').getAttribute('aria-label'), '다시하기'); assert.equal(await id('quest-card-exchange-start').getByTestId('quest-replay-icon').count(), 1); }
       assert.equal(await text('quest-summary-progress'), `퀘스트 ${level}/2 완료`);
       assert.equal(await text('quest-card-exchange-status'), level === '1' ? '완료' : '미시작');
       assert.equal(await text('quest-card-transfer-status'), level === '1' ? '미시작' : '대기');
@@ -245,11 +289,13 @@ async function run() {
       await tab('퀘스트').click(); await id('quest-card-exchange-start').waitFor();
       await id('quest-card-exchange-start').click();
       await id('wallet-screen').waitFor();
-      const entry = await expectSpotlight([id('wallet-exchange-item')], { body: '환전하기에서는 KRW와 USD 환전을 할 수 있어요.', stepLabel: '1/6', context: `${context} entry` });
+      const entry = await expectSpotlight([id('wallet-exchange-surface'), id('wallet-exchange-label')], { body: '환전하기에서는 KRW와 USD 환전을 할 수 있어요.', stepLabel: '1/6', context: `${context} entry` });
+      await checkEntryHighlight('wallet-exchange', entry);
       if (context.endsWith('390')) assert.ok(page.viewportSize().width - entry.card.right <= 13, 'entry card sits top-right');
       await page.screenshot({ path: path.join(out, `fx-1-entry-${context}.png`) });
       await id('wallet-exchange').click(); // the real button, through the overlay
       await id('wallet-fx-screen').waitFor();
+      assert.equal(await page.getByTestId('quest-target-highlight').count(), 0, 'entry animation is disposed on navigation');
       await expectSpotlight([id('wallet-fx-direction-row')], { stepLabel: '2/6', context: `${context} direction` });
       await page.screenshot({ path: path.join(out, `fx-2-direction-${context}.png`) });
       await id('quest-guide-next').click();
@@ -275,7 +321,7 @@ async function run() {
       await page.waitForTimeout(450);
       await expectBadgeCheck();
       await page.screenshot({ path: path.join(out, `fx-7-celebration-${context}.png`) });
-      await id('quest-card-exchange-completed').waitFor({ timeout: 8000 });
+      await waitForQuestCompletion('exchange');
       await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
       await page.waitForTimeout(400);
       assertSmoothReturn(await stopFrames(), 'fx');
@@ -287,7 +333,8 @@ async function run() {
     async function practiceTransfer(context) {
       await id('quest-card-transfer-start').click();
       await id('wallet-screen').waitFor();
-      await expectSpotlight([id('wallet-transfer-item')], { body: '이체하기에서는 같은 통화를 내 지갑 사이에서 옮길 수 있어요.', stepLabel: '1/6', context: `${context} transfer entry` });
+      const entry = await expectSpotlight([id('wallet-transfer-surface'), id('wallet-transfer-label')], { body: '이체하기에서는 같은 통화를 내 지갑 사이에서 옮길 수 있어요.', stepLabel: '1/6', context: `${context} transfer entry` });
+      await checkEntryHighlight('wallet-transfer', entry);
       await page.screenshot({ path: path.join(out, `tr-1-entry-${context}.png`) });
       await id('wallet-transfer').click();
       await id('wallet-transfer-screen').waitFor();
@@ -312,7 +359,7 @@ async function run() {
       await page.waitForTimeout(450);
       await expectBadgeCheck();
       await page.screenshot({ path: path.join(out, `tr-7-celebration-${context}.png`) });
-      await id('quest-card-transfer-completed').waitFor({ timeout: 8000 });
+      await waitForQuestCompletion('transfer');
       await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
       await page.waitForTimeout(400);
       assertSmoothReturn(await stopFrames(), 'transfer');
@@ -332,6 +379,84 @@ async function run() {
       assert.deepEqual(posts.map(p => p.replace(/^\/trading-accounts\/[^/]+/, '')), ['/fx/quote', '/fx/execute', '/wallet-transfers'], 'exactly one user command per practice');
       flows.push({ context, exchange: 'pass', transfer: 'pass', posts: posts.length });
     }
+
+    // Completed quests perform new real commands, retain timestamps, and return without confetti.
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await open('practice=1&fxState=available&quest=2&fontScale=2&theme=dark');
+    await tab('퀘스트').click();
+    const original = await page.evaluate(() => ({ fxAt: window.beginnerFixture.ledger.fxAt, transferAt: window.beginnerFixture.ledger.transferAt }));
+    for (const quest of ['exchange', 'transfer']) {
+      assert.equal(await id(`quest-card-${quest}-start`).getAttribute('aria-label'), '다시하기');
+      await id(`quest-card-${quest}-start`).click();
+      await id(`wallet-${quest}`).click();
+      await page.getByTestId('quest-guide-card').waitFor();
+      if (quest === 'exchange') {
+        await id('quest-guide-next').click(); await id('wallet-fx-amount-input').fill('13500');
+      } else {
+        await id('quest-guide-next').click(); await id('quest-guide-next').click(); await id('wallet-transfer-amount').fill('10');
+      }
+      for (let step = 0; step < (quest === 'exchange' ? 3 : 2); step++) {
+        await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
+        await id('quest-guide-next').click();
+      }
+      await id(quest === 'exchange' ? 'wallet-fx-execute-submit' : 'wallet-transfer-submit').click();
+      await id('quest-guide-celebration').waitFor();
+      assert.equal(await text('quest-guide-celebration-title'), '실습을 완료했어요.');
+      assert.equal(await page.getByTestId('quest-confetti-piece').count(), 0);
+      await settled('quest-guide-celebration');
+      await page.screenshot({ path: path.join(out, `replay-${quest}-success.png`) });
+      await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
+      await id('beginner-quest-list').waitFor(); await contentFits('beginner-quest-list');
+      assert.equal(await text('quest-summary-progress'), '퀘스트 2/2 완료');
+    }
+    assert.deepEqual(await page.evaluate(() => ({ fxAt: window.beginnerFixture.ledger.fxAt, transferAt: window.beginnerFixture.ledger.transferAt })), original);
+    assert.equal((await page.evaluate(() => window.beginnerFixture.posts)).length, 3);
+    flows.push({ context: 'replays', noConfetti: true, timestampsPreserved: true, realCommands: 2 });
+
+    // The shared finance forms also validate cash reservations in every account mode.
+    await page.setViewportSize({ width: 320, height: 640 });
+    for (const account of ['general', 'season', 'beginner']) {
+      await open(`account=${account}&holdings=1&practice=1&quest=2&fxState=available&fontScale=2&theme=dark`);
+      await tab('지갑').click(); await id('wallet-exchange').click(); await id('wallet-fx-screen').waitFor();
+      const available = async currency => page.evaluate(({ account, currency }) => {
+        const data = window.fixture.client.getQueryCache().getAll().find(q => q.queryKey.includes('wallets') && q.queryKey.includes(`${account}-account`)).state.data;
+        const wallet = data.wallets.find(w => w.walletScope === 'securities' && w.currencyCode === currency);
+        return Number(wallet.balanceAmount) - Number(wallet.reservedAmount);
+      }, { account, currency });
+      for (const currency of ['KRW', 'USD']) {
+        await id(currency === 'KRW' ? 'wallet-fx-direction-krw-usd' : 'wallet-fx-direction-usd-krw').click();
+        const cash = await available(currency);
+        await id('wallet-fx-amount-input').fill((cash + 1).toFixed(8));
+        await page.getByText('잔액이 부족합니다.', { exact: true }).filter({ visible: true }).waitFor();
+        assert.equal(await id('wallet-fx-execute-submit').getAttribute('aria-disabled'), 'true');
+        await contentFits('wallet-fx-screen');
+        await id('wallet-fx-execute-submit').scrollIntoViewIfNeeded();
+        await page.getByText('잔액이 부족합니다.', { exact: true }).filter({ visible: true }).scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(out, `insufficient-fx-${account}-${currency}.png`), fullPage: true });
+        await id('wallet-fx-amount-input').fill(cash.toFixed(8));
+        await page.waitForFunction(() => document.querySelector('[data-testid="wallet-fx-execute-submit"]')?.getAttribute('aria-disabled') !== 'true');
+        assert.equal(await page.getByText('잔액이 부족합니다.', { exact: true }).count(), 0);
+        await id('wallet-fx-amount-input').fill('1e3');
+        assert.equal(await page.getByText('잔액이 부족합니다.', { exact: true }).count(), 0);
+        assert.equal(await id('wallet-fx-execute-submit').getAttribute('aria-disabled'), 'true');
+      }
+      await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
+      await id('wallet-transfer').click(); await id('wallet-transfer-screen').waitFor();
+      const cash = await available('USD');
+      await id('wallet-transfer-amount').fill((cash + 1).toFixed(8));
+      await page.getByText('잔액이 부족합니다.', { exact: true }).filter({ visible: true }).waitFor();
+      assert.equal(await id('wallet-transfer-submit').getAttribute('aria-disabled'), 'true');
+      await contentFits('wallet-transfer-screen');
+      await id('wallet-transfer-submit').scrollIntoViewIfNeeded();
+      await page.getByText('잔액이 부족합니다.', { exact: true }).filter({ visible: true }).scrollIntoViewIfNeeded();
+      await page.screenshot({ path: path.join(out, `insufficient-transfer-${account}.png`), fullPage: true });
+      await id('wallet-transfer-amount').fill(cash.toFixed(8));
+      assert.equal(await id('wallet-transfer-submit').getAttribute('aria-disabled'), null);
+      assert.equal(await page.getByTestId('quest-target-highlight').count(), 0);
+      assert.equal((await page.evaluate(() => window.beginnerFixture.posts)).length, 0, 'validation never sends a financial command');
+    }
+    flows.push({ context: 'balance-validation', accounts: 3, directions: 2, reservations: true, exactBalance: true, commands: 0 });
 
     // C: Reduced Motion keeps the guidance and the completion, without motion.
     await page.setViewportSize({ width: 390, height: 844 });
@@ -353,7 +478,7 @@ async function run() {
     await id('quest-guide-celebration').waitFor();
     assert.equal(await page.getByTestId('quest-confetti-piece').count(), 0, 'no confetti under Reduced Motion');
     await page.screenshot({ path: path.join(out, 'reduced-motion-celebration.png') });
-    await id('quest-card-exchange-completed').waitFor({ timeout: 8000 });
+    await waitForQuestCompletion('exchange');
     await page.emulateMedia({ reducedMotion: 'no-preference' });
     flows.push({ context: 'reduced-motion', confetti: 0, returned: true });
 
@@ -376,7 +501,7 @@ async function run() {
     await page.screenshot({ path: path.join(out, 'unconfirmed.png') });
     await id('quest-guide-retry').click();
     await id('quest-guide-celebration').waitFor();
-    await id('quest-card-exchange-completed').waitFor({ timeout: 8000 });
+    await waitForQuestCompletion('exchange');
     assert.deepEqual((await page.evaluate(() => window.beginnerFixture.posts)).map(p => p.replace(/^\/trading-accounts\/[^/]+/, '')), ['/fx/quote', '/fx/execute'], 'retry re-reads progress, never re-executes');
     flows.push({ context: 'unconfirmed-then-retry', pass: true });
 

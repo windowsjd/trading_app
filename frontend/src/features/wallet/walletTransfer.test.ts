@@ -14,7 +14,7 @@ test('Futures availability requires the account-owned wallet and canonical nonne
   assert.equal(futuresTransferAvailableAmount(response, 'B', wallet), null);
   assert.equal(futuresTransferAvailableAmount(response, 'A', { ...wallet, id: 'other' }), null);
   assert.equal(futuresTransferAvailableAmount(undefined, 'A', wallet), null);
-  for (const code of ['INSUFFICIENT_FUTURES_FREE_COLLATERAL', 'FUTURES_MARK_UNAVAILABLE', 'FUTURES_MARK_STALE']) {
+  for (const code of ['FUTURES_MARK_UNAVAILABLE', 'FUTURES_MARK_STALE']) {
     assert.match(transferErrorMessage(code), /선물 지갑의 이체 가능 금액/);
     assert.doesNotMatch(transferErrorMessage(code), /FUTURES_|Mark|HTTP/);
   }
@@ -83,4 +83,10 @@ test('a cross quote and success must echo account, wallet route, source currency
     { ...result, destination: { ...result.destination, walletId: 'foreign' } }, { ...result, source: { ...result.source, availableAfter: '100001.00000000' } },
     { ...result, fx: { ...result.fx, feeRate: '0.020000' } }, { ...result, fx: { ...result.fx, sourceAmount: '1.00000000' } },
   ]) assert.throws(() => parseWalletFxTransferResponse(corrupt, 'A', quote), WalletTransferContractError);
+});
+
+test('all insufficient wallet responses use the same message', () => {
+  for (const code of ['INSUFFICIENT_FUTURES_FREE_COLLATERAL', 'INSUFFICIENT_AVAILABLE_BALANCE', 'INSUFFICIENT_BALANCE']) {
+    assert.equal(transferErrorMessage(code), '잔액이 부족합니다.');
+  }
 });

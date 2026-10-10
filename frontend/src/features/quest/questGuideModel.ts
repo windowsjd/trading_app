@@ -24,13 +24,13 @@ import type { BeginnerQuestKey, BeginnerQuests } from './questProgress.ts';
 import { QUEST_CARDS, QUEST_GUIDE_COPY } from './questContent.ts';
 
 export type FocusedGuideScreen = QuestGuideScreen | 'quests' | 'other';
-export type GuidePhase = 'guiding' | 'verifying' | 'celebrating' | 'returning' | 'unconfirmed' | 'completedElsewhere';
+export type GuidePhase = 'guiding' | 'verifying' | 'celebrating' | 'replaySucceeded' | 'returning' | 'unconfirmed' | 'completedElsewhere';
 
 export interface GuideSession {
   id: number;
   accountId: string;
   quest: BeginnerQuestKey;
-  /** The server had already proven this quest at start: a review, never a celebration. */
+  /** Already proven at start: practice again without repeating the completion reward. */
   replay: boolean;
   /** 1-based step on the practice screen; the Wallet entry button is step 0. */
   step: number;
@@ -69,7 +69,7 @@ export type GuideView =
     card: GuideCard;
   }
   | { kind: 'message'; key: string; anchor: string; screen: QuestGuideScreen; card: GuideCard }
-  | { kind: 'celebration'; key: string; quest: BeginnerQuestKey; title: string; summary: string | null; leaving: boolean };
+  | { kind: 'celebration'; key: string; quest: BeginnerQuestKey; title: string; summary: string | null; leaving: boolean; replay: boolean };
 
 export type GuideFacts = {
   wallet: WalletGuideFacts | null;
@@ -243,14 +243,15 @@ function transferView(session: GuideSession, transfer: TransferGuideFacts | null
 /** What the overlay shows for this session, focus and form state. */
 export function resolveGuideView(session: GuideSession | null, focused: FocusedGuideScreen, facts: GuideFacts): GuideView {
   if (!session) return NONE;
-  if (session.phase === 'celebrating' || session.phase === 'returning') {
+  if (session.phase === 'celebrating' || session.phase === 'replaySucceeded' || session.phase === 'returning') {
     return {
       kind: 'celebration',
       key: `${session.id}:celebration`,
       quest: session.quest,
-      title: QUEST_CARDS[session.quest].completed,
+      title: session.replay ? '실습을 완료했어요.' : QUEST_CARDS[session.quest].completed,
       summary: session.summary,
       leaving: session.phase === 'returning',
+      replay: session.replay,
     };
   }
   const practice = PRACTICE_SCREEN[session.quest];
@@ -299,8 +300,8 @@ export function commandMatchesQuest(quest: BeginnerQuestKey, command: QuestGuide
 
 /**
  * A screen's committed command. Only a matching command of THIS account and a
- * live, non-review session is adopted; the session then waits for the server.
- * A review run ends on its matching command and the screen keeps its receipt.
+ * live session is adopted. First completion waits for ledger-derived progress;
+ * a replay succeeds only on this run's committed command, never old progress.
  */
 export function claimGuideCommand(session: GuideSession | null, accountId: string, command: QuestGuideCommand): {
   session: GuideSession | null;
@@ -310,8 +311,7 @@ export function claimGuideCommand(session: GuideSession | null, accountId: strin
     || !commandMatchesQuest(session.quest, command)) {
     return { session, claimed: false };
   }
-  if (session.replay) return { session: null, claimed: false };
-  return { session: { ...session, phase: 'verifying', summary: command.summary }, claimed: true };
+  return { session: { ...session, phase: session.replay ? 'replaySucceeded' : 'verifying', summary: command.summary }, claimed: true };
 }
 
 /** A fresh server read decides: celebrate only what the ledger proves. */

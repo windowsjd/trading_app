@@ -165,7 +165,7 @@ describe('Wallet entry buttons and the quest guide', () => {
     t.after(h.close);
     h.seed(h.account, { points: [] });
     const tree = h.renderWallet().tree;
-    const item = (id: string) => elements(tree).find((node: any) => node.props.testID === `${id}-item`);
+    const item = (id: string) => elements(tree).find((node: any) => node.props.testID === `${id}-guide-target`);
     assert.equal(item('wallet-exchange').props.ref === bridge.questGuideTarget('wallet-exchange'), true);
     assert.equal(item('wallet-transfer').props.ref === bridge.questGuideTarget('wallet-transfer'), true);
     assert.equal(item('wallet-ledger').props.ref === undefined, true);

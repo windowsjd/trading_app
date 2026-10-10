@@ -43,6 +43,7 @@ function walletTransferHarness({ platform = 'web', diagnostics = false, role = '
       },
       post: async (path, body) => {
         h.requests.push({ path, body });
+        if (h.beforePost) await h.beforePost();
         if (h.gate) await h.gate.promise;
         if (h.failure) throw h.failure;
         const wallet = (walletId, balance) => ({ walletId, walletScope: walletId.split(':')[1], balanceAfter: balance, availableAfter: balance });
