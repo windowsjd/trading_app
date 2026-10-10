@@ -1,0 +1,162 @@
+GitHub job 114244665248; full raw log: /tmp/trading-ci-investigation/github-job-114244665248.log
+793: 2026-10-10T15:17:00.3708096Z PASS src/fx/fx.execute.integration.spec.ts
+794: 2026-10-10T15:17:02.5424909Z PASS src/mvp-flow.integration.spec.ts
+795: 2026-10-10T15:17:06.2754164Z FAIL src/orders/orders.execute.integration.spec.ts
+796: 2026-10-10T15:17:06.2755635Z   ● OrdersService.executeOrder DB integration › keeps season market/limit post-execution prices aligned with live valuation and rolls back failed valuation
+797: 2026-10-10T15:17:06.2756201Z
+798: 2026-10-10T15:17:06.2756209Z
+836: 2026-10-10T15:17:18.2387878Z PASS src/orders/limit-order-idempotent-replay.integration.spec.ts
+837: 2026-10-10T15:17:20.5020227Z PASS src/orders/limit-order-matching.integration.spec.ts
+838: 2026-10-10T15:17:27.0468078Z FAIL src/orders/trading-transaction-time.integration.spec.ts (6.537 s)
+839: 2026-10-10T15:17:27.0518461Z   ● Common trading transaction-time PostgreSQL policy › checks market/FX/Path A/B boundaries, authorization races, timestamps and replay in both modes
+840: 2026-10-10T15:17:27.0539886Z
+841: 2026-10-10T15:17:27.0541240Z     Trading transaction-time integration failed.
+877: 2026-10-10T15:17:27.0564221Z       at Object.<anonymous> (orders/trading-transaction-time.integration.spec.ts:25:15)
+878: 2026-10-10T15:17:27.0564749Z
+879: 2026-10-10T15:17:28.6049040Z FAIL src/orders/market-execution.integration.spec.ts
+880: 2026-10-10T15:17:28.6050103Z   ● One-shot market execution PostgreSQL integration › settles actual fills, replays once, and rolls back every financial stage
+881: 2026-10-10T15:17:28.6050579Z
+882: 2026-10-10T15:17:28.6051729Z     [32m[Nest] 4650  - [39m10/10/2026, 3:17:28 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"df6b1d06-a5fe-4bfa-888c-ccecf4e9aa7b"}[39m
+821: 2026-10-10T15:17:06.2793469Z           success: false,
+822: 2026-10-10T15:17:06.2793697Z           error: {
+823: 2026-10-10T15:17:06.2793950Z             code: 'ASSET_PRICE_UNAVAILABLE',
+824: 2026-10-10T15:17:06.2794316Z             message: 'Asset price snapshot is unavailable.'
+825: 2026-10-10T15:17:06.2794616Z           }
+826: 2026-10-10T15:17:06.2794805Z         },
+868: 2026-10-10T15:17:27.0561262Z           success: false,
+869: 2026-10-10T15:17:27.0561514Z           error: {
+870: 2026-10-10T15:17:27.0561770Z             code: 'ASSET_PRICE_UNAVAILABLE',
+871: 2026-10-10T15:17:27.0562105Z             message: 'Asset price is unavailable.'
+872: 2026-10-10T15:17:27.0562387Z           }
+873: 2026-10-10T15:17:27.0562573Z         },
+902: 2026-10-10T15:17:28.6063805Z           success: false,
+903: 2026-10-10T15:17:28.6064158Z           error: {
+904: 2026-10-10T15:17:28.6064540Z             code: 'ASSET_PRICE_UNAVAILABLE',
+905: 2026-10-10T15:17:28.6065032Z             message: 'Asset price is unavailable.'
+906: 2026-10-10T15:17:28.6065449Z           }
+907: 2026-10-10T15:17:28.6065728Z         },
+1061: 2026-10-10T15:19:47.4582369Z           success: false,
+1062: 2026-10-10T15:19:47.4582715Z           error: {
+1063: 2026-10-10T15:19:47.4583140Z             code: 'CONDITIONAL_PRICE_UNAVAILABLE',
+1064: 2026-10-10T15:19:47.4583826Z             message: 'A fresh eligible reference price is required.'
+1065: 2026-10-10T15:19:47.4584331Z           }
+1066: 2026-10-10T15:19:47.4584646Z         },
+1328: 2026-10-10T15:19:58.9904450Z           success: false,
+1329: 2026-10-10T15:19:58.9937298Z           error: {
+1330: 2026-10-10T15:19:58.9938654Z             code: 'CONDITIONAL_PRICE_UNAVAILABLE',
+1331: 2026-10-10T15:19:58.9939285Z             message: 'A fresh eligible reference price is required.'
+1332: 2026-10-10T15:19:58.9939633Z           }
+1333: 2026-10-10T15:19:58.9940006Z         },
+1338: 2026-10-10T15:19:58.9941306Z
+1339: 2026-10-10T15:19:58.9941315Z
+1340: 2026-10-10T15:19:58.9941486Z Test Suites: 6 failed, 16 passed, 22 total
+1341: 2026-10-10T15:19:58.9941809Z Tests:       6 failed, 17 passed, 23 total
+1342: 2026-10-10T15:19:58.9942084Z Snapshots:   0 total
+1343: 2026-10-10T15:19:58.9942297Z Time:        183.573 s
+1344: 2026-10-10T15:19:58.9947282Z Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.
+
+GitHub job 114244665164; full raw log: /tmp/trading-ci-investigation/github-job-114244665164.log
+781: 2026-10-10T15:17:10.6176457Z PASS src/portfolio/general-performance-hardening.integration.spec.ts (9.849 s)
+782: 2026-10-10T15:17:14.6033241Z PASS src/ranking/season-ranking-scope.integration.spec.ts
+783: 2026-10-10T15:17:18.0350135Z FAIL src/seasons/trading-account-trading-scope.integration.spec.ts
+784: 2026-10-10T15:17:18.0352129Z   ● Trading trading-account scope DB integration › verifies account-only trading schema, scope fail-closed, and account APIs against PostgreSQL
+785: 2026-10-10T15:17:18.0353703Z
+786: 2026-10-10T15:17:18.0354037Z     Trading scope DB integration runner failed.
+809: 2026-10-10T15:17:24.8026300Z PASS src/seasons/trading-account-link.integration.spec.ts
+810: 2026-10-10T15:17:30.4658270Z PASS src/seasons/seasons.join.integration.spec.ts (5.654 s)
+811: 2026-10-10T15:17:36.2476319Z FAIL src/orders/general-account-trading.integration.spec.ts (5.77 s)
+812: 2026-10-10T15:17:36.2526747Z   ● Standalone account trading DB integration › general executes market and limit orders through the shared account core
+813: 2026-10-10T15:17:36.2535273Z
+814: 2026-10-10T15:17:36.2565562Z     General trading DB runner failed.
+891: 2026-10-10T15:18:20.4903988Z PASS src/trading-accounts/beginner-account.integration.spec.ts
+892: 2026-10-10T15:18:23.5908852Z PASS src/assets/assets-tradability.integration.spec.ts
+893: 2026-10-10T15:18:25.2396356Z FAIL src/portfolio/krx-session-close-recovery.integration.spec.ts
+894: 2026-10-10T15:18:25.2419179Z   ● KRX session-close recovery PostgreSQL integration › recovers dated provider closes through HTTP, PostgreSQL and both account modes
+895: 2026-10-10T15:18:25.2445309Z
+896: 2026-10-10T15:18:25.2476975Z     [32m[Nest] 6548  - [39m07/10/2026, 9:00:00 AM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"2ec9763a-28bf-4a19-a266-1aa15ac87a3f"}[39m
+793: 2026-10-10T15:17:18.0358378Z     (node:3911) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+794: 2026-10-10T15:17:18.0360184Z     (Use `node --trace-deprecation ...` to show where the warning was created)
+795: 2026-10-10T15:17:18.0361399Z     AssertionError [ERR_ASSERTION]: Missing expected rejection: fill with mismatched wallet scope must fail
+796: 2026-10-10T15:17:18.0362128Z
+797: 2026-10-10T15:17:18.0362457Z       at async testLimitLifecycleAndFill (../[eval]:791:3)
+798: 2026-10-10T15:17:18.0363111Z       at async main (../[eval]:1150:17) {
+964: 2026-10-10T15:18:29.4974377Z     (node:3911) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+965: 2026-10-10T15:18:29.4978692Z     (Use `node --trace-deprecation ...` to show where the warning was created)
+966: 2026-10-10T15:18:29.4986344Z     AssertionError [ERR_ASSERTION]: Missing expected rejection: fill with mismatched wallet scope must fail
+967: 2026-10-10T15:18:29.4987286Z
+968: 2026-10-10T15:18:29.4987811Z       at async testLimitLifecycleAndFill (../[eval]:791:3)
+969: 2026-10-10T15:18:29.4988481Z       at async main (../[eval]:1150:17) {
+898: 2026-10-10T15:18:25.2478859Z     AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+899: 2026-10-10T15:18:25.2479445Z
+900: 2026-10-10T15:18:25.2479611Z     0 !== 2
+901: 2026-10-10T15:18:25.2479824Z
+902: 2026-10-10T15:18:25.2480317Z     [0m [90m 306 |[39m       usSymbols[33m:[39m [][33m,[39m
+903: 2026-10-10T15:18:25.2481077Z      [90m 307 |[39m     })[33m;[39m
+1053: 2026-10-10T15:18:29.5059485Z     AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+1054: 2026-10-10T15:18:29.5060042Z
+1055: 2026-10-10T15:18:29.5060200Z     0 !== 2
+1056: 2026-10-10T15:18:29.5060409Z
+1057: 2026-10-10T15:18:29.5060860Z     [0m [90m 306 |[39m       usSymbols[33m:[39m [][33m,[39m
+1058: 2026-10-10T15:18:29.5061600Z      [90m 307 |[39m     })[33m;[39m
+1105: 2026-10-10T15:18:29.5124927Z
+1106: 2026-10-10T15:18:29.5124942Z
+1107: 2026-10-10T15:18:29.5125298Z Test Suites: 4 failed, 19 passed, 23 total
+1108: 2026-10-10T15:18:29.5126004Z Tests:       5 failed, 20 passed, 25 total
+1109: 2026-10-10T15:18:29.5126575Z Snapshots:   0 total
+1110: 2026-10-10T15:18:29.5127001Z Time:        88.977 s
+1111: 2026-10-10T15:18:29.5137189Z Ran all test suites matching src/assets/assets-tradability.integration.spec.ts|src/seasons/trading-account.integration.spec.ts|src/seasons/trading-account-link.integration.spec.ts|src/seasons/trading-account-financial-scope.integration.spec.ts|src/seasons/trading-account-trading-scope.integration.spec.ts|src/trading-accounts/general-account.integration.spec.ts|src/trading-accounts/beginner-account.integration.spec.ts|src/trading-accounts/beginner-quest.integration.spec.ts|src/wallets/wallet-scope.integration.spec.ts|src/orders/general-account-trading.integration.spec.ts|src/fx/general-account-fx.integration.spec.ts|src/orders/order-replay-and-cancel-scope.integration.spec.ts|src/portfolio/general-performance-hardening.integration.spec.ts|src/portfolio/krx-closed-price.integration.spec.ts|src/portfolio/krx-session-close-recovery.integration.spec.ts|src/portfolio/snapshot-scope-audit.integration.spec.ts|src/trading-accounts/general-trading-audit.integration.spec.ts|src/ranking/season-ranking-scope.integration.spec.ts|src/ranking/ranking-consistency.integration.spec.ts|src/friends/friends.integration.spec.ts|src/seasons/seasons.join.integration.spec.ts|src/auth/auth.integration.spec.ts|src/ops/ops-job-lock.integration.spec.ts.
+
+GitHub job 114244665292; full raw log: /tmp/trading-ci-investigation/github-job-114244665292.log
+682: 2026-10-10T15:16:52.5477101Z
+683: 2026-10-10T15:16:52.5477553Z KIS_STREAMS_EMPTY: KIS_STREAMS_EMPTY
+684: 2026-10-10T15:16:52.5479974Z     at namedError (/home/runner/work/trading_app/trading_app/backend/src/realtime/live-candle-stream-supervisor.service.ts:1040:17)
+685: 2026-10-10T15:16:52.5482687Z     at LiveCandleStreamSupervisorService.connectKis (/home/runner/work/trading_app/trading_app/backend/src/realtime/live-candle-stream-supervisor.service.ts:554:37)
+686: 2026-10-10T15:16:52.5484121Z
+687: 2026-10-10T15:16:52.5484543Z Node.js v24.21.0
+681: 2026-10-10T15:16:52.5476630Z                 ^
+688: 2026-10-10T15:16:52.5959543Z  ELIFECYCLE  Command failed with exit code 1.
+689: 2026-10-10T15:16:52.6170015Z ##[error]Process completed with exit code 1.
+690: 2026-10-10T15:16:52.6228336Z ##[group]Run shopt -s nullglob
+691: 2026-10-10T15:16:52.6228712Z [36;1mshopt -s nullglob[0m
+
+GitHub job 114258906688; full raw log: /tmp/trading-ci-investigation/github-job-114258906688.log
+4613: 2026-10-10T16:32:56.5613632Z ##[endgroup]
+4614: 2026-10-10T16:32:56.9152355Z Diagnostic bypass gate (frontend): FAIL
+4615: 2026-10-10T16:32:56.9153569Z frontend/src/screens/wallet/WalletTransferScreen.tsx:285: Raw exception/server text or fields are not public JSX copy.
+4616: 2026-10-10T16:32:56.9400710Z ##[error]Process completed with exit code 1.
+4617: 2026-10-10T16:32:56.9530250Z Post job cleanup.
+4618: 2026-10-10T16:32:57.0229140Z [command]/usr/bin/git version
+4598: 2026-10-10T16:32:56.5312144Z   ✔ open market with available price renders it (0.138629ms)
+4599: 2026-10-10T16:32:56.5312807Z ✔ getAssetPriceText (market list rows) (1.874271ms)
+4600: 2026-10-10T16:32:56.5382524Z ℹ tests 2221
+4601: 2026-10-10T16:32:56.5382885Z ℹ suites 222
+4602: 2026-10-10T16:32:56.5383172Z ℹ pass 2221
+4603: 2026-10-10T16:32:56.5383426Z ℹ fail 0
+4604: 2026-10-10T16:32:56.5383853Z ℹ cancelled 0
+4605: 2026-10-10T16:32:56.5384122Z ℹ skipped 0
+4606: 2026-10-10T16:32:56.5384362Z ℹ todo 0
+4612: 2026-10-10T16:32:56.5613351Z   DIAGNOSTIC_AUDIT_BASE: 8390ae3ff96a971ac714e129fe1a7c68b4f6af67
+
+GitHub job 114231468617; full raw log: /tmp/trading-ci-investigation/github-job-114231468617.log
+932: 2026-10-10T14:09:34.4186688Z ##[endgroup]
+933: 2026-10-10T14:09:34.9143303Z backend/src/assets/asset-candles.service.ts:493: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+934: 2026-10-10T14:09:34.9144823Z backend/src/assets/candle-serving.service.ts:473: Use an approved HTTP factory; direct exceptions bypass public message policy.
+935: 2026-10-10T14:09:34.9146321Z backend/src/assets/candle-serving.service.ts:476: Unassigned structured error: use an HTTP factory, partial diagnostic or projectOpsFailure.
+936: 2026-10-10T14:09:34.9147549Z backend/src/assets/live-candle-event-normalizer.service.ts:66: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+937: 2026-10-10T14:09:34.9148479Z backend/src/operator/operator-provider-ingestion.service.ts:201: Use an approved HTTP factory; direct exceptions bypass public message policy.
+938: 2026-10-10T14:09:34.9149374Z backend/src/providers/koscom/koscom-candle.adapter.ts:145: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+939: 2026-10-10T14:09:34.9150301Z backend/src/providers/koscom/koscom-candle.adapter.ts:150: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+940: 2026-10-10T14:09:34.9151160Z backend/src/providers/koscom/koscom-candle.adapter.ts:159: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+954: 2026-10-10T14:09:34.9165824Z backend/src/providers/koscom/koscom-ingestion.service.ts:422: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+955: 2026-10-10T14:09:34.9166933Z backend/src/providers/koscom/koscom-ingestion.service.ts:426: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+956: 2026-10-10T14:09:34.9167811Z backend/src/providers/koscom/koscom-ingestion.service.ts:500: Ops failure fields must pass through the Ops persistence boundary.
+957: 2026-10-10T14:09:34.9168706Z backend/src/providers/koscom/koscom-market-map.service.ts:33: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+958: 2026-10-10T14:09:34.9169670Z backend/src/providers/koscom/koscom-market-map.service.ts:34: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+959: 2026-10-10T14:09:34.9170609Z backend/src/providers/koscom/koscom-market-map.service.ts:40: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+1012: 2026-10-10T14:09:34.9221785Z backend/src/providers/koscom/koscom.client.ts:255: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+1013: 2026-10-10T14:09:34.9234390Z backend/src/providers/koscom/koscom.client.ts:258: Raw error emitter needs an HTTP/Ops boundary or a local @diagnosticSurface internal: reason.
+1014: 2026-10-10T14:09:34.9235309Z Diagnostic bypass gate (backend): FAIL
+1015: 2026-10-10T14:09:34.9274323Z ##[error]Process completed with exit code 1.
+1016: 2026-10-10T14:09:34.9383982Z Post job cleanup.
+1017: 2026-10-10T14:09:35.0044492Z [command]/usr/bin/git version
+Original baseline diagnostic findings: 81 (77 internal emitters, 2 direct HTTP exceptions, 1 structured error, 1 Ops summary).

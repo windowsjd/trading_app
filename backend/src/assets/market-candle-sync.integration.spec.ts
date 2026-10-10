@@ -198,7 +198,7 @@ const binanceStub = {
   },
 };
 
-// KIS 5m fixtures (domestic + US): one segment worth of candles per call.
+// Domestic and US 5m fixtures: one segment worth of candles per call.
 function fiveMinuteFixtureResult(input: { from: Date; to: Date }) {
   const candles = [] as ReturnType<typeof candleFixture>[];
   const firstGrid = Math.ceil(input.from.getTime() / FIVE_MIN) * FIVE_MIN;
@@ -493,7 +493,7 @@ async function main() {
     assert.equal(repaired.writtenRows, 1);
     const baseline = await repository.findRange({ assetId: domestic.id, interval: '1d', from: baselineFrom, to: baselineTo });
     assert.equal(baseline.length, 1);
-    assert.equal(baseline[0].sourceProvider, 'kis_domestic_period');
+    assert.equal(baseline[0].sourceProvider, 'koscom_history');
     assert.equal(baseline[0].isClosed, true);
     assert.equal(baseline[0].closeTime.toISOString(), baselineTo.toISOString());
     assert.equal(await new DailyChangeRateService(repository).calculate(dailyPrice), '10.00000000');

@@ -25,7 +25,9 @@ export function koscomBatches(targets: readonly KoscomTarget[]): KoscomBatch[] {
   const grouped = new Map<KoscomMarket, Map<string, KoscomTarget>>();
   for (const target of targets) {
     if (!/^\d{6}$/.test(target.symbol))
-      throw new KoscomError('KOSCOM_INVALID_SYMBOL');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_INVALID_SYMBOL',
+      );
     const group = grouped.get(target.market) ?? new Map<string, KoscomTarget>();
     group.set(target.symbol, target);
     grouped.set(target.market, group);
@@ -47,7 +49,9 @@ export function parseKoscomJson(text: string): unknown {
     (_key: string, value: unknown, context?: { source?: string }) => {
       if (typeof value !== 'number') return value;
       if (!context?.source)
-        throw new KoscomError('KOSCOM_LOSSLESS_JSON_UNAVAILABLE');
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_LOSSLESS_JSON_UNAVAILABLE',
+        );
       return context.source;
     },
   ) as unknown;
@@ -55,7 +59,9 @@ export function parseKoscomJson(text: string): unknown {
 
 export function koscomRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
-    throw new KoscomError('KOSCOM_MALFORMED_RESPONSE');
+    throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+      'KOSCOM_MALFORMED_RESPONSE',
+    );
   return value as Record<string, unknown>;
 }
 
@@ -76,20 +82,32 @@ export class KoscomClient {
     signal?: AbortSignal,
   ): Promise<KoscomResponse> {
     if (!this.config.getConfig().enabled)
-      return Promise.reject(new KoscomError('KOSCOM_DISABLED'));
+      return Promise.reject(
+        /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_DISABLED',
+        ),
+      );
     if (
       !/^\/v3\/market\/(realtime|closed)\/(kospi|kosdaq|konex)\/[a-zA-Z0-9/]+$/.test(
         path,
       ) ||
       'apikey' in query
     )
-      return Promise.reject(new KoscomError('KOSCOM_INVALID_REQUEST'));
+      return Promise.reject(
+        /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_INVALID_REQUEST',
+        ),
+      );
     const identity = `${path}?${new URLSearchParams(query)}`;
     // Cancellation-bound candle jobs must not inherit another caller's signal.
     const shared = !signal && this.pending.get(identity);
     if (shared) return shared;
     if (this.activeRequests >= 64)
-      return Promise.reject(new KoscomError('KOSCOM_QUEUE_FULL'));
+      return Promise.reject(
+        /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_QUEUE_FULL',
+        ),
+      );
     this.activeRequests++;
     const promise = this.request(path, query, signal).finally(() => {
       this.activeRequests--;
@@ -113,7 +131,9 @@ export class KoscomClient {
       batch.targets.some((t) => t.market !== batch.market) ||
       (batch.market === 'konex' && batch.targets.length !== 1)
     )
-      throw new KoscomError('KOSCOM_INVALID_BATCH');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_INVALID_BATCH',
+      );
     const single = batch.market === 'konex';
     const path = single
       ? `/v3/market/realtime/${batch.market}/stocks/${batch.targets[0].symbol}/${kind}`
@@ -125,7 +145,9 @@ export class KoscomClient {
     );
     const rows = single ? [response.result] : response.result.isulist;
     if (!Array.isArray(rows) || rows.length > batch.targets.length)
-      throw new KoscomError('KOSCOM_MALFORMED_RESPONSE');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_MALFORMED_RESPONSE',
+      );
     return { rows: rows.map(koscomRecord), receivedAt: response.receivedAt };
   }
 
@@ -141,7 +163,9 @@ export class KoscomClient {
         const safe =
           error instanceof KoscomError
             ? error
-            : new KoscomError('KOSCOM_REQUEST_FAILED');
+            : /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+                'KOSCOM_REQUEST_FAILED',
+              );
         if (!safe.retryable || attempt >= 1 || signal?.aborted) throw safe;
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
@@ -154,14 +178,20 @@ export class KoscomClient {
     signal?: AbortSignal,
   ): Promise<KoscomResponse> {
     const config = this.config.getConfig();
-    if (!config.enabled) throw new KoscomError('KOSCOM_DISABLED');
+    if (!config.enabled)
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_DISABLED',
+      );
     const lock = await this.admit(signal);
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(abort, config.timeoutMs);
     try {
-      if (signal?.aborted) throw new KoscomError('KOSCOM_CANCELED');
+      if (signal?.aborted)
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_CANCELED',
+        );
       const url = new URL(path, config.baseUrl);
       for (const [key, value] of Object.entries(query))
         url.searchParams.set(key, value);
@@ -175,38 +205,57 @@ export class KoscomClient {
         await response.body?.cancel().catch(() => undefined);
         const status = response.status;
         if (status === 401 || status === 403)
-          throw new KoscomError('KOSCOM_AUTH_FAILED');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_AUTH_FAILED',
+          );
         if (status === 429) {
           await this.redis.setNxPx(
             `koscom:${config.namespace}:cooldown`,
             '1',
             10000,
           );
-          throw new KoscomError('KOSCOM_RATE_LIMITED');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_RATE_LIMITED',
+          );
         }
-        throw new KoscomError('KOSCOM_HTTP_FAILED', status >= 500);
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_HTTP_FAILED',
+          status >= 500,
+        );
       }
       const body = await response.text();
       const receivedAt = new Date();
       if (body.length > 8_000_000)
-        throw new KoscomError('KOSCOM_RESPONSE_TOO_LARGE');
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_RESPONSE_TOO_LARGE',
+        );
       let parsed: Record<string, unknown>;
       try {
         parsed = koscomRecord(parseKoscomJson(body));
       } catch {
-        throw new KoscomError('KOSCOM_MALFORMED_RESPONSE');
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_MALFORMED_RESPONSE',
+        );
       }
-      if (parsed.error != null) throw new KoscomError('KOSCOM_API_ERROR');
+      if (parsed.error != null)
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_API_ERROR',
+        );
       // Lists use a top-level isuLists; other v3 endpoints use JSON-RPC result.
       if (Array.isArray(parsed.isuLists) && path.endsWith('/lists'))
         return { result: parsed, receivedAt };
       if (parsed.jsonrpc !== '2.0')
-        throw new KoscomError('KOSCOM_MALFORMED_RESPONSE');
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_MALFORMED_RESPONSE',
+        );
       return { result: koscomRecord(parsed.result), receivedAt };
     } catch (error) {
-      if (signal?.aborted) throw new KoscomError('KOSCOM_CANCELED');
+      if (signal?.aborted)
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_CANCELED',
+        );
       if (error instanceof KoscomError) throw error;
-      throw new KoscomError(
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
         controller.signal.aborted ? 'KOSCOM_TIMEOUT' : 'KOSCOM_REQUEST_FAILED',
         true,
       );
@@ -223,16 +272,23 @@ export class KoscomClient {
     const deadline = performance.now() + 30000;
     try {
       while (performance.now() < deadline) {
-        if (signal?.aborted) throw new KoscomError('KOSCOM_CANCELED');
+        if (signal?.aborted)
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_CANCELED',
+          );
         if (await this.redis.get(`${prefix}:cooldown`))
-          throw new KoscomError('KOSCOM_RATE_LIMITED');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_RATE_LIMITED',
+          );
         for (let i = 0; i < config.concurrency; i++) {
           const acquired = await this.locks.acquire(
             `${prefix}:http:${i}`,
             config.timeoutMs + 5000,
           );
           if (acquired.status === 'error')
-            throw new KoscomError('KOSCOM_COORDINATION_UNAVAILABLE');
+            throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+              'KOSCOM_COORDINATION_UNAVAILABLE',
+            );
           if (acquired.status !== 'acquired') continue;
           try {
             if (
@@ -245,17 +301,23 @@ export class KoscomClient {
               return acquired.lock;
           } catch {
             await this.locks.release(acquired.lock);
-            throw new KoscomError('KOSCOM_COORDINATION_UNAVAILABLE');
+            throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+              'KOSCOM_COORDINATION_UNAVAILABLE',
+            );
           }
           await this.locks.release(acquired.lock);
           break;
         }
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
-      throw new KoscomError('KOSCOM_QUEUE_TIMEOUT');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_QUEUE_TIMEOUT',
+      );
     } catch (error) {
       if (error instanceof KoscomError) throw error;
-      throw new KoscomError('KOSCOM_COORDINATION_UNAVAILABLE');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_COORDINATION_UNAVAILABLE',
+      );
     }
   }
 }

@@ -4,6 +4,7 @@ import {
   preserveAdminFailureCause,
 } from '../common/admin-diagnostics';
 import { classifyFailureCause } from '../common/safe-failure-cause';
+import { createApiError } from '../common/api-error';
 import {
   HttpException,
   HttpStatus,
@@ -470,21 +471,15 @@ export class CandleServingService {
 
   private providerCompatibilityError(asset: AssetCandlesAsset): HttpException {
     const crypto = asset.assetType === 'crypto';
-    return new HttpException(
-      {
-        success: false,
-        error: {
-          code: crypto
-            ? 'ASSET_CANDLES_PROVIDER_ERROR'
-            : 'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
-          message: crypto
-            ? 'Binance candle provider is unavailable.'
-            : asset.assetType === 'domestic_stock'
-              ? 'KOSCOM candle provider is unavailable.'
-              : 'KIS candle provider is unavailable.',
-          details: null,
-        },
-      },
+    return createApiError(
+      crypto
+        ? 'ASSET_CANDLES_PROVIDER_ERROR'
+        : 'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+      crypto
+        ? 'Binance candle provider is unavailable.'
+        : asset.assetType === 'domestic_stock'
+          ? 'KOSCOM candle provider is unavailable.'
+          : 'KIS candle provider is unavailable.',
       crypto ? HttpStatus.BAD_GATEWAY : HttpStatus.SERVICE_UNAVAILABLE,
     );
   }

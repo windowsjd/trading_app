@@ -1,0 +1,1586 @@
+{
+  "codeCommit": "e9b379971792192081b562d920af4b2da2ae5f84",
+  "guard": {
+    "maxSeconds": 900,
+    "maxProcessGroupRssMiB": 2300,
+    "nodeMaxOldSpaceMiB": 1536
+  },
+  "entries": [
+    {
+      "command": [
+        "pnpm",
+        "run",
+        "build"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 13.87,
+      "peak_group_rss_bytes": 1825435648,
+      "label": "backend-build",
+      "status": "PASS",
+      "shellCommand": "pnpm run build",
+      "rawLog": "/tmp/trading-ci-investigation/backend-build.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/assets/candle-serving.service.spec.ts",
+        "src/operator/operator-provider-ingestion.service.spec.ts",
+        "src/providers/koscom/koscom-ingestion.service.spec.ts",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/backend-diagnostic-tests.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 1.51,
+      "peak_group_rss_bytes": 367026176,
+      "label": "backend-diagnostic-tests",
+      "status": "PASS",
+      "shellCommand": "pnpm exec jest --runInBand --runTestsByPath src/assets/candle-serving.service.spec.ts src/operator/operator-provider-ingestion.service.spec.ts src/providers/koscom/koscom-ingestion.service.spec.ts --json --outputFile=/tmp/trading-ci-investigation/backend-diagnostic-tests.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/backend-diagnostic-tests.log",
+      "jest": {
+        "numPassedTestSuites": 3,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 52,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 52
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "run",
+        "test:e2e",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/backend-e2e-host.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 12.11,
+      "peak_group_rss_bytes": 628174848,
+      "label": "backend-e2e-host",
+      "status": "PASS",
+      "shellCommand": "pnpm run test:e2e --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-e2e-host.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/backend-e2e-host.log",
+      "jest": {
+        "numPassedTestSuites": 2,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 404,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 404
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "test:e2e",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/backend-e2e-release.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 12.35,
+      "peak_group_rss_bytes": 645394432,
+      "label": "backend-e2e-release",
+      "status": "PASS",
+      "shellCommand": "pnpm test:e2e --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-e2e-release.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/backend-e2e-release.log",
+      "jest": {
+        "numPassedTestSuites": 2,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 404,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 404
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "run",
+        "test:e2e",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/backend-e2e.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 15.53,
+      "peak_group_rss_bytes": 1123414016,
+      "label": "backend-e2e",
+      "status": "FAIL",
+      "shellCommand": "pnpm run test:e2e --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-e2e.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/backend-e2e.log",
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 2,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 1,
+        "numFailedTests": 403,
+        "numPendingTests": 0,
+        "numTotalTests": 404
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm run lint:candles:check && pnpm run format:candles:check && pnpm run lint:accounts:check && pnpm run typecheck && pnpm run build && pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-unit.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 2,
+      "guard": null,
+      "seconds": 28.3,
+      "peak_group_rss_bytes": 1746837504,
+      "label": "backend-quality-final",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'pnpm run lint:candles:check && pnpm run format:candles:check && pnpm run lint:accounts:check && pnpm run typecheck && pnpm run build && pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-unit.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/backend-quality-final.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e\npnpm run lint:candles:check\npnpm run format:candles:check\npnpm run lint:accounts:check\npnpm run typecheck\npnpm run build"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 40.56,
+      "peak_group_rss_bytes": 1788805120,
+      "label": "backend-quality-release",
+      "status": "PASS",
+      "shellCommand": "bash -c 'set -e\npnpm run lint:candles:check\npnpm run format:candles:check\npnpm run lint:accounts:check\npnpm run typecheck\npnpm run build'",
+      "rawLog": "/tmp/trading-ci-investigation/backend-quality-release.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm run lint:candles:check && pnpm run format:candles:check && pnpm run lint:accounts:check && pnpm run typecheck && pnpm run build && pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-unit.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 10.27,
+      "peak_group_rss_bytes": 1833156608,
+      "label": "backend-quality",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'pnpm run lint:candles:check && pnpm run format:candles:check && pnpm run lint:accounts:check && pnpm run typecheck && pnpm run build && pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-unit.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/backend-quality.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "run",
+        "typecheck"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 10.59,
+      "peak_group_rss_bytes": 1628729344,
+      "label": "backend-typecheck",
+      "status": "PASS",
+      "shellCommand": "pnpm run typecheck",
+      "rawLog": "/tmp/trading-ci-investigation/backend-typecheck.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/backend-unit-host.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 26.46,
+      "peak_group_rss_bytes": 1224826880,
+      "label": "backend-unit-host",
+      "status": "PASS",
+      "shellCommand": "pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-unit-host.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/backend-unit-host.log",
+      "jest": {
+        "numPassedTestSuites": 260,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 62,
+        "numPassedTests": 4234,
+        "numFailedTests": 0,
+        "numPendingTests": 85,
+        "numTotalTests": 4319
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "test",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/backend-unit-release.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 21.92,
+      "peak_group_rss_bytes": 1367126016,
+      "label": "backend-unit-release",
+      "status": "PASS",
+      "shellCommand": "pnpm test --runInBand --json --outputFile=/tmp/trading-ci-investigation/backend-unit-release.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/backend-unit-release.log",
+      "jest": {
+        "numPassedTestSuites": 260,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 62,
+        "numPassedTests": 4236,
+        "numFailedTests": 0,
+        "numPendingTests": 85,
+        "numTotalTests": 4321
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 634114048,
+      "label": "candle-after-development-2",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-after-development-2.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Run release fixture smoke (no provider credentials)",
+        "command": "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture",
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "REDIS_URL": "redis://127.0.0.1:56461"
+        }
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 567611392,
+      "label": "candle-after-development-final",
+      "status": "PASS",
+      "shellCommand": "bash -c 'CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-after-development-final.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Run release fixture smoke (no provider credentials)",
+        "command": "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture",
+        "env": {
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "NODE_ENV": "test"
+        }
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 550744064,
+      "label": "candle-after-development",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-after-development.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Run release fixture smoke (no provider credentials)",
+        "command": "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture",
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "REDIS_URL": "redis://127.0.0.1:56461"
+        }
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 1.51,
+      "peak_group_rss_bytes": 497885184,
+      "label": "candle-before",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-before.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Run release fixture smoke (no provider credentials)",
+        "command": "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture",
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_before",
+          "REDIS_URL": "redis://127.0.0.1:56461"
+        }
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "test",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/providers/binance/binance-rest-coordinator.integration.spec.ts",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/candle-cooldown.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 1.77,
+      "peak_group_rss_bytes": 279105536,
+      "label": "candle-cooldown",
+      "status": "PASS",
+      "shellCommand": "pnpm test --runInBand --runTestsByPath src/providers/binance/binance-rest-coordinator.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-cooldown.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/candle-cooldown.log",
+      "jest": {
+        "numPassedTestSuites": 1,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 18,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 18
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 618115072,
+      "label": "candle-release",
+      "status": "PASS",
+      "shellCommand": "bash -c 'CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-release.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Run release fixture smoke (no provider credentials)",
+        "command": "CANDLE_PIPELINE_RELEASE_FIXTURE_SMOKE=1 pnpm run smoke:candle-fixture",
+        "env": {
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "NODE_ENV": "test"
+        }
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "--no-fix",
+        "--max-warnings=0",
+        "scripts/candle-release-fixture-smoke.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 3.76,
+      "peak_group_rss_bytes": 1234432000,
+      "label": "candle-script-lint",
+      "status": "PASS",
+      "shellCommand": "pnpm exec eslint --no-fix --max-warnings=0 scripts/candle-release-fixture-smoke.ts",
+      "rawLog": "/tmp/trading-ci-investigation/candle-script-lint.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-sync-final.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.52,
+      "peak_group_rss_bytes": 702750720,
+      "label": "candle-sync-final",
+      "status": "PASS",
+      "shellCommand": "bash -c 'MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-sync-final.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-sync-final.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Candle checkpoint and daily recovery DB fixture (mock providers)",
+        "command": "MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-sync-final.jest.json",
+        "env": {
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "NODE_ENV": "test"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 1,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 1,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 1
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-sync.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 2.77,
+      "peak_group_rss_bytes": 757907456,
+      "label": "candle-sync",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-sync.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/candle-sync.log",
+      "workflow": {
+        "job": "candle-fixture-integration",
+        "step": "Candle checkpoint and daily recovery DB fixture (mock providers)",
+        "command": "MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/candle-sync.jest.json",
+        "env": {
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "REDIS_URL": "redis://127.0.0.1:56461"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 1,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 0,
+        "numFailedTests": 1,
+        "numPendingTests": 0,
+        "numTotalTests": 1
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e\npnpm exec eslint --no-fix --max-warnings=0 scripts/conditional-orders-integration.ts scripts/krx-closed-price-integration.ts scripts/krx-session-close-recovery-integration.ts scripts/market-execution-integration.ts scripts/order-closed-price-parity-integration.ts scripts/order-input-policy-integration.ts scripts/trading-fee-pinning-integration.ts scripts/trading-transaction-time-integration.ts src/operator/operator-provider-ingestion.service.ts\npnpm exec prettier --check scripts/conditional-orders-integration.ts scripts/krx-closed-price-integration.ts scripts/krx-session-close-recovery-integration.ts scripts/market-execution-integration.ts scripts/order-closed-price-parity-integration.ts scripts/order-input-policy-integration.ts scripts/trading-fee-pinning-integration.ts scripts/trading-transaction-time-integration.ts src/operator/operator-provider-ingestion.service.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 7.26,
+      "peak_group_rss_bytes": 1687101440,
+      "label": "changed-files-style",
+      "status": "PASS",
+      "shellCommand": "bash -c 'set -e\npnpm exec eslint --no-fix --max-warnings=0 scripts/conditional-orders-integration.ts scripts/krx-closed-price-integration.ts scripts/krx-session-close-recovery-integration.ts scripts/market-execution-integration.ts scripts/order-closed-price-parity-integration.ts scripts/order-input-policy-integration.ts scripts/trading-fee-pinning-integration.ts scripts/trading-transaction-time-integration.ts src/operator/operator-provider-ingestion.service.ts\npnpm exec prettier --check scripts/conditional-orders-integration.ts scripts/krx-closed-price-integration.ts scripts/krx-session-close-recovery-integration.ts scripts/market-execution-integration.ts scripts/order-closed-price-parity-integration.ts scripts/order-input-policy-integration.ts scripts/trading-fee-pinning-integration.ts scripts/trading-transaction-time-integration.ts src/operator/operator-provider-ingestion.service.ts'",
+      "rawLog": "/tmp/trading-ci-investigation/changed-files-style.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "--no-fix",
+        "--max-warnings=0",
+        "scripts/krx-session-close-recovery-integration.ts",
+        "scripts/krx-closed-price-integration.ts",
+        "scripts/market-execution-integration.ts",
+        "scripts/order-closed-price-parity-integration.ts",
+        "scripts/order-input-policy-integration.ts",
+        "scripts/trading-fee-pinning-integration.ts",
+        "scripts/trading-transaction-time-integration.ts",
+        "scripts/conditional-orders-integration.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 7.26,
+      "peak_group_rss_bytes": 1648533504,
+      "label": "changed-script-style",
+      "status": "FAIL",
+      "shellCommand": "pnpm exec eslint --no-fix --max-warnings=0 scripts/krx-session-close-recovery-integration.ts scripts/krx-closed-price-integration.ts scripts/market-execution-integration.ts scripts/order-closed-price-parity-integration.ts scripts/order-input-policy-integration.ts scripts/trading-fee-pinning-integration.ts scripts/trading-transaction-time-integration.ts scripts/conditional-orders-integration.ts",
+      "rawLog": "/tmp/trading-ci-investigation/changed-script-style.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "eslint",
+        "--no-fix",
+        "--max-warnings=0",
+        "scripts/candle-release-fixture-smoke.ts",
+        "scripts/krx-session-close-recovery-integration.ts",
+        "scripts/krx-closed-price-integration.ts",
+        "scripts/market-execution-integration.ts",
+        "scripts/order-closed-price-parity-integration.ts",
+        "scripts/order-input-policy-integration.ts",
+        "scripts/trading-fee-pinning-integration.ts",
+        "scripts/trading-transaction-time-integration.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 5.01,
+      "peak_group_rss_bytes": 1400492032,
+      "label": "changed-style-final",
+      "status": "PASS",
+      "shellCommand": "pnpm exec eslint --no-fix --max-warnings=0 scripts/candle-release-fixture-smoke.ts scripts/krx-session-close-recovery-integration.ts scripts/krx-closed-price-integration.ts scripts/market-execution-integration.ts scripts/order-closed-price-parity-integration.ts scripts/order-input-policy-integration.ts scripts/trading-fee-pinning-integration.ts scripts/trading-transaction-time-integration.ts",
+      "rawLog": "/tmp/trading-ci-investigation/changed-style-final.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e\npnpm run trading-accounts:repair-links\npnpm run trading-accounts:repair-ranking-scope\npnpm run trading-accounts:audit-general"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.27,
+      "peak_group_rss_bytes": 452530176,
+      "label": "core-audits",
+      "status": "PASS",
+      "shellCommand": "bash -c 'set -e\npnpm run trading-accounts:repair-links\npnpm run trading-accounts:repair-ranking-scope\npnpm run trading-accounts:audit-general'",
+      "rawLog": "/tmp/trading-ci-investigation/core-audits.log",
+      "workflow": {
+        "job": "core-account-db-integration",
+        "step": "Repair and audit tools (dry-run, no writes)",
+        "command": "set -e\npnpm run trading-accounts:repair-links\npnpm run trading-accounts:repair-ranking-scope\npnpm run trading-accounts:audit-general",
+        "env": {
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "AUTH_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "BEGINNER_ACCOUNT_DB_INTEGRATION": "1",
+          "JWT_ACCESS_SECRET": "ci-core-account-secret",
+          "LIMIT_ORDER_ENABLED": "true",
+          "NODE_ENV": "test",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_core_test",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "AD_REWARD_ENABLED": "true"
+        }
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm exec jest --runInBand src/assets/assets-tradability.integration.spec.ts src/seasons/trading-account.integration.spec.ts src/seasons/trading-account-link.integration.spec.ts src/seasons/trading-account-financial-scope.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/trading-accounts/general-account.integration.spec.ts src/trading-accounts/beginner-account.integration.spec.ts src/trading-accounts/beginner-quest.integration.spec.ts src/wallets/wallet-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/fx/general-account-fx.integration.spec.ts src/orders/order-replay-and-cancel-scope.integration.spec.ts src/portfolio/general-performance-hardening.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts src/portfolio/snapshot-scope-audit.integration.spec.ts src/trading-accounts/general-trading-audit.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/ranking/ranking-consistency.integration.spec.ts src/friends/friends.integration.spec.ts src/seasons/seasons.join.integration.spec.ts src/auth/auth.integration.spec.ts src/ops/ops-job-lock.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/core-full-final.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 60.72,
+      "peak_group_rss_bytes": 842993664,
+      "label": "core-full-final",
+      "status": "PASS",
+      "shellCommand": "bash -c 'pnpm exec jest --runInBand src/assets/assets-tradability.integration.spec.ts src/seasons/trading-account.integration.spec.ts src/seasons/trading-account-link.integration.spec.ts src/seasons/trading-account-financial-scope.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/trading-accounts/general-account.integration.spec.ts src/trading-accounts/beginner-account.integration.spec.ts src/trading-accounts/beginner-quest.integration.spec.ts src/wallets/wallet-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/fx/general-account-fx.integration.spec.ts src/orders/order-replay-and-cancel-scope.integration.spec.ts src/portfolio/general-performance-hardening.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts src/portfolio/snapshot-scope-audit.integration.spec.ts src/trading-accounts/general-trading-audit.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/ranking/ranking-consistency.integration.spec.ts src/friends/friends.integration.spec.ts src/seasons/seasons.join.integration.spec.ts src/auth/auth.integration.spec.ts src/ops/ops-job-lock.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/core-full-final.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/core-full-final.log",
+      "workflow": {
+        "job": "core-account-db-integration",
+        "step": "Core account integration tests",
+        "command": "pnpm exec jest --runInBand src/assets/assets-tradability.integration.spec.ts src/seasons/trading-account.integration.spec.ts src/seasons/trading-account-link.integration.spec.ts src/seasons/trading-account-financial-scope.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/trading-accounts/general-account.integration.spec.ts src/trading-accounts/beginner-account.integration.spec.ts src/trading-accounts/beginner-quest.integration.spec.ts src/wallets/wallet-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/fx/general-account-fx.integration.spec.ts src/orders/order-replay-and-cancel-scope.integration.spec.ts src/portfolio/general-performance-hardening.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts src/portfolio/snapshot-scope-audit.integration.spec.ts src/trading-accounts/general-trading-audit.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/ranking/ranking-consistency.integration.spec.ts src/friends/friends.integration.spec.ts src/seasons/seasons.join.integration.spec.ts src/auth/auth.integration.spec.ts src/ops/ops-job-lock.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/core-full-final.jest.json",
+        "env": {
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "JWT_ACCESS_SECRET": "ci-core-account-secret",
+          "AUTH_DB_SMOKE": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "FRIENDS_DB_INTEGRATION": "1",
+          "NODE_ENV": "test",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "AD_REWARD_ENABLED": "true",
+          "BEGINNER_ACCOUNT_DB_INTEGRATION": "1",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_core_test",
+          "GENERAL_FX_DB_INTEGRATION": "1"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 23,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 25,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 25
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm exec jest --runInBand src/assets/assets-tradability.integration.spec.ts src/seasons/trading-account.integration.spec.ts src/seasons/trading-account-link.integration.spec.ts src/seasons/trading-account-financial-scope.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/trading-accounts/general-account.integration.spec.ts src/trading-accounts/beginner-account.integration.spec.ts src/trading-accounts/beginner-quest.integration.spec.ts src/wallets/wallet-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/fx/general-account-fx.integration.spec.ts src/orders/order-replay-and-cancel-scope.integration.spec.ts src/portfolio/general-performance-hardening.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts src/portfolio/snapshot-scope-audit.integration.spec.ts src/trading-accounts/general-trading-audit.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/ranking/ranking-consistency.integration.spec.ts src/friends/friends.integration.spec.ts src/seasons/seasons.join.integration.spec.ts src/auth/auth.integration.spec.ts src/ops/ops-job-lock.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/core-full.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 60.24,
+      "peak_group_rss_bytes": 897880064,
+      "label": "core-full",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'pnpm exec jest --runInBand src/assets/assets-tradability.integration.spec.ts src/seasons/trading-account.integration.spec.ts src/seasons/trading-account-link.integration.spec.ts src/seasons/trading-account-financial-scope.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/trading-accounts/general-account.integration.spec.ts src/trading-accounts/beginner-account.integration.spec.ts src/trading-accounts/beginner-quest.integration.spec.ts src/wallets/wallet-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/fx/general-account-fx.integration.spec.ts src/orders/order-replay-and-cancel-scope.integration.spec.ts src/portfolio/general-performance-hardening.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts src/portfolio/snapshot-scope-audit.integration.spec.ts src/trading-accounts/general-trading-audit.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/ranking/ranking-consistency.integration.spec.ts src/friends/friends.integration.spec.ts src/seasons/seasons.join.integration.spec.ts src/auth/auth.integration.spec.ts src/ops/ops-job-lock.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/core-full.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/core-full.log",
+      "workflow": {
+        "job": "core-account-db-integration",
+        "step": "Core account integration tests",
+        "command": "pnpm exec jest --runInBand src/assets/assets-tradability.integration.spec.ts src/seasons/trading-account.integration.spec.ts src/seasons/trading-account-link.integration.spec.ts src/seasons/trading-account-financial-scope.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/trading-accounts/general-account.integration.spec.ts src/trading-accounts/beginner-account.integration.spec.ts src/trading-accounts/beginner-quest.integration.spec.ts src/wallets/wallet-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/fx/general-account-fx.integration.spec.ts src/orders/order-replay-and-cancel-scope.integration.spec.ts src/portfolio/general-performance-hardening.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts src/portfolio/snapshot-scope-audit.integration.spec.ts src/trading-accounts/general-trading-audit.integration.spec.ts src/ranking/season-ranking-scope.integration.spec.ts src/ranking/ranking-consistency.integration.spec.ts src/friends/friends.integration.spec.ts src/seasons/seasons.join.integration.spec.ts src/auth/auth.integration.spec.ts src/ops/ops-job-lock.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/core-full.jest.json",
+        "env": {
+          "FRIENDS_DB_INTEGRATION": "1",
+          "AUTH_DB_SMOKE": "1",
+          "NODE_ENV": "test",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "BEGINNER_ACCOUNT_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_ENABLED": "true",
+          "JWT_ACCESS_SECRET": "ci-core-account-secret",
+          "SEASON_JOIN_DB_INTEGRATION": "1",
+          "GENERAL_FX_DB_INTEGRATION": "1",
+          "OPS_JOB_LOCK_DB_SMOKE": "1",
+          "GENERAL_TRADING_DB_INTEGRATION": "1",
+          "TRADING_ACCOUNT_DB_INTEGRATION": "1",
+          "AD_REWARD_ENABLED": "true",
+          "REDIS_URL": "redis://127.0.0.1:56461"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 21,
+        "numFailedTestSuites": 2,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 23,
+        "numFailedTests": 2,
+        "numPendingTests": 0,
+        "numTotalTests": 25
+      }
+    },
+    {
+      "command": [
+        "node",
+        "../scripts/diagnostic-enforcement.cjs",
+        "backend"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 0.25,
+      "peak_group_rss_bytes": 17825792,
+      "label": "diagnostic-backend",
+      "status": "PASS",
+      "shellCommand": "node ../scripts/diagnostic-enforcement.cjs backend",
+      "rawLog": "/tmp/trading-ci-investigation/diagnostic-backend.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e\nnode scripts/diagnostic-enforcement.cjs backend\nnode scripts/diagnostic-enforcement.cjs frontend"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 1.01,
+      "peak_group_rss_bytes": 149135360,
+      "label": "diagnostic-baseline-final",
+      "status": "PASS",
+      "shellCommand": "bash -c 'set -e\nnode scripts/diagnostic-enforcement.cjs backend\nnode scripts/diagnostic-enforcement.cjs frontend'",
+      "rawLog": "/tmp/trading-ci-investigation/diagnostic-baseline-final.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e\nnode scripts/diagnostic-enforcement.cjs backend\nnode scripts/diagnostic-enforcement.cjs frontend"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 0.5,
+      "peak_group_rss_bytes": 46399488,
+      "label": "diagnostic-branch-final",
+      "status": "PASS",
+      "shellCommand": "bash -c 'set -e\nnode scripts/diagnostic-enforcement.cjs backend\nnode scripts/diagnostic-enforcement.cjs frontend'",
+      "rawLog": "/tmp/trading-ci-investigation/diagnostic-branch-final.log"
+    },
+    {
+      "command": [
+        "node",
+        "../scripts/diagnostic-enforcement.cjs",
+        "frontend"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 0.25,
+      "peak_group_rss_bytes": 18087936,
+      "label": "diagnostic-frontend",
+      "status": "PASS",
+      "shellCommand": "node ../scripts/diagnostic-enforcement.cjs frontend",
+      "rawLog": "/tmp/trading-ci-investigation/diagnostic-frontend.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/failures-after.jest.json",
+        "--runTestsByPath",
+        "src/orders/orders.execute.integration.spec.ts",
+        "src/orders/trading-transaction-time.integration.spec.ts",
+        "src/orders/market-execution.integration.spec.ts",
+        "src/orders/trading-fee-pinning.integration.spec.ts",
+        "src/orders/order-input-policy.integration.spec.ts",
+        "src/conditional/conditional.integration.spec.ts",
+        "src/seasons/trading-account-trading-scope.integration.spec.ts",
+        "src/orders/general-account-trading.integration.spec.ts",
+        "src/portfolio/krx-closed-price.integration.spec.ts",
+        "src/portfolio/krx-session-close-recovery.integration.spec.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 88.69,
+      "peak_group_rss_bytes": 913403904,
+      "label": "failures-after",
+      "status": "PASS",
+      "shellCommand": "pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/failures-after.jest.json --runTestsByPath src/orders/orders.execute.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/market-execution.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/order-input-policy.integration.spec.ts src/conditional/conditional.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts",
+      "rawLog": "/tmp/trading-ci-investigation/failures-after.log",
+      "jest": {
+        "numPassedTestSuites": 10,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 12,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 12
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/failures-baseline.jest.json",
+        "--runTestsByPath",
+        "src/orders/orders.execute.integration.spec.ts",
+        "src/orders/trading-transaction-time.integration.spec.ts",
+        "src/orders/market-execution.integration.spec.ts",
+        "src/orders/trading-fee-pinning.integration.spec.ts",
+        "src/orders/order-input-policy.integration.spec.ts",
+        "src/conditional/conditional.integration.spec.ts",
+        "src/seasons/trading-account-trading-scope.integration.spec.ts",
+        "src/orders/general-account-trading.integration.spec.ts",
+        "src/portfolio/krx-closed-price.integration.spec.ts",
+        "src/portfolio/krx-session-close-recovery.integration.spec.ts"
+      ],
+      "cwd": "/tmp/trading-ci-baseline/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 86.51,
+      "peak_group_rss_bytes": 928727040,
+      "label": "failures-baseline",
+      "status": "PASS",
+      "shellCommand": "pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/failures-baseline.jest.json --runTestsByPath src/orders/orders.execute.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/market-execution.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/order-input-policy.integration.spec.ts src/conditional/conditional.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts",
+      "rawLog": "/tmp/trading-ci-investigation/failures-baseline.log",
+      "jest": {
+        "numPassedTestSuites": 10,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 11,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 11
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/failures-before.jest.json",
+        "--runTestsByPath",
+        "src/orders/orders.execute.integration.spec.ts",
+        "src/orders/trading-transaction-time.integration.spec.ts",
+        "src/orders/market-execution.integration.spec.ts",
+        "src/orders/trading-fee-pinning.integration.spec.ts",
+        "src/orders/order-input-policy.integration.spec.ts",
+        "src/conditional/conditional.integration.spec.ts",
+        "src/seasons/trading-account-trading-scope.integration.spec.ts",
+        "src/orders/general-account-trading.integration.spec.ts",
+        "src/portfolio/krx-closed-price.integration.spec.ts",
+        "src/portfolio/krx-session-close-recovery.integration.spec.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 19.65,
+      "peak_group_rss_bytes": 931672064,
+      "label": "failures-before",
+      "status": "FAIL",
+      "shellCommand": "pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/failures-before.jest.json --runTestsByPath src/orders/orders.execute.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/market-execution.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/order-input-policy.integration.spec.ts src/conditional/conditional.integration.spec.ts src/seasons/trading-account-trading-scope.integration.spec.ts src/orders/general-account-trading.integration.spec.ts src/portfolio/krx-closed-price.integration.spec.ts src/portfolio/krx-session-close-recovery.integration.spec.ts",
+      "rawLog": "/tmp/trading-ci-investigation/failures-before.log",
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 8,
+        "numPendingTestSuites": 2,
+        "numPassedTests": 1,
+        "numFailedTests": 9,
+        "numPendingTests": 2,
+        "numTotalTests": 12
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm exec jest --runInBand src/orders/order-input-policy.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/wallets/spot-wallet-transfer.integration.spec.ts src/wallets/wallet-fx-transfer.integration.spec.ts src/futures/futures.integration.spec.ts src/futures/futures-risk.integration.spec.ts src/futures/futures-f3.integration.spec.ts src/futures/futures-f31.integration.spec.ts src/conditional/conditional.integration.spec.ts src/futures/futures-limit.integration.spec.ts src/futures/futures-isolated-boundary.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/orders/market-execution.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/financial-full.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 215.4,
+      "peak_group_rss_bytes": 947462144,
+      "label": "financial-full",
+      "status": "PASS",
+      "shellCommand": "bash -c 'pnpm exec jest --runInBand src/orders/order-input-policy.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/wallets/spot-wallet-transfer.integration.spec.ts src/wallets/wallet-fx-transfer.integration.spec.ts src/futures/futures.integration.spec.ts src/futures/futures-risk.integration.spec.ts src/futures/futures-f3.integration.spec.ts src/futures/futures-f31.integration.spec.ts src/conditional/conditional.integration.spec.ts src/futures/futures-limit.integration.spec.ts src/futures/futures-isolated-boundary.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/orders/market-execution.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/financial-full.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/financial-full.log",
+      "workflow": {
+        "job": "limit-order-db-integration",
+        "step": "Limit order PostgreSQL integration tests",
+        "command": "pnpm exec jest --runInBand src/orders/order-input-policy.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/wallets/spot-wallet-transfer.integration.spec.ts src/wallets/wallet-fx-transfer.integration.spec.ts src/futures/futures.integration.spec.ts src/futures/futures-risk.integration.spec.ts src/futures/futures-f3.integration.spec.ts src/futures/futures-f31.integration.spec.ts src/conditional/conditional.integration.spec.ts src/futures/futures-limit.integration.spec.ts src/futures/futures-isolated-boundary.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/orders/market-execution.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/financial-full.jest.json",
+        "env": {
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "FUTURES_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_fixed",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "NODE_ENV": "test",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 22,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 23,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 23
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm exec jest --runInBand src/orders/order-input-policy.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/wallets/spot-wallet-transfer.integration.spec.ts src/wallets/wallet-fx-transfer.integration.spec.ts src/futures/futures.integration.spec.ts src/futures/futures-risk.integration.spec.ts src/futures/futures-f3.integration.spec.ts src/futures/futures-f31.integration.spec.ts src/conditional/conditional.integration.spec.ts src/futures/futures-limit.integration.spec.ts src/futures/futures-isolated-boundary.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/orders/market-execution.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/financial-release.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 207.44,
+      "peak_group_rss_bytes": 914395136,
+      "label": "financial-release",
+      "status": "PASS",
+      "shellCommand": "bash -c 'pnpm exec jest --runInBand src/orders/order-input-policy.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/wallets/spot-wallet-transfer.integration.spec.ts src/wallets/wallet-fx-transfer.integration.spec.ts src/futures/futures.integration.spec.ts src/futures/futures-risk.integration.spec.ts src/futures/futures-f3.integration.spec.ts src/futures/futures-f31.integration.spec.ts src/conditional/conditional.integration.spec.ts src/futures/futures-limit.integration.spec.ts src/futures/futures-isolated-boundary.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/orders/market-execution.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/financial-release.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/financial-release.log",
+      "workflow": {
+        "job": "limit-order-db-integration",
+        "step": "Limit order PostgreSQL integration tests",
+        "command": "pnpm exec jest --runInBand src/orders/order-input-policy.integration.spec.ts src/orders/limit-order-reservation.integration.spec.ts src/wallets/spot-wallet-transfer.integration.spec.ts src/wallets/wallet-fx-transfer.integration.spec.ts src/futures/futures.integration.spec.ts src/futures/futures-risk.integration.spec.ts src/futures/futures-f3.integration.spec.ts src/futures/futures-f31.integration.spec.ts src/conditional/conditional.integration.spec.ts src/futures/futures-limit.integration.spec.ts src/futures/futures-isolated-boundary.integration.spec.ts src/orders/limit-order-create-race.integration.spec.ts src/orders/limit-order-transaction-time.integration.spec.ts src/orders/trading-transaction-time.integration.spec.ts src/orders/trading-fee-pinning.integration.spec.ts src/orders/limit-order-create-no-redis.integration.spec.ts src/orders/limit-order-idempotent-replay.integration.spec.ts src/orders/limit-order-matching.integration.spec.ts src/orders/orders.execute.integration.spec.ts src/orders/market-execution.integration.spec.ts src/fx/fx.execute.integration.spec.ts src/mvp-flow.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/financial-release.jest.json",
+        "env": {
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "NODE_ENV": "test",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_core_test",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "FUTURES_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 22,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 23,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 23
+      }
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "export:web",
+        "--",
+        "--max-workers",
+        "2"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 10.58,
+      "peak_group_rss_bytes": 1035034624,
+      "label": "frontend-export-final",
+      "status": "PASS",
+      "shellCommand": "npm run export:web -- --max-workers 2",
+      "rawLog": "/tmp/trading-ci-investigation/frontend-export-final.log"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "export:web"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": -15,
+      "guard": "process group RSS exceeded 2300 MiB",
+      "seconds": 2.53,
+      "peak_group_rss_bytes": 2656362496,
+      "label": "frontend-export",
+      "status": "FAIL",
+      "shellCommand": "npm run export:web",
+      "rawLog": "/tmp/trading-ci-investigation/frontend-export.log"
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 189.49,
+      "peak_group_rss_bytes": 1202933760,
+      "label": "frontend-quality-host",
+      "status": "PASS",
+      "shellCommand": "npm run check",
+      "rawLog": "/tmp/trading-ci-investigation/frontend-quality-host.log",
+      "nodeTest": {
+        "tests": 2221,
+        "suites": 222,
+        "pass": 2221,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 194.37,
+      "peak_group_rss_bytes": 1251786752,
+      "label": "frontend-quality",
+      "status": "PASS",
+      "shellCommand": "npm run check",
+      "rawLog": "/tmp/trading-ci-investigation/frontend-quality.log"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "src/screens/wallet/WalletTransferScreen.test.ts",
+        "src/features/wallet/walletTransfer.test.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 7.56,
+      "peak_group_rss_bytes": 369975296,
+      "label": "frontend-targeted-host",
+      "status": "PASS",
+      "shellCommand": "node --test --test-concurrency=1 src/screens/wallet/WalletTransferScreen.test.ts src/features/wallet/walletTransfer.test.ts",
+      "rawLog": "/tmp/trading-ci-investigation/frontend-targeted-host.log",
+      "nodeTest": {
+        "tests": 64,
+        "suites": 0,
+        "pass": 64,
+        "fail": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "src/screens/wallet/WalletTransferScreen.test.ts",
+        "src/features/wallet/walletTransfer.test.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/frontend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 7.51,
+      "peak_group_rss_bytes": 368029696,
+      "label": "frontend-targeted",
+      "status": "PASS",
+      "shellCommand": "node --test --test-concurrency=1 src/screens/wallet/WalletTransferScreen.test.ts src/features/wallet/walletTransfer.test.ts",
+      "rawLog": "/tmp/trading-ci-investigation/frontend-targeted.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/futures/futures-price-safety.integration.spec.ts",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/futures-safety-complete.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 13.87,
+      "peak_group_rss_bytes": 1132257280,
+      "label": "futures-safety-complete",
+      "status": "PASS",
+      "shellCommand": "pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/futures-safety-complete.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/futures-safety-complete.log",
+      "jest": {
+        "numPassedTestSuites": 1,
+        "numFailedTestSuites": 0,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 1,
+        "numFailedTests": 0,
+        "numPendingTests": 0,
+        "numTotalTests": 1
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE futures_price_safety_test'\npnpm exec prisma migrate deploy\npnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/futures-safety-final.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 9.83,
+      "peak_group_rss_bytes": 1170755584,
+      "label": "futures-safety-final",
+      "status": "FAIL",
+      "shellCommand": "bash -c 'PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c '\"'\"'CREATE DATABASE futures_price_safety_test'\"'\"'\npnpm exec prisma migrate deploy\npnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/futures-safety-final.jest.json'",
+      "rawLog": "/tmp/trading-ci-investigation/futures-safety-final.log",
+      "workflow": {
+        "job": "limit-order-db-integration",
+        "step": "Futures readiness and Last retention PostgreSQL safety",
+        "command": "PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE futures_price_safety_test'\npnpm exec prisma migrate deploy\npnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/futures-safety-final.jest.json",
+        "env": {
+          "LIMIT_ORDER_IDEMPOTENT_REPLAY_INTEGRATION": "1",
+          "DATABASE_URL": "postgresql://ci_stabilization@127.0.0.1:55461/ci_futures_safety_test",
+          "REDIS_URL": "redis://127.0.0.1:56461",
+          "FUTURES_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_MATCHING_DB_INTEGRATION": "1",
+          "ORDER_EXECUTE_DB_INTEGRATION": "1",
+          "FX_EXECUTE_DB_INTEGRATION": "1",
+          "FUTURES_F31_DB_INTEGRATION": "1",
+          "FUTURES_RISK_DB_INTEGRATION": "1",
+          "CONDITIONAL_DB_INTEGRATION": "1",
+          "MVP_FLOW_DB_SMOKE": "1",
+          "NODE_ENV": "test",
+          "FUTURES_F3_DB_INTEGRATION": "1",
+          "LIMIT_ORDER_RESERVATION_DB_INTEGRATION": "1",
+          "FUTURES_PRICE_SAFETY_DB_INTEGRATION": "1",
+          "FUTURES_LIMIT_DB_INTEGRATION": "1",
+          "MARKET_EXECUTION_DB_INTEGRATION": "1"
+        }
+      },
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 1,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 0,
+        "numFailedTests": 1,
+        "numPendingTests": 0,
+        "numTotalTests": 1
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/futures/futures-price-safety.integration.spec.ts",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/futures-safety-release.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 2.27,
+      "peak_group_rss_bytes": 1096683520,
+      "label": "futures-safety-release",
+      "status": "FAIL",
+      "shellCommand": "pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/futures-safety-release.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/futures-safety-release.log",
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 1,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 0,
+        "numFailedTests": 1,
+        "numPendingTests": 0,
+        "numTotalTests": 1
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/futures/futures-price-safety.integration.spec.ts",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/futures-safety.jest.json"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 1.52,
+      "peak_group_rss_bytes": 578818048,
+      "label": "futures-safety",
+      "status": "FAIL",
+      "shellCommand": "pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts --json --outputFile=/tmp/trading-ci-investigation/futures-safety.jest.json",
+      "rawLog": "/tmp/trading-ci-investigation/futures-safety.log",
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 1,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 0,
+        "numFailedTests": 1,
+        "numPendingTests": 0,
+        "numTotalTests": 1
+      }
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-baseline/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.01,
+      "peak_group_rss_bytes": 314871808,
+      "label": "migrate-baseline",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-baseline.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.52,
+      "peak_group_rss_bytes": 354119680,
+      "label": "migrate-before",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-before.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.01,
+      "peak_group_rss_bytes": 314044416,
+      "label": "migrate-core-test",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-core-test.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 314200064,
+      "label": "migrate-fixed",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-fixed.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 313499648,
+      "label": "migrate-futures-release",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-futures-release.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.27,
+      "peak_group_rss_bytes": 312954880,
+      "label": "migrate-futures-safety",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-futures-safety.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "prisma",
+        "migrate",
+        "deploy"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 2.02,
+      "peak_group_rss_bytes": 313389056,
+      "label": "migrate-futures-test",
+      "status": "PASS",
+      "shellCommand": "pnpm exec prisma migrate deploy",
+      "rawLog": "/tmp/trading-ci-investigation/migrate-futures-test.log"
+    },
+    {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--json",
+        "--outputFile=/tmp/trading-ci-investigation/missing-flags-before.jest.json",
+        "--runTestsByPath",
+        "src/orders/trading-transaction-time.integration.spec.ts",
+        "src/orders/order-input-policy.integration.spec.ts"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 1,
+      "guard": null,
+      "seconds": 8.07,
+      "peak_group_rss_bytes": 764641280,
+      "label": "missing-flags-before",
+      "status": "FAIL",
+      "shellCommand": "pnpm exec jest --runInBand --json --outputFile=/tmp/trading-ci-investigation/missing-flags-before.jest.json --runTestsByPath src/orders/trading-transaction-time.integration.spec.ts src/orders/order-input-policy.integration.spec.ts",
+      "rawLog": "/tmp/trading-ci-investigation/missing-flags-before.log",
+      "jest": {
+        "numPassedTestSuites": 0,
+        "numFailedTestSuites": 2,
+        "numPendingTestSuites": 0,
+        "numPassedTests": 0,
+        "numFailedTests": 2,
+        "numPendingTests": 0,
+        "numTotalTests": 2
+      }
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "pnpm exec prisma generate && git diff --exit-code -- src/generated/prisma && pnpm exec prisma migrate status && pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 3.03,
+      "peak_group_rss_bytes": 500400128,
+      "label": "schema-generate-drift",
+      "status": "PASS",
+      "shellCommand": "bash -c 'pnpm exec prisma generate && git diff --exit-code -- src/generated/prisma && pnpm exec prisma migrate status && pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code'",
+      "rawLog": "/tmp/trading-ci-investigation/schema-generate-drift.log"
+    },
+    {
+      "command": [
+        "bash",
+        "-c",
+        "set -e\npnpm exec prisma migrate status\npnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code\ngit diff --exit-code 129289d86a32ea83ab2521f9d3d2469cf6d88ba7 -- prisma src/generated/prisma"
+      ],
+      "cwd": "/tmp/trading-ci-stabilization/backend",
+      "exit_code": 0,
+      "guard": null,
+      "seconds": 1.51,
+      "peak_group_rss_bytes": 268894208,
+      "label": "schema-release",
+      "status": "PASS",
+      "shellCommand": "bash -c 'set -e\npnpm exec prisma migrate status\npnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code\ngit diff --exit-code 129289d86a32ea83ab2521f9d3d2469cf6d88ba7 -- prisma src/generated/prisma'",
+      "rawLog": "/tmp/trading-ci-investigation/schema-release.log"
+    }
+  ],
+  "releaseSmoke": {
+    "schemaVersion": 1,
+    "result": "passed",
+    "gitCommit": "e9b379971792192081b562d920af4b2da2ae5f84",
+    "gitBranch": "fix/ci-stabilization-20261011",
+    "gitDirty": false,
+    "startedAt": "2026-10-10T16:57:30.490Z",
+    "finishedAt": "2026-10-10T16:57:31.551Z",
+    "durationMs": 1061,
+    "assets": [
+      {
+        "assetType": "crypto",
+        "symbol": "FX4796USDT"
+      },
+      {
+        "assetType": "domestic_stock",
+        "symbol": "906339"
+      },
+      {
+        "assetType": "us_stock",
+        "symbol": "FXU479"
+      }
+    ],
+    "scenarios": [
+      {
+        "name": "prisma migrations applied (coverage migration present)",
+        "state": "passed"
+      },
+      {
+        "name": "historical 5m/1d/1w fixtures stored",
+        "state": "passed"
+      },
+      {
+        "name": "initial sync writes a coverage-complete checkpoint (crypto)",
+        "state": "passed"
+      },
+      {
+        "name": "provider-exhausted US sync stays coverage-incomplete",
+        "state": "passed"
+      },
+      {
+        "name": "incomplete coverage is not mistaken for a fresh/confirmed-empty database",
+        "state": "passed"
+      },
+      {
+        "name": "database serving + Redis response cache",
+        "state": "passed"
+      },
+      {
+        "name": "stale Redis + injected DB operational failure → stale fallback",
+        "state": "passed"
+      },
+      {
+        "name": "programmer/config errors are never hidden behind stale Redis",
+        "state": "passed"
+      },
+      {
+        "name": "fake provider sockets: Binance absolute + KIS US delta events; legacy reducer preserved",
+        "state": "passed"
+      },
+      {
+        "name": "15m/30m/1h/4h overlay snapshots from live state",
+        "state": "passed"
+      },
+      {
+        "name": "Pub/Sub fanout reaches an authenticated app WebSocket client",
+        "state": "passed"
+      },
+      {
+        "name": "frontend parser/merge + shared socket fixtures",
+        "state": "passed"
+      },
+      {
+        "name": "finalizer closes buckets exactly once with cache invalidation",
+        "state": "passed"
+      },
+      {
+        "name": "old-generation Binance provider-final bucket is recovered",
+        "state": "passed"
+      },
+      {
+        "name": "old-generation KIS delta bucket goes through REST repair recovery",
+        "state": "passed"
+      },
+      {
+        "name": "REST reconciliation corrects drift to zero",
+        "state": "passed"
+      },
+      {
+        "name": "owner lease loss and provider disconnect keep buckets incomplete",
+        "state": "passed"
+      },
+      {
+        "name": "DB finalization failure preserves live state for retry",
+        "state": "passed"
+      },
+      {
+        "name": "checkpoint conflict and cursor stall are surfaced, cursor never skips",
+        "state": "passed"
+      },
+      {
+        "name": "Pub/Sub subscriber survives a forced disconnect",
+        "state": "passed"
+      },
+      {
+        "name": "holiday and early-close calendar policy",
+        "state": "passed"
+      },
+      {
+        "name": "retention deletes only aged closed 5m rows",
+        "state": "passed"
+      },
+      {
+        "name": "KOSCOM native absolute candles keep ownership, OHLCV and finalization",
+        "state": "passed"
+      },
+      {
+        "name": "no incomplete closed candles and no duplicate canonical rows",
+        "state": "passed"
+      },
+      {
+        "name": "fixture cleanup leaves no rows or keys behind",
+        "state": "passed"
+      }
+    ],
+    "passed": 25,
+    "failed": 0,
+    "redisKeysCreated": 11,
+    "redisKeysRemainingAfterCleanup": 0,
+    "dbRowsRemainingAfterCleanup": 0,
+    "duplicateEvents": 2,
+    "outOfOrderEvents": 1,
+    "incompleteClosedCandles": 0,
+    "reconciliationCorrections": 1,
+    "errors": []
+  },
+  "futuresSafety": {
+    "checks": [
+      "read-only CLI passes fresh complete DISABLED launch targets without idle Ops runs",
+      "CLI rejects expired coverage and disabled required collectors/risk",
+      "CLI rejects registered instrument missing prices",
+      "actual batched SQL matches individual Last/Mark readers for missing, fresh, future and stale newest trades; no older-trade resurrection",
+      "actual CLI rejects disabled live protection config and successful preview-only worker observations",
+      "real execution, TP/SL, season pin, inclusive unpinned windows, latest per source preserved; repeat no-op; records immutable",
+      "both financial reference/delete race orderings preserve FK integrity",
+      "concurrent SKIP LOCKED batches delete each old observation exactly once at scale",
+      "multi-instance scheduler holds one actual Ops lease",
+      "failed job recorded, committed progress resumes safely, expired lease takeover fences old owner",
+      "actual CLI detects missing boundary evidence before the ended status update",
+      "actual CLI distinguishes missing historical settlement evidence, an unfixed boundary candidate and immutable Last pin"
+    ],
+    "groups": 12,
+    "retentionRows": 100000,
+    "deleted": 100000
+  },
+  "remotePatchCI": {
+    "status": "NOT_RUN",
+    "reason": "Separate branch push or PR requires user approval."
+  }
+}

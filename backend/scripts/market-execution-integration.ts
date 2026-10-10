@@ -258,7 +258,7 @@ async function refreshPrice(
           ? 'binance_public_rest_24hr_ticker'
           : type === 'us_stock'
             ? 'kis_us_delayed_trade'
-            : 'kis_krx_realtime_trade',
+            : 'koscom_krx_realtime_price',
       capturedAt: now,
       effectiveAt: now,
     },

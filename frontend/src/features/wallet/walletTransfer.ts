@@ -25,10 +25,16 @@ export function transferAmountFits(amount: string | null, available: string | nu
 
 /** A local preflight rejection means no financial command was sent. */
 export class WalletBalanceCheckError extends Error {
+  readonly insufficient: boolean;
   constructor(insufficient: boolean) {
-    super(insufficient ? '잔액이 부족합니다.' : '사용 가능한 잔액을 확인하지 못했습니다. 다시 확인해주세요.');
+    super(walletBalanceCheckMessage(insufficient));
     this.name = 'WalletBalanceCheckError';
+    this.insufficient = insufficient;
   }
+}
+
+export function walletBalanceCheckMessage(insufficient: boolean): string {
+  return insufficient ? '잔액이 부족합니다.' : '사용 가능한 잔액을 확인하지 못했습니다. 다시 확인해주세요.';
 }
 
 export function futuresTransferAvailableAmount(payload: TradingAccountFuturesCollateralDto | undefined, accountId: string, wallet: WalletBalanceDto | null): string | null {

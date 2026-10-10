@@ -229,7 +229,7 @@ async function stockPrice(
   price: string,
   effectiveAt: Date,
   sourceType: 'provider_api' | 'admin_manual',
-  sourceName = 'kis_krx_realtime_trade',
+  sourceName = 'koscom_krx_realtime_price',
 ) {
   return prisma.assetPriceSnapshot.create({
     data: {

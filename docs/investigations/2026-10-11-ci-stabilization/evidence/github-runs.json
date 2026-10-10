@@ -1,0 +1,220 @@
+[
+  {
+    "run": 38038493689,
+    "sha": "218fd02d669c5762e43c2651f7a31a154e70049a",
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689",
+    "jobs": [
+      {
+        "id": 114173854247,
+        "name": "Limit order PostgreSQL integration",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689/job/114173854247",
+        "failedSteps": []
+      },
+      {
+        "id": 114173854349,
+        "name": "Release-critical E2E",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689/job/114173854349",
+        "failedSteps": []
+      },
+      {
+        "id": 114173854361,
+        "name": "Backend quality",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689/job/114173854361",
+        "failedSteps": []
+      },
+      {
+        "id": 114173854392,
+        "name": "Candle fixture integration",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689/job/114173854392",
+        "failedSteps": []
+      },
+      {
+        "id": 114173854422,
+        "name": "Frontend quality",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689/job/114173854422",
+        "failedSteps": []
+      },
+      {
+        "id": 114173854434,
+        "name": "Core account PostgreSQL integration",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38038493689/job/114173854434",
+        "failedSteps": []
+      }
+    ]
+  },
+  {
+    "run": 38058398254,
+    "sha": "0f9149955bc92e88d108bcd44f1f8d565d4837c9",
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254",
+    "jobs": [
+      {
+        "id": 114231468386,
+        "name": "Core account PostgreSQL integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254/job/114231468386",
+        "failedSteps": [
+          "Core account integration tests"
+        ]
+      },
+      {
+        "id": 114231468541,
+        "name": "Limit order PostgreSQL integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254/job/114231468541",
+        "failedSteps": [
+          "Limit order PostgreSQL integration tests"
+        ]
+      },
+      {
+        "id": 114231468596,
+        "name": "Frontend quality",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254/job/114231468596",
+        "failedSteps": []
+      },
+      {
+        "id": 114231468617,
+        "name": "Backend quality",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254/job/114231468617",
+        "failedSteps": [
+          "Diagnostic production bypass gate (changed files)"
+        ]
+      },
+      {
+        "id": 114231468619,
+        "name": "Release-critical E2E",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254/job/114231468619",
+        "failedSteps": []
+      },
+      {
+        "id": 114231468638,
+        "name": "Candle fixture integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38058398254/job/114231468638",
+        "failedSteps": [
+          "Run release fixture smoke (no provider credentials)"
+        ]
+      }
+    ]
+  },
+  {
+    "run": 38062920843,
+    "sha": "8390ae3ff96a971ac714e129fe1a7c68b4f6af67",
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843",
+    "jobs": [
+      {
+        "id": 114244665164,
+        "name": "Core account PostgreSQL integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843/job/114244665164",
+        "failedSteps": [
+          "Core account integration tests"
+        ]
+      },
+      {
+        "id": 114244665248,
+        "name": "Limit order PostgreSQL integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843/job/114244665248",
+        "failedSteps": [
+          "Limit order PostgreSQL integration tests"
+        ]
+      },
+      {
+        "id": 114244665284,
+        "name": "Backend quality",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843/job/114244665284",
+        "failedSteps": []
+      },
+      {
+        "id": 114244665292,
+        "name": "Candle fixture integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843/job/114244665292",
+        "failedSteps": [
+          "Run release fixture smoke (no provider credentials)"
+        ]
+      },
+      {
+        "id": 114244665297,
+        "name": "Release-critical E2E",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843/job/114244665297",
+        "failedSteps": []
+      },
+      {
+        "id": 114244665346,
+        "name": "Frontend quality",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38062920843/job/114244665346",
+        "failedSteps": []
+      }
+    ]
+  },
+  {
+    "run": 38067801776,
+    "sha": "129289d86a32ea83ab2521f9d3d2469cf6d88ba7",
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776",
+    "jobs": [
+      {
+        "id": 114258906438,
+        "name": "Core account PostgreSQL integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776/job/114258906438",
+        "failedSteps": [
+          "Core account integration tests"
+        ]
+      },
+      {
+        "id": 114258906588,
+        "name": "Candle fixture integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776/job/114258906588",
+        "failedSteps": [
+          "Run release fixture smoke (no provider credentials)"
+        ]
+      },
+      {
+        "id": 114258906604,
+        "name": "Backend quality",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776/job/114258906604",
+        "failedSteps": []
+      },
+      {
+        "id": 114258906614,
+        "name": "Release-critical E2E",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776/job/114258906614",
+        "failedSteps": []
+      },
+      {
+        "id": 114258906666,
+        "name": "Limit order PostgreSQL integration",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776/job/114258906666",
+        "failedSteps": [
+          "Limit order PostgreSQL integration tests"
+        ]
+      },
+      {
+        "id": 114258906688,
+        "name": "Frontend quality",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/38067801776/job/114258906688",
+        "failedSteps": [
+          "Diagnostic presentation bypass gate (changed files)"
+        ]
+      }
+    ]
+  }
+]

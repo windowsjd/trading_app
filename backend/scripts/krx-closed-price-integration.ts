@@ -149,7 +149,7 @@ async function main() {
           price,
           currencyCode: 'KRW',
           sourceType: 'provider_api',
-          sourceName: 'kis_krx_realtime_trade',
+          sourceName: 'koscom_krx_realtime_price',
           effectiveAt: sessionClose,
           capturedAt: new Date('2026-07-10T06:30:02Z'),
         },
@@ -161,7 +161,7 @@ async function main() {
           price: '999999',
           currencyCode: 'KRW' as const,
           sourceType: 'provider_api' as const,
-          sourceName: 'kis_krx_realtime_trade',
+          sourceName: 'koscom_krx_realtime_price',
           effectiveAt: new Date(sessionClose.getTime() + (i + 1) * 60000),
           capturedAt: new Date(sessionClose.getTime() + (i + 1) * 60000),
         })),
@@ -171,7 +171,7 @@ async function main() {
           {
             assetId: asset.id,
             price: '0',
-            sourceName: 'kis_krx_realtime_trade',
+            sourceName: 'koscom_krx_realtime_price',
           },
           { assetId: asset.id, price: '999999', sourceName: 'wrong_source' },
         ].map((row) => ({

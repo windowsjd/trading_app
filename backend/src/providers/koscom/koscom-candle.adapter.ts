@@ -142,12 +142,16 @@ export class KoscomCandleAdapter {
           !Array.isArray(response.result.hisLists) ||
           response.result.hisLists.length > 100
         )
-          throw new KoscomError('KOSCOM_MALFORMED_CANDLES');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_MALFORMED_CANDLES',
+          );
         if (
           response.result.trdDd !== undefined &&
           response.result.trdDd !== date
         )
-          throw new KoscomError('KOSCOM_CANDLE_DATE_MISMATCH');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_CANDLE_DATE_MISMATCH',
+          );
         providerReturnedRows += response.result.hisLists.length;
         for (const item of response.result.hisLists) {
           try {
@@ -156,7 +160,9 @@ export class KoscomCandleAdapter {
             // interval: inddTm labels the interval END. Store minute opens.
             const end = koscomTime(date, row.inddTm);
             if (end.getTime() % 60000 !== 0)
-              throw new KoscomError('KOSCOM_INVALID_TIME');
+              throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+                'KOSCOM_INVALID_TIME',
+              );
             const openTime = new Date(end.getTime() - 60000);
             if (
               openTime.getTime() < startMs ||
@@ -244,7 +250,9 @@ export class KoscomCandleAdapter {
       !/^\d{8}$/.test(input.endDate) ||
       input.fromDate > input.endDate
     )
-      throw new KoscomError('KOSCOM_INVALID_DATE_RANGE');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_INVALID_DATE_RANGE',
+      );
     const bounded = createBoundedAbortSignal(
       input.signal,
       input.timeoutMs ?? 15000,
@@ -275,7 +283,9 @@ export class KoscomCandleAdapter {
       !Array.isArray(result.hisLists) ||
       result.hisLists.length > 100
     )
-      throw new KoscomError('KOSCOM_MALFORMED_CANDLES');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_MALFORMED_CANDLES',
+      );
     const rows: KisRawCandleRow[] = [];
     const seen = new Map<string, string>();
     for (const item of result.hisLists) {
@@ -288,12 +298,16 @@ export class KoscomCandleAdapter {
         date > formatZonedCursor(response.receivedAt, 'Asia/Seoul').date ||
         !resolveMarketSession('KRX', date)
       )
-        throw new KoscomError('KOSCOM_CANDLE_DATE_MISMATCH');
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_CANDLE_DATE_MISMATCH',
+        );
       const values = ohlcv(row, false);
       const serialized = JSON.stringify(values);
       if (seen.has(date)) {
         if (seen.get(date) !== serialized)
-          throw new KoscomError('KOSCOM_CONFLICTING_CANDLES');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_CONFLICTING_CANDLES',
+          );
         continue;
       }
       seen.set(date, serialized);
@@ -329,7 +343,9 @@ export class KoscomCandleAdapter {
       `/v3/market/closed/${market}/${symbol}/master`,
     );
     if (response.result.isuSrtCd !== symbol)
-      throw new KoscomError('KOSCOM_SYMBOL_MISMATCH');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_SYMBOL_MISMATCH',
+      );
     return response;
   }
 }
@@ -348,7 +364,9 @@ export function ohlcv(row: Record<string, unknown>, intraday: boolean) {
     low.gt(open) ||
     low.gt(close)
   )
-    throw new KoscomError('KOSCOM_INVALID_OHLC');
+    throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+      'KOSCOM_INVALID_OHLC',
+    );
   return {
     open: open.toFixed(),
     high: high.toFixed(),

@@ -63,7 +63,7 @@ export class LiveCandleEventNormalizerService {
         ) ||
       candle.isClosed !== (coveredUntil === candle.closeTime.getTime())
     )
-      throw new LiveCandleEventValidationError(
+      throw /* @diagnosticSurface internal: The stream pipeline rejects invalid coverage before persisting state. */ new LiveCandleEventValidationError(
         'INVALID_CANDLE_WINDOW',
         'KOSCOM candle has an invalid coverage window.',
       );

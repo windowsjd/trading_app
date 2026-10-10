@@ -30,31 +30,52 @@ export class KoscomMarketMapService {
     assetMarket: string,
     signal?: AbortSignal,
   ): Promise<KoscomMarket> {
-    if (signal?.aborted) throw new KoscomError('KOSCOM_CANCELED');
-    if (!/^\d{6}$/.test(symbol)) throw new KoscomError('KOSCOM_INVALID_SYMBOL');
+    if (signal?.aborted)
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_CANCELED',
+      );
+    if (!/^\d{6}$/.test(symbol))
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_INVALID_SYMBOL',
+      );
     const explicit = assetMarket.toLowerCase() as KoscomMarket;
     if (
       !KOSCOM_MARKETS.includes(explicit) &&
       explicit !== ('krx' as KoscomMarket)
     )
-      throw new KoscomError('KOSCOM_MARKET_UNSUPPORTED');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_MARKET_UNSUPPORTED',
+      );
     const map = await waitForMap(this.load(), signal);
     const market = map.get(symbol);
-    if (!market) throw new KoscomError('KOSCOM_MARKET_UNRESOLVED');
+    if (!market)
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_MARKET_UNRESOLVED',
+      );
     if (explicit !== ('krx' as KoscomMarket) && explicit !== market)
-      throw new KoscomError('KOSCOM_MARKET_MISMATCH');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_MARKET_MISMATCH',
+      );
     return market;
   }
 
   private load(): Promise<Map<string, KoscomMarket>> {
     const config = this.config.getConfig();
     if (!config.enabled)
-      return Promise.reject(new KoscomError('KOSCOM_DISABLED'));
+      return Promise.reject(
+        /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_DISABLED',
+        ),
+      );
     if (
       this.failedLoad?.namespace === config.namespace &&
       Date.now() < this.failedLoad.expires
     )
-      return Promise.reject(new KoscomError(this.failedLoad.code));
+      return Promise.reject(
+        /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          this.failedLoad.code,
+        ),
+      );
     if (this.cached && Date.now() < this.cached.expires)
       return Promise.resolve(this.cached.map);
     this.pending ??= this.fetch()
@@ -67,7 +88,9 @@ export class KoscomMarketMapService {
           namespace: config.namespace,
           code,
         };
-        throw new KoscomError(code);
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          code,
+        );
       })
       .finally(() => {
         this.pending = null;
@@ -77,7 +100,9 @@ export class KoscomMarketMapService {
 
   private async fetch() {
     if (!this.config.getConfig().enabled)
-      throw new KoscomError('KOSCOM_DISABLED');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_DISABLED',
+      );
     const map = new Map<string, KoscomMarket>();
     const ambiguous = new Set<string>();
     // Only positive official membership is usable. A failed market must not
@@ -103,13 +128,18 @@ export class KoscomMarketMapService {
           `/v3/market/closed/${market}/lists`,
         );
         if (!Array.isArray(result.isuLists))
-          throw new KoscomError('KOSCOM_MALFORMED_LIST');
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_MALFORMED_LIST',
+          );
         const symbols = result.isuLists
           .map((value) => koscomRecord(value).isuSrtCd)
           .filter(
             (v): v is string => typeof v === 'string' && /^\d{6}$/.test(v),
           );
-        if (!symbols.length) throw new KoscomError('KOSCOM_EMPTY_LIST');
+        if (!symbols.length)
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_EMPTY_LIST',
+          );
         await this.redis
           .setWithTtl(key, JSON.stringify(symbols), 21600)
           .catch(() => undefined);
@@ -121,7 +151,7 @@ export class KoscomMarketMapService {
     );
     if (!lists.length) {
       const failure = results.find((result) => result.status === 'rejected');
-      throw new KoscomError(
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
         failure?.status === 'rejected'
           ? koscomFailure(failure.reason)
           : 'KOSCOM_EMPTY_LIST',
@@ -148,10 +178,19 @@ function waitForMap<T>(pending: Promise<T>, signal?: AbortSignal): Promise<T> {
   if (!signal) return pending;
   if (signal.aborted) {
     void pending.catch(() => undefined);
-    return Promise.reject(new KoscomError('KOSCOM_CANCELED'));
+    return Promise.reject(
+      /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_CANCELED',
+      ),
+    );
   }
   return new Promise((resolve, reject) => {
-    const abort = () => reject(new KoscomError('KOSCOM_CANCELED'));
+    const abort = () =>
+      reject(
+        /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_CANCELED',
+        ),
+      );
     signal.addEventListener('abort', abort, { once: true });
     void pending
       .then(resolve, reject)
