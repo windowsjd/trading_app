@@ -1,0 +1,312 @@
+{
+  "observedAtUtc": "2026-10-10T18:38:14.840328+00:00",
+  "deploys": [
+    {
+      "id": "dep-db58b0qd0e5s73ei3uc0",
+      "status": "live",
+      "commit": {
+        "id": "55cda476acc11f067814cf061320bc5c95f53319",
+        "message": "Merge pull request #3 from windowsjd/fix/ci-stabilization-20261011\n\nFix CI provider fixtures and diagnostic boundaries",
+        "createdAt": "2026-10-10T18:29:28Z"
+      },
+      "createdAt": "2026-10-10T18:35:47.343723Z",
+      "finishedAt": "2026-10-10T18:37:08.142738Z"
+    },
+    {
+      "id": "dep-db5882jrjlhs73ahrsp0",
+      "status": "deactivated",
+      "commit": {
+        "id": "55cda476acc11f067814cf061320bc5c95f53319",
+        "message": "Merge pull request #3 from windowsjd/fix/ci-stabilization-20261011\n\nFix CI provider fixtures and diagnostic boundaries",
+        "createdAt": "2026-10-10T18:29:28Z"
+      },
+      "createdAt": "2026-10-10T18:29:30.8129Z",
+      "finishedAt": "2026-10-10T18:30:49.035685Z"
+    },
+    {
+      "id": "dep-db584c49v7es738s8jog",
+      "status": "deactivated",
+      "commit": {
+        "id": "99192c94e7fb7d297d68dfc2b573ecf6a64e99b6",
+        "message": "binance 선물 후보조사",
+        "createdAt": "2026-10-10T18:21:27Z"
+      },
+      "createdAt": "2026-10-10T18:21:36.302241Z",
+      "finishedAt": "2026-10-10T18:23:04.810216Z"
+    },
+    {
+      "id": "dep-db56e7id0e5s73ec8irg",
+      "status": "deactivated",
+      "commit": {
+        "id": "8390ae3ff96a971ac714e129fe1a7c68b4f6af67",
+        "message": "UI개선",
+        "createdAt": "2026-10-10T15:16:02Z"
+      },
+      "createdAt": "2026-10-10T16:26:06.879477Z",
+      "finishedAt": "2026-10-10T16:27:24.363528Z"
+    },
+    {
+      "id": "dep-db56covavr4c73fkcim0",
+      "status": "deactivated",
+      "commit": {
+        "id": "8390ae3ff96a971ac714e129fe1a7c68b4f6af67",
+        "message": "UI개선",
+        "createdAt": "2026-10-10T15:16:02Z"
+      },
+      "createdAt": "2026-10-10T16:22:59.247888Z",
+      "finishedAt": "2026-10-10T16:24:18.217442Z"
+    }
+  ],
+  "owner": {
+    "id": "tea-da79omgae00c73b5n1mg",
+    "name": "league of trading",
+    "type": "team"
+  },
+  "postgres": {
+    "connectionPool": "none",
+    "diskAutoscalingEnabled": false,
+    "diskSizeGB": 5,
+    "highAvailabilityEnabled": false,
+    "id": "dpg-da7ac0e1egvs73e2sv20-a",
+    "plan": "0.5c-1g",
+    "region": "singapore",
+    "status": "available",
+    "version": "17"
+  },
+  "serviceEnv": {
+    "names": [
+      "BINANCE_PUBLIC_MARKET_DATA_ENABLED",
+      "BINANCE_WEBSOCKET_STREAMING_ENABLED",
+      "CANDLE_LIVE_BINANCE_ENABLED",
+      "CANDLE_LIVE_KIS_ENABLED",
+      "CANDLE_LIVE_KIS_US_DELAYED_ENABLED",
+      "CANDLE_LIVE_STREAMING_ENABLED",
+      "CANDLE_RECONCILIATION_CRYPTO_ENABLED",
+      "CANDLE_SERVING_MODE",
+      "CORS_ORIGINS",
+      "DATABASE_URL",
+      "JWT_ACCESS_SECRET",
+      "JWT_ACCESS_TTL",
+      "KIS_API_ENVIRONMENT",
+      "KIS_APP_KEY",
+      "KIS_APP_SECRET",
+      "KIS_DOMESTIC_SYMBOLS",
+      "KIS_MARKET_DATA_ENABLED",
+      "KIS_REST_BASE_URL",
+      "KIS_WEBSOCKET_STREAMING_ENABLED",
+      "KIS_WS_ALLOW_US_DELAYED",
+      "KIS_WS_BASE_URL",
+      "KOREA_EXIM_EXCHANGE_AUTH_KEY",
+      "KOREA_EXIM_EXCHANGE_ENABLED",
+      "KOSCOM_API_KEY",
+      "KOSCOM_POLLING_ENABLED",
+      "LIMIT_ORDER_ENABLED",
+      "NODE_ENV",
+      "PROVIDER_INGESTION_ENABLED",
+      "REDIS_URL",
+      "REFRESH_TOKEN_TTL",
+      "SCHEDULER_DAILY_SNAPSHOT_ENABLED",
+      "SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS",
+      "SCHEDULER_MARKET_CANDLE_SYNC_ENABLED",
+      "SCHEDULER_PROVIDER_FX_ENABLED",
+      "SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS",
+      "SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP",
+      "SCHEDULER_PROVIDER_KIS_ENABLED"
+    ],
+    "safeConfiguration": {
+      "KOSCOM_POLLING_ENABLED": "true",
+      "LIMIT_ORDER_ENABLED": "true",
+      "SCHEDULER_DAILY_SNAPSHOT_ENABLED": "true",
+      "SCHEDULER_PROVIDER_FX_INTERVAL_SECONDS": "3600",
+      "SCHEDULER_PROVIDER_FX_ENABLED": "true",
+      "KOREA_EXIM_EXCHANGE_ENABLED": "true",
+      "CANDLE_LIVE_BINANCE_ENABLED": "false",
+      "BINANCE_WEBSOCKET_STREAMING_ENABLED": "true",
+      "CANDLE_RECONCILIATION_CRYPTO_ENABLED": "true",
+      "BINANCE_PUBLIC_MARKET_DATA_ENABLED": "true",
+      "SCHEDULER_MARKET_CANDLE_SYNC_ENABLED": "true",
+      "SCHEDULER_PROVIDER_KIS_ENABLED": "false",
+      "CANDLE_LIVE_KIS_US_DELAYED_ENABLED": "false",
+      "CANDLE_LIVE_KIS_ENABLED": "true",
+      "CANDLE_LIVE_STREAMING_ENABLED": "false",
+      "KIS_WEBSOCKET_STREAMING_ENABLED": "true",
+      "KIS_MARKET_DATA_ENABLED": "true",
+      "PROVIDER_INGESTION_ENABLED": "true",
+      "REDIS_URL_target_resource": "red-da7alead0e5s73dusbs0",
+      "REDIS_URL_database_or_namespace": "",
+      "DATABASE_URL_target_resource": "dpg-da7ac0e1egvs73e2sv20-a",
+      "DATABASE_URL_database_or_namespace": "trading_app_fbbk",
+      "NODE_ENV": "production",
+      "SCHEDULER_PROVIDER_INGESTION_RUN_ON_STARTUP": "true",
+      "KIS_WS_ALLOW_US_DELAYED": "false",
+      "KIS_API_ENVIRONMENT": "real",
+      "CANDLE_SERVING_MODE": "database",
+      "REFRESH_TOKEN_TTL": "7d",
+      "JWT_ACCESS_TTL": "15m"
+    }
+  },
+  "service": {
+    "id": "srv-da84cg8u01pc73cjasa0",
+    "type": "web_service",
+    "branch": "main",
+    "repo": "https://github.com/windowsjd/trading_app",
+    "rootDir": "backend",
+    "autoDeploy": "yes",
+    "autoDeployTrigger": "commit",
+    "details": {
+      "plan": "1c-2g",
+      "numInstances": 1,
+      "region": "singapore",
+      "url": "https://trading-app-qtsw.onrender.com",
+      "runtime": "node",
+      "envSpecificDetails": {
+        "buildCommand": "pnpm install --frozen-lockfile && pnpm exec prisma generate && pnpm exec prisma migrate deploy && pnpm build",
+        "startCommand": "node dist/src/main.js"
+      }
+    }
+  },
+  "keyValue": {
+    "id": "red-da7alead0e5s73dusbs0",
+    "plan": "256mb",
+    "region": "singapore",
+    "version": "8.1.4",
+    "options": {
+      "maxmemoryPolicy": "noeviction",
+      "persistenceMode": "journal_snapshot"
+    },
+    "status": "available"
+  },
+  "metricAccessProbe": {
+    "cpu": {
+      "httpStatus": 200,
+      "resource": "srv-da84cg8u01pc73cjasa0",
+      "series": [
+        {
+          "labels": [
+            {
+              "field": "instance",
+              "value": "srv-da84cg8u01pc73cjasa0-29pxw"
+            },
+            {
+              "field": "service",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            },
+            {
+              "field": "resource",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            }
+          ],
+          "unit": "cpu",
+          "points": 4
+        },
+        {
+          "labels": [
+            {
+              "field": "instance",
+              "value": "srv-da84cg8u01pc73cjasa0-sz2cx"
+            },
+            {
+              "field": "service",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            },
+            {
+              "field": "resource",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            }
+          ],
+          "unit": "cpu",
+          "points": 8
+        }
+      ]
+    },
+    "memory": {
+      "httpStatus": 200,
+      "resource": "srv-da84cg8u01pc73cjasa0",
+      "series": [
+        {
+          "labels": [
+            {
+              "field": "service",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            },
+            {
+              "field": "resource",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            },
+            {
+              "field": "instance",
+              "value": "srv-da84cg8u01pc73cjasa0-sz2cx"
+            }
+          ],
+          "unit": "bytes",
+          "points": 8
+        },
+        {
+          "labels": [
+            {
+              "field": "instance",
+              "value": "srv-da84cg8u01pc73cjasa0-29pxw"
+            },
+            {
+              "field": "service",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            },
+            {
+              "field": "resource",
+              "value": "srv-da84cg8u01pc73cjasa0"
+            }
+          ],
+          "unit": "bytes",
+          "points": 5
+        }
+      ]
+    },
+    "active-connections": {
+      "httpStatus": 200,
+      "resource": "dpg-da7ac0e1egvs73e2sv20-a",
+      "series": [
+        {
+          "labels": [
+            {
+              "field": "resource",
+              "value": "dpg-da7ac0e1egvs73e2sv20-a"
+            }
+          ],
+          "unit": "unitless",
+          "points": 11
+        }
+      ]
+    }
+  },
+  "metricAccessProbeOriginal": {
+    "cpu": {
+      "httpStatus": 400,
+      "errorType": "HTTPError"
+    },
+    "memory": {
+      "httpStatus": 400,
+      "errorType": "HTTPError"
+    },
+    "active-connections": {
+      "httpStatus": 400,
+      "errorType": "HTTPError"
+    },
+    "note": "Initial RFC3339 query used fractional seconds and returned 400; second precision Z with a single resource returned 200. Not an authorization failure."
+  },
+  "workspacePlan": {
+    "value": "Hobby",
+    "source": "user-provided; owners API did not expose billing plan"
+  },
+  "existingAlternatePostgres": {
+    "id": "dpg-dattqaou01pc73agrsr0-a",
+    "plan": "0.1c-256mb",
+    "version": "17",
+    "diskSizeGB": 1,
+    "region": "singapore",
+    "name": "league of trading -upgrade-clone-32e2",
+    "status": "available",
+    "reuseApproved": false,
+    "dataAndCurrentUsageVerified": false
+  },
+  "scope": "Render control-plane GET only. No application API load, datastore connections, resource mutations, or tests executed."
+}

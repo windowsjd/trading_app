@@ -1,0 +1,39 @@
+{
+  "source": "https://render.com/pricing",
+  "observedAtUtc": "2026-10-10T18:41:40.355593+00:00",
+  "webService": [
+    [
+      "1 CPU",
+      "$25/month",
+      "2 GB RAM",
+      "1c-2g"
+    ]
+  ],
+  "postgres": [
+    [
+      "Less than 1 CPU",
+      "$6/month",
+      "256 MB RAM",
+      "100 connections",
+      "0.1c-256mb"
+    ],
+    [
+      "Less than 1 CPU",
+      "$19/month",
+      "1 GB RAM",
+      "100 connections",
+      "0.5c-1g"
+    ]
+  ],
+  "keyValue": [
+    [
+      "Less than 1 CPU",
+      "$10/month",
+      "256 MB RAM",
+      "256 MB storage",
+      "200 connections",
+      "256mb"
+    ]
+  ],
+  "connectionLimitCaveat": "Current pricing table says Key Value 256mb 200 connections; compute-plans docs snapshot says 250. Use 200 for planning; verify INFO maxclients on the isolated instance before execution."
+}

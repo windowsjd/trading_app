@@ -1,0 +1,183 @@
+{
+  "observedDateKst": "2026-10-11",
+  "repository": "https://github.com/windowsjd/trading_app",
+  "localBranch": "main",
+  "localHead": "99192c94e7fb7d297d68dfc2b573ecf6a64e99b6",
+  "remoteMain": "55cda476acc11f067814cf061320bc5c95f53319",
+  "compareUrl": "https://github.com/windowsjd/trading_app/compare/99192c94e7fb7d297d68dfc2b573ecf6a64e99b6...55cda476acc11f067814cf061320bc5c95f53319",
+  "status": "ahead",
+  "aheadBy": 3,
+  "behindBy": 0,
+  "commits": [
+    {
+      "sha": "6ebbec8e44585bd743bf95052dd643403ceb547d",
+      "message": "fix(ci): align provider fixtures and diagnostic boundaries"
+    },
+    {
+      "sha": "e1f46852e649eb5ffc920d2687a4b24f751b6498",
+      "message": "docs: record CI stabilization causes and verification"
+    },
+    {
+      "sha": "55cda476acc11f067814cf061320bc5c95f53319",
+      "message": "Merge pull request #3 from windowsjd/fix/ci-stabilization-20261011\n\nFix CI provider fixtures and diagnostic boundaries"
+    }
+  ],
+  "changedFiles": [
+    {
+      "filename": "backend/scripts/candle-release-fixture-smoke.ts",
+      "status": "modified",
+      "changes": 442
+    },
+    {
+      "filename": "backend/scripts/conditional-orders-integration.ts",
+      "status": "modified",
+      "changes": 12
+    },
+    {
+      "filename": "backend/scripts/krx-closed-price-integration.ts",
+      "status": "modified",
+      "changes": 6
+    },
+    {
+      "filename": "backend/scripts/krx-session-close-recovery-integration.ts",
+      "status": "modified",
+      "changes": 322
+    },
+    {
+      "filename": "backend/scripts/market-execution-integration.ts",
+      "status": "modified",
+      "changes": 2
+    },
+    {
+      "filename": "backend/scripts/order-closed-price-parity-integration.ts",
+      "status": "modified",
+      "changes": 2
+    },
+    {
+      "filename": "backend/scripts/order-input-policy-integration.ts",
+      "status": "modified",
+      "changes": 2
+    },
+    {
+      "filename": "backend/scripts/trading-fee-pinning-integration.ts",
+      "status": "modified",
+      "changes": 4
+    },
+    {
+      "filename": "backend/scripts/trading-transaction-time-integration.ts",
+      "status": "modified",
+      "changes": 4
+    },
+    {
+      "filename": "backend/src/assets/asset-candles.service.ts",
+      "status": "modified",
+      "changes": 5
+    },
+    {
+      "filename": "backend/src/assets/candle-serving.service.spec.ts",
+      "status": "modified",
+      "changes": 75
+    },
+    {
+      "filename": "backend/src/assets/candle-serving.service.ts",
+      "status": "modified",
+      "changes": 25
+    },
+    {
+      "filename": "backend/src/assets/live-candle-event-normalizer.service.ts",
+      "status": "modified",
+      "changes": 2
+    },
+    {
+      "filename": "backend/src/assets/market-candle-sync.integration.spec.ts",
+      "status": "modified",
+      "changes": 4
+    },
+    {
+      "filename": "backend/src/operator/operator-provider-ingestion.service.spec.ts",
+      "status": "modified",
+      "changes": 20
+    },
+    {
+      "filename": "backend/src/operator/operator-provider-ingestion.service.ts",
+      "status": "modified",
+      "changes": 7
+    },
+    {
+      "filename": "backend/src/orders/general-account-trading.integration.spec.ts",
+      "status": "modified",
+      "changes": 4
+    },
+    {
+      "filename": "backend/src/providers/koscom/koscom-candle.adapter.ts",
+      "status": "modified",
+      "changes": 36
+    },
+    {
+      "filename": "backend/src/providers/koscom/koscom-ingestion.service.spec.ts",
+      "status": "modified",
+      "changes": 6
+    },
+    {
+      "filename": "backend/src/providers/koscom/koscom-ingestion.service.ts",
+      "status": "modified",
+      "changes": 45
+    },
+    {
+      "filename": "backend/src/providers/koscom/koscom-market-map.service.ts",
+      "status": "modified",
+      "changes": 67
+    },
+    {
+      "filename": "backend/src/providers/koscom/koscom-normalizer.ts",
+      "status": "modified",
+      "changes": 73
+    },
+    {
+      "filename": "backend/src/providers/koscom/koscom.client.ts",
+      "status": "modified",
+      "changes": 114
+    },
+    {
+      "filename": "backend/src/seasons/trading-account-trading-scope.integration.spec.ts",
+      "status": "modified",
+      "changes": 32
+    },
+    {
+      "filename": "docs/investigations/2026-10-11-ci-stabilization/evidence/ci-excerpts.log",
+      "status": "added",
+      "changes": 162
+    },
+    {
+      "filename": "docs/investigations/2026-10-11-ci-stabilization/evidence/github-runs.json",
+      "status": "added",
+      "changes": 220
+    },
+    {
+      "filename": "docs/investigations/2026-10-11-ci-stabilization/evidence/local-results.json",
+      "status": "added",
+      "changes": 1586
+    },
+    {
+      "filename": "docs/investigations/2026-10-11-ci-stabilization/report.md",
+      "status": "added",
+      "changes": 202
+    },
+    {
+      "filename": "frontend/src/features/wallet/walletTransfer.ts",
+      "status": "modified",
+      "changes": 8
+    },
+    {
+      "filename": "frontend/src/screens/wallet/WalletTransferScreen.test.ts",
+      "status": "modified",
+      "changes": 11
+    },
+    {
+      "filename": "frontend/src/screens/wallet/WalletTransferScreen.tsx",
+      "status": "modified",
+      "changes": 6
+    }
+  ],
+  "reviewScope": "Local source plus all remote changed-file patches; no checkout, fetch, push, merge, or deployment initiated."
+}
