@@ -14,6 +14,7 @@ export function collectProviderSecretsFromEnv(
   return [
     env.EXCHANGE_RATE_API_KEY,
     env.KOREA_EXIM_EXCHANGE_AUTH_KEY,
+    env.KOSCOM_API_KEY,
     env.KIS_APP_KEY,
     env.KIS_APP_SECRET,
   ].filter((value): value is string => Boolean(value && value.trim()));

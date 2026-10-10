@@ -41,6 +41,9 @@ export class KisQuoteClient {
     headers?: Record<string, string>;
     signal?: AbortSignal;
   }): Promise<KisLowLevelCallWithMetadataResult<T>> {
+    if (input.path.trim().startsWith('/uapi/domestic-stock/')) {
+      return { state: 'skipped', reason: 'KIS_DOMESTIC_PROVIDER_RETIRED' };
+    }
     const config = this.configService.getConfig();
     if (!config.kis.enabled) {
       throw new ProviderConfigError(

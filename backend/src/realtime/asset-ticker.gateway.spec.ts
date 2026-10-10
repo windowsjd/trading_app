@@ -262,7 +262,7 @@ describe('AssetTickerGateway', () => {
         symbol: '005930',
         price: '70123.00000000',
         currencyCode: CurrencyCode.KRW,
-        sourceName: 'kis_krx_realtime_trade',
+        sourceName: 'koscom_krx_realtime_price',
         capturedAt: '2026-06-19T03:00:29.000Z',
         effectiveAt: '2026-06-19T03:00:29.000Z',
       },
@@ -290,7 +290,7 @@ describe('AssetTickerGateway', () => {
       freshnessAgeSeconds: 1,
       priceSource: {
         sourceType: 'provider_api',
-        sourceName: 'kis_krx_realtime_trade',
+        sourceName: 'koscom_krx_realtime_price',
       },
     });
   });
@@ -320,7 +320,7 @@ describe('AssetTickerGateway', () => {
           price: {
             price: '248500',
             currencyCode: CurrencyCode.KRW,
-            sourceName: 'kis_krx_realtime_trade',
+            sourceName: 'koscom_krx_realtime_price',
             effectiveAt: '2026-06-18T06:30:00.000Z',
             capturedAt: now,
           },
@@ -348,7 +348,7 @@ describe('AssetTickerGateway', () => {
         price: {
           price: '248500',
           currencyCode: CurrencyCode.KRW,
-          sourceName: 'kis_krx_realtime_trade',
+          sourceName: 'koscom_krx_realtime_price',
           effectiveAt: '2026-06-18T06:30:00.000Z',
           capturedAt: '2026-06-19T03:00:29.000Z',
         },
@@ -803,7 +803,7 @@ describe('AssetTickerGateway', () => {
       price: {
         price: '248500',
         currencyCode: CurrencyCode.KRW,
-        sourceName: 'kis_krx_realtime_trade',
+        sourceName: 'koscom_krx_realtime_price',
         effectiveAt: '2026-06-18T06:29:59Z',
         capturedAt: '2026-06-18T06:29:59Z',
       },

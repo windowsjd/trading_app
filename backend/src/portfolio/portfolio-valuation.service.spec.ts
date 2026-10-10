@@ -309,7 +309,7 @@ describe('PortfolioValuationService source eligibility', () => {
         price: new Prisma.Decimal('999.00000000'),
         currencyCode: CurrencyCode.KRW,
         sourceType: AssetPriceSourceType.provider_api,
-        sourceName: 'kis_krx_realtime_trade',
+        sourceName: 'koscom_krx_realtime_price',
         effectiveAt: new Date('2026-06-02T23:58:30.000Z'),
         capturedAt: new Date('2026-06-02T23:58:59.000Z'),
         createdAt: new Date('2026-06-02T23:59:00.000Z'),
@@ -628,7 +628,7 @@ describe('PortfolioValuationService source eligibility', () => {
       providerPrice(
         'snapshot-b',
         'asset-b',
-        'kis_krx_realtime_trade',
+        'koscom_krx_realtime_price',
         '2026-06-01T00:00:00.000Z',
         CurrencyCode.KRW,
       ),
@@ -638,7 +638,7 @@ describe('PortfolioValuationService source eligibility', () => {
       providerPrice(
         'snapshot-a',
         'asset-a',
-        'kis_krx_realtime_trade',
+        'koscom_krx_realtime_price',
         '2026-06-01T00:00:00.000Z',
         CurrencyCode.KRW,
       ),
@@ -657,7 +657,7 @@ describe('PortfolioValuationService source eligibility', () => {
           providerCandidates: [
             {
               snapshotId: 'snapshot-a',
-              sourceName: 'kis_krx_realtime_trade',
+              sourceName: 'koscom_krx_realtime_price',
             },
           ],
           selectionResult: 'REJECTED',
@@ -706,11 +706,13 @@ describe('PortfolioValuationService source eligibility', () => {
         providerPrice(
           'price-krx-last-session',
           'asset-krx',
-          'kis_krx_realtime_trade',
+          'koscom_krx_realtime_price',
           '2026-07-16T06:29:00.000Z',
           CurrencyCode.KRW,
         ),
       ])
+      // Legacy domestic source is also read only for historical valuation.
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         providerPrice(
           'price-us-current',

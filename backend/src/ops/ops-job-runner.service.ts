@@ -379,7 +379,7 @@ export class OpsJobRunnerService {
           await this.kisRestCurrentPriceIngestionService.ingestCurrentPrices({
             dryRun: false,
             requestedBy: input.requestedBy ?? undefined,
-            domesticSymbols: marketPlan.targets.kisDomesticSymbols,
+            domesticSymbols: [],
             usSymbols: marketPlan.targets.kisUsSymbols,
             maxSnapshots: input.maxSnapshots,
             isLockOwned: context.isLockOwned,
@@ -454,7 +454,7 @@ export class OpsJobRunnerService {
         const result = await this.kisWebSocketClient.runTradePriceIngestion({
           dryRun: false,
           requestedBy: input.requestedBy ?? undefined,
-          domesticSymbols: marketPlan.targets.kisDomesticSymbols,
+          domesticSymbols: [],
           usSymbols: marketPlan.targets.kisUsSymbols,
           maxSnapshots: input.maxSnapshots,
           isLockOwned: context.isLockOwned,

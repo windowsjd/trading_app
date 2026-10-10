@@ -32,7 +32,10 @@ export function readAssetListTurnover(
   if (!payload) return unavailable;
   let value: unknown;
   let period: AssetListTurnover['turnoverPeriod'] = null;
-  if (snapshot.sourceName === 'kis_krx_realtime_trade') {
+  if (snapshot.sourceName === 'koscom_krx_realtime_price') {
+    value = record(payload.row)?.accTrdval;
+    period = 'session';
+  } else if (snapshot.sourceName === 'kis_krx_realtime_trade') {
     if (payload.messageType === 'websocket_trade') {
       value = record(payload.rawFields)?.ACML_TR_PBMN;
     } else if (payload.messageType === 'rest_current_price') {

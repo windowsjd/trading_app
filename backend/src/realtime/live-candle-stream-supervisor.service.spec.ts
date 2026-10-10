@@ -1,3 +1,6 @@
+jest.mock('../providers/koscom/koscom-ingestion.service', () => ({
+  KoscomIngestionService: class {},
+}));
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
     '@prisma/client/runtime/client',
@@ -13,6 +16,9 @@ jest.mock('../generated/prisma/client', () => {
     CurrencyCode: { KRW: 'KRW', USD: 'USD' },
   };
 });
+jest.mock('../assets/market-candle-ingestion.service', () => ({
+  MarketCandleIngestionService: class {},
+}));
 jest.mock('../assets/live-candle-pipeline.service', () => ({
   LiveCandlePipelineService: class LiveCandlePipelineService {},
 }));
@@ -23,8 +29,105 @@ import { LiveCandleHealthService } from '../assets/live-candle-health.service';
 import { BINANCE_FIXED_SYMBOLS } from '../providers/binance/binance-fixed-asset-universe';
 import { LiveCandleStreamSupervisorService } from './live-candle-stream-supervisor.service';
 import { BinanceOrderBookService } from '../providers/binance/binance-order-book.service';
+import type { KoscomIngestionOptions } from '../providers/koscom/koscom-ingestion.service';
 
 describe('LiveCandleStreamSupervisorService', () => {
+  it('reports central KOSCOM ticker health without inventing candles from polled prices', async () => {
+    const fixture = setup(
+      () => new FakeSocket(),
+      [
+        {
+          id: 'krx',
+          symbol: '005930',
+          market: 'KRX',
+          assetType: 'domestic_stock',
+          isActive: true,
+        },
+      ],
+    );
+    const context = { ...ownerContext(), provider: 'koscom' as never };
+    fixture.koscom.collect.mockImplementationOnce(async (options) => {
+      await options.onPrice?.({
+        type: 'market_price',
+        assetId: 'krx',
+        snapshotState: 'created',
+        delayed: false,
+        price: {
+          price: '70000',
+          currencyCode: 'KRW',
+          sourceName: 'koscom_krx_realtime_price',
+          effectiveAt: '2026-09-30T01:00:00Z',
+          capturedAt: '2026-09-30T01:00:01Z',
+        },
+      });
+      context.lost = true;
+      return { success: true };
+    });
+    await (
+      fixture.service as unknown as {
+        pollKoscom(context: unknown): Promise<void>;
+      }
+    ).pollKoscom(context);
+    expect(fixture.pipeline.process).not.toHaveBeenCalled();
+    expect(fixture.health.snapshot().providers.koscom).toMatchObject({
+      state: 'connected',
+      delayed: false,
+      lastEventAt: '2026-09-30T01:00:00Z',
+    });
+    expect(fixture.factory).not.toHaveBeenCalled();
+  });
+  it('publishes native candles under the KOSCOM lease, isolates partial failure and stops on lease loss', async () => {
+    const assets = [0, 1, 2].map((n) => ({
+      id: `krx-${n}`,
+      symbol: '005930',
+      market: 'KRX',
+      assetType: 'domestic_stock',
+      isActive: true,
+    }));
+    const fixture = setup(() => new FakeSocket(), assets);
+    const context = { ...ownerContext(), provider: 'koscom' as never };
+    fixture.candleIngestion.fetchDomesticFiveMinuteCandles
+      .mockRejectedValueOnce(new Error('redacted transport failure'))
+      .mockResolvedValue({ candles: [{ isClosed: true }] });
+    const refresh = (now: Date) =>
+      (
+        fixture.service as unknown as {
+          refreshKoscomCandles(
+            context: unknown,
+            assets: unknown[],
+            now: Date,
+          ): Promise<void>;
+        }
+      ).refreshKoscomCandles(context, assets, now);
+    await refresh(new Date('2026-09-30T00:07:05Z'));
+    expect(
+      fixture.candleIngestion.fetchDomesticFiveMinuteCandles,
+    ).toHaveBeenCalledTimes(3);
+    expect(
+      fixture.candleIngestion.fetchDomesticFiveMinuteCandles,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        from: new Date('2026-09-30T00:00:00Z'),
+        to: new Date('2026-09-30T00:07:05Z'),
+        maxPages: 1,
+        maxRows: 20,
+      }),
+    );
+    expect(fixture.pipeline.process).toHaveBeenCalledTimes(2);
+    expect(fixture.pipeline.process).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: { source: 'koscom_intraday', mode: 'absolute' },
+        ownerGeneration: context.lock.token,
+        ownerLeaseKey: context.leaseKey,
+      }),
+    );
+    expect(fixture.health.snapshot().liveCandle.eventsRejected).toBe(1);
+    await refresh(new Date('2026-10-03T00:07:05Z'));
+    expect(fixture.pipeline.process).toHaveBeenCalledTimes(2);
+    context.lost = true;
+    await refresh(new Date('2026-09-30T00:08:05Z'));
+    expect(fixture.pipeline.process).toHaveBeenCalledTimes(2);
+  });
   it('supplies depth for the fixed universe beside combined ticker/kline on one owned connection', async () => {
     const socket = new FakeSocket();
     const fixture = setup(
@@ -416,10 +519,10 @@ describe('LiveCandleStreamSupervisorService', () => {
       () => socket,
       [
         {
-          id: 'dom-1',
-          symbol: '005930',
-          assetType: 'domestic_stock',
-          market: 'KOSPI',
+          id: 'us-1',
+          symbol: 'AAPL',
+          assetType: 'us_stock',
+          market: 'NAS',
           isActive: true,
         },
       ],
@@ -439,7 +542,7 @@ describe('LiveCandleStreamSupervisorService', () => {
     socket.emit(
       'message',
       JSON.stringify({
-        header: { tr_id: 'H0STCNT0' },
+        header: { tr_id: 'HDFSCNT0' },
         body: { rt_cd: '0', msg1: 'SUBSCRIBE SUCCESS' },
       }),
     );
@@ -466,10 +569,10 @@ describe('LiveCandleStreamSupervisorService', () => {
       () => socket,
       [
         {
-          id: 'dom-1',
-          symbol: '005930',
-          assetType: 'domestic_stock',
-          market: 'KOSPI',
+          id: 'us-1',
+          symbol: 'AAPL',
+          assetType: 'us_stock',
+          market: 'NAS',
           isActive: true,
         },
       ],
@@ -576,6 +679,9 @@ function setup(
     }),
   };
   const normalizer = {
+    normalizeKoscomCandle: jest
+      .fn()
+      .mockReturnValue({ source: 'koscom_intraday', mode: 'absolute' }),
     normalizeBinance: jest.fn().mockReturnValue({
       price: '105.00000000',
       source: 'binance_spot_ws_5m_kline',
@@ -609,6 +715,14 @@ function setup(
     prisma as never,
     orderBookPubSub as never,
   );
+  const candleIngestion = {
+    fetchDomesticFiveMinuteCandles: jest
+      .fn()
+      .mockResolvedValue({ candles: [] }),
+  };
+  const koscom = {
+    collect: jest.fn<Promise<{ success: boolean }>, [KoscomIngestionOptions]>(),
+  };
   const service = new LiveCandleStreamSupervisorService(
     prisma as never,
     locks as never,
@@ -624,13 +738,25 @@ function setup(
       enabled: true,
       binanceEnabled: true,
       kisEnabled: true,
+      kisUsDelayedEnabled: true,
       maxProviderSubscriptionsPerShard,
       ...configOverrides,
     },
     factory,
     orderBooks,
+    koscom as never,
+    {
+      getConfig: () => ({
+        enabled: true,
+        pollingEnabled: false,
+        pollIntervalMs: 1,
+        concurrency: 2,
+      }),
+    } as never,
+    candleIngestion as never,
   );
   return {
+    candleIngestion,
     service,
     locks,
     pipeline,
@@ -640,6 +766,7 @@ function setup(
     factory,
     orderBooks,
     orderBookPubSub,
+    koscom,
   };
 }
 

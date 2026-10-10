@@ -3,7 +3,7 @@ import type { AssetType } from '../generated/prisma/client';
 export const LIVE_CANDLE_INTERVALS = ['5m', '15m', '30m', '1h', '4h'] as const;
 
 export type LiveCandleInterval = (typeof LIVE_CANDLE_INTERVALS)[number];
-export type LiveCandleProvider = 'binance' | 'kis';
+export type LiveCandleProvider = 'binance' | 'kis' | 'koscom';
 export type LiveCandleMarketSession = 'regular' | 'continuous';
 
 export type LiveCandleAbsoluteValues = {

@@ -79,7 +79,7 @@ export class LiveCandleHealthService {
   }
 
   updateProvider(
-    provider: 'binance' | 'kis',
+    provider: 'binance' | 'kis' | 'koscom',
     patch: Partial<LiveCandleProviderHealth>,
   ): void {
     const current =
@@ -92,6 +92,7 @@ export class LiveCandleHealthService {
       providers: {
         binance: this.providers.get('binance') ?? defaultProviderHealth(false),
         kis: this.providers.get('kis') ?? defaultProviderHealth(true),
+        koscom: this.providers.get('koscom') ?? defaultProviderHealth(false),
       },
       liveCandle: {
         ...this.counters,

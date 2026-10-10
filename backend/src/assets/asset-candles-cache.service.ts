@@ -568,6 +568,18 @@ export function isAssetCandlesResponse(
   }
 
   const source = data.source;
+  if (source.provider === 'koscom' || source.provider === 'mixed') {
+    return (
+      data.asset.assetType === 'domestic_stock' &&
+      hasStrings(source, ['marketCode']) &&
+      Array.isArray(source.sourceProviders) &&
+      source.sourceProviders.every(
+        (provider) => typeof provider === 'string',
+      ) &&
+      Number.isSafeInteger(source.requestedCount) &&
+      Number.isSafeInteger(source.returnedCount)
+    );
+  }
   if (source.provider === 'kis') {
     return (
       hasStrings(source, ['trId', 'path', 'marketCode']) &&

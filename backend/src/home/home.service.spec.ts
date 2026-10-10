@@ -917,7 +917,7 @@ describe('HomeService', () => {
           price: new Prisma.Decimal('110.00000000'),
           currencyCode: CurrencyCode.KRW,
           sourceType: AssetPriceSourceType.provider_api,
-          sourceName: 'kis_krx_realtime_trade',
+          sourceName: 'koscom_krx_realtime_price',
           effectiveAt: new Date(Date.now() - 1_000),
           capturedAt: new Date(Date.now() - 1_000),
         },
@@ -936,7 +936,7 @@ describe('HomeService', () => {
             returnRate: '22.22222222',
             priceSource: {
               sourceType: 'provider_api',
-              sourceName: 'kis_krx_realtime_trade',
+              sourceName: 'koscom_krx_realtime_price',
               snapshotId: 'provider-price-home',
               fallbackUsed: false,
             },

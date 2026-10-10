@@ -1,7 +1,9 @@
 jest.mock('./generated/prisma/client', () => ({
   PrismaClient: class PrismaClient {},
   Prisma: {
-    Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
+    Decimal: jest.requireActual<{ Decimal: unknown }>(
+      '@prisma/client/runtime/client',
+    ).Decimal,
   },
   AssetPriceSourceType: {
     admin_manual: 'admin_manual',
@@ -231,19 +233,22 @@ describe('AppService candle readiness', () => {
       expect(result.data.reasons).not.toContain('LIVE_PROVIDER_STALE');
     });
 
-    it('exempts a quiet KIS feed outside the KRX regular session', async () => {
-      const health = new LiveCandleHealthService();
-      health.updateProvider('kis', {
-        owner: true,
-        state: 'connected',
-        delayed: false,
-        eventLagMs: 999_999,
-      });
-      const stale = await createService(health).getReadiness(inKrxSession);
-      expect(stale.data.reasons).toContain('LIVE_PROVIDER_STALE');
-      const quiet = await createService(health).getReadiness(outOfKrxSession);
-      expect(quiet.data.reasons).not.toContain('LIVE_PROVIDER_STALE');
-    });
+    it.each(['kis', 'koscom'] as const)(
+      'exempts a quiet %s feed outside the KRX regular session',
+      async (provider) => {
+        const health = new LiveCandleHealthService();
+        health.updateProvider(provider, {
+          owner: true,
+          state: 'connected',
+          delayed: false,
+          eventLagMs: 999_999,
+        });
+        const stale = await createService(health).getReadiness(inKrxSession);
+        expect(stale.data.reasons).toContain('LIVE_PROVIDER_STALE');
+        const quiet = await createService(health).getReadiness(outOfKrxSession);
+        expect(quiet.data.reasons).not.toContain('LIVE_PROVIDER_STALE');
+      },
+    );
 
     it('excludes the delayed US feed from real-time staleness checks', async () => {
       const health = new LiveCandleHealthService();

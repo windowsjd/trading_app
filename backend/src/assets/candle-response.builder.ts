@@ -22,6 +22,7 @@ import type {
 
 export type PersistedResponseCandle = {
   openTime: Date;
+  sourceProvider?: string;
   open: Prisma.Decimal | string;
   high: Prisma.Decimal | string;
   low: Prisma.Decimal | string;
@@ -50,6 +51,7 @@ export class CandleResponseBuilder {
     asset: AssetCandlesAsset,
     query: ParsedAssetCandlesQuery,
     rows: readonly PersistedResponseCandle[],
+    providers?: readonly string[],
   ): AssetCandlesResponse {
     const candles = rows.map((row) => this.toPayload(row, asset.assetType));
     const base = this.base(asset, query, candles);
@@ -69,6 +71,33 @@ export class CandleResponseBuilder {
           },
         },
       };
+    }
+
+    if (asset.assetType === AssetType.domestic_stock) {
+      const sourceProviders = [
+        ...new Set(
+          (
+            providers ??
+            rows.flatMap((r) => (r.sourceProvider ? [r.sourceProvider] : []))
+          ).filter((p): p is string => typeof p === 'string'),
+        ),
+      ];
+      const koscom = sourceProviders.some((p) => p.startsWith('koscom'));
+      const legacy = sourceProviders.some((p) => p.startsWith('kis'));
+      if (koscom || !legacy)
+        return {
+          success: true,
+          data: {
+            ...base,
+            source: {
+              provider: legacy ? 'mixed' : 'koscom',
+              sourceProviders,
+              marketCode: asset.market,
+              requestedCount: query.limit,
+              returnedCount: candles.length,
+            },
+          },
+        };
     }
 
     const period = query.interval === '1d' || query.interval === '1w';

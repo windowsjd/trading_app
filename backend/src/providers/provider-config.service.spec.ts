@@ -125,13 +125,13 @@ describe('provider config', () => {
     expect(config.kis.wsStreamingHeartbeatTimeoutMs).toBe(60000);
   });
 
-  it('keeps the fixed domestic universe fallback when KIS symbols are unset or blank', () => {
-    expect(buildProviderConfig({}).kis.domesticSymbols).toEqual([
-      ...KIS_FIXED_DOMESTIC_SYMBOLS,
-    ]);
+  it('preserves the domestic seed universe while retiring KIS runtime targets', () => {
+    expect(KIS_FIXED_DOMESTIC_SYMBOLS.length).toBe(15);
+    expect(KIS_FIXED_DOMESTIC_SYMBOLS.includes('086520')).toBe(true);
+    expect(buildProviderConfig({}).kis.domesticSymbols).toEqual([]);
     expect(
       buildProviderConfig({ KIS_DOMESTIC_SYMBOLS: '   ' }).kis.domesticSymbols,
-    ).toEqual([...KIS_FIXED_DOMESTIC_SYMBOLS]);
+    ).toEqual([]);
   });
 
   it('parses KIS long-lived WebSocket streaming env overrides', () => {

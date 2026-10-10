@@ -159,7 +159,11 @@ export class KisWebSocketStreamingService
     }
 
     const liveCandles = readLiveCandleConfig();
-    if (liveCandles.enabled && liveCandles.kisEnabled) {
+    if (
+      liveCandles.enabled &&
+      liveCandles.kisEnabled &&
+      liveCandles.kisUsDelayedEnabled
+    ) {
       this.status.enabled = false;
       this.status.running = false;
       this.status.state = 'disabled';

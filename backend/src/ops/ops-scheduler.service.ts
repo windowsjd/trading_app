@@ -1,3 +1,6 @@
+import { readLiveCandleConfig } from '../assets/live-candle.config';
+import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
+import { KoscomConfigService } from '../providers/koscom/koscom.config';
 import {
   Injectable,
   OnModuleDestroy,
@@ -40,6 +43,7 @@ import { classifyFailureCause } from '../common/safe-failure-cause';
 
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
+  private koscomInterval: NodeJS.Timeout | null = null;
   private interval: NodeJS.Timeout | null = null;
   private limitOrderMatchingInterval: NodeJS.Timeout | null = null;
   /** Prevents same-process tick overlap of the candle sync job (see below). */
@@ -61,9 +65,24 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
     @Optional()
     private readonly limitOrderMatchingService?: LimitOrderMatchingService,
+    @Optional() private readonly koscom?: KoscomIngestionService,
+    @Optional() private readonly koscomConfig?: KoscomConfigService,
   ) {}
 
   onModuleInit() {
+    const koscom = this.koscomConfig?.getConfig();
+    if (
+      koscom?.enabled &&
+      koscom.pollingEnabled &&
+      !readLiveCandleConfig().enabled
+    ) {
+      const collect = () => {
+        void this.koscom?.collect().catch(() => undefined);
+      };
+      this.koscomInterval = setInterval(collect, koscom.pollIntervalMs);
+      this.koscomInterval.unref?.();
+      collect();
+    }
     const config = getOpsSchedulerConfig();
     if (config.providerIngestionRunOnStartup) {
       const startupAt = new Date();
@@ -127,6 +146,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   clearInterval() {
+    if (this.koscomInterval) clearInterval(this.koscomInterval);
+    this.koscomInterval = null;
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;

@@ -9,7 +9,8 @@ export const PROVIDER_SOURCE_NAMES = {
   cryptoUsd: 'binance_public_rest_24hr_ticker',
   cryptoUsdRest: 'binance_public_rest_24hr_ticker',
   cryptoUsdWebSocket: 'binance_spot_ws_ticker',
-  domesticStockKrx: 'kis_krx_realtime_trade',
+  domesticStockKrx: 'koscom_krx_realtime_price',
+  domesticStockLegacy: 'kis_krx_realtime_trade',
   usStock: 'kis_us_delayed_trade',
 } as const;
 
@@ -217,7 +218,14 @@ export function resolveAssetProviderEligibility(input: {
     return {
       eligible: true,
       sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx,
-      sourceNames: [PROVIDER_SOURCE_NAMES.domesticStockKrx],
+      sourceNames:
+        input.workflow === 'daily_portfolio_snapshot' ||
+        input.workflow === 'season_settlement'
+          ? [
+              PROVIDER_SOURCE_NAMES.domesticStockKrx,
+              PROVIDER_SOURCE_NAMES.domesticStockLegacy,
+            ]
+          : [PROVIDER_SOURCE_NAMES.domesticStockKrx],
       freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
         input.workflow,
       ),
@@ -771,6 +779,18 @@ function evaluateProviderSnapshot<T extends ProviderSnapshotCandidate>(input: {
     return {
       eligible: false,
       reason: 'captured_at_stale',
+      freshnessAgeSeconds,
+    };
+  }
+
+  if (
+    candidate.sourceName === PROVIDER_SOURCE_NAMES.domesticStockKrx &&
+    input.now.getTime() - candidate.effectiveAt.getTime() >
+      input.freshnessThresholdSeconds * 1000
+  ) {
+    return {
+      eligible: false,
+      reason: 'effective_at_stale',
       freshnessAgeSeconds,
     };
   }

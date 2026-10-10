@@ -78,7 +78,8 @@ export interface AssetCandleDto {
 }
 
 export interface AssetCandlesSourceDto {
-  provider?: 'kis' | 'binance';
+  provider?: 'kis' | 'binance' | 'koscom' | 'mixed';
+  sourceProviders?: string[];
   requestedCount?: number;
   returnedCount?: number;
   // Binance only: true when the requested window exceeded one klines call and

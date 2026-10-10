@@ -1,3 +1,8 @@
+import { KoscomCandleAdapter } from '../providers/koscom/koscom-candle.adapter';
+import {
+  KOSCOM_MINUTE_SOURCE,
+  KOSCOM_HISTORY_SOURCE,
+} from '../providers/koscom/koscom.config';
 import { BINANCE_REST_MAX_CONCURRENCY } from '../providers/binance/binance-rest-coordinator';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
@@ -12,17 +17,13 @@ import { redactText } from '../providers/provider-secret-redaction';
 import { toBinanceUsdtSymbol } from '../providers/provider-target-resolver.service';
 import { normalizeKisUsMarketCode } from '../providers/kis/kis-websocket.subscription';
 import { formatZonedCursor } from '../providers/kis/candles/kis-candle-time';
-import {
-  KIS_DOMESTIC_CANDLE_SOURCE,
-  KIS_US_CANDLE_SOURCE,
-} from '../providers/kis/candles/kis-candle.types';
+import { KIS_US_CANDLE_SOURCE } from '../providers/kis/candles/kis-candle.types';
 import {
   KIS_DOMESTIC_PERIOD_SOURCE,
   KIS_OVERSEAS_PERIOD_SOURCE,
   type KisPeriodInterval,
   type KisPeriodPageResult,
 } from '../providers/kis/candles/kis-period-candle.types';
-import { KisDomesticPeriodAdapter } from '../providers/kis/candles/kis-domestic-period.adapter';
 import { KisOverseasPeriodAdapter } from '../providers/kis/candles/kis-overseas-period.adapter';
 import {
   KisPeriodCandleNormalizerService,
@@ -182,7 +183,7 @@ export class MarketCandleSyncService {
     private readonly stateRepository: MarketCandleSyncStateRepository,
     private readonly lockService: MarketCandleBackfillLockService,
     private readonly fiveMinuteIngestion: MarketCandleIngestionService,
-    private readonly domesticPeriodAdapter: KisDomesticPeriodAdapter,
+    private readonly domesticPeriodAdapter: KoscomCandleAdapter,
     private readonly overseasPeriodAdapter: KisOverseasPeriodAdapter,
     private readonly periodNormalizer: KisPeriodCandleNormalizerService,
     private readonly binanceCandles: BinanceCandleIngestionService,
@@ -1044,7 +1045,9 @@ export class MarketCandleSyncService {
         row !== undefined &&
         row.assetId === asset.id &&
         row.interval === '1d' &&
-        row.sourceProvider === sourceProvider &&
+        (row.sourceProvider === sourceProvider ||
+          (sourceProvider === KOSCOM_HISTORY_SOURCE &&
+            row.sourceProvider === KIS_DOMESTIC_PERIOD_SOURCE)) &&
         row.isClosed &&
         row.closeTime.getTime() === window.closeTime.getTime() &&
         Number.isFinite(row.sourceUpdatedAt.getTime()) &&
@@ -1631,7 +1634,7 @@ export class MarketCandleSyncService {
       }
       return {
         ok: true,
-        descriptor: { kind: 'kis_domestic', symbol, marketCode: 'J' },
+        descriptor: { kind: 'kis_domestic', symbol, marketCode: asset.market },
       };
     }
     if (asset.assetType === AssetType.us_stock) {
@@ -1667,11 +1670,11 @@ export class MarketCandleSyncService {
     if (descriptor.kind === 'binance') return BINANCE_CANDLE_SOURCE;
     if (feed === '5m') {
       return descriptor.kind === 'kis_domestic'
-        ? KIS_DOMESTIC_CANDLE_SOURCE
+        ? KOSCOM_MINUTE_SOURCE
         : KIS_US_CANDLE_SOURCE;
     }
     return descriptor.kind === 'kis_domestic'
-      ? KIS_DOMESTIC_PERIOD_SOURCE
+      ? KOSCOM_HISTORY_SOURCE
       : KIS_OVERSEAS_PERIOD_SOURCE;
   }
 

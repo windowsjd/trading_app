@@ -116,6 +116,18 @@ export class CandleServingService {
     query: ParsedAssetCandlesQuery,
     legacyLoader: () => Promise<AssetCandlesResponse>,
   ): Promise<AssetCandlesResponse> {
+    // Compatibility reads share the same cache and cross-instance single flight
+    // as persisted charts. One viewer must not create a new provider poller.
+    if (asset.assetType === 'domestic_stock') {
+      const direct = legacyLoader;
+      const directPlan = this.plans.build(asset, query);
+      legacyLoader = () =>
+        this.singleFlight.getOrLoad({
+          cacheKeyInput: this.cacheKey(asset.id, query, directPlan),
+          staleWaiterMaxWaitMs: this.config.staleWaiterMaxWaitMs,
+          loader: direct,
+        });
+    }
     if (this.config.mode === 'legacy') {
       const response = await legacyLoader();
       this.logDelivery('legacy_provider', asset.id, query, null, {
@@ -467,7 +479,9 @@ export class CandleServingService {
             : 'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
           message: crypto
             ? 'Binance candle provider is unavailable.'
-            : 'KIS candle provider is unavailable.',
+            : asset.assetType === 'domestic_stock'
+              ? 'KOSCOM candle provider is unavailable.'
+              : 'KIS candle provider is unavailable.',
           details: null,
         },
       },

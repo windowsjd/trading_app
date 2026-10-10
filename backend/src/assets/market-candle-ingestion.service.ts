@@ -1,11 +1,11 @@
+import { KoscomCandleAdapter } from '../providers/koscom/koscom-candle.adapter';
+import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
 import { Injectable } from '@nestjs/common';
 import { MarketCandlesRepository } from './market-candles.repository';
 import { KisCandleNormalizerService } from '../providers/kis/candles/kis-candle-normalizer.service';
 import { KisDomesticFiveMinuteBuilder } from '../providers/kis/candles/kis-domestic-five-minute.builder';
-import { KisDomesticMinuteAdapter } from '../providers/kis/candles/kis-domestic-minute.adapter';
 import { KisUsMinuteAdapter } from '../providers/kis/candles/kis-us-minute.adapter';
 import {
-  KIS_DOMESTIC_CANDLE_SOURCE,
   KIS_US_CANDLE_SOURCE,
   type CanonicalFiveMinuteCandle,
   type KisCandleFetchInput,
@@ -14,7 +14,7 @@ import {
 import { AssetCandlesCacheService } from './asset-candles-cache.service';
 
 export type KisFiveMinuteFetchResult = {
-  provider: typeof KIS_DOMESTIC_CANDLE_SOURCE | typeof KIS_US_CANDLE_SOURCE;
+  provider: typeof KOSCOM_MINUTE_SOURCE | typeof KIS_US_CANDLE_SOURCE;
   assetId: string;
   rangeFrom: Date;
   rangeTo: Date;
@@ -49,7 +49,7 @@ export type KisFiveMinuteIngestionResult = Omit<
 @Injectable()
 export class MarketCandleIngestionService {
   constructor(
-    private readonly domesticAdapter: KisDomesticMinuteAdapter,
+    private readonly domesticAdapter: KoscomCandleAdapter,
     private readonly usAdapter: KisUsMinuteAdapter,
     private readonly normalizer: KisCandleNormalizerService,
     private readonly domesticBuilder: KisDomesticFiveMinuteBuilder,
@@ -71,9 +71,10 @@ export class MarketCandleIngestionService {
     const built = this.domesticBuilder.build({
       rows: normalized.rows,
       now: input.now,
+      completedMinutesOnly: true,
     });
     return {
-      provider: KIS_DOMESTIC_CANDLE_SOURCE,
+      provider: KOSCOM_MINUTE_SOURCE,
       assetId: input.asset.id,
       rangeFrom: input.from,
       rangeTo: input.to,

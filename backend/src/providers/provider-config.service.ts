@@ -10,10 +10,7 @@ import {
 } from './provider-env.validation';
 import { ProviderConfigError } from './provider.types';
 import { buildKisWatchlist } from './kis/kis-watchlist.policy';
-import {
-  KIS_FIXED_DOMESTIC_SYMBOLS,
-  KIS_FIXED_US_SYMBOLS,
-} from './kis/kis-fixed-asset-universe';
+import { KIS_FIXED_US_SYMBOLS } from './kis/kis-fixed-asset-universe';
 import { BINANCE_FIXED_SYMBOLS } from './binance/binance-fixed-asset-universe';
 
 export type CommonProviderConfig = {
@@ -286,13 +283,9 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
     41,
     'kis',
   );
-  const envDomesticSymbols = readCsvEnv(env, 'KIS_DOMESTIC_SYMBOLS');
   const envUsSymbols = readCsvEnv(env, 'KIS_US_SYMBOLS');
   const watchlist = buildKisWatchlist({
-    domesticSymbols:
-      envDomesticSymbols.length > 0
-        ? envDomesticSymbols
-        : KIS_FIXED_DOMESTIC_SYMBOLS,
+    domesticSymbols: [],
     usSymbols: envUsSymbols.length > 0 ? envUsSymbols : KIS_FIXED_US_SYMBOLS,
     maxSize: maxWatchlistSize,
   });
@@ -380,7 +373,7 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       'kis',
     ),
     maxWatchlistSize,
-    domesticSymbols: watchlist.domesticSymbols,
+    domesticSymbols: [], // Historical universe is retained; KIS runtime serves US only.
     usSymbols: watchlist.usSymbols,
     allSymbols: watchlist.allSymbols,
     canCallRestLive: kisEnabled && Boolean(kisRestBaseUrl),

@@ -111,14 +111,14 @@ Body:
 Policy:
 
 - `dryRun` defaults to `true`; non-dry-run requires explicit `"dryRun": false`.
-- `symbols` is optional and provider-specific. KIS accepts 6-digit domestic symbols and US symbols in `NAS:AAPL`/`NYS:IBM` form; Binance accepts public ticker symbols such as `BTCUSDT`.
+- `symbols` is optional and provider-specific. KOSCOM accepts existing 6-digit domestic symbols; KIS collects US symbols in `NAS:AAPL`/`NYS:IBM` form; Binance accepts public ticker symbols such as `BTCUSDT`.
 - `maxSnapshots` caps accepted `created`/`would_create` rows for KIS REST/WebSocket modes.
 - `kisModes` defaults to `["rest_current_price", "rest_hoga"]`; `websocket_trade` can be requested explicitly.
 - Disabled or missing provider env returns a handled `state="skipped"` or `state="failed"` summary instead of creating fake rows.
 - The trigger only writes provider market-data rows:
   - FX providers write `fx_rate_snapshots`.
   - Binance and KIS current-price/trade ingestion write `asset_price_snapshots`.
-  - KIS hoga ingestion writes `asset_orderbook_snapshots`.
+  - KOSCOM domestic/KIS US hoga ingestion writes `asset_orderbook_snapshots`.
 - It does not mutate orders, FX execute requests, wallets, positions, ledgers, rankings, settlement, rewards, or reward fulfillment rows.
 - Responses and audit metadata contain aggregate safe summaries only. Raw provider payloads, access tokens, approval keys, app keys/secrets, `.env.local`, `DATABASE_URL`, and private ledgers are not exposed.
 - Success and handled skipped/disabled outcomes write `OperatorAuditLog` with safe metadata.
@@ -810,3 +810,5 @@ this API only changes the trading calendar, it does not publish notices.
 ## Next Gate
 
 Recommended next gate: Reward Policy / Reward Catalog Gate, Production Scheduler Ownership Gate, or Backend Release / Operations Runbook Gate. This is separate from Provider API Source Eligibility Implementation Gate.
+
+Domestic provider migration: `POST /api/v1/operator/providers/koscom/run` accepts the existing `dryRun`, `symbols`, and `maxSnapshots` fields, and collects price and orderbook batches. See [KOSCOM configuration and verification](koscom-market-data.md). Existing audit and operator authorization apply.

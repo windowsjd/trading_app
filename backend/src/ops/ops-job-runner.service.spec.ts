@@ -1431,7 +1431,7 @@ describe('OpsJobRunnerService', () => {
       isLockOwned: expect.any(Function),
       dryRun: false,
       requestedBy: 'scheduler',
-      domesticSymbols: ['005930'],
+      domesticSymbols: [],
       usSymbols: [],
       maxSnapshots: 10,
     });
@@ -1520,7 +1520,7 @@ describe('OpsJobRunnerService', () => {
     expect(kisWebSocketClient.runTradePriceIngestion).toHaveBeenCalledWith({
       dryRun: false,
       requestedBy: 'scheduler',
-      domesticSymbols: ['005930'],
+      domesticSymbols: [],
       usSymbols: [],
       maxSnapshots: 10,
       isLockOwned: expect.any(Function),

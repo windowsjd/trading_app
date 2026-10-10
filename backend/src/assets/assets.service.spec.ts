@@ -980,7 +980,7 @@ describe('AssetsService', () => {
   it.each([
     {
       label: 'domestic KRX',
-      sourceName: 'kis_krx_realtime_trade',
+      sourceName: 'koscom_krx_realtime_price',
       fixture: asset({
         id: 'asset-krx',
         market: 'KRX',
@@ -1063,7 +1063,7 @@ describe('AssetsService', () => {
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       providerPriceSnapshot(
         'provider-price-stale',
-        'kis_krx_realtime_trade',
+        'koscom_krx_realtime_price',
         '999.00000000',
         CurrencyCode.KRW,
         new Date(Date.now() - 301_000),
@@ -1470,7 +1470,7 @@ describe('AssetsService', () => {
     prisma.assetPriceSnapshot.findMany.mockResolvedValue([
       providerPriceSnapshot(
         'stale-krx',
-        'kis_krx_realtime_trade',
+        'koscom_krx_realtime_price',
         '12345.87654321',
         CurrencyCode.KRW,
         new Date(Date.now() - 3600000),
@@ -1646,7 +1646,7 @@ describe('AssetsService', () => {
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
       providerPriceSnapshot(
         'price-90-seconds',
-        'kis_krx_realtime_trade',
+        'koscom_krx_realtime_price',
         '70000.00000000',
         CurrencyCode.KRW,
         capturedAt,
@@ -1745,7 +1745,7 @@ describe('AssetsService', () => {
       const { prisma, service } = createService();
       const isCrypto = assetType === AssetType.crypto;
       const currency = isCrypto ? CurrencyCode.USD : CurrencyCode.KRW;
-      const sourceName = isCrypto ? 'binance_spot_ws_ticker' : 'kis_krx_realtime_trade';
+      const sourceName = isCrypto ? 'binance_spot_ws_ticker' : 'koscom_krx_realtime_price';
       const fixture = asset({ id: 'asset-daily', symbol: isCrypto ? 'BTCUSDT' : '005930', assetType, currencyCode: currency });
       const current = providerPriceSnapshot('current', sourceName, '110', currency);
       prisma.asset.findUnique.mockResolvedValue(fixture);
@@ -2146,14 +2146,14 @@ describe('AssetsService', () => {
           return values.map((_, i) => ({
             id: `p${i}`,
             sourceType: 'provider_api',
-            sourceName: 'kis_krx_realtime_trade',
+            sourceName: 'koscom_krx_realtime_price',
             rawPayloadJson: {
               truncated: false,
               payload: {
-                messageType: 'websocket_trade',
-                rawFields: {
-                  ACML_VOL: String(1000 - i),
-                  ACML_TR_PBMN: i === 2 ? '' : String(i * 100),
+                messageType: 'rest_current_price',
+                row: {
+                  accTrdvol: String(1000 - i),
+                  accTrdval: i === 2 ? '' : String(i * 100),
                 },
               },
             },
@@ -2161,7 +2161,7 @@ describe('AssetsService', () => {
         return [
           providerPriceSnapshot(
             `p${args.where.assetId.slice(1)}`,
-            'kis_krx_realtime_trade',
+            'koscom_krx_realtime_price',
             '100',
           ),
         ];

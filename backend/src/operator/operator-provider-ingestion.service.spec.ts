@@ -1,3 +1,4 @@
+jest.mock('../providers/koscom/koscom-ingestion.service', () => ({ KoscomIngestionService: class {} }));
 jest.mock('../generated/prisma/client', () => ({
   OperatorAuditResult: {
     success: 'success',
@@ -187,14 +188,14 @@ describe('OperatorProviderIngestionService', () => {
     });
     expect(kisCurrent.ingestCurrentPrices).toHaveBeenCalledWith(
       expect.objectContaining({
-        domesticSymbols: ['005930'],
+        domesticSymbols: [],
         usSymbols: ['NAS:AAPL'],
         maxSnapshots: 2,
       }),
     );
     expect(kisHoga.ingestHogaSnapshots).toHaveBeenCalledWith(
       expect.objectContaining({
-        domesticSymbols: ['005930'],
+        domesticSymbols: [],
         usSymbols: ['NAS:AAPL'],
       }),
     );

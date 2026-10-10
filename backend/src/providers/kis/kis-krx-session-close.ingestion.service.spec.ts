@@ -136,7 +136,7 @@ describe('KIS KRX closing-price ingestion', () => {
       {
         id: 'existing',
         sourceType: 'provider_api',
-        sourceName: 'kis_krx_realtime_trade',
+        sourceName: 'koscom_krx_realtime_price',
         price: new Prisma.Decimal('253500'),
         effectiveAt: new Date('2026-09-16T06:30:00Z'),
         capturedAt: now,

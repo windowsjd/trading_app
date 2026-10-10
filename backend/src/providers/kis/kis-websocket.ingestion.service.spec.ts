@@ -484,8 +484,8 @@ describe('KIS WebSocket ingestion service', () => {
 
     await expect(
       service.buildSubscriptionTargets({
-        domesticSymbols: Array.from({ length: 42 }, (_, index) =>
-          String(index).padStart(6, '0'),
+        usSymbols: Array.from({ length: 42 }, (_, index) =>
+          `NAS:STOCK${index}`,
         ),
       }),
     ).rejects.toThrow('KIS watchlist allows at most 41 symbols.');

@@ -157,6 +157,18 @@ function isTime(value: unknown): value is string {
 /** Provider-specific bus wiring lives in ProvidersModule, never in the gateway. */
 @Injectable()
 export class MarketPriceEventService {
+  private readonly listeners = new Set<
+    (event: MarketPriceEvent) => void | Promise<void>
+  >();
+
+  publish(event: MarketPriceEvent): void {
+    for (const listener of this.listeners) {
+      void Promise.resolve()
+        .then(() => listener(event))
+        .catch(() => undefined);
+    }
+  }
+
   constructor(
     private readonly kis: KisRealtimePriceEventBus,
     private readonly binance: BinanceRealtimePriceEventBus,
@@ -169,9 +181,11 @@ export class MarketPriceEventService {
       const event = normalizeMarketPriceEvent(raw);
       if (event) return listener(event);
     };
+    this.listeners.add(listener);
     const unsubscribeKis = this.kis.subscribe(forward);
     const unsubscribeBinance = this.binance.subscribe(forward);
     return () => {
+      this.listeners.delete(listener);
       unsubscribeKis();
       unsubscribeBinance();
     };

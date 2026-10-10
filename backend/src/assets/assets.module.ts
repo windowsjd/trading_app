@@ -1,3 +1,5 @@
+import { KoscomCandleReaderService } from './koscom-candle-reader.service';
+import { readKoscomConfig } from '../providers/koscom/koscom.config';
 import { Logger, Module } from '@nestjs/common';
 import { RedisModule } from '../redis/redis.module';
 import { RedisService } from '../redis/redis.service';
@@ -58,6 +60,7 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
   imports: [ProvidersModule, RedisModule, MarketSessionOverrideModule],
   controllers: [AssetsController],
   providers: [
+    KoscomCandleReaderService,
     AssetsService,
     DailyChangeRateService,
     MarketSessionOverrideCacheInvalidatorService,
@@ -91,10 +94,12 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
       provide: LIVE_CANDLE_CONFIG,
       useFactory: () => {
         const live = readLiveCandleConfig();
+        const koscom = readKoscomConfig();
         // Refuses invalid live/reconciliation combinations in production;
         // returns warnings elsewhere.
         const warnings = validateLiveReconciliationDependencies({
           live,
+          koscomPollingEnabled: koscom.enabled && koscom.pollingEnabled,
           reconciliation: readMarketCandleReconciliationConfig(),
           nodeEnv: process.env.NODE_ENV,
         });

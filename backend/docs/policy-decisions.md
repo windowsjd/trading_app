@@ -48,12 +48,12 @@
 
 ## Market-State-Aware Price Freshness
 
-- KRX startup recovery requests the missing completed date from KIS FHKST03010100 (J, D, original prices FID_ORG_ADJ_PRC=1). Only an exact-date output2.stck_bsop_date with valid stck_clpr/OHLCV and matching output1.stck_shrn_iscd, received after session close, is closing-price evidence. The existing KIS KRW provider source is retained; raw endpoint, request and business-date evidence distinguish it from a WebSocket trade. sourceTimestamp remains null (no trade clock), capturedAt remains actual receipt time, and effectiveAt is the calendar close of the provider-reported closing-price date. A timestamp-less current quote cannot supply this evidence.
-- Recovery remains one bounded pass per process, only after today's KRX session and only for configured domestic symbols with missing coverage. Success requires a second health read through the shared selector for every requested asset; created rows alone are insufficient. Missing/invalid evidence retains unavailable/stale-cache behaviour. No selector, order, US/crypto or schema policy changes.
+- KRX close recovery now uses KOSCOM exact-date history D rows, validates business date/OHLCV/symbol and actual receipt after the calendar close, and rechecks coverage. `sourceTimestamp` stays null and `effectiveAt` is the calendar close. The timestamp-less closeprice/current quote is insufficient. See [KOSCOM contract](koscom-market-data.md).
+- Recovery uses the shared KOSCOM collection lease and per-asset leases, only after today's KRX session and for active domestic symbols with missing coverage. Success requires a second health read through the shared selector; created rows alone are insufficient. Incomplete coverage is retried after a bounded cooldown. Missing/invalid evidence retains unavailable/stale-cache behaviour. Order arithmetic, US/crypto and schema policies remain unchanged.
 
 - 휴장 조회는 최근 완료 세션의 `openTime <= effectiveAt <= closeTime`, 양수 가격, 적격 source를 DB 조건에 먼저 넣고 source별 최신 1개를 선택한다. 최신 N개를 먼저 읽어 세션 가격을 찾지 않는다. 수동 fallback도 휴장 중에는 같은 세션 범위만 허용하며 캘린더 미확인 시 fail-closed한다.
-- KIS transport와 frontend `/api/v1/ws`는 유지한다. Gateway는 주식별 캘린더가 open일 때만 현재 세션의 provider event를 live ticker로 전달한다. 휴장 ticker는 기존 3초 snapshot poll에서 완료 세션 가격을 전달한다. 세션 상태 전환은 가격 snapshot ID가 같아도 전송하며 frontend는 서버의 시장 상태를 사용한다.
-- KRX `H0STCNT0`의 `BSOP_DATE` + `STCK_CNTG_HOUR`가 체결 `effectiveAt`, 서버 수신 시간이 `capturedAt`이다. 정상 종가가 늦게 수신되어도 snapshot evidence로 저장할 수 있으며 휴장 live fanout은 금지한다. 유효한 provider 시각이 없는 휴장 이벤트에 임의 grace period를 적용하지 않는다.
+- 미국주식 KIS transport와 frontend `/api/v1/ws`는 유지한다. Gateway는 주식별 캘린더가 open일 때만 현재 세션의 provider event를 live ticker로 전달한다. 휴장 ticker는 기존 3초 snapshot poll에서 완료 세션 가격을 전달한다. 세션 상태 전환은 가격 snapshot ID가 같아도 전송하며 frontend는 서버의 시장 상태를 사용한다.
+- 신규 KRX 가격은 코스콤 `trdTm`을 서울 거래일과 결합해 `effectiveAt`으로 사용하고 실제 서버 수신 시간을 `capturedAt`으로 구분한다. `trdDd`가 있으면 일자를 검증하며, 시각이 아닌 장 상태 코드와 미래·과거 세션 가격은 거절한다. 개장 중 두 시각 모두 같은 freshness 한도를 적용한다. 과거 KIS `H0STCNT0` evidence는 보존하지만 신규 실시간 대체 가격으로 선택하지 않는다. 휴장 복구 가격의 live fanout은 금지한다.
 
 - 주식시장 개장 중에는 아래 `capturedAt` freshness와 현재 세션 안의 `effectiveAt`을 함께 요구한다. 현재 세션 가격이 없으면 stale/unavailable이며 이전 세션 가격으로 넘어가지 않는다.
   근거: 시장이 열렸는데 현재 세션 데이터가 없는 상태는 정상 휴장이 아니라 provider 지연 또는 장애다.
@@ -131,7 +131,7 @@
   근거: 정부 공식 무료 API를 우선 사용해 비용/계약 리스크를 낮추고 상용 API는 이중화 폴백으로만 둔다. OANDA/Twelve Data는 유료 계약·응답 필드 검증이 끝나지 않아 최종 채택되지 않았다.
 - 암호화폐: Binance(공개 REST, API 키 불필요).
   근거: 위 Crypto USD Settlement 정책과 동일한 이유로, 계약/키 없이 공개 데이터만으로 USD 결제 모델에 맞는 시세 수집이 가능하다.
-- 국내/미국 주식: KIS(한국투자증권) — 국내 KRX 실시간 체결가(`H0STCNT0`), 미국 0분 지연 체결가(`HDFSCNT0`).
+- 국내주식: KOSCOM Open API v3 중앙 수집 (`koscom_krx_realtime_price`). 미국주식: 기존 KIS (`HDFSCNT0`) 유지. API 키 없는 국내 시세는 unavailable이며 KIS 실시간 출처로 자동 회귀하지 않는다. [상세 계약](koscom-market-data.md).
   근거: Twelve Data 공식 문서상 한국거래소는 EOD 지연으로만 제공되어 실시간 quote/execute 요건을 충족하지 못한다. KIS는 실계좌 연동 없이 시세 조회 전용으로 국내 실시간·미국 지연 데이터를 모두 제공한다.
 - KIS 주문/계좌/잔고/체결/입출금 API는 사용하지 않는다(시세 조회 전용).
   근거: 이 프로젝트는 가상매매 앱이며 실거래 연동은 범위 밖이다.
@@ -140,7 +140,7 @@
 
 국내 15 + 미국 25 종목 심볼 리스트는 문서가 아니라 코드로 관리한다.
 
-- 기본값(코드): `src/providers/kis/kis-fixed-asset-universe.ts`의 `KIS_FIXED_DOMESTIC_SYMBOLS`/`KIS_FIXED_US_SYMBOLS`. `KIS_DOMESTIC_SYMBOLS`/`KIS_US_SYMBOLS` 환경변수가 비어 있으면 이 기본값을 사용한다.
+- 기본값(코드): `src/providers/kis/kis-fixed-asset-universe.ts`의 `KIS_FIXED_DOMESTIC_SYMBOLS`/`KIS_FIXED_US_SYMBOLS`. `KIS_US_SYMBOLS` 환경변수가 비어 있으면 미국주식 기본값을 사용한다. `KIS_DOMESTIC_SYMBOLS`는 신규 KIS 수집에서 무시하며 국내주식은 기존 활성 DB 자산을 코스콤 목록으로 매핑한다.
 - 자산 DB 시딩: `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts [--dry-run]`로 40개 자산을 upsert한다.
 - 근거: 이 리스트는 프로젝트 결정으로 고정된 고유동성 후보군이며(공식 YTD 순위 검증을 주장하지 않음), 매 환경마다 운영자가 수동 입력하지 않도록 코드에 기본값으로 고정한다.
 

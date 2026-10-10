@@ -87,7 +87,7 @@ describe('CandleResponseBuilder.buildPersisted source diagnostics', () => {
         [row(30), row(0)],
       );
       expect(response.data.source).toMatchObject({
-        provider: 'kis',
+        provider: 'koscom',
         requestedCount: limit,
         returnedCount: 2,
       });
@@ -104,6 +104,33 @@ describe('CandleResponseBuilder.buildPersisted source diagnostics', () => {
       [],
     );
     expect(response.data.source).toMatchObject({ symbol: '币安人生USDT' });
+  });
+
+  it('keeps historical KIS provenance and reports a mixed chart across the provider boundary', () => {
+    const candles = [
+      { ...row(30), sourceProvider: 'kis_domestic_minute' },
+      { ...row(0), sourceProvider: 'koscom_intraday' },
+    ];
+    const response = builder.buildPersisted(
+      asset(AssetType.domestic_stock),
+      query('14d', '30m', 672),
+      candles,
+    );
+    expect(response.data.source).toMatchObject({
+      provider: 'mixed',
+      sourceProviders: ['kis_domestic_minute', 'koscom_intraday'],
+      returnedCount: 2,
+    });
+    expect(response.data.candles.map((c) => c.close)).toEqual([
+      '100.50000000',
+      '100.50000000',
+    ]);
+    const old = builder.buildPersisted(
+      asset(AssetType.domestic_stock),
+      query('14d', '30m', 672),
+      [candles[0]],
+    );
+    expect(old.data.source.provider).toBe('kis');
   });
 
   it('clamps the crypto requestedCount at the Binance single-call cap', () => {

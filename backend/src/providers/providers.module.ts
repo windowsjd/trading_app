@@ -1,4 +1,9 @@
 import { Module } from '@nestjs/common';
+import { KoscomConfigService } from './koscom/koscom.config';
+import { KoscomClient } from './koscom/koscom.client';
+import { KoscomMarketMapService } from './koscom/koscom-market-map.service';
+import { KoscomCandleAdapter } from './koscom/koscom-candle.adapter';
+import { KoscomIngestionService } from './koscom/koscom-ingestion.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { RedisModule } from '../redis/redis.module';
 import { RedisService } from '../redis/redis.service';
@@ -18,8 +23,6 @@ import { KisQuoteClient } from './kis/kis-quote.client';
 import { KisRealtimePriceCacheService } from './kis/kis-realtime-price-cache.service';
 import { KisRealtimePriceEventBus } from './kis/kis-realtime-price-event-bus.service';
 import { KisRestCurrentPriceIngestionService } from './kis/kis-rest-current-price.ingestion.service';
-import { KisKrxSessionCloseIngestionService } from './kis/kis-krx-session-close.ingestion.service';
-import { KisKrxStartupCatchUpService } from './kis/kis-krx-startup-catch-up.service';
 import { KisRestHogaIngestionService } from './kis/kis-rest-hoga.ingestion.service';
 import { KisWebSocketClient } from './kis/kis-websocket.client';
 import { KisWebSocketIngestionService } from './kis/kis-websocket.ingestion.service';
@@ -33,9 +36,7 @@ import { ProviderHttpClient } from './provider-http.client';
 import { ProviderTargetResolverService } from './provider-target-resolver.service';
 import { KisCandleNormalizerService } from './kis/candles/kis-candle-normalizer.service';
 import { KisDomesticFiveMinuteBuilder } from './kis/candles/kis-domestic-five-minute.builder';
-import { KisDomesticMinuteAdapter } from './kis/candles/kis-domestic-minute.adapter';
 import { KisUsMinuteAdapter } from './kis/candles/kis-us-minute.adapter';
-import { KisDomesticPeriodAdapter } from './kis/candles/kis-domestic-period.adapter';
 import { KisOverseasPeriodAdapter } from './kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from './kis/candles/kis-period-candle-normalizer.service';
 import { BinanceCandleIngestionService } from './binance/binance-candle.ingestion.service';
@@ -48,6 +49,11 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
 @Module({
   imports: [PrismaModule, RedisModule],
   providers: [
+    KoscomConfigService,
+    KoscomClient,
+    KoscomCandleAdapter,
+    KoscomMarketMapService,
+    KoscomIngestionService,
     UsdKrwRefreshService,
     OrderBookPubSubService,
     BinanceOrderBookService,
@@ -88,15 +94,11 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     KisQuoteClient,
     KisCandleNormalizerService,
     KisDomesticFiveMinuteBuilder,
-    KisDomesticMinuteAdapter,
     KisUsMinuteAdapter,
-    KisDomesticPeriodAdapter,
     KisOverseasPeriodAdapter,
     KisPeriodCandleNormalizerService,
     BinanceCandleIngestionService,
     KisRestCurrentPriceIngestionService,
-    KisKrxSessionCloseIngestionService,
-    KisKrxStartupCatchUpService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,
     KisRealtimePriceEventBus,
@@ -109,6 +111,11 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     MarketSnapshotHealthService,
   ],
   exports: [
+    KoscomConfigService,
+    KoscomClient,
+    KoscomCandleAdapter,
+    KoscomMarketMapService,
+    KoscomIngestionService,
     UsdKrwRefreshService,
     OrderBookPubSubService,
     BinanceOrderBookService,
@@ -127,9 +134,7 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     KisQuoteClient,
     KisCandleNormalizerService,
     KisDomesticFiveMinuteBuilder,
-    KisDomesticMinuteAdapter,
     KisUsMinuteAdapter,
-    KisDomesticPeriodAdapter,
     KisOverseasPeriodAdapter,
     KisPeriodCandleNormalizerService,
     BinanceCandleIngestionService,

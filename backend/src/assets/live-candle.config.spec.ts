@@ -127,7 +127,8 @@ describe('readLiveCandleConfig', () => {
     it('refuses production startup for each live-without-reconciliation combination', () => {
       expect(() =>
         validateLiveReconciliationDependencies({
-          live: live({ CANDLE_LIVE_KIS_ENABLED: 'true' }),
+          live: live({}),
+          koscomPollingEnabled: true,
           reconciliation: reconciliation(false, false, true),
           nodeEnv: 'production',
         }),
@@ -159,6 +160,19 @@ describe('readLiveCandleConfig', () => {
             CANDLE_LIVE_BINANCE_ENABLED: 'true',
           }),
           reconciliation: reconciliation(true, false, true),
+          nodeEnv: 'production',
+        }),
+      ).toEqual([]);
+    });
+
+    it('keeps US-only KIS independent of KRX reconciliation', () => {
+      expect(
+        validateLiveReconciliationDependencies({
+          live: live({
+            CANDLE_LIVE_KIS_ENABLED: 'true',
+            CANDLE_LIVE_KIS_US_DELAYED_ENABLED: 'true',
+          }),
+          reconciliation: reconciliation(false, true, false),
           nodeEnv: 'production',
         }),
       ).toEqual([]);

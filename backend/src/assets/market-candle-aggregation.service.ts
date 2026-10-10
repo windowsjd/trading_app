@@ -28,6 +28,7 @@ const AGGREGATION_INTERVAL_MINUTES: Record<
   '4h': 240,
 };
 
+const CandleDecimal = Prisma.Decimal.clone({ precision: 50 });
 const FIVE_MINUTES_MS = 5 * 60_000;
 const MAX_BUCKET_SPAN_MS = 4 * 60 * 60_000;
 
@@ -214,8 +215,8 @@ export class MarketCandleAggregationService {
     const close = toDecimal(ordered[ordered.length - 1].close);
     let high = toDecimal(ordered[0].high);
     let low = toDecimal(ordered[0].low);
-    let volume = new Prisma.Decimal(0);
-    let amount: Prisma.Decimal | null = new Prisma.Decimal(0);
+    let volume = new CandleDecimal(0);
+    let amount: Prisma.Decimal | null = new CandleDecimal(0);
     let sourceUpdatedAt = ordered[0].sourceUpdatedAt;
     let allClosed = true;
     for (const row of ordered) {

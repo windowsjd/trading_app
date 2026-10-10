@@ -1,3 +1,6 @@
+import { KoscomCandleReaderService } from './koscom-candle-reader.service';
+import { KoscomError } from '../providers/koscom/koscom.config';
+import { Optional } from '@nestjs/common';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   AssetType,
@@ -10,7 +13,6 @@ import {
   inspectMarketSessionsInRange,
   resolveCalendarMarket,
   resolveMarketSession,
-  resolveStockMarketDataUpperBound,
   resolveStockMarketSessionState,
 } from '../orders/market-calendar.policy';
 import { BinancePublicClient } from '../providers/binance/binance-public.client';
@@ -65,7 +67,6 @@ export type CandleInterval =
   | '1d'
   | '1w';
 type CryptoCandleInterval = CandleInterval;
-type KisDomesticPeriodDivCode = 'D' | 'W';
 
 export type AssetCandlesAsset = {
   id: string;
@@ -164,6 +165,13 @@ export type AssetCandlesResponse = {
     candles: CandlePayload[];
     source:
       | {
+          provider: 'koscom' | 'mixed';
+          sourceProviders: string[];
+          marketCode: string;
+          requestedCount: number;
+          returnedCount: number;
+        }
+      | {
           provider: 'kis';
           trId: string;
           path: string;
@@ -201,11 +209,6 @@ export type AssetCandlesResponse = {
 //     mind KIS TPS limits).
 //   - overseas: NEXT/KEYB/tr_cont continuation loop with a maxPages bound.
 const BINANCE_KLINE_MAX_LIMIT = 1000;
-const KIS_DOMESTIC_TODAY_MAX_COUNT = 30;
-const KIS_DOMESTIC_DAILY_MINUTE_MAX_COUNT = 120;
-const KIS_DOMESTIC_PERIOD_MAX_COUNT = 100;
-const KIS_DOMESTIC_DAILY_PERIOD_MAX_PAGES = 5;
-const KIS_DOMESTIC_WEEKLY_PERIOD_MAX_PAGES = 3;
 const KIS_OVERSEAS_MINUTE_MAX_COUNT = 120;
 const DEFAULT_LIMIT = 100;
 // Request-level cap; per-provider caps above clamp lower where needed.
@@ -301,18 +304,9 @@ const RANGE_INTERVALS: Record<
   season: CANDLE_INTERVALS,
 };
 
-const DOMESTIC_TODAY_CANDLE_PATH =
-  '/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice';
-const DOMESTIC_DAILY_CANDLE_PATH =
-  '/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice';
-const DOMESTIC_PERIOD_CANDLE_PATH =
-  '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice';
 const OVERSEAS_CANDLE_PATH =
   '/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice';
 
-const DOMESTIC_TODAY_CANDLE_TR_ID = 'FHKST03010200';
-const DOMESTIC_DAILY_CANDLE_TR_ID = 'FHKST03010230';
-const DOMESTIC_PERIOD_CANDLE_TR_ID = 'FHKST03010100';
 const OVERSEAS_CANDLE_TR_ID = 'HHDFS76950200';
 
 const DATE_FIELD_ALIASES = [
@@ -353,6 +347,7 @@ export class AssetCandlesService {
     private readonly binancePublicClient: BinancePublicClient,
     private readonly serving: CandleServingService,
     private readonly responses: CandleResponseBuilder,
+    @Optional() private readonly koscomReader?: KoscomCandleReaderService,
   ) {}
 
   async getAssetCandles(
@@ -494,138 +489,18 @@ export class AssetCandlesService {
     asset: AssetCandlesAsset,
     query: ParsedAssetCandlesQuery,
   ): Promise<AssetCandlesResponse> {
-    const marketCode = this.resolveDomesticKisMarketCode(asset);
-
-    if (query.interval === '1d' || query.interval === '1w') {
-      return this.getDomesticStockPeriodCandles(asset, query, marketCode);
+    try {
+      if (!this.koscomReader) throw new KoscomError('KOSCOM_DISABLED');
+      return await this.koscomReader.read(asset, query);
+    } catch (error) {
+      if (error instanceof KoscomError)
+        this.throwApiError(
+          HttpStatus.SERVICE_UNAVAILABLE,
+          'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+          'Domestic candle provider is unavailable.',
+        );
+      throw error;
     }
-
-    // Same-day-only ranges may use the today endpoint (30 rows). Multi-day
-    // ranges (prev_open/prev2_open/7d/…) need the daily-minute endpoint, which
-    // returns up to 120 rows and can cross into prior days.
-    const providerCursor = this.resolveDomesticProviderCursor(asset, query);
-    const usesTodayEndpoint =
-      query.range === '1d' &&
-      query.intervalMinutes < CANDLE_INTERVAL_MINUTES['1d'] &&
-      query.requestedDate === this.dateInZone(query.clock, KOREA_TIME_ZONE) &&
-      providerCursor.date === this.compactDate(query.requestedDate);
-    const descriptor = usesTodayEndpoint
-      ? this.buildDomesticTodayCall(asset, query, marketCode, providerCursor)
-      : this.buildDomesticDailyCall(asset, query, marketCode, providerCursor);
-    if (this.isConfirmedEmptyStockRange(asset, query)) {
-      return this.buildResponse(asset, query, descriptor, []);
-    }
-    const response = await this.callKisCandles(descriptor);
-    const rows = this.extractRows(response);
-    const normalized = this.normalizeRows(rows, {
-      fallbackDate: query.requestedDate,
-      timeZone: KOREA_TIME_ZONE,
-    });
-    const rangeFiltered = this.filterCandlesToRange(normalized, query);
-    const bucketed = this.bucketStockCandles(
-      rangeFiltered,
-      query.intervalMinutes,
-      asset,
-    );
-    const candles = this.sliceRecent(
-      this.filterCandlesToRange(bucketed, query),
-      query.limit,
-    ).map((candle) => this.formatCandle(candle));
-
-    return this.buildResponse(asset, query, descriptor, candles);
-  }
-
-  private async getDomesticStockPeriodCandles(
-    asset: AssetRecord,
-    query: ParsedAssetCandlesQuery,
-    marketCode: string,
-  ): Promise<AssetCandlesResponse> {
-    const periodCode: KisDomesticPeriodDivCode =
-      query.interval === '1w' ? 'W' : 'D';
-    const maxPages =
-      periodCode === 'D'
-        ? KIS_DOMESTIC_DAILY_PERIOD_MAX_PAGES
-        : KIS_DOMESTIC_WEEKLY_PERIOD_MAX_PAGES;
-    const requestedCount = Math.min(
-      query.limit,
-      KIS_DOMESTIC_PERIOD_MAX_COUNT * maxPages,
-    );
-    const dateRange = this.resolveDomesticPeriodDateRange(query, asset);
-    const sourceDescriptor = this.buildDomesticPeriodCall({
-      asset,
-      marketCode,
-      periodCode,
-      startDate: dateRange.startDate,
-      endDate: dateRange.endDate,
-      requestedCount,
-    });
-    if (this.isConfirmedEmptyStockRange(asset, query)) {
-      return this.buildResponse(asset, query, sourceDescriptor, []);
-    }
-    const candlesBySourceDate = new Map<string, NormalizedCandle>();
-    let cursorEndDate = dateRange.endDate;
-
-    for (
-      let page = 0;
-      page < maxPages && candlesBySourceDate.size < requestedCount;
-      page += 1
-    ) {
-      if (cursorEndDate < dateRange.startDate) {
-        break;
-      }
-
-      const descriptor = this.buildDomesticPeriodCall({
-        asset,
-        marketCode,
-        periodCode,
-        startDate: dateRange.startDate,
-        endDate: cursorEndDate,
-        requestedCount,
-      });
-      const response = await this.callKisCandles(descriptor);
-      const rows = this.extractRows(response);
-
-      if (rows.length === 0) {
-        break;
-      }
-
-      const normalized = this.normalizeDomesticPeriodRows(rows);
-      let oldestSourceDate: string | null = null;
-
-      for (const candle of normalized) {
-        if (
-          candle.sourceDate < dateRange.startDate ||
-          candle.sourceDate > dateRange.endDate
-        ) {
-          continue;
-        }
-
-        if (!candlesBySourceDate.has(candle.sourceDate)) {
-          candlesBySourceDate.set(candle.sourceDate, candle);
-        }
-
-        if (!oldestSourceDate || candle.sourceDate < oldestSourceDate) {
-          oldestSourceDate = candle.sourceDate;
-        }
-      }
-
-      if (
-        rows.length < KIS_DOMESTIC_PERIOD_MAX_COUNT ||
-        !oldestSourceDate ||
-        oldestSourceDate <= dateRange.startDate
-      ) {
-        break;
-      }
-
-      cursorEndDate = this.previousCompactDate(oldestSourceDate);
-    }
-
-    const candles = this.sliceRecent(
-      this.filterCandlesToRange([...candlesBySourceDate.values()], query),
-      requestedCount,
-    ).map((candle) => this.formatCandle(candle));
-
-    return this.buildResponse(asset, query, sourceDescriptor, candles);
   }
 
   private async getUsStockCandles(
@@ -709,85 +584,6 @@ export class AssetCandlesService {
       candles,
       truncated,
     );
-  }
-
-  private buildDomesticTodayCall(
-    asset: AssetRecord,
-    query: ParsedAssetCandlesQuery,
-    marketCode: string,
-    providerCursor: { date: string; time: string },
-  ): KisCallDescriptor {
-    const symbol = this.normalizeDomesticSymbol(asset.symbol);
-
-    return {
-      path: DOMESTIC_TODAY_CANDLE_PATH,
-      trId: DOMESTIC_TODAY_CANDLE_TR_ID,
-      marketCode,
-      requestedCount: Math.min(query.limit, KIS_DOMESTIC_TODAY_MAX_COUNT),
-      query: {
-        FID_COND_MRKT_DIV_CODE: marketCode,
-        FID_INPUT_ISCD: symbol,
-        FID_INPUT_HOUR_1: providerCursor.time,
-        FID_ETC_CLS_CODE: '',
-        FID_PW_DATA_INCU_YN: 'N',
-      },
-    };
-  }
-
-  private buildDomesticPeriodCall(input: {
-    asset: AssetRecord;
-    marketCode: string;
-    periodCode: KisDomesticPeriodDivCode;
-    startDate: string;
-    endDate: string;
-    requestedCount: number;
-  }): KisCallDescriptor {
-    const symbol = this.normalizeDomesticSymbol(input.asset.symbol);
-
-    return {
-      path: DOMESTIC_PERIOD_CANDLE_PATH,
-      trId: DOMESTIC_PERIOD_CANDLE_TR_ID,
-      marketCode: input.marketCode,
-      requestedCount: input.requestedCount,
-      query: {
-        FID_COND_MRKT_DIV_CODE: input.marketCode,
-        FID_INPUT_ISCD: symbol,
-        FID_INPUT_DATE_1: input.startDate,
-        FID_INPUT_DATE_2: input.endDate,
-        FID_PERIOD_DIV_CODE: input.periodCode,
-        FID_ORG_ADJ_PRC: '0',
-      },
-    };
-  }
-
-  private buildDomesticDailyCall(
-    asset: AssetRecord,
-    query: ParsedAssetCandlesQuery,
-    marketCode: string,
-    providerCursor: { date: string; time: string },
-  ): KisCallDescriptor {
-    const symbol = this.normalizeDomesticSymbol(asset.symbol);
-
-    return {
-      path: DOMESTIC_DAILY_CANDLE_PATH,
-      trId: DOMESTIC_DAILY_CANDLE_TR_ID,
-      marketCode,
-      // KIS returns at most 120 rows per call regardless of how many we want.
-      requestedCount: Math.min(
-        query.limit,
-        KIS_DOMESTIC_DAILY_MINUTE_MAX_COUNT,
-      ),
-      query: {
-        FID_COND_MRKT_DIV_CODE: marketCode,
-        FID_INPUT_ISCD: symbol,
-        FID_INPUT_DATE_1: providerCursor.date,
-        FID_INPUT_HOUR_1: providerCursor.time,
-        // 'Y' lets the 120 returned rows continue backwards into prior trading
-        // days, which multi-day ranges (prev_open/prev2_open/7d/…) need.
-        FID_PW_DATA_INCU_YN: query.includePrevious ? 'Y' : 'N',
-        FID_FAKE_TICK_INCU_YN: 'N',
-      },
-    };
   }
 
   private buildOverseasCall(
@@ -947,60 +743,6 @@ export class AssetCandlesService {
 
       candles.push({
         time: this.zonedDateTimeToUtc(sourceDate, sourceTime, input.timeZone),
-        open,
-        high,
-        low,
-        close,
-        volume,
-        amount,
-        sourceDate,
-        sourceTime,
-      });
-    }
-
-    return this.sortCandles(candles);
-  }
-
-  private normalizeDomesticPeriodRows(
-    rows: readonly Record<string, unknown>[],
-  ): NormalizedCandle[] {
-    const candles: NormalizedCandle[] = [];
-
-    for (const row of rows) {
-      const sourceDate = this.normalizeSourceDate(
-        this.readOptionalString(row.stck_bsop_date),
-        '',
-      );
-      const sourceTime = '000000';
-      const open = this.parseDecimal(this.readOptionalString(row.stck_oprc));
-      const high = this.parseDecimal(this.readOptionalString(row.stck_hgpr));
-      const low = this.parseDecimal(this.readOptionalString(row.stck_lwpr));
-      const close = this.parseDecimal(this.readOptionalString(row.stck_clpr));
-      const volume = this.parseDecimal(this.readOptionalString(row.acml_vol));
-      const amount = this.parseDecimal(
-        this.readOptionalString(row.acml_tr_pbmn),
-      );
-
-      if (
-        !sourceDate ||
-        !open ||
-        !high ||
-        !low ||
-        !close ||
-        !volume ||
-        !amount ||
-        open.lte(0) ||
-        high.lte(0) ||
-        low.lte(0) ||
-        close.lte(0) ||
-        volume.lt(0) ||
-        amount.lt(0)
-      ) {
-        continue;
-      }
-
-      candles.push({
-        time: this.zonedDateTimeToUtc(sourceDate, sourceTime, KOREA_TIME_ZONE),
         open,
         high,
         low,
@@ -1393,59 +1135,6 @@ export class AssetCandlesService {
     );
   }
 
-  private resolveDomesticPeriodDateRange(
-    query: ParsedAssetCandlesQuery,
-    asset: AssetRecord,
-  ): {
-    startDate: string;
-    endDate: string;
-  } {
-    const startDate = query.rangeStartAt
-      ? this.compactDate(this.dateInZone(query.rangeStartAt, KOREA_TIME_ZONE))
-      : this.compactDate(query.requestedDate);
-    const endDate =
-      query.explicitDate || query.explicitTo
-        ? query.rangeEndAt
-          ? this.compactDate(this.dateInZone(query.rangeEndAt, KOREA_TIME_ZONE))
-          : this.compactDate(query.requestedDate)
-        : this.resolveDomesticProviderCursor(asset, query).date;
-
-    if (startDate <= endDate) {
-      return { startDate, endDate };
-    }
-
-    return { startDate: endDate, endDate };
-  }
-
-  private resolveDomesticProviderCursor(
-    asset: AssetRecord,
-    query: ParsedAssetCandlesQuery,
-  ): { date: string; time: string } {
-    if (query.explicitDate || query.explicitTo) {
-      return {
-        date: this.compactDate(query.requestedDate),
-        time: query.toHHmmss,
-      };
-    }
-    const requestedTo = query.rangeEndAt ?? query.clock;
-    const upperBound = resolveStockMarketDataUpperBound(
-      asset,
-      requestedTo,
-      query.clock,
-    );
-    if (!upperBound) {
-      this.throwApiError(
-        HttpStatus.SERVICE_UNAVAILABLE,
-        'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
-        'Market calendar coverage is unavailable for the candle range.',
-      );
-    }
-    return {
-      date: this.compactDate(this.dateInZone(upperBound, KOREA_TIME_ZONE)),
-      time: this.timeInZone(upperBound, KOREA_TIME_ZONE),
-    };
-  }
-
   private isConfirmedEmptyStockRange(
     asset: AssetRecord,
     query: ParsedAssetCandlesQuery,
@@ -1803,24 +1492,6 @@ export class AssetCandlesService {
     return trimmed === '' ? undefined : trimmed;
   }
 
-  private resolveDomesticKisMarketCode(asset: AssetRecord): string {
-    const market = asset.market.trim().toUpperCase();
-    if (
-      market === 'KRX' ||
-      market === 'KOSPI' ||
-      market === 'KOSDAQ' ||
-      market === 'KONEX'
-    ) {
-      return 'J';
-    }
-
-    this.throwApiError(
-      HttpStatus.BAD_REQUEST,
-      'ASSET_CANDLES_UNSUPPORTED_MARKET',
-      'Asset market is unsupported for KIS domestic stock candles.',
-    );
-  }
-
   private resolveUsKisMarketCode(asset: AssetRecord): string {
     const marketCode = normalizeKisUsMarketCode(asset.market);
     if (marketCode) {
@@ -1831,19 +1502,6 @@ export class AssetCandlesService {
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_UNSUPPORTED_MARKET',
       'Asset market is unsupported for KIS overseas stock candles.',
-    );
-  }
-
-  private normalizeDomesticSymbol(symbol: string): string {
-    const normalized = symbol.trim().toUpperCase();
-    if (/^\d{6}$/u.test(normalized)) {
-      return normalized;
-    }
-
-    this.throwApiError(
-      HttpStatus.BAD_REQUEST,
-      'ASSET_CANDLES_UNSUPPORTED_SYMBOL',
-      'Domestic stock candles require a 6-digit KIS stock code.',
     );
   }
 
@@ -2015,19 +1673,6 @@ export class AssetCandlesService {
 
   private compactDate(value: string): string {
     return value.replace(/-/gu, '');
-  }
-
-  private previousCompactDate(value: string): string {
-    const date = new Date(
-      Date.UTC(
-        Number(value.slice(0, 4)),
-        Number(value.slice(4, 6)) - 1,
-        Number(value.slice(6, 8)),
-      ),
-    );
-    date.setUTCDate(date.getUTCDate() - 1);
-
-    return date.toISOString().slice(0, 10).replace(/-/gu, '');
   }
 
   private formatAuthorization(

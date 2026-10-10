@@ -129,6 +129,7 @@ export class CandleDatabaseLoader {
     const completedCoverage = coverageStatus === 'complete';
 
     let rows: PersistedResponseCandle[];
+    let sourceProviders: string[] | undefined;
     let droppedIncompleteBuckets = 0;
     if (plan.requiresAggregation) {
       const stored = await this.repository.findRange({
@@ -152,6 +153,26 @@ export class CandleDatabaseLoader {
         return false;
       });
       rows = this.latest(usable, plan.limit);
+      if (asset.assetType === 'domestic_stock') {
+        const first = rows[0]?.openTime.getTime();
+        const last = rows.at(-1) as
+          | (PersistedResponseCandle & { closeTime?: Date })
+          | undefined;
+        const end =
+          last?.closeTime?.getTime() ?? plan.requestedRange.to.getTime();
+        sourceProviders = [
+          ...new Set(
+            stored
+              .filter(
+                (r) =>
+                  first !== undefined &&
+                  r.openTime.getTime() >= first &&
+                  r.openTime.getTime() < end,
+              )
+              .map((r) => r.sourceProvider),
+          ),
+        ];
+      }
     } else {
       const stored = await this.repository.findRange({
         assetId: plan.assetId,
@@ -170,9 +191,34 @@ export class CandleDatabaseLoader {
         return false;
       });
       rows = this.latest(usable, plan.limit);
+      if (asset.assetType === 'domestic_stock') {
+        const first = rows[0]?.openTime.getTime();
+        const last = rows.at(-1) as
+          | (PersistedResponseCandle & { closeTime?: Date })
+          | undefined;
+        const end =
+          last?.closeTime?.getTime() ?? plan.requestedRange.to.getTime();
+        sourceProviders = [
+          ...new Set(
+            stored
+              .filter(
+                (r) =>
+                  first !== undefined &&
+                  r.openTime.getTime() >= first &&
+                  r.openTime.getTime() < end,
+              )
+              .map((r) => r.sourceProvider),
+          ),
+        ];
+      }
     }
 
-    const response = this.responses.buildPersisted(asset, query, rows);
+    const response = this.responses.buildPersisted(
+      asset,
+      query,
+      rows,
+      sourceProviders,
+    );
     const fresh = this.isFresh(
       rows,
       coverage.newestCompletedAt,

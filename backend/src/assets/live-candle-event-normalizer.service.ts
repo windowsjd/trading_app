@@ -3,6 +3,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { AssetType, Prisma } from '../generated/prisma/client';
 import type { BinanceFiveMinuteKline } from '../providers/binance/binance-kline.parser';
 import type { KisWebSocketTradeTick } from '../providers/kis/kis-websocket.types';
+import type { CanonicalFiveMinuteCandle } from '../providers/kis/candles/kis-candle.types';
+import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
 import { resolveRegularSessionForEvent } from '../orders/market-calendar.policy';
 import {
   LIVE_CANDLE_CONFIG,
@@ -33,6 +35,74 @@ export class LiveCandleEventNormalizerService {
   constructor(
     @Inject(LIVE_CANDLE_CONFIG) private readonly config: LiveCandleConfig,
   ) {}
+
+  normalizeKoscomCandle(
+    candle: CanonicalFiveMinuteCandle,
+    asset: LiveCandleAsset,
+    asOf: Date,
+    receivedAt = new Date(),
+  ): NormalizedLiveCandleEvent {
+    this.assertAsset(asset, AssetType.domestic_stock);
+    // Only completed, contiguous provider minutes enter this method. As-of is
+    // the request's clock, not its completion time or a polled quote timestamp.
+    const coveredUntil = Math.min(
+      candle.closeTime.getTime(),
+      Math.floor(asOf.getTime() / 60000) * 60000,
+    );
+    const eventTime = new Date(coveredUntil - 1);
+    this.assertTimestamps(eventTime, receivedAt);
+    const session = resolveRegularSessionForEvent(asset, candle.openTime);
+    if (
+      !session ||
+      coveredUntil <= candle.openTime.getTime() ||
+      (candle.openTime.getTime() - session.openTime.getTime()) % 300000 !== 0 ||
+      candle.closeTime.getTime() !==
+        Math.min(
+          candle.openTime.getTime() + 300000,
+          session.closeTime.getTime(),
+        ) ||
+      candle.isClosed !== (coveredUntil === candle.closeTime.getTime())
+    )
+      throw new LiveCandleEventValidationError(
+        'INVALID_CANDLE_WINDOW',
+        'KOSCOM candle has an invalid coverage window.',
+      );
+    const absolute = {
+      open: this.positive(candle.open.toString(), 'open'),
+      high: this.positive(candle.high.toString(), 'high'),
+      low: this.positive(candle.low.toString(), 'low'),
+      close: this.positive(candle.close.toString(), 'close'),
+      volume: this.nonNegative(candle.volume.toString(), 'volume'),
+      amount: this.optionalNonNegative(
+        candle.amount?.toString() ?? null,
+        'amount',
+      ),
+      providerFinal: candle.isClosed,
+    };
+    return {
+      provider: 'koscom',
+      source: KOSCOM_MINUTE_SOURCE,
+      assetId: asset.id,
+      assetType: asset.assetType,
+      market: asset.market,
+      symbol: asset.symbol,
+      eventTime,
+      receivedAt,
+      price: absolute.close,
+      tradeQuantity: null,
+      amount: null,
+      eventId: hash(
+        `koscom:${asset.id}:${candle.openTime.toISOString()}:${coveredUntil}:${JSON.stringify(absolute)}`,
+      ),
+      sequence: null,
+      marketSession: 'regular',
+      delayed: false,
+      openTime: candle.openTime,
+      closeTime: candle.closeTime,
+      mode: 'absolute',
+      absolute,
+    };
+  }
 
   normalizeBinance(
     kline: BinanceFiveMinuteKline,

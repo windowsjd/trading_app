@@ -133,11 +133,35 @@ async function main() {
     await runRetentionDelete();
     await runUnknownAssetRejection();
     await runInvalidInputRejection();
+    await runKoscomTransitionPreservation();
     console.log('market candles db smoke ok');
   } finally {
     await cleanup();
     await prisma.$disconnect();
   }
+}
+
+async function runKoscomTransitionPreservation() {
+  await prisma.marketCandle.deleteMany({where:{assetId}});
+  const old=candleInput({sourceProvider:'kis_domestic_minute'});
+  await repository.upsertMany([old]);
+  const before=await repository.findLatest({assetId,interval:'5m'});
+  await repository.upsertMany([
+    {...old,close:'108',sourceProvider:'koscom_intraday',sourceUpdatedAt:minute(20)},
+    candleInput({openTime:minute(5),closeTime:minute(10),sourceProvider:'koscom_intraday',sourceUpdatedAt:minute(20)}),
+  ]);
+  const rows=await repository.findRange({assetId,interval:'5m',from:minute(0),to:minute(10)});
+  assert.equal(rows.length,2);
+  assert.equal(rows[0].id,before.id);
+  assert.equal(rows[0].close.toFixed(),'105');
+  assert.equal(rows[0].sourceProvider,'kis_domestic_minute');
+  assert.equal(rows[0].sourceUpdatedAt.getTime(),before.sourceUpdatedAt.getTime());
+  assert.equal(rows[1].sourceProvider,'koscom_intraday');
+  await repository.upsertMany([candleInput({interval:'1d',closeTime:minute(1440),sourceProvider:'kis_domestic_period'})]);
+  await repository.upsertMany([candleInput({interval:'1d',closeTime:minute(1440),close:'108',sourceProvider:'koscom_history',sourceUpdatedAt:minute(20)})]);
+  const daily=await repository.findLatest({assetId,interval:'1d'});
+  assert.equal(daily.sourceProvider,'kis_domestic_period');
+  assert.equal(daily.close.toFixed(),'105');
 }
 
 async function runIdempotentUpsert() {

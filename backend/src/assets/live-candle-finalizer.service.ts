@@ -148,6 +148,7 @@ export class LiveCandleFinalizerService
       !this.isStrictlyValid(state) ||
       !state.complete ||
       state.volume === null ||
+      (state.sourceProvider.startsWith('koscom') && !state.providerFinal) ||
       (!state.providerFinal && !state.sourceContinuity)
     ) {
       // Not finalizable from live data alone: hand the bucket to the bounded
@@ -158,7 +159,9 @@ export class LiveCandleFinalizerService
     }
     const provider = state.sourceProvider.startsWith('binance')
       ? 'binance'
-      : 'kis';
+      : state.sourceProvider.startsWith('koscom')
+        ? 'koscom'
+        : 'kis';
     const ownerLeaseKey = buildLiveCandleOwnerLeaseKey(provider);
     const leaseValue = await this.redis.get(ownerLeaseKey);
     if (leaseValue !== state.ownerGeneration) {
@@ -422,7 +425,8 @@ export class LiveCandleFinalizerService
     if (
       !state.assetId.trim() ||
       (!state.sourceProvider.startsWith('binance') &&
-        !state.sourceProvider.startsWith('kis')) ||
+        !state.sourceProvider.startsWith('kis') &&
+        !state.sourceProvider.startsWith('koscom')) ||
       !Number.isFinite(openTime) ||
       !Number.isFinite(closeTime) ||
       closeTime <= openTime ||

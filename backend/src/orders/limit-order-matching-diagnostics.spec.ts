@@ -281,7 +281,7 @@ describe('bounded matcher Ops diagnostics', () => {
       f.prisma.assetPriceSnapshot.findMany.mockResolvedValue([
         {
           ...snapshot(),
-          sourceName: 'kis_krx_realtime_trade',
+          sourceName: 'koscom_krx_realtime_price',
           effectiveAt,
           capturedAt: new Date(
             now.getTime() - (reason === 'captured_at_stale' ? 11_000 : 0),

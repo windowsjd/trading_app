@@ -1,3 +1,7 @@
+import { KoscomConfigService } from '../src/providers/koscom/koscom.config';
+import { KoscomClient } from '../src/providers/koscom/koscom.client';
+import { KoscomMarketMapService } from '../src/providers/koscom/koscom-market-map.service';
+import { KoscomCandleAdapter } from '../src/providers/koscom/koscom-candle.adapter';
 /**
  * Post-run REST verification for a completed live smoke: reconciles an
  * explicit window for the given symbols and reports SUBSTANTIVE drift
@@ -58,11 +62,9 @@ import { KisRateLimiterService } from '../src/providers/kis/coordination/kis-rat
 import { KisRequestCoordinatorService } from '../src/providers/kis/coordination/kis-request-coordinator.service';
 import { KisAuthClient } from '../src/providers/kis/kis-auth.client';
 import { KisQuoteClient } from '../src/providers/kis/kis-quote.client';
-import { KisDomesticMinuteAdapter } from '../src/providers/kis/candles/kis-domestic-minute.adapter';
 import { KisUsMinuteAdapter } from '../src/providers/kis/candles/kis-us-minute.adapter';
 import { KisCandleNormalizerService } from '../src/providers/kis/candles/kis-candle-normalizer.service';
 import { KisDomesticFiveMinuteBuilder } from '../src/providers/kis/candles/kis-domestic-five-minute.builder';
-import { KisDomesticPeriodAdapter } from '../src/providers/kis/candles/kis-domestic-period.adapter';
 import { KisOverseasPeriodAdapter } from '../src/providers/kis/candles/kis-overseas-period.adapter';
 
 function arg(name: string): string | undefined {
@@ -143,20 +145,30 @@ async function main() {
   const kisCoordinator = new KisRequestCoordinatorService(kisLimiter);
   const kisAuth = new KisAuthClient(providerConfig, kisCoordinator);
   const kisQuote = new KisQuoteClient(providerConfig, kisCoordinator);
+  const koscomConfig = new KoscomConfigService();
+  const koscomClient = new KoscomClient(
+    koscomConfig,
+    redis,
+    new RedisLockService(redis),
+  );
+  const koscom = new KoscomCandleAdapter(
+    koscomClient,
+    new KoscomMarketMapService(koscomClient, redis, koscomConfig),
+  );
   const sync = new MarketCandleSyncService(
     prisma,
     repository,
     new MarketCandleSyncStateRepository(prisma),
     new MarketCandleBackfillLockService(locks),
     new MarketCandleIngestionService(
-      new KisDomesticMinuteAdapter(kisAuth, kisQuote, providerConfig),
+      koscom,
       new KisUsMinuteAdapter(kisAuth, kisQuote, providerConfig),
       new KisCandleNormalizerService(),
       new KisDomesticFiveMinuteBuilder(),
       repository,
       cache,
     ),
-    new KisDomesticPeriodAdapter(kisAuth, kisQuote, providerConfig),
+    koscom,
     new KisOverseasPeriodAdapter(kisAuth, kisQuote, providerConfig),
     new KisPeriodCandleNormalizerService(),
     new BinanceCandleIngestionService(

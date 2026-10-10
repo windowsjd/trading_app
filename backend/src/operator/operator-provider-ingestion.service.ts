@@ -2,9 +2,10 @@ import {
   BadRequestException,
   HttpException,
   Injectable,
+  Optional,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { UserRole } from '../generated/prisma/client';
+import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { BinancePriceIngestionService } from '../providers/binance/binance-price.ingestion.service';
 import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
@@ -26,7 +27,12 @@ export type OperatorProviderIngestionBody = {
   durationMs?: unknown;
 };
 
-type ProviderName = 'exchange-rate' | 'korea-exim' | 'binance' | 'kis';
+type ProviderName =
+  | 'exchange-rate'
+  | 'korea-exim'
+  | 'binance'
+  | 'kis'
+  | 'koscom';
 type KisIngestionMode = 'rest_current_price' | 'rest_hoga' | 'websocket_trade';
 
 type ProviderRunSummary = {
@@ -48,6 +54,10 @@ const MAX_SYMBOLS = 100;
 const MAX_SNAPSHOTS_LIMIT = 500;
 const MAX_DURATION_MS = 60_000;
 const DISABLED_OR_SKIPPED_CODES = new Set([
+  'KOSCOM_DISABLED',
+  'KOSCOM_COLLECTION_BUSY',
+  'KOSCOM_CLOSE_ALREADY_CHECKED',
+  'MARKET_CLOSED_EXPECTED_NO_DATA',
   'PROVIDER_INGESTION_DISABLED',
   'PROVIDER_DISABLED',
   'KOREA_EXIM_PROVIDER_DISABLED',
@@ -67,6 +77,7 @@ export class OperatorProviderIngestionService {
     private readonly kisRestCurrentPriceIngestion: KisRestCurrentPriceIngestionService,
     private readonly kisRestHogaIngestion: KisRestHogaIngestionService,
     private readonly kisWebSocketClient: KisWebSocketClient,
+    @Optional() private readonly koscom?: KoscomIngestionService,
   ) {}
 
   async runProviderIngestion(
@@ -185,6 +196,14 @@ export class OperatorProviderIngestionService {
             symbols: input.symbols,
           }),
         );
+      case 'koscom':
+        if (!this.koscom)
+          throw new InternalServerErrorException('KOSCOM_UNAVAILABLE');
+        return summaryFromResult(
+          input.provider,
+          input.dryRun,
+          await this.koscom.collect(input),
+        );
       case 'kis':
         return this.runKisProvider(input);
     }
@@ -208,7 +227,7 @@ export class OperatorProviderIngestionService {
           await this.kisRestCurrentPriceIngestion.ingestCurrentPrices({
             dryRun: input.dryRun,
             requestedBy: input.requestedBy,
-            domesticSymbols: splitSymbols?.domesticSymbols,
+            domesticSymbols: [],
             usSymbols: splitSymbols?.usSymbols,
             maxSnapshots: input.maxSnapshots,
           }),
@@ -221,7 +240,7 @@ export class OperatorProviderIngestionService {
           await this.kisRestHogaIngestion.ingestHogaSnapshots({
             dryRun: input.dryRun,
             requestedBy: input.requestedBy,
-            domesticSymbols: splitSymbols?.domesticSymbols,
+            domesticSymbols: [],
             usSymbols: splitSymbols?.usSymbols,
             maxSnapshots: input.maxSnapshots,
           }),
@@ -233,7 +252,7 @@ export class OperatorProviderIngestionService {
         await this.kisWebSocketClient.runTradePriceIngestion({
           dryRun: input.dryRun,
           requestedBy: input.requestedBy,
-          domesticSymbols: splitSymbols?.domesticSymbols,
+          domesticSymbols: [],
           usSymbols: splitSymbols?.usSymbols,
           maxSnapshots: input.maxSnapshots,
           durationMs: input.durationMs,
@@ -289,12 +308,14 @@ export class OperatorProviderIngestionService {
         return 'korea-exim';
       case 'binance':
         return 'binance';
+      case 'koscom':
+        return 'koscom';
       case 'kis':
         return 'kis';
       default:
         throw this.badRequest(
           'INVALID_PROVIDER',
-          'Provider must be exchange-rate, korea-exim, binance, or kis.',
+          'Provider must be exchange-rate, korea-exim, binance, kis, or koscom.',
         );
     }
   }
@@ -470,7 +491,7 @@ export class OperatorProviderIngestionService {
     const errorCode = errorCodeFromError(input.error);
     await this.auditService.recordFailure({
       actorUserId: input.actor.userId,
-      actorRole: input.actor.role as UserRole,
+      actorRole: input.actor.role,
       action: 'operator.provider_ingestion.run.failed',
       targetType: 'provider_ingestion',
       targetId: input.provider,

@@ -360,7 +360,7 @@ export class LiveCandleStoreService {
 }
 
 export function buildLiveCandleOwnerLeaseKey(
-  provider: 'binance' | 'kis',
+  provider: 'binance' | 'kis' | 'koscom',
   shard = 0,
 ): string {
   return `${LIVE_KEY_PREFIX}:owner:${provider}:${shard}`;

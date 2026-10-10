@@ -108,7 +108,7 @@ describe('MarketCandleIngestionService', () => {
     const { service, repository, cache } = create();
     const result = await service.ingestDomesticFiveMinuteCandles(input);
     expect(result).toMatchObject({
-      provider: 'kis_domestic_minute',
+      provider: 'koscom_intraday',
       assetId: 'asset-1',
       pagesFetched: 2,
       acceptedRows: 5,
@@ -122,7 +122,7 @@ describe('MarketCandleIngestionService', () => {
       expect.objectContaining({
         assetId: 'asset-1',
         interval: '5m',
-        sourceProvider: 'kis_domestic_minute',
+        sourceProvider: 'koscom_intraday',
         isClosed: true,
       }),
     ]);

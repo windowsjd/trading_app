@@ -83,7 +83,7 @@ export class LiveCandlePipelineService {
   }
 
   markProviderConnected(input: {
-    provider: 'binance' | 'kis';
+    provider: 'binance' | 'kis' | 'koscom';
     ownerGeneration: string;
     connectedAt?: Date;
   }): void {
@@ -96,7 +96,7 @@ export class LiveCandlePipelineService {
   }
 
   async markProviderContinuityLost(input: {
-    provider: 'binance' | 'kis';
+    provider: 'binance' | 'kis' | 'koscom';
     ownerGeneration: string;
     ownerLeaseKey: string;
   }): Promise<void> {

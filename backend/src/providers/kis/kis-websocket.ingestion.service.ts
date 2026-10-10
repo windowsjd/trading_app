@@ -75,7 +75,7 @@ export class KisWebSocketIngestionService {
   ): Promise<BuildKisWebSocketSubscriptionTargetsResult> {
     const config = this.configService.getConfig();
     const watchlist = buildKisWatchlist({
-      domesticSymbols: options.domesticSymbols ?? config.kis.domesticSymbols,
+      domesticSymbols: [], // Domestic subscriptions moved to KOSCOM REST polling.
       usSymbols: options.usSymbols ?? config.kis.usSymbols,
       maxSize: config.kis.maxWatchlistSize,
     });

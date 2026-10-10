@@ -33,17 +33,26 @@ jest.mock('../generated/prisma/client', () => {
 });
 
 import { HttpException } from '@nestjs/common';
-import { AssetType, CurrencyCode } from '../generated/prisma/client';
+import { AssetType, CurrencyCode, Prisma } from '../generated/prisma/client';
 import { ProviderHttpError } from '../providers/provider.types';
 import { AssetCandlesService } from './asset-candles.service';
 import type { ParsedAssetCandlesQuery } from './asset-candles.service';
 import { CandleResponseBuilder } from './candle-response.builder';
-
-type KisQuoteCall = {
-  path: string;
-  query: Record<string, string>;
-  headers: Record<string, string>;
-};
+import type {
+  KoscomClient,
+  KoscomResponse,
+} from '../providers/koscom/koscom.client';
+import { KoscomCandleAdapter } from '../providers/koscom/koscom-candle.adapter';
+import { KoscomCandleReaderService } from './koscom-candle-reader.service';
+import { KisCandleNormalizerService } from '../providers/kis/candles/kis-candle-normalizer.service';
+import { KisDomesticFiveMinuteBuilder } from '../providers/kis/candles/kis-domestic-five-minute.builder';
+import { KisPeriodCandleNormalizerService } from '../providers/kis/candles/kis-period-candle-normalizer.service';
+import { CandleReadPlanBuilder } from './candle-read-plan.builder';
+import { CandleDatabaseLoader } from './candle-database.loader';
+import { readCandleServingConfig } from './candle-serving.config';
+import { MarketCandleAggregationService } from './market-candle-aggregation.service';
+import { resolveMarketSession } from '../orders/market-calendar.policy';
+import { zonedDateTimeToUtc } from '../providers/kis/candles/kis-candle-time';
 
 describe('AssetCandlesService', () => {
   beforeEach(() => {
@@ -120,6 +129,29 @@ describe('AssetCandlesService', () => {
     const kisAuthClient = createKisAuthClient();
     const kisQuoteClient = createKisQuoteClient();
     const binancePublicClient = createBinancePublicClient();
+    const koscomClient = {
+      get: jest
+        .fn<Promise<KoscomResponse>, Parameters<KoscomClient['get']>>()
+        .mockImplementation(() =>
+          Promise.resolve({
+            result: { isuSrtCd: '005930', hisLists: [] },
+            receivedAt: new Date(),
+          }),
+        ),
+    };
+    const plans = new CandleReadPlanBuilder(readCandleServingConfig({}));
+    const koscomReader = new KoscomCandleReaderService(
+      new KoscomCandleAdapter(
+        koscomClient as never,
+        { resolve: () => Promise.resolve('kospi') } as never,
+      ),
+      new KisCandleNormalizerService(),
+      new KisDomesticFiveMinuteBuilder(),
+      new KisPeriodCandleNormalizerService(),
+      plans,
+      new CandleResponseBuilder(),
+      new MarketCandleAggregationService({} as never),
+    );
     const serving = {
       serve: jest.fn(
         (
@@ -136,17 +168,131 @@ describe('AssetCandlesService', () => {
       binancePublicClient as never,
       serving as never,
       new CandleResponseBuilder(),
+      koscomReader,
     );
 
     return {
       prisma,
       kisAuthClient,
       kisQuoteClient,
+      koscomClient,
       binancePublicClient,
       serving,
       service,
     };
   };
+
+  // Reuse the old historical fixture values, translating their shape only in
+  // tests. Native provider parsing itself is covered in koscom-candle.adapter.
+  function koscomFixture(fixture: {
+    receivedAt: Date;
+    response: { output2: Record<string, string>[]; rt_cd?: string };
+    state?: string;
+  }) {
+    return {
+      receivedAt: fixture.receivedAt,
+      result: {
+        isuSrtCd: '005930',
+        hisLists: fixture.response.output2.map((row) => {
+          if (row.stck_cntg_hour) {
+            const minute =
+              Number(row.stck_cntg_hour.slice(0, 2)) * 60 +
+              Number(row.stck_cntg_hour.slice(2, 4)) +
+              1;
+            return {
+              inddTm: `${String(Math.floor(minute / 60)).padStart(2, '0')}${String(minute % 60).padStart(2, '0')}0000`,
+              inddOpnprc: row.stck_oprc,
+              inddHgprc: row.stck_hgpr,
+              inddLwprc: row.stck_lwpr,
+              inddClsprc: row.stck_prpr,
+              inddTrdvol: row.cntg_vol,
+              inddTrdval:
+                row.cntg_tr_pbmn ??
+                new Prisma.Decimal(row.stck_prpr).mul(row.cntg_vol).toFixed(),
+            };
+          }
+          return {
+            trdDd: row.stck_bsop_date,
+            opnprc: row.stck_oprc,
+            hgprc: row.stck_hgpr,
+            lwprc: row.stck_lwpr,
+            trdPrc: row.stck_clpr,
+            accTrdvol: row.acml_vol,
+            accTrdval: row.acml_tr_pbmn,
+          };
+        }),
+      },
+    };
+  }
+
+  // Calendar/range regressions read historical KIS rows from the real database
+  // loader. KOSCOM does not promise historical intraday retention.
+  function serveStoredDomestic(
+    serving: ReturnType<typeof createService>['serving'],
+    raw: Record<string, string>[],
+  ) {
+    const config = readCandleServingConfig({});
+    const plans = new CandleReadPlanBuilder(config);
+    serving.serve.mockImplementationOnce(
+      async (asset: unknown, query: unknown) => {
+        const q = query as ParsedAssetCandlesQuery;
+        const rows = raw.flatMap((r) => {
+          const period = !r.stck_cntg_hour;
+          const time = r.stck_cntg_hour ?? '000000';
+          const start = zonedDateTimeToUtc(
+            r.stck_bsop_date,
+            time,
+            'Asia/Seoul',
+          )!;
+          // Complete 5m constituents for each requested interval, rather than
+          // interpreting a lone old minute as a complete 30m candle.
+          const count = period ? 1 : Math.max(1, q.intervalMinutes / 5);
+          return Array.from({ length: count }, (_, i) => ({
+            openTime: new Date(start.getTime() + i * 300000),
+            closeTime: new Date(
+              start.getTime() + (i + 1) * (period ? 86400000 : 300000),
+            ),
+            open: new Prisma.Decimal(r.stck_oprc),
+            high: new Prisma.Decimal(r.stck_hgpr),
+            low: new Prisma.Decimal(r.stck_lwpr),
+            close: new Prisma.Decimal(r.stck_clpr ?? r.stck_prpr),
+            volume: new Prisma.Decimal(r.acml_vol ?? r.cntg_vol),
+            amount: null,
+            isClosed: true,
+            sourceUpdatedAt: q.clock,
+            sourceProvider: period
+              ? 'kis_domestic_period'
+              : 'kis_domestic_minute',
+          }));
+        });
+        const repository = {
+          findRange: ({ from, to }: { from: Date; to: Date }) =>
+            Promise.resolve(
+              rows.filter((r) => r.openTime >= from && r.openTime < to),
+            ),
+        };
+        const states = {
+          findCandleCoverage: () =>
+            Promise.resolve({
+              startsAtRequestedFrom: true,
+              contiguousCoveredTo: q.clock,
+              newestCompletedAt: q.clock,
+              hasInteriorGap: false,
+            }),
+          findLatestOverlapping: () => Promise.resolve(null),
+        };
+        const loader = new CandleDatabaseLoader(
+          plans,
+          repository as never,
+          states as never,
+          new MarketCandleAggregationService(repository as never),
+          new CandleResponseBuilder(),
+          config,
+        );
+        return (await loader.load(asset as never, q)).response;
+      },
+    );
+  }
 
   const asset = (input: {
     id: string;
@@ -274,28 +420,6 @@ describe('AssetCandlesService', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   };
 
-  const firstKisQuoteCall = (
-    kisQuoteClient: ReturnType<typeof createKisQuoteClient>,
-  ): KisQuoteCall => {
-    expect(kisQuoteClient.getMarketDataByExplicitPath).toHaveBeenCalledTimes(1);
-    const call = kisQuoteCalls(kisQuoteClient)[0];
-
-    if (!call) {
-      throw new Error('Expected KIS quote client to be called.');
-    }
-
-    return call;
-  };
-
-  const kisQuoteCalls = (
-    kisQuoteClient: ReturnType<typeof createKisQuoteClient>,
-  ): KisQuoteCall[] => {
-    const calls = kisQuoteClient.getMarketDataByExplicitPath.mock
-      .calls as unknown as Array<[KisQuoteCall]>;
-
-    return calls.map(([call]) => call);
-  };
-
   it('rejects missing authenticated user', async () => {
     const { service } = createService();
 
@@ -306,8 +430,8 @@ describe('AssetCandlesService', () => {
     );
   });
 
-  it('normalizes KIS domestic today 1-minute candles into server-side buckets', async () => {
-    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+  it('normalizes KOSCOM domestic today 1-minute candles into server-side buckets', async () => {
+    const { prisma, kisAuthClient, koscomClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-samsung',
@@ -318,60 +442,62 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          {
-            stck_bsop_date: '20260619',
-            stck_cntg_hour: '090400',
-            stck_oprc: '104',
-            stck_hgpr: '106',
-            stck_lwpr: '103',
-            stck_prpr: '104',
-            cntg_vol: '10',
-          },
-          {
-            stck_bsop_date: '20260619',
-            stck_cntg_hour: '090200',
-            stck_oprc: '102',
-            stck_hgpr: '103',
-            stck_lwpr: '101',
-            stck_prpr: '102',
-            cntg_vol: '10',
-          },
-          {
-            stck_bsop_date: '20260619',
-            stck_cntg_hour: '090000',
-            stck_oprc: '100',
-            stck_hgpr: '101',
-            stck_lwpr: '99',
-            stck_prpr: '100',
-            cntg_vol: '10',
-          },
-          {
-            stck_bsop_date: '20260619',
-            stck_cntg_hour: '090300',
-            stck_oprc: '103',
-            stck_hgpr: '104',
-            stck_lwpr: '102',
-            stck_prpr: '103',
-            cntg_vol: '10',
-          },
-          {
-            stck_bsop_date: '20260619',
-            stck_cntg_hour: '090100',
-            stck_oprc: '101',
-            stck_hgpr: '102',
-            stck_lwpr: '100',
-            stck_prpr: '101',
-            cntg_vol: '10',
-          },
-        ],
-      },
-    });
+    koscomClient.get.mockResolvedValueOnce(
+      koscomFixture({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [
+            {
+              stck_bsop_date: '20260619',
+              stck_cntg_hour: '090400',
+              stck_oprc: '104',
+              stck_hgpr: '106',
+              stck_lwpr: '103',
+              stck_prpr: '104',
+              cntg_vol: '10',
+            },
+            {
+              stck_bsop_date: '20260619',
+              stck_cntg_hour: '090200',
+              stck_oprc: '102',
+              stck_hgpr: '103',
+              stck_lwpr: '101',
+              stck_prpr: '102',
+              cntg_vol: '10',
+            },
+            {
+              stck_bsop_date: '20260619',
+              stck_cntg_hour: '090000',
+              stck_oprc: '100',
+              stck_hgpr: '101',
+              stck_lwpr: '99',
+              stck_prpr: '100',
+              cntg_vol: '10',
+            },
+            {
+              stck_bsop_date: '20260619',
+              stck_cntg_hour: '090300',
+              stck_oprc: '103',
+              stck_hgpr: '104',
+              stck_lwpr: '102',
+              stck_prpr: '103',
+              cntg_vol: '10',
+            },
+            {
+              stck_bsop_date: '20260619',
+              stck_cntg_hour: '090100',
+              stck_oprc: '101',
+              stck_hgpr: '102',
+              stck_lwpr: '100',
+              stck_prpr: '101',
+              cntg_vol: '10',
+            },
+          ],
+        },
+      }),
+    );
 
     const response = await service.getAssetCandles('user-1', 'asset-samsung', {
       interval: '5m',
@@ -408,35 +534,30 @@ describe('AssetCandlesService', () => {
           },
         ],
         source: {
-          provider: 'kis',
-          trId: 'FHKST03010200',
-          path: '/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice',
-          marketCode: 'J',
-          requestedCount: 30,
+          provider: 'koscom',
+          sourceProviders: ['koscom_intraday'],
+          marketCode: 'KRX',
+          requestedCount: 100,
           returnedCount: 1,
         },
       },
     });
-    const kisCall = firstKisQuoteCall(kisQuoteClient);
-    expect(kisCall.path).toBe(
-      '/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice',
+    expect(koscomClient.get).toHaveBeenCalledWith(
+      '/v3/market/realtime/kospi/stocks/005930/intraday',
+      {
+        inddCycleTpCd: '60',
+        inqStrtDd: '20260619',
+        strtTm: '0900',
+        endTm: '1000',
+      },
+      expect.any(AbortSignal),
     );
-    expect(kisCall.query).toMatchObject({
-      FID_COND_MRKT_DIV_CODE: 'J',
-      FID_INPUT_ISCD: '005930',
-      FID_INPUT_HOUR_1: '100000',
-    });
-    expect(kisCall.headers).toEqual({
-      authorization: 'Bearer cached-kis-token',
-      tr_id: 'FHKST03010200',
-      custtype: 'P',
-    });
     expect(kisAuthClient.requestConfiguredRestToken).not.toHaveBeenCalled();
     expectNoWrites(prisma);
   });
 
   it('allows a 1m domestic stock interval as 1-minute server-side buckets', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
+    const { prisma, koscomClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-samsung-1m',
@@ -447,17 +568,19 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticRow('20260619', '090100', '101'),
-          domesticRow('20260619', '090000', '100'),
-        ],
-      },
-    });
+    koscomClient.get.mockResolvedValueOnce(
+      koscomFixture({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [
+            domesticRow('20260619', '090100', '101'),
+            domesticRow('20260619', '090000', '100'),
+          ],
+        },
+      }),
+    );
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -484,8 +607,9 @@ describe('AssetCandlesService', () => {
     ]);
   });
 
-  it('uses the domestic daily minute endpoint for past dates', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
+  it('serves existing KIS candles for past dates without a provider call', async () => {
+    const { prisma, serving, koscomClient, kisQuoteClient, service } =
+      createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-samsung',
@@ -495,50 +619,27 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          {
-            stck_bsop_date: '20260618',
-            stck_cntg_hour: '153000',
-            stck_oprc: '70000',
-            stck_hgpr: '70100',
-            stck_lwpr: '69900',
-            stck_prpr: '70050',
-            cntg_vol: '20',
-          },
-        ],
-      },
-    });
-
+    serveStoredDomestic(serving, [domesticRow('20260618', '152500', '70050')]);
     const response = await service.getAssetCandles('user-1', 'asset-samsung', {
       date: '2026-06-18',
       limit: '120',
       to: '153000',
     });
-
     expect(response.data.source).toMatchObject({
-      trId: 'FHKST03010230',
-      path: '/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice',
+      provider: 'kis',
       requestedCount: 120,
+      returnedCount: 1,
     });
-    const kisCall = firstKisQuoteCall(kisQuoteClient);
-    expect(kisCall.query).toMatchObject({
-      FID_INPUT_DATE_1: '20260618',
-      FID_INPUT_HOUR_1: '153000',
-      // includePrevious defaults to true → rows may continue into prior days.
-      FID_PW_DATA_INCU_YN: 'Y',
+    expect(response.data.candles[0]).toMatchObject({
+      time: '2026-06-18T06:25:00.000Z',
+      close: '70050.00000000',
     });
-    expect(kisCall.headers).toMatchObject({
-      tr_id: 'FHKST03010230',
-    });
+    expect(koscomClient.get).not.toHaveBeenCalled();
+    expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
   });
 
-  it('uses KIS domestic period daily API for domestic 1d candles and maps output2 rows', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
+  it('uses KOSCOM domestic period daily API for domestic 1d candles and maps hisLists rows', async () => {
+    const { prisma, koscomClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-samsung-period-daily',
@@ -549,31 +650,33 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticPeriodRow('20260618', {
-            open: '70000',
-            high: '71300',
-            low: '69800',
-            close: '70500',
-            volume: '12345',
-            amount: '870322500',
-          }),
-          domesticPeriodRow('20260617', {
-            open: '69000',
-            high: '70100',
-            low: '68800',
-            close: '70000',
-            volume: '23456',
-            amount: '1641920000',
-          }),
-        ],
-      },
-    });
+    koscomClient.get.mockResolvedValueOnce(
+      koscomFixture({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [
+            domesticPeriodRow('20260618', {
+              open: '70000',
+              high: '71300',
+              low: '69800',
+              close: '70500',
+              volume: '12345',
+              amount: '870322500',
+            }),
+            domesticPeriodRow('20260617', {
+              open: '69000',
+              high: '70100',
+              low: '68800',
+              close: '70000',
+              volume: '23456',
+              amount: '1641920000',
+            }),
+          ],
+        },
+      }),
+    );
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -625,34 +728,28 @@ describe('AssetCandlesService', () => {
           },
         ],
         source: {
-          provider: 'kis',
-          trId: 'FHKST03010100',
-          path: '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
-          marketCode: 'J',
+          provider: 'koscom',
+          sourceProviders: ['koscom_history'],
+          marketCode: 'KRX',
           requestedCount: 400,
           returnedCount: 2,
         },
       },
     });
-    const kisCall = firstKisQuoteCall(kisQuoteClient);
-    expect(kisCall.path).toBe(
-      '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
+    expect(koscomClient.get).toHaveBeenCalledWith(
+      '/v3/market/closed/kospi/005930/history',
+      {
+        trnsmCycleTpCd: 'D',
+        inqStrtDd: '20250619',
+        inqEndDd: '20260619',
+        reqCnt: '100',
+      },
+      expect.any(AbortSignal),
     );
-    expect(kisCall.query).toMatchObject({
-      FID_COND_MRKT_DIV_CODE: 'J',
-      FID_INPUT_ISCD: '005930',
-      FID_INPUT_DATE_1: '20250619',
-      FID_INPUT_DATE_2: '20260619',
-      FID_PERIOD_DIV_CODE: 'D',
-      FID_ORG_ADJ_PRC: '0',
-    });
-    expect(kisCall.headers).toMatchObject({
-      tr_id: 'FHKST03010100',
-    });
   });
 
-  it('uses KIS domestic period weekly API for domestic 1w candles', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
+  it('uses KOSCOM domestic period weekly API for domestic 1w candles', async () => {
+    const { prisma, koscomClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-samsung-period-weekly',
@@ -662,14 +759,16 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [domesticPeriodRow('20260613')],
-      },
-    });
+    koscomClient.get.mockResolvedValueOnce(
+      koscomFixture({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [domesticPeriodRow('20260612')],
+        },
+      }),
+    );
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -686,23 +785,27 @@ describe('AssetCandlesService', () => {
       range: '1y',
       interval: '1w',
       source: {
-        provider: 'kis',
-        trId: 'FHKST03010100',
-        path: '/uapi/domestic-stock/v1/quotations/inquire-daily-itemchartprice',
+        provider: 'koscom',
+        sourceProviders: ['koscom_history'],
         requestedCount: 60,
         returnedCount: 1,
       },
     });
-    const kisCall = firstKisQuoteCall(kisQuoteClient);
-    expect(kisCall.query).toMatchObject({
-      FID_PERIOD_DIV_CODE: 'W',
-      FID_INPUT_DATE_1: '20250619',
-      FID_INPUT_DATE_2: '20260619',
-    });
+    expect(koscomClient.get).toHaveBeenCalledWith(
+      '/v3/market/closed/kospi/005930/history',
+      {
+        trnsmCycleTpCd: 'W',
+        inqStrtDd: '20250619',
+        inqEndDd: '20260619',
+        reqCnt: '100',
+      },
+      expect.any(AbortSignal),
+    );
+    expect(response.data.candles[0].time).toBe('2026-06-07T15:00:00.000Z');
   });
 
-  it('returns empty for empty KIS domestic period rows and clamps to the bounded provider cap', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
+  it('returns empty for empty KOSCOM domestic period rows and clamps to the bounded provider cap', async () => {
+    const { prisma, koscomClient, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(
       asset({
         id: 'asset-samsung-period-empty',
@@ -712,14 +815,16 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [],
-      },
-    });
+    koscomClient.get.mockResolvedValueOnce(
+      koscomFixture({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: {
+          rt_cd: '0',
+          output2: [],
+        },
+      }),
+    );
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -735,20 +840,24 @@ describe('AssetCandlesService', () => {
       state: 'empty',
       candles: [],
       source: {
-        provider: 'kis',
-        trId: 'FHKST03010100',
+        provider: 'koscom',
         requestedCount: 500,
         returnedCount: 0,
       },
     });
   });
 
-  it('pages KIS domestic daily period rows backwards with a bounded multi-call window', async () => {
-    const { prisma, kisQuoteClient, service } = createService();
-    const firstPageRows = Array.from({ length: 100 }, (_, index) =>
-      domesticPeriodRow(compactDateDaysBefore('20260619', index)),
-    );
-    const oldestFirstPageDate = compactDateDaysBefore('20260619', 99);
+  it('pages KOSCOM domestic daily period rows backwards with a bounded multi-call window', async () => {
+    const { prisma, koscomClient, service } = createService();
+    const dates: string[] = [];
+    for (let i = 0; dates.length < 101; i++) {
+      const date = compactDateDaysBefore('20260619', i);
+      if (resolveMarketSession('KRX', date)) dates.push(date);
+    }
+    const firstPageRows = dates
+      .slice(0, 100)
+      .map((date) => domesticPeriodRow(date));
+    const oldestFirstPageDate = dates[99];
     const secondPageEndDate = compactDateDaysBefore(oldestFirstPageDate, 1);
 
     prisma.asset.findUnique.mockResolvedValueOnce(
@@ -760,23 +869,27 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath
-      .mockResolvedValueOnce({
-        state: 'available',
-        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-        response: {
-          rt_cd: '0',
-          output2: firstPageRows,
-        },
-      })
-      .mockResolvedValueOnce({
-        state: 'available',
-        receivedAt: new Date('2026-06-19T03:00:02.000Z'),
-        response: {
-          rt_cd: '0',
-          output2: [domesticPeriodRow(secondPageEndDate)],
-        },
-      });
+    koscomClient.get
+      .mockResolvedValueOnce(
+        koscomFixture({
+          state: 'available',
+          receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+          response: {
+            rt_cd: '0',
+            output2: firstPageRows,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        koscomFixture({
+          state: 'available',
+          receivedAt: new Date('2026-06-19T03:00:02.000Z'),
+          response: {
+            rt_cd: '0',
+            output2: [domesticPeriodRow(dates[100])],
+          },
+        }),
+      );
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -789,28 +902,29 @@ describe('AssetCandlesService', () => {
     );
 
     expect(response.data.source).toMatchObject({
-      trId: 'FHKST03010100',
       requestedCount: 400,
       returnedCount: 101,
     });
-    const calls = kisQuoteCalls(kisQuoteClient);
+    const calls = koscomClient.get.mock.calls;
     expect(calls).toHaveLength(2);
-    expect(calls[0].query).toMatchObject({
-      FID_INPUT_DATE_1: '20250619',
-      FID_INPUT_DATE_2: '20260619',
-      FID_PERIOD_DIV_CODE: 'D',
+    expect(calls[0][1]).toMatchObject({
+      inqStrtDd: '20250619',
+      inqEndDd: '20260619',
+      trnsmCycleTpCd: 'D',
+      reqCnt: '100',
     });
-    expect(calls[1].query).toMatchObject({
-      FID_INPUT_DATE_1: '20250619',
-      FID_INPUT_DATE_2: secondPageEndDate,
-      FID_PERIOD_DIV_CODE: 'D',
+    expect(calls[1][1]).toMatchObject({
+      inqStrtDd: '20250619',
+      inqEndDd: secondPageEndDate,
+      trnsmCycleTpCd: 'D',
+      reqCnt: '100',
     });
   });
 
   it.each(['5m', '15m', '30m', '1h'] as const)(
-    'keeps domestic %s candles on the minute KIS APIs',
+    'keeps domestic %s candles on the minute KOSCOM API',
     async (interval) => {
-      const { prisma, kisQuoteClient, service } = createService();
+      const { prisma, koscomClient, service } = createService();
       prisma.asset.findUnique.mockResolvedValueOnce(
         asset({
           id: `asset-samsung-minute-${interval}`,
@@ -820,14 +934,16 @@ describe('AssetCandlesService', () => {
           currencyCode: CurrencyCode.KRW,
         }),
       );
-      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-        state: 'available',
-        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-        response: {
-          rt_cd: '0',
-          output2: [],
-        },
-      });
+      koscomClient.get.mockResolvedValueOnce(
+        koscomFixture({
+          state: 'available',
+          receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+          response: {
+            rt_cd: '0',
+            output2: [],
+          },
+        }),
+      );
 
       await service.getAssetCandles(
         'user-1',
@@ -839,13 +955,11 @@ describe('AssetCandlesService', () => {
         },
       );
 
-      const kisCall = firstKisQuoteCall(kisQuoteClient);
-      expect(kisCall.path).toBe(
-        '/uapi/domestic-stock/v1/quotations/inquire-time-itemchartprice',
+      expect(koscomClient.get).toHaveBeenCalledWith(
+        '/v3/market/realtime/kospi/stocks/005930/intraday',
+        expect.objectContaining({ inddCycleTpCd: '60', inqStrtDd: '20260619' }),
+        expect.any(AbortSignal),
       );
-      expect(kisCall.headers).toMatchObject({
-        tr_id: 'FHKST03010200',
-      });
     },
   );
 
@@ -880,7 +994,7 @@ describe('AssetCandlesService', () => {
       }),
       rows: [
         domesticRow('20260612', '115959', '10'),
-        domesticRow('20260613', '090000', '20'),
+        domesticRow('20260615', '090000', '20'),
         domesticRow('20260619', '120000', '30'),
       ],
       startAt: Date.parse('2026-06-12T03:00:00.000Z'),
@@ -1045,19 +1159,22 @@ describe('AssetCandlesService', () => {
   ])(
     'filters $label stock candles to the resolved range window before returning',
     async ({ fixture, range, rows, season, startAt, endAt }) => {
-      const { prisma, kisQuoteClient, service } = createService();
+      const { prisma, serving, kisQuoteClient, service } = createService();
       prisma.asset.findUnique.mockResolvedValueOnce(fixture);
       if (season) {
         prisma.season.findFirst.mockResolvedValueOnce(season);
       }
-      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-        state: 'available',
-        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
-        response: {
-          rt_cd: '0',
-          output2: rows,
-        },
-      });
+      if (fixture.assetType === AssetType.domestic_stock)
+        serveStoredDomestic(serving, rows);
+      else
+        kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+          state: 'available',
+          receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+          response: {
+            rt_cd: '0',
+            output2: rows,
+          },
+        });
 
       const response = await service.getAssetCandles('user-1', fixture.id, {
         range,
@@ -1587,7 +1704,7 @@ describe('AssetCandlesService', () => {
     // 2026-06-19 09:00 KST (2026-06-19T00:00:00.000Z), not Sunday.
     jest.setSystemTime(new Date('2026-06-22T03:00:00.000Z'));
 
-    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    const { prisma, serving, kisAuthClient, service } = createService();
     // The default cached token expires 2026-06-20; keep it valid for this now.
     kisAuthClient.getCachedToken.mockReturnValue({
       accessToken: 'cached-kis-token',
@@ -1604,18 +1721,11 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-06-22T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticRow('20260619', '085900', '10'),
-          domesticRow('20260619', '090000', '20'),
-          domesticRow('20260622', '100000', '30'),
-        ],
-      },
-    });
+    serveStoredDomestic(serving, [
+      domesticRow('20260619', '085900', '10'),
+      domesticRow('20260619', '090000', '20'),
+      domesticRow('20260622', '100000', '30'),
+    ]);
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -1632,7 +1742,7 @@ describe('AssetCandlesService', () => {
 
   it('counts real sessions across a KRX holiday plus weekend for prev2_open', async () => {
     jest.setSystemTime(new Date('2026-07-18T03:00:00.000Z'));
-    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    const { prisma, serving, kisAuthClient, service } = createService();
     kisAuthClient.getCachedToken.mockReturnValue({
       accessToken: 'cached-kis-token',
       tokenType: 'Bearer',
@@ -1648,18 +1758,11 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-07-18T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticRow('20260714', '150000', '10'),
-          domesticRow('20260715', '090000', '20'),
-          domesticRow('20260716', '150000', '30'),
-        ],
-      },
-    });
+    serveStoredDomestic(serving, [
+      domesticRow('20260714', '150000', '10'),
+      domesticRow('20260715', '090000', '20'),
+      domesticRow('20260716', '150000', '30'),
+    ]);
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -1675,7 +1778,7 @@ describe('AssetCandlesService', () => {
 
   it('uses the actual delayed open for a previous-session chart anchor', async () => {
     jest.setSystemTime(new Date('2026-01-05T03:00:00.000Z'));
-    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    const { prisma, serving, kisAuthClient, service } = createService();
     kisAuthClient.getCachedToken.mockReturnValue({
       accessToken: 'cached-kis-token',
       tokenType: 'Bearer',
@@ -1691,18 +1794,11 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-01-05T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticRow('20260102', '095900', '10'),
-          domesticRow('20260102', '100000', '20'),
-          domesticRow('20260105', '110000', '30'),
-        ],
-      },
-    });
+    serveStoredDomestic(serving, [
+      domesticRow('20260102', '095900', '10'),
+      domesticRow('20260102', '100000', '20'),
+      domesticRow('20260105', '110000', '30'),
+    ]);
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -1718,7 +1814,7 @@ describe('AssetCandlesService', () => {
     // skips Jan 1 (holiday) and Dec 31 (year-end closure) into 2025:
     // prev_open = Tue 2025-12-30 09:00 KST open.
     jest.setSystemTime(new Date('2026-01-02T03:00:00.000Z'));
-    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    const { prisma, serving, kisAuthClient, service } = createService();
     kisAuthClient.getCachedToken.mockReturnValue({
       accessToken: 'cached-kis-token',
       tokenType: 'Bearer',
@@ -1734,18 +1830,11 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-01-02T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticRow('20251229', '150000', '10'),
-          domesticRow('20251230', '090000', '20'),
-          domesticRow('20260102', '100000', '30'),
-        ],
-      },
-    });
+    serveStoredDomestic(serving, [
+      domesticRow('20251229', '150000', '10'),
+      domesticRow('20251230', '090000', '20'),
+      domesticRow('20260102', '100000', '30'),
+    ]);
 
     const response = await service.getAssetCandles(
       'user-1',
@@ -1766,7 +1855,7 @@ describe('AssetCandlesService', () => {
     // 2025-12-29 — Dec 31 (year-end closure), Jan 1, and the weekend are
     // not counted as sessions.
     jest.setSystemTime(new Date('2026-01-02T03:00:00.000Z'));
-    const { prisma, kisAuthClient, kisQuoteClient, service } = createService();
+    const { prisma, serving, kisAuthClient, service } = createService();
     kisAuthClient.getCachedToken.mockReturnValue({
       accessToken: 'cached-kis-token',
       tokenType: 'Bearer',
@@ -1782,18 +1871,11 @@ describe('AssetCandlesService', () => {
         currencyCode: CurrencyCode.KRW,
       }),
     );
-    kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
-      state: 'available',
-      receivedAt: new Date('2026-01-02T03:00:01.000Z'),
-      response: {
-        rt_cd: '0',
-        output2: [
-          domesticRow('20251229', '090000', '10'),
-          domesticRow('20251230', '090000', '20'),
-          domesticRow('20260102', '100000', '30'),
-        ],
-      },
-    });
+    serveStoredDomestic(serving, [
+      domesticRow('20251229', '090000', '10'),
+      domesticRow('20251230', '090000', '20'),
+      domesticRow('20260102', '100000', '30'),
+    ]);
 
     const response = await service.getAssetCandles(
       'user-1',

@@ -25,6 +25,7 @@ export class LiveCandleOverlayService {
 
   async buildCurrentSnapshots(
     state: LiveFiveMinuteCandleState,
+    provenance?: Map<LiveCandleInterval, string[]>,
   ): Promise<Omit<AssetCandleSnapshotEvent, 'sequence'>[]> {
     if (state.volume === null) return [];
     const openTime = new Date(state.openTime);
@@ -43,6 +44,9 @@ export class LiveCandleOverlayService {
       ? this.eventFromRow(state, '5m', closedCurrent)
       : this.eventFromState(state);
     const events: Omit<AssetCandleSnapshotEvent, 'sequence'>[] = [fiveMinute];
+    provenance?.set('5m', [
+      closedCurrent?.sourceProvider ?? state.sourceProvider,
+    ]);
 
     for (const interval of ['15m', '30m', '1h', '4h'] as const) {
       const result = this.aggregation.aggregateCandles({
@@ -59,6 +63,17 @@ export class LiveCandleOverlayService {
           candidate.closeTime.getTime() > openTime.getTime(),
       );
       if (!candle) continue;
+      provenance?.set(interval, [
+        ...new Set(
+          rows
+            .filter(
+              (row) =>
+                row.openTime >= candle.openTime &&
+                row.openTime < candle.closeTime,
+            )
+            .map((row) => row.sourceProvider),
+        ),
+      ]);
       events.push({
         type: 'asset_candle',
         assetId: state.assetId,
@@ -102,9 +117,11 @@ export class LiveCandleOverlayService {
     if (!['5m', '15m', '30m', '1h', '4h'].includes(query.interval)) {
       return response;
     }
-    const event = await this.getCurrentSnapshot(
-      response.data.asset.id,
-      query.interval as LiveCandleInterval,
+    const state = await this.store.getCurrent(response.data.asset.id);
+    if (!state) return response;
+    const provenance = new Map<LiveCandleInterval, string[]>();
+    const event = (await this.buildCurrentSnapshots(state, provenance)).find(
+      (candidate) => candidate.interval === query.interval,
     );
     if (!event) return response;
     const time = Date.parse(event.candle.time);
@@ -132,16 +149,43 @@ export class LiveCandleOverlayService {
       })
       .sort((left, right) => Date.parse(left.time) - Date.parse(right.time));
     const limited = next.length > query.limit ? next.slice(-query.limit) : next;
+    let source = { ...response.data.source, returnedCount: limited.length };
+    if (response.data.asset.assetType === 'domestic_stock') {
+      const retained = limited.some(
+        (candle) => candle.time !== event.candle.time,
+      );
+      const original = response.data.source;
+      const providers = [
+        ...new Set([
+          ...(provenance.get(query.interval as LiveCandleInterval) ?? []),
+          ...(retained
+            ? 'sourceProviders' in original
+              ? original.sourceProviders
+              : original.provider === 'kis'
+                ? ['kis_domestic_minute']
+                : []
+            : []),
+        ]),
+      ];
+      if (providers.some((provider) => provider.startsWith('koscom'))) {
+        source = {
+          provider: providers.some((provider) => provider.startsWith('kis'))
+            ? 'mixed'
+            : 'koscom',
+          sourceProviders: providers,
+          marketCode: response.data.asset.market,
+          requestedCount: original.requestedCount,
+          returnedCount: limited.length,
+        };
+      }
+    }
     return {
       ...response,
       data: {
         ...response.data,
         state: limited.length > 0 ? 'available' : response.data.state,
         candles: limited,
-        source: {
-          ...response.data.source,
-          returnedCount: limited.length,
-        },
+        source,
       },
     };
   }

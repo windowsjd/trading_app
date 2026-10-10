@@ -207,6 +207,7 @@ export function readLiveCandleConfig(
  */
 export function validateLiveReconciliationDependencies(input: {
   live: LiveCandleConfig;
+  koscomPollingEnabled?: boolean;
   reconciliation: {
     krx: { enabled: boolean };
     us: { enabled: boolean };
@@ -216,9 +217,9 @@ export function validateLiveReconciliationDependencies(input: {
 }): string[] {
   if (!input.live.enabled) return [];
   const violations: string[] = [];
-  if (input.live.kisEnabled && !input.reconciliation.krx.enabled) {
+  if (input.koscomPollingEnabled && !input.reconciliation.krx.enabled) {
     violations.push(
-      'CANDLE_LIVE_KIS_ENABLED=true requires CANDLE_RECONCILIATION_KRX_ENABLED=true.',
+      'KOSCOM_POLLING_ENABLED=true with live candles requires CANDLE_RECONCILIATION_KRX_ENABLED=true.',
     );
   }
   if (input.live.kisUsDelayedEnabled && !input.reconciliation.us.enabled) {

@@ -44,12 +44,8 @@ import { MarketCandleSyncStateRepository } from '../../src/assets/market-candle-
 import { MarketCandlesRepository } from '../../src/assets/market-candles.repository';
 import { MarketCandleBackfillLockService } from '../../src/assets/market-candle-backfill-lock.service';
 import * as syncConfig from '../../src/assets/market-candle-sync.config';
-import { KisDomesticMinuteAdapter } from '../../src/providers/kis/candles/kis-domestic-minute.adapter';
 import { KisUsMinuteAdapter } from '../../src/providers/kis/candles/kis-us-minute.adapter';
-import { KisDomesticPeriodAdapter } from '../../src/providers/kis/candles/kis-domestic-period.adapter';
 import { KisOverseasPeriodAdapter } from '../../src/providers/kis/candles/kis-overseas-period.adapter';
-import { KisAuthClient } from '../../src/providers/kis/kis-auth.client';
-import { KisQuoteClient } from '../../src/providers/kis/kis-quote.client';
 import { BinanceCandleIngestionService } from '../../src/providers/binance/binance-candle.ingestion.service';
 import { getAssetTradingStatus } from '../../src/orders/market-hours.policy';
 import {
@@ -71,6 +67,9 @@ import {
   resetMarketSessionOverrideStoreForTest,
   type MarketSessionOverrideEntry,
 } from '../../src/orders/market-calendar/market-session-override.store';
+import { KoscomCandleAdapter } from '../../src/providers/koscom/koscom-candle.adapter';
+import { KoscomClient } from '../../src/providers/koscom/koscom.client';
+import { KoscomMarketMapService } from '../../src/providers/koscom/koscom-market-map.service';
 import type { MarketCandleSyncSummary } from '../../src/assets/market-candle-sync.types';
 
 const NOW = new Date('2026-07-13T23:00:00Z');
@@ -187,12 +186,9 @@ describe('standalone candle baseline calendar bootstrap', () => {
       .spyOn(MarketCandlesRepository.prototype, 'findRange')
       .mockResolvedValue([]);
     const providers = [
-      jest.spyOn(
-        KisDomesticMinuteAdapter.prototype,
-        'fetchDomesticOneMinuteRows',
-      ),
+      jest.spyOn(KoscomCandleAdapter.prototype, 'fetchDomesticOneMinuteRows'),
       jest.spyOn(KisUsMinuteAdapter.prototype, 'fetchUsFiveMinuteRows'),
-      jest.spyOn(KisDomesticPeriodAdapter.prototype, 'fetchPeriodPage'),
+      jest.spyOn(KoscomCandleAdapter.prototype, 'fetchPeriodPage'),
       jest.spyOn(KisOverseasPeriodAdapter.prototype, 'fetchPeriodPage'),
       jest.spyOn(BinanceCandleIngestionService.prototype, 'fetchKlinesPage'),
     ];
@@ -499,24 +495,20 @@ describe('standalone candle baseline calendar bootstrap', () => {
       override('KRX', 'custom'),
     ]);
     jest
-      .spyOn(KisAuthClient.prototype, 'requestConfiguredRestToken')
-      .mockResolvedValue({
-        state: 'available',
-        response: { accessToken: 'fixture-token' },
-      } as never);
+      .spyOn(KoscomMarketMapService.prototype, 'resolve')
+      .mockResolvedValue('kospi');
     const request = jest
-      .spyOn(KisQuoteClient.prototype, 'getMarketDataByExplicitPath')
+      .spyOn(KoscomClient.prototype, 'get')
       .mockResolvedValue({
-        state: 'available',
-        response: { output2: [] },
+        result: { isuSrtCd: '005930', hisLists: [] },
         receivedAt: NOW,
-      } as never);
+      });
 
     await expect(main(['--apply', '--days', '1'])).resolves.toBe(0);
     expect(request).toHaveBeenCalledTimes(1);
-    expect(request.mock.calls[0][0].query).toMatchObject({
-      FID_INPUT_DATE_1: '20260713',
-      FID_INPUT_HOUR_1: '125959',
+    expect(request.mock.calls[0][1]).toMatchObject({
+      inqStrtDd: '20260713',
+      endTm: '1300',
     });
     expect((await summary(h.sync)).assets[0].feeds[0].coverageComplete).toBe(
       false,

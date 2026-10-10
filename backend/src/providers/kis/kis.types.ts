@@ -35,7 +35,7 @@ export type ParsedKisApprovalKeyResponse = {
 export type KisLowLevelCallResult<T> =
   | {
       state: 'skipped';
-      reason: 'KIS_REST_BASE_URL_MISSING' | 'KIS_WS_BASE_URL_MISSING';
+      reason: 'KIS_REST_BASE_URL_MISSING' | 'KIS_WS_BASE_URL_MISSING' | 'KIS_DOMESTIC_PROVIDER_RETIRED';
     }
   | {
       state: 'available';

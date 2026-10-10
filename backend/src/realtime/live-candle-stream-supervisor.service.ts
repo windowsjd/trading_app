@@ -1,9 +1,14 @@
+import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
+import { KoscomConfigService } from '../providers/koscom/koscom.config';
+import { MarketCandleIngestionService } from '../assets/market-candle-ingestion.service';
+import { resolveRegularSessionForEvent } from '../orders/market-calendar.policy';
 import {
   Inject,
   Injectable,
   Logger,
   OnModuleDestroy,
   OnModuleInit,
+  Optional,
 } from '@nestjs/common';
 import { WebSocket as WsWebSocket } from 'ws';
 import { AssetType, CurrencyCode } from '../generated/prisma/client';
@@ -30,7 +35,6 @@ import { toBinanceUsdtSymbol } from '../providers/provider-target-resolver.servi
 import { KisAuthClient } from '../providers/kis/kis-auth.client';
 import { parseKisWebSocketMessage } from '../providers/kis/kis-websocket.trade-parser';
 import {
-  buildKisDomesticSubscriptionTarget,
   buildKisUsDelayedSubscriptionTarget,
   buildKisWebSocketSubscriptionRequest,
   normalizeKisUsMarketCode,
@@ -55,7 +59,7 @@ export type LiveCandleSocket = {
 
 export type LiveCandleSocketFactory = (url: string) => LiveCandleSocket;
 
-type ProviderName = 'binance' | 'kis';
+type ProviderName = 'binance' | 'kis' | 'koscom';
 type OwnedProviderContext = {
   provider: ProviderName;
   lock: RedisLock;
@@ -79,6 +83,7 @@ export class LiveCandleStreamSupervisorService
   private readonly contexts = new Map<ProviderName, OwnedProviderContext>();
   private readonly pendingEvents = new Set<Promise<void>>();
   private readonly waiters = new Set<() => void>();
+  private koscomCandleRefresh: Promise<void> | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -99,6 +104,9 @@ export class LiveCandleStreamSupervisorService
     @Inject(LIVE_CANDLE_SOCKET_FACTORY)
     private readonly socketFactory: LiveCandleSocketFactory,
     private readonly orderBooks: BinanceOrderBookService,
+    @Optional() private readonly koscom?: KoscomIngestionService,
+    @Optional() private readonly koscomConfig?: KoscomConfigService,
+    @Optional() private readonly candleIngestion?: MarketCandleIngestionService,
   ) {}
 
   onModuleInit(): void {
@@ -112,10 +120,13 @@ export class LiveCandleStreamSupervisorService
   start(): void {
     if (!this.config.enabled || this.tasks.length > 0) return;
     this.stopping = false;
+    const koscom = this.koscomConfig?.getConfig();
+    if (koscom?.enabled && koscom.pollingEnabled)
+      this.tasks.push(this.runOwnershipLoop('koscom'));
     if (this.config.binanceEnabled) {
       this.tasks.push(this.runOwnershipLoop('binance'));
     }
-    if (this.config.kisEnabled) {
+    if (this.config.kisEnabled && this.config.kisUsDelayedEnabled) {
       this.tasks.push(this.runOwnershipLoop('kis'));
     }
   }
@@ -200,6 +211,144 @@ export class LiveCandleStreamSupervisorService
     context.renewTimer.unref?.();
   }
 
+  private async pollKoscom(context: OwnedProviderContext): Promise<void> {
+    this.pipeline.markProviderConnected({
+      provider: 'koscom',
+      ownerGeneration: context.lock.token,
+    });
+    this.health.updateProvider('koscom', {
+      connectedAt: new Date().toISOString(),
+      delayed: false,
+    });
+    let lastCandleMinute = -1;
+    while (!this.stopping && !context.lost) {
+      const assets = await this.loadAssets(AssetType.domestic_stock);
+      const now = new Date();
+      const minute = Math.floor(now.getTime() / 60000);
+      if (minute !== lastCandleMinute && !this.koscomCandleRefresh) {
+        lastCandleMinute = minute;
+        const refresh = this.refreshKoscomCandles(context, assets, now)
+          .catch(() => {
+            this.health.increment('eventsRejected');
+          })
+          .finally(() => {
+            this.pendingEvents.delete(refresh);
+            this.koscomCandleRefresh = null;
+          });
+        this.koscomCandleRefresh = refresh;
+        this.pendingEvents.add(refresh);
+      }
+      const collected = await this.koscom?.collect({
+        onPrice: (event) => {
+          if (context.lost || this.stopping) return;
+          // Ticker fanout is already published by the central collector.
+          // Polled prices cannot establish candle OHLCV or continuity.
+          this.health.updateProvider('koscom', {
+            lastEventAt: event.price.effectiveAt,
+            eventLagMs: Math.max(
+              0,
+              Date.now() - Date.parse(event.price.effectiveAt),
+            ),
+          });
+        },
+      });
+      const expectedIdle = [
+        'MARKET_CLOSED_EXPECTED_NO_DATA',
+        'KOSCOM_CLOSE_ALREADY_CHECKED',
+        'KOSCOM_COLLECTION_BUSY',
+      ].includes(collected?.errorCode ?? '');
+      this.health.updateProvider('koscom', {
+        state: collected?.success || expectedIdle ? 'connected' : 'degraded',
+        subscriptionsRequested: assets.length,
+        subscriptionsActive: collected?.success ? assets.length : 0,
+        lastErrorCode:
+          collected?.success || expectedIdle
+            ? null
+            : (collected?.errorCode ?? 'KOSCOM_COLLECTION_PARTIAL'),
+      });
+      await this.sleep(this.koscomConfig?.getConfig().pollIntervalMs ?? 3000);
+    }
+  }
+
+  private async refreshKoscomCandles(
+    context: OwnedProviderContext,
+    assets: LiveCandleAsset[],
+    now: Date,
+  ): Promise<void> {
+    if (!this.candleIngestion) return;
+    let next = 0;
+    // Reuse the provider-wide HTTP limit. Only one refresh runs per owner;
+    // no client subscription creates another provider request.
+    await Promise.all(
+      Array.from(
+        {
+          length: Math.min(
+            assets.length,
+            this.koscomConfig?.getConfig().concurrency ?? 2,
+          ),
+        },
+        async () => {
+          while (!context.lost && !this.stopping && next < assets.length) {
+            const asset = assets[next++];
+            const session =
+              resolveRegularSessionForEvent(asset, now) ??
+              resolveRegularSessionForEvent(
+                asset,
+                new Date(now.getTime() - 10 * 60000),
+              );
+            if (
+              !session ||
+              now <= session.openTime ||
+              now.getTime() >= session.closeTime.getTime() + 10 * 60000
+            )
+              continue;
+            const to = new Date(
+              Math.min(now.getTime(), session.closeTime.getTime()),
+            );
+            const bucket =
+              session.openTime.getTime() +
+              Math.floor((to.getTime() - session.openTime.getTime()) / 300000) *
+                300000;
+            try {
+              const fetched =
+                await this.candleIngestion!.fetchDomesticFiveMinuteCandles({
+                  asset: {
+                    id: asset.id,
+                    symbol: asset.symbol,
+                    marketCode: asset.market,
+                  },
+                  from: new Date(
+                    Math.max(session.openTime.getTime(), bucket - 300000),
+                  ),
+                  to,
+                  now,
+                  maxPages: 1,
+                  maxRows: 20,
+                  maxDurationMs: 5000,
+                });
+              for (const candle of fetched.candles) {
+                if (context.lost || this.stopping) return;
+                await this.pipeline.process({
+                  event: this.normalizer.normalizeKoscomCandle(
+                    candle,
+                    asset,
+                    now,
+                  ),
+                  ownerGeneration: context.lock.token,
+                  ownerLeaseKey: context.leaseKey,
+                });
+              }
+            } catch {
+              // Partial failures are isolated; native REST reconciliation fills
+              // missing buckets. Never send raw HTTP errors to logs/diagnostics.
+              this.health.increment('eventsRejected');
+            }
+          }
+        },
+      ),
+    );
+  }
+
   private async runOwnedConnections(
     context: OwnedProviderContext,
   ): Promise<void> {
@@ -209,7 +358,9 @@ export class LiveCandleStreamSupervisorService
         this.health.updateProvider(context.provider, {
           state: attempt === 0 ? 'connecting' : 'reconnecting',
         });
-        if (context.provider === 'binance') {
+        if (context.provider === 'koscom') {
+          await this.pollKoscom(context);
+        } else if (context.provider === 'binance') {
           await this.connectBinance(context);
         } else {
           await this.connectKis(context);
@@ -376,20 +527,10 @@ export class LiveCandleStreamSupervisorService
     }
     const approval = await this.kisAuth.requestConfiguredWebSocketApprovalKey();
     if (approval.state !== 'available') throw namedError(approval.reason);
-    const [domestic, us] = await Promise.all([
-      this.loadAssets(AssetType.domestic_stock),
-      this.config.kisUsDelayedEnabled
-        ? this.loadAssets(AssetType.us_stock)
-        : Promise.resolve([]),
-    ]);
+    const us = this.config.kisUsDelayedEnabled
+      ? await this.loadAssets(AssetType.us_stock)
+      : [];
     const desiredTargets = [
-      ...domestic.map((asset) => ({
-        asset,
-        target: buildKisDomesticSubscriptionTarget({
-          symbol: asset.symbol,
-          trId: provider.kis.wsDomesticTrId,
-        }),
-      })),
       ...us.flatMap((asset) => {
         const marketCode = normalizeKisUsMarketCode(asset.market);
         return marketCode

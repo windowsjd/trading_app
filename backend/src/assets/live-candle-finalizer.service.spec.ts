@@ -149,6 +149,38 @@ describe('LiveCandleFinalizerService', () => {
     expect(fixture.health.snapshot().liveCandle.finalizeSuccess).toBe(1);
   });
 
+  it('requires all native minutes before finalizing a KOSCOM bucket', async () => {
+    const fixture = setup();
+    const native = {
+      ...state(),
+      assetType: AssetType.domestic_stock,
+      market: 'KRX',
+      sourceProvider: 'koscom_intraday',
+    };
+    await finalize(
+      fixture.service,
+      { ...native, providerFinal: false },
+      new Date('2026-07-13T00:05:06Z'),
+    );
+    expect(fixture.repository.upsertMany).not.toHaveBeenCalled();
+    expect(fixture.store.enqueueReconcilePending).toHaveBeenCalledTimes(1);
+    await finalize(
+      fixture.service,
+      { ...native, providerFinal: true },
+      new Date('2026-07-13T00:05:06Z'),
+    );
+    expect(fixture.repository.upsertMany).toHaveBeenCalledWith([
+      expect.objectContaining({
+        sourceProvider: 'koscom_intraday',
+        isClosed: true,
+      }),
+    ]);
+    expect(fixture.redis.get).toHaveBeenCalledWith(
+      'candles:live:v1:owner:koscom:0',
+    );
+    expect(fixture.publisher.publishState).toHaveBeenCalledTimes(1);
+  });
+
   it('queues an incomplete bucket for REST repair instead of closing it', async () => {
     const fixture = setup();
     await finalize(

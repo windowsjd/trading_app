@@ -326,6 +326,40 @@ describe('AssetCandlesCacheService', () => {
       expect(envelope.response).toEqual(response);
     });
 
+    it.each(['koscom', 'mixed'] as const)(
+      'round-trips %s provenance through the cache',
+      async (provider) => {
+        const redis = createFakeRedis();
+        const service = createService(redis);
+        const response = createResponse('available');
+        response.data.asset = {
+          ...response.data.asset,
+          assetType: 'domestic_stock',
+          market: 'KRX',
+          priceCurrency: 'KRW',
+          symbol: '005930',
+        };
+        response.data.source = {
+          provider,
+          sourceProviders:
+            provider === 'mixed'
+              ? ['kis_domestic_minute', 'koscom_intraday']
+              : ['koscom_intraday'],
+          marketCode: 'KRX',
+          requestedCount: 100,
+          returnedCount: 1,
+        };
+        expect((await service.set(keyInput, response)).status).toBe('stored');
+        mockDataValue(redis, redis.setWithTtl.mock.calls[0][1]);
+        const cached = await service.get(keyInput);
+        expect(cached.status).toBe('fresh');
+        if (cached.status !== 'fresh')
+          throw new Error('Expected cached candles');
+        expect(cached.value.data.source.provider).toBe(provider);
+        expect(cached.value.data.candles[0].volume).toBe('10.00000000');
+      },
+    );
+
     it('stores an empty response', async () => {
       const redis = createFakeRedis();
       const service = createService(redis);

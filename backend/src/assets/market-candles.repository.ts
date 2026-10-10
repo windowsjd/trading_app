@@ -368,6 +368,11 @@ export class MarketCandlesRepository {
         "source_updated_at" = EXCLUDED."source_updated_at",
         "updated_at" = EXCLUDED."updated_at"
       WHERE EXCLUDED."source_updated_at" >= "market_candles"."source_updated_at"
+        AND NOT (
+          "market_candles"."is_closed"
+          AND "market_candles"."source_provider" IN ('kis_domestic_minute', 'kis_domestic_period')
+          AND EXCLUDED."source_provider" IN ('koscom_intraday', 'koscom_history')
+        )
     `;
 
     try {

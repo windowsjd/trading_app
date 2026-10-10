@@ -24,6 +24,7 @@ import {
 import { LiveCandlePubSubService } from './realtime/live-candle-pubsub.service';
 import { RedisService } from './redis/redis.service';
 import { readRedisConfig } from './redis/redis.config';
+import { readKoscomConfig } from './providers/koscom/koscom.config';
 
 /**
  * Structured readiness reasons for the operator market-session override
@@ -145,10 +146,12 @@ export class AppService {
 
     // Live ingestion without its reconciliation safety net (only reachable
     // outside production or via the explicit escape hatch).
+    const koscom = readKoscomConfig();
     const liveReconciliationViolations =
       liveEnabled && this.liveCandleConfig
         ? validateLiveReconciliationDependencies({
             live: this.liveCandleConfig,
+            koscomPollingEnabled: koscom.enabled && koscom.pollingEnabled,
             reconciliation: {
               krx: {
                 enabled: scheduler.marketCandleReconciliation.krx.enabled,
@@ -166,8 +169,8 @@ export class AppService {
     }
 
     // Trade freshness is only meaningful while the market can trade: a quiet
-    // KIS socket outside the KRX regular session is healthy as long as the
-    // connection itself is alive (heartbeats). Crypto trades continuously.
+    // domestic collector outside the KRX session is expected to be quiet.
+    // Crypto trades continuously; delayed US KIS is excluded below.
     // This uses tradeStaleThresholdMs (readiness-only); the supervisor's
     // reconnect watchdog uses connectionLivenessTimeoutMs instead.
     const krxSessionOpen =
@@ -185,7 +188,7 @@ export class AppService {
               !provider.delayed &&
               provider.eventLagMs !== null &&
               provider.eventLagMs > staleThresholdMs &&
-              (name !== 'kis' || krxSessionOpen),
+              (!['kis', 'koscom'].includes(name) || krxSessionOpen),
           )
         : false;
     if (providerStale) reasons.push('LIVE_PROVIDER_STALE');

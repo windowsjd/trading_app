@@ -91,7 +91,7 @@ export class DailyChangeRateService {
       row.assetId !== assetId ||
       row.interval !== '1d' ||
       !row.isClosed ||
-      row.sourceProvider !== window.provider ||
+      (row.sourceProvider !== window.provider && !(window.provider === MARKET_DAILY_CANDLE_SOURCE.domesticStock && row.sourceProvider === 'koscom_history')) ||
       row.openTime.getTime() !== window.openTime.getTime() ||
       row.closeTime.getTime() !== window.closeTime.getTime() ||
       !Number.isFinite(row.sourceUpdatedAt.getTime()) ||

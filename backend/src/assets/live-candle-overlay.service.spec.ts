@@ -20,6 +20,10 @@ import {
 } from '../generated/prisma/client';
 import { MarketCandleAggregationService } from './market-candle-aggregation.service';
 import { LiveCandleOverlayService } from './live-candle-overlay.service';
+import type {
+  AssetCandlesResponse,
+  ParsedAssetCandlesQuery,
+} from './asset-candles.service';
 import type { LiveFiveMinuteCandleState } from './live-candle.types';
 
 describe('LiveCandleOverlayService', () => {
@@ -58,6 +62,71 @@ describe('LiveCandleOverlayService', () => {
       complete: true,
     });
     expect(repository.findRange).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports mixed provenance when native KOSCOM live OHLCV joins stored KIS candles', async () => {
+    const native = {
+      ...state(),
+      assetType: AssetType.domestic_stock,
+      market: 'KRX',
+      symbol: '005930',
+      sourceProvider: 'koscom_intraday',
+    };
+    const repository = {
+      findRange: jest.fn().mockResolvedValue([
+        {
+          ...row('2026-07-13T00:00:00.000Z', '100', '101'),
+          sourceProvider: 'kis_domestic_minute',
+        },
+        {
+          ...row('2026-07-13T00:05:00.000Z', '101', '102'),
+          sourceProvider: 'kis_domestic_minute',
+        },
+      ]),
+    };
+    const service = new LiveCandleOverlayService(
+      { getCurrent: jest.fn().mockResolvedValue(native) } as never,
+      repository as never,
+      new MarketCandleAggregationService(repository as never),
+    );
+    const response: AssetCandlesResponse = {
+      success: true,
+      data: {
+        state: 'empty',
+        asset: {
+          id: 'asset-1',
+          symbol: '005930',
+          name: 'Samsung',
+          assetType: AssetType.domestic_stock,
+          market: 'KRX',
+          priceCurrency: 'KRW',
+        },
+        range: '1d',
+        interval: '15m',
+        requestedDate: '2026-07-13',
+        candles: [],
+        source: {
+          provider: 'koscom',
+          sourceProviders: [],
+          marketCode: 'KRX',
+          requestedCount: 100,
+          returnedCount: 0,
+        },
+      },
+    };
+    const result = await service.overlayHttpResponse(response, {
+      interval: '15m',
+      limit: 100,
+      clock: new Date('2026-07-13T00:12:00Z'),
+    } as ParsedAssetCandlesQuery);
+    expect(result.data.source.provider).toBe('mixed');
+    expect(
+      'sourceProviders' in result.data.source
+        ? result.data.source.sourceProviders
+        : [],
+    ).toEqual(['kis_domestic_minute', 'koscom_intraday']);
+    expect(result.data.candles[0].volume).toBe('3.00000000');
+    expect(result.data.candles[0].open).toBe('100.00000000');
   });
 
   it('never lets a provisional state override a closed row at the same openTime', async () => {

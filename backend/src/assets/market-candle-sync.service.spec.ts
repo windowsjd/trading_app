@@ -46,7 +46,7 @@ import {
   type AssetType,
   type MarketCandle,
 } from '../generated/prisma/client';
-import { KIS_DOMESTIC_PERIOD_SOURCE } from '../providers/kis/candles/kis-period-candle.types';
+import { KOSCOM_HISTORY_SOURCE } from '../providers/koscom/koscom.config';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 import { BINANCE_FIXED_ASSET_UNIVERSE } from '../providers/binance/binance-fixed-asset-universe';
@@ -526,7 +526,7 @@ describe('MarketCandleSyncService', () => {
   it.each([
     {
       asset: DOMESTIC_ASSET,
-      source: KIS_DOMESTIC_PERIOD_SOURCE,
+      source: KOSCOM_HISTORY_SOURCE,
       baseline: '2026-09-16T15:00:00Z',
       effectiveAt: '2026-09-18T06:30:00Z',
     },
@@ -997,7 +997,7 @@ describe('MarketCandleSyncService', () => {
     const feed = result.feeds[0];
     expect(feed.status).toBe('completed');
     expect(feed.complete).toBe(true);
-    expect(feed.provider).toBe('kis_domestic_period');
+    expect(feed.provider).toBe('koscom_history');
     expect(feed.acceptedRows).toBe(3);
     // Page 2 was requested with the cursor one day before page 1's oldest.
     const secondCall = callArg<{ endDate: string; fromDate: string }>(
@@ -1014,7 +1014,7 @@ describe('MarketCandleSyncService', () => {
     expect(writtenRows).toHaveLength(3);
     expect(writtenRows[0]).toMatchObject({
       interval: '1d',
-      sourceProvider: 'kis_domestic_period',
+      sourceProvider: 'koscom_history',
     });
   });
 
@@ -2572,7 +2572,7 @@ describe('MarketCandleSyncService', () => {
           ...candle,
           assetId: kia.id,
           interval: '1d',
-          sourceProvider: KIS_DOMESTIC_PERIOD_SOURCE,
+          sourceProvider: KOSCOM_HISTORY_SOURCE,
         })),
       );
     };
@@ -2809,7 +2809,7 @@ describe('MarketCandleSyncService', () => {
         interval: '1d',
         openTime: range.from,
         closeTime: range.to,
-        sourceProvider: KIS_DOMESTIC_PERIOD_SOURCE,
+        sourceProvider: KOSCOM_HISTORY_SOURCE,
         isClosed: true,
       });
       expect(row.close.toString()).toBe('120900');

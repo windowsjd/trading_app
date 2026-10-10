@@ -145,7 +145,7 @@ export class KisKrxSessionCloseIngestionService {
           sourceType: 'provider_api',
           // Existing KIS KRW family also used by current-price REST.
           // Raw metadata explicitly records the different daily-close origin.
-          sourceName: eligibility.sourceName,
+          sourceName: 'kis_krx_realtime_trade',
           sourceTimestamp: close.sourceTimestamp,
           effectiveAt: close.effectiveAt,
           capturedAt: close.capturedAt,

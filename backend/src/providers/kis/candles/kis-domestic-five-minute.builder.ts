@@ -7,6 +7,7 @@ import type {
 } from './kis-candle.types';
 import { getZonedParts } from './kis-candle-time';
 
+const CandleDecimal = Prisma.Decimal.clone({ precision: 50 });
 const TIME_ZONE = 'Asia/Seoul';
 const MINUTE_MS = 60_000;
 const FIVE_MINUTES_MS = 5 * MINUTE_MS;
@@ -16,6 +17,8 @@ export class KisDomesticFiveMinuteBuilder {
   build(input: {
     rows: readonly NormalizedKisCandleRow[];
     now?: Date;
+    // KOSCOM supplies completed minutes only; KIS may include the open minute.
+    completedMinutesOnly?: boolean;
   }): KisDomesticBuildResult {
     const buckets = new Map<number, NormalizedKisCandleRow[]>();
     const rejectedBucketKeys = new Set<string>();
@@ -82,7 +85,8 @@ export class KisDomesticFiveMinuteBuilder {
       const requiredCount = isCurrent
         ? Math.min(
             sessionRequiredCount,
-            Math.floor((nowMs - bucketMs) / MINUTE_MS) + 1,
+            Math.floor((nowMs - bucketMs) / MINUTE_MS) +
+              (input.completedMinutesOnly ? 0 : 1),
           )
         : sessionRequiredCount;
       const contiguous =
@@ -105,12 +109,12 @@ export class KisDomesticFiveMinuteBuilder {
         close: rows[rows.length - 1].close,
         volume: rows.reduce(
           (sum, row) => sum.add(row.volume),
-          new Prisma.Decimal(0),
+          new CandleDecimal(0),
         ),
         amount: rows.every((row) => row.amount !== null)
           ? rows.reduce(
               (sum, row) => sum.add(row.amount!),
-              new Prisma.Decimal(0),
+              new CandleDecimal(0),
             )
           : null,
         sourceUpdatedAt: new Date(

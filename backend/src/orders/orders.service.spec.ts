@@ -832,7 +832,7 @@ describe('OrdersService', () => {
     prisma: ReturnType<typeof createPrisma>,
     price = '100.00000000',
     snapshotId = 'aps-exec-1',
-    sourceName = 'kis_krx_realtime_trade',
+    sourceName = 'koscom_krx_realtime_price',
   ) => {
     const providerNow = new Date(Date.now());
     prisma.assetPriceSnapshot.findMany.mockResolvedValueOnce([
@@ -924,7 +924,7 @@ describe('OrdersService', () => {
         : new Prisma.Decimal(input.priceKrw),
     currencyCode: input.currencyCode ?? CurrencyCode.KRW,
     sourceType: AssetPriceSourceType.provider_api,
-    sourceName: input.sourceName ?? 'kis_krx_realtime_trade',
+    sourceName: input.sourceName ?? 'koscom_krx_realtime_price',
     effectiveAt: input.effectiveAt ?? executedAt,
     capturedAt: input.capturedAt ?? executedAt,
   });
@@ -1096,7 +1096,7 @@ describe('OrdersService', () => {
                 ? 'binance_public_rest_24hr_ticker'
                 : currencyCode === CurrencyCode.USD
                   ? 'kis_us_delayed_trade'
-                  : 'kis_krx_realtime_trade',
+                  : 'koscom_krx_realtime_price',
           }),
         ]
       ).map((snapshot) => ({ ...snapshot, assetId, createdAt: executedAt })),
@@ -1664,7 +1664,7 @@ describe('OrdersService', () => {
         id: 'provider-price-stale',
         price: new Prisma.Decimal('999.00000000'),
         sourceType: AssetPriceSourceType.provider_api,
-        sourceName: 'kis_krx_realtime_trade',
+        sourceName: 'koscom_krx_realtime_price',
         effectiveAt: new Date(Date.now() - 1_000),
         capturedAt: new Date(Date.now() - 61_000),
       },
@@ -3220,7 +3220,7 @@ describe('OrdersService', () => {
       value: string,
       effectiveAt = sessionClose,
       sourceType: AssetPriceSourceType = AssetPriceSourceType.provider_api,
-      sourceName = 'kis_krx_realtime_trade',
+      sourceName = 'koscom_krx_realtime_price',
     ) => ({
       id,
       assetId: 'asset-1',
