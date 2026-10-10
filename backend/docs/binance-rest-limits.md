@@ -37,6 +37,9 @@ single-symbol ticker/24hr=2, Spot exchangeInfo=20, Futures exchangeInfo=1,
 Futures premiumIndex=1 with symbol or 10 without, Futures `/fapi/v2/ticker/price`
 =1 with symbol or 2 without (Futures Last re-confirmation, at most every 3s);
 unknown routes reserve 80.
+Futures `/fapi/v1/klines` follows the official LIMIT tiers: below 100 = 1,
+100..499 = 2, 500..1000 = 5, 1001..1500 = 10; omitted LIMIT defaults to 500.
+Invalid or duplicate LIMIT parameters retain the conservative weight 80.
 This conservative budget is preventive, not a declaration of Binance's actual
 IP capacity. `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE` can set 20..600; it must be
 identical across instances. Observed used weight can exhaust the local budget

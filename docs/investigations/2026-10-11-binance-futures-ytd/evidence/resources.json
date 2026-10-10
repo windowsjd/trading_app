@@ -1,0 +1,7 @@
+{
+  "ownedRedisPid": 1284125,
+  "ownedRedisPort": 56611,
+  "stopped": true,
+  "appendOnlyStatePreserved": "/tmp/binance-futures-2026-research/redis",
+  "otherRedisProcessesUntouched": true
+}

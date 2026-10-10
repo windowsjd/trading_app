@@ -10,6 +10,36 @@ describe('Binance safe HTTP restriction metadata', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it.each([
+    ['', 5],
+    ['?limit=1', 1],
+    ['?limit=99', 1],
+    ['?limit=100', 2],
+    ['?limit=499', 2],
+    ['?limit=500', 5],
+    ['?limit=1000', 5],
+    ['?limit=1001', 10],
+    ['?limit=1500', 10],
+    ['?limit=1501', 80],
+    ['?limit=0', 80],
+    ['?limit=', 80],
+    ['?limit=1.5', 80],
+    ['?limit=1&limit=1500', 80],
+    ['?limit=9007199254740993', 80],
+  ])('reserves official Futures kline weight for %s', async (query, weight) => {
+    const evalRedis = jest.fn().mockResolvedValue([1, 0, 0]);
+    const coordinator = new BinanceRestCoordinator({
+      eval: evalRedis,
+    } as never);
+    await coordinator.acquire(
+      `https://fapi.binance.com/fapi/v1/klines${query}`,
+      1000,
+    );
+    const calls = evalRedis.mock.calls as unknown[][];
+    const args = calls[0][2] as string[];
+    expect(args[1]).toBe(String(weight));
+  });
+
+  it.each([
     ['60', 429, 60_000],
     ['0', 429, 1000],
     [null, 429, 60_000],

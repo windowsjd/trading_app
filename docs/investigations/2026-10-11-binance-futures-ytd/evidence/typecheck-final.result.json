@@ -1,0 +1,18 @@
+{
+  "command": [
+    "timeout",
+    "180s",
+    "node",
+    "node_modules/typescript/bin/tsc",
+    "--noEmit",
+    "--incremental",
+    "false",
+    "-p",
+    "tsconfig.build.json"
+  ],
+  "cwd": "/home/nayuta/projects/trading-app/backend",
+  "exit_code": 0,
+  "guard": null,
+  "seconds": 8.82,
+  "peak_group_rss_bytes": 1569988608
+}

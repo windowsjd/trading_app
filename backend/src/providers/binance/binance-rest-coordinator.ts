@@ -208,6 +208,19 @@ function requestWeight(url: string): number {
   if (parsed.pathname === '/api/v3/klines') return 2;
   if (parsed.pathname === '/api/v3/exchangeInfo') return 20;
   if (parsed.pathname === '/fapi/v1/exchangeInfo') return 1;
+  if (parsed.pathname === '/fapi/v1/klines') {
+    const values = parsed.searchParams.getAll('limit');
+    const raw = values[0] ?? '500';
+    const limit = Number(raw);
+    if (
+      values.length > 1 ||
+      !/^[1-9]\d*$/.test(raw) ||
+      !Number.isSafeInteger(limit) ||
+      limit > 1500
+    )
+      return 80;
+    return limit < 100 ? 1 : limit < 500 ? 2 : limit <= 1000 ? 5 : 10;
+  }
   if (parsed.pathname === '/fapi/v1/premiumIndex')
     return parsed.searchParams.has('symbol') ? 1 : 10;
   if (parsed.pathname === '/fapi/v2/ticker/price')

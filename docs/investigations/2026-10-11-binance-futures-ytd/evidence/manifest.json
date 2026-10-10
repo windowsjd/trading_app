@@ -1,0 +1,110 @@
+{
+  "sourceHead": "129289d86a32ea83ab2521f9d3d2469cf6d88ba7",
+  "files": {
+    "backend/docs/binance-rest-limits.md": {
+      "sha256": "70a23f8f1b7ddee5954a46d6b78402fed994f49c607825dd8c30cf715f91210a",
+      "bytes": 5382
+    },
+    "backend/scripts/research-binance-futures-2026.test.ts": {
+      "sha256": "636cf4490cb3b1f02be0aaceab3251dd9d4de29dae3c36641d930a9b18da594a",
+      "bytes": 5179
+    },
+    "backend/scripts/research-binance-futures-2026.ts": {
+      "sha256": "2d66bb7f5bd4633473b42ef4cdd9ced725b4f5706f20e945f6f57cb061e3b897",
+      "bytes": 26943
+    },
+    "backend/scripts/verify-binance-futures-2026.py": {
+      "sha256": "1c6b8052d60c857100e6b54e937d2e3ee654bc2f2059988db0a8935e950994d7",
+      "bytes": 5263
+    },
+    "backend/src/providers/binance/binance-rest-coordinator.spec.ts": {
+      "sha256": "4f02d112303b51251aad33546dfb633a50ad1674298d6d36e5d5762bab806236",
+      "bytes": 3995
+    },
+    "backend/src/providers/binance/binance-rest-coordinator.ts": {
+      "sha256": "8a8115a785107688c687c5f885b69c033e2af0e90fc42b796be641dbbe084e62",
+      "bytes": 9618
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/all-contracts.csv": {
+      "sha256": "c5c251d24f610ce891f547d8fa03f9255caee3196589da3ea6bad30c2a01e1be",
+      "bytes": 88671
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/asset-metadata.json": {
+      "sha256": "de2d6abda00a586e54cfb46025ce038b8a344207ab2561c9f95f453cf71f0a6d",
+      "bytes": 1056816
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/cache.tar.gz": {
+      "sha256": "060a5c39a57574f27efac6ea58b4ff0c15f53d6ae2500e75cc41081273f4880a",
+      "bytes": 8329036
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/exchange-info-final.json": {
+      "sha256": "a7f720f5ece63fe9ab087cbdd9fecc66d18645f113896b81ec171c89636ed39f",
+      "bytes": 1147714
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/exchange-info.json": {
+      "sha256": "8f12708b56b6bdd7917ddc87dd1493b748057121496b21d391e5b662a66406b3",
+      "bytes": 1147714
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/independent-verification.json": {
+      "sha256": "6966a3f84f0fdffe5de2bf4095e4f40f122940ca5ccebea2c1dd5e03e3cda294",
+      "bytes": 3632
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/klines.ndjson.gz": {
+      "sha256": "12954aaf67a2082c0df72b4cec52429e0d4ebf978b1d14b10c7bff713a4ce5e9",
+      "bytes": 7341773
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/live-cross-check-originals.json": {
+      "sha256": "49942df89535e8d92ec17d77b7ef0947a54c6df874b5a1b83a32287ff312af8d",
+      "bytes": 126551
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/requests.jsonl": {
+      "sha256": "0b58fe778679619f21ceb27e568b18be46ab305dfd76cca974b602a16cba1c28",
+      "bytes": 133784
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/resources.json": {
+      "sha256": "60e1001572a47fe16ae2ba76a3deaf7dac4b21a3dc5e8fa78fdc98e84ab10edd",
+      "bytes": 191
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/result.json": {
+      "sha256": "299f360d807a6f1ab475929c1c9744ce08bc5ddda2b67341660ad9ea8031fe87",
+      "bytes": 637084
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/spot-exchange-info.json": {
+      "sha256": "3c73c8e4c981dacd2289086b241586d83996f7a889263f4952dd5001a7ea0bbb",
+      "bytes": 17744038
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/top25-binance.csv": {
+      "sha256": "ed4852ba59be7c4273fa3b3379974f6e7e5015a4dd20f1e2e4bfcf79e1192798",
+      "bytes": 4404
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/top25-conditional-new-underlying.csv": {
+      "sha256": "182656f99cf5a8bab4f126650440fbcdadaf1cfd6ac09325238ce0b44b23e3b3",
+      "bytes": 4244
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/top25-crypto.csv": {
+      "sha256": "ed4852ba59be7c4273fa3b3379974f6e7e5015a4dd20f1e2e4bfcf79e1192798",
+      "bytes": 4404
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/top25-existing-underlying.csv": {
+      "sha256": "2cbed14a00622e29266e2b700dcd7973ca7ea08c95054f3101d9cc6a72751c41",
+      "bytes": 3951
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/typecheck-final.result.json": {
+      "sha256": "d372aadac0fec1a6226b3a3098f824193211f555dbd14c4ae7ca9d837eab06e0",
+      "bytes": 333
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/evidence/validation.json": {
+      "sha256": "e524801c1fd718332ba2be09423b75211ffb01ccaf2d7be4fb228e15cc6f22a2",
+      "bytes": 6106
+    },
+    "docs/investigations/2026-10-11-binance-futures-ytd/report.md": {
+      "sha256": "eaadb0ce00ce7ef71db5614e51210b9cead7b7568562ae849551dcc63ed8efc9",
+      "bytes": 27441
+    }
+  },
+  "replayNetworkRequests": 0,
+  "sourceHashMatched": true,
+  "localDocumentLinksValid": true,
+  "commitPushMerge": "NOT_RUN",
+  "pr3": "UNCHANGED"
+}

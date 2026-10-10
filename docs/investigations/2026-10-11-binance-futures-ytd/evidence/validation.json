@@ -1,0 +1,156 @@
+{
+  "status": "PASS",
+  "sourceHead": "129289d86a32ea83ab2521f9d3d2469cf6d88ba7",
+  "checks": [
+    {
+      "name": "Full live collection",
+      "cwd": "backend",
+      "command": "REDIS_URL=redis://127.0.0.1:56611 NODE_OPTIONS=--max-old-space-size=768 timeout 1200s node --import tsx scripts/research-binance-futures-2026.ts",
+      "exitCode": 0,
+      "contracts": 525,
+      "passed": 525,
+      "failed": 0,
+      "httpRequests": 529,
+      "initialProbeAdditionalRequests": 1
+    },
+    {
+      "name": "Live classification and independent API windows",
+      "cwd": "backend",
+      "command": "REDIS_URL=redis://127.0.0.1:56611 NODE_OPTIONS=--max-old-space-size=768 timeout 180s node --import tsx scripts/research-binance-futures-2026.ts --verify",
+      "exitCode": 0,
+      "cachedContracts": 525,
+      "additionalHttpRequests": 7,
+      "matchedSymbols": [
+        "BTCUSDT",
+        "ETHUSDT",
+        "SOLUSDT"
+      ],
+      "finalTotalHttpRequests": 537
+    },
+    {
+      "name": "Replay from archived cache without Redis or network",
+      "cwd": "backend",
+      "command": "REDIS_URL= NODE_OPTIONS=--max-old-space-size=768 timeout 60s node --import tsx scripts/research-binance-futures-2026.ts --verify --replay --cache-dir /tmp/binance-futures-replay-20261011/cache --output-dir /tmp/binance-futures-replay-20261011/result",
+      "exitCode": 0,
+      "passedContracts": 525,
+      "failed": 0,
+      "additionalHttpRequests": 0
+    },
+    {
+      "name": "Independent Python verification",
+      "cwd": "backend",
+      "command": "python3 scripts/verify-binance-futures-2026.py /tmp/binance-futures-replay-20261011/result",
+      "exitCode": 0,
+      "matchedDecimalSums": 525,
+      "matchedHashes": 525,
+      "matchedFullRanking": true,
+      "matchedCohortTotalsAndShares": [
+        525,
+        523,
+        518
+      ]
+    },
+    {
+      "name": "Research regression tests",
+      "cwd": "backend",
+      "command": "NODE_OPTIONS=--max-old-space-size=512 timeout 60s node --import tsx --test scripts/research-binance-futures-2026.test.ts",
+      "exitCode": 0,
+      "passed": 10,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "Existing financial contract and HTTP policies",
+      "cwd": "backend",
+      "command": "NODE_OPTIONS=--max-old-space-size=768 timeout 180s node node_modules/jest/bin/jest.js --runInBand --runTestsByPath src/providers/binance/binance-rest-coordinator.spec.ts src/providers/provider-http.client.spec.ts src/providers/binance/binance-exchange-info.validation.spec.ts src/futures/futures-instrument-coverage.spec.ts",
+      "exitCode": 0,
+      "passedSuites": 4,
+      "passedTests": 59,
+      "failed": 0
+    },
+    {
+      "name": "Final Typecheck",
+      "cwd": "backend",
+      "command": "python3 /tmp/trading-ci-investigation/run.py futures-research-typecheck-final /home/nayuta/projects/trading-app/backend timeout 180s node node_modules/typescript/bin/tsc --noEmit --incremental false -p tsconfig.build.json",
+      "exitCode": 0,
+      "nodeHeapMiB": 1536,
+      "processGroupRssLimitMiB": 2300,
+      "timeoutSeconds": 180,
+      "peakProcessGroupRssBytes": 1569988608,
+      "seconds": 8.82,
+      "guard": null
+    },
+    {
+      "name": "Final lint",
+      "cwd": "backend",
+      "command": "NODE_OPTIONS=--max-old-space-size=768 timeout 120s node node_modules/eslint/bin/eslint.js --no-fix --max-warnings=0 scripts/research-binance-futures-2026.ts scripts/research-binance-futures-2026.test.ts src/providers/binance/binance-rest-coordinator.ts src/providers/binance/binance-rest-coordinator.spec.ts",
+      "exitCode": 0
+    },
+    {
+      "name": "Final format",
+      "cwd": "backend",
+      "command": "node node_modules/prettier/bin/prettier.cjs --check scripts/research-binance-futures-2026.ts scripts/research-binance-futures-2026.test.ts src/providers/binance/binance-rest-coordinator.ts src/providers/binance/binance-rest-coordinator.spec.ts docs/binance-rest-limits.md ../docs/investigations/2026-10-11-binance-futures-ytd/report.md",
+      "exitCode": 0
+    },
+    {
+      "name": "Diff whitespace",
+      "command": "git diff --check",
+      "exitCode": 0
+    }
+  ],
+  "intermediateFailures": [
+    {
+      "name": "Redis launch without local library path",
+      "exitCode": 127,
+      "actualHttpRequests": 0,
+      "resolution": "Use existing extracted library directory via task-local LD_LIBRARY_PATH; no installation or service modification."
+    },
+    {
+      "name": "Probe with unavailable dedicated Redis",
+      "exitCode": 1,
+      "actualHttpRequests": 0,
+      "resolution": "Existing Coordinator failed closed; start dedicated Redis successfully before real GET."
+    },
+    {
+      "name": "Initial script Typecheck",
+      "exitCode": 2,
+      "resolution": "Fixed the new result mapping types; final check passed."
+    },
+    {
+      "name": "Initial script lint",
+      "exitCode": 1,
+      "resolution": "Fixed unsafe JSON types, primitive CSV serialization, mock call types and explicit node:test Promise markers."
+    },
+    {
+      "name": "Initial format",
+      "exitCode": 1,
+      "resolution": "Formatted only changed files; final check passed."
+    },
+    {
+      "name": "Typecheck raced temporary probe deletion",
+      "exitCode": 2,
+      "code": "TS6053",
+      "resolution": "Wait until probe removal completed, then validate final files."
+    },
+    {
+      "name": "Uncached Typecheck with 1024MiB heap",
+      "exitCode": 134,
+      "resolution": "Confirmed terminated compiler, applied existing process-group memory/time guard and 1536MiB heap; final uncached check passed."
+    }
+  ],
+  "notRun": [
+    {
+      "name": "Production DB registration and active instrument verification",
+      "reason": "Task permits public market data only."
+    },
+    {
+      "name": "Remote CI, commit, push, PR edit or merge",
+      "reason": "Not authorized for this research; PR #3 must remain unchanged."
+    }
+  ],
+  "noFinancialAssertionWeakening": true,
+  "noDatabaseAccess": true,
+  "noMigrations": true,
+  "noDeploymentOrActivation": true,
+  "noPrivateOrderApi": true
+}
