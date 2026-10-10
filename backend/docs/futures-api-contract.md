@@ -29,12 +29,12 @@ All routes are authenticated and account scoped under
 
 | Method/path | Contract |
 | --- | --- |
-| GET `/instruments` | Verified instruments, display precision, separate Spot/Mark evidence, server capabilities and evaluatedAt |
+| GET `/instruments` | Verified instruments, display precision, separate Futures Last/Mark evidence, server capabilities and evaluatedAt |
 | POST `/execute` | A single idempotent Market command; no Spot quote/order lifecycle |
 | GET `/positions` | Open positions and collateral risk foundation |
 | GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |
 | GET `/liquidations?limit=20&offset=0` | System liquidation events with all closes/Mark evidence; same bounds |
-| GET `/final-settlement` | This account's single Season final exit, closes, pinned Spot evidence and cash/shortfall; null if absent |
+| GET `/final-settlement` | This account's single Season final exit, closes, pinned Futures Last (or legacy Spot) evidence and cash/shortfall; null if absent |
 
 Execute body: `instrumentId`, `operation` (`open`, `increase`, `reduce`, `close`),
 `direction` (`long`, `short`), `quantity` (positive decimal string, up to 8 places),
@@ -88,7 +88,7 @@ LONG PnL is `(exit - averageEntry) * closedQty`; SHORT PnL is
 Futures USD credit/debit, then debits the executed-notional trade fee. General
 uses `GENERAL_TRADE_FEE_RATE`; Season uses the locked `Season.tradeFeeRate`.
 Execution stores the actual rate/fee. The legacy `unrealizedPnl` field in Futures
-reads remains the Spot reference estimate. `markUnrealizedPnl` and `risk.unrealizedPnl`
+reads is the reference estimate at the Futures Last `referencePrice`. `markUnrealizedPnl` and `risk.unrealizedPnl`
 use Mark, also the sole open Futures valuation source for Home/Portfolio/TWR/Season
 return/Ranking. Missing/stale evidence returns null for the corresponding price/
 estimate. UPNL is never written to cash.
@@ -112,19 +112,22 @@ the margin-aware value. Transfer server checks remain authoritative.
 
 ## Price, transactions, and evidence
 
-Existing canonical Binance **Spot last trade** snapshots (WS priority then REST)
-are the synthetic execution/reference price. This is **not Mark Price**.
-Reuse `AssetPriceSnapshot` and the current Crypto execution provider-only source
-selector/freshness policy (10s capturedAt threshold, no future effective/captured
-timestamps). Fresh durable DB evidence gives one full fill; stale/missing/wrong
-asset/source/currency evidence rejects. User execution introduces no new ingestion or Redis/cache pricing,
-partial fills, spread/slippage, exchange matching, or provider I/O inside locks.
+Since 2026-10-10 Binance USDⓈ-M perpetual **Last Price** observations are the
+execution/reference price ([Futures Last contract](futures-last-price-contract.md)).
+This is **not Mark Price** and **not Spot**. Evidence lives in its own
+instrument-keyed table, so Spot selection never sees it. Receipt within 10s,
+reported trade within 60s, no future timestamps; the newest known trade wins.
+Fresh durable DB evidence gives one full fill; stale/missing/wrong instrument
+evidence rejects, with no Spot or Mark fallback. User execution introduces no
+Redis/cache pricing, partial fills, spread/slippage, exchange matching, or
+provider I/O inside locks.
 Preflight reads DB evidence; transaction reselects/validates after wallet/position
 locks against `clock_timestamp()`, so lock wait cannot hide staleness.
+Executions committed before 2026-10-10 keep their canonical Spot evidence.
 
 `FuturesExecution` records position lifetime, account/instrument, operation,
-direction, quantity, leverage, margin mode, execution price, snapshot FK,
-copied source/effectiveAt/capturedAt, notional, fee rate/amount, realized PnL,
+direction, quantity, leverage, margin mode, execution price, exactly one
+evidence FK (Futures Last, or legacy Spot), copied source/effectiveAt/capturedAt, notional, fee rate/amount, realized PnL,
 post-position state and executedAt. History never infers prior operations from
 the current position. Fee/PnL ledger rows reference `futures_execution`.
 `FuturesExecuteRequest` stores account/key/hash, unique execution FK and the
@@ -152,14 +155,17 @@ historical reinterpretation; service transactions own financial formulas.
 Provision instruments explicitly with `pnpm futures:provision-instruments`
 (dry-run) then `pnpm futures:provision-instruments --apply`. This only creates
 missing instrument rows for eligible existing assets and is safe to rerun; it
-does not change assets, wallets or the trading flag. Deployment order is additive
+does not change assets, wallets or the trading flag. The JSON report also names
+the target database (no credentials), per-symbol exclusion reasons, existing
+instruments with coverage state and ineligible Binance assets. New instruments
+join Mark and Futures Last ingestion targets within 30 seconds. Deployment order is additive
 `prisma migrate deploy` → new server/generated client → explicit provisioning;
 keep the mutation flag OFF. Financial API reads never provision or repair rows.
 
 ## F2 risk reads and durable system history
 
 Positions retain F1 `referencePrice`, `referencePriceEvidence` and `unrealizedPnl`
-for the explicitly Spot-based synthetic reference estimate. `markPrice`,
+for the Futures Last reference estimate (Spot before 2026-10-10). `markPrice`,
 `markEvidence` and `markState` identify the separate risk source. `risk` contains
 Mark-based `unrealizedPnl`, initial requirement, maintenance, estimated fee,
 liquidation requirement, isolated equity/buffer and isolated liquidation price.
@@ -206,7 +212,7 @@ reservation is released atomically and this contract's execution primitive runs.
 No dated/inverse/coin-margin/options, funding, Hedge Mode, ADL, insurance, partial
 liquidation, trailing stops, or Binance
 brackets/risk tiers. [Conditional v1](conditional-orders-contract.md) adds
-Position-bound SL/TP Market/Limit exits and OCO using Spot reference prices. F3 supplies account-pinned Futures UI and coherent
+Position-bound SL/TP Market/Limit exits and OCO, triggered on Futures Last. F3 supplies account-pinned Futures UI and coherent
 Home/Portfolio/TWR/Equity/Daily/Season return/Ranking valuation. Total equity adds
 only signed fresh Mark UPNL to existing cash + Spot holdings. Missing evidence
 makes valuation unavailable. Event snapshots reuse existing performance primitives;
@@ -214,8 +220,8 @@ a price outage skips the observation with a fixed diagnostic and does not preven
 a valid risk-reducing Futures exit.
 
 At ended/settled Season boundaries automatic liquidation continues to skip.
-F3 pins canonical Spot evidence at `Season.endAt` (both timestamps within 10s and
-never after end), then atomically closes each account's lifetimes before final
+F3 pins Futures Last evidence at `Season.endAt` (received within 10s before and
+never after end; trade within 60s), then atomically closes each account's lifetimes before final
 ranking. `FuturesSeasonSettlement`/`FuturesSeasonClose` distinguish normal final
 exits from liquidation; cash ledger uses `futures_season_settlement`. Details,
 failure/retry policy and activation checklist: [F3 contract](futures-f3-contract.md).

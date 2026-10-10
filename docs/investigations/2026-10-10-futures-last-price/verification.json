@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-10",
+  "startHead": "117fdb01a6f21810ba376564847ffb82cfec3de1",
+  "worktree": "/home/nayuta/projects/trading-app-futures-last (detached, uncommitted)",
+  "productionDatabase": "not accessed (read-only check blocked by auto-mode permission policy; no migration/apply/deploy)",
+  "isolatedInfra": { "postgres": "16.15 127.0.0.1:55432 UTC", "redis": "7.0.15 127.0.0.1:56379" },
+  "backend": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "unit": { "suites": 252, "passed": 4111, "skippedDbOptIn": 81, "failed": 0 },
+    "e2e": { "suites": 2, "passed": 404, "failed": 0 },
+    "lint": { "accountsCheck": "PASS", "candlesCheck": "PASS", "candlesFormat": "PASS", "diagnosticSourceGate": "PASS" },
+    "migrations": { "freshChain": 71, "status": "up to date", "drift": "exit 0" },
+    "futuresConditionalPgRunners": {
+      "F1": "290 checks PASS", "F2": "83 PASS", "F3": "49 scenarios PASS", "F31": "31 PASS",
+      "conditional": "82 PASS", "limitEntry": "65 PASS", "isolatedBoundary": "112 PASS"
+    },
+    "ciFinancialGate22": { "passed": 20, "failed": 2, "failedSuites": ["wallet-fx-transfer", "futures-isolated-boundary"], "classification": "environment: WSL wall-clock backward steps; each rerun individually 2/2 PASS", "stepTimesCorrelated": true },
+    "ciCoreAccountGate22": { "passed": 22, "note": "beginner-account rerun on _test-suffixed DB (runner name guard)", "repairAuditTools": "0 findings" },
+    "binanceRestCoordinatorRedisIntegration": "18 PASS",
+    "baselineAtHead": { "futuresConditionalUnit": "214 passed", "pgRunners": "6/7 (F1 rollback step failed)" }
+  },
+  "frontend": {
+    "typecheck": "PASS", "lintAccounts": "PASS", "diagnosticSourceGate": "PASS",
+    "fullCheck": { "tests": 2105, "passed": 2104, "failed": 1, "classification": "pre-existing clock-step flake in unchanged FuturesLimitEntry (HEAD 2/4 runs fail the same way)" },
+    "focused": { "futures": "111 passed", "conditionalAndMarket": "31 passed" }
+  },
+  "provisioningIsolatedDb": { "dryRun": "23 candidates / 2 unsupported", "apply": "created 23", "reApply": "created 0 (idempotent)", "unsupported": { "PEPEUSDT": "only_multiplier_contract", "币安人生USDT": "symbol_identity_unsupported" } },
+  "wslClockProbe": "evidence/wsl-clock-probe.json (-1.67..-1.71s every ~30.8s)",
+  "performance": { "liveIngestion": "evidence/live-ingestion.json", "benchmarkHeadSpot": "evidence/benchmark-head-spot.json", "benchmarkFuturesLast": "evidence/benchmark-futures-last.json" }
+}

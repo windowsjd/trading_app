@@ -16,9 +16,10 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/wallet-transfers-api-contract.md` — Spot cash provenance, internal USD transfers and atomic Securities FX + Crypto transfer
    - `docs/positions-api-contract.md`
    - `docs/futures-api-contract.md` — F1/F2/F3 synthetic USD perpetuals; default OFF
+   - `docs/futures-last-price-contract.md` — USDⓈ-M Futures Last execution/trigger/final price, ingestion, evidence and retention
    - `docs/futures-limit-entry-contract.md` — new-lifetime Limit entries, collateral reservations and attached TP/SL through the existing execution core
    - `docs/futures-risk-contract.md` — F2 Mark, Cross collateral, maintenance and full liquidation policy
-   - `docs/futures-f3-contract.md` — Mark valuation, final Season Spot exit, UI and release procedure
+   - `docs/futures-f3-contract.md` — Mark valuation, final Season exit (Futures Last since 2026-10-10), UI and release procedure
    - `docs/conditional-orders-contract.md` — SL/TP Market/Limit exits, OCO and attached Spot/Futures Limit entry; default OFF
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`

@@ -84,7 +84,8 @@ export function freshFuturesEvidence(
   );
 }
 
-/** F1 Spot execution uses captured age, unlike the two-clock Mark age bound. */
+/** Futures Last mirrors the server: receipt within 10s and the reported trade
+ * within 60s. A quiet market's older trade stays usable once re-confirmed. */
 export function freshFuturesReference(
   evidence: PriceTimes | null | undefined,
   now: number,
@@ -95,8 +96,20 @@ export function freshFuturesReference(
   return (
     Number.isFinite(effective) &&
     Number.isFinite(captured) &&
-    effective <= now &&
+    effective <= captured &&
     captured <= now &&
-    now - captured <= 10000
+    now - captured <= 10000 &&
+    now - effective <= 60000
   );
+}
+
+/** Each record shows the basis it was actually executed on. */
+export function futuresPriceBasisLabel(
+  basis: "futures_last" | "spot_last" | undefined,
+) {
+  return basis === "spot_last"
+    ? "Spot(이전 기준)"
+    : basis === "futures_last"
+      ? "선물 Last"
+      : null;
 }

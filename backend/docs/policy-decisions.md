@@ -327,8 +327,10 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - Outgoing Futures USD Transfer 및 Futures→Securities KRW composite는 공유 transaction 이체
   seam에서 margin-aware free collateral을 검증한다. wallet lock이 trade/transfer와 여러 상품의
   collateral 경합을 직렬화하고 lifecycle lock 순서/committed replay 의미는 기존 계약을 따른다.
-- Canonical fresh Binance Spot snapshot은 synthetic execution/reference price이며 Mark Price가
-  아니다. 기존 snapshot/selector/execute freshness를 재사용하며 stale/missing은 reject한다.
+- (2026-10-10 변경) Execution/reference price는 Binance USDⓈ-M perpetual Futures Last
+  evidence다([Futures Last 계약](futures-last-price-contract.md)). Mark도 Spot도 아니다.
+  수신 10초/체결 60초 freshness, stale/missing은 reject하며 다른 가격으로 대체하지 않는다.
+  이전의 canonical Spot 기준 체결 기록은 당시 증거 그대로 보존한다.
   PostgreSQL이 금융 SoT이고 network I/O는 financial locks 내부에 없다.
 - 손실+fee를 안전하게 정산할 수 없는 manual reduce/close는 `FUTURES_LIQUIDATION_REQUIRED`로
   전체 rollback한다. Loss clamp/negative wallet/silent close는 없다.
@@ -342,6 +344,7 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   별도 penalty/partial liquidation/Insurance Fund/ADL/debt/SL·TP는 없다.
 - ENABLED/REDUCE_ONLY/DISABLED와 독립 risk engine을 사용한다. ENABLED에는 ingestion과
   risk engine이 필수이며 startup validation이 잘못된 조합을 거부한다. 기존 boolean은 호환된다.
+  (2026-10-10) ENABLED와 REDUCE_ONLY는 Futures Last ingestion도 필수다.
   stale Mark에서 open/increase/Cross outgoing transfer는 거부하지만 reduce/close/incoming은
   Mark만으로 차단하지 않는다. 자동청산은 fresh Mark와 유효 lifecycle에서만 수행한다.
 - F3는 [아래 계약](futures-f3-contract.md)대로 UI와 valuation/성과/final settlement를 통합한다.
@@ -358,8 +361,9 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
 - General stored-factor TWR와 Season initial-capital return, 기존 ranking tie-break를 유지한다.
   Equity/Daily snapshot은 signed Futures USD/KRW component와 Mark/FX 증거를 보존한다.
   기존 cryptoValueKrw는 Spot이며, 과거 row는 null 그대로 두고 재평가하지 않는다.
-- Season final exit는 endAt 이하·10초 이내 canonical Spot evidence를 Season/instrument별
-  pin한다. 근거: 상품의 정상 simulated execution은 Spot이고, 종료 시각은 job 시간이 아니다.
+- Season final exit는 endAt 이전 10초 이내 수신(이후 수신 불가)·60초 이내 체결된 Futures Last
+  evidence를 Season/instrument별 pin한다(2026-10-10). 근거: 상품의 정상 체결 가격은 Futures
+  Last이고, 종료 시각은 job 시간이 아니다. 전환 전 Spot pin은 retry 시 재검증 후 그대로 재사용한다.
   예약 cleanup → 모든 계정(제외 participant 포함)의 atomic full exit → 최종 평가/순위/등급/
   account close/settled 순서다. 중간 실패는 ended로 재시도하며 pin과 lifetime unique로 중복을 막는다.
 - 최종 exit의 Isolated/Cross 담보 budget은 account 정산 시작 상태에서 고정한다. 정상 Season
@@ -529,7 +533,7 @@ preserves financial atomicity without exchange-style fill event infrastructure.
 ## Conditional Orders v1 (2026-10-08, current)
 
 - [계약](conditional-orders-contract.md): Position 전체 잔량을 하나의 SL/TP/OCO group이
-  보호한다. Spot은 기존 시장별 실행 evidence, Futures는 canonical Binance Spot을
+  보호한다. Spot은 기존 시장별 실행 evidence, Futures는 Futures Last(2026-10-10)를
   trigger/exit에 사용한다. Mark는 risk/강제청산 전용이다.
 - Trigger는 실제 exit가 아니다. 미체결 Limit 동안 sibling은 살아 있고, 반대 trigger는
   기존 child 예약 해제/취소 후 하나의 새 child로 교체한다. 실제 flat만 group 완료다.
@@ -556,7 +560,7 @@ preserves financial atomicity without exchange-style fill event infrastructure.
 - 제출은 초기 증거금과 기존 opening fee를 예약하며 현금 차감·Position·UPNL·fill count를
   만들지 않는다. 체결 transaction에서 자기 예약만 해제하고 담보를 다시 검증한다.
   근거: 예약 담보의 중복 사용을 막으면서 Short 가격 개선에 필요한 추가 담보도 확인한다.
-- Fresh canonical Binance Spot last trade로 Long ≤ limit, Short ≥ limit일 때 체결한다.
+- Fresh Futures Last(2026-10-10)로 Long ≤ limit, Short ≥ limit일 때 체결한다.
   Mark는 risk readiness·평가·청산에 사용한다. ENABLED에서만 신규 제출/체결하며
   거래 중지·시즌 종료 후 취소와 committed replay는 유지한다.
   근거: 가격 기준과 운영 권한을 기존 Futures 정책과 일치시킨다.
@@ -566,3 +570,28 @@ preserves financial atomicity without exchange-style fill event infrastructure.
   나누고 Conditional child를 중복 표시하지 않는다. 근거: 같은 주문/보호 의도를 한 곳에서 관리한다.
 - Disabled capability도 TP/SL UI와 기존 내역을 숨기지 않고 불가/감시 중지 상태를 알린다.
   실제 생성·취소 권한은 서버 capability를 따른다. 근거: 기능 발견과 mutation 허용을 구분한다.
+
+## Futures Last Price (2026-10-10, current)
+
+- [계약](futures-last-price-contract.md): Futures 시장가·지정가 체결, TP/SL 발동·청산 체결,
+  시즌 최종 정산은 Binance USDⓈ-M perpetual Last trade 증거를 쓴다. Mark는 UPNL·담보 위험·
+  강제청산·평가 전용, Spot은 Spot 상품 전용이다. 서로 자동 대체하지 않는다.
+  근거: 체결 가격은 실제 그 상품의 거래 가격이어야 하고, 위험 평가는 조작 저항적인 Mark여야 한다.
+- 증거는 instrument 기준 별도 테이블에 저장한다. 근거: Spot 후보 조회는 sourceName 없이
+  최신 10건을 읽으므로 같은 asset 테이블에 선물 거래를 넣으면 Spot 선택을 밀어낼 수 있다.
+- `@aggTrade`(100ms, 실제 market trade 가격/시각/aggregate id)를 쓰고 `@ticker`는 쓰지 않는다.
+  근거: 무기한 선물에는 raw `@trade`가 없고, 선물 `@ticker`는 2초 주기이며 거래가 없으면
+  전송되지 않아 지연만 크다(실측). 조용한 종목은 REST `/fapi/v2/ticker/price`로 현재 Last를
+  재확인한다(가중치 2, 3초 간격).
+- 가장 최신 체결이 우선하며 같은 체결은 늦은 수신이 우선한다. 더 늦게 받은 더 오래된 체결로
+  최신 체결을 대체하지 않는다. 수신 10초(기존 실행 freshness), 체결 60초 이내만 유효하다.
+  근거: 조용한 시장은 재확인으로 거래를 유지하되, 멈춘 계약의 오래된 가격은 쓰지 않는다.
+- 시즌 종료 증거는 `[endAt−10s, endAt]` 수신·체결 60초 이내만 허용하고 종료 후 수신은 쓰지 않는다.
+  보존 작업은 모든 시즌 종료 구간의 관측을 지우지 않는다. 근거: 지연된 정산 재시도도
+  종료 시점 증거가 필요하고, 증거가 없으면 기존처럼 ended 상태로 재시도한다.
+- 기존 금융 기록(Spot 기준 체결·trigger·시즌 pin·멱등 응답)은 재작성하지 않는다. DB는
+  정확히 하나의 증거 종류를 요구하며 Spot 분기는 legacy와 rolling deploy를 위해 유지한다.
+- REDUCE_ONLY도 Futures Last ingestion이 필요하다. 근거: 청산(exit) 체결 가격도 Futures Last다.
+  열린 Futures 포지션이 있는 동안에는 DISABLED여도 ingestion을 유지한다.
+- 한계: 체결·trigger 판단은 저장된 관측(종목당 초당 최대 1건, worker 1초 polling) 기준이다.
+  그보다 짧은 가격 도달은 놓칠 수 있으며 범위/캔들 기반 체결 정책은 추가하지 않았다.

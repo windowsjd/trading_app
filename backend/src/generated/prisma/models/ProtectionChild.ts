@@ -43,6 +43,7 @@ export type ProtectionChildMinAggregateOutputType = {
   orderId: string | null
   futuresExecutionId: string | null
   assetPriceSnapshotId: string | null
+  futuresLastPriceSnapshotId: string | null
   triggeredAt: Date | null
   endedAt: Date | null
   terminalReason: string | null
@@ -57,6 +58,7 @@ export type ProtectionChildMaxAggregateOutputType = {
   orderId: string | null
   futuresExecutionId: string | null
   assetPriceSnapshotId: string | null
+  futuresLastPriceSnapshotId: string | null
   triggeredAt: Date | null
   endedAt: Date | null
   terminalReason: string | null
@@ -71,6 +73,7 @@ export type ProtectionChildCountAggregateOutputType = {
   orderId: number
   futuresExecutionId: number
   assetPriceSnapshotId: number
+  futuresLastPriceSnapshotId: number
   triggerEvidenceJson: number
   triggeredAt: number
   endedAt: number
@@ -96,6 +99,7 @@ export type ProtectionChildMinAggregateInputType = {
   orderId?: true
   futuresExecutionId?: true
   assetPriceSnapshotId?: true
+  futuresLastPriceSnapshotId?: true
   triggeredAt?: true
   endedAt?: true
   terminalReason?: true
@@ -110,6 +114,7 @@ export type ProtectionChildMaxAggregateInputType = {
   orderId?: true
   futuresExecutionId?: true
   assetPriceSnapshotId?: true
+  futuresLastPriceSnapshotId?: true
   triggeredAt?: true
   endedAt?: true
   terminalReason?: true
@@ -124,6 +129,7 @@ export type ProtectionChildCountAggregateInputType = {
   orderId?: true
   futuresExecutionId?: true
   assetPriceSnapshotId?: true
+  futuresLastPriceSnapshotId?: true
   triggerEvidenceJson?: true
   triggeredAt?: true
   endedAt?: true
@@ -225,7 +231,8 @@ export type ProtectionChildGroupByOutputType = {
   quantity: runtime.Decimal
   orderId: string | null
   futuresExecutionId: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId: string | null
+  futuresLastPriceSnapshotId: string | null
   triggerEvidenceJson: runtime.JsonValue
   triggeredAt: Date
   endedAt: Date | null
@@ -263,7 +270,8 @@ export type ProtectionChildWhereInput = {
   quantity?: Prisma.DecimalFilter<"ProtectionChild"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
   futuresExecutionId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
-  assetPriceSnapshotId?: Prisma.StringFilter<"ProtectionChild"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
+  futuresLastPriceSnapshotId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
   triggerEvidenceJson?: Prisma.JsonFilter<"ProtectionChild">
   triggeredAt?: Prisma.DateTimeFilter<"ProtectionChild"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"ProtectionChild"> | Date | string | null
@@ -272,7 +280,8 @@ export type ProtectionChildWhereInput = {
   leg?: Prisma.XOR<Prisma.ProtectionLegScalarRelationFilter, Prisma.ProtectionLegWhereInput>
   order?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
   futuresExecution?: Prisma.XOR<Prisma.FuturesExecutionNullableScalarRelationFilter, Prisma.FuturesExecutionWhereInput> | null
-  assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput>
+  assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
+  futuresLastPriceSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotNullableScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput> | null
 }
 
 export type ProtectionChildOrderByWithRelationInput = {
@@ -283,7 +292,8 @@ export type ProtectionChildOrderByWithRelationInput = {
   quantity?: Prisma.SortOrder
   orderId?: Prisma.SortOrderInput | Prisma.SortOrder
   futuresExecutionId?: Prisma.SortOrderInput | Prisma.SortOrder
-  assetPriceSnapshotId?: Prisma.SortOrder
+  assetPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresLastPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   triggerEvidenceJson?: Prisma.SortOrder
   triggeredAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -293,6 +303,7 @@ export type ProtectionChildOrderByWithRelationInput = {
   order?: Prisma.OrderOrderByWithRelationInput
   futuresExecution?: Prisma.FuturesExecutionOrderByWithRelationInput
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotOrderByWithRelationInput
 }
 
 export type ProtectionChildWhereUniqueInput = Prisma.AtLeast<{
@@ -306,7 +317,8 @@ export type ProtectionChildWhereUniqueInput = Prisma.AtLeast<{
   legId?: Prisma.StringFilter<"ProtectionChild"> | string
   status?: Prisma.EnumProtectionChildStatusFilter<"ProtectionChild"> | $Enums.ProtectionChildStatus
   quantity?: Prisma.DecimalFilter<"ProtectionChild"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  assetPriceSnapshotId?: Prisma.StringFilter<"ProtectionChild"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
+  futuresLastPriceSnapshotId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
   triggerEvidenceJson?: Prisma.JsonFilter<"ProtectionChild">
   triggeredAt?: Prisma.DateTimeFilter<"ProtectionChild"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"ProtectionChild"> | Date | string | null
@@ -315,7 +327,8 @@ export type ProtectionChildWhereUniqueInput = Prisma.AtLeast<{
   leg?: Prisma.XOR<Prisma.ProtectionLegScalarRelationFilter, Prisma.ProtectionLegWhereInput>
   order?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
   futuresExecution?: Prisma.XOR<Prisma.FuturesExecutionNullableScalarRelationFilter, Prisma.FuturesExecutionWhereInput> | null
-  assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput>
+  assetPriceSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
+  futuresLastPriceSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotNullableScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput> | null
 }, "id" | "orderId" | "futuresExecutionId">
 
 export type ProtectionChildOrderByWithAggregationInput = {
@@ -326,7 +339,8 @@ export type ProtectionChildOrderByWithAggregationInput = {
   quantity?: Prisma.SortOrder
   orderId?: Prisma.SortOrderInput | Prisma.SortOrder
   futuresExecutionId?: Prisma.SortOrderInput | Prisma.SortOrder
-  assetPriceSnapshotId?: Prisma.SortOrder
+  assetPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
+  futuresLastPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   triggerEvidenceJson?: Prisma.SortOrder
   triggeredAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -349,7 +363,8 @@ export type ProtectionChildScalarWhereWithAggregatesInput = {
   quantity?: Prisma.DecimalWithAggregatesFilter<"ProtectionChild"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionChild"> | string | null
   futuresExecutionId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionChild"> | string | null
-  assetPriceSnapshotId?: Prisma.StringWithAggregatesFilter<"ProtectionChild"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionChild"> | string | null
+  futuresLastPriceSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"ProtectionChild"> | string | null
   triggerEvidenceJson?: Prisma.JsonWithAggregatesFilter<"ProtectionChild">
   triggeredAt?: Prisma.DateTimeWithAggregatesFilter<"ProtectionChild"> | Date | string
   endedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"ProtectionChild"> | Date | string | null
@@ -368,7 +383,8 @@ export type ProtectionChildCreateInput = {
   leg: Prisma.ProtectionLegCreateNestedOneWithoutChildrenInput
   order?: Prisma.OrderCreateNestedOneWithoutProtectionChildInput
   futuresExecution?: Prisma.FuturesExecutionCreateNestedOneWithoutProtectionChildInput
-  assetPriceSnapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutProtectionTriggersInput
 }
 
 export type ProtectionChildUncheckedCreateInput = {
@@ -379,7 +395,8 @@ export type ProtectionChildUncheckedCreateInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -398,7 +415,8 @@ export type ProtectionChildUpdateInput = {
   leg?: Prisma.ProtectionLegUpdateOneRequiredWithoutChildrenNestedInput
   order?: Prisma.OrderUpdateOneWithoutProtectionChildNestedInput
   futuresExecution?: Prisma.FuturesExecutionUpdateOneWithoutProtectionChildNestedInput
-  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutProtectionChildrenNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutProtectionTriggersNestedInput
 }
 
 export type ProtectionChildUncheckedUpdateInput = {
@@ -409,7 +427,8 @@ export type ProtectionChildUncheckedUpdateInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -424,7 +443,8 @@ export type ProtectionChildCreateManyInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -449,7 +469,8 @@ export type ProtectionChildUncheckedUpdateManyInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -480,6 +501,7 @@ export type ProtectionChildCountOrderByAggregateInput = {
   orderId?: Prisma.SortOrder
   futuresExecutionId?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
+  futuresLastPriceSnapshotId?: Prisma.SortOrder
   triggerEvidenceJson?: Prisma.SortOrder
   triggeredAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
@@ -499,6 +521,7 @@ export type ProtectionChildMaxOrderByAggregateInput = {
   orderId?: Prisma.SortOrder
   futuresExecutionId?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
+  futuresLastPriceSnapshotId?: Prisma.SortOrder
   triggeredAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrder
@@ -513,6 +536,7 @@ export type ProtectionChildMinOrderByAggregateInput = {
   orderId?: Prisma.SortOrder
   futuresExecutionId?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
+  futuresLastPriceSnapshotId?: Prisma.SortOrder
   triggeredAt?: Prisma.SortOrder
   endedAt?: Prisma.SortOrder
   terminalReason?: Prisma.SortOrder
@@ -716,6 +740,48 @@ export type ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.ProtectionChildUpdateToOneWithWhereWithoutOrderInput, Prisma.ProtectionChildUpdateWithoutOrderInput>, Prisma.ProtectionChildUncheckedUpdateWithoutOrderInput>
 }
 
+export type ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput = {
+  create?: Prisma.XOR<Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput> | Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput[] | Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput[]
+  createMany?: Prisma.ProtectionChildCreateManyFuturesLastPriceSnapshotInputEnvelope
+  connect?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+}
+
+export type ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput = {
+  create?: Prisma.XOR<Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput> | Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput[] | Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput[]
+  createMany?: Prisma.ProtectionChildCreateManyFuturesLastPriceSnapshotInputEnvelope
+  connect?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+}
+
+export type ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput = {
+  create?: Prisma.XOR<Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput> | Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput[] | Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput[]
+  upsert?: Prisma.ProtectionChildUpsertWithWhereUniqueWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildUpsertWithWhereUniqueWithoutFuturesLastPriceSnapshotInput[]
+  createMany?: Prisma.ProtectionChildCreateManyFuturesLastPriceSnapshotInputEnvelope
+  set?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  disconnect?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  delete?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  connect?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  update?: Prisma.ProtectionChildUpdateWithWhereUniqueWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildUpdateWithWhereUniqueWithoutFuturesLastPriceSnapshotInput[]
+  updateMany?: Prisma.ProtectionChildUpdateManyWithWhereWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildUpdateManyWithWhereWithoutFuturesLastPriceSnapshotInput[]
+  deleteMany?: Prisma.ProtectionChildScalarWhereInput | Prisma.ProtectionChildScalarWhereInput[]
+}
+
+export type ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput = {
+  create?: Prisma.XOR<Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput> | Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput[] | Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput[]
+  upsert?: Prisma.ProtectionChildUpsertWithWhereUniqueWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildUpsertWithWhereUniqueWithoutFuturesLastPriceSnapshotInput[]
+  createMany?: Prisma.ProtectionChildCreateManyFuturesLastPriceSnapshotInputEnvelope
+  set?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  disconnect?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  delete?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  connect?: Prisma.ProtectionChildWhereUniqueInput | Prisma.ProtectionChildWhereUniqueInput[]
+  update?: Prisma.ProtectionChildUpdateWithWhereUniqueWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildUpdateWithWhereUniqueWithoutFuturesLastPriceSnapshotInput[]
+  updateMany?: Prisma.ProtectionChildUpdateManyWithWhereWithoutFuturesLastPriceSnapshotInput | Prisma.ProtectionChildUpdateManyWithWhereWithoutFuturesLastPriceSnapshotInput[]
+  deleteMany?: Prisma.ProtectionChildScalarWhereInput | Prisma.ProtectionChildScalarWhereInput[]
+}
+
 export type ProtectionChildCreateWithoutAssetPriceSnapshotInput = {
   id?: string
   status?: $Enums.ProtectionChildStatus
@@ -728,6 +794,7 @@ export type ProtectionChildCreateWithoutAssetPriceSnapshotInput = {
   leg: Prisma.ProtectionLegCreateNestedOneWithoutChildrenInput
   order?: Prisma.OrderCreateNestedOneWithoutProtectionChildInput
   futuresExecution?: Prisma.FuturesExecutionCreateNestedOneWithoutProtectionChildInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutProtectionTriggersInput
 }
 
 export type ProtectionChildUncheckedCreateWithoutAssetPriceSnapshotInput = {
@@ -738,6 +805,7 @@ export type ProtectionChildUncheckedCreateWithoutAssetPriceSnapshotInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -781,7 +849,8 @@ export type ProtectionChildScalarWhereInput = {
   quantity?: Prisma.DecimalFilter<"ProtectionChild"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
   futuresExecutionId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
-  assetPriceSnapshotId?: Prisma.StringFilter<"ProtectionChild"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
+  futuresLastPriceSnapshotId?: Prisma.StringNullableFilter<"ProtectionChild"> | string | null
   triggerEvidenceJson?: Prisma.JsonFilter<"ProtectionChild">
   triggeredAt?: Prisma.DateTimeFilter<"ProtectionChild"> | Date | string
   endedAt?: Prisma.DateTimeNullableFilter<"ProtectionChild"> | Date | string | null
@@ -799,7 +868,8 @@ export type ProtectionChildCreateWithoutFuturesExecutionInput = {
   group: Prisma.ProtectionGroupCreateNestedOneWithoutChildrenInput
   leg: Prisma.ProtectionLegCreateNestedOneWithoutChildrenInput
   order?: Prisma.OrderCreateNestedOneWithoutProtectionChildInput
-  assetPriceSnapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutProtectionTriggersInput
 }
 
 export type ProtectionChildUncheckedCreateWithoutFuturesExecutionInput = {
@@ -809,7 +879,8 @@ export type ProtectionChildUncheckedCreateWithoutFuturesExecutionInput = {
   status?: $Enums.ProtectionChildStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -843,7 +914,8 @@ export type ProtectionChildUpdateWithoutFuturesExecutionInput = {
   group?: Prisma.ProtectionGroupUpdateOneRequiredWithoutChildrenNestedInput
   leg?: Prisma.ProtectionLegUpdateOneRequiredWithoutChildrenNestedInput
   order?: Prisma.OrderUpdateOneWithoutProtectionChildNestedInput
-  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutProtectionChildrenNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutProtectionTriggersNestedInput
 }
 
 export type ProtectionChildUncheckedUpdateWithoutFuturesExecutionInput = {
@@ -853,7 +925,8 @@ export type ProtectionChildUncheckedUpdateWithoutFuturesExecutionInput = {
   status?: Prisma.EnumProtectionChildStatusFieldUpdateOperationsInput | $Enums.ProtectionChildStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -871,7 +944,8 @@ export type ProtectionChildCreateWithoutGroupInput = {
   leg: Prisma.ProtectionLegCreateNestedOneWithoutChildrenInput
   order?: Prisma.OrderCreateNestedOneWithoutProtectionChildInput
   futuresExecution?: Prisma.FuturesExecutionCreateNestedOneWithoutProtectionChildInput
-  assetPriceSnapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutProtectionTriggersInput
 }
 
 export type ProtectionChildUncheckedCreateWithoutGroupInput = {
@@ -881,7 +955,8 @@ export type ProtectionChildUncheckedCreateWithoutGroupInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -925,7 +1000,8 @@ export type ProtectionChildCreateWithoutLegInput = {
   group: Prisma.ProtectionGroupCreateNestedOneWithoutChildrenInput
   order?: Prisma.OrderCreateNestedOneWithoutProtectionChildInput
   futuresExecution?: Prisma.FuturesExecutionCreateNestedOneWithoutProtectionChildInput
-  assetPriceSnapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutProtectionTriggersInput
 }
 
 export type ProtectionChildUncheckedCreateWithoutLegInput = {
@@ -934,7 +1010,8 @@ export type ProtectionChildUncheckedCreateWithoutLegInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -978,7 +1055,8 @@ export type ProtectionChildCreateWithoutOrderInput = {
   group: Prisma.ProtectionGroupCreateNestedOneWithoutChildrenInput
   leg: Prisma.ProtectionLegCreateNestedOneWithoutChildrenInput
   futuresExecution?: Prisma.FuturesExecutionCreateNestedOneWithoutProtectionChildInput
-  assetPriceSnapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutProtectionTriggersInput
 }
 
 export type ProtectionChildUncheckedCreateWithoutOrderInput = {
@@ -988,7 +1066,8 @@ export type ProtectionChildUncheckedCreateWithoutOrderInput = {
   status?: $Enums.ProtectionChildStatus
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -1022,7 +1101,8 @@ export type ProtectionChildUpdateWithoutOrderInput = {
   group?: Prisma.ProtectionGroupUpdateOneRequiredWithoutChildrenNestedInput
   leg?: Prisma.ProtectionLegUpdateOneRequiredWithoutChildrenNestedInput
   futuresExecution?: Prisma.FuturesExecutionUpdateOneWithoutProtectionChildNestedInput
-  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutProtectionChildrenNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutProtectionTriggersNestedInput
 }
 
 export type ProtectionChildUncheckedUpdateWithoutOrderInput = {
@@ -1032,11 +1112,68 @@ export type ProtectionChildUncheckedUpdateWithoutOrderInput = {
   status?: Prisma.EnumProtectionChildStatusFieldUpdateOperationsInput | $Enums.ProtectionChildStatus
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput = {
+  id?: string
+  status?: $Enums.ProtectionChildStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  triggeredAt: Date | string
+  endedAt?: Date | string | null
+  terminalReason?: string | null
+  group: Prisma.ProtectionGroupCreateNestedOneWithoutChildrenInput
+  leg: Prisma.ProtectionLegCreateNestedOneWithoutChildrenInput
+  order?: Prisma.OrderCreateNestedOneWithoutProtectionChildInput
+  futuresExecution?: Prisma.FuturesExecutionCreateNestedOneWithoutProtectionChildInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput
+}
+
+export type ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput = {
+  id?: string
+  groupId: string
+  legId: string
+  status?: $Enums.ProtectionChildStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  orderId?: string | null
+  futuresExecutionId?: string | null
+  assetPriceSnapshotId?: string | null
+  triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  triggeredAt: Date | string
+  endedAt?: Date | string | null
+  terminalReason?: string | null
+}
+
+export type ProtectionChildCreateOrConnectWithoutFuturesLastPriceSnapshotInput = {
+  where: Prisma.ProtectionChildWhereUniqueInput
+  create: Prisma.XOR<Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput>
+}
+
+export type ProtectionChildCreateManyFuturesLastPriceSnapshotInputEnvelope = {
+  data: Prisma.ProtectionChildCreateManyFuturesLastPriceSnapshotInput | Prisma.ProtectionChildCreateManyFuturesLastPriceSnapshotInput[]
+  skipDuplicates?: boolean
+}
+
+export type ProtectionChildUpsertWithWhereUniqueWithoutFuturesLastPriceSnapshotInput = {
+  where: Prisma.ProtectionChildWhereUniqueInput
+  update: Prisma.XOR<Prisma.ProtectionChildUpdateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedUpdateWithoutFuturesLastPriceSnapshotInput>
+  create: Prisma.XOR<Prisma.ProtectionChildCreateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedCreateWithoutFuturesLastPriceSnapshotInput>
+}
+
+export type ProtectionChildUpdateWithWhereUniqueWithoutFuturesLastPriceSnapshotInput = {
+  where: Prisma.ProtectionChildWhereUniqueInput
+  data: Prisma.XOR<Prisma.ProtectionChildUpdateWithoutFuturesLastPriceSnapshotInput, Prisma.ProtectionChildUncheckedUpdateWithoutFuturesLastPriceSnapshotInput>
+}
+
+export type ProtectionChildUpdateManyWithWhereWithoutFuturesLastPriceSnapshotInput = {
+  where: Prisma.ProtectionChildScalarWhereInput
+  data: Prisma.XOR<Prisma.ProtectionChildUpdateManyMutationInput, Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotInput>
 }
 
 export type ProtectionChildCreateManyAssetPriceSnapshotInput = {
@@ -1047,6 +1184,7 @@ export type ProtectionChildCreateManyAssetPriceSnapshotInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -1065,6 +1203,7 @@ export type ProtectionChildUpdateWithoutAssetPriceSnapshotInput = {
   leg?: Prisma.ProtectionLegUpdateOneRequiredWithoutChildrenNestedInput
   order?: Prisma.OrderUpdateOneWithoutProtectionChildNestedInput
   futuresExecution?: Prisma.FuturesExecutionUpdateOneWithoutProtectionChildNestedInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutProtectionTriggersNestedInput
 }
 
 export type ProtectionChildUncheckedUpdateWithoutAssetPriceSnapshotInput = {
@@ -1075,6 +1214,7 @@ export type ProtectionChildUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1089,6 +1229,7 @@ export type ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1102,7 +1243,8 @@ export type ProtectionChildCreateManyGroupInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -1120,7 +1262,8 @@ export type ProtectionChildUpdateWithoutGroupInput = {
   leg?: Prisma.ProtectionLegUpdateOneRequiredWithoutChildrenNestedInput
   order?: Prisma.OrderUpdateOneWithoutProtectionChildNestedInput
   futuresExecution?: Prisma.FuturesExecutionUpdateOneWithoutProtectionChildNestedInput
-  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutProtectionChildrenNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutProtectionTriggersNestedInput
 }
 
 export type ProtectionChildUncheckedUpdateWithoutGroupInput = {
@@ -1130,7 +1273,8 @@ export type ProtectionChildUncheckedUpdateWithoutGroupInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1144,7 +1288,8 @@ export type ProtectionChildUncheckedUpdateManyWithoutGroupInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1157,7 +1302,8 @@ export type ProtectionChildCreateManyLegInput = {
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: string | null
   futuresExecutionId?: string | null
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  futuresLastPriceSnapshotId?: string | null
   triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt: Date | string
   endedAt?: Date | string | null
@@ -1175,7 +1321,8 @@ export type ProtectionChildUpdateWithoutLegInput = {
   group?: Prisma.ProtectionGroupUpdateOneRequiredWithoutChildrenNestedInput
   order?: Prisma.OrderUpdateOneWithoutProtectionChildNestedInput
   futuresExecution?: Prisma.FuturesExecutionUpdateOneWithoutProtectionChildNestedInput
-  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutProtectionChildrenNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutProtectionTriggersNestedInput
 }
 
 export type ProtectionChildUncheckedUpdateWithoutLegInput = {
@@ -1184,7 +1331,8 @@ export type ProtectionChildUncheckedUpdateWithoutLegInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1197,7 +1345,68 @@ export type ProtectionChildUncheckedUpdateManyWithoutLegInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresLastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ProtectionChildCreateManyFuturesLastPriceSnapshotInput = {
+  id?: string
+  groupId: string
+  legId: string
+  status?: $Enums.ProtectionChildStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  orderId?: string | null
+  futuresExecutionId?: string | null
+  assetPriceSnapshotId?: string | null
+  triggerEvidenceJson: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  triggeredAt: Date | string
+  endedAt?: Date | string | null
+  terminalReason?: string | null
+}
+
+export type ProtectionChildUpdateWithoutFuturesLastPriceSnapshotInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumProtectionChildStatusFieldUpdateOperationsInput | $Enums.ProtectionChildStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  group?: Prisma.ProtectionGroupUpdateOneRequiredWithoutChildrenNestedInput
+  leg?: Prisma.ProtectionLegUpdateOneRequiredWithoutChildrenNestedInput
+  order?: Prisma.OrderUpdateOneWithoutProtectionChildNestedInput
+  futuresExecution?: Prisma.FuturesExecutionUpdateOneWithoutProtectionChildNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput
+}
+
+export type ProtectionChildUncheckedUpdateWithoutFuturesLastPriceSnapshotInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  groupId?: Prisma.StringFieldUpdateOperationsInput | string
+  legId?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumProtectionChildStatusFieldUpdateOperationsInput | $Enums.ProtectionChildStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+}
+
+export type ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  groupId?: Prisma.StringFieldUpdateOperationsInput | string
+  legId?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumProtectionChildStatusFieldUpdateOperationsInput | $Enums.ProtectionChildStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  futuresExecutionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.JsonNullValueInput | runtime.InputJsonValue
   triggeredAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1215,6 +1424,7 @@ export type ProtectionChildSelect<ExtArgs extends runtime.Types.Extensions.Inter
   orderId?: boolean
   futuresExecutionId?: boolean
   assetPriceSnapshotId?: boolean
+  futuresLastPriceSnapshotId?: boolean
   triggerEvidenceJson?: boolean
   triggeredAt?: boolean
   endedAt?: boolean
@@ -1223,7 +1433,8 @@ export type ProtectionChildSelect<ExtArgs extends runtime.Types.Extensions.Inter
   leg?: boolean | Prisma.ProtectionLegDefaultArgs<ExtArgs>
   order?: boolean | Prisma.ProtectionChild$orderArgs<ExtArgs>
   futuresExecution?: boolean | Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>
-  assetPriceSnapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  assetPriceSnapshot?: boolean | Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>
+  futuresLastPriceSnapshot?: boolean | Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["protectionChild"]>
 
 export type ProtectionChildSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1235,6 +1446,7 @@ export type ProtectionChildSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   orderId?: boolean
   futuresExecutionId?: boolean
   assetPriceSnapshotId?: boolean
+  futuresLastPriceSnapshotId?: boolean
   triggerEvidenceJson?: boolean
   triggeredAt?: boolean
   endedAt?: boolean
@@ -1243,7 +1455,8 @@ export type ProtectionChildSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   leg?: boolean | Prisma.ProtectionLegDefaultArgs<ExtArgs>
   order?: boolean | Prisma.ProtectionChild$orderArgs<ExtArgs>
   futuresExecution?: boolean | Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>
-  assetPriceSnapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  assetPriceSnapshot?: boolean | Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>
+  futuresLastPriceSnapshot?: boolean | Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["protectionChild"]>
 
 export type ProtectionChildSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1255,6 +1468,7 @@ export type ProtectionChildSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   orderId?: boolean
   futuresExecutionId?: boolean
   assetPriceSnapshotId?: boolean
+  futuresLastPriceSnapshotId?: boolean
   triggerEvidenceJson?: boolean
   triggeredAt?: boolean
   endedAt?: boolean
@@ -1263,7 +1477,8 @@ export type ProtectionChildSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   leg?: boolean | Prisma.ProtectionLegDefaultArgs<ExtArgs>
   order?: boolean | Prisma.ProtectionChild$orderArgs<ExtArgs>
   futuresExecution?: boolean | Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>
-  assetPriceSnapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  assetPriceSnapshot?: boolean | Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>
+  futuresLastPriceSnapshot?: boolean | Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["protectionChild"]>
 
 export type ProtectionChildSelectScalar = {
@@ -1275,33 +1490,37 @@ export type ProtectionChildSelectScalar = {
   orderId?: boolean
   futuresExecutionId?: boolean
   assetPriceSnapshotId?: boolean
+  futuresLastPriceSnapshotId?: boolean
   triggerEvidenceJson?: boolean
   triggeredAt?: boolean
   endedAt?: boolean
   terminalReason?: boolean
 }
 
-export type ProtectionChildOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "groupId" | "legId" | "status" | "quantity" | "orderId" | "futuresExecutionId" | "assetPriceSnapshotId" | "triggerEvidenceJson" | "triggeredAt" | "endedAt" | "terminalReason", ExtArgs["result"]["protectionChild"]>
+export type ProtectionChildOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "groupId" | "legId" | "status" | "quantity" | "orderId" | "futuresExecutionId" | "assetPriceSnapshotId" | "futuresLastPriceSnapshotId" | "triggerEvidenceJson" | "triggeredAt" | "endedAt" | "terminalReason", ExtArgs["result"]["protectionChild"]>
 export type ProtectionChildInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   group?: boolean | Prisma.ProtectionGroupDefaultArgs<ExtArgs>
   leg?: boolean | Prisma.ProtectionLegDefaultArgs<ExtArgs>
   order?: boolean | Prisma.ProtectionChild$orderArgs<ExtArgs>
   futuresExecution?: boolean | Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>
-  assetPriceSnapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  assetPriceSnapshot?: boolean | Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>
+  futuresLastPriceSnapshot?: boolean | Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>
 }
 export type ProtectionChildIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   group?: boolean | Prisma.ProtectionGroupDefaultArgs<ExtArgs>
   leg?: boolean | Prisma.ProtectionLegDefaultArgs<ExtArgs>
   order?: boolean | Prisma.ProtectionChild$orderArgs<ExtArgs>
   futuresExecution?: boolean | Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>
-  assetPriceSnapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  assetPriceSnapshot?: boolean | Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>
+  futuresLastPriceSnapshot?: boolean | Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>
 }
 export type ProtectionChildIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   group?: boolean | Prisma.ProtectionGroupDefaultArgs<ExtArgs>
   leg?: boolean | Prisma.ProtectionLegDefaultArgs<ExtArgs>
   order?: boolean | Prisma.ProtectionChild$orderArgs<ExtArgs>
   futuresExecution?: boolean | Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>
-  assetPriceSnapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  assetPriceSnapshot?: boolean | Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>
+  futuresLastPriceSnapshot?: boolean | Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>
 }
 
 export type $ProtectionChildPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1311,7 +1530,8 @@ export type $ProtectionChildPayload<ExtArgs extends runtime.Types.Extensions.Int
     leg: Prisma.$ProtectionLegPayload<ExtArgs>
     order: Prisma.$OrderPayload<ExtArgs> | null
     futuresExecution: Prisma.$FuturesExecutionPayload<ExtArgs> | null
-    assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs>
+    assetPriceSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
+    futuresLastPriceSnapshot: Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1321,7 +1541,12 @@ export type $ProtectionChildPayload<ExtArgs extends runtime.Types.Extensions.Int
     quantity: runtime.Decimal
     orderId: string | null
     futuresExecutionId: string | null
-    assetPriceSnapshotId: string
+    /**
+     * Spot triggers (and Futures triggers recorded before Futures Last pricing).
+     * SQL CHECK: exactly one of assetPriceSnapshotId / futuresLastPriceSnapshotId.
+     */
+    assetPriceSnapshotId: string | null
+    futuresLastPriceSnapshotId: string | null
     triggerEvidenceJson: runtime.JsonValue
     triggeredAt: Date
     endedAt: Date | null
@@ -1724,7 +1949,8 @@ export interface Prisma__ProtectionChildClient<T, Null = never, ExtArgs extends 
   leg<T extends Prisma.ProtectionLegDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionLegDefaultArgs<ExtArgs>>): Prisma.Prisma__ProtectionLegClient<runtime.Types.Result.GetResult<Prisma.$ProtectionLegPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   order<T extends Prisma.ProtectionChild$orderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionChild$orderArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   futuresExecution<T extends Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionChild$futuresExecutionArgs<ExtArgs>>): Prisma.Prisma__FuturesExecutionClient<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
-  assetPriceSnapshot<T extends Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  assetPriceSnapshot<T extends Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionChild$assetPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  futuresLastPriceSnapshot<T extends Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__FuturesLastPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1762,6 +1988,7 @@ export interface ProtectionChildFieldRefs {
   readonly orderId: Prisma.FieldRef<"ProtectionChild", 'String'>
   readonly futuresExecutionId: Prisma.FieldRef<"ProtectionChild", 'String'>
   readonly assetPriceSnapshotId: Prisma.FieldRef<"ProtectionChild", 'String'>
+  readonly futuresLastPriceSnapshotId: Prisma.FieldRef<"ProtectionChild", 'String'>
   readonly triggerEvidenceJson: Prisma.FieldRef<"ProtectionChild", 'Json'>
   readonly triggeredAt: Prisma.FieldRef<"ProtectionChild", 'DateTime'>
   readonly endedAt: Prisma.FieldRef<"ProtectionChild", 'DateTime'>
@@ -2202,6 +2429,44 @@ export type ProtectionChild$futuresExecutionArgs<ExtArgs extends runtime.Types.E
    */
   include?: Prisma.FuturesExecutionInclude<ExtArgs> | null
   where?: Prisma.FuturesExecutionWhereInput
+}
+
+/**
+ * ProtectionChild.assetPriceSnapshot
+ */
+export type ProtectionChild$assetPriceSnapshotArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AssetPriceSnapshot
+   */
+  select?: Prisma.AssetPriceSnapshotSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AssetPriceSnapshot
+   */
+  omit?: Prisma.AssetPriceSnapshotOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AssetPriceSnapshotInclude<ExtArgs> | null
+  where?: Prisma.AssetPriceSnapshotWhereInput
+}
+
+/**
+ * ProtectionChild.futuresLastPriceSnapshot
+ */
+export type ProtectionChild$futuresLastPriceSnapshotArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesLastPriceSnapshot
+   */
+  select?: Prisma.FuturesLastPriceSnapshotSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesLastPriceSnapshot
+   */
+  omit?: Prisma.FuturesLastPriceSnapshotOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesLastPriceSnapshotInclude<ExtArgs> | null
+  where?: Prisma.FuturesLastPriceSnapshotWhereInput
 }
 
 /**

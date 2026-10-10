@@ -17,7 +17,7 @@ import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { futuresDecimal as d } from '../src/futures/futures-math';
 import { readFuturesMark } from '../src/futures/futures-mark';
-import { readFuturesPrice } from '../src/futures/futures-price';
+import { readFuturesLastPrice } from '../src/futures/futures-last-price';
 import { HttpException } from '@nestjs/common';
 import {
   adminDiagnosticRequestMiddleware,
@@ -826,8 +826,9 @@ async function evidenceCases() {
       (await readFuturesMark(db, instrument, await now()))!.id,
       newer.id,
     );
-    const spot = await readFuturesPrice(db, r.asset, await now());
-    assert.equal(spot!.price.toString(), '100');
+    // Mark rows never become the execution price, and vice versa.
+    const last = await readFuturesLastPrice(db, instrument, await now());
+    assert.equal(last!.price.toString(), '100');
     await assert.rejects(
       db.futuresMarkSnapshot.update({
         where: { id: newer.id },

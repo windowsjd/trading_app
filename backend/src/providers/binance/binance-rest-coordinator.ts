@@ -210,6 +210,8 @@ function requestWeight(url: string): number {
   if (parsed.pathname === '/fapi/v1/exchangeInfo') return 1;
   if (parsed.pathname === '/fapi/v1/premiumIndex')
     return parsed.searchParams.has('symbol') ? 1 : 10;
+  if (parsed.pathname === '/fapi/v2/ticker/price')
+    return parsed.searchParams.has('symbol') ? 1 : 2;
   if (
     parsed.pathname === '/api/v3/ticker/24hr' &&
     parsed.searchParams.has('symbol')

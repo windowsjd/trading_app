@@ -118,6 +118,7 @@ export type FuturesExecution = {
   feeAmount: string;
   executedAt: string;
   instrument: FuturesInstrument;
+  priceEvidence?: { priceBasis?: "futures_last" | "spot_last" };
 };
 export type FuturesLiquidation = {
   id: string;
@@ -190,6 +191,7 @@ export const getFuturesFinalSettlement = (id: string, signal?: AbortSignal) =>
       feeAmount: string;
       settledCash: string;
       bankruptcyShortfall: string;
+      closes?: { price?: { lastPriceSnapshot?: unknown } }[];
     } | null;
   }>(id, "final-settlement", signal);
 export async function executeFutures(id: string, command: FuturesCommand) {

@@ -1,0 +1,417 @@
+{
+  "measuredAt": "2026-10-10T04:58:45.747Z",
+  "durationSec": 150.1,
+  "ingestion": {
+    "wsFramesPerSec": 31.1,
+    "acceptedPerSec": 31.1,
+    "restCalls": 44,
+    "restRows": 162,
+    "restCallsPerMin": 17.6,
+    "lastRowsBySource": [
+      [
+        "binance_usdm_ticker_price_rest",
+        162
+      ],
+      [
+        "binance_usdm_agg_trade_ws",
+        1857
+      ]
+    ],
+    "lastRowsPerSec": 13.45,
+    "markRowsBySource": [
+      [
+        "binance_usdm_mark_ws",
+        3266
+      ],
+      [
+        "binance_usdm_mark_rest",
+        23
+      ]
+    ],
+    "processCpuPercentOneCore": 4.13,
+    "processRssPeakBytes": 428224512,
+    "samples": [
+      {
+        "second": 10,
+        "wsFramesPerSec": 24.4,
+        "acceptedPerSec": 24.3,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            88
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            31
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            177
+          ],
+          [
+            "binance_usdm_mark_rest",
+            23
+          ]
+        ]
+      },
+      {
+        "second": 20,
+        "wsFramesPerSec": 22.4,
+        "acceptedPerSec": 22.4,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            114
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            12
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            217
+          ]
+        ]
+      },
+      {
+        "second": 30,
+        "wsFramesPerSec": 24.9,
+        "acceptedPerSec": 24.9,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            121
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            9
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            187
+          ]
+        ]
+      },
+      {
+        "second": 40,
+        "wsFramesPerSec": 21,
+        "acceptedPerSec": 21,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            93
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            16
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 50,
+        "wsFramesPerSec": 21.7,
+        "acceptedPerSec": 21.7,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            90
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            9
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 60,
+        "wsFramesPerSec": 25.7,
+        "acceptedPerSec": 25.7,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            91
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            14
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 70,
+        "wsFramesPerSec": 19.5,
+        "acceptedPerSec": 19.5,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_ticker_price_rest",
+            14
+          ],
+          [
+            "binance_usdm_agg_trade_ws",
+            101
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 80,
+        "wsFramesPerSec": 32.6,
+        "acceptedPerSec": 32.6,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            99
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            10
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 90,
+        "wsFramesPerSec": 43.5,
+        "acceptedPerSec": 43.5,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            149
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            4
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 100,
+        "wsFramesPerSec": 31.5,
+        "acceptedPerSec": 31.5,
+        "restCalls": 2,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            125
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            6
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 110,
+        "wsFramesPerSec": 37.8,
+        "acceptedPerSec": 37.8,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            137
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            11
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 120,
+        "wsFramesPerSec": 36,
+        "acceptedPerSec": 36,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            133
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            5
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 130,
+        "wsFramesPerSec": 30.5,
+        "acceptedPerSec": 30.5,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_ticker_price_rest",
+            9
+          ],
+          [
+            "binance_usdm_agg_trade_ws",
+            110
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      },
+      {
+        "second": 140,
+        "wsFramesPerSec": 26.8,
+        "acceptedPerSec": 26.8,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            115
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            9
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            184
+          ]
+        ]
+      },
+      {
+        "second": 150,
+        "wsFramesPerSec": 52.9,
+        "acceptedPerSec": 52.9,
+        "restCalls": 3,
+        "lastRows": [
+          [
+            "binance_usdm_agg_trade_ws",
+            151
+          ],
+          [
+            "binance_usdm_ticker_price_rest",
+            3
+          ]
+        ],
+        "markRows": [
+          [
+            "binance_usdm_mark_ws",
+            207
+          ]
+        ]
+      }
+    ]
+  },
+  "storage": {
+    "addedRows": 2091,
+    "addedBytes": 540672,
+    "bytesPerRowIncludingIndexes": 259,
+    "projectedRowsPer24h": 1162197
+  },
+  "readiness": {
+    "instruments": 23,
+    "lastValid": 23,
+    "markValid": 23,
+    "tradeAgeMs": {
+      "samples": 23,
+      "p50": 2591,
+      "p95": 4388,
+      "max": 6445
+    },
+    "receiptAgeMs": {
+      "samples": 23,
+      "p50": 1426,
+      "p95": 2920,
+      "max": 3346
+    }
+  },
+  "execution": [
+    {
+      "label": "live ingestion running",
+      "commands": 60,
+      "latencyMs": {
+        "samples": 60,
+        "p50": 30,
+        "p95": 39.42,
+        "max": 75.08
+      },
+      "failures": {}
+    },
+    {
+      "label": "ingestion stopped (synthetic feed)",
+      "commands": 60,
+      "latencyMs": {
+        "samples": 60,
+        "p50": 28.68,
+        "p95": 33.62,
+        "max": 36.94
+      },
+      "failures": {}
+    }
+  ]
+}

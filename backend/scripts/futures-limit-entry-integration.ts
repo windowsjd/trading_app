@@ -9,6 +9,7 @@ import {
   fixture,
   now,
   price,
+  spotPrice,
   fxEvidence,
   fxEvidenceIds,
   cleanup,
@@ -215,21 +216,29 @@ async function entrySafety() {
       await fresh(s);
       const a = await entries.create(s.userId, s.accountId, body(s));
       if (kind !== 'before_entry') {
-        await db.assetPriceSnapshot.deleteMany({
-          where: { assetId: s.instruments[0].asset.id },
+        await db.futuresLastPriceSnapshot.deleteMany({
+          where: { instrumentId: s.instruments[0].instrument.id },
         });
         if (kind === 'stale') await price(s, '99', 0, 11000);
         if (kind === 'wrong_source') {
-          const wrong = await price(s, '99', 0, 0);
-          await db.assetPriceSnapshot.update({
-            where: { id: wrong.id },
-            data: { sourceName: 'binance_usdm_mark_ws' },
+          // Fresh Spot and Mark below the limit are never Futures fill evidence.
+          await spotPrice(s, '99', 0, 0);
+          const at = await now();
+          await db.futuresMarkSnapshot.create({
+            data: {
+              instrumentId: s.instruments[0].instrument.id,
+              symbol: s.instruments[0].asset.symbol,
+              price: '99',
+              source: 'binance_usdm_mark_ws',
+              effectiveAt: at,
+              capturedAt: at,
+            },
           });
         }
         if (kind === 'mark_only') {
           await fresh(s, '99');
-          await db.assetPriceSnapshot.deleteMany({
-            where: { assetId: s.instruments[0].asset.id },
+          await db.futuresLastPriceSnapshot.deleteMany({
+            where: { instrumentId: s.instruments[0].instrument.id },
           });
           await price(s, '101', 0, 0);
         }

@@ -34,7 +34,7 @@ import {
 import { accountFuturesFee } from './futures-risk';
 import { assertFuturesTransferCollateral } from './futures-collateral';
 import { readFuturesMark } from './futures-mark';
-import { readFuturesPrice } from './futures-price';
+import { readFuturesLastPrice } from './futures-last-price';
 import { cancelFuturesEntriesInTransaction } from './futures-limit-state';
 import {
   futuresInstrumentInclude,
@@ -358,13 +358,13 @@ export class FuturesLimitService {
         this.prisma,
         row.instrumentId,
       );
-      const price = (await readFuturesPrice(
+      const price = (await readFuturesLastPrice(
         this.prisma,
-        instrument.underlyingAsset,
+        instrument,
         evaluationAt,
       ))!;
-      // Negative preview only. Candidate executions still select evidence and
-      // check the same predicate again inside the canonical financial locks.
+      // Negative preview only, on the same Futures Last basis. Candidate
+      // executions select evidence and check the predicate again under locks.
       if (
         price.effectiveAt < row.createdAt ||
         price.capturedAt < row.createdAt ||

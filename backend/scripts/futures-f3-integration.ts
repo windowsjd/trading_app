@@ -9,6 +9,8 @@ import {
   newInstrument,
   now,
   price,
+  spotPrice,
+  untilDb,
   fxEvidence,
   fxEvidenceIds,
   openBody,
@@ -17,6 +19,7 @@ import {
   code,
   type Scenario,
 } from './futures-integration';
+import { FUTURES_FINAL_LAST_WINDOW_MS } from '../src/futures/futures-last-price';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { futuresDecimal as d } from '../src/futures/futures-math';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
@@ -98,13 +101,36 @@ async function release(s: Scenario) {
     });
   await cleanup(s);
 }
+/** A Futures Last trade received exactly at endAt for each listed instrument. */
+async function lastAt(
+  s: Scenario,
+  value: string,
+  index: number,
+  at: Date,
+  source:
+    | 'binance_usdm_agg_trade_ws'
+    | 'binance_usdm_ticker_price_rest' = 'binance_usdm_agg_trade_ws',
+) {
+  return db.futuresLastPriceSnapshot.create({
+    data: {
+      instrumentId: s.instruments[index].instrument.id,
+      symbol: s.instruments[index].asset.symbol,
+      price: value,
+      source,
+      effectiveAt: at,
+      capturedAt: at,
+    },
+  });
+}
 async function end(s: Scenario, values: string[]) {
   const endAt = await now();
   for (let i = 0; i < values.length; i++) {
+    await lastAt(s, values[i], i, endAt);
+    // Same-underlying Spot at the boundary must neither price nor leak into the exit.
     await db.assetPriceSnapshot.create({
       data: {
         assetId: s.instruments[i].asset.id,
-        price: values[i],
+        price: '777',
         currencyCode: 'USD',
         sourceType: 'provider_api',
         sourceName: 'binance_spot_ws_ticker',
@@ -388,8 +414,10 @@ async function finalCases() {
             }),
             0,
           );
+          assert.equal(e.closes[0].price.assetPriceSnapshotId, null);
+          assert.ok(e.closes[0].price.lastPriceSnapshotId);
           pass(
-            `final ${direction} ${marginMode} Spot=${value} preview/exact endAt/fee/shortfall/retry`,
+            `final ${direction} ${marginMode} Last=${value} (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry`,
           );
         } finally {
           await release(s);
@@ -528,27 +556,37 @@ async function jobAndFaults() {
   }
   const missing = await fixture('season');
   try {
-    await fresh(missing);
+    await fxEvidence();
+    for (let i = 0; i < missing.instruments.length; i++)
+      await mark(missing, '100', i);
+    // The newest trade is received 9s before the open, so by endAt it lies
+    // outside the 10s boundary window. Evidence is immutable: real time passes.
+    await db.futuresLastPriceSnapshot.deleteMany({
+      where: { instrumentId: missing.instruments[0].instrument.id },
+    });
+    const lastTrade = await price(missing, '100', 0, 9000);
     await open(missing);
+    await untilDb(+lastTrade.capturedAt + FUTURES_FINAL_LAST_WINDOW_MS + 1);
     const endAt = await end(missing, []);
-    await db.assetPriceSnapshot.deleteMany({
-      where: {
-        assetId: missing.instruments[0].asset.id,
-        futuresExecutions: { none: {} },
-      },
-    });
-    // Keep lifecycle valid: the failure must be the absent bounded price,
-    // not an endAt that is still in the future.
-    await db.assetPriceSnapshot.updateMany({
-      where: { assetId: missing.instruments[0].asset.id },
-      data: {
-        effectiveAt: new Date(+endAt - 11000),
-        capturedAt: new Date(+endAt - 11000),
-      },
-    });
+    // Fresh Spot and Mark at the boundary are never a substitute.
+    await spotPrice(missing, '100', 0, 0);
+    await mark(missing, '100', 0, endAt);
     await assert.rejects(
       final.settleSeason(missing.season!.id),
       (e) => code(e) === 'FUTURES_FINAL_PRICE_UNAVAILABLE',
+    );
+    // A receipt after endAt is never applied retroactively.
+    await untilDb(+endAt + 2);
+    await price(missing, '100', 0, 0);
+    await assert.rejects(
+      final.settleSeason(missing.season!.id),
+      (e) => code(e) === 'FUTURES_FINAL_PRICE_UNAVAILABLE',
+    );
+    assert.equal(
+      await db.futuresSeasonPrice.count({
+        where: { seasonId: missing.season!.id },
+      }),
+      0,
     );
     assert.equal(
       (await db.season.findUniqueOrThrow({ where: { id: missing.season!.id } }))
@@ -582,17 +620,7 @@ async function race() {
     // Season end is held ahead of the liquidation's authorization lock.
     await client.query('BEGIN');
     const endAt = await now();
-    await db.assetPriceSnapshot.create({
-      data: {
-        assetId: s.instruments[0].asset.id,
-        price: '100',
-        currencyCode: 'USD',
-        sourceType: 'provider_api',
-        sourceName: 'binance_spot_ws_ticker',
-        effectiveAt: endAt,
-        capturedAt: endAt,
-      },
-    });
+    await lastAt(s, '100', 0, endAt);
     await client.query(
       "UPDATE seasons SET status='ended', end_at=$1 WHERE id=$2",
       [endAt.toISOString(), s.season!.id],
@@ -942,17 +970,7 @@ async function multiAccountRetry() {
       'ended',
     );
     // A backfilled competing boundary row cannot reprice the remaining accounts.
-    await db.assetPriceSnapshot.create({
-      data: {
-        assetId: a.instruments[0].asset.id,
-        price: '999',
-        currencyCode: 'USD',
-        sourceType: 'provider_api',
-        sourceName: 'binance_spot_ws_ticker',
-        effectiveAt: endAt,
-        capturedAt: endAt,
-      },
-    });
+    await lastAt(a, '999', 0, endAt, 'binance_usdm_ticker_price_rest');
     const jobs = new SeasonSettlementJobService(
       new BatchService(db),
       db,
@@ -1022,7 +1040,7 @@ async function mixedScopeAndMidwayRollback() {
     });
     const pins = await db.futuresSeasonPrice.findMany({
       where: { seasonId: s.season!.id },
-      include: { snapshot: true },
+      include: { snapshot: true, lastPriceSnapshot: true },
     });
     const prices = new Map(pins.map((p) => [p.instrumentId, p]));
     const w = await wallet(s);
@@ -1056,7 +1074,87 @@ async function mixedScopeAndMidwayRollback() {
   }
 }
 
+/** A Season pinned with Spot evidence before the switch keeps that pin: the
+ * retry re-verifies and reuses it, even when Futures Last at endAt differs. */
+async function legacySpotPinRetry() {
+  const s = await fixture('season');
+  try {
+    await fresh(s);
+    await open(s);
+    const endAt = await now();
+    await lastAt(s, '110', 0, endAt);
+    const spot = await db.assetPriceSnapshot.create({
+      data: {
+        assetId: s.instruments[0].asset.id,
+        price: '120',
+        currencyCode: 'USD',
+        sourceType: 'provider_api',
+        sourceName: 'binance_spot_ws_ticker',
+        effectiveAt: endAt,
+        capturedAt: endAt,
+      },
+    });
+    const season = await db.season.update({
+      where: { id: s.season!.id },
+      data: { status: 'ended', endAt },
+    });
+    const pin = await db.futuresSeasonPrice.create({
+      data: {
+        seasonId: season.id,
+        instrumentId: s.instruments[0].instrument.id,
+        assetPriceSnapshotId: spot.id,
+        endAt,
+        feeRate: season.tradeFeeRate,
+      },
+    });
+    // A pin holding both evidence kinds (or neither) is rejected by the DB.
+    const last = await db.futuresLastPriceSnapshot.findFirstOrThrow({
+      where: {
+        instrumentId: s.instruments[0].instrument.id,
+        capturedAt: endAt,
+      },
+    });
+    for (const data of [
+      { assetPriceSnapshotId: spot.id, lastPriceSnapshotId: last.id },
+      { assetPriceSnapshotId: null, lastPriceSnapshotId: null },
+    ])
+      await assert.rejects(
+        db.futuresSeasonPrice.create({
+          data: {
+            seasonId: season.id,
+            instrumentId: s.instruments[1].instrument.id,
+            endAt,
+            feeRate: season.tradeFeeRate,
+            ...data,
+          },
+        }),
+      );
+    await final.settleSeason(season.id);
+    const close = await db.futuresSeasonClose.findFirstOrThrow({
+      where: { tradingAccountId: s.accountId },
+    });
+    assert.equal(close.priceId, pin.id);
+    assert.equal(close.executionPrice.toFixed(8), '120.00000000');
+    assert.equal(
+      await db.futuresSeasonPrice.count({ where: { seasonId: season.id } }),
+      1,
+    );
+    const view = await app.futures.finalSettlement(s.userId, s.accountId);
+    const shown = JSON.parse(JSON.stringify(view.data.settlement)) as {
+      closes: Array<{
+        price: { snapshot: { id: string } | null; lastPriceSnapshot: unknown };
+      }>;
+    };
+    assert.equal(shown.closes[0].price.snapshot?.id, spot.id);
+    assert.equal(shown.closes[0].price.lastPriceSnapshot, null);
+    pass('legacy Spot Season pin is re-verified and reused unchanged on retry');
+  } finally {
+    await release(s);
+  }
+}
+
 async function main() {
+  await legacySpotPinRetry();
   await valuationTransitions();
   await staleAndGeneration();
   await finalCases();

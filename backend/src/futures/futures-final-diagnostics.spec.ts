@@ -38,7 +38,10 @@ import {
   FuturesSeasonSettlementService,
   planSeasonFuturesExit,
 } from './futures-season-settlement.service';
-import { readFuturesFinalPrice } from './futures-price';
+import {
+  readFuturesFinalLastPrice,
+  readFuturesLastPrice,
+} from './futures-last-price';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { futuresDecimal as d } from './futures-math';
 import { FuturesController } from './futures.controller';
@@ -145,11 +148,12 @@ function fixture() {
     futuresSeasonPrice: { findMany: jest.fn().mockResolvedValue([]) },
     futuresSeasonSettlement: { findUnique: jest.fn().mockResolvedValue(null) },
     cashWallet: { findMany: jest.fn().mockResolvedValue(wallets) },
-    assetPriceSnapshot: { findFirst: jest.fn().mockResolvedValue(null) },
+    futuresLastPriceSnapshot: { findFirst: jest.fn().mockResolvedValue(null) },
   };
   return {
     tx,
     asset,
+    instrument,
     position,
     wallets,
     context,
@@ -157,14 +161,45 @@ function fixture() {
   };
 }
 describe('F3 final settlement diagnostics at existing delivery boundaries', () => {
-  it('identifies missing end-boundary Spot evidence', async () => {
+  it('identifies missing end-boundary Futures Last evidence', async () => {
     const h = fixture();
     assertDiagnosticTriage(
       await diagnostic(() =>
-        readFuturesFinalPrice(h.tx as never, h.asset as never, endAt),
+        readFuturesFinalLastPrice(h.tx as never, h.instrument as never, endAt),
       ),
       'FUTURES_FINAL_PRICE_UNAVAILABLE',
-      'backend/src/futures/futures-price.ts#readFuturesFinalPrice',
+      'backend/src/futures/futures-last-price.ts#readFuturesFinalLastPrice',
+    );
+  });
+  it('identifies missing and stale live Futures Last evidence', async () => {
+    const h = fixture();
+    const route = '/api/v1/trading-accounts/account/futures/execute';
+    assertDiagnosticTriage(
+      await diagnostic(
+        () => readFuturesLastPrice(h.tx as never, h.instrument as never, endAt),
+        route,
+      ),
+      'FUTURES_PRICE_UNAVAILABLE',
+      'backend/src/futures/futures-last-price.ts#readFuturesLastPrice',
+    );
+    h.tx.futuresLastPriceSnapshot.findFirst.mockResolvedValue({
+      id: 'last',
+      instrumentId: 'instrument',
+      symbol: 'BTCUSDT',
+      providerProduct: 'binance_usdm_perpetual',
+      currencyCode: 'USD',
+      source: 'binance_usdm_agg_trade_ws',
+      price: d('100'),
+      effectiveAt: new Date(+endAt - 20000),
+      capturedAt: new Date(+endAt - 20000),
+    } as never);
+    assertDiagnosticTriage(
+      await diagnostic(
+        () => readFuturesLastPrice(h.tx as never, h.instrument as never, endAt),
+        route,
+      ),
+      'FUTURES_PRICE_STALE',
+      'backend/src/futures/futures-last-price.ts#readFuturesLastPrice',
     );
   });
   it('identifies the final open-lifetime barrier', async () => {

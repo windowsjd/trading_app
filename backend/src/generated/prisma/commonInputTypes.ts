@@ -1225,6 +1225,23 @@ export type EnumOpsJobTriggerWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumOpsJobTriggerFilter<$PrismaModel>
 }
 
+export type EnumFuturesLastPriceSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesLastPriceSource | Prisma.EnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesLastPriceSourceFilter<$PrismaModel> | $Enums.FuturesLastPriceSource
+}
+
+export type EnumFuturesLastPriceSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesLastPriceSource | Prisma.EnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesLastPriceSourceWithAggregatesFilter<$PrismaModel> | $Enums.FuturesLastPriceSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFuturesLastPriceSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFuturesLastPriceSourceFilter<$PrismaModel>
+}
+
 export type EnumFuturesMarkSourceFilter<$PrismaModel = never> = {
   equals?: $Enums.FuturesMarkSource | Prisma.EnumFuturesMarkSourceFieldRefInput<$PrismaModel>
   in?: $Enums.FuturesMarkSource[] | Prisma.ListEnumFuturesMarkSourceFieldRefInput<$PrismaModel>
@@ -2410,6 +2427,23 @@ export type NestedEnumOpsJobTriggerWithAggregatesFilter<$PrismaModel = never> = 
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumOpsJobTriggerFilter<$PrismaModel>
   _max?: Prisma.NestedEnumOpsJobTriggerFilter<$PrismaModel>
+}
+
+export type NestedEnumFuturesLastPriceSourceFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesLastPriceSource | Prisma.EnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesLastPriceSourceFilter<$PrismaModel> | $Enums.FuturesLastPriceSource
+}
+
+export type NestedEnumFuturesLastPriceSourceWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.FuturesLastPriceSource | Prisma.EnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  in?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  notIn?: $Enums.FuturesLastPriceSource[] | Prisma.ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumFuturesLastPriceSourceWithAggregatesFilter<$PrismaModel> | $Enums.FuturesLastPriceSource
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumFuturesLastPriceSourceFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumFuturesLastPriceSourceFilter<$PrismaModel>
 }
 
 export type NestedEnumFuturesMarkSourceFilter<$PrismaModel = never> = {

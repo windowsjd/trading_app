@@ -21,7 +21,10 @@ jest.mock('../trading-accounts/trading-account-access.service', () => ({
 jest.mock('../portfolio/general-account-performance.service', () => ({
   GeneralAccountPerformanceService: class {},
 }));
-jest.mock('./futures-price', () => ({ readFuturesPrice: jest.fn() }));
+jest.mock('./futures-last-price', () => ({
+  ...jest.requireActual('./futures-last-price'),
+  readFuturesLastPrice: jest.fn(),
+}));
 jest.mock('./futures-mark', () => ({ readFuturesMark: jest.fn() }));
 
 import { HttpException, type ArgumentsHost } from '@nestjs/common';
@@ -32,7 +35,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { FuturesService } from './futures.service';
-import { readFuturesPrice } from './futures-price';
+import { readFuturesLastPrice } from './futures-last-price';
 import { readFuturesMark } from './futures-mark';
 import {
   adminDiagnosticRequestMiddleware,
@@ -208,11 +211,10 @@ describe('Futures existing execution diagnostic boundary', () => {
       walletTransaction: { createMany: jest.fn() },
     };
     tx.$transaction = jest.fn((work) => work(tx));
-    jest.mocked(readFuturesPrice).mockResolvedValue({
-      id: 'spot-1',
+    jest.mocked(readFuturesLastPrice).mockResolvedValue({
+      id: 'last-1',
       price: d('123.45678912'),
-      sourceType: 'provider_api',
-      sourceName: 'binance_spot_ws_ticker',
+      source: 'binance_usdm_agg_trade_ws',
       effectiveAt: now,
       capturedAt: now,
     } as never);

@@ -34,7 +34,9 @@ reopens admission, without retrying the failed request automatically.
 Normal admission allows two simultaneous HTTP requests and reserves at most
 600 weight per Redis UTC minute. Existing routes reserve klines=2,
 single-symbol ticker/24hr=2, Spot exchangeInfo=20, Futures exchangeInfo=1,
-Futures premiumIndex=1 with symbol or 10 without; unknown routes reserve 80.
+Futures premiumIndex=1 with symbol or 10 without, Futures `/fapi/v2/ticker/price`
+=1 with symbol or 2 without (Futures Last re-confirmation, at most every 3s);
+unknown routes reserve 80.
 This conservative budget is preventive, not a declaration of Binance's actual
 IP capacity. `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE` can set 20..600; it must be
 identical across instances. Observed used weight can exhaust the local budget

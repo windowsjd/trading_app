@@ -7,6 +7,7 @@ import {
   type FuturesPosition,
   type FuturesSeasonPrice,
   type AssetPriceSnapshot,
+  type FuturesLastPriceSnapshot,
   type CashWallet,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,10 +18,60 @@ import { assertAccountFinancialScopeIntegrity } from '../trading-accounts/tradin
 import { futuresError } from './futures-error';
 import { futuresDecimal as d, planFuturesExecution } from './futures-math';
 import { sumRisk } from './futures-risk';
-import { readFuturesFinalPrice, validFuturesFinalPrice } from './futures-price';
+import { validLegacySpotFinalPrice } from './futures-price';
+import {
+  FUTURES_FINAL_LAST_WINDOW_MS,
+  FUTURES_LAST_MAX_TRADE_AGE_MS,
+  readFuturesFinalLastPrice,
+  validFuturesFinalLastPrice,
+} from './futures-last-price';
 import { bankruptcySettlement, settleFuturesCash } from './futures-settlement';
+import type { InstrumentWithAsset } from './futures.presenter';
 
-type PinnedPrice = FuturesSeasonPrice & { snapshot: AssetPriceSnapshot };
+/** Exactly one evidence kind (SQL CHECK). Spot pins predate Futures Last. */
+type PinnedPrice = FuturesSeasonPrice & {
+  snapshot: AssetPriceSnapshot | null;
+  lastPriceSnapshot: FuturesLastPriceSnapshot | null;
+};
+const pinInclude = { snapshot: true, lastPriceSnapshot: true } as const;
+
+/** A pin is re-verified by its own evidence kind and reused unchanged. */
+function validSeasonPin(
+  pin: PinnedPrice,
+  instrument: InstrumentWithAsset,
+  endAt: Date,
+) {
+  if (pin.lastPriceSnapshot)
+    return (
+      !pin.snapshot &&
+      validFuturesFinalLastPrice(pin.lastPriceSnapshot, instrument, endAt)
+    );
+  return (
+    !!pin.snapshot &&
+    validLegacySpotFinalPrice(pin.snapshot, instrument.underlyingAsset, endAt)
+  );
+}
+
+/** Pinned final price and its time bounds; null for a malformed pin. */
+function pinnedFinalEvidence(pin: PinnedPrice, instrumentId: string) {
+  if (pin.lastPriceSnapshot && !pin.snapshot)
+    return pin.lastPriceSnapshot.instrumentId === instrumentId
+      ? {
+          price: pin.lastPriceSnapshot.price,
+          effectiveAt: pin.lastPriceSnapshot.effectiveAt,
+          capturedAt: pin.lastPriceSnapshot.capturedAt,
+          maxEffectiveAgeMs: FUTURES_LAST_MAX_TRADE_AGE_MS,
+        }
+      : null;
+  if (pin.snapshot && !pin.lastPriceSnapshot && pin.snapshot.assetId !== '')
+    return {
+      price: pin.snapshot.price,
+      effectiveAt: pin.snapshot.effectiveAt,
+      capturedAt: pin.snapshot.capturedAt,
+      maxEffectiveAgeMs: 10000,
+    };
+  return null;
+}
 
 /** No provider I/O. Season → Account → Participant → Futures wallet → sorted lifetimes.
  * Pin all instrument prices first, then commit bounded account transactions. A retry
@@ -110,7 +161,7 @@ export class FuturesSeasonSettlementService {
         });
         const pinned = await tx.futuresSeasonPrice.findMany({
           where: { seasonId },
-          include: { snapshot: true },
+          include: pinInclude,
         });
         const prices = new Map(pinned.map((p) => [p.instrumentId, p]));
         for (const instrument of instruments) {
@@ -119,11 +170,7 @@ export class FuturesSeasonSettlementService {
             if (
               +existing.endAt !== +season.endAt ||
               !existing.feeRate.eq(season.tradeFeeRate) ||
-              !validFuturesFinalPrice(
-                existing.snapshot,
-                instrument.underlyingAsset,
-                season.endAt,
-              )
+              !validSeasonPin(existing, instrument, season.endAt)
             )
               futuresError(
                 'FUTURES_FINAL_EVIDENCE_INTEGRITY',
@@ -131,26 +178,32 @@ export class FuturesSeasonSettlementService {
               );
             continue;
           }
-          // Same F1 canonical Spot source priority, effective/captured <= endAt,
-          // and the crypto execution 10-second eligibility, evaluated at endAt.
-          const snapshot = await readFuturesFinalPrice(
+          // Futures Last received within 10 seconds before endAt (never after),
+          // reporting a trade within 60 seconds. No Spot or Mark substitute.
+          const lastPriceSnapshot = await readFuturesFinalLastPrice(
             tx,
-            instrument.underlyingAsset,
+            instrument,
             season.endAt,
           );
           const data = {
             id: randomUUID(),
             seasonId,
             instrumentId: instrument.id,
-            assetPriceSnapshotId: snapshot.id,
+            lastPriceSnapshotId: lastPriceSnapshot.id,
             endAt: season.endAt,
             feeRate: season.tradeFeeRate,
           };
-          const price = dryRun
-            ? { ...data, createdAt: new Date(), snapshot }
+          const price: PinnedPrice = dryRun
+            ? {
+                ...data,
+                assetPriceSnapshotId: null,
+                createdAt: new Date(),
+                snapshot: null,
+                lastPriceSnapshot,
+              }
             : await tx.futuresSeasonPrice.create({
                 data,
-                include: { snapshot: true },
+                include: pinInclude,
               });
           prices.set(instrument.id, price);
         }
@@ -242,7 +295,7 @@ export class FuturesSeasonSettlementService {
                 (
                   await tx.futuresSeasonPrice.findMany({
                     where: { seasonId },
-                    include: { snapshot: true },
+                    include: pinInclude,
                   })
                 ).map((p) => [p.instrumentId, p]),
               );
@@ -250,11 +303,7 @@ export class FuturesSeasonSettlementService {
           const price = prices.get(position.instrumentId);
           if (
             !price ||
-            !validFuturesFinalPrice(
-              price.snapshot,
-              position.instrument.underlyingAsset,
-              season.endAt,
-            )
+            !validSeasonPin(price, position.instrument, season.endAt)
           )
             futuresError(
               'FUTURES_FINAL_PRICE_UNAVAILABLE',
@@ -312,7 +361,7 @@ export class FuturesSeasonSettlementService {
               direction: row.position.direction,
               marginMode: row.position.marginMode,
               quantity: row.position.quantity,
-              executionPrice: row.price.snapshot.price,
+              executionPrice: row.executionPrice,
               realizedPnl: row.close.realizedPnl,
               feeRate: season.tradeFeeRate,
               feeAmount: row.close.feeAmount,
@@ -374,15 +423,16 @@ export function planSeasonFuturesExit(
     );
   const rows = positions.map((position) => {
     const price = prices.get(position.instrumentId);
+    const evidence = price && pinnedFinalEvidence(price, position.instrumentId);
     if (
       !price ||
+      !evidence ||
       +price.endAt !== +endAt ||
       !price.feeRate.eq(feeRate) ||
-      price.snapshot.assetId === '' ||
-      price.snapshot.effectiveAt > endAt ||
-      price.snapshot.capturedAt > endAt ||
-      +endAt - +price.snapshot.effectiveAt > 10000 ||
-      +endAt - +price.snapshot.capturedAt > 10000
+      evidence.effectiveAt > evidence.capturedAt ||
+      evidence.capturedAt > endAt ||
+      +endAt - +evidence.capturedAt > FUTURES_FINAL_LAST_WINDOW_MS ||
+      +endAt - +evidence.effectiveAt > evidence.maxEffectiveAgeMs
     )
       futuresError(
         'FUTURES_FINAL_PRICE_UNAVAILABLE',
@@ -391,6 +441,7 @@ export function planSeasonFuturesExit(
     return {
       position,
       price,
+      executionPrice: evidence.price,
       close: planFuturesExecution(
         {
           instrumentId: position.instrumentId,
@@ -403,7 +454,7 @@ export function planSeasonFuturesExit(
           idempotencyKey: 'season-final',
         },
         position,
-        price.snapshot.price,
+        evidence.price,
         feeRate,
         'season_final',
       ),

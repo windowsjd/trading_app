@@ -96,6 +96,7 @@ export const ModelName = {
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
+  FuturesLastPriceSnapshot: 'FuturesLastPriceSnapshot',
   FuturesMarkSnapshot: 'FuturesMarkSnapshot',
   FuturesLiquidation: 'FuturesLiquidation',
   FuturesLiquidationClose: 'FuturesLiquidationClose',
@@ -497,6 +498,7 @@ export const FuturesExecutionScalarFieldEnum = {
   leverage: 'leverage',
   executionPrice: 'executionPrice',
   assetPriceSnapshotId: 'assetPriceSnapshotId',
+  lastPriceSnapshotId: 'lastPriceSnapshotId',
   priceSourceType: 'priceSourceType',
   priceSourceName: 'priceSourceName',
   priceEffectiveAt: 'priceEffectiveAt',
@@ -595,6 +597,7 @@ export const ProtectionChildScalarFieldEnum = {
   orderId: 'orderId',
   futuresExecutionId: 'futuresExecutionId',
   assetPriceSnapshotId: 'assetPriceSnapshotId',
+  futuresLastPriceSnapshotId: 'futuresLastPriceSnapshotId',
   triggerEvidenceJson: 'triggerEvidenceJson',
   triggeredAt: 'triggeredAt',
   endedAt: 'endedAt',
@@ -1036,6 +1039,21 @@ export const LimitOrderCandleEvidenceScalarFieldEnum = {
 export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
 
 
+export const FuturesLastPriceSnapshotScalarFieldEnum = {
+  id: 'id',
+  instrumentId: 'instrumentId',
+  symbol: 'symbol',
+  providerProduct: 'providerProduct',
+  currencyCode: 'currencyCode',
+  source: 'source',
+  price: 'price',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt'
+} as const
+
+export type FuturesLastPriceSnapshotScalarFieldEnum = (typeof FuturesLastPriceSnapshotScalarFieldEnum)[keyof typeof FuturesLastPriceSnapshotScalarFieldEnum]
+
+
 export const FuturesMarkSnapshotScalarFieldEnum = {
   id: 'id',
   instrumentId: 'instrumentId',
@@ -1100,6 +1118,7 @@ export const FuturesSeasonPriceScalarFieldEnum = {
   seasonId: 'seasonId',
   instrumentId: 'instrumentId',
   assetPriceSnapshotId: 'assetPriceSnapshotId',
+  lastPriceSnapshotId: 'lastPriceSnapshotId',
   endAt: 'endAt',
   feeRate: 'feeRate',
   createdAt: 'createdAt'

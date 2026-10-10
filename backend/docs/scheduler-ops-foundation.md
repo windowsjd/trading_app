@@ -14,6 +14,18 @@ cutoff and failures are persisted in Ops history. This job never changes financi
 settlement or trading mode. Configuration and audit details are in
 [F3.1](futures-f31-contract.md).
 
+## Futures Last Price ingestion and retention (2026-10-10)
+
+`FuturesLastPriceIngestion` is a dedicated 1-second service, separate from Mark:
+its own `@aggTrade` socket, a batched insert of at most one newest trade per
+symbol per second and an in-flight-limited REST re-confirmation (`/fapi/v2/ticker/price`,
+weight 2) for symbols without an observation in 3 seconds. It is not an Ops job
+and holds no lock; duplicate instances only add observations.
+`futures_last_price_retention` mirrors Mark retention (dedicated 60-second
+interval, OpsJobLock/OpsJobRun, disabled in the generic scheduler map). It keeps
+execution/pin/trigger references, every Season `[endAt-10s, endAt]` window and the
+latest row per instrument/source. See the [Futures Last contract](futures-last-price-contract.md).
+
 ## Futures F3 integration
 
 The existing jobs/OpsJobLock remain authoritative. F3 adds no scheduler or queue.
@@ -22,7 +34,7 @@ each capture still requires eligible 5-second evidence. A generation that takes
 longer than this window can fail closed and needs a later retry; it cannot extend
 freshness to make a large batch succeed. Monitor these failures and batch duration.
 
-Season final settlement pins all required canonical Spot end-boundary evidence,
+Season final settlement pins all required Futures Last end-boundary evidence,
 then closes accounts in bounded idempotent transactions before existing final
 snapshot/ranking/tier/account-close/settled writes. Existing limit/reservation cleanup
 must complete first. F2 liquidation skips ended/settled Seasons and uses the same

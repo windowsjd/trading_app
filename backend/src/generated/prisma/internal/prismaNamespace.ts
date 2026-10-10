@@ -429,6 +429,7 @@ export const ModelName = {
   OpsJobRun: 'OpsJobRun',
   OpsJobLock: 'OpsJobLock',
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
+  FuturesLastPriceSnapshot: 'FuturesLastPriceSnapshot',
   FuturesMarkSnapshot: 'FuturesMarkSnapshot',
   FuturesLiquidation: 'FuturesLiquidation',
   FuturesLiquidationClose: 'FuturesLiquidationClose',
@@ -450,7 +451,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3784,6 +3785,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    FuturesLastPriceSnapshot: {
+      payload: Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs>
+      fields: Prisma.FuturesLastPriceSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesLastPriceSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesLastPriceSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesLastPriceSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesLastPriceSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesLastPriceSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesLastPriceSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesLastPriceSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesLastPriceSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesLastPriceSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>
+        }
+        update: {
+          args: Prisma.FuturesLastPriceSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesLastPriceSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesLastPriceSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesLastPriceSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesLastPriceSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesLastPriceSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesLastPriceSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesLastPriceSnapshot>
+        }
+        groupBy: {
+          args: Prisma.FuturesLastPriceSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLastPriceSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesLastPriceSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesLastPriceSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
     FuturesMarkSnapshot: {
       payload: Prisma.$FuturesMarkSnapshotPayload<ExtArgs>
       fields: Prisma.FuturesMarkSnapshotFieldRefs
@@ -4644,6 +4719,7 @@ export const FuturesExecutionScalarFieldEnum = {
   leverage: 'leverage',
   executionPrice: 'executionPrice',
   assetPriceSnapshotId: 'assetPriceSnapshotId',
+  lastPriceSnapshotId: 'lastPriceSnapshotId',
   priceSourceType: 'priceSourceType',
   priceSourceName: 'priceSourceName',
   priceEffectiveAt: 'priceEffectiveAt',
@@ -4742,6 +4818,7 @@ export const ProtectionChildScalarFieldEnum = {
   orderId: 'orderId',
   futuresExecutionId: 'futuresExecutionId',
   assetPriceSnapshotId: 'assetPriceSnapshotId',
+  futuresLastPriceSnapshotId: 'futuresLastPriceSnapshotId',
   triggerEvidenceJson: 'triggerEvidenceJson',
   triggeredAt: 'triggeredAt',
   endedAt: 'endedAt',
@@ -5183,6 +5260,21 @@ export const LimitOrderCandleEvidenceScalarFieldEnum = {
 export type LimitOrderCandleEvidenceScalarFieldEnum = (typeof LimitOrderCandleEvidenceScalarFieldEnum)[keyof typeof LimitOrderCandleEvidenceScalarFieldEnum]
 
 
+export const FuturesLastPriceSnapshotScalarFieldEnum = {
+  id: 'id',
+  instrumentId: 'instrumentId',
+  symbol: 'symbol',
+  providerProduct: 'providerProduct',
+  currencyCode: 'currencyCode',
+  source: 'source',
+  price: 'price',
+  effectiveAt: 'effectiveAt',
+  capturedAt: 'capturedAt'
+} as const
+
+export type FuturesLastPriceSnapshotScalarFieldEnum = (typeof FuturesLastPriceSnapshotScalarFieldEnum)[keyof typeof FuturesLastPriceSnapshotScalarFieldEnum]
+
+
 export const FuturesMarkSnapshotScalarFieldEnum = {
   id: 'id',
   instrumentId: 'instrumentId',
@@ -5247,6 +5339,7 @@ export const FuturesSeasonPriceScalarFieldEnum = {
   seasonId: 'seasonId',
   instrumentId: 'instrumentId',
   assetPriceSnapshotId: 'assetPriceSnapshotId',
+  lastPriceSnapshotId: 'lastPriceSnapshotId',
   endAt: 'endAt',
   feeRate: 'feeRate',
   createdAt: 'createdAt'
@@ -6071,6 +6164,20 @@ export type ListEnumOpsJobTriggerFieldRefInput<$PrismaModel> = FieldRefInputType
 
 
 /**
+ * Reference to a field of type 'FuturesLastPriceSource'
+ */
+export type EnumFuturesLastPriceSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesLastPriceSource'>
+    
+
+
+/**
+ * Reference to a field of type 'FuturesLastPriceSource[]'
+ */
+export type ListEnumFuturesLastPriceSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesLastPriceSource[]'>
+    
+
+
+/**
  * Reference to a field of type 'FuturesMarkSource'
  */
 export type EnumFuturesMarkSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FuturesMarkSource'>
@@ -6237,6 +6344,7 @@ export type GlobalOmitConfig = {
   opsJobRun?: Prisma.OpsJobRunOmit
   opsJobLock?: Prisma.OpsJobLockOmit
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceOmit
+  futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotOmit
   futuresMarkSnapshot?: Prisma.FuturesMarkSnapshotOmit
   futuresLiquidation?: Prisma.FuturesLiquidationOmit
   futuresLiquidationClose?: Prisma.FuturesLiquidationCloseOmit

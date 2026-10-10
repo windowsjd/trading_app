@@ -7,6 +7,7 @@ import { readGeneralFxFeeRate } from '../fx/general-fx.config';
 import { readProfileImageStorageConfig } from '../auth/profile-image.config';
 import { validateFuturesConfig } from '../futures/futures.config';
 import { futuresMarkRetentionConfig } from '../futures/futures-mark-retention.config';
+import { futuresLastPriceRetentionConfig } from '../futures/futures-last-price-retention.config';
 import { conditionalEnabled } from '../conditional/conditional.config';
 
 /**
@@ -47,6 +48,7 @@ export function validateEnv(
   collect(errors, () => readGeneralTradeFeeRate(env));
   collect(errors, () => validateFuturesConfig(env));
   collect(errors, () => futuresMarkRetentionConfig(env));
+  collect(errors, () => futuresLastPriceRetentionConfig(env));
   collect(errors, () => conditionalEnabled(env));
   collect(errors, () => readGeneralFxFeeRate(env));
   collect(errors, () => readProfileImageStorageConfig(config));

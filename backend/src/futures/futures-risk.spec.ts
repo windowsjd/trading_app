@@ -194,9 +194,40 @@ describe('Operational modes, startup safety and F1 replay compatibility', () => 
         FUTURES_MARK_INGESTION_ENABLED: 'true',
       }),
     ).not.toThrow();
+    // Exits are priced from Futures Last: REDUCE_ONLY without it cannot exit.
     expect(() =>
       validateFuturesConfig({ FUTURES_TRADING_MODE: 'REDUCE_ONLY' }),
+    ).toThrow('FUTURES_LAST_PRICE_INGESTION_ENABLED');
+    for (const flags of [
+      { FUTURES_LAST_PRICE_INGESTION_ENABLED: 'true' },
+      { FUTURES_MARK_INGESTION_ENABLED: 'true' },
+    ])
+      expect(() =>
+        validateFuturesConfig({
+          FUTURES_TRADING_MODE: 'REDUCE_ONLY',
+          ...flags,
+        }),
+      ).not.toThrow();
+    expect(() =>
+      validateFuturesConfig({
+        FUTURES_TRADING_MODE: 'ENABLED',
+        FUTURES_RISK_ENGINE_ENABLED: 'true',
+        FUTURES_MARK_INGESTION_ENABLED: 'true',
+        FUTURES_LAST_PRICE_INGESTION_ENABLED: 'false',
+      }),
+    ).toThrow('FUTURES_LAST_PRICE_INGESTION_ENABLED');
+    expect(() =>
+      validateFuturesConfig({
+        FUTURES_TRADING_MODE: 'DISABLED',
+        FUTURES_LAST_PRICE_INGESTION_ENABLED: 'false',
+      }),
     ).not.toThrow();
+    expect(() =>
+      validateFuturesConfig({
+        FUTURES_TRADING_MODE: 'DISABLED',
+        FUTURES_LAST_PRICE_INGESTION_ENABLED: 'yes please',
+      }),
+    ).toThrow();
     expect(() =>
       validateFuturesConfig({ FUTURES_TRADING_MODE: 'unknown' }),
     ).toThrow();

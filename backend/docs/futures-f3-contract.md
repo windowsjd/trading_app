@@ -80,14 +80,16 @@ writers request participant FOR NO KEY UPDATE from the start, avoiding lock upgr
    Season lock recheck the barrier and write final snapshot/ranking/tier/account
    closure/settled. The existing no-eligible-participants error remains unchanged.
 
-Final exit uses canonical Binance **Spot last trade**, the product's normal synthetic
-execution semantics. Liquidation continues using Mark. Selection uses F1 WS-before-
-REST priority and the latest eligible row per source. Both effectiveAt and capturedAt
-must be <= Season.endAt and >= endAt−10s; effectiveAt cannot exceed capturedAt.
-A post-end observation cannot hide a qualifying earlier row. The job's run time
+Final exit uses Binance USDⓈ-M **Futures Last** (2026-10-10; [contract](futures-last-price-contract.md)),
+the product's normal execution price. Liquidation continues using Mark. Selection
+takes the newest trade received at or before endAt; it must be received within
+`[endAt−10s, endAt]` and report a trade within 60s of endAt; effectiveAt cannot
+exceed capturedAt. A post-end observation cannot hide or replace it. A Season
+pinned with Spot evidence before the switch keeps and re-verifies that pin. The job's run time
 never sets the economic price. Missing evidence fails closed with
-`FUTURES_FINAL_PRICE_UNAVAILABLE`; no price generation, Mark substitution or deletion
-of open positions occurs. Failed jobs leave ended/partial durable progress and
+`FUTURES_FINAL_PRICE_UNAVAILABLE`; no price generation, Spot or Mark substitution or
+deletion of open positions occurs. Futures Last retention never deletes rows
+received in any Season's end window. Failed jobs leave ended/partial durable progress and
 retry using the already pinned terms, even if a later backfill arrives.
 
 Dry-run reads the same policy and projects each wallet's final balance without
@@ -174,8 +176,8 @@ Before a separately authorized production enable:
 
 1. Complete code review and the existing backend/frontend/financial/core gates,
    PG16/17 migration chain/status/drift and Season final-exit dry-run/integration.
-2. Review the intended exact catalog, ingestion lag, fresh DB Mark/Spot coverage
-   and endAt evidence retention. A missing historical end price cannot be repaired
+2. Review the intended exact catalog, ingestion lag, fresh DB Mark/Futures Last
+   coverage (`pnpm futures:price-readiness`) and endAt evidence retention. A missing historical end price cannot be repaired
    with a new live price. Preserve evidence referenced by final pins.
 3. Run Mark ingestion and the independent risk engine, inspect Ops failures and
    measure the intended workload with performance recording enabled. F2.1's prior
@@ -191,8 +193,8 @@ Before a separately authorized production enable:
    Futures or final-exit evidence exists. Fix/roll forward compatible code instead.
 
 F3 itself introduced no conditional orders. The subsequent
-[Conditional v1](conditional-orders-contract.md) adds SL/TP/OCO exits using Spot
-reference evidence. No microservice, bus, queue, new margin wallet, clearing
+[Conditional v1](conditional-orders-contract.md) adds SL/TP/OCO exits, triggered
+on Futures Last evidence since 2026-10-10. No microservice, bus, queue, new margin wallet, clearing
 system, Futures partial fill, funding, hedge mode,
 brackets, partial liquidation, ADL, insurance or real Binance account/order APIs.
 The subsequent [Limit Entry v1](futures-limit-entry-contract.md) adds pending

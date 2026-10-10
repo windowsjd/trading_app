@@ -225,7 +225,7 @@ export function BoundProtectionPanel({
       {expanded ? <>
       <Text style={styles.hint}>
         {domain === "futures"
-          ? "현재가 / Spot 거래 기준으로 조건을 확인합니다. Mark 청산과는 별개입니다."
+          ? "현재가 / 선물 Last 거래 기준으로 조건을 확인합니다. Mark 청산과는 별개입니다."
           : "해당 계정의 남은 보유 수량 전체를 보호합니다."}
       </Text>
       {active && !canCreate ? (

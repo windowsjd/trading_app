@@ -420,6 +420,22 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
     expect(fetch).toHaveBeenCalledTimes(7);
   });
 
+  it('reserves Futures Last re-confirmation at its documented weight (2 all, 1 single)', async () => {
+    process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = '20';
+    const fetch = jest
+      .spyOn(global, 'fetch')
+      .mockImplementation(() => Promise.resolve(success()));
+    const client = new ProviderHttpClient(redis);
+    const all = 'https://fixture.invalid/fapi/v2/ticker/price';
+    for (let i = 0; i < 9; i++) await client.getJson(all, options);
+    await client.getJson(`${all}?symbol=BTCUSDT`, options);
+    await client.getJson(`${all}?symbol=ETHUSDT`, options);
+    await expect(client.getJson(all, options)).rejects.toMatchObject({
+      code: 'PROVIDER_RATE_LIMITED',
+    });
+    expect(fetch).toHaveBeenCalledTimes(11);
+  });
+
   it('keeps non-Binance requests independent of an active ban', async () => {
     const fetch = jest
       .spyOn(global, 'fetch')

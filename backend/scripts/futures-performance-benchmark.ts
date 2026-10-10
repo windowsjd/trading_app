@@ -49,18 +49,20 @@ function summary(values: number[]) {
     +(sorted[Math.max(0, Math.ceil(sorted.length * p) - 1)] ?? 0).toFixed(2);
   return { samples: sorted.length, p50: at(0.5), p95: at(0.95), max: at(1) };
 }
-async function refresh(spot: string) {
+async function refresh(last: string) {
+  // Futures Last observations for every instrument (over-approximates the 1/s
+  // ingestion write rate; each insert also runs the identity guard trigger).
   await feed.query(
-    `INSERT INTO asset_price_snapshots (id,asset_id,currency_code,price,source_type,source_name,effective_at,captured_at)
-    SELECT gen_random_uuid()::text,id,'USD',$1::numeric,'provider_api','binance_spot_ws_ticker',t.at,t.at FROM assets CROSS JOIN (SELECT date_trunc('milliseconds',clock_timestamp()) at) t`,
-    [spot],
+    `INSERT INTO futures_last_price_snapshots (id,instrument_id,symbol,price,source,effective_at,captured_at)
+    SELECT gen_random_uuid()::text,i.id,a.symbol,$1::numeric,'binance_usdm_agg_trade_ws',t.at,t.at FROM futures_instruments i JOIN assets a ON a.id=i.underlying_asset_id CROSS JOIN (SELECT date_trunc('milliseconds',clock_timestamp()) at) t ON CONFLICT DO NOTHING`,
+    [last],
   );
-  const spotCommittedAt = performance.now();
+  const lastCommittedAt = performance.now();
   await feed.query(`INSERT INTO futures_mark_snapshots (id,instrument_id,symbol,price,source,effective_at,captured_at)
     SELECT gen_random_uuid()::text,i.id,a.symbol,100,'binance_usdm_mark_ws',t.at,t.at FROM futures_instruments i JOIN assets a ON a.id=i.underlying_asset_id CROSS JOIN (SELECT date_trunc('milliseconds',clock_timestamp()) at) t ON CONFLICT DO NOTHING`);
   await feed.query(`INSERT INTO fx_rate_snapshots (id,base_currency,quote_currency,rate,source_type,source_name,effective_at,captured_at)
     VALUES (gen_random_uuid()::text,'USD','KRW',1400,'provider_api','korea_exim_exchange_rate',clock_timestamp(),clock_timestamp())`);
-  return spotCommittedAt;
+  return lastCommittedAt;
 }
 async function upkeep(spot: string) {
   let stop = false,
@@ -143,7 +145,7 @@ async function upkeep(spot: string) {
     );
     const application = statements.rows.filter(
       (row) =>
-        !/benchmark contention|pg_stat_|^INSERT INTO (?:asset_price_snapshots|futures_mark_snapshots|fx_rate_snapshots)|^SELECT pid,state/iu.test(
+        !/benchmark contention|pg_stat_|^INSERT INTO (?:futures_last_price_snapshots|futures_mark_snapshots|fx_rate_snapshots)|^SELECT pid,state/iu.test(
           row.query,
         ),
     );
@@ -245,7 +247,7 @@ async function matching(count: number, fraction: number, label: string) {
     await seedFeed;
   }
   await feed.query('ANALYZE');
-  const origin = await refresh('100'); // first eligible Spot commit; no UI polling
+  const origin = await refresh('100'); // first eligible Futures Last commit; no UI polling
   const stop = await begin('100');
   let contentionRelease = Promise.resolve();
   let contentionInjections = 0;

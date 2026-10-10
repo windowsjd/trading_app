@@ -7,7 +7,9 @@ import {
   app,
   fixture,
   now,
-  price,
+  price as lastPrice,
+  spotPrice,
+  untilDb,
   fxEvidence,
   fxEvidenceIds,
   openBody,
@@ -15,6 +17,10 @@ import {
   cleanup,
   type Scenario,
 } from './futures-integration';
+import {
+  FUTURES_LAST_MAX_CAPTURE_AGE_MS,
+  readFuturesLastPrice,
+} from '../src/futures/futures-last-price';
 import { Prisma } from '../src/generated/prisma/client';
 import { ConditionalService } from '../src/conditional/conditional.service';
 import { TradingAccountAccessService } from '../src/trading-accounts/trading-account-access.service';
@@ -117,6 +123,12 @@ async function mark(s: Scenario, value = '100') {
       capturedAt: at,
     },
   });
+}
+/** One market move for both products: each domain reads only its own
+ * evidence (Spot snapshot for Spot, Futures Last for Futures). Returns Spot. */
+async function price(s: Scenario, value = '100', index = 0, ageMs = 1000) {
+  await lastPrice(s, value, index, ageMs);
+  return spotPrice(s, value, index, ageMs);
 }
 async function fresh(s: Scenario, value = '100') {
   await fxEvidence();
@@ -292,6 +304,33 @@ async function matrix() {
                   .length,
                 1,
               );
+              // Trigger evidence belongs to the protected product's own domain.
+              const filled = (await group(id)).children.find(
+                (c) => c.status === 'filled',
+              )!;
+              const basis = (
+                filled.triggerEvidenceJson as { priceBasis?: string }
+              ).priceBasis;
+              assert.equal(
+                basis,
+                domain === 'futures' ? 'futures_last' : 'spot',
+              );
+              assert.equal(
+                filled.futuresLastPriceSnapshotId !== null,
+                domain === 'futures',
+              );
+              assert.equal(
+                filled.assetPriceSnapshotId !== null,
+                domain === 'spot',
+              );
+              if (domain === 'futures')
+                assert.ok(
+                  (
+                    await db.futuresExecution.findUniqueOrThrow({
+                      where: { id: filled.futuresExecutionId! },
+                    })
+                  ).lastPriceSnapshotId,
+                );
               await conditional.evaluate(id);
               if (s.season)
                 assert.equal(
@@ -410,7 +449,14 @@ async function oco() {
 async function sourceAndModes() {
   const s = await fixture('season');
   try {
-    await fresh(s);
+    await fxEvidence();
+    await mark(s);
+    // The opening trade is received 8.5s old, so plain elapsed time makes the
+    // newest (immutable, execution-referenced) trade stale below.
+    await db.futuresLastPriceSnapshot.deleteMany({
+      where: { instrumentId: s.instruments[0].instrument.id },
+    });
+    const opening = await lastPrice(s, '100', 0, 8500);
     const opened = await app.futures.execute(
       s.userId,
       s.accountId,
@@ -425,25 +471,23 @@ async function sourceAndModes() {
     };
     const created = await conditional.create(s.userId, s.accountId, body);
     const id = (created as { data: { groupId: string } }).data.groupId;
+    // Mark and Spot below the stop never trigger a Futures exit.
     await mark(s, '90');
+    await spotPrice(s, '90', 0, 0);
     await conditional.evaluate(id);
     assert.equal((await group(id)).children.length, 0);
-    await db.assetPriceSnapshot.updateMany({
-      where: { assetId: s.instruments[0].asset.id },
-      data: {
-        effectiveAt: new Date(+(await now()) - 20000),
-        capturedAt: new Date(+(await now()) - 20000),
-      },
-    });
+    await untilDb(+opening.capturedAt + FUTURES_LAST_MAX_CAPTURE_AGE_MS + 1);
+    await spotPrice(s, '90', 0, 0);
+    await mark(s, '90');
     assert.equal((await conditional.evaluate(id)).state, 'price_unavailable');
-    await db.assetPriceSnapshot.deleteMany({
+    await db.futuresLastPriceSnapshot.deleteMany({
       where: {
-        assetId: s.instruments[0].asset.id,
-        futuresExecutions: { none: {} },
-        quotes: { none: {} },
+        instrumentId: s.instruments[0].instrument.id,
+        executions: { none: {} },
       },
     });
     assert.equal((await conditional.evaluate(id)).state, 'price_unavailable');
+    assert.equal((await group(id)).children.length, 0);
     process.env.FUTURES_TRADING_MODE = 'DISABLED';
     assert.deepEqual(
       await conditional.create(s.userId, s.accountId, body),
@@ -456,7 +500,7 @@ async function sourceAndModes() {
     await conditional.evaluate(id);
     assert.equal((await group(id)).status, 'completed');
     pass(
-      'Spot-only trigger source; stale/missing defer; disabled pauses; reduce-only exits; command replay',
+      'Futures Last-only trigger source (Spot/Mark ignored); stale/missing defer; disabled pauses; reduce-only exits; command replay',
     );
   } finally {
     process.env.FUTURES_TRADING_MODE = 'ENABLED';
@@ -1106,7 +1150,12 @@ async function invalidEvidence() {
   for (const mode of ['general', 'season'] as const) {
     const s = await fixture(mode);
     try {
-      await fresh(s);
+      await fxEvidence();
+      await mark(s);
+      await db.futuresLastPriceSnapshot.deleteMany({
+        where: { instrumentId: s.instruments[0].instrument.id },
+      });
+      const opening = await lastPrice(s, '100', 0, 8500);
       const p = (
         await app.futures.execute(
           s.userId,
@@ -1117,37 +1166,50 @@ async function invalidEvidence() {
       const id = await protect(s, 'futures', p.id, [
         leg('stop_loss', 'market'),
       ]);
-      await db.assetPriceSnapshot.updateMany({
-        where: { assetId: s.instruments[0].asset.id },
-        data: { capturedAt: new Date((await now()).getTime() - 11000) },
+      await untilDb(+opening.capturedAt + FUTURES_LAST_MAX_CAPTURE_AGE_MS + 1);
+      const instrument = await db.futuresInstrument.findUniqueOrThrow({
+        where: { id: s.instruments[0].instrument.id },
+        include: { underlyingAsset: true },
       });
-      for (const bad of ['future', 'source', 'currency', 'asset'] as const) {
+      // DB guards reject wrong currency/symbol/product rows outright; every
+      // remaining wrong kind of fresh evidence must not trigger either.
+      for (const bad of ['future', 'instrument', 'spot', 'mark'] as const) {
         const at = await now();
-        const row = await db.assetPriceSnapshot.create({
-          data: {
-            assetId:
-              bad === 'asset'
-                ? s.instruments[1].asset.id
-                : s.instruments[0].asset.id,
-            price: '90',
-            currencyCode: bad === 'currency' ? 'KRW' : 'USD',
-            sourceType: 'provider_api',
-            sourceName:
-              bad === 'source'
-                ? 'binance_usdm_mark_ws'
-                : 'binance_spot_ws_ticker',
-            capturedAt: bad === 'future' ? new Date(at.getTime() + 10000) : at,
-            effectiveAt: at,
-          },
-        });
+        const cleanupRow =
+          bad === 'future'
+            ? await db.futuresLastPriceSnapshot.create({
+                data: {
+                  instrumentId: s.instruments[0].instrument.id,
+                  symbol: s.instruments[0].asset.symbol,
+                  price: '90',
+                  source: 'binance_usdm_agg_trade_ws',
+                  effectiveAt: at,
+                  capturedAt: new Date(at.getTime() + 10000),
+                },
+              })
+            : bad === 'instrument'
+              ? await lastPrice(s, '90', 1, 0)
+              : bad === 'spot'
+                ? await spotPrice(s, '90', 0, 0)
+                : await mark(s, '90');
         assert.equal(
           (await conditional.evaluate(id)).state,
           'price_unavailable',
         );
         assert.equal((await group(id)).children.length, 0);
-        await db.assetPriceSnapshot.delete({ where: { id: row.id } });
+        assert.equal(
+          (await readFuturesLastPrice(db, instrument, await now(), false)) ===
+            null,
+          true,
+        );
+        if (bad === 'future' || bad === 'instrument')
+          await db.futuresLastPriceSnapshot.delete({
+            where: { id: cleanupRow.id },
+          });
       }
-      pass(`${mode}: future/wrong source/currency/asset never trigger Futures`);
+      pass(
+        `${mode}: future receipt, other instrument, Spot and Mark never trigger Futures`,
+      );
     } finally {
       await release(s);
     }
@@ -1593,9 +1655,108 @@ async function inactiveAccountCleanup() {
   }
 }
 
+/** One underlying protected in both products: each group triggers only on its
+ * own domain's price, and the DB keeps trigger evidence in its domain. */
+async function domainIsolation() {
+  const s = await fixture('general');
+  try {
+    await fresh(s);
+    const spot = await createSpot(s);
+    const futures = (
+      await app.futures.execute(
+        s.userId,
+        s.accountId,
+        openBody(s, { leverage: 1 }),
+      )
+    ).data.position;
+    const spotGroup = await protect(s, 'spot', spot.id, [
+      leg('stop_loss', 'market'),
+    ]);
+    const futuresGroup = await protect(s, 'futures', futures.id, [
+      leg('stop_loss', 'market'),
+    ]);
+    // Spot breaks the stop; Futures Last and Mark stay put / move separately.
+    await spotPrice(s, '98', 0, 0);
+    await lastPrice(s, '100', 0, 0);
+    await mark(s, '98');
+    await conditional.evaluate(futuresGroup);
+    assert.equal((await group(futuresGroup)).children.length, 0);
+    await conditional.evaluate(spotGroup);
+    const spotChild = (await group(spotGroup)).children[0];
+    assert.ok(spotChild.assetPriceSnapshotId);
+    assert.equal(spotChild.futuresLastPriceSnapshotId, null);
+    // Futures Last breaks the stop while Spot recovers.
+    await spotPrice(s, '100', 0, 0);
+    await lastPrice(s, '98', 0, 0);
+    await mark(s, '100');
+    await conditional.evaluate(futuresGroup);
+    const futuresChild = (await group(futuresGroup)).children[0];
+    assert.ok(futuresChild.futuresLastPriceSnapshotId);
+    assert.equal(futuresChild.assetPriceSnapshotId, null);
+    const evidence = futuresChild.triggerEvidenceJson as Record<string, string>;
+    assert.equal(evidence.priceBasis, 'futures_last');
+    assert.equal(evidence.price, '98.00000000');
+    assert.equal(evidence.instrumentId, s.instruments[0].instrument.id);
+    assert.equal(evidence.sourceName, 'binance_usdm_agg_trade_ws');
+    assert.equal((await group(futuresGroup)).status, 'completed');
+    const closed = await db.futuresExecution.findUniqueOrThrow({
+      where: { id: futuresChild.futuresExecutionId! },
+    });
+    assert.equal(closed.executionPrice.toFixed(8), '98.00000000');
+    // Direct writes cannot cross domains or underlyings.
+    const spotLeg = await db.protectionLeg.findFirstOrThrow({
+      where: { groupId: spotGroup },
+    });
+    const futuresLeg = await db.protectionLeg.findFirstOrThrow({
+      where: { groupId: futuresGroup },
+    });
+    const ownLast = futuresChild.futuresLastPriceSnapshotId!;
+    const otherLast = (await lastPrice(s, '98', 1, 0)).id;
+    const anySpot = spotChild.assetPriceSnapshotId!;
+    for (const data of [
+      {
+        groupId: spotGroup,
+        legId: spotLeg.id,
+        futuresLastPriceSnapshotId: ownLast,
+      },
+      {
+        groupId: futuresGroup,
+        legId: futuresLeg.id,
+        futuresLastPriceSnapshotId: otherLast,
+      },
+      {
+        groupId: futuresGroup,
+        legId: futuresLeg.id,
+        futuresLastPriceSnapshotId: ownLast,
+        assetPriceSnapshotId: anySpot,
+      },
+      { groupId: futuresGroup, legId: futuresLeg.id },
+    ]) {
+      await assert.rejects(
+        db.protectionChild.create({
+          data: {
+            quantity: '1',
+            status: 'canceled',
+            triggerEvidenceJson: {},
+            triggeredAt: await now(),
+            ...data,
+          },
+        }),
+      );
+      checks++;
+    }
+    pass(
+      'same underlying: Spot SL fires on Spot only, Futures SL on Futures Last only; DB keeps evidence in its domain',
+    );
+  } finally {
+    await release(s);
+  }
+}
+
 async function main() {
   await db.$connect();
   try {
+    await domainIsolation();
     await matrix();
     await oco();
     await sourceAndModes();

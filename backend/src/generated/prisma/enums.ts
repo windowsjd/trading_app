@@ -353,7 +353,8 @@ export const OpsJobName = {
   futures_liquidation: 'futures_liquidation',
   futures_mark_retention: 'futures_mark_retention',
   conditional_orders: 'conditional_orders',
-  futures_limit_matching: 'futures_limit_matching'
+  futures_limit_matching: 'futures_limit_matching',
+  futures_last_price_retention: 'futures_last_price_retention'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -467,3 +468,11 @@ export const FuturesMarkSource = {
 } as const
 
 export type FuturesMarkSource = (typeof FuturesMarkSource)[keyof typeof FuturesMarkSource]
+
+
+export const FuturesLastPriceSource = {
+  binance_usdm_agg_trade_ws: 'binance_usdm_agg_trade_ws',
+  binance_usdm_ticker_price_rest: 'binance_usdm_ticker_price_rest'
+} as const
+
+export type FuturesLastPriceSource = (typeof FuturesLastPriceSource)[keyof typeof FuturesLastPriceSource]

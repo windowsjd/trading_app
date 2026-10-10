@@ -184,6 +184,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.futures_mark_retention]: false, // Dedicated bounded retention worker.
       [OpsJobName.conditional_orders]: false, // Dedicated bounded conditional worker.
       [OpsJobName.futures_limit_matching]: false, // Dedicated bounded Futures entry worker.
+      [OpsJobName.futures_last_price_retention]: false, // Dedicated bounded retention worker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

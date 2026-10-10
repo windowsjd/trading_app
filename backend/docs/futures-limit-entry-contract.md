@@ -21,8 +21,9 @@ opening fee at the limit in the Futures USD wallet. Balance does not change.
 Reservations protect transfers and other openings; pending entries contribute
 no Position, UPNL, maintenance, ledger event or fill count.
 
-The bounded PostgreSQL/Ops matcher uses fresh canonical Binance Spot evidence:
-Long fills at Spot <= limit, Short at Spot >= limit. The financial transaction
+The bounded PostgreSQL/Ops matcher uses fresh Binance USDⓈ-M **Futures Last**
+evidence ([contract](futures-last-price-contract.md), 2026-10-10): Long fills at
+Last <= limit, Short at Last >= limit. The financial transaction
 rechecks evidence and lifecycle, releases only its own reservation, and runs
 the existing Futures execution plan, settlement, history and user fill count.
 Fresh Mark remains a risk-readiness requirement, never trigger/execution price.
@@ -70,17 +71,18 @@ SL/TP guidance. Backend validation remains authoritative.
 The worker polls every second, at most 200 entries per cycle with an indexed
 cursor and the existing 30-second Ops lease. The lease limits duplicate work;
 the PostgreSQL financial fence determines the single winner even after lease
-loss or duplicate execution. A read-only canonical Spot preview skips only
+loss or duplicate execution. A read-only Futures Last preview skips only
 negative price predicates on currently tradable accounts. Every candidate retains
 the original lifecycle cleanup transaction and the complete financial execution
 transaction; preview evidence never authorizes a fill. Stale/missing evidence
-remains fail-closed. Pre-creation Spot evidence is ineligible for a fill.
+remains fail-closed. Pre-creation evidence is ineligible for a fill; Spot and
+Mark are never fill evidence.
 Database time, current operating mode and account lifecycle are rechecked after
 the wallet lock. Maintenance, fees, PnL, loss allocation and rounding stay in the
 existing Futures primitives.
 
-Before production enablement: deploy the additive migration, verify canonical
-Spot and Mark coverage/freshness, current collateral integrity, worker lease and
+Before production enablement: deploy the additive migration, verify Futures
+Last and Mark coverage/freshness, current collateral integrity, worker lease and
 backlog, Conditional capabilities, Season cleanup and all financial/release
 gates. Default DISABLED is unchanged. No instrument provisioning, real exchange
 order, production database write or feature activation is part of this change.

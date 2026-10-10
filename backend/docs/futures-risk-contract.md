@@ -32,7 +32,7 @@ engine. User trading stays DISABLED by default until a separate release decision
 
 ## Price evidence
 
-F1 user execution continues using canonical Binance Spot last trade. Risk and
+User execution uses Binance USDⓈ-M Futures Last since 2026-10-10 ([contract](futures-last-price-contract.md)). Risk and
 liquidation use only a separate PostgreSQL `FuturesMarkSnapshot`, never
 `AssetPriceSnapshot`, Redis or an in-memory price. Mark evidence identifies the
 instrument, Binance USDT symbol, USD synthetic currency, USDⓈ-M perpetual product,
@@ -99,7 +99,7 @@ Reproducible F2.1 benchmark and measured operating range are recorded in
 that disposable PostgreSQL environment, not a production SLA.
 
 `GET /api/v1/trading-accounts/:accountId/futures/positions` adds mark risk and
-account Cross metrics. Legacy Spot reference fields remain explicitly separate.
+account Cross metrics. Reference fields (Futures Last since 2026-10-10) remain explicitly separate.
 `GET .../futures/liquidations` is ownership-scoped, read-only history with the same
 limit (1–100, default 20) and offset (0–1,000,000) conventions as executions.
 

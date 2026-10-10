@@ -21,6 +21,7 @@
     "test": "jest",
     "test:db:prepare": "prisma migrate deploy",
     "futures:provision-instruments": "tsx scripts/provision-futures-instruments.ts",
+    "futures:price-readiness": "tsx scripts/futures-price-readiness.ts",
     "smoke:candle-fixture": "tsx scripts/candle-release-fixture-smoke.ts",
     "integration:limit-order-idempotent-replay": "tsx scripts/limit-order-idempotent-replay-integration.ts",
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",

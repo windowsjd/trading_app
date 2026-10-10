@@ -26,7 +26,7 @@ export default function FuturesMarketList({ onSelect }: { onSelect: (accountId: 
   const rows = data.instruments.filter(i => `${i.underlying.name} ${i.underlying.symbol}`.toLowerCase().includes(search.trim().toLowerCase()));
   return <View testID="futures-market-list" style={styles.list}>
     <TextInput accessibilityLabel="선물 상품 검색" placeholder="이름 또는 심볼 검색" value={search} onChangeText={setSearch} style={styles.input} />
-    <Text style={styles.hint}>현재가 · Spot 거래 기준 / Mark · 평가·청산 기준</Text>
+    <Text style={styles.hint}>현재가 · 선물 Last 거래 기준 / Mark · 평가·청산 기준</Text>
     {data.capabilities.tradingMode !== 'ENABLED' ? <Text style={styles.hint}>현재 신규 선물 거래가 제한되어 있습니다. 상품과 보유 현황은 확인할 수 있습니다.</Text> : null}
     {rows.map(i => <ActionPressable key={i.id} accessibilityRole="button" testID={`futures-market-${i.id}`} onPress={() => { if (focused && currentAccount.current === selectedAccountId && isCurrentSession(session)) onSelect(selectedAccountId, i.id); }} style={styles.row}>
       <Text style={styles.name}>{i.underlying.name} · {i.underlying.symbol}</Text>

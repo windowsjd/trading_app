@@ -21,12 +21,16 @@ import {
   futuresDecimal,
 } from '../src/futures/futures-math';
 import {
+  futuresCommandHash,
   parseFuturesCommand,
   type FuturesExecuteBody,
 } from '../src/futures/futures-input';
+import { settleFuturesCash } from '../src/futures/futures-settlement';
+import { conditionalPrice } from '../src/conditional/conditional-price';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-account-wallet-fx-transfer.service';
 import { FxService } from '../src/fx/fx.service';
+import { FUTURES_LAST_MAX_CAPTURE_AGE_MS } from '../src/futures/futures-last-price';
 
 if (
   process.env.NODE_ENV !== 'test' ||
@@ -213,7 +217,45 @@ async function newInstrument() {
   return { asset, instrument };
 }
 type Scenario = Awaited<ReturnType<typeof fixture>>;
-async function price(s: Scenario, value = '100', index = 0, ageMs = 1000) {
+/** Futures Last observation: the execution/trigger/final price under test.
+ * ageMs is the trade age (effectiveAt); receiptAgeMs the receipt (capturedAt). */
+async function price(
+  s: Scenario,
+  value = '100',
+  index = 0,
+  ageMs = 1000,
+  source:
+    | 'binance_usdm_agg_trade_ws'
+    | 'binance_usdm_ticker_price_rest' = 'binance_usdm_agg_trade_ws',
+  receiptAgeMs = ageMs,
+) {
+  const clock = await now();
+  // One receipt per instrument/source/ms; an equal-ms caller moves 1ms older.
+  for (let shift = 0; ; shift++) {
+    const captured = clock.getTime() - receiptAgeMs - shift;
+    try {
+      return await db.futuresLastPriceSnapshot.create({
+        data: {
+          instrumentId: s.instruments[index].instrument.id,
+          symbol: s.instruments[index].asset.symbol,
+          price: value,
+          source,
+          effectiveAt: new Date(Math.min(clock.getTime() - ageMs, captured)),
+          capturedAt: new Date(captured),
+        },
+      });
+    } catch (error) {
+      if (
+        shift >= 5 ||
+        !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+        error.code !== 'P2002'
+      )
+        throw error;
+    }
+  }
+}
+/** Canonical Spot evidence of the same underlying (Spot domain only). */
+async function spotPrice(s: Scenario, value = '100', index = 0, ageMs = 1000) {
   const clock = await now();
   return db.assetPriceSnapshot.create({
     data: {
@@ -226,6 +268,21 @@ async function price(s: Scenario, value = '100', index = 0, ageMs = 1000) {
       capturedAt: new Date(clock.getTime() - ageMs),
     },
   });
+}
+/** The newest known trade, as the Futures Last selector orders it. */
+async function latestLast(s: Scenario, index = 0) {
+  return db.futuresLastPriceSnapshot.findFirst({
+    where: { instrumentId: s.instruments[index].instrument.id },
+    orderBy: [{ effectiveAt: 'desc' }, { capturedAt: 'desc' }, { id: 'desc' }],
+  });
+}
+/** Wait on the authoritative DB clock, never a JS timer assumption. */
+async function untilDb(at: number) {
+  const started = Date.now();
+  while ((await now()).getTime() < at) {
+    assert.ok(Date.now() - started < 15000, 'DB clock did not advance');
+    await delay(25);
+  }
 }
 async function fxEvidence() {
   const clock = await now();
@@ -259,18 +316,14 @@ const execute = async (
   body: FuturesExecuteBody,
   service = app.futures,
 ) => {
-  // F1 exercises Spot execution. F2 risk evidence is independently kept healthy
-  // at the planned entry basis; adverse/stale marks are covered by the F2 suite.
+  // F1 exercises Futures Last execution. F2 risk evidence is independently kept
+  // healthy at the planned entry basis; adverse/stale marks are covered by F2.
   if (['open', 'increase'].includes(String(body.operation))) {
-    const row = s.instruments.find(
+    const index = s.instruments.findIndex(
       (r) => r.instrument.id === body.instrumentId,
     );
-    const price =
-      row &&
-      (await db.assetPriceSnapshot.findFirst({
-        where: { assetId: row.asset.id },
-        orderBy: { capturedAt: 'desc' },
-      }));
+    const row = index >= 0 ? s.instruments[index] : undefined;
+    const price = row && (await latestLast(s, index));
     if (row && price) {
       const current = await db.futuresPosition.findFirst({
         where: {
@@ -450,6 +503,9 @@ async function cleanup(s: Scenario) {
     await db.futuresMarkSnapshot.deleteMany({
       where: { instrumentId: row.instrument.id },
     });
+    await db.futuresLastPriceSnapshot.deleteMany({
+      where: { instrumentId: row.instrument.id },
+    });
     await db.futuresInstrument.delete({ where: { id: row.instrument.id } });
     await db.assetPriceSnapshot.deleteMany({
       where: { assetId: row.asset.id },
@@ -548,12 +604,15 @@ async function lifecycle(
       d('10002').sub(fees).toFixed(8),
     );
     for (const e of executions) {
-      const evidence = await db.assetPriceSnapshot.findUniqueOrThrow({
-        where: { id: e.assetPriceSnapshotId },
+      // Every new execution is Futures Last evidence; none references Spot.
+      assert.equal(e.assetPriceSnapshotId, null);
+      const evidence = await db.futuresLastPriceSnapshot.findUniqueOrThrow({
+        where: { id: e.lastPriceSnapshotId! },
       });
-      assert.equal(evidence.assetId, s.instruments[0].asset.id);
+      assert.equal(evidence.instrumentId, s.instruments[0].instrument.id);
       assert.equal(e.executionPrice.toFixed(8), evidence.price.toFixed(8));
-      assert.equal(e.priceSourceName, evidence.sourceName);
+      assert.equal(e.priceSourceType, 'provider_api');
+      assert.equal(e.priceSourceName, evidence.source);
       assert.equal(
         e.priceEffectiveAt.getTime(),
         evidence.effectiveAt.getTime(),
@@ -597,8 +656,8 @@ async function lifecycle(
       where: { id: s.accountId },
       data: { status: 'suspended' },
     });
-    await db.assetPriceSnapshot.deleteMany({
-      where: { assetId: s.instruments[1].asset.id },
+    await db.futuresLastPriceSnapshot.deleteMany({
+      where: { instrumentId: s.instruments[1].instrument.id },
     });
     assert.deepEqual(
       await execute(s, { ...body, quantity: '1.00000000' }),
@@ -811,26 +870,53 @@ async function evidenceAndLifecycle(mode: TradingAccountMode) {
   try {
     const body = openBody(s);
     const before = await state(s);
-    await db.assetPriceSnapshot.deleteMany({
-      where: { assetId: s.instruments[0].asset.id },
+    await db.futuresLastPriceSnapshot.deleteMany({
+      where: { instrumentId: s.instruments[0].instrument.id },
     });
     await reject(execute(s, body), 'FUTURES_PRICE_UNAVAILABLE');
-    await price(s, '100', 1); // A fresh row for the wrong asset cannot fund this execution.
+    // Another instrument's fresh trade or the same underlying's fresh Spot
+    // price cannot fund this execution: no cross-product fallback.
+    await price(s, '100', 1);
+    await spotPrice(s, '100');
     await reject(execute(s, body), 'FUTURES_PRICE_UNAVAILABLE');
     await price(s, '100', 0, 12000);
     await reject(execute(s, body), 'FUTURES_PRICE_STALE');
+    // A fresh receipt reporting an OLDER trade never replaces a newer stale one.
+    await price(s, '95', 0, 13000, 'binance_usdm_ticker_price_rest', 500);
+    await reject(execute(s, body), 'FUTURES_PRICE_STALE');
     assert.deepEqual(await state(s), before);
-    const fresh = await price(s);
-    await execute(s, body);
-    await db.assetPriceSnapshot.updateMany({
-      where: { assetId: s.instruments[0].asset.id },
-      data: { capturedAt: new Date((await now()).getTime() - 12000) },
-    });
-    assert.equal(
-      (await app.futures.positions(s.userId, s.accountId)).data.positions[0]
-        .unrealizedPnl,
-      null,
+    // A quiet market: REST re-confirms the same last trade with a fresh receipt.
+    // The receipt is near the 10s limit so plain elapsed time makes it stale.
+    const fresh = await price(
+      s,
+      '100',
+      0,
+      12000,
+      'binance_usdm_ticker_price_rest',
+      8500,
     );
+    const quietFill = await execute(s, body);
+    assert.equal(quietFill.data.execution.executionPrice, '100.00000000');
+    assert.equal(
+      quietFill.data.execution.priceEvidence.lastPriceSnapshotId,
+      fresh.id,
+    );
+    assert.equal(
+      quietFill.data.execution.priceEvidence.priceBasis,
+      'futures_last',
+    );
+    assert.equal(
+      quietFill.data.execution.priceEvidence.sourceName,
+      'binance_usdm_ticker_price_rest',
+    );
+    await untilDb(
+      fresh.capturedAt.getTime() + FUTURES_LAST_MAX_CAPTURE_AGE_MS + 1,
+    );
+    const staleRead = (await app.futures.positions(s.userId, s.accountId)).data
+      .positions[0];
+    assert.equal(staleRead.unrealizedPnl, null);
+    assert.equal(staleRead.referencePrice, null);
+    assert.equal(staleRead.referencePriceEvidence, null);
     assert.equal(
       (
         await db.futuresExecution.findUniqueOrThrow({
@@ -1231,8 +1317,8 @@ async function walletWait(
       [s.futuresWalletId],
     );
     if (boundary === 'price') {
-      await db.assetPriceSnapshot.deleteMany({
-        where: { assetId: s.instruments[0].asset.id },
+      await db.futuresLastPriceSnapshot.deleteMany({
+        where: { instrumentId: s.instruments[0].instrument.id },
       });
       await price(s, '100', 0, 9000);
     }
@@ -1262,14 +1348,7 @@ async function walletWait(
         boundary === 'season'
           ? (await db.season.findUniqueOrThrow({ where: { id: s.season!.id } }))
               .endAt
-          : new Date(
-              (
-                await db.assetPriceSnapshot.findFirstOrThrow({
-                  where: { assetId: s.instruments[0].asset.id },
-                  orderBy: { capturedAt: 'desc' },
-                })
-              ).capturedAt.getTime() + 11001,
-            );
+          : new Date((await latestLast(s))!.capturedAt.getTime() + 11001);
       const started = Date.now();
       while (
         (await blocker.query('SELECT clock_timestamp() AS now')).rows[0].now <
@@ -1298,6 +1377,228 @@ async function walletWait(
     await blocker.query('ROLLBACK').catch(() => undefined);
     if (pending) await pending.catch(() => undefined);
     await blocker.end();
+    await cleanup(s);
+  }
+}
+
+/** Commits a lifetime exactly as the pre-Futures-Last service did: Spot
+ * evidence FK/source, real cash/fee ledger primitive and the old response shape. */
+async function legacySpotOpen(
+  s: Scenario,
+  index: number,
+  body: FuturesExecuteBody,
+) {
+  const spot = await spotPrice(s, '100', index);
+  const command = parseFuturesCommand(body);
+  return db.$transaction(async (tx) => {
+    const executeNow = (
+      await tx.$queryRaw<
+        Array<{ now: Date }>
+      >`SELECT clock_timestamp() AS "now"`
+    )[0].now;
+    await tx.$queryRaw`SELECT id FROM cash_wallets WHERE id = ${s.futuresWalletId} FOR UPDATE`;
+    const wallet = await tx.cashWallet.findUniqueOrThrow({
+      where: { id: s.futuresWalletId },
+    });
+    const feeRate = d('0.001');
+    const plan = planFuturesExecution(command, null, spot.price, feeRate);
+    const executionId = randomUUID();
+    const commandId = randomUUID();
+    const { ledger } = await settleFuturesCash(
+      tx,
+      wallet,
+      'futures_execution',
+      executionId,
+      plan.realizedPnl,
+      plan.feeAmount,
+      executeNow,
+    );
+    const position = await tx.futuresPosition.create({
+      data: {
+        tradingAccountId: s.accountId,
+        instrumentId: command.instrumentId,
+        direction: command.direction,
+        marginMode: command.marginMode,
+        quantity: plan.quantity.toFixed(8),
+        averageEntryPrice: plan.averageEntryPrice.toFixed(8),
+        entryNotional: plan.entryNotional.toFixed(16),
+        leverage: command.leverage,
+        isolatedMargin: plan.isolatedMargin.toFixed(8),
+        realizedPnl: plan.cumulativeRealizedPnl.toFixed(8),
+        status: plan.status,
+        createdAt: executeNow,
+        updatedAt: executeNow,
+      },
+    });
+    const execution = await tx.futuresExecution.create({
+      data: {
+        id: executionId,
+        tradingAccountId: s.accountId,
+        instrumentId: command.instrumentId,
+        positionId: position.id,
+        operation: 'open',
+        direction: command.direction,
+        marginMode: command.marginMode,
+        quantity: command.quantity,
+        leverage: command.leverage,
+        executionPrice: spot.price,
+        assetPriceSnapshotId: spot.id,
+        priceSourceType: spot.sourceType,
+        priceSourceName: spot.sourceName!,
+        priceEffectiveAt: spot.effectiveAt,
+        priceCapturedAt: spot.capturedAt,
+        notional: plan.notional.toFixed(8),
+        feeRate,
+        feeAmount: plan.feeAmount.toFixed(8),
+        realizedPnl: plan.realizedPnl.toFixed(8),
+        positionQuantityAfter: position.quantity,
+        averageEntryPriceAfter: position.averageEntryPrice,
+        isolatedMarginAfter: position.isolatedMargin,
+        executedAt: executeNow,
+        createdAt: executeNow,
+      },
+    });
+    await tx.walletTransaction.createMany({ data: ledger });
+    // The response shape stored before Futures Last (no lastPriceSnapshotId/priceBasis).
+    const payload = {
+      success: true,
+      data: {
+        tradingAccountId: s.accountId,
+        commandId,
+        execution: {
+          id: execution.id,
+          executionPrice: execution.executionPrice.toFixed(8),
+          priceEvidence: {
+            assetPriceSnapshotId: spot.id,
+            sourceType: spot.sourceType,
+            sourceName: spot.sourceName,
+            effectiveAt: spot.effectiveAt.toISOString(),
+            capturedAt: spot.capturedAt.toISOString(),
+          },
+        },
+        position: { id: position.id, quantity: position.quantity.toFixed(8) },
+      },
+    };
+    await tx.futuresExecuteRequest.create({
+      data: {
+        id: commandId,
+        tradingAccountId: s.accountId,
+        executionId,
+        idempotencyKey: command.idempotencyKey,
+        requestHash: futuresCommandHash(s.accountId, command),
+        responsePayloadJson: payload,
+        executedAt: executeNow,
+        createdAt: executeNow,
+      },
+    });
+    return { spot, position, execution, payload };
+  });
+}
+
+/** One underlying, three domains: Spot keeps Spot, Futures uses Futures Last,
+ * risk keeps Mark. Spot-era history and replays survive the price switch. */
+async function legacyAndIsolation(mode: TradingAccountMode) {
+  const s = await fixture(mode);
+  try {
+    const legacyBody = openBody(s, {
+      instrumentId: s.instruments[1].instrument.id,
+      leverage: 10,
+      idempotencyKey: 'spot-era-open',
+    });
+    const legacy = await legacySpotOpen(s, 1, legacyBody);
+    const legacyRow = JSON.stringify(
+      await db.futuresExecution.findUniqueOrThrow({
+        where: { id: legacy.execution.id },
+      }),
+    );
+    // Committed replay returns the stored Spot-era payload, needing no price.
+    await db.futuresLastPriceSnapshot.deleteMany({
+      where: { instrumentId: s.instruments[1].instrument.id },
+    });
+    assert.deepEqual(await execute(s, legacyBody), legacy.payload);
+    const history = await app.futures.executions(s.userId, s.accountId);
+    const shown = history.data.executions.find(
+      (e) => e.id === legacy.execution.id,
+    )!;
+    assert.deepEqual(shown.priceEvidence, {
+      assetPriceSnapshotId: legacy.spot.id,
+      lastPriceSnapshotId: null,
+      priceBasis: 'spot_last',
+      sourceType: 'provider_api',
+      sourceName: 'binance_spot_ws_ticker',
+      effectiveAt: legacy.spot.effectiveAt.toISOString(),
+      capturedAt: legacy.spot.capturedAt.toISOString(),
+    });
+    // A new exit of that Spot-era lifetime needs Futures Last: fresh Spot of
+    // the same underlying is never a fallback.
+    await spotPrice(s, '120', 1);
+    const close = {
+      ...legacyBody,
+      operation: 'close',
+      positionId: legacy.position.id,
+      idempotencyKey: randomUUID(),
+    };
+    await reject(execute(s, close), 'FUTURES_PRICE_UNAVAILABLE');
+    await price(s, '110', 1);
+    const closed = await execute(s, close);
+    assert.equal(closed.data.execution.executionPrice, '110.00000000');
+    assert.equal(closed.data.execution.realizedPnl, '10.00000000');
+    assert.equal(
+      closed.data.execution.priceEvidence.priceBasis,
+      'futures_last',
+    );
+    assert.equal(
+      closed.data.execution.priceEvidence.assetPriceSnapshotId,
+      null,
+    );
+    assert.equal(
+      JSON.stringify(
+        await db.futuresExecution.findUniqueOrThrow({
+          where: { id: legacy.execution.id },
+        }),
+      ),
+      legacyRow,
+    );
+    // Same underlying, three different prices and three separate selectors.
+    await spotPrice(s, '100');
+    await price(s, '105');
+    const opened = await execute(s, openBody(s, { leverage: 10 }));
+    assert.equal(opened.data.execution.executionPrice, '105.00000000');
+    const asset = s.instruments[0].asset;
+    const clock = await now();
+    await db.futuresMarkSnapshot.create({
+      data: {
+        instrumentId: s.instruments[0].instrument.id,
+        symbol: asset.symbol,
+        source: 'binance_usdm_mark_ws',
+        price: '90',
+        effectiveAt: clock,
+        capturedAt: clock,
+      },
+    });
+    // Many newer Futures observations never crowd Spot selection out.
+    for (let i = 0; i < 15; i++) await price(s, '106', 0, 500 - i * 10);
+    const at = await now();
+    const spotSelected = await conditionalPrice(db, asset, 'spot', at);
+    const futuresSelected = await conditionalPrice(db, asset, 'futures', at);
+    assert.equal(spotSelected?.kind, 'spot');
+    assert.equal(spotSelected?.price.toFixed(8), '100.00000000');
+    assert.equal(futuresSelected?.kind, 'futures_last');
+    assert.equal(futuresSelected?.price.toFixed(8), '106.00000000');
+    const read = (
+      await app.futures.positions(s.userId, s.accountId)
+    ).data.positions.find(
+      (p) => p.instrumentId === s.instruments[0].instrument.id,
+    )!;
+    assert.equal(read.referencePrice, '106.00000000');
+    assert.equal(read.markPrice, '90.00000000');
+    assert.equal(read.referencePriceEvidence?.priceBasis, 'futures_last');
+    await invariant(s);
+    checks++;
+    console.log(
+      `PASS ${mode} Spot-era execution/replay preserved; Spot, Futures Last and Mark stay isolated`,
+    );
+  } finally {
     await cleanup(s);
   }
 }
@@ -1362,10 +1663,76 @@ async function databaseConstraints() {
     });
     const { id: _id, ...data } = e;
     const wrong = await price(s, '100', 1);
+    const spot = await spotPrice(s, '100');
+    const own = await db.futuresLastPriceSnapshot.findUniqueOrThrow({
+      where: { id: e.lastPriceSnapshotId! },
+    });
+    const other = await price(s, '101');
+    for (const patch of [
+      { lastPriceSnapshotId: wrong.id }, // another instrument
+      { lastPriceSnapshotId: other.id }, // copied price/time differ
+      { assetPriceSnapshotId: spot.id }, // both evidence kinds
+      { lastPriceSnapshotId: null, assetPriceSnapshotId: null }, // neither
+      { priceSourceName: 'binance_spot_ws_ticker' }, // Spot name on Last FK
+      { priceSourceName: 'binance_usdm_mark_ws' }, // Mark is never a fill price
+      { lastPriceSnapshotId: null, assetPriceSnapshotId: spot.id }, // Spot FK, Futures name
+    ]) {
+      await assert.rejects(
+        db.futuresExecution.create({ data: { ...data, ...patch } }),
+      );
+      checks++;
+    }
+    // Legacy Spot evidence (pre-Futures-Last rows / rolling deploy) stays valid.
     await assert.rejects(
-      db.futuresExecution.create({
-        data: { ...data, assetPriceSnapshotId: wrong.id },
+      db.$transaction(async (tx) => {
+        await tx.futuresExecution.create({
+          data: {
+            ...data,
+            lastPriceSnapshotId: null,
+            assetPriceSnapshotId: spot.id,
+            priceSourceName: spot.sourceName!,
+            executionPrice: spot.price,
+            priceEffectiveAt: spot.effectiveAt,
+            priceCapturedAt: spot.capturedAt,
+          },
+        });
+        throw new Error('legacy-spot-row-accepted');
       }),
+      /legacy-spot-row-accepted/,
+    );
+    // Evidence rows are immutable and identity-bound.
+    await assert.rejects(
+      db.futuresLastPriceSnapshot.update({
+        where: { id: own.id },
+        data: { price: '999' },
+      }),
+    );
+    for (const patch of [
+      { symbol: s.instruments[1].asset.symbol },
+      { symbol: 'BTCUSD_PERP' },
+      { currencyCode: 'KRW' as const },
+      { providerProduct: 'binance_spot' },
+      { price: '0' },
+      { effectiveAt: new Date(+own.capturedAt + 8) }, // trade after receipt
+    ]) {
+      await assert.rejects(
+        db.futuresLastPriceSnapshot.create({
+          data: {
+            instrumentId: own.instrumentId,
+            symbol: own.symbol,
+            source: own.source,
+            price: own.price,
+            effectiveAt: own.effectiveAt,
+            capturedAt: new Date(+own.capturedAt + 7),
+            ...patch,
+          },
+        }),
+      );
+      checks++;
+    }
+    // Referenced evidence cannot be deleted.
+    await assert.rejects(
+      db.futuresLastPriceSnapshot.delete({ where: { id: own.id } }),
     );
     await invariant(s);
     checks++;
@@ -1380,6 +1747,7 @@ async function databaseConstraints() {
 async function main() {
   await db.$connect();
   await databaseConstraints();
+  await legacyAndIsolation('general');
   await accountIsolation();
   for (const mode of ['general', 'season', 'beginner'] as const) {
     for (const direction of ['long', 'short'] as const) {
@@ -1409,6 +1777,9 @@ export {
   fixture,
   newInstrument,
   price,
+  spotPrice,
+  latestLast,
+  untilDb,
   fxEvidence,
   openBody,
   positionBody,

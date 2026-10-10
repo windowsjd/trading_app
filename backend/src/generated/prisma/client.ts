@@ -289,6 +289,11 @@ export type OpsJobLock = Prisma.OpsJobLockModel
  */
 export type LimitOrderCandleEvidence = Prisma.LimitOrderCandleEvidenceModel
 /**
+ * Model FuturesLastPriceSnapshot
+ * 
+ */
+export type FuturesLastPriceSnapshot = Prisma.FuturesLastPriceSnapshotModel
+/**
  * Model FuturesMarkSnapshot
  * 
  */

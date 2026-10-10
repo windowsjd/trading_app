@@ -34,6 +34,7 @@ import {
   freshFuturesEvaluation,
   freshFuturesEvidence,
   freshFuturesReference,
+  futuresPriceBasisLabel,
   futuresActionAllowed,
   futuresInputError,
   positionCommand,
@@ -498,7 +499,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             <>
               <Text style={styles.heading}>{instrument.underlying.name}</Text>
               <Metric
-                label="현재가 · Spot 거래 기준"
+                label="현재가 · 선물 Last 거래 기준"
                 value={
                   referenceFresh
                     ? price(reference, instrument)
@@ -686,7 +687,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     {directionLabel[e.direction]}
                   </Text>
                   <Metric
-                    label="수량 / Spot 체결가"
+                    label={[
+                      "수량 / 체결가",
+                      futuresPriceBasisLabel(e.priceEvidence?.priceBasis),
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
                     value={`${formatDisplayDecimal(e.quantity)} / ${price(e.executionPrice, e.instrument)}`}
                   />
                   <Metric
@@ -765,7 +771,23 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         </View>
         {!final.isError && final.data?.settlement ? (
           <View style={styles.card}>
-            <Text style={styles.heading}>시즌 최종 종료 · Spot 체결</Text>
+            <Text style={styles.heading}>
+              {[
+                "시즌 최종 종료",
+                futuresPriceBasisLabel(
+                  final.data.settlement.closes?.some(
+                    (c) => !!c.price?.lastPriceSnapshot,
+                  )
+                    ? "futures_last"
+                    : final.data.settlement.closes?.length
+                      ? "spot_last"
+                      : undefined,
+                ),
+              ]
+                .filter(Boolean)
+                .join(" · ")}{" "}
+              체결
+            </Text>
             <Metric
               label="실현 손익"
               value={usd(final.data.settlement.realizedPnl)}

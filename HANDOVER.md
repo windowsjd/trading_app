@@ -10,6 +10,37 @@
 
 ---
 
+## 2026-10-10 Binance Futures Last Price 도입·선물 상품 등록 준비
+
+- **기능 구현 의도:** 가상 선물 체결(시장가·지정가·TP/SL·시즌 최종 정산)을 Binance Spot이 아닌
+  실제 USDⓈ-M 무기한 선물 Last trade 가격으로 바꾸고, Mark의 위험·청산·평가 역할과 기존 금융
+  기록은 그대로 유지한다. 운영 적용(Migration/배포/등록/활성화)은 승인 대기다.
+- 시작 `main`=`origin/main`=`117fdb01`, clean. UI 병행 작업 보호를 위해 branch 없이 detached
+  worktree `/home/nayuta/projects/trading-app-futures-last`에서 작업. commit/push/배포 없음.
+- **주의:** `backend/.env.local`의 `DATABASE_URL`/`REDIS_URL`이 Render DB다. `prisma.config.ts`와
+  `loadRuntimeEnv` 스크립트(등록 스크립트 포함)는 이를 읽으므로 반드시 loopback DB를 명시해 실행한다.
+- 증거는 instrument 기준 새 테이블 `futures_last_price_snapshots`. 근거: Spot 후보 조회가 sourceName
+  없이 최신 10건을 읽어 같은 테이블이면 Spot 선택을 밀어낸다. `@aggTrade`(100ms) 별도 socket +
+  `/fapi/v2/ticker/price`(weight 2) 조용한 종목 재확인. 수신 10초·체결 60초 이내만 유효, 최신 체결 우선,
+  Spot/Mark 대체 없음. 시즌 종료는 `[endAt−10s, endAt]` 수신·체결 60초 이내.
+- 추가형 migration `20261010120000_add_futures_last_price_evidence`: Execution/SeasonPrice/
+  ProtectionChild에 Last FK, 기존 Spot FK NOT NULL 해제 + "정확히 1종" CHECK, guard 2분기,
+  OpsJobName `futures_last_price_retention`. 기존 행 재작성 없음. Spot 시대 체결·멱등 응답·시즌 pin은
+  그대로 재생/재사용됨을 실제 PG에서 검증. 코드 rollback 대신 REDUCE_ONLY/DISABLED + forward fix.
+- 설정: `FUTURES_LAST_PRICE_INGESTION_ENABLED`(기본=Mark ingestion), ENABLED·REDUCE_ONLY는 필수
+  (시작 검증 강화 — 배포 env 확인). `FUTURES_LAST_PRICE_RETENTION_*`. 열린 포지션이 있으면 DISABLED여도
+  수집 유지. 점검: `pnpm futures:price-readiness [--require-ready]`(READ ONLY).
+- 등록: 실제 exchangeInfo 기준 고정 25종 중 23종 적격, `PEPEUSDT`(1000PEPE만 존재)·`币安人生USDT`
+  (앱 identity 규칙) 제외. 격리 DB에서 dry-run 23/2 → apply 23 → 재실행 0. 운영 값은 미검증
+  (읽기 전용 운영 조회가 자동 권한 정책에 차단됨 — 승인 필요).
+- 검증: backend unit 4,111 + 신규 spec, e2e 404, futures/conditional PG 7 runner 전부 PASS(F1 290 checks 등),
+  CI 금융 22-suite 20/22(실패 2건은 WSL 시계 −1.7s/30.8s step과 시각 일치, 개별 재실행 PASS),
+  core-account 22/22, migration 빈 DB 체인·drift PASS, lint/format/diagnostic gate PASS, frontend check.
+- 성능(실측): live 23종목 WS 31 msg/s, Last 13.5행/s, REST 17.6회/분, CPU 약 4%; 시장가 p95 39ms(수집 중)
+  vs 34ms; Matching worker benchmark HEAD와 변동 범위 내. 상세·운영 계획·승인 항목:
+  [보고서](docs/investigations/2026-10-10-futures-last-price/report.md),
+  [계약](backend/docs/futures-last-price-contract.md).
+
 ## 2026-10-09 홈 시즌 티어 Native 레이아웃 수정·최종 PNG 교체
 
 - **기능 구현 의도:** Android에서 시즌 티어 카드가 비정상적으로 세로 확장되는 문제를

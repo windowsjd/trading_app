@@ -269,6 +269,7 @@ enum OpsJobName {
   futures_mark_retention
   conditional_orders
   futures_limit_matching
+  futures_last_price_retention
 }
 
 enum MarketCandleSyncMode {
@@ -858,10 +859,11 @@ model FuturesInstrument {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  underlyingAsset   Asset                     @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
+  underlyingAsset   Asset                      @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
   positions         FuturesPosition[]
   executions        FuturesExecution[]
   marks             FuturesMarkSnapshot[]
+  lastPrices        FuturesLastPriceSnapshot[]
   liquidationCloses FuturesLiquidationClose[]
   seasonPrices      FuturesSeasonPrice[]
   seasonCloses      FuturesSeasonClose[]
@@ -916,7 +918,10 @@ model FuturesExecution {
   quantity               Decimal              @db.Decimal(24, 8)
   leverage               Int
   executionPrice         Decimal              @map("execution_price") @db.Decimal(24, 8)
-  assetPriceSnapshotId   String               @map("asset_price_snapshot_id")
+  /// Legacy Spot evidence of executions committed before Futures Last pricing.
+  /// SQL CHECK: exactly one of assetPriceSnapshotId / lastPriceSnapshotId.
+  assetPriceSnapshotId   String?              @map("asset_price_snapshot_id")
+  lastPriceSnapshotId    String?              @map("last_price_snapshot_id")
   priceSourceType        AssetPriceSourceType @map("price_source_type")
   priceSourceName        String               @map("price_source_name")
   priceEffectiveAt       DateTime             @map("price_effective_at")
@@ -931,10 +936,11 @@ model FuturesExecution {
   executedAt             DateTime             @map("executed_at")
   createdAt              DateTime             @default(now()) @map("created_at")
 
-  tradingAccount     TradingAccount         @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  instrument         FuturesInstrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  position           FuturesPosition        @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
-  assetPriceSnapshot AssetPriceSnapshot     @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  tradingAccount     TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument         FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  position           FuturesPosition           @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  lastPriceSnapshot  FuturesLastPriceSnapshot? @relation(fields: [lastPriceSnapshotId], references: [id], onDelete: Restrict)
   executeRequest     FuturesExecuteRequest?
   protectionChild    ProtectionChild?
   limitOrder         FuturesLimitOrder?
@@ -944,6 +950,7 @@ model FuturesExecution {
   @@index([instrumentId])
   @@index([positionId])
   @@index([assetPriceSnapshotId])
+  @@index([lastPriceSnapshotId])
   @@map("futures_executions")
 }
 
@@ -1073,27 +1080,32 @@ model ProtectionLeg {
 }
 
 model ProtectionChild {
-  id                   String                @id @default(uuid())
-  groupId              String                @map("group_id")
-  legId                String                @map("leg_id")
-  status               ProtectionChildStatus @default(pending)
-  quantity             Decimal               @db.Decimal(24, 8)
-  orderId              String?               @unique @map("order_id")
-  futuresExecutionId   String?               @unique @map("futures_execution_id")
-  assetPriceSnapshotId String                @map("asset_price_snapshot_id")
-  triggerEvidenceJson  Json                  @map("trigger_evidence_json")
-  triggeredAt          DateTime              @map("triggered_at")
-  endedAt              DateTime?             @map("ended_at")
-  terminalReason       String?               @map("terminal_reason")
+  id                         String                @id @default(uuid())
+  groupId                    String                @map("group_id")
+  legId                      String                @map("leg_id")
+  status                     ProtectionChildStatus @default(pending)
+  quantity                   Decimal               @db.Decimal(24, 8)
+  orderId                    String?               @unique @map("order_id")
+  futuresExecutionId         String?               @unique @map("futures_execution_id")
+  /// Spot triggers (and Futures triggers recorded before Futures Last pricing).
+  /// SQL CHECK: exactly one of assetPriceSnapshotId / futuresLastPriceSnapshotId.
+  assetPriceSnapshotId       String?               @map("asset_price_snapshot_id")
+  futuresLastPriceSnapshotId String?               @map("futures_last_price_snapshot_id")
+  triggerEvidenceJson        Json                  @map("trigger_evidence_json")
+  triggeredAt                DateTime              @map("triggered_at")
+  endedAt                    DateTime?             @map("ended_at")
+  terminalReason             String?               @map("terminal_reason")
 
-  group              ProtectionGroup    @relation(fields: [groupId], references: [id], onDelete: Restrict)
-  leg                ProtectionLeg      @relation(fields: [legId, groupId], references: [id, groupId], onDelete: Restrict)
-  order              Order?             @relation(fields: [orderId], references: [id], onDelete: Restrict)
-  futuresExecution   FuturesExecution?  @relation(fields: [futuresExecutionId], references: [id], onDelete: Restrict)
-  assetPriceSnapshot AssetPriceSnapshot @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  group                    ProtectionGroup           @relation(fields: [groupId], references: [id], onDelete: Restrict)
+  leg                      ProtectionLeg             @relation(fields: [legId, groupId], references: [id, groupId], onDelete: Restrict)
+  order                    Order?                    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  futuresExecution         FuturesExecution?         @relation(fields: [futuresExecutionId], references: [id], onDelete: Restrict)
+  assetPriceSnapshot       AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  futuresLastPriceSnapshot FuturesLastPriceSnapshot? @relation(fields: [futuresLastPriceSnapshotId], references: [id], onDelete: Restrict)
 
   @@index([groupId, triggeredAt, id])
   @@index([assetPriceSnapshotId])
+  @@index([futuresLastPriceSnapshotId])
   @@map("protection_children")
 }
 
@@ -1786,6 +1798,35 @@ enum FuturesMarkSource {
   binance_usdm_mark_rest
 }
 
+enum FuturesLastPriceSource {
+  binance_usdm_agg_trade_ws
+  binance_usdm_ticker_price_rest
+}
+
+// Binance USDⓈ-M perpetual last trade observations: the Futures execution,
+// trigger and Season final price. Never Spot, Mark or Index evidence.
+// effectiveAt is the provider trade time; capturedAt is the server receipt time.
+model FuturesLastPriceSnapshot {
+  id                 String                 @id @default(uuid())
+  instrumentId       String                 @map("instrument_id")
+  symbol             String
+  providerProduct    String                 @default("binance_usdm_perpetual") @map("provider_product")
+  currencyCode       CurrencyCode           @default(USD) @map("currency_code")
+  source             FuturesLastPriceSource
+  price              Decimal                @db.Decimal(24, 8)
+  effectiveAt        DateTime               @map("effective_at")
+  capturedAt         DateTime               @map("captured_at")
+  instrument         FuturesInstrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  executions         FuturesExecution[]
+  seasonPrices       FuturesSeasonPrice[]
+  protectionTriggers ProtectionChild[]
+
+  @@unique([instrumentId, source, capturedAt])
+  @@index([instrumentId, effectiveAt, capturedAt])
+  @@index([capturedAt, id])
+  @@map("futures_last_price_snapshots")
+}
+
 // Deliberately separate from Spot valuation/execution evidence.
 model FuturesMarkSnapshot {
   id              String                    @id @default(uuid())
@@ -1861,19 +1902,24 @@ model FuturesLiquidationClose {
 
 // End-boundary evidence is pinned once for the whole Season, before any account closes.
 model FuturesSeasonPrice {
-  id                   String               @id @default(uuid())
-  seasonId             String               @map("season_id")
-  instrumentId         String               @map("instrument_id")
-  assetPriceSnapshotId String               @map("asset_price_snapshot_id")
-  endAt                DateTime             @map("end_at")
-  feeRate              Decimal              @map("fee_rate") @db.Decimal(10, 6)
-  createdAt            DateTime             @default(now()) @map("created_at")
-  season               Season               @relation(fields: [seasonId], references: [id], onDelete: Restrict)
-  instrument           FuturesInstrument    @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  snapshot             AssetPriceSnapshot   @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  id                   String                    @id @default(uuid())
+  seasonId             String                    @map("season_id")
+  instrumentId         String                    @map("instrument_id")
+  /// Legacy Spot pin created before Futures Last pricing; reused on retry.
+  /// SQL CHECK: exactly one of assetPriceSnapshotId / lastPriceSnapshotId.
+  assetPriceSnapshotId String?                   @map("asset_price_snapshot_id")
+  lastPriceSnapshotId  String?                   @map("last_price_snapshot_id")
+  endAt                DateTime                  @map("end_at")
+  feeRate              Decimal                   @map("fee_rate") @db.Decimal(10, 6)
+  createdAt            DateTime                  @default(now()) @map("created_at")
+  season               Season                    @relation(fields: [seasonId], references: [id], onDelete: Restrict)
+  instrument           FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  snapshot             AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  lastPriceSnapshot    FuturesLastPriceSnapshot? @relation(fields: [lastPriceSnapshotId], references: [id], onDelete: Restrict)
   closes               FuturesSeasonClose[]
 
   @@unique([seasonId, instrumentId])
+  @@index([lastPriceSnapshotId])
   @@map("futures_season_prices")
 }
 

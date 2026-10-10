@@ -53,14 +53,24 @@ test('closing from the detailed card sends the existing captured quantity and re
   assert.equal(h.invalidations.some(key => key.includes('A') && key.includes('futures')), true);
   assert.equal(h.reads.filter(path => path.endsWith('/futures/positions')).length >= 2, true);
 });
-test("Reduce/Close uses the F1 captured-age rule even when the provider effective time is older", async (t) => {
+test("Reduce/Close accepts a quiet market's re-confirmed older Futures Last trade", async (t) => {
   const h = futuresHarness({ position: true, stale: true, oldReference: true });
   await h.start();
   t.after(h.close);
+  assert.match(h.text(), /현재가 · 선물 Last 거래 기준/);
   await h.choose("전량 종료(Close)");
   assert.equal(h.node("futures-submit").props.state, "enabled");
   await h.press("futures-submit");
   assert.equal(h.requests[0].body.operation, "close");
+});
+test("a Futures Last trade older than 60 seconds is not shown or executable", async (t) => {
+  const h = futuresHarness({ position: true, stale: true, expiredReference: true });
+  await h.start();
+  t.after(h.close);
+  assert.match(h.text(), /시세 확인 불가/);
+  await h.choose("전량 종료(Close)");
+  assert.equal(h.node("futures-submit").props.state, "disabled");
+  assert.equal(h.requests.length, 0);
 });
 for (const accountId of ["A", "B"])
   for (const direction of ["롱(Long)", "숏(Short)"])

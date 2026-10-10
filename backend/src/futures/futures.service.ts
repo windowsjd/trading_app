@@ -54,7 +54,10 @@ import {
   planFuturesExecution,
 } from './futures-math';
 import { futuresMarginUsed } from './futures-collateral';
-import { readFuturesPrice } from './futures-price';
+import {
+  presentFuturesLastEvidence,
+  readFuturesLastPrice,
+} from './futures-last-price';
 import {
   futuresInstrumentInclude,
   presentFuturesExecution,
@@ -124,11 +127,11 @@ export class FuturesService {
       this.prisma,
     );
     const instrument = await this.instrument(this.prisma, request.instrumentId);
-    // No network refresh is introduced. Existing Binance ingestion commits snapshots
-    // independently. Preflight and financial transaction both read canonical DB evidence.
-    await readFuturesPrice(
+    // No network call in the command. Futures Last ingestion commits evidence
+    // independently; preflight and the financial transaction both read the DB.
+    await readFuturesLastPrice(
       this.prisma,
-      instrument.underlyingAsset,
+      instrument,
       await this.dbNow(this.prisma),
     );
     try {
@@ -242,9 +245,9 @@ export class FuturesService {
           );
         const wallet = await this.wallet(tx, accountId);
         stage('futures_execution_price_selection', accountId);
-        const price = (await readFuturesPrice(
+        const price = (await readFuturesLastPrice(
           tx,
-          lockedInstrument.underlyingAsset,
+          lockedInstrument,
           executeNow,
         ))!;
         if (
@@ -547,9 +550,9 @@ export class FuturesService {
             quantity: request.quantity,
             leverage: request.leverage,
             executionPrice: price.price,
-            assetPriceSnapshotId: price.id,
-            priceSourceType: price.sourceType,
-            priceSourceName: price.sourceName!,
+            lastPriceSnapshotId: price.id,
+            priceSourceType: 'provider_api',
+            priceSourceName: price.source,
             priceEffectiveAt: price.effectiveAt,
             priceCapturedAt: price.capturedAt,
             notional: plan.notional.toFixed(8),
@@ -679,9 +682,9 @@ export class FuturesService {
             .filter((row) => verifiedFuturesInstrument(row, now))
             .map(async (row) => {
               const mark = await readFuturesMark(this.prisma, row, now, false);
-              const price = await readFuturesPrice(
+              const price = await readFuturesLastPrice(
                 this.prisma,
-                row.underlyingAsset,
+                row,
                 now,
                 false,
               );
@@ -700,10 +703,7 @@ export class FuturesService {
                     }
                   : null,
                 referencePriceEvidence: price
-                  ? {
-                      effectiveAt: price.effectiveAt.toISOString(),
-                      capturedAt: price.capturedAt.toISOString(),
-                    }
+                  ? presentFuturesLastEvidence(price)
                   : null,
                 coverageVerifiedAt: row.markVerifiedAt!.toISOString(),
               };
@@ -733,9 +733,9 @@ export class FuturesService {
         });
         const positions = await Promise.all(
           rows.map(async (row) => {
-            const price = await readFuturesPrice(
+            const price = await readFuturesLastPrice(
               tx,
-              row.instrument.underlyingAsset,
+              row.instrument,
               now,
               false,
             );
@@ -767,13 +767,7 @@ export class FuturesService {
                   ).toFixed(8)
                 : null,
               referencePriceEvidence: price
-                ? {
-                    assetPriceSnapshotId: price.id,
-                    sourceType: price.sourceType,
-                    sourceName: price.sourceName,
-                    effectiveAt: price.effectiveAt.toISOString(),
-                    capturedAt: price.capturedAt.toISOString(),
-                  }
+                ? presentFuturesLastEvidence(price)
                 : null,
             };
           }),
@@ -904,6 +898,7 @@ export class FuturesService {
           include: {
             price: {
               include: {
+                // Legacy pins hold Spot evidence; new pins hold Futures Last.
                 snapshot: {
                   select: {
                     id: true,
@@ -912,6 +907,18 @@ export class FuturesService {
                     currencyCode: true,
                     sourceType: true,
                     sourceName: true,
+                    effectiveAt: true,
+                    capturedAt: true,
+                  },
+                },
+                lastPriceSnapshot: {
+                  select: {
+                    id: true,
+                    instrumentId: true,
+                    symbol: true,
+                    price: true,
+                    currencyCode: true,
+                    source: true,
                     effectiveAt: true,
                     capturedAt: true,
                   },

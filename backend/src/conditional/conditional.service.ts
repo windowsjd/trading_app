@@ -496,7 +496,9 @@ export class ConditionalService {
             groupId: id,
             legId: leg.id,
             quantity,
-            assetPriceSnapshotId: price.id,
+            ...(price.kind === 'futures_last'
+              ? { futuresLastPriceSnapshotId: price.id }
+              : { assetPriceSnapshotId: price.id }),
             triggeredAt: now,
             triggerEvidenceJson: {
               assetId: group.assetId,
@@ -507,6 +509,8 @@ export class ConditionalService {
               triggerPrice: leg.triggerPrice.toFixed(8),
               price: price.price.toFixed(8),
               currencyCode: price.currencyCode,
+              priceBasis: price.kind,
+              instrumentId: price.instrumentId,
               sourceType: price.sourceType,
               sourceName: price.sourceName,
               effectiveAt: price.effectiveAt.toISOString(),

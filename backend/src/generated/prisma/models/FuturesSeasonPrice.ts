@@ -39,6 +39,7 @@ export type FuturesSeasonPriceMinAggregateOutputType = {
   seasonId: string | null
   instrumentId: string | null
   assetPriceSnapshotId: string | null
+  lastPriceSnapshotId: string | null
   endAt: Date | null
   feeRate: runtime.Decimal | null
   createdAt: Date | null
@@ -49,6 +50,7 @@ export type FuturesSeasonPriceMaxAggregateOutputType = {
   seasonId: string | null
   instrumentId: string | null
   assetPriceSnapshotId: string | null
+  lastPriceSnapshotId: string | null
   endAt: Date | null
   feeRate: runtime.Decimal | null
   createdAt: Date | null
@@ -59,6 +61,7 @@ export type FuturesSeasonPriceCountAggregateOutputType = {
   seasonId: number
   instrumentId: number
   assetPriceSnapshotId: number
+  lastPriceSnapshotId: number
   endAt: number
   feeRate: number
   createdAt: number
@@ -79,6 +82,7 @@ export type FuturesSeasonPriceMinAggregateInputType = {
   seasonId?: true
   instrumentId?: true
   assetPriceSnapshotId?: true
+  lastPriceSnapshotId?: true
   endAt?: true
   feeRate?: true
   createdAt?: true
@@ -89,6 +93,7 @@ export type FuturesSeasonPriceMaxAggregateInputType = {
   seasonId?: true
   instrumentId?: true
   assetPriceSnapshotId?: true
+  lastPriceSnapshotId?: true
   endAt?: true
   feeRate?: true
   createdAt?: true
@@ -99,6 +104,7 @@ export type FuturesSeasonPriceCountAggregateInputType = {
   seasonId?: true
   instrumentId?: true
   assetPriceSnapshotId?: true
+  lastPriceSnapshotId?: true
   endAt?: true
   feeRate?: true
   createdAt?: true
@@ -195,7 +201,8 @@ export type FuturesSeasonPriceGroupByOutputType = {
   id: string
   seasonId: string
   instrumentId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId: string | null
+  lastPriceSnapshotId: string | null
   endAt: Date
   feeRate: runtime.Decimal
   createdAt: Date
@@ -228,13 +235,15 @@ export type FuturesSeasonPriceWhereInput = {
   id?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
   seasonId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
   instrumentId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
-  assetPriceSnapshotId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableFilter<"FuturesSeasonPrice"> | string | null
+  lastPriceSnapshotId?: Prisma.StringNullableFilter<"FuturesSeasonPrice"> | string | null
   endAt?: Prisma.DateTimeFilter<"FuturesSeasonPrice"> | Date | string
   feeRate?: Prisma.DecimalFilter<"FuturesSeasonPrice"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFilter<"FuturesSeasonPrice"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
   instrument?: Prisma.XOR<Prisma.FuturesInstrumentScalarRelationFilter, Prisma.FuturesInstrumentWhereInput>
-  snapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput>
+  snapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
+  lastPriceSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotNullableScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput> | null
   closes?: Prisma.FuturesSeasonCloseListRelationFilter
 }
 
@@ -242,13 +251,15 @@ export type FuturesSeasonPriceOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   seasonId?: Prisma.SortOrder
   instrumentId?: Prisma.SortOrder
-  assetPriceSnapshotId?: Prisma.SortOrder
+  assetPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   endAt?: Prisma.SortOrder
   feeRate?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   season?: Prisma.SeasonOrderByWithRelationInput
   instrument?: Prisma.FuturesInstrumentOrderByWithRelationInput
   snapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotOrderByWithRelationInput
   closes?: Prisma.FuturesSeasonCloseOrderByRelationAggregateInput
 }
 
@@ -260,13 +271,15 @@ export type FuturesSeasonPriceWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.FuturesSeasonPriceWhereInput | Prisma.FuturesSeasonPriceWhereInput[]
   seasonId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
   instrumentId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
-  assetPriceSnapshotId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableFilter<"FuturesSeasonPrice"> | string | null
+  lastPriceSnapshotId?: Prisma.StringNullableFilter<"FuturesSeasonPrice"> | string | null
   endAt?: Prisma.DateTimeFilter<"FuturesSeasonPrice"> | Date | string
   feeRate?: Prisma.DecimalFilter<"FuturesSeasonPrice"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFilter<"FuturesSeasonPrice"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
   instrument?: Prisma.XOR<Prisma.FuturesInstrumentScalarRelationFilter, Prisma.FuturesInstrumentWhereInput>
-  snapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput>
+  snapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
+  lastPriceSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotNullableScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput> | null
   closes?: Prisma.FuturesSeasonCloseListRelationFilter
 }, "id" | "seasonId_instrumentId">
 
@@ -274,7 +287,8 @@ export type FuturesSeasonPriceOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   seasonId?: Prisma.SortOrder
   instrumentId?: Prisma.SortOrder
-  assetPriceSnapshotId?: Prisma.SortOrder
+  assetPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
+  lastPriceSnapshotId?: Prisma.SortOrderInput | Prisma.SortOrder
   endAt?: Prisma.SortOrder
   feeRate?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -292,7 +306,8 @@ export type FuturesSeasonPriceScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"FuturesSeasonPrice"> | string
   seasonId?: Prisma.StringWithAggregatesFilter<"FuturesSeasonPrice"> | string
   instrumentId?: Prisma.StringWithAggregatesFilter<"FuturesSeasonPrice"> | string
-  assetPriceSnapshotId?: Prisma.StringWithAggregatesFilter<"FuturesSeasonPrice"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"FuturesSeasonPrice"> | string | null
+  lastPriceSnapshotId?: Prisma.StringNullableWithAggregatesFilter<"FuturesSeasonPrice"> | string | null
   endAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesSeasonPrice"> | Date | string
   feeRate?: Prisma.DecimalWithAggregatesFilter<"FuturesSeasonPrice"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"FuturesSeasonPrice"> | Date | string
@@ -305,7 +320,8 @@ export type FuturesSeasonPriceCreateInput = {
   createdAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutFuturesFinalPricesInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutSeasonPricesInput
-  snapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  snapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutSeasonPricesInput
   closes?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutPriceInput
 }
 
@@ -313,7 +329,8 @@ export type FuturesSeasonPriceUncheckedCreateInput = {
   id?: string
   seasonId: string
   instrumentId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -327,7 +344,8 @@ export type FuturesSeasonPriceUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutFuturesFinalPricesNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutSeasonPricesNestedInput
-  snapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutFuturesSeasonPricesNestedInput
+  snapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutFuturesSeasonPricesNestedInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutSeasonPricesNestedInput
   closes?: Prisma.FuturesSeasonCloseUpdateManyWithoutPriceNestedInput
 }
 
@@ -335,7 +353,8 @@ export type FuturesSeasonPriceUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -346,7 +365,8 @@ export type FuturesSeasonPriceCreateManyInput = {
   id?: string
   seasonId: string
   instrumentId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -363,7 +383,8 @@ export type FuturesSeasonPriceUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -389,6 +410,7 @@ export type FuturesSeasonPriceCountOrderByAggregateInput = {
   seasonId?: Prisma.SortOrder
   instrumentId?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
+  lastPriceSnapshotId?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   feeRate?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -403,6 +425,7 @@ export type FuturesSeasonPriceMaxOrderByAggregateInput = {
   seasonId?: Prisma.SortOrder
   instrumentId?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
+  lastPriceSnapshotId?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   feeRate?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -413,6 +436,7 @@ export type FuturesSeasonPriceMinOrderByAggregateInput = {
   seasonId?: Prisma.SortOrder
   instrumentId?: Prisma.SortOrder
   assetPriceSnapshotId?: Prisma.SortOrder
+  lastPriceSnapshotId?: Prisma.SortOrder
   endAt?: Prisma.SortOrder
   feeRate?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -553,6 +577,48 @@ export type FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput = 
   deleteMany?: Prisma.FuturesSeasonPriceScalarWhereInput | Prisma.FuturesSeasonPriceScalarWhereInput[]
 }
 
+export type FuturesSeasonPriceCreateNestedManyWithoutLastPriceSnapshotInput = {
+  create?: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput> | Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput[] | Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput[]
+  createMany?: Prisma.FuturesSeasonPriceCreateManyLastPriceSnapshotInputEnvelope
+  connect?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+}
+
+export type FuturesSeasonPriceUncheckedCreateNestedManyWithoutLastPriceSnapshotInput = {
+  create?: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput> | Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput[] | Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput[]
+  createMany?: Prisma.FuturesSeasonPriceCreateManyLastPriceSnapshotInputEnvelope
+  connect?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+}
+
+export type FuturesSeasonPriceUpdateManyWithoutLastPriceSnapshotNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput> | Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput[] | Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput[]
+  upsert?: Prisma.FuturesSeasonPriceUpsertWithWhereUniqueWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceUpsertWithWhereUniqueWithoutLastPriceSnapshotInput[]
+  createMany?: Prisma.FuturesSeasonPriceCreateManyLastPriceSnapshotInputEnvelope
+  set?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  disconnect?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  delete?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  connect?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  update?: Prisma.FuturesSeasonPriceUpdateWithWhereUniqueWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceUpdateWithWhereUniqueWithoutLastPriceSnapshotInput[]
+  updateMany?: Prisma.FuturesSeasonPriceUpdateManyWithWhereWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceUpdateManyWithWhereWithoutLastPriceSnapshotInput[]
+  deleteMany?: Prisma.FuturesSeasonPriceScalarWhereInput | Prisma.FuturesSeasonPriceScalarWhereInput[]
+}
+
+export type FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput> | Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput[] | Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput[]
+  connectOrCreate?: Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput[]
+  upsert?: Prisma.FuturesSeasonPriceUpsertWithWhereUniqueWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceUpsertWithWhereUniqueWithoutLastPriceSnapshotInput[]
+  createMany?: Prisma.FuturesSeasonPriceCreateManyLastPriceSnapshotInputEnvelope
+  set?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  disconnect?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  delete?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  connect?: Prisma.FuturesSeasonPriceWhereUniqueInput | Prisma.FuturesSeasonPriceWhereUniqueInput[]
+  update?: Prisma.FuturesSeasonPriceUpdateWithWhereUniqueWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceUpdateWithWhereUniqueWithoutLastPriceSnapshotInput[]
+  updateMany?: Prisma.FuturesSeasonPriceUpdateManyWithWhereWithoutLastPriceSnapshotInput | Prisma.FuturesSeasonPriceUpdateManyWithWhereWithoutLastPriceSnapshotInput[]
+  deleteMany?: Prisma.FuturesSeasonPriceScalarWhereInput | Prisma.FuturesSeasonPriceScalarWhereInput[]
+}
+
 export type FuturesSeasonPriceCreateNestedOneWithoutClosesInput = {
   create?: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutClosesInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutClosesInput>
   connectOrCreate?: Prisma.FuturesSeasonPriceCreateOrConnectWithoutClosesInput
@@ -573,14 +639,16 @@ export type FuturesSeasonPriceCreateWithoutSeasonInput = {
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutSeasonPricesInput
-  snapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  snapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutSeasonPricesInput
   closes?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutPriceInput
 }
 
 export type FuturesSeasonPriceUncheckedCreateWithoutSeasonInput = {
   id?: string
   instrumentId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -620,7 +688,8 @@ export type FuturesSeasonPriceScalarWhereInput = {
   id?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
   seasonId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
   instrumentId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
-  assetPriceSnapshotId?: Prisma.StringFilter<"FuturesSeasonPrice"> | string
+  assetPriceSnapshotId?: Prisma.StringNullableFilter<"FuturesSeasonPrice"> | string | null
+  lastPriceSnapshotId?: Prisma.StringNullableFilter<"FuturesSeasonPrice"> | string | null
   endAt?: Prisma.DateTimeFilter<"FuturesSeasonPrice"> | Date | string
   feeRate?: Prisma.DecimalFilter<"FuturesSeasonPrice"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFilter<"FuturesSeasonPrice"> | Date | string
@@ -633,6 +702,7 @@ export type FuturesSeasonPriceCreateWithoutSnapshotInput = {
   createdAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutFuturesFinalPricesInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutSeasonPricesInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutSeasonPricesInput
   closes?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutPriceInput
 }
 
@@ -640,6 +710,7 @@ export type FuturesSeasonPriceUncheckedCreateWithoutSnapshotInput = {
   id?: string
   seasonId: string
   instrumentId: string
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -678,14 +749,16 @@ export type FuturesSeasonPriceCreateWithoutInstrumentInput = {
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutFuturesFinalPricesInput
-  snapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  snapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutSeasonPricesInput
   closes?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutPriceInput
 }
 
 export type FuturesSeasonPriceUncheckedCreateWithoutInstrumentInput = {
   id?: string
   seasonId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -718,6 +791,54 @@ export type FuturesSeasonPriceUpdateManyWithWhereWithoutInstrumentInput = {
   data: Prisma.XOR<Prisma.FuturesSeasonPriceUpdateManyMutationInput, Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentInput>
 }
 
+export type FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput = {
+  id?: string
+  endAt: Date | string
+  feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  season: Prisma.SeasonCreateNestedOneWithoutFuturesFinalPricesInput
+  instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutSeasonPricesInput
+  snapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  closes?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutPriceInput
+}
+
+export type FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput = {
+  id?: string
+  seasonId: string
+  instrumentId: string
+  assetPriceSnapshotId?: string | null
+  endAt: Date | string
+  feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+  closes?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutPriceInput
+}
+
+export type FuturesSeasonPriceCreateOrConnectWithoutLastPriceSnapshotInput = {
+  where: Prisma.FuturesSeasonPriceWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput>
+}
+
+export type FuturesSeasonPriceCreateManyLastPriceSnapshotInputEnvelope = {
+  data: Prisma.FuturesSeasonPriceCreateManyLastPriceSnapshotInput | Prisma.FuturesSeasonPriceCreateManyLastPriceSnapshotInput[]
+  skipDuplicates?: boolean
+}
+
+export type FuturesSeasonPriceUpsertWithWhereUniqueWithoutLastPriceSnapshotInput = {
+  where: Prisma.FuturesSeasonPriceWhereUniqueInput
+  update: Prisma.XOR<Prisma.FuturesSeasonPriceUpdateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedUpdateWithoutLastPriceSnapshotInput>
+  create: Prisma.XOR<Prisma.FuturesSeasonPriceCreateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedCreateWithoutLastPriceSnapshotInput>
+}
+
+export type FuturesSeasonPriceUpdateWithWhereUniqueWithoutLastPriceSnapshotInput = {
+  where: Prisma.FuturesSeasonPriceWhereUniqueInput
+  data: Prisma.XOR<Prisma.FuturesSeasonPriceUpdateWithoutLastPriceSnapshotInput, Prisma.FuturesSeasonPriceUncheckedUpdateWithoutLastPriceSnapshotInput>
+}
+
+export type FuturesSeasonPriceUpdateManyWithWhereWithoutLastPriceSnapshotInput = {
+  where: Prisma.FuturesSeasonPriceScalarWhereInput
+  data: Prisma.XOR<Prisma.FuturesSeasonPriceUpdateManyMutationInput, Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotInput>
+}
+
 export type FuturesSeasonPriceCreateWithoutClosesInput = {
   id?: string
   endAt: Date | string
@@ -725,14 +846,16 @@ export type FuturesSeasonPriceCreateWithoutClosesInput = {
   createdAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutFuturesFinalPricesInput
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutSeasonPricesInput
-  snapshot: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  snapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutSeasonPricesInput
 }
 
 export type FuturesSeasonPriceUncheckedCreateWithoutClosesInput = {
   id?: string
   seasonId: string
   instrumentId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -761,14 +884,16 @@ export type FuturesSeasonPriceUpdateWithoutClosesInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutFuturesFinalPricesNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutSeasonPricesNestedInput
-  snapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutFuturesSeasonPricesNestedInput
+  snapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutFuturesSeasonPricesNestedInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutSeasonPricesNestedInput
 }
 
 export type FuturesSeasonPriceUncheckedUpdateWithoutClosesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -777,7 +902,8 @@ export type FuturesSeasonPriceUncheckedUpdateWithoutClosesInput = {
 export type FuturesSeasonPriceCreateManySeasonInput = {
   id?: string
   instrumentId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -789,14 +915,16 @@ export type FuturesSeasonPriceUpdateWithoutSeasonInput = {
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutSeasonPricesNestedInput
-  snapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutFuturesSeasonPricesNestedInput
+  snapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutFuturesSeasonPricesNestedInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutSeasonPricesNestedInput
   closes?: Prisma.FuturesSeasonCloseUpdateManyWithoutPriceNestedInput
 }
 
 export type FuturesSeasonPriceUncheckedUpdateWithoutSeasonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -806,7 +934,8 @@ export type FuturesSeasonPriceUncheckedUpdateWithoutSeasonInput = {
 export type FuturesSeasonPriceUncheckedUpdateManyWithoutSeasonInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -816,6 +945,7 @@ export type FuturesSeasonPriceCreateManySnapshotInput = {
   id?: string
   seasonId: string
   instrumentId: string
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -828,6 +958,7 @@ export type FuturesSeasonPriceUpdateWithoutSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutFuturesFinalPricesNestedInput
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutSeasonPricesNestedInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutSeasonPricesNestedInput
   closes?: Prisma.FuturesSeasonCloseUpdateManyWithoutPriceNestedInput
 }
 
@@ -835,6 +966,7 @@ export type FuturesSeasonPriceUncheckedUpdateWithoutSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -845,6 +977,7 @@ export type FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
   instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -853,7 +986,8 @@ export type FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotInput = {
 export type FuturesSeasonPriceCreateManyInstrumentInput = {
   id?: string
   seasonId: string
-  assetPriceSnapshotId: string
+  assetPriceSnapshotId?: string | null
+  lastPriceSnapshotId?: string | null
   endAt: Date | string
   feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Date | string
@@ -865,14 +999,16 @@ export type FuturesSeasonPriceUpdateWithoutInstrumentInput = {
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutFuturesFinalPricesNestedInput
-  snapshot?: Prisma.AssetPriceSnapshotUpdateOneRequiredWithoutFuturesSeasonPricesNestedInput
+  snapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutFuturesSeasonPricesNestedInput
+  lastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutSeasonPricesNestedInput
   closes?: Prisma.FuturesSeasonCloseUpdateManyWithoutPriceNestedInput
 }
 
 export type FuturesSeasonPriceUncheckedUpdateWithoutInstrumentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -882,7 +1018,50 @@ export type FuturesSeasonPriceUncheckedUpdateWithoutInstrumentInput = {
 export type FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   seasonId?: Prisma.StringFieldUpdateOperationsInput | string
-  assetPriceSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  lastPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
+export type FuturesSeasonPriceCreateManyLastPriceSnapshotInput = {
+  id?: string
+  seasonId: string
+  instrumentId: string
+  assetPriceSnapshotId?: string | null
+  endAt: Date | string
+  feeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Date | string
+}
+
+export type FuturesSeasonPriceUpdateWithoutLastPriceSnapshotInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  season?: Prisma.SeasonUpdateOneRequiredWithoutFuturesFinalPricesNestedInput
+  instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutSeasonPricesNestedInput
+  snapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutFuturesSeasonPricesNestedInput
+  closes?: Prisma.FuturesSeasonCloseUpdateManyWithoutPriceNestedInput
+}
+
+export type FuturesSeasonPriceUncheckedUpdateWithoutLastPriceSnapshotInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonId?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closes?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutPriceNestedInput
+}
+
+export type FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  seasonId?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   endAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   feeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -924,12 +1103,14 @@ export type FuturesSeasonPriceSelect<ExtArgs extends runtime.Types.Extensions.In
   seasonId?: boolean
   instrumentId?: boolean
   assetPriceSnapshotId?: boolean
+  lastPriceSnapshotId?: boolean
   endAt?: boolean
   feeRate?: boolean
   createdAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
-  snapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  snapshot?: boolean | Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>
+  lastPriceSnapshot?: boolean | Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>
   closes?: boolean | Prisma.FuturesSeasonPrice$closesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesSeasonPriceCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresSeasonPrice"]>
@@ -939,12 +1120,14 @@ export type FuturesSeasonPriceSelectCreateManyAndReturn<ExtArgs extends runtime.
   seasonId?: boolean
   instrumentId?: boolean
   assetPriceSnapshotId?: boolean
+  lastPriceSnapshotId?: boolean
   endAt?: boolean
   feeRate?: boolean
   createdAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
-  snapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  snapshot?: boolean | Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>
+  lastPriceSnapshot?: boolean | Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["futuresSeasonPrice"]>
 
 export type FuturesSeasonPriceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -952,12 +1135,14 @@ export type FuturesSeasonPriceSelectUpdateManyAndReturn<ExtArgs extends runtime.
   seasonId?: boolean
   instrumentId?: boolean
   assetPriceSnapshotId?: boolean
+  lastPriceSnapshotId?: boolean
   endAt?: boolean
   feeRate?: boolean
   createdAt?: boolean
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
-  snapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  snapshot?: boolean | Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>
+  lastPriceSnapshot?: boolean | Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>
 }, ExtArgs["result"]["futuresSeasonPrice"]>
 
 export type FuturesSeasonPriceSelectScalar = {
@@ -965,28 +1150,32 @@ export type FuturesSeasonPriceSelectScalar = {
   seasonId?: boolean
   instrumentId?: boolean
   assetPriceSnapshotId?: boolean
+  lastPriceSnapshotId?: boolean
   endAt?: boolean
   feeRate?: boolean
   createdAt?: boolean
 }
 
-export type FuturesSeasonPriceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonId" | "instrumentId" | "assetPriceSnapshotId" | "endAt" | "feeRate" | "createdAt", ExtArgs["result"]["futuresSeasonPrice"]>
+export type FuturesSeasonPriceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonId" | "instrumentId" | "assetPriceSnapshotId" | "lastPriceSnapshotId" | "endAt" | "feeRate" | "createdAt", ExtArgs["result"]["futuresSeasonPrice"]>
 export type FuturesSeasonPriceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
-  snapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  snapshot?: boolean | Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>
+  lastPriceSnapshot?: boolean | Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>
   closes?: boolean | Prisma.FuturesSeasonPrice$closesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesSeasonPriceCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesSeasonPriceIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
-  snapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  snapshot?: boolean | Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>
+  lastPriceSnapshot?: boolean | Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>
 }
 export type FuturesSeasonPriceIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   instrument?: boolean | Prisma.FuturesInstrumentDefaultArgs<ExtArgs>
-  snapshot?: boolean | Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>
+  snapshot?: boolean | Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>
+  lastPriceSnapshot?: boolean | Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>
 }
 
 export type $FuturesSeasonPricePayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -994,14 +1183,20 @@ export type $FuturesSeasonPricePayload<ExtArgs extends runtime.Types.Extensions.
   objects: {
     season: Prisma.$SeasonPayload<ExtArgs>
     instrument: Prisma.$FuturesInstrumentPayload<ExtArgs>
-    snapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs>
+    snapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
+    lastPriceSnapshot: Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs> | null
     closes: Prisma.$FuturesSeasonClosePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
     seasonId: string
     instrumentId: string
-    assetPriceSnapshotId: string
+    /**
+     * Legacy Spot pin created before Futures Last pricing; reused on retry.
+     * SQL CHECK: exactly one of assetPriceSnapshotId / lastPriceSnapshotId.
+     */
+    assetPriceSnapshotId: string | null
+    lastPriceSnapshotId: string | null
     endAt: Date
     feeRate: runtime.Decimal
     createdAt: Date
@@ -1401,7 +1596,8 @@ export interface Prisma__FuturesSeasonPriceClient<T, Null = never, ExtArgs exten
   readonly [Symbol.toStringTag]: "PrismaPromise"
   season<T extends Prisma.SeasonDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.SeasonDefaultArgs<ExtArgs>>): Prisma.Prisma__SeasonClient<runtime.Types.Result.GetResult<Prisma.$SeasonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   instrument<T extends Prisma.FuturesInstrumentDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrumentDefaultArgs<ExtArgs>>): Prisma.Prisma__FuturesInstrumentClient<runtime.Types.Result.GetResult<Prisma.$FuturesInstrumentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
-  snapshot<T extends Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshotDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  snapshot<T extends Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesSeasonPrice$snapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  lastPriceSnapshot<T extends Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs>>): Prisma.Prisma__FuturesLastPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   closes<T extends Prisma.FuturesSeasonPrice$closesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesSeasonPrice$closesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonClosePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -1436,6 +1632,7 @@ export interface FuturesSeasonPriceFieldRefs {
   readonly seasonId: Prisma.FieldRef<"FuturesSeasonPrice", 'String'>
   readonly instrumentId: Prisma.FieldRef<"FuturesSeasonPrice", 'String'>
   readonly assetPriceSnapshotId: Prisma.FieldRef<"FuturesSeasonPrice", 'String'>
+  readonly lastPriceSnapshotId: Prisma.FieldRef<"FuturesSeasonPrice", 'String'>
   readonly endAt: Prisma.FieldRef<"FuturesSeasonPrice", 'DateTime'>
   readonly feeRate: Prisma.FieldRef<"FuturesSeasonPrice", 'Decimal'>
   readonly createdAt: Prisma.FieldRef<"FuturesSeasonPrice", 'DateTime'>
@@ -1837,6 +2034,44 @@ export type FuturesSeasonPriceDeleteManyArgs<ExtArgs extends runtime.Types.Exten
    * Limit how many FuturesSeasonPrices to delete.
    */
   limit?: number
+}
+
+/**
+ * FuturesSeasonPrice.snapshot
+ */
+export type FuturesSeasonPrice$snapshotArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AssetPriceSnapshot
+   */
+  select?: Prisma.AssetPriceSnapshotSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AssetPriceSnapshot
+   */
+  omit?: Prisma.AssetPriceSnapshotOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AssetPriceSnapshotInclude<ExtArgs> | null
+  where?: Prisma.AssetPriceSnapshotWhereInput
+}
+
+/**
+ * FuturesSeasonPrice.lastPriceSnapshot
+ */
+export type FuturesSeasonPrice$lastPriceSnapshotArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesLastPriceSnapshot
+   */
+  select?: Prisma.FuturesLastPriceSnapshotSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesLastPriceSnapshot
+   */
+  omit?: Prisma.FuturesLastPriceSnapshotOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesLastPriceSnapshotInclude<ExtArgs> | null
+  where?: Prisma.FuturesLastPriceSnapshotWhereInput
 }
 
 /**

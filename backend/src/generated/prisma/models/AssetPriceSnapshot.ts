@@ -572,11 +572,6 @@ export type AssetPriceSnapshotSumOrderByAggregateInput = {
   priceKrw?: Prisma.SortOrder
 }
 
-export type AssetPriceSnapshotScalarRelationFilter = {
-  is?: Prisma.AssetPriceSnapshotWhereInput
-  isNot?: Prisma.AssetPriceSnapshotWhereInput
-}
-
 export type AssetPriceSnapshotNullableScalarRelationFilter = {
   is?: Prisma.AssetPriceSnapshotWhereInput | null
   isNot?: Prisma.AssetPriceSnapshotWhereInput | null
@@ -642,10 +637,12 @@ export type AssetPriceSnapshotCreateNestedOneWithoutFuturesExecutionsInput = {
   connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
 }
 
-export type AssetPriceSnapshotUpdateOneRequiredWithoutFuturesExecutionsNestedInput = {
+export type AssetPriceSnapshotUpdateOneWithoutFuturesExecutionsNestedInput = {
   create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutFuturesExecutionsInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutFuturesExecutionsInput>
   connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutFuturesExecutionsInput
   upsert?: Prisma.AssetPriceSnapshotUpsertWithoutFuturesExecutionsInput
+  disconnect?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  delete?: Prisma.AssetPriceSnapshotWhereInput | boolean
   connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutFuturesExecutionsInput, Prisma.AssetPriceSnapshotUpdateWithoutFuturesExecutionsInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutFuturesExecutionsInput>
 }
@@ -656,10 +653,12 @@ export type AssetPriceSnapshotCreateNestedOneWithoutProtectionChildrenInput = {
   connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
 }
 
-export type AssetPriceSnapshotUpdateOneRequiredWithoutProtectionChildrenNestedInput = {
+export type AssetPriceSnapshotUpdateOneWithoutProtectionChildrenNestedInput = {
   create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutProtectionChildrenInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutProtectionChildrenInput>
   connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutProtectionChildrenInput
   upsert?: Prisma.AssetPriceSnapshotUpsertWithoutProtectionChildrenInput
+  disconnect?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  delete?: Prisma.AssetPriceSnapshotWhereInput | boolean
   connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutProtectionChildrenInput, Prisma.AssetPriceSnapshotUpdateWithoutProtectionChildrenInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutProtectionChildrenInput>
 }
@@ -702,10 +701,12 @@ export type AssetPriceSnapshotCreateNestedOneWithoutFuturesSeasonPricesInput = {
   connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
 }
 
-export type AssetPriceSnapshotUpdateOneRequiredWithoutFuturesSeasonPricesNestedInput = {
+export type AssetPriceSnapshotUpdateOneWithoutFuturesSeasonPricesNestedInput = {
   create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutFuturesSeasonPricesInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutFuturesSeasonPricesInput>
   connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutFuturesSeasonPricesInput
   upsert?: Prisma.AssetPriceSnapshotUpsertWithoutFuturesSeasonPricesInput
+  disconnect?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  delete?: Prisma.AssetPriceSnapshotWhereInput | boolean
   connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutFuturesSeasonPricesInput, Prisma.AssetPriceSnapshotUpdateWithoutFuturesSeasonPricesInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutFuturesSeasonPricesInput>
 }

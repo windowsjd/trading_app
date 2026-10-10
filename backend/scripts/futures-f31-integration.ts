@@ -7,6 +7,7 @@ import {
   fixture,
   now,
   price,
+  spotPrice,
   fxEvidence,
   fxEvidenceIds,
   openBody,
@@ -24,6 +25,8 @@ import { GeneralExternalFundingService } from '../src/portfolio/general-external
 import { FuturesSeasonSettlementService } from '../src/futures/futures-season-settlement.service';
 import { FuturesLiquidationService } from '../src/futures/futures-liquidation.service';
 import { FuturesMarkRetentionService } from '../src/futures/futures-mark-retention.service';
+import { FuturesLastPriceRetentionService } from '../src/futures/futures-last-price-retention.service';
+import { readFuturesLastPrice } from '../src/futures/futures-last-price';
 import { readFuturesMark } from '../src/futures/futures-mark';
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
@@ -102,8 +105,19 @@ async function release(s: Scenario) {
   });
   await cleanup(s);
 }
-async function end(s: Scenario, value = '100') {
-  const endAt = await now();
+/** Boundary evidence per domain: Futures Last prices the forced exit, Spot
+ * values retained Spot holdings. Equal values keep the expected totals. */
+async function boundary(s: Scenario, value: string, endAt: Date) {
+  await db.futuresLastPriceSnapshot.create({
+    data: {
+      instrumentId: s.instruments[0].instrument.id,
+      symbol: s.instruments[0].asset.symbol,
+      price: value,
+      source: 'binance_usdm_agg_trade_ws',
+      effectiveAt: endAt,
+      capturedAt: endAt,
+    },
+  });
   await db.assetPriceSnapshot.create({
     data: {
       assetId: s.instruments[0].asset.id,
@@ -115,6 +129,10 @@ async function end(s: Scenario, value = '100') {
       capturedAt: endAt,
     },
   });
+}
+async function end(s: Scenario, value = '100') {
+  const endAt = await now();
+  await boundary(s, value, endAt);
   await db.season.update({
     where: { id: s.season!.id },
     data: { status: 'ended', endAt },
@@ -302,15 +320,15 @@ async function finalHistoryAndReads() {
         },
       });
     const liveBefore = await portfolio.getPortfolio(a.userId, a.accountId);
-    await price(a, '200', 0, 0);
+    await spotPrice(a, '200', 0, 0); // Spot holdings revalue on Spot evidence.
     const liveAfter = await portfolio.getPortfolio(a.userId, a.accountId);
     assert.notEqual(
       liveBefore.data.summary?.totalAssetKrw,
       liveAfter.data.summary?.totalAssetKrw,
     );
     pass('active Season remains live');
-    // fresh() deliberately lags capturedAt by 20ms. Let the earlier live-price
-    // change precede the new execution fixture, instead of choosing its $200 row.
+    // The $200 Spot row is Spot-only evidence; Futures executions below use
+    // their own fresh Futures Last rows from fresh().
     await new Promise((resolve) => setTimeout(resolve, 30));
     for (const subject of [a, b]) {
       await fresh(subject);
@@ -321,17 +339,7 @@ async function finalHistoryAndReads() {
       );
     }
     const endAt = await end(a, '105');
-    await db.assetPriceSnapshot.create({
-      data: {
-        assetId: b.instruments[0].asset.id,
-        price: '105',
-        currencyCode: 'USD',
-        sourceType: 'provider_api',
-        sourceName: 'binance_spot_ws_ticker',
-        effectiveAt: endAt,
-        capturedAt: endAt,
-      },
-    });
+    await boundary(b, '105', endAt);
     for (const s of [a, b]) {
       await db.tradingAccount.update({
         where: { id: s.accountId },
@@ -396,6 +404,7 @@ async function finalHistoryAndReads() {
       'settled account history omits post-end observations and keeps final settlement evidence',
     );
     await price(a, '999999', 0, 0);
+    await spotPrice(a, '999999', 0, 0);
     await fxEvidence();
     await jobs.run({ ...input, idempotencyKey: randomUUID() });
     assert.deepEqual(
@@ -410,7 +419,7 @@ async function finalHistoryAndReads() {
       ranks,
     );
     pass(
-      'post-end Spot/FX evidence and settlement retry cannot reprice final results',
+      'post-end Futures Last/Spot/FX evidence and settlement retry cannot reprice final results',
     );
     const home = await new HomeService(db, valuation).getHome(a.userId);
     assert.equal(home.data.mode, 'settled_joined');
@@ -623,10 +632,135 @@ async function retention() {
   }
 }
 
+/** Last observations are bounded transport data; referenced financial evidence,
+ * Season end windows and the newest row per instrument/source are never deleted. */
+async function lastPriceRetention() {
+  const s = await fixture('general');
+  const t = await fixture('season');
+  const extra = await db.season.create({
+    data: {
+      name: `f31-window-${randomUUID()}`,
+      status: 'ended',
+      startAt: new Date(Date.now() - 86400000),
+      endAt: new Date(Date.now() - 86400000),
+      initialCapitalKrw: '10000000',
+      tradeFeeRate: '0.002',
+      fxFeeRate: '0.001',
+    },
+  });
+  const retention = new FuturesLastPriceRetentionService(
+    db,
+    new OpsJobLockService(db),
+    new OpsJobRunService(db),
+  );
+  try {
+    // Unreferenced history outside every Season end window (the window guard
+    // is global), then a referenced execution price.
+    const disposable: string[] = [];
+    for (let i = 0; i < 5; i++)
+      disposable.push((await price(s, '100', 0, 40000 - i)).id);
+    await fresh(s);
+    const executed = await app.futures.execute(
+      s.userId,
+      s.accountId,
+      openBody(s),
+    );
+    const executionRow = executed.data.execution.priceEvidence
+      .lastPriceSnapshotId as string;
+    // A Season pin and an unreferenced receipt inside another Season's window.
+    await fresh(t);
+    await app.futures.execute(t.userId, t.accountId, openBody(t));
+    const endAt = await end(t, '101');
+    await final.settleSeason(t.season!.id);
+    const pinRow = (
+      await db.futuresSeasonPrice.findFirstOrThrow({
+        where: { seasonId: t.season!.id },
+      })
+    ).lastPriceSnapshotId!;
+    const windowRow = await price(t, '100', 0, 0);
+    await db.season.update({
+      where: { id: extra.id },
+      data: { endAt: new Date(+windowRow.capturedAt + 5000) },
+    });
+    const newest = await price(s, '100', 0, 0);
+    // A future cutoff treats every row as old; only the guards keep rows.
+    const cutoff = new Date((await now()).getTime() + 3600000);
+    let deleted = 0;
+    for (let i = 0; i < 20; i++) {
+      const batch = await retention.deleteBatch(cutoff, 2);
+      assert.ok(batch <= 2);
+      deleted += batch;
+      if (batch === 0) break;
+    }
+    assert.ok(deleted >= disposable.length);
+    assert.equal(await retention.deleteBatch(cutoff, 2), 0);
+    for (const id of disposable)
+      assert.equal(
+        await db.futuresLastPriceSnapshot.count({ where: { id } }),
+        0,
+      );
+    for (const id of [executionRow, pinRow, windowRow.id, newest.id])
+      assert.equal(
+        await db.futuresLastPriceSnapshot.count({ where: { id } }),
+        1,
+        id,
+      );
+    pass(
+      'Last retention keeps execution/pin evidence, Season windows and newest rows; bounded batches drain',
+    );
+    const instrument = await db.futuresInstrument.findUniqueOrThrow({
+      where: { id: s.instruments[0].instrument.id },
+      include: { underlyingAsset: true },
+    });
+    assert.equal(
+      (await readFuturesLastPrice(db, instrument, await now()))?.id,
+      newest.id,
+    );
+    const history = await app.futures.executions(s.userId, s.accountId, {});
+    assert.equal(
+      history.data.executions[0].priceEvidence.lastPriceSnapshotId,
+      executionRow,
+    );
+    const view = await app.futures.finalSettlement(t.userId, t.accountId);
+    assert.ok(JSON.stringify(view).includes(pinRow));
+    assert.ok(+endAt > 0);
+    pass(
+      'selection, execution history and final evidence survive Last retention',
+    );
+    process.env.FUTURES_LAST_PRICE_RETENTION_ENABLED = 'true';
+    const results = await Promise.all([
+      retention.run(),
+      new FuturesLastPriceRetentionService(
+        db,
+        new OpsJobLockService(db),
+        new OpsJobRunService(db),
+      ).run(),
+    ]);
+    assert.ok(results.some(Boolean));
+    assert.equal(
+      await db.futuresLastPriceSnapshot.count({ where: { id: executionRow } }),
+      1,
+    );
+    pass('duplicate Last retention workers serialize on the Ops lock');
+  } finally {
+    delete process.env.FUTURES_LAST_PRICE_RETENTION_ENABLED;
+    await release(t);
+    await release(s);
+    await db.season.delete({ where: { id: extra.id } });
+    await db.opsJobRun.deleteMany({
+      where: { jobName: 'futures_last_price_retention' },
+    });
+    await db.opsJobLock.deleteMany({
+      where: { jobName: 'futures_last_price_retention' },
+    });
+  }
+}
+
 async function main() {
   await userCounts();
   await finalHistoryAndReads();
   await retention();
+  await lastPriceRetention();
   console.log(`futures F3.1 db integration ok (${checks} checks)`);
 }
 main()

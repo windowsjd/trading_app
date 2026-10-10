@@ -6,7 +6,7 @@ Current contract: server capability defaults OFF; production activation is a sep
 
 One account-scoped protection group protects the entire remaining Spot position or one Futures position lifetime. It contains Stop Loss, Take Profit, or both. Each leg has a trigger and a Market or Limit exit intent. [Futures Limit Entry v1](futures-limit-entry-contract.md) supplies a parent entry without adding a second Conditional engine. There is no trailing stop, quantity ladder, or general condition framework.
 
-Spot triggers use the existing eligible market evidence/session policy. Futures triggers and user exits use canonical Binance **Spot** last trade; Mark remains the risk/liquidation source. Registration requires fresh evidence and strictly untriggered prices (long SL below / TP above; short reversed). Unavailable evidence defers evaluation without canceling protection.
+Spot triggers use the existing eligible market evidence/session policy. Futures triggers and user exits use Binance USDⓈ-M **Futures Last** ([contract](futures-last-price-contract.md), 2026-10-10); Mark remains the risk/liquidation source. Registration requires fresh evidence and strictly untriggered prices (long SL below / TP above; short reversed). Unavailable evidence defers evaluation without canceling protection.
 
 ## OCO and quantity
 
@@ -60,9 +60,12 @@ do not borrow quantities from a later Spot holding. Reads never repair state.
 The durable tables are `protection_groups`, `protection_legs`,
 `protection_children`, and `protection_commands`. Partial unique indexes enforce
 one live group per account/product/asset and one pending child per group. A
-composite leg/group FK prevents cross-group child linkage. Each trigger keeps a
-Spot snapshot FK and price/source/currency/effectiveAt/capturedAt/asset/symbol/
+composite leg/group FK prevents cross-group child linkage. Each trigger keeps
+exactly one evidence FK — a Spot snapshot for Spot groups (and Futures triggers
+recorded before 2026-10-10), a Futures Last snapshot for Futures groups — and a
+price/source/currency/priceBasis/instrument/effectiveAt/capturedAt/asset/symbol/
 position/kind/threshold copy; Mark snapshots are not linked or consulted here.
+The DB rejects Futures Last evidence on a Spot group or another underlying.
 The existing actual Order/FuturesExecution and ledger remain settlement evidence.
 
 Typed conflicts include `PROTECTION_CONFLICT`, `PROTECTION_CHILD_PENDING`,

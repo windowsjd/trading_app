@@ -64,8 +64,13 @@ export function presentFuturesExecution(row: FuturesExecution) {
     feeRate: row.feeRate.toFixed(6),
     feeAmount: row.feeAmount.toFixed(8),
     realizedPnl: row.realizedPnl.toFixed(8),
+    // Executions committed before Futures Last pricing keep their Spot evidence.
     priceEvidence: {
       assetPriceSnapshotId: row.assetPriceSnapshotId,
+      lastPriceSnapshotId: row.lastPriceSnapshotId,
+      priceBasis: row.lastPriceSnapshotId
+        ? ('futures_last' as const)
+        : ('spot_last' as const),
       sourceType: row.priceSourceType,
       sourceName: row.priceSourceName,
       effectiveAt: row.priceEffectiveAt.toISOString(),
