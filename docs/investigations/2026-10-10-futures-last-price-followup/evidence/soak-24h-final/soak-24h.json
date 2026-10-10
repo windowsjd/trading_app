@@ -1,14 +1,14 @@
 {
   "state": "RUNNING",
   "requestedSeconds": 86400,
-  "elapsedSeconds": 575.70066314,
+  "elapsedSeconds": 646.237707666,
   "actual24hCompleted": false,
   "startedAt": "2026-10-10T06:31:49.088Z",
   "database": "127.0.0.1:55439/futures_soak_24h_final_test",
   "instruments": 23,
   "spotSymbols": 25,
-  "samples": 57,
-  "evaluatedFreshSamples": 51,
+  "samples": 64,
+  "evaluatedFreshSamples": 58,
   "badFreshSamples": 0,
   "frames": {
     "?": {
@@ -18,164 +18,164 @@
       "lastAt": 1099.30199
     },
     "WLDUSDT": {
-      "accepted": 4542,
+      "accepted": 4881,
       "rejected": 0,
       "maxGapMs": 20489.75193,
-      "lastAt": 575929.844415
+      "lastAt": 646762.00082
     },
     "SOLUSDT": {
-      "accepted": 853,
+      "accepted": 973,
       "rejected": 0,
       "maxGapMs": 22108.419286999997,
-      "lastAt": 576103.684773
+      "lastAt": 646729.347633
     },
     "AVAXUSDT": {
-      "accepted": 738,
+      "accepted": 817,
       "rejected": 0,
       "maxGapMs": 22854.918517000013,
-      "lastAt": 575916.010961
+      "lastAt": 646487.028391
     },
     "NEARUSDT": {
-      "accepted": 1503,
+      "accepted": 1644,
       "rejected": 0,
       "maxGapMs": 20836.16622699998,
-      "lastAt": 575694.023272
+      "lastAt": 645401.827387
     },
     "DOGEUSDT": {
-      "accepted": 484,
+      "accepted": 549,
       "rejected": 0,
       "maxGapMs": 22111.571662000002,
-      "lastAt": 575248.527716
+      "lastAt": 647003.135361
     },
     "UNIUSDT": {
-      "accepted": 496,
+      "accepted": 557,
       "rejected": 0,
       "maxGapMs": 22314.80931499999,
-      "lastAt": 575160.445228
+      "lastAt": 647011.232139
     },
     "XLMUSDT": {
-      "accepted": 434,
+      "accepted": 508,
       "rejected": 0,
       "maxGapMs": 22859.090031,
-      "lastAt": 575273.782656
+      "lastAt": 646571.226738
     },
     "ETHUSDT": {
-      "accepted": 866,
+      "accepted": 1136,
       "rejected": 0,
       "maxGapMs": 21558.37308000002,
-      "lastAt": 575775.506148
+      "lastAt": 646921.461519
     },
     "TAOUSDT": {
-      "accepted": 921,
+      "accepted": 1113,
       "rejected": 0,
       "maxGapMs": 22964.161473000015,
-      "lastAt": 574814.830539
+      "lastAt": 645834.889387
     },
     "ZECUSDT": {
-      "accepted": 3098,
+      "accepted": 3361,
       "rejected": 0,
       "maxGapMs": 21942.804516000004,
-      "lastAt": 576020.013432
+      "lastAt": 646718.318758
     },
     "XRPUSDT": {
-      "accepted": 646,
+      "accepted": 787,
       "rejected": 0,
       "maxGapMs": 20570.308684000018,
-      "lastAt": 575718.132351
+      "lastAt": 646080.747741
     },
     "BNBUSDT": {
-      "accepted": 778,
-      "rejected": 0,
-      "maxGapMs": 22238.022104999982,
-      "lastAt": 576309.235606
-    },
-    "ASTERUSDT": {
-      "accepted": 232,
-      "rejected": 0,
-      "maxGapMs": 26023.35874299999,
-      "lastAt": 573314.435506
-    },
-    "LINKUSDT": {
-      "accepted": 288,
-      "rejected": 0,
-      "maxGapMs": 23944.04217100001,
-      "lastAt": 575312.625748
-    },
-    "LTCUSDT": {
-      "accepted": 179,
-      "rejected": 0,
-      "maxGapMs": 22423.57966800002,
-      "lastAt": 574808.743686
-    },
-    "BTCUSDT": {
-      "accepted": 1069,
-      "rejected": 0,
-      "maxGapMs": 24258.161890999996,
-      "lastAt": 575694.535144
-    },
-    "TRXUSDT": {
-      "accepted": 222,
-      "rejected": 0,
-      "maxGapMs": 23622.703011999984,
-      "lastAt": 574700.456726
-    },
-    "TRUMPUSDT": {
-      "accepted": 220,
-      "rejected": 0,
-      "maxGapMs": 22277.37270800001,
-      "lastAt": 575900.467219
-    },
-    "ADAUSDT": {
-      "accepted": 484,
-      "rejected": 0,
-      "maxGapMs": 25088.758622000023,
-      "lastAt": 574580.817995
-    },
-    "NIGHTUSDT": {
-      "accepted": 403,
-      "rejected": 0,
-      "maxGapMs": 23833.66748100001,
-      "lastAt": 572062.515792
-    },
-    "ENAUSDT": {
       "accepted": 996,
       "rejected": 0,
+      "maxGapMs": 22238.022104999982,
+      "lastAt": 646880.210372
+    },
+    "ASTERUSDT": {
+      "accepted": 260,
+      "rejected": 0,
+      "maxGapMs": 26023.35874299999,
+      "lastAt": 646628.490881
+    },
+    "LINKUSDT": {
+      "accepted": 315,
+      "rejected": 0,
+      "maxGapMs": 23944.04217100001,
+      "lastAt": 646015.8353
+    },
+    "LTCUSDT": {
+      "accepted": 195,
+      "rejected": 0,
+      "maxGapMs": 22423.57966800002,
+      "lastAt": 638679.340992
+    },
+    "BTCUSDT": {
+      "accepted": 1347,
+      "rejected": 0,
+      "maxGapMs": 24258.161890999996,
+      "lastAt": 646748.928593
+    },
+    "TRXUSDT": {
+      "accepted": 244,
+      "rejected": 0,
+      "maxGapMs": 23622.703011999984,
+      "lastAt": 643210.709068
+    },
+    "TRUMPUSDT": {
+      "accepted": 255,
+      "rejected": 0,
+      "maxGapMs": 22277.37270800001,
+      "lastAt": 646632.57406
+    },
+    "ADAUSDT": {
+      "accepted": 536,
+      "rejected": 0,
+      "maxGapMs": 25088.758622000023,
+      "lastAt": 647008.803296
+    },
+    "NIGHTUSDT": {
+      "accepted": 477,
+      "rejected": 0,
+      "maxGapMs": 23833.66748100001,
+      "lastAt": 643322.95348
+    },
+    "ENAUSDT": {
+      "accepted": 1076,
+      "rejected": 0,
       "maxGapMs": 24207.87553999998,
-      "lastAt": 575104.243882
+      "lastAt": 646984.899318
     },
     "CHIPUSDT": {
-      "accepted": 364,
+      "accepted": 406,
       "rejected": 0,
       "maxGapMs": 30650.527608999982,
-      "lastAt": 576431.214665
+      "lastAt": 645630.848655
     },
     "SUIUSDT": {
-      "accepted": 719,
+      "accepted": 814,
       "rejected": 0,
       "maxGapMs": 23800.39074999999,
-      "lastAt": 575570.730254
+      "lastAt": 644849.63916
     }
   },
   "rest": {
     "fapi.binance.com/fapi/v1/exchangeInfo": {
-      "calls": 3,
+      "calls": 4,
       "failures": 0,
       "statuses": {
-        "200": 3
+        "200": 4
       }
     },
     "fapi.binance.com/fapi/v2/ticker/price": {
-      "calls": 164,
+      "calls": 184,
       "failures": 6,
       "statuses": {
-        "200": 158
+        "200": 178
       }
     },
     "api.binance.com/api/v3/ticker/24hr": {
-      "calls": 10,
+      "calls": 11,
       "failures": 0,
       "statuses": {
-        "200": 10
+        "200": 11
       }
     },
     "fapi.binance.com/fapi/v1/premiumIndex": {
@@ -253,17 +253,17 @@
     "lastStartedAt": "2026-10-10T06:31:49.090Z",
     "lastConnectedAt": "2026-10-10T06:31:49.229Z",
     "lastDisconnectedAt": null,
-    "lastMessageAt": "2026-10-10T06:40:51.302Z",
-    "lastTickerAt": "2026-10-10T06:40:51.279Z",
-    "lastSnapshotAt": "2026-10-10T06:40:51.279Z",
+    "lastMessageAt": "2026-10-10T06:41:58.292Z",
+    "lastTickerAt": "2026-10-10T06:41:58.289Z",
+    "lastSnapshotAt": "2026-10-10T06:41:58.105Z",
     "reconnectCount": 0,
     "nextReconnectAt": null,
     "nextReconnectDelayMs": null,
-    "receivedFrames": 21396,
-    "receivedTickers": 9113,
+    "receivedFrames": 24077,
+    "receivedTickers": 10265,
     "acknowledged": 1,
-    "created": 2243,
-    "skipped": 6870,
+    "created": 2523,
+    "skipped": 7742,
     "failed": 0,
     "latestPriceCount": 25,
     "eventListenerCount": 0,
@@ -363,32 +363,40 @@
     {
       "elapsedSeconds": 564.5158013749999,
       "stepMs": -1801.2025539999595
+    },
+    {
+      "elapsedSeconds": 596.989836332,
+      "stepMs": -1858.4370020000497
+    },
+    {
+      "elapsedSeconds": 629.503565398,
+      "stepMs": -1843.5646839999827
     }
   ],
   "commands": {
     "marketLatencyMs": {
-      "samples": 19,
+      "samples": 21,
       "p50": 33.34,
-      "p95": 66.46,
+      "p95": 54.07,
       "p99": 66.46,
       "max": 66.46
     },
     "limitEvaluationMs": {
-      "samples": 19,
+      "samples": 21,
       "p50": 2.78,
-      "p95": 4.32,
+      "p95": 3.47,
       "p99": 4.32,
       "max": 4.32
     },
     "limitFillMs": {
-      "samples": 18,
-      "p50": 2039.52,
-      "p95": 2952.44,
+      "samples": 20,
+      "p50": 1949.43,
+      "p95": 2946.33,
       "p99": 2952.44,
       "max": 2952.44
     },
     "pendingLimitOutcomes": {
-      "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 19
+      "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 21
     },
     "expectedOutageBlocks": 1,
     "errors": {}
@@ -412,358 +420,380 @@
     }
   ],
   "latestSample": {
-    "elapsedSeconds": 575.70066314,
-    "evaluatedAt": "2026-10-10T06:40:51.458Z",
+    "elapsedSeconds": 646.237707666,
+    "evaluatedAt": "2026-10-10T06:41:58.293Z",
     "fresh": 23,
     "references": [
       {
         "symbol": "BTCUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.883Z",
-          "capturedAt": "2026-10-10T06:40:50.677Z"
+          "effectiveAt": "2026-10-10T06:41:55.345Z",
+          "capturedAt": "2026-10-10T06:41:56.384Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.690Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.966Z"
         }
       },
       {
         "symbol": "ETHUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.959Z",
-          "capturedAt": "2026-10-10T06:40:50.758Z"
+          "effectiveAt": "2026-10-10T06:41:56.355Z",
+          "capturedAt": "2026-10-10T06:41:57.456Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.692Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.965Z"
         }
       },
       {
         "symbol": "BNBUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.223Z",
-          "capturedAt": "2026-10-10T06:40:51.039Z"
+          "effectiveAt": "2026-10-10T06:41:55.960Z",
+          "capturedAt": "2026-10-10T06:41:57.036Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.691Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.967Z"
         }
       },
       {
         "symbol": "XRPUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.905Z",
-          "capturedAt": "2026-10-10T06:40:50.701Z"
+          "effectiveAt": "2026-10-10T06:41:56.266Z",
+          "capturedAt": "2026-10-10T06:41:57.361Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.692Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.965Z"
         }
       },
       {
         "symbol": "SOLUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.268Z",
-          "capturedAt": "2026-10-10T06:40:51.087Z"
+          "effectiveAt": "2026-10-10T06:41:56.240Z",
+          "capturedAt": "2026-10-10T06:41:57.334Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.693Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.968Z"
         }
       },
       {
         "symbol": "TRXUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:48.943Z",
-          "capturedAt": "2026-10-10T06:40:49.683Z"
+          "effectiveAt": "2026-10-10T06:41:53.562Z",
+          "capturedAt": "2026-10-10T06:41:54.491Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.690Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.966Z"
         }
       },
       {
         "symbol": "DOGEUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.462Z",
-          "capturedAt": "2026-10-10T06:40:50.231Z"
+          "effectiveAt": "2026-10-10T06:41:55.773Z",
+          "capturedAt": "2026-10-10T06:41:56.838Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.692Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.967Z"
         }
       },
       {
         "symbol": "ZECUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.190Z",
-          "capturedAt": "2026-10-10T06:40:51.003Z"
+          "effectiveAt": "2026-10-10T06:41:56.323Z",
+          "capturedAt": "2026-10-10T06:41:57.423Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.691Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.967Z"
         }
       },
       {
         "symbol": "XLMUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.486Z",
-          "capturedAt": "2026-10-10T06:40:50.257Z"
+          "effectiveAt": "2026-10-10T06:41:56.357Z",
+          "capturedAt": "2026-10-10T06:41:57.444Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.692Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.965Z"
         }
       },
       {
         "symbol": "LINKUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.522Z",
-          "capturedAt": "2026-10-10T06:40:50.296Z"
+          "effectiveAt": "2026-10-10T06:41:56.204Z",
+          "capturedAt": "2026-10-10T06:41:57.296Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.690Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.966Z"
         }
       },
       {
         "symbol": "SUIUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.765Z",
-          "capturedAt": "2026-10-10T06:40:50.554Z"
+          "effectiveAt": "2026-10-10T06:41:55.106Z",
+          "capturedAt": "2026-10-10T06:41:56.130Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.694Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.970Z"
         }
       },
       {
         "symbol": "NIGHTUSDT",
         "last": {
-          "source": "binance_usdm_ticker_price_rest",
-          "effectiveAt": "2026-10-10T06:40:46.456Z",
-          "capturedAt": "2026-10-10T06:40:51.174Z"
+          "source": "binance_usdm_agg_trade_ws",
+          "effectiveAt": "2026-10-10T06:41:53.667Z",
+          "capturedAt": "2026-10-10T06:41:54.603Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.709Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.986Z"
         }
       },
       {
         "symbol": "NEARUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.882Z",
-          "capturedAt": "2026-10-10T06:40:50.677Z"
+          "effectiveAt": "2026-10-10T06:41:55.626Z",
+          "capturedAt": "2026-10-10T06:41:56.682Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.693Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.968Z"
         }
       },
       {
         "symbol": "ADAUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:48.832Z",
-          "capturedAt": "2026-10-10T06:40:49.564Z"
+          "effectiveAt": "2026-10-10T06:41:55.529Z",
+          "capturedAt": "2026-10-10T06:41:56.581Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.691Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.966Z"
         }
       },
       {
         "symbol": "TAOUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.053Z",
-          "capturedAt": "2026-10-10T06:40:49.798Z"
+          "effectiveAt": "2026-10-10T06:41:56.034Z",
+          "capturedAt": "2026-10-10T06:41:57.115Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.698Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.974Z"
         }
       },
       {
         "symbol": "WLDUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.105Z",
-          "capturedAt": "2026-10-10T06:40:50.913Z"
+          "effectiveAt": "2026-10-10T06:41:56.418Z",
+          "capturedAt": "2026-10-10T06:41:57.451Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.694Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.971Z"
         }
       },
       {
         "symbol": "ENAUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.326Z",
-          "capturedAt": "2026-10-10T06:40:50.087Z"
+          "effectiveAt": "2026-10-10T06:41:55.689Z",
+          "capturedAt": "2026-10-10T06:41:56.749Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.698Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.974Z"
         }
       },
       {
         "symbol": "AVAXUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.091Z",
-          "capturedAt": "2026-10-10T06:40:50.899Z"
+          "effectiveAt": "2026-10-10T06:41:55.229Z",
+          "capturedAt": "2026-10-10T06:41:56.261Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.693Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.967Z"
         }
       },
       {
         "symbol": "UNIUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.379Z",
-          "capturedAt": "2026-10-10T06:40:50.143Z"
+          "effectiveAt": "2026-10-10T06:41:56.065Z",
+          "capturedAt": "2026-10-10T06:41:57.149Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.693Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.967Z"
         }
       },
       {
         "symbol": "CHIPUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.205Z",
-          "capturedAt": "2026-10-10T06:40:51.019Z"
+          "effectiveAt": "2026-10-10T06:41:55.841Z",
+          "capturedAt": "2026-10-10T06:41:56.911Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.711Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.988Z"
         }
       },
       {
         "symbol": "LTCUSDT",
         "last": {
-          "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:49.047Z",
-          "capturedAt": "2026-10-10T06:40:49.792Z"
+          "source": "binance_usdm_ticker_price_rest",
+          "effectiveAt": "2026-10-10T06:41:49.291Z",
+          "capturedAt": "2026-10-10T06:41:53.513Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.690Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.966Z"
         }
       },
       {
         "symbol": "ASTERUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:47.637Z",
-          "capturedAt": "2026-10-10T06:40:48.297Z"
+          "effectiveAt": "2026-10-10T06:41:56.014Z",
+          "capturedAt": "2026-10-10T06:41:57.094Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.708Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.985Z"
         }
       },
       {
         "symbol": "TRUMPUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T06:40:50.074Z",
-          "capturedAt": "2026-10-10T06:40:50.883Z"
+          "effectiveAt": "2026-10-10T06:41:55.650Z",
+          "capturedAt": "2026-10-10T06:41:56.707Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T06:40:50.000Z",
-          "capturedAt": "2026-10-10T06:40:50.700Z"
+          "effectiveAt": "2026-10-10T06:41:56.003Z",
+          "capturedAt": "2026-10-10T06:41:56.978Z"
         }
       }
     ],
     "expected": 23,
     "plannedFault": false,
     "memory": {
-      "rss": 440414208,
-      "heapTotal": 227692544,
-      "heapUsed": 105012280,
-      "external": 30071426,
-      "arrayBuffers": 2139126
+      "rss": 440676352,
+      "heapTotal": 226119680,
+      "heapUsed": 109304240,
+      "external": 32613308,
+      "arrayBuffers": 2385772
     },
     "processCpu": {
-      "user": 32006613,
-      "system": 12854703
+      "user": 35686031,
+      "system": 14450617
     },
     "databaseStats": [
       {
-        "xact_commit": "61718",
+        "xact_commit": "69429",
         "xact_rollback": "16",
         "blks_read": "0",
-        "blks_hit": "898738",
-        "tup_inserted": "22546",
-        "tup_updated": "4085",
-        "tup_deleted": "150",
+        "blks_hit": "1006572",
+        "tup_inserted": "25374",
+        "tup_updated": "4596",
+        "tup_deleted": "156",
         "temp_bytes": "0",
         "connections": 5
       }
     ],
     "opsLocks": [
       {
+        "id": "f15f7382-fe65-491c-b825-25404c78808b",
+        "lockKey": "futures_limit_matching:current",
+        "jobName": "futures_limit_matching",
+        "ownerId": "074ad2b4-18af-4eb7-9103-bef69b199c78",
+        "acquiredAt": "2026-10-10T06:41:57.468Z",
+        "expiresAt": "2026-10-10T06:42:27.470Z",
+        "releasedAt": "2026-10-10T06:41:57.476Z",
+        "createdAt": "2026-10-10T06:32:18.230Z",
+        "updatedAt": "2026-10-10T06:41:57.476Z"
+      },
+      {
+        "id": "315eb870-04ef-496a-a476-778a0f959bec",
+        "lockKey": "futures_liquidation:current",
+        "jobName": "futures_liquidation",
+        "ownerId": "a61a965c-8065-4c22-83bf-af9ff2a360ae",
+        "acquiredAt": "2026-10-10T06:41:57.467Z",
+        "expiresAt": "2026-10-10T06:42:27.477Z",
+        "releasedAt": "2026-10-10T06:41:57.478Z",
+        "createdAt": "2026-10-10T06:31:50.099Z",
+        "updatedAt": "2026-10-10T06:41:57.478Z"
+      },
+      {
         "id": "5962fb50-f7a7-451a-8c0c-e07d6e5ac055",
         "lockKey": "futures_mark_retention:current",
         "jobName": "futures_mark_retention",
-        "ownerId": "284904d1-27c1-4f3a-a2fb-5a3d6d3712f9",
-        "acquiredAt": "2026-10-10T06:40:17.561Z",
-        "expiresAt": "2026-10-10T06:40:47.566Z",
-        "releasedAt": "2026-10-10T06:40:17.569Z",
+        "ownerId": "e1a7675f-fa1e-4d03-88bc-0182e3470126",
+        "acquiredAt": "2026-10-10T06:41:13.902Z",
+        "expiresAt": "2026-10-10T06:41:43.906Z",
+        "releasedAt": "2026-10-10T06:41:13.910Z",
         "createdAt": "2026-10-10T06:32:45.375Z",
-        "updatedAt": "2026-10-10T06:40:17.570Z"
+        "updatedAt": "2026-10-10T06:41:13.910Z"
       },
       {
         "id": "d4335726-d66d-4c2a-b9dc-b91de906f19a",
         "lockKey": "futures_last_price_retention:current",
         "jobName": "futures_last_price_retention",
-        "ownerId": "abba4eb6-a52e-453d-bc6c-136c46dd9190",
-        "acquiredAt": "2026-10-10T06:40:17.560Z",
-        "expiresAt": "2026-10-10T06:40:47.565Z",
-        "releasedAt": "2026-10-10T06:40:17.570Z",
+        "ownerId": "197cc322-67e5-4e82-8a6d-04545847d701",
+        "acquiredAt": "2026-10-10T06:41:13.902Z",
+        "expiresAt": "2026-10-10T06:41:43.905Z",
+        "releasedAt": "2026-10-10T06:41:13.910Z",
         "createdAt": "2026-10-10T06:32:45.375Z",
-        "updatedAt": "2026-10-10T06:40:17.570Z"
+        "updatedAt": "2026-10-10T06:41:13.910Z"
       },
       {
         "id": "081859ba-82aa-4026-8ccb-f07aff3fd1fb",
@@ -775,45 +805,23 @@
         "releasedAt": "2026-10-10T06:32:45.424Z",
         "createdAt": "2026-10-10T06:32:18.232Z",
         "updatedAt": "2026-10-10T06:32:45.425Z"
-      },
-      {
-        "id": "f15f7382-fe65-491c-b825-25404c78808b",
-        "lockKey": "futures_limit_matching:current",
-        "jobName": "futures_limit_matching",
-        "ownerId": "fb80c921-c683-495c-aca9-25d98e37c434",
-        "acquiredAt": "2026-10-10T06:40:51.124Z",
-        "expiresAt": "2026-10-10T06:41:21.127Z",
-        "releasedAt": "2026-10-10T06:40:51.134Z",
-        "createdAt": "2026-10-10T06:32:18.230Z",
-        "updatedAt": "2026-10-10T06:40:51.135Z"
-      },
-      {
-        "id": "315eb870-04ef-496a-a476-778a0f959bec",
-        "lockKey": "futures_liquidation:current",
-        "jobName": "futures_liquidation",
-        "ownerId": "b8596cb5-e934-43b9-9df5-7befc3256b81",
-        "acquiredAt": "2026-10-10T06:40:51.124Z",
-        "expiresAt": "2026-10-10T06:41:21.133Z",
-        "releasedAt": "2026-10-10T06:40:51.135Z",
-        "createdAt": "2026-10-10T06:31:50.099Z",
-        "updatedAt": "2026-10-10T06:40:51.135Z"
       }
     ],
     "tables": [
       {
         "domain": "last",
-        "rows": "7564",
-        "bytes": "4456448"
+        "rows": "8558",
+        "bytes": "5038080"
       },
       {
         "domain": "mark",
-        "rows": "12029",
-        "bytes": "6963200"
+        "rows": "13547",
+        "bytes": "7872512"
       },
       {
         "domain": "spot",
-        "rows": "2253",
-        "bytes": "3145728"
+        "rows": "2534",
+        "bytes": "3489792"
       }
     ],
     "spot": {
@@ -879,17 +887,17 @@
       "lastStartedAt": "2026-10-10T06:31:49.090Z",
       "lastConnectedAt": "2026-10-10T06:31:49.229Z",
       "lastDisconnectedAt": null,
-      "lastMessageAt": "2026-10-10T06:40:51.302Z",
-      "lastTickerAt": "2026-10-10T06:40:51.279Z",
-      "lastSnapshotAt": "2026-10-10T06:40:51.279Z",
+      "lastMessageAt": "2026-10-10T06:41:58.292Z",
+      "lastTickerAt": "2026-10-10T06:41:58.289Z",
+      "lastSnapshotAt": "2026-10-10T06:41:58.105Z",
       "reconnectCount": 0,
       "nextReconnectAt": null,
       "nextReconnectDelayMs": null,
-      "receivedFrames": 21396,
-      "receivedTickers": 9113,
+      "receivedFrames": 24077,
+      "receivedTickers": 10265,
       "acknowledged": 1,
-      "created": 2243,
-      "skipped": 6870,
+      "created": 2523,
+      "skipped": 7742,
       "failed": 0,
       "latestPriceCount": 25,
       "eventListenerCount": 0,
@@ -898,13 +906,13 @@
     },
     "workers": [
       {
-        "id": "da435dd1-af61-4b9e-90f3-2ceef08ab7e3",
+        "id": "7c409120-ef45-4ff5-a36b-3cdf88490dcd",
         "jobName": "futures_liquidation",
         "status": "succeeded",
         "trigger": "scheduler",
         "requestedBy": null,
-        "startedAt": "2026-10-10T06:40:47.120Z",
-        "finishedAt": "2026-10-10T06:40:47.133Z",
+        "startedAt": "2026-10-10T06:41:47.461Z",
+        "finishedAt": "2026-10-10T06:41:47.474Z",
         "durationMs": 13,
         "lockKey": "futures_liquidation:current",
         "idempotencyKey": null,
@@ -916,7 +924,7 @@
         "resultJson": {
           "results": [
             {
-              "scope": "081d01f7-dd85-4126-a4d7-4af9f35b9cbb",
+              "scope": "6b4aa620-52b1-4c1c-ab5e-eebdf646d250",
               "state": "healthy",
               "accountId": "b3a31431-333c-4c2e-9363-584fe6258383"
             }
@@ -924,18 +932,18 @@
           "nextAccountCursor": ""
         },
         "metadataJson": null,
-        "createdAt": "2026-10-10T06:40:47.132Z",
-        "updatedAt": "2026-10-10T06:40:47.133Z"
+        "createdAt": "2026-10-10T06:41:47.472Z",
+        "updatedAt": "2026-10-10T06:41:47.474Z"
       },
       {
-        "id": "10e247a8-c4ea-4af1-999f-0cd55594168d",
+        "id": "8e948607-8fad-47d4-9761-93581dcb59cb",
         "jobName": "futures_limit_matching",
         "status": "succeeded",
         "trigger": "scheduler",
         "requestedBy": null,
-        "startedAt": "2026-10-10T06:40:20.960Z",
-        "finishedAt": "2026-10-10T06:40:20.962Z",
-        "durationMs": 2,
+        "startedAt": "2026-10-10T06:41:21.296Z",
+        "finishedAt": "2026-10-10T06:41:21.297Z",
+        "durationMs": 1,
         "lockKey": "futures_limit_matching:current",
         "idempotencyKey": null,
         "dryRun": false,
@@ -945,48 +953,21 @@
         "errorMessage": null,
         "resultJson": {
           "states": {
-            "executed": 1,
             "FUTURES_ENTRY_LIMIT_NOT_REACHED": 1
           }
         },
         "metadataJson": null,
-        "createdAt": "2026-10-10T06:40:20.961Z",
-        "updatedAt": "2026-10-10T06:40:20.962Z"
+        "createdAt": "2026-10-10T06:41:21.296Z",
+        "updatedAt": "2026-10-10T06:41:21.297Z"
       },
       {
-        "id": "a561c309-8c39-4564-b0cd-991a36936fb1",
-        "jobName": "futures_last_price_retention",
-        "status": "succeeded",
-        "trigger": "scheduler",
-        "requestedBy": null,
-        "startedAt": "2026-10-10T06:40:17.564Z",
-        "finishedAt": "2026-10-10T06:40:17.569Z",
-        "durationMs": 5,
-        "lockKey": "futures_last_price_retention:current",
-        "idempotencyKey": null,
-        "dryRun": false,
-        "attempt": 1,
-        "maxAttempts": 1,
-        "errorCode": null,
-        "errorMessage": null,
-        "resultJson": {
-          "cutoff": "2026-10-09T06:40:17.564Z",
-          "batchCount": 1,
-          "deletedCount": 0,
-          "batchLimitReached": false
-        },
-        "metadataJson": null,
-        "createdAt": "2026-10-10T06:40:17.564Z",
-        "updatedAt": "2026-10-10T06:40:17.569Z"
-      },
-      {
-        "id": "86c6cfc3-6221-40ec-ad82-03bdccddf6a7",
+        "id": "6541bfc6-5cfb-4ccb-a59f-c9ead67de397",
         "jobName": "futures_mark_retention",
         "status": "succeeded",
         "trigger": "scheduler",
         "requestedBy": null,
-        "startedAt": "2026-10-10T06:40:17.564Z",
-        "finishedAt": "2026-10-10T06:40:17.568Z",
+        "startedAt": "2026-10-10T06:41:13.905Z",
+        "finishedAt": "2026-10-10T06:41:13.909Z",
         "durationMs": 4,
         "lockKey": "futures_mark_retention:current",
         "idempotencyKey": null,
@@ -996,14 +977,40 @@
         "errorCode": null,
         "errorMessage": null,
         "resultJson": {
-          "cutoff": "2026-10-09T06:40:17.564Z",
+          "cutoff": "2026-10-09T06:41:13.905Z",
           "batchCount": 1,
           "deletedCount": 0,
           "batchLimitReached": false
         },
         "metadataJson": null,
-        "createdAt": "2026-10-10T06:40:17.564Z",
-        "updatedAt": "2026-10-10T06:40:17.568Z"
+        "createdAt": "2026-10-10T06:41:13.905Z",
+        "updatedAt": "2026-10-10T06:41:13.909Z"
+      },
+      {
+        "id": "dff6175d-fb89-4480-9232-f46fea8197eb",
+        "jobName": "futures_last_price_retention",
+        "status": "succeeded",
+        "trigger": "scheduler",
+        "requestedBy": null,
+        "startedAt": "2026-10-10T06:41:13.904Z",
+        "finishedAt": "2026-10-10T06:41:13.909Z",
+        "durationMs": 5,
+        "lockKey": "futures_last_price_retention:current",
+        "idempotencyKey": null,
+        "dryRun": false,
+        "attempt": 1,
+        "maxAttempts": 1,
+        "errorCode": null,
+        "errorMessage": null,
+        "resultJson": {
+          "cutoff": "2026-10-09T06:41:13.904Z",
+          "batchCount": 1,
+          "deletedCount": 0,
+          "batchLimitReached": false
+        },
+        "metadataJson": null,
+        "createdAt": "2026-10-10T06:41:13.905Z",
+        "updatedAt": "2026-10-10T06:41:13.909Z"
       },
       {
         "id": "9f1886e7-e117-4ece-a0c9-956911f8f606",
@@ -1033,96 +1040,96 @@
     ],
     "coverageVerifiedAt": [
       {
-        "id": "a2a1f91b-4773-4374-9579-bc380174e001",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
-      },
-      {
         "id": "d3eff083-677f-45a0-aa89-b79e8e64595f",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "d0fcf895-7c04-4f1e-bbb0-927b44832a55",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "b0a0acb5-b1d5-4e93-b3dc-c9770c314b10",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "c82e253d-8601-4965-91ee-47f4d3185ba4",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "d09a80f6-0f6f-4a5f-834a-50615f3596e0",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "15fdb106-aea8-49b1-b748-9af66468738e",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "be144369-6f38-4304-b193-bff2d821ca65",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "12ed0bc1-fd8d-4818-aa54-7f5ef85e6398",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "0677ffa7-c3f4-48ac-982b-848b88392174",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "f8fc33f9-ada6-4973-936c-e33f943f1438",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "2bc4f722-7751-40f7-a3d5-932116a4d93a",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "e98dc550-49cb-4894-b063-6bed5ebe62d1",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "e608bb04-238d-492f-ac5a-699db5ce2926",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "cb80318d-3161-47de-b418-fee6c6834a2c",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "5ed1c0d2-bae3-4cb4-8f66-8a23d779986c",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "195e4578-0e0c-427a-98e0-680251c40344",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "64af96d4-0673-4996-a7d8-4fe02938a719",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "13c2fbbd-a7c8-4bc3-ad8e-b55968248458",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "73a7592a-ceb7-42c9-9f09-78ebb46b630d",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "3d7a5484-f5a1-4dd9-a43b-07031372b295",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "37a605b2-932a-45a8-b09b-48f690c68fcd",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       },
       {
         "id": "b67356af-1b8f-45ce-a27d-710d9898b6b5",
-        "markVerifiedAt": "2026-10-10T06:36:49.867Z"
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
+      },
+      {
+        "id": "a2a1f91b-4773-4374-9579-bc380174e001",
+        "markVerifiedAt": "2026-10-10T06:41:50.532Z"
       }
     ]
   }
