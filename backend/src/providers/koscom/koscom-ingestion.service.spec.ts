@@ -205,9 +205,9 @@ describe('KOSCOM central ingestion', () => {
   it('does not call externally when disabled, market closed, or lease busy', async () => {
     const h = create();
     h.config.getConfig = () => readKoscomConfig({});
-    expect((await h.service.collect({ now })).errorCode).toBe(
-      'KOSCOM_DISABLED',
-    );
+    const disabled = await h.service.collect({ now });
+    expect(disabled.errorCode).toBe('KOSCOM_DISABLED');
+    expect(disabled.errorMessage).toBe('Background operation failed.');
     expect(h.client.batch).not.toHaveBeenCalled();
     const closed = create();
     expect(

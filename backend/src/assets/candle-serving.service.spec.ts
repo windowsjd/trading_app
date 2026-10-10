@@ -566,47 +566,52 @@ describe('CandleServingService', () => {
         success: false,
         error: expect.objectContaining({
           code: 'ASSET_CANDLES_PROVIDER_ERROR',
+          message: 'Request could not be completed.',
         }) as unknown,
       },
     });
     expect(legacy).toHaveBeenCalledTimes(0);
   });
 
-  it('keeps the stock provider error contract on an unresolved managed refresh without a provider call', async () => {
-    const { service, plans, database, singleFlight } = create();
-    const stockAsset = {
-      ...asset,
-      id: 'asset-2',
-      symbol: '005930',
-      market: 'KOSPI',
-      assetType: AssetType.domestic_stock,
-    };
-    plans.build.mockReturnValue({
-      ...plan,
-      assetId: stockAsset.id,
-      assetType: stockAsset.assetType,
-      market: stockAsset.market,
-    });
-    database.load.mockResolvedValue(
-      load('missing', null, { completedCoverage: true }),
-    );
-    singleFlight.getOrLoad.mockRejectedValue(
-      new CandleOperationalRefreshError('provider'),
-    );
-    const legacy = jest.fn().mockResolvedValue(response('legacy'));
-    await expect(
-      service.serve(stockAsset, query, legacy),
-    ).rejects.toMatchObject({
-      status: 503,
-      response: {
-        success: false,
-        error: expect.objectContaining({
-          code: 'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
-        }) as unknown,
-      },
-    });
-    expect(legacy).toHaveBeenCalledTimes(0);
-  });
+  it.each([AssetType.domestic_stock, AssetType.us_stock])(
+    'keeps the %s provider error contract on an unresolved managed refresh without a provider call',
+    async (assetType) => {
+      const { service, plans, database, singleFlight } = create();
+      const stockAsset = {
+        ...asset,
+        id: 'asset-2',
+        symbol: '005930',
+        market: 'KOSPI',
+        assetType,
+      };
+      plans.build.mockReturnValue({
+        ...plan,
+        assetId: stockAsset.id,
+        assetType: stockAsset.assetType,
+        market: stockAsset.market,
+      });
+      database.load.mockResolvedValue(
+        load('missing', null, { completedCoverage: true }),
+      );
+      singleFlight.getOrLoad.mockRejectedValue(
+        new CandleOperationalRefreshError('provider'),
+      );
+      const legacy = jest.fn().mockResolvedValue(response('legacy'));
+      await expect(
+        service.serve(stockAsset, query, legacy),
+      ).rejects.toMatchObject({
+        status: 503,
+        response: {
+          success: false,
+          error: expect.objectContaining({
+            code: 'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+            message: 'Request could not be completed.',
+          }) as unknown,
+        },
+      });
+      expect(legacy).toHaveBeenCalledTimes(0);
+    },
+  );
 
   describe('stale Redis fallback on database outages', () => {
     const databaseDown = () => {

@@ -179,7 +179,9 @@ async function fixture(mode: TradingAccountMode, stock = false) {
       price: '100',
       currencyCode: asset.currencyCode,
       sourceType: 'provider_api',
-      sourceName: stock ? 'kis_krx_realtime_trade' : 'binance_spot_ws_ticker',
+      sourceName: stock
+        ? 'koscom_krx_realtime_price'
+        : 'binance_spot_ws_ticker',
       effectiveAt: new Date(now.getTime() - 1000),
       capturedAt: new Date(now.getTime() - 1000),
     },

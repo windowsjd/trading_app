@@ -908,7 +908,7 @@ async function testLimitLifecycleAndFill() {
       price: '90.00000000',
       currencyCode: CurrencyCode.KRW,
       sourceType: 'provider_api',
-      sourceName: 'kis_krx_realtime_trade',
+      sourceName: 'koscom_krx_realtime_price',
       effectiveAt: new Date(),
       capturedAt: new Date(),
     },
@@ -948,6 +948,31 @@ async function testLimitLifecycleAndFill() {
     where: { id: s.krwWalletId },
     data: { tradingAccountId: foilAccount.id },
   });
+  // Compare financial state as a boolean so a failure cannot print Prisma's
+  // entire object graph. The corrupt wallet must remain untouched too.
+  const fillState = async () => JSON.stringify({
+    order: await prisma.order.findUnique({ where: { id: fillOrderId } }),
+    wallets: await prisma.cashWallet.findMany({
+      where: { tradingAccountId: { in: [s.accountId, foilAccount.id] } },
+      orderBy: { id: 'asc' },
+    }),
+    positions: await prisma.position.findMany({
+      where: { tradingAccountId: { in: [s.accountId, foilAccount.id] } },
+      orderBy: { id: 'asc' },
+    }),
+    ledger: await prisma.walletTransaction.findMany({
+      where: { tradingAccountId: { in: [s.accountId, foilAccount.id] } },
+      orderBy: { id: 'asc' },
+    }),
+    equity: await prisma.equitySnapshot.findMany({
+      where: { tradingAccountId: { in: [s.accountId, foilAccount.id] } },
+      orderBy: { id: 'asc' },
+    }),
+    participant: await prisma.seasonParticipant.findUnique({
+      where: { tradingAccountId: s.accountId },
+    }),
+  });
+  const beforeBlockedFill = await fillState();
   await assert.rejects(
     executionService.fillLimitBuyOrder({
       orderId: fillOrderId,
@@ -958,6 +983,11 @@ async function testLimitLifecycleAndFill() {
       error instanceof HttpException &&
       error.getResponse().error.code === 'ORDER_RESERVATION_INCONSISTENT',
     'fill with mismatched wallet scope must fail',
+  );
+  assert.equal(
+    (await fillState()) === beforeBlockedFill,
+    true,
+    'blocked fill cannot change either account, cash, reservations, positions, ledger or equity',
   );
   const orderAfterBlockedFill = await prisma.order.findUnique({
     where: { id: fillOrderId },

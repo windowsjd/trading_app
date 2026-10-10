@@ -379,7 +379,7 @@ async function main() {
     domesticAssetId,
     '70000.00000000',
     CurrencyCode.KRW,
-    'kis_krx_realtime_trade',
+    'koscom_krx_realtime_price',
   );
   const domesticRequest = {
     assetId: domesticAssetId,
@@ -490,7 +490,7 @@ async function main() {
   assert.ok(domesticState.latestCompletedSession);
   await prisma.assetPriceSnapshot.create({data: {
     assetId: domesticAssetId, price: '70000.00000000', currencyCode: CurrencyCode.KRW,
-    sourceType: AssetPriceSourceType.provider_api, sourceName: 'kis_krx_realtime_trade',
+    sourceType: AssetPriceSourceType.provider_api, sourceName: 'koscom_krx_realtime_price',
     effectiveAt: domesticState.latestCompletedSession.closeTime, capturedAt: closeAt,
   }});
   const closedMarket = { assetType: AssetType.domestic_stock, market: 'KRX', currency: CurrencyCode.KRW };

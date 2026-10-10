@@ -28,6 +28,7 @@ import { JwtService } from '@nestjs/jwt';
 import {
   AssetType,
   CurrencyCode,
+  Prisma,
   MarketCandleSyncMode,
   MarketCandleSyncStatus,
 } from '../src/generated/prisma/client';
@@ -142,8 +143,6 @@ class FakeProviderSocket extends EventEmitter {
   }
 }
 
-const KIS_DOMESTIC_FIELDS = 46;
-
 function kisTradeFrame(input: {
   symbol: string;
   timeKst: string; // HHMMSS on 2026-07-10
@@ -152,15 +151,27 @@ function kisTradeFrame(input: {
   cumVol: string;
   cumAmt: string;
 }): string {
-  const fields = new Array<string>(KIS_DOMESTIC_FIELDS).fill('');
-  fields[0] = input.symbol; // MKSC_SHRN_ISCD
-  fields[1] = input.timeKst; // STCK_CNTG_HOUR
-  fields[2] = input.price; // STCK_PRPR
-  fields[12] = input.qty; // CNTG_VOL
-  fields[13] = input.cumVol; // ACML_VOL
-  fields[14] = input.cumAmt; // ACML_TR_PBMN
-  fields[33] = '20260710'; // BSOP_DATE
-  return `0|H0STCNT0|001|${fields.join('^')}`;
+  const fields = new Array<string>(26).fill('');
+  fields[0] = `DNAS${input.symbol}`;
+  fields[1] = input.symbol;
+  fields[2] = '2';
+  fields[6] = '20260710';
+  fields[7] = input.timeKst;
+  fields[11] = input.price;
+  fields[19] = input.qty;
+  fields[20] = input.cumVol;
+  fields[21] = input.cumAmt;
+  fields[25] = '3';
+  return `0|HDFSCNT0|001|${fields.join('^')}`;
+}
+
+// Observe immediately, then propagate at connection cleanup. A connection
+// failure must be a recorded scenario failure, never an unhandled rejection.
+function observeConnection(promise: Promise<void>) {
+  return promise.then(
+    () => ({ status: 'fulfilled' as const }),
+    (reason: unknown) => ({ status: 'rejected' as const, reason }),
+  );
 }
 
 function binanceKlineFrame(input: {
@@ -766,17 +777,20 @@ async function main() {
     const binanceSocket = new FakeProviderSocket();
     const kisSocket = new FakeProviderSocket();
     await scenario(
-      'fake provider sockets: Binance absolute + KIS delta events',
+      'fake provider sockets: Binance absolute + KIS US delta events; legacy reducer preserved',
       async () => {
         await redis.setWithTtl(binanceLease, generation, 3600);
         await redis.setWithTtl(kisLease, generation, 3600);
         const sockets = [binanceSocket, kisSocket];
+        let includeUs = false;
         const supervisorPrisma = {
           asset: {
             findMany: ({ where }: { where: { assetType: AssetType } }) =>
               Promise.resolve(
                 [cryptoAsset, domesticAsset, usAsset].filter(
-                  (asset) => asset.assetType === where.assetType,
+                  (asset) =>
+                    asset.assetType === where.assetType &&
+                    (asset.id !== usAsset.id || includeUs),
                 ),
               ),
           },
@@ -822,7 +836,11 @@ async function main() {
                 tickers: [],
               }),
           } as never,
-          { ...liveConfig, connectionLivenessTimeoutMs: 3_600_000 },
+          {
+            ...liveConfig,
+            kisUsDelayedEnabled: true,
+            connectionLivenessTimeoutMs: 3_600_000,
+          },
           () => sockets.shift() ?? new FakeProviderSocket(),
           new BinanceOrderBookService(
             supervisorPrisma as never,
@@ -852,132 +870,194 @@ async function main() {
           connectedAt: new Date(BUCKET_OPEN.getTime() - 1),
         });
 
-        const connectedBinance = (
-          supervisor as never as {
-            connectBinance(context: unknown): Promise<void>;
-          }
-        ).connectBinance(context('binance', binanceSocket));
-        await settle();
+        await assert.rejects(
+          (
+            supervisor as never as {
+              connectKis(context: unknown): Promise<void>;
+            }
+          ).connectKis(context('kis', kisSocket)),
+          (error: Error) => error.name === 'KIS_STREAMS_EMPTY',
+          'empty KIS US targets must reject through the caller',
+        );
+        includeUs = true;
+        const connections: ReturnType<typeof observeConnection>[] = [];
+        let outcomes: Awaited<ReturnType<typeof observeConnection>>[] = [];
+        try {
+          const connectedBinance = observeConnection(
+            (
+              supervisor as never as {
+                connectBinance(context: unknown): Promise<void>;
+              }
+            ).connectBinance(context('binance', binanceSocket)),
+          );
+          connections.push(connectedBinance);
+          await settle();
 
-        // KIS PINGPONG heartbeat handling (echo + no rejection).
-        const connectedKis = (
-          supervisor as never as {
-            connectKis(context: unknown): Promise<void>;
-          }
-        ).connectKis(context('kis', kisSocket));
-        await settle();
+          // KIS PINGPONG heartbeat handling (echo + no rejection).
+          const connectedKis = observeConnection(
+            (
+              supervisor as never as {
+                connectKis(context: unknown): Promise<void>;
+              }
+            ).connectKis(context('kis', kisSocket)),
+          );
+          connections.push(connectedKis);
+          await settle();
+          assert.ok(kisSocket.sent.some((frame) => frame.includes('HDFSCNT0')));
+          assert.equal(
+            kisSocket.sent.some((frame) => frame.includes('H0STCNT0')),
+            false,
+          );
 
-        const pingpong = JSON.stringify({
-          header: { tr_id: 'PINGPONG', datetime: '20260710140100' },
-        });
-        kisSocket.frame(pingpong);
-        await settle();
-        assert.ok(kisSocket.sent.includes(pingpong), 'PINGPONG must be echoed');
-
-        const rowsBefore = await countRows();
-
-        // Binance absolute klines: provisional → duplicate → out-of-order → final.
-        const kline = (eventMs: number, close: string, final: boolean) =>
-          binanceKlineFrame({
-            symbol: providerSymbol,
-            eventMs,
-            openMs: BUCKET_OPEN.getTime(),
-            open: '100',
-            high: '110',
-            low: '95',
-            close,
-            volume: '10',
-            quote: '1000',
-            final,
+          const pingpong = JSON.stringify({
+            header: { tr_id: 'PINGPONG', datetime: '20260710140100' },
           });
-        binanceSocket.frame(
-          kline(BUCKET_OPEN.getTime() + 60_000, '105', false),
-        );
-        await settle();
-        binanceSocket.frame(
-          kline(BUCKET_OPEN.getTime() + 60_000, '105', false),
-        ); // duplicate
-        await settle();
-        binanceSocket.frame(
-          kline(BUCKET_OPEN.getTime() + 30_000, '104', false),
-        ); // out-of-order
-        await settle();
-        binanceSocket.frame(kline(BUCKET_CLOSE.getTime() - 1, '106', true)); // provider final
-        await settle();
+          kisSocket.frame(pingpong);
+          await settle();
+          assert.ok(
+            kisSocket.sent.includes(pingpong),
+            'PINGPONG must be echoed',
+          );
 
-        // KIS delta trades: two trades, then a duplicate frame.
-        const trade = (
-          timeKst: string,
-          price: string,
-          qty: string,
-          cumVol: string,
-          cumAmt: string,
-        ) =>
-          kisTradeFrame({
-            symbol: domesticSymbol,
-            timeKst,
-            price,
-            qty,
-            cumVol,
-            cumAmt,
-          });
-        kisSocket.frame(trade('140001', '50000', '3', '103', '5150000'));
-        await settle();
-        kisSocket.frame(trade('140130', '50100', '2', '105', '5250200'));
-        await settle();
-        kisSocket.frame(trade('140130', '50100', '2', '105', '5250200')); // duplicate
-        await settle();
+          const rowsBefore = await countRows();
 
-        const snapshot = health.snapshot().liveCandle;
-        summaryCounters.duplicates = snapshot.eventsDuplicate;
-        summaryCounters.outOfOrder = snapshot.eventsOutOfOrder;
-        assert.ok(
-          snapshot.eventsAccepted >= 4,
-          `accepted=${snapshot.eventsAccepted}`,
-        );
-        assert.ok(
-          snapshot.eventsDuplicate >= 2,
-          `duplicate=${snapshot.eventsDuplicate}`,
-        );
-        assert.ok(
-          snapshot.eventsOutOfOrder >= 1,
-          `outOfOrder=${snapshot.eventsOutOfOrder}`,
-        );
+          // Binance absolute klines: provisional → duplicate → out-of-order → final.
+          const kline = (eventMs: number, close: string, final: boolean) =>
+            binanceKlineFrame({
+              symbol: providerSymbol,
+              eventMs,
+              openMs: BUCKET_OPEN.getTime(),
+              open: '100',
+              high: '110',
+              low: '95',
+              close,
+              volume: '10',
+              quote: '1000',
+              final,
+            });
+          binanceSocket.frame(
+            kline(BUCKET_OPEN.getTime() + 60_000, '105', false),
+          );
+          await settle();
+          binanceSocket.frame(
+            kline(BUCKET_OPEN.getTime() + 60_000, '105', false),
+          ); // duplicate
+          await settle();
+          binanceSocket.frame(
+            kline(BUCKET_OPEN.getTime() + 30_000, '104', false),
+          ); // out-of-order
+          await settle();
+          binanceSocket.frame(kline(BUCKET_CLOSE.getTime() - 1, '106', true)); // provider final
+          await settle();
 
-        // invalid provider event fixture
-        const rejectedBefore = health.snapshot().liveCandle.eventsRejected;
-        kisSocket.frame('garbage|frame');
-        await settle();
-        assert.ok(health.snapshot().liveCandle.eventsRejected > rejectedBefore);
+          // KIS delta trades: two trades, then a duplicate frame.
+          const trade = (
+            timeKst: string,
+            price: string,
+            qty: string,
+            cumVol: string,
+            cumAmt: string,
+          ) =>
+            kisTradeFrame({
+              symbol: usSymbol,
+              timeKst,
+              price,
+              qty,
+              cumVol,
+              cumAmt,
+            });
+          kisSocket.frame(trade('230001', '10000', '3', '103', '10300'));
+          await settle();
+          kisSocket.frame(trade('230130', '10100', '2', '105', '10502'));
+          await settle();
+          kisSocket.frame(trade('230130', '10100', '2', '105', '10502')); // duplicate
+          await settle();
+          const usState = await store.getCurrent(usAsset.id);
+          assert.ok(usState);
+          assert.equal(usState.volume, '5.00000000');
+          assert.equal(usState.close, '101.00000000');
+          assert.equal(usState.complete, true);
+          assert.equal(usState.delayed, true);
 
-        // No DB write happened per tick.
-        assert.equal(await countRows(), rowsBefore, 'no per-tick DB writes');
+          // Preserve legacy KIS reducer/history compatibility directly. Runtime
+          // domestic subscriptions now belong to KOSCOM, not the KIS supervisor.
+          for (const tick of [
+            kisTradeTick({
+              symbol: domesticSymbol,
+              eventTime: new Date(BUCKET_OPEN.getTime() + 1000),
+              price: '50000',
+              qty: '3',
+              cumVol: '103',
+            }),
+            kisTradeTick({
+              symbol: domesticSymbol,
+              eventTime: new Date(BUCKET_OPEN.getTime() + 90000),
+              price: '50100',
+              qty: '2',
+              cumVol: '105',
+            }),
+          ])
+            await pipeline.process({
+              event: normalizer.normalizeKis(tick, domesticAsset),
+              ownerGeneration: generation,
+              ownerLeaseKey: kisLease,
+            });
 
-        // Redis live 5m state reflects the absolute kline...
-        const cryptoState = await store.getCurrent(cryptoAsset.id);
-        assert.ok(cryptoState);
-        assert.equal(cryptoState.close, '106.00000000');
-        assert.equal(cryptoState.volume, '10.00000000');
-        assert.equal(cryptoState.providerFinal, true);
-        trackedRedisKeys.add(buildLiveCandlePointerKey(cryptoAsset.id));
-        trackedRedisKeys.add(
-          buildLiveCandleStateKey(cryptoAsset.id, BUCKET_OPEN, generation),
-        );
-        // ...and the KIS delta accumulation (3 + 2 shares, no double count).
-        const domesticState = await store.getCurrent(domesticAsset.id);
-        assert.ok(domesticState);
-        assert.equal(domesticState.volume, '5.00000000');
-        assert.equal(domesticState.close, '50100.00000000');
-        assert.equal(domesticState.complete, true);
-        trackedRedisKeys.add(buildLiveCandlePointerKey(domesticAsset.id));
-        trackedRedisKeys.add(
-          buildLiveCandleStateKey(domesticAsset.id, BUCKET_OPEN, generation),
-        );
+          const snapshot = health.snapshot().liveCandle;
+          summaryCounters.duplicates = snapshot.eventsDuplicate;
+          summaryCounters.outOfOrder = snapshot.eventsOutOfOrder;
+          assert.ok(
+            snapshot.eventsAccepted >= 4,
+            `accepted=${snapshot.eventsAccepted}`,
+          );
+          assert.ok(
+            snapshot.eventsDuplicate >= 2,
+            `duplicate=${snapshot.eventsDuplicate}`,
+          );
+          assert.ok(
+            snapshot.eventsOutOfOrder >= 1,
+            `outOfOrder=${snapshot.eventsOutOfOrder}`,
+          );
 
-        binanceSocket.close(1000, 'fixture done');
-        kisSocket.close(1000, 'fixture done');
-        await connectedBinance;
-        await connectedKis;
+          // invalid provider event fixture
+          const rejectedBefore = health.snapshot().liveCandle.eventsRejected;
+          kisSocket.frame('garbage|frame');
+          await settle();
+          assert.ok(
+            health.snapshot().liveCandle.eventsRejected > rejectedBefore,
+          );
+
+          // No DB write happened per tick.
+          assert.equal(await countRows(), rowsBefore, 'no per-tick DB writes');
+
+          // Redis live 5m state reflects the absolute kline...
+          const cryptoState = await store.getCurrent(cryptoAsset.id);
+          assert.ok(cryptoState);
+          assert.equal(cryptoState.close, '106.00000000');
+          assert.equal(cryptoState.volume, '10.00000000');
+          assert.equal(cryptoState.providerFinal, true);
+          trackedRedisKeys.add(buildLiveCandlePointerKey(cryptoAsset.id));
+          trackedRedisKeys.add(
+            buildLiveCandleStateKey(cryptoAsset.id, BUCKET_OPEN, generation),
+          );
+          // ...and the KIS delta accumulation (3 + 2 shares, no double count).
+          const domesticState = await store.getCurrent(domesticAsset.id);
+          assert.ok(domesticState);
+          assert.equal(domesticState.volume, '5.00000000');
+          assert.equal(domesticState.close, '50100.00000000');
+          assert.equal(domesticState.complete, true);
+          trackedRedisKeys.add(buildLiveCandlePointerKey(domesticAsset.id));
+          trackedRedisKeys.add(
+            buildLiveCandleStateKey(domesticAsset.id, BUCKET_OPEN, generation),
+          );
+        } finally {
+          binanceSocket.close(1000, 'fixture done');
+          kisSocket.close(1000, 'fixture done');
+          outcomes = await Promise.all(connections);
+        }
+        for (const outcome of outcomes) {
+          if (outcome.status === 'rejected') throw outcome.reason;
+        }
       },
     );
 
@@ -1137,6 +1217,16 @@ async function main() {
         });
         assert.equal(closedDomestic.length, 1);
         assert.equal(closedDomestic[0].volume.toFixed(8), '5.00000000');
+        const closedUs = await repository.findRange({
+          assetId: usAsset.id,
+          interval: '5m',
+          from: new Date('2026-07-10T14:00:00Z'),
+          to: new Date('2026-07-10T14:05:00Z'),
+        });
+        assert.equal(closedUs.length, 1);
+        assert.equal(closedUs[0].isClosed, true);
+        assert.equal(closedUs[0].close.toFixed(8), '101.00000000');
+        assert.equal(closedUs[0].volume.toFixed(8), '5.00000000');
 
         // duplicate finalization fixture: run again, still exactly one row.
         await finalizer.runOnce(new Date());
@@ -1147,7 +1237,11 @@ async function main() {
           to: BUCKET_CLOSE,
         });
         assert.equal(again.length, 1);
-        assert.ok((await countRows()) === rowsBefore + 2);
+        assert.equal(
+          await countRows(),
+          rowsBefore + 3,
+          'exactly one row per Binance, legacy KIS domestic and KIS US bucket',
+        );
         // Cache generation was invalidated by the finalize commit.
         if (
           cachedBefore.status === 'fresh' ||
@@ -1252,7 +1346,7 @@ async function main() {
         });
         assert.equal(repaired.length, 1);
         assert.equal(repaired[0].isClosed, true);
-        assert.equal(repaired[0].sourceProvider, 'kis_domestic_minute');
+        assert.equal(repaired[0].sourceProvider, 'koscom_intraday');
         const due = await store.getDueReconcilePending(new Date(), 10);
         assert.equal(
           due.filter((entry) => entry.assetId === domesticAsset.id).length,
@@ -1554,6 +1648,78 @@ async function main() {
       });
       assert.equal(old1d.length, 1, '1d rows are not retention targets');
     });
+
+    await scenario(
+      'KOSCOM native absolute candles keep ownership, OHLCV and finalization',
+      async () => {
+        const nativeAsset = await createAsset({
+          symbol: String(Number(domesticSymbol) + 1).padStart(6, '0'),
+          market: 'KOSPI',
+          assetType: AssetType.domestic_stock,
+          currency: CurrencyCode.KRW,
+        });
+        assetIds.push(nativeAsset.id);
+        scopedAssetIds.add(nativeAsset.id);
+        const lease = buildLiveCandleOwnerLeaseKey('koscom');
+        trackedRedisKeys.add(lease);
+        await redis.setWithTtl(lease, generation, 3600);
+        const event = normalizer.normalizeKoscomCandle(
+          {
+            ...fixtureCandle(BUCKET_OPEN.getTime()),
+            open: new Prisma.Decimal('100'),
+            high: new Prisma.Decimal('102'),
+            low: new Prisma.Decimal('99'),
+            close: new Prisma.Decimal('101'),
+            volume: new Prisma.Decimal('10'),
+            amount: new Prisma.Decimal('1010'),
+          },
+          nativeAsset,
+          BUCKET_CLOSE,
+        );
+        const rowsBefore = await countRows();
+        await pipeline.process({
+          event,
+          ownerGeneration: generation,
+          ownerLeaseKey: lease,
+        });
+        const state = await store.getCurrent(nativeAsset.id);
+        assert.ok(state);
+        assert.equal(state.sourceProvider, 'koscom_intraday');
+        assert.equal(state.volume, '10.00000000');
+        assert.equal(state.close, '101.00000000');
+        assert.equal(state.complete, true);
+        assert.equal(state.providerFinal, true);
+        assert.equal(
+          await countRows(),
+          rowsBefore,
+          'native events never write PostgreSQL per tick',
+        );
+        await pipeline.process({
+          event,
+          ownerGeneration: 'lost-owner',
+          ownerLeaseKey: lease,
+        });
+        assert.equal(
+          (await store.getCurrent(nativeAsset.id))?.revision,
+          state.revision,
+        );
+        await finalizer.runOnce(CLOCK);
+        const row = await prisma.marketCandle.findUnique({
+          where: {
+            assetId_interval_openTime: {
+              assetId: nativeAsset.id,
+              interval: '5m',
+              openTime: BUCKET_OPEN,
+            },
+          },
+        });
+        assert.ok(row);
+        assert.equal(row.sourceProvider, 'koscom_intraday');
+        assert.equal(row.volume.toFixed(8), state.volume);
+        assert.equal(row.close.toFixed(8), state.close);
+        assert.equal(row.isClosed, true);
+      },
+    );
 
     // Global invariants.
     await scenario(

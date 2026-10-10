@@ -27,6 +27,17 @@ test('transfer rejects a fresh debit before sending a new financial command', as
   assert.equal(h.requests.length, 0);
   assert.match(text(h), /잔액이 부족합니다\./);
   assert.equal(h.node('wallet-transfer-submit').props.state, 'disabled');
+  const notices = h.renderer.root.findAll(node =>
+    node.type.name === 'ErrorNotice' && node.props.error?.name === 'WalletBalanceCheckError');
+  assert.equal(notices.length, 1);
+  const original = notices[0].props.error;
+  original.message = 'PROVIDER_INTERNAL_FAILURE secret';
+  await h.update();
+  assert.equal(h.node('wallet-transfer-error').props.children, '잔액이 부족합니다.');
+  assert.doesNotMatch(text(h), /PROVIDER_INTERNAL|secret/);
+  assert.equal(h.renderer.root.findAll(node =>
+    node.type.name === 'ErrorNotice' && node.props.error === original).length, 1);
+  assert.equal(h.requests.length, 0);
 });
 
 test('transfer preflight cannot execute after unmount or an account switch', async t => {
