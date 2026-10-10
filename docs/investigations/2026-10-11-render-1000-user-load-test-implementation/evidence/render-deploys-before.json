@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-10T20:09:52.043Z",
+  "data": [
+    {
+      "id": "dep-db58lj740ujc73c8q3tg",
+      "status": "live",
+      "createdAt": "2026-10-10T18:58:20.350801Z",
+      "finishedAt": "2026-10-10T18:59:40.83813Z",
+      "commit": {
+        "id": "3985aa1fbdfb1be8fe7d778445a6580984f2d026",
+        "message": "Merge remote-tracking branch 'origin/main'"
+      },
+      "keys": [
+        "commit",
+        "createdAt",
+        "finishedAt",
+        "id",
+        "startedAt",
+        "status",
+        "trigger",
+        "updatedAt"
+      ]
+    },
+    {
+      "id": "dep-db58b0qd0e5s73ei3uc0",
+      "status": "deactivated",
+      "createdAt": "2026-10-10T18:35:47.343723Z",
+      "finishedAt": "2026-10-10T18:37:08.142738Z",
+      "commit": {
+        "id": "55cda476acc11f067814cf061320bc5c95f53319",
+        "message": "Merge pull request #3 from windowsjd/fix/ci-stabilization-20261011\n\nFix CI provider fixtures and diagnostic boundaries"
+      },
+      "keys": [
+        "commit",
+        "createdAt",
+        "finishedAt",
+        "id",
+        "startedAt",
+        "status",
+        "trigger",
+        "updatedAt"
+      ]
+    },
+    {
+      "id": "dep-db5882jrjlhs73ahrsp0",
+      "status": "deactivated",
+      "createdAt": "2026-10-10T18:29:30.8129Z",
+      "finishedAt": "2026-10-10T18:30:49.035685Z",
+      "commit": {
+        "id": "55cda476acc11f067814cf061320bc5c95f53319",
+        "message": "Merge pull request #3 from windowsjd/fix/ci-stabilization-20261011\n\nFix CI provider fixtures and diagnostic boundaries"
+      },
+      "keys": [
+        "commit",
+        "createdAt",
+        "finishedAt",
+        "id",
+        "startedAt",
+        "status",
+        "trigger",
+        "updatedAt"
+      ]
+    }
+  ]
+}

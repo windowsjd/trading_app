@@ -1,0 +1,25 @@
+{
+  "providerFrames": {
+    "prepare:replay.frames.mark": 505,
+    "prepare:replay.frames.last": 2545,
+    "prepare:replay.frames.spot": 1651,
+    "ramp:replay.frames.last": 720,
+    "ramp:replay.frames.spot": 550,
+    "ramp:replay.frames.mark": 144,
+    "smoke-protocol:replay.frames.last": 1680,
+    "smoke-protocol:replay.frames.spot": 1275,
+    "smoke-protocol:replay.frames.mark": 336,
+    "hold:replay.frames.last": 10680,
+    "hold:replay.frames.spot": 8150,
+    "hold:replay.frames.mark": 2136,
+    "drain:replay.frames.last": 1560,
+    "drain:replay.frames.spot": 1200,
+    "drain:replay.frames.mark": 312,
+    "audit:replay.frames.last": 29208,
+    "audit:replay.frames.spot": 22275,
+    "audit:replay.frames.mark": 5808
+  },
+  "attemptedExternalCalls": 0,
+  "failureExamples": [],
+  "shutdown": "Normal SIGTERM; local test data preserved"
+}

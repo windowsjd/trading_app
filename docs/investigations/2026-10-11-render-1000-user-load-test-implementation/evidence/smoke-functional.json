@@ -1,0 +1,120 @@
+{
+  "profile": "local 10-user smoke, not Render baseline",
+  "sourceGitSha": "3985aa1fbdfb1be8fe7d778445a6580984f2d026",
+  "dirtyLocalSmoke": true,
+  "users": 10,
+  "rampSeconds": 5,
+  "holdSeconds": 90,
+  "accessTokenTtl": "30s",
+  "runValidity": "INVALID RUN",
+  "invalidReasons": [
+    "WALL_CLOCK_STEP"
+  ],
+  "correctness": "CORRECTNESS PASS",
+  "performance": "NOT EVALUATED",
+  "performanceFailures": [],
+  "websocket": {
+    "rampAuthenticatedAck": 10,
+    "expected": 10,
+    "connectedUserSeconds": 898.9963999549998,
+    "expectedUserSeconds": 900,
+    "retention": 0.9988848888388887
+  },
+  "postDrainFanout": {
+    "clients": 0,
+    "sent": 23076,
+    "coalesced": 0,
+    "dropped": 0,
+    "pendingTickers": 0,
+    "clientsWithPendingTickers": 0,
+    "maxPendingTickersPerClient": 0,
+    "pendingTickerLimitPerClient": 64
+  },
+  "protocolChecks": {
+    "smoke-protocol:smoke.subscribeUnsubscribeReconnectVerified": 1,
+    "smoke-protocol:smoke.refreshReconnectVerified": 1,
+    "smoke-protocol:smoke.spotLimitFillVerified": 1,
+    "smoke-protocol:smoke.idempotencyVerified": 1,
+    "smoke-protocol:smoke.futuresLimitFillVerified": 1,
+    "smoke-protocol:smoke.futuresOpenIncreaseReduceCloseVerified": 1,
+    "smoke-protocol:smoke.conditionalOcoCommitVerified": 1,
+    "smoke-protocol:smoke.futuresCancelVerified": 1
+  },
+  "authRefreshDuringHold": 15,
+  "authenticationExpiry401Count": 23,
+  "httpRequestsDuringHold": 212,
+  "httpRequestsPerSecond": 2.3555555555555556,
+  "httpUnrecoveredErrorRate": 0,
+  "wsMessagesDuringHold": 18386,
+  "wsMessagesPerSecond": 204.2888888888889,
+  "holdPayloadBytes": {
+    "http": 2421040,
+    "ws": 14823291
+  },
+  "subscriptionRange": {
+    "min": 78,
+    "max": 175
+  },
+  "externalProviderAttempts": 0,
+  "serverFailures": [],
+  "generator": {
+    "cpuFraction": {
+      "count": 90,
+      "p50": 0.010000000000000009,
+      "p95": 0.010000000000000009,
+      "p99": 0.01971546233249614,
+      "max": 0.01971546233249614,
+      "mean": 0.004619614883748124
+    },
+    "eventLoopLagSampleP99": {
+      "count": 90,
+      "p50": 10.678291847040299,
+      "p95": 11.018239,
+      "p99": 11.018239,
+      "max": 11.018239,
+      "mean": 10.651419444444448
+    },
+    "rampScheduledDelay": {
+      "count": 10,
+      "p50": 0.8532123022052295,
+      "p95": 1.0735129999999344,
+      "p99": 1.0735129999999344,
+      "max": 1.0735129999999344,
+      "mean": 0.7072541999999998
+    },
+    "peakRam": 124911616,
+    "peakBacklog": 0
+  },
+  "fixtureCounts": {
+    "users": 10,
+    "accounts": 10,
+    "wallets": 40,
+    "orders": 52,
+    "positions": 30,
+    "futuresPositions": 20,
+    "futuresLimitOrders": 2,
+    "protections": 0,
+    "ledger": 160,
+    "candles": 16350,
+    "lastPrices": 192,
+    "marks": 192
+  },
+  "audit": {
+    "at": "2026-10-10T20:08:53.941Z",
+    "verdict": "CORRECTNESS PASS",
+    "accounts": 10,
+    "examinedOrders": 54,
+    "examinedExecutions": 26,
+    "examinedLedgers": 171,
+    "liquidationAccounts": 0,
+    "findings": [],
+    "arithmetic": "Existing Prisma Decimal and Futures calculation policy; exact equality, no floating point tolerance"
+  },
+  "projectionOnly": {
+    "method": "10-user hold payload/RPS x100; network x3600/90; does not prove generator/server capacity",
+    "httpRpsFor1000": 235.55555555555557,
+    "hold60MinutesPayloadGBFor1000": 68.977324
+  },
+  "rawArtifactDirectory": "/tmp/trading-load-impl/run9",
+  "finalCounterCorrection": "Per-actor refreshCount no longer counts login. Final compiled client was additionally verified against this isolated API; actual hold refresh metric above was already correct."
+}

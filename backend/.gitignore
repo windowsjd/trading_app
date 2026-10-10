@@ -17,6 +17,8 @@ lerna-debug.log*
 
 # Tests
 /coverage
+/artifacts/load-test/
+load-test.credentials.json
 /.nyc_output
 
 # IDEs and editors

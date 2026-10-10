@@ -4,8 +4,13 @@ import {
   OnModuleDestroy,
   OnModuleInit,
   Optional,
+  Inject,
 } from '@nestjs/common';
 import WebSocket from 'ws';
+import {
+  FUTURES_PROVIDER_SOCKET_FACTORY,
+  type FuturesProviderSocketFactory,
+} from '../providers/provider-socket-factory';
 import { RedisService } from '../redis/redis.service';
 import { ProviderHttpClient } from '../providers/provider-http.client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -51,6 +56,9 @@ export class FuturesLastPriceIngestion
   constructor(
     private readonly prisma: PrismaService,
     @Optional() redis?: RedisService,
+    @Optional()
+    @Inject(FUTURES_PROVIDER_SOCKET_FACTORY)
+    private readonly socketFactory?: FuturesProviderSocketFactory,
   ) {
     this.httpClient = new ProviderHttpClient(redis);
   }
@@ -139,7 +147,9 @@ export class FuturesLastPriceIngestion
   }
   private connect() {
     this.lastConnect = Date.now();
-    const socket = new WebSocket(FUTURES_LAST_WS_URL);
+    const socket =
+      this.socketFactory?.(FUTURES_LAST_WS_URL) ??
+      new WebSocket(FUTURES_LAST_WS_URL);
     this.socket = socket;
     socket.on('open', () => {
       this.lastWs = Date.now();

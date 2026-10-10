@@ -1,0 +1,150 @@
+{
+  "baselineNetworkRunExecuted": false,
+  "productionResourcesChanged": false,
+  "productionDatabaseOrValkeyUsed": false,
+  "frontendOrSchemaOrDependenciesChanged": false,
+  "harnessUnitTests": {
+    "passed": 38,
+    "failed": 0,
+    "command": "npm run test:load-test",
+    "log": "/tmp/trading-load-impl/unit-final2.log"
+  },
+  "existingUnitGroups": [
+    {
+      "suites": 5,
+      "tests": 171,
+      "status": "PASS",
+      "log": "/tmp/trading-load-impl/related-unit.log"
+    },
+    {
+      "suites": 4,
+      "tests": 71,
+      "status": "PASS",
+      "note": "Includes overlapping auth suite; do not sum as unique count"
+    }
+  ],
+  "financialPostgresqlGate": {
+    "numTotalTestSuites": 22,
+    "numPassedTestSuites": 22,
+    "numFailedTestSuites": 0,
+    "numTotalTests": 23,
+    "numPassedTests": 23,
+    "numPendingTests": 0,
+    "success": true,
+    "suites": [
+      {
+        "path": "backend/src/futures/futures-f3.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/futures/futures.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/wallets/spot-wallet-transfer.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/fx/fx.execute.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/futures/futures-f31.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/conditional/conditional.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/order-input-policy.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/limit-order-matching.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/market-execution.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/mvp-flow.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/futures/futures-isolated-boundary.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/trading-fee-pinning.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/limit-order-transaction-time.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/limit-order-create-race.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/orders.execute.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/trading-transaction-time.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/futures/futures-risk.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/wallets/wallet-fx-transfer.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/futures/futures-limit.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "path": "backend/src/orders/limit-order-reservation.integration.spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "backendTypecheck": "PASS",
+  "backendBuild": "PASS",
+  "accountsLint": "PASS",
+  "diagnosticChangedFilesGate": "PASS",
+  "targetGuard": {
+    "approvedLocalIdentity": "PASS",
+    "operationalUrl": "FAIL CLOSED before network",
+    "nonemptyDatabaseMigration": "FAIL CLOSED before migration",
+    "logicalRedisDatabaseIsolation": "REFUSED"
+  },
+  "replay": {
+    "deterministicWireEvents": "PASS",
+    "existingLastMarkTickerCandleBookParsers": "PASS",
+    "externalProviderTransportAttempts": 0,
+    "fxNormalOpsIngestSeconds": 30,
+    "existingFxExecutionFreshnessSeconds": 60
+  },
+  "smokeFunctional": "PASS",
+  "smokeRunValidity": "INVALID RUN: WSL WALL_CLOCK_STEP",
+  "performance": "NOT EVALUATED",
+  "audit": "CORRECTNESS PASS: zero findings",
+  "exactDecimalNegativeAndRestore": "PASS",
+  "normalLoginRefreshAndWsRecoveryFinalCompiledClient": "PASS",
+  "unchangedFinancialInvariants": true,
+  "skipOrWeakenedExistingTests": false
+}

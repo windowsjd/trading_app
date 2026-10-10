@@ -59,6 +59,8 @@ jobs:
         run: pnpm exec prisma generate
         env:
           DATABASE_URL: postgresql://prisma:prisma@localhost:5432/prisma?schema=public
+      - name: Load harness safety and deterministic protocol tests
+        run: pnpm run test:load-test
       - name: Verify committed Prisma generated artifacts
         run: |
           generated_status="$(git status --porcelain --untracked-files=all -- src/generated/prisma)"

@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-10T20:09:26.063Z",
+  "verdict": "CORRECTNESS FAIL",
+  "accounts": 10,
+  "examinedOrders": 54,
+  "examinedExecutions": 26,
+  "examinedLedgers": 171,
+  "liquidationAccounts": 0,
+  "findings": [
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "8d5f9209-d4ee-4dbe-be4f-cf7dda2966a0",
+      "rowId": "71fa3e39-1f8d-4351-b02e-8de1c29d383e"
+    }
+  ],
+  "arithmetic": "Existing Prisma Decimal and Futures calculation policy; exact equality, no floating point tolerance"
+}

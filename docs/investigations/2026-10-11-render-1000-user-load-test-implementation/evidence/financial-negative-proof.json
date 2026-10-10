@@ -1,0 +1,7 @@
+{
+  "negativeDecimal": "0.00000001",
+  "negativeVerdict": "CORRECTNESS FAIL",
+  "restoredVerdict": "CORRECTNESS PASS",
+  "nonemptyMigrationRejected": true,
+  "scope": "Local smoke9 test DB only"
+}

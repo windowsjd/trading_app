@@ -1,0 +1,21 @@
+{
+  "loginRefreshCount": 0,
+  "refreshCount": 1,
+  "authenticatedSubscriptionAck": 1,
+  "counters": {
+    "prepare:http.request.POST /auth/login": 1,
+    "prepare:http.receivedBytes": 1120,
+    "prepare:http.status.200.POST /auth/login": 1,
+    "prepare:auth.login": 1,
+    "prepare:ws.connect": 2,
+    "prepare:ws.subscribe": 2,
+    "prepare:ws.receivedBytes": 1682,
+    "prepare:ws.ack.asset_ticker": 2,
+    "prepare:ws.message.asset_ticker": 2,
+    "prepare:http.request.POST /auth/refresh": 1,
+    "prepare:http.status.200.POST /auth/refresh": 1,
+    "prepare:auth.refresh": 1,
+    "prepare:ws.tokenRefreshReconnect": 1,
+    "prepare:ws.restored": 1
+  }
+}

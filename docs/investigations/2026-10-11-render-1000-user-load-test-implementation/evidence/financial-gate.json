@@ -1,0 +1,99 @@
+{
+  "numTotalTestSuites": 22,
+  "numPassedTestSuites": 22,
+  "numFailedTestSuites": 0,
+  "numTotalTests": 23,
+  "numPassedTests": 23,
+  "numPendingTests": 0,
+  "success": true,
+  "suites": [
+    {
+      "path": "backend/src/futures/futures-f3.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/futures/futures.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/wallets/spot-wallet-transfer.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/fx/fx.execute.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/futures/futures-f31.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/conditional/conditional.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/order-input-policy.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/limit-order-matching.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/market-execution.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/mvp-flow.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/futures/futures-isolated-boundary.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/trading-fee-pinning.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/limit-order-transaction-time.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/limit-order-create-race.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/limit-order-create-no-redis.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/limit-order-idempotent-replay.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/orders.execute.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/trading-transaction-time.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/futures/futures-risk.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/wallets/wallet-fx-transfer.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/futures/futures-limit.integration.spec.ts",
+      "status": "passed"
+    },
+    {
+      "path": "backend/src/orders/limit-order-reservation.integration.spec.ts",
+      "status": "passed"
+    }
+  ]
+}

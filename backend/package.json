@@ -18,6 +18,8 @@
     "lint:candles:check": "eslint --no-fix --max-warnings=0 src/assets/asset-candles* src/assets/candle-* src/assets/market-candle* src/assets/live-candle* src/providers/kis/candles src/providers/koscom src/assets/koscom-candle-reader.service.ts src/providers/binance/binance-candle* src/providers/binance/binance-kline* src/providers/binance/binance-live-candle* src/providers/binance/binance-public* src/providers/binance/binance-rest* src/realtime/live-candle-* scripts/candle-*.ts scripts/lib",
     "format:candles:check": "prettier --check src/assets/asset-candles* src/assets/candle-* src/assets/market-candle* src/assets/live-candle* src/providers/kis/candles src/providers/koscom src/assets/koscom-candle-reader.service.ts src/providers/binance/binance-candle* src/providers/binance/binance-kline* src/providers/binance/binance-live-candle* src/providers/binance/binance-public* src/providers/binance/binance-rest* src/realtime/live-candle-* scripts/candle-*.ts scripts/lib",
     "typecheck": "tsc --noEmit -p tsconfig.build.json",
+    "load-test": "ts-node --project scripts/load-test/tsconfig.json --transpile-only scripts/load-test/cli.ts",
+    "test:load-test": "jest --runInBand --config scripts/load-test/jest.config.json",
     "test": "jest",
     "test:db:prepare": "prisma migrate deploy",
     "futures:provision-instruments": "tsx scripts/provision-futures-instruments.ts",
