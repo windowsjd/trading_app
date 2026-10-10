@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { projectOpsFailure } from '../../ops/ops-failure';
 import {
   AssetPriceSourceType,
   AssetType,
@@ -140,7 +141,9 @@ export class KoscomIngestionService {
       for (const asset of assets) {
         try {
           if (assets.filter((a) => a.symbol === asset.symbol).length !== 1)
-            throw new KoscomError('KOSCOM_ASSET_AMBIGUOUS');
+            throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+              'KOSCOM_ASSET_AMBIGUOUS',
+            );
           targets.push({
             assetId: asset.id,
             symbol: asset.symbol,
@@ -170,7 +173,10 @@ export class KoscomIngestionService {
               try {
                 const response = await this.client.batch(batch, kind);
                 for (const target of batch.targets) {
-                  if (!owned) throw new KoscomError('KOSCOM_LOCK_LOST');
+                  if (!owned)
+                    throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+                      'KOSCOM_LOCK_LOST',
+                    );
                   const matches = response.rows.filter(
                     (r) => r.isuSrtCd === target.symbol,
                   );
@@ -271,7 +277,10 @@ export class KoscomIngestionService {
       if (latest && latest.effectiveAt >= price.effectiveAt)
         return { state: 'skipped', reason: 'KOSCOM_DUPLICATE_OR_OLDER_PRICE' };
       if (dryRun) return { state: 'would_create' };
-      if (!(await owned())) throw new KoscomError('KOSCOM_LOCK_LOST');
+      if (!(await owned()))
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_LOCK_LOST',
+        );
       await this.prisma.assetPriceSnapshot.create({
         data: {
           assetId: target.assetId,
@@ -329,11 +338,16 @@ export class KoscomIngestionService {
       receivedAt,
     );
     if (state?.state !== 'open')
-      throw new KoscomError('KOSCOM_OUTSIDE_SESSION');
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_OUTSIDE_SESSION',
+      );
     const book = normalizeKoscomOrderbook(row);
     // v3 orderbook has no documented provider clock: receipt is not a trade timestamp.
     if (dryRun) return { state: 'would_create' };
-    if (!(await owned())) throw new KoscomError('KOSCOM_LOCK_LOST');
+    if (!(await owned()))
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_LOCK_LOST',
+      );
     await this.prisma.assetOrderbookSnapshot.create({
       data: {
         assetId: target.assetId,
@@ -396,7 +410,9 @@ export class KoscomIngestionService {
       for (const asset of missing.slice(0, options.maxSnapshots ?? 100)) {
         try {
           if (!(await this.locks.extend(acquired.lock)))
-            throw new KoscomError('KOSCOM_LOCK_LOST');
+            throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+              'KOSCOM_LOCK_LOST',
+            );
           const market = await this.markets.resolve(asset.symbol, asset.market);
           // closeprice has no documented business date. Dated history is the
           // closing evidence; do not stamp a timestamp-less quote as today's close.
@@ -416,14 +432,20 @@ export class KoscomIngestionService {
             rows.length !== 1 ||
             response.receivedAt < session.closeTime
           )
-            throw new KoscomError('KOSCOM_CLOSE_EVIDENCE_MISSING');
+            throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+              'KOSCOM_CLOSE_EVIDENCE_MISSING',
+            );
           const row = rows[0] as Record<string, unknown>;
           if (row.trdDd !== date)
-            throw new KoscomError('KOSCOM_CLOSE_DATE_MISMATCH');
+            throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+              'KOSCOM_CLOSE_DATE_MISMATCH',
+            );
           const values = ohlcv(row, false);
           if (!dryRun) {
             if (!(await this.locks.extend(acquired.lock)))
-              throw new KoscomError('KOSCOM_LOCK_LOST');
+              throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+                'KOSCOM_LOCK_LOST',
+              );
             await this.prisma.assetPriceSnapshot.create({
               data: {
                 assetId: asset.assetId,
@@ -487,6 +509,7 @@ function summary(
   errorCode?: string,
 ) {
   const failed = snapshots.filter((s) => s.state === 'failed').length;
+  const failure = projectOpsFailure({ message: errorCode }, errorCode);
   return {
     provider: 'koscom' as const,
     dryRun,
@@ -497,6 +520,8 @@ function summary(
     skipped: snapshots.filter((s) => s.state === 'skipped').length,
     failed,
     snapshots,
-    ...(errorCode ? { errorCode, errorMessage: errorCode } : {}),
+    ...(errorCode
+      ? { errorCode: failure.code, errorMessage: failure.message }
+      : {}),
   };
 }

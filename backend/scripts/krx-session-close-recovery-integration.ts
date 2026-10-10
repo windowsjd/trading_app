@@ -5,19 +5,21 @@ import { randomInt, randomUUID } from 'node:crypto';
 import { mock } from 'node:test';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { ProviderConfigService } from '../src/providers/provider-config.service';
 import { ProviderTargetResolverService } from '../src/providers/provider-target-resolver.service';
 import { MarketSnapshotHealthService } from '../src/providers/market-snapshot-health.service';
-import { KisAuthClient } from '../src/providers/kis/kis-auth.client';
-import { KisWebSocketIngestionService } from '../src/providers/kis/kis-websocket.ingestion.service';
-import { parseKisWebSocketMessage } from '../src/providers/kis/kis-websocket.trade-parser';
-import { KisQuoteClient } from '../src/providers/kis/kis-quote.client';
-import { KisRestCurrentPriceIngestionService } from '../src/providers/kis/kis-rest-current-price.ingestion.service';
-import { KisKrxSessionCloseIngestionService } from '../src/providers/kis/kis-krx-session-close.ingestion.service';
-import { KisKrxStartupCatchUpService } from '../src/providers/kis/kis-krx-startup-catch-up.service';
-import { KisRateLimiterService } from '../src/providers/kis/coordination/kis-rate-limiter.service';
-import { KisRequestCoordinatorService } from '../src/providers/kis/coordination/kis-request-coordinator.service';
-import { readKisRateLimitConfig } from '../src/providers/kis/coordination/kis-rate-limit.config';
+import { KoscomClient } from '../src/providers/koscom/koscom.client';
+import { KoscomIngestionService } from '../src/providers/koscom/koscom-ingestion.service';
+import { KoscomMarketMapService } from '../src/providers/koscom/koscom-market-map.service';
+import {
+  KoscomConfigService,
+  readKoscomConfig,
+  KOSCOM_PRICE_SOURCE,
+} from '../src/providers/koscom/koscom.config';
+import { MarketPriceEventService } from '../src/providers/market-price-event.service';
+import { KisRealtimePriceEventBus } from '../src/providers/kis/kis-realtime-price-event-bus.service';
+import { BinanceRealtimePriceEventBus } from '../src/providers/binance/binance-realtime-price-event-bus.service';
+import { PROVIDER_PRICE_PUBSUB_CHANNEL } from '../src/providers/fx-rate-update-event';
+import { RedisLockService } from '../src/redis/redis-lock.service';
 import { RedisService } from '../src/redis/redis.service';
 import { HttpException } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -75,7 +77,7 @@ let seasonId: string | undefined;
 const sessionClose = new Date('2026-07-10T06:30:00Z');
 
 // Six-digit unique symbols exercise the real domestic mapping without touching
-// any existing local Samsung/Kia asset. Provider field names match KIS contracts.
+// any existing local Samsung/Kia asset. Provider field names match KOSCOM v3.
 const fixtureSymbols = [
   String(randomInt(800000, 900000)),
   String(randomInt(900000, 999999)),
@@ -87,73 +89,93 @@ const prices = new Map([
 const requests: Array<{
   path: string;
   query: Record<string, string>;
-  trId: string | undefined;
 }> = [];
 let evidenceAvailable = false;
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? '/', 'http://127.0.0.1');
   res.setHeader('content-type', 'application/json');
-  if (url.pathname === '/oauth2/tokenP') {
+  requests.push({
+    path: url.pathname,
+    query: Object.fromEntries(url.searchParams),
+  });
+  if (url.pathname.endsWith('/lists')) {
     res.end(
       JSON.stringify({
-        access_token: 'fixture-token',
-        token_type: 'Bearer',
-        expires_in: 86400,
+        isuLists: url.pathname.includes('/kospi/')
+          ? fixtureSymbols.map((isuSrtCd) => ({ isuSrtCd }))
+          : [],
       }),
     );
     return;
   }
-  requests.push({
-    path: url.pathname,
-    query: Object.fromEntries(url.searchParams),
-    trId: req.headers.tr_id as string | undefined,
-  });
-  const symbol = url.searchParams.get('FID_INPUT_ISCD') ?? '';
+  if (url.pathname.includes('/multiquote/stocks/')) {
+    const isulist = (url.searchParams.get('isuCd') ?? '')
+      .split(',')
+      .map((symbol) =>
+        url.pathname.endsWith('/price')
+          ? {
+              isuSrtCd: symbol,
+              trdPrc: prices.get(symbol),
+              trdTm: '10000000',
+              trdDd: '20260714',
+              cmpprevddPrc: '0',
+              cmpprevddTpCd: '3',
+              accTrdvol: '100000',
+              accTrdval: '10000000',
+            }
+          : {
+              isuSrtCd: symbol,
+              askStep1BstordPrc: prices.get(symbol),
+              bidStep1BstordPrc: prices.get(symbol),
+              askStep1BstordRqty: '10',
+              bidStep1BstordRqty: '20',
+            },
+      );
+    res.end(JSON.stringify({ jsonrpc: '2.0', result: { isulist } }));
+    return;
+  }
+  const symbol = url.pathname.split('/').at(-2) ?? '';
   const price = prices.get(symbol);
   if (!price) {
     res.statusCode = 400;
     res.end('{}');
     return;
   }
-  if (url.pathname.endsWith('/inquire-price')) {
-    // Actual current-price contract has neither business date nor trade clock.
-    res.end(
-      JSON.stringify({
-        rt_cd: '0',
-        output: { stck_shrn_iscd: symbol, stck_prpr: price },
-      }),
-    );
-    return;
-  }
-  if (!url.pathname.endsWith('/inquire-daily-itemchartprice')) {
+  if (!url.pathname.endsWith('/history')) {
     res.statusCode = 404;
     res.end('{}');
     return;
   }
   res.end(
     JSON.stringify({
-      rt_cd: '0',
-      output1: { stck_shrn_iscd: symbol },
-      output2: [
-        {
-          ...(evidenceAvailable ? { stck_bsop_date: '20260710' } : {}),
-          stck_clpr: price,
-          stck_oprc: price,
-          stck_hgpr: price,
-          stck_lwpr: price,
-          acml_vol: '100000',
-        },
-      ],
+      jsonrpc: '2.0',
+      result: {
+        isuSrtCd: symbol,
+        hisLists: [
+          {
+            ...(evidenceAvailable ? { trdDd: '20260710' } : {}),
+            trdPrc: price,
+            opnprc: price,
+            hgprc: price,
+            lwprc: price,
+            accTrdvol: '100000',
+            accTrdval: '10000000',
+          },
+        ],
+      },
     }),
   );
 });
-const redis = new RedisService();
-const coordinator = new KisRequestCoordinatorService(
-  new KisRateLimiterService(
-    redis,
-    readKisRateLimitConfig({ KIS_RATE_LIMIT_ENABLED: 'false' }),
-  ),
-);
+let realtimeEvents = 0;
+class FixtureRedis extends RedisService {
+  override publish(channel: string, message: string): Promise<number> {
+    if (channel === PROVIDER_PRICE_PUBSUB_CHANNEL) realtimeEvents++;
+    return super.publish(channel, message);
+  }
+}
+const redis = new FixtureRedis();
+const namespace = `krx-recovery-${randomUUID()}`;
+const closeKey = `koscom:${namespace}:close:2026-07-10`;
 
 async function main() {
   mock.timers.enable({
@@ -166,40 +188,44 @@ async function main() {
     const address = server.address();
     assert.ok(address && typeof address === 'object');
     const fixtureBaseUrl = `http://127.0.0.1:${address.port}`;
-    class FixtureConfig extends ProviderConfigService {
+    class FixtureConfig extends KoscomConfigService {
       override getConfig() {
-        return super.getConfig({
-          PROVIDER_INGESTION_ENABLED: 'true',
-          KIS_MARKET_DATA_ENABLED: 'true',
-          KIS_APP_KEY: 'fixture-key',
-          KIS_APP_SECRET: 'fixture-secret',
-          KIS_REST_BASE_URL: fixtureBaseUrl,
-          KIS_DOMESTIC_SYMBOLS: fixtureSymbols.join(','),
-          KIS_US_SYMBOLS: '',
-        });
+        return {
+          ...readKoscomConfig({
+            PROVIDER_INGESTION_ENABLED: 'true',
+            KOSCOM_API_KEY: 'fixture-key',
+          }),
+          baseUrl: fixtureBaseUrl,
+          namespace,
+        };
       }
     }
     const config = new FixtureConfig();
-    const auth = new KisAuthClient(config, coordinator);
-    const quote = new KisQuoteClient(config, coordinator);
-    const current = new KisRestCurrentPriceIngestionService(
-      prisma,
-      config,
-      auth,
-      quote,
-    );
-    const close = new KisKrxSessionCloseIngestionService(
-      prisma,
-      config,
-      auth,
-      quote,
-    );
+    const locks = new RedisLockService(redis);
+    const client = new KoscomClient(config, redis, locks);
+    const markets = new KoscomMarketMapService(client, redis, config);
     const health = new MarketSnapshotHealthService(
       prisma,
       new ProviderTargetResolverService(prisma),
     );
-    const catchUp = () =>
-      new KisKrxStartupCatchUpService(config, health, close);
+    const events = new MarketPriceEventService(
+      new KisRealtimePriceEventBus(),
+      new BinanceRealtimePriceEventBus(),
+    );
+    events.subscribe(() => {
+      realtimeEvents++;
+    });
+    const collector = new KoscomIngestionService(
+      prisma,
+      config,
+      client,
+      markets,
+      locks,
+      redis,
+      events,
+      health,
+    );
+    const collect = () => collector.collect({ symbols: fixtureSymbols });
     await prisma.$connect();
     const user = await prisma.user.create({
       data: {
@@ -301,11 +327,20 @@ async function main() {
       await prisma.assetPriceSnapshot.count({ where: fixtureWhere }),
       0,
     );
-    const currentResult = await current.ingestCurrentPrices({
-      domesticSymbols: fixtureSymbols,
-      usSymbols: [],
+    // A timestamp-less receipt from after close is not session-close evidence.
+    // Preserve the old fixture's negative case without calling retired KIS APIs.
+    await prisma.assetPriceSnapshot.createMany({
+      data: assetIds.map((assetId, i) => ({
+        assetId,
+        price: prices.get(fixtureSymbols[i])!,
+        currencyCode: 'KRW',
+        sourceType: 'provider_api',
+        sourceName: KOSCOM_PRICE_SOURCE,
+        sourceTimestamp: null,
+        effectiveAt: new Date(),
+        capturedAt: new Date(),
+      })),
     });
-    assert.equal(currentResult.created, 2);
     const receipts = await prisma.assetPriceSnapshot.findMany({
       where: fixtureWhere,
     });
@@ -347,17 +382,16 @@ async function main() {
       }
     }
     await assertUnavailable();
-    const failed = await catchUp().startOnce();
-    assert.equal(failed.state, 'failed');
-    if (failed.state === 'failed') {
-      assert.equal(failed.reason, 'COMPLETED_SESSION_PRICE_UNAVAILABLE');
-      assert.equal(failed.failures?.length, 2);
-      assert.ok(
-        failed.failures?.every(
-          (row) => row.reason === 'KIS_SESSION_CLOSE_DATE_MISSING_OR_AMBIGUOUS',
-        ),
-      );
-    }
+    const failed = await collect();
+    assert.equal(failed.success, false);
+    assert.equal(failed.errorCode, 'KOSCOM_CLOSE_RECOVERY_INCOMPLETE');
+    assert.equal(failed.failed, 2);
+    assert.ok(
+      failed.snapshots.every(
+        (row) => row.reason === 'KOSCOM_CLOSE_DATE_MISMATCH',
+      ),
+    );
+    assert.equal(realtimeEvents, 0);
     assert.equal(
       await prisma.assetPriceSnapshot.count({ where: fixtureWhere }),
       2,
@@ -368,10 +402,17 @@ async function main() {
     );
 
     evidenceAvailable = true;
-    const recovery = catchUp();
-    const recovered = await recovery.startOnce();
-    assert.equal(recovered.state, 'completed');
-    if (recovered.state === 'completed') assert.equal(recovered.created, 2);
+    // Simulate expiry of this fixture's retry marker; provider retry TTL is
+    // independently checked by the ingestion unit contract.
+    await redis.delete(closeKey);
+    const recovered = await collect();
+    assert.equal(recovered.success, true);
+    assert.equal(recovered.created, 2);
+    assert.equal(
+      realtimeEvents,
+      0,
+      'recovered closes cannot become realtime ticks',
+    );
     const snapshots = await prisma.assetPriceSnapshot.findMany({
       where: { ...fixtureWhere, effectiveAt: sessionClose },
     });
@@ -381,26 +422,22 @@ async function main() {
       assert.equal(row.capturedAt.toISOString(), '2026-07-10T09:00:00.000Z');
       assert.equal(row.price.toString(), expected.get(row.assetId));
       assert.ok(
-        JSON.stringify(row.rawPayloadJson).includes(
-          'provider_daily_close_trading_date',
-        ),
+        JSON.stringify(row.rawPayloadJson).includes('provider_history'),
       );
     }
     const dailyRequests = requests.filter((row) =>
-      row.path.endsWith('/inquire-daily-itemchartprice'),
+      row.path.endsWith('/history'),
     );
     assert.equal(dailyRequests.length, 4);
     for (const request of dailyRequests) {
-      assert.equal(request.trId, 'FHKST03010100');
       assert.deepEqual(request.query, {
-        FID_COND_MRKT_DIV_CODE: 'J',
-        FID_INPUT_ISCD: request.query.FID_INPUT_ISCD,
-        FID_INPUT_DATE_1: '20260710',
-        FID_INPUT_DATE_2: '20260710',
-        FID_PERIOD_DIV_CODE: 'D',
-        FID_ORG_ADJ_PRC: '1',
+        trnsmCycleTpCd: 'D',
+        inqStrtDd: '20260710',
+        inqEndDd: '20260710',
+        reqCnt: '1',
+        apikey: 'fixture-key',
       });
-      assert.ok(fixtureSymbols.includes(request.query.FID_INPUT_ISCD));
+      assert.ok(fixtureSymbols.includes(request.path.split('/').at(-2)!));
     }
     async function assertAvailable() {
       const market = await assets.getAssets(user.id, {
@@ -473,11 +510,11 @@ async function main() {
       'PASS CASE 1 provider HTTP → parser → recovery → DB → Market/Position/Portfolio/Home, GENERAL/SEASON, orders closed',
     );
     const callsAfterRecovery = requests.length;
-    assert.strictEqual(await recovery.startOnce(), recovered);
-    assert.deepEqual(await catchUp().startOnce(), {
-      state: 'not_needed',
-      reason: 'LATEST_COMPLETED_SESSION_COVERED',
-    });
+    assert.equal((await collect()).errorCode, 'KOSCOM_CLOSE_ALREADY_CHECKED');
+    await redis.delete(closeKey);
+    const covered = await collect();
+    assert.equal(covered.success, true);
+    assert.equal(covered.created, 0);
     assert.equal(requests.length, callsAfterRecovery);
     console.log(
       'PASS CASE 3 covered session and repeated bootstrap cause no provider calls',
@@ -498,10 +535,10 @@ async function main() {
           ],
           new Date(),
         );
-      assert.deepEqual(await catchUp().startOnce(), {
-        state: 'skipped',
-        reason: 'NO_COMPLETED_KRX_SESSION_TODAY',
-      });
+      assert.equal(
+        (await collect()).errorCode,
+        'MARKET_CLOSED_EXPECTED_NO_DATA',
+      );
       assert.equal(requests.length, callsAfterRecovery);
       await assertAvailable();
     }
@@ -510,39 +547,34 @@ async function main() {
     );
     resetMarketSessionOverrideStoreForTest();
     mock.timers.setTime(Date.parse('2026-07-14T01:00:00Z'));
-    assert.deepEqual(await catchUp().startOnce(), {
-      state: 'skipped',
-      reason: 'NO_COMPLETED_KRX_SESSION_TODAY',
-    });
-    assert.equal(requests.length, callsAfterRecovery);
+    const dailyCallsBeforeOpen = requests.filter((r) =>
+      r.path.endsWith('/history'),
+    ).length;
     assert.equal(
       await prisma.assetPriceSnapshot.count({ where: fixtureWhere }),
       4,
     );
-    // The existing WebSocket parser and ingestion still own OPEN prices.
-    const ws = new KisWebSocketIngestionService(prisma, config);
-    const fields = fixtureSymbols.flatMap((symbol) => {
-      const row = Array.from({ length: 46 }, () => '');
-      row[0] = symbol;
-      row[1] = '100000';
-      row[2] = prices.get(symbol)!;
-      row[33] = '20260714';
-      row[35] = 'N';
-      return row;
-    });
-    const live = parseKisWebSocketMessage({
-      frame: `0|H0STCNT0|002|${fields.join('^')}`,
-      receivedAt: new Date(),
-    });
-    assert.equal(live.state, 'trades');
-    assert.equal((await ws.ingestParsedMessage(live)).created, 2);
+    // OPEN uses central KOSCOM price/book collection, without close recovery.
+    const live = await collect();
+    assert.equal(live.success, true);
+    assert.equal(live.created, 4);
+    assert.equal(
+      realtimeEvents,
+      2,
+      'only the two OPEN prices emit realtime ticks',
+    );
+    assert.equal(live.snapshots.filter((r) => r.kind === 'price').length, 2);
+    assert.equal(
+      requests.filter((r) => r.path.endsWith('/history')).length,
+      dailyCallsBeforeOpen,
+    );
     for (const assetId of assetIds) {
       const detail = (await assets.getAsset(user.id, assetId)).data.asset;
       assert.equal(detail.marketStatus, 'open');
       assert.equal(detail.price?.state, 'available');
     }
     console.log(
-      'PASS CASE 5 OPEN skips recovery and keeps live provider ingestion available',
+      'PASS CASE 5 OPEN skips close recovery and keeps central KOSCOM ingestion available',
     );
     console.log('krx recovery integration ok: 5 scenarios');
   } finally {
@@ -552,6 +584,9 @@ async function main() {
       where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.assetPriceSnapshot.deleteMany({
+      where: { assetId: { in: assetIds } },
+    });
+    await prisma.assetOrderbookSnapshot.deleteMany({
       where: { assetId: { in: assetIds } },
     });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
@@ -573,7 +608,10 @@ async function main() {
     if (seasonId) await prisma.season.delete({ where: { id: seasonId } });
     if (userId) await prisma.user.delete({ where: { id: userId } });
     await prisma.$disconnect();
-    await coordinator.onModuleDestroy();
+    // Only this fixture's Redis namespace is cleaned.
+    await redis.delete(closeKey);
+    for (const market of ['kospi', 'kosdaq', 'konex'])
+      await redis.delete(`koscom:${namespace}:symbols:${market}`);
     await redis.onModuleDestroy();
     server.closeAllConnections();
     await new Promise<void>((resolve, reject) =>

@@ -195,7 +195,7 @@ async function fixture(
       sourceType: 'provider_api',
       sourceName:
         assetType === 'domestic_stock'
-          ? 'kis_krx_realtime_trade'
+          ? 'koscom_krx_realtime_price'
           : assetType === 'us_stock'
             ? 'kis_us_delayed_trade'
             : 'binance_spot_ws_ticker',

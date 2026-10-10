@@ -180,7 +180,7 @@ async function stockOrCryptoPrice(s: Scenario, value: string) {
       sourceType: 'provider_api',
       sourceName:
         asset.market === 'KRX'
-          ? 'kis_krx_realtime_trade'
+          ? 'koscom_krx_realtime_price'
           : 'kis_us_delayed_trade',
       capturedAt: at,
       effectiveAt: at,
@@ -290,7 +290,7 @@ async function matrix() {
                   const child = (await group(id)).children[0];
                   assert.ok(child.orderId);
                   assert.equal(
-                    (await settleLimit(s, child.orderId!, '103')).state,
+                    (await settleLimit(s, child.orderId, '103')).state,
                     'filled',
                   );
                 } else {
@@ -658,7 +658,7 @@ async function stockCoverage() {
                 sourceType: 'provider_api',
                 sourceName:
                   market === 'KRX'
-                    ? 'kis_krx_realtime_trade'
+                    ? 'koscom_krx_realtime_price'
                     : 'kis_us_delayed_trade',
                 effectiveAt: at,
                 capturedAt: at,
@@ -987,7 +987,7 @@ async function spotRaces() {
       assert.ok(
         executed
           .reduce(
-            (a, o) => a.add(o.executedQuantity ?? o.quantity!),
+            (a, o) => a.add(o.executedQuantity ?? o.quantity),
             new Prisma.Decimal(0),
           )
           .lte(100),
@@ -1710,9 +1710,9 @@ async function domainIsolation() {
     const futuresLeg = await db.protectionLeg.findFirstOrThrow({
       where: { groupId: futuresGroup },
     });
-    const ownLast = futuresChild.futuresLastPriceSnapshotId!;
+    const ownLast = futuresChild.futuresLastPriceSnapshotId;
     const otherLast = (await lastPrice(s, '98', 1, 0)).id;
-    const anySpot = spotChild.assetPriceSnapshotId!;
+    const anySpot = spotChild.assetPriceSnapshotId;
     for (const data of [
       {
         groupId: spotGroup,

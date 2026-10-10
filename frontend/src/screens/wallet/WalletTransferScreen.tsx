@@ -15,7 +15,7 @@ import { ACCOUNT_INTEGRITY_TITLE, findAccountIntegrityFailure } from '../../feat
 import { invalidateAfterWalletTransfer } from '../../features/tradingAccount/invalidation';
 import { getWalletByIdentity } from '../../features/wallet/mapper';
 import { TRANSFER_WALLETS, WALLET_SCOPE_LABELS, type TransferWalletIdentity } from '../../features/wallet/walletIdentity';
-import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError, WalletBalanceCheckError } from '../../features/wallet/walletTransfer';
+import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError, WalletBalanceCheckError, walletBalanceCheckMessage } from '../../features/wallet/walletTransfer';
 import { isFxResponseInScope as isTransferResponseInScope, type FxRequestScope as TransferScope } from '../../features/wallet/fxAccountScope';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { createIdempotencyKey } from '../../utils/idempotency';
@@ -169,7 +169,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   const uncertainRetry = sameIntent(attempt.current) && !!attempt.current.uncertain;
   const balanceReady = !wallets.isFetching && !wallets.isError && (!sourceIsFutures || (!futures.isFetching && !futures.isError));
   useEffect(() => {
-    const insufficient = failure instanceof WalletBalanceCheckError ? failure.message === '잔액이 부족합니다.'
+    const insufficient = failure instanceof WalletBalanceCheckError ? failure.insufficient
       : ['INSUFFICIENT_BALANCE', 'INSUFFICIENT_AVAILABLE_BALANCE', 'INSUFFICIENT_FUTURES_FREE_COLLATERAL'].includes(getApiErrorCode(failure) ?? '');
     const refreshed = wallets.dataUpdatedAt !== balanceFailureRead.current.wallets ||
       (sourceIsFutures && futures.dataUpdatedAt !== balanceFailureRead.current.futures);
@@ -282,7 +282,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                       {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
                         : balanceReady && canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>잔액이 부족합니다.</Text> : null}
                     </View>
-                    {failure ? <ErrorNotice error={failure} message={failure instanceof WalletBalanceCheckError ? failure.message : attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
+                    {failure ? <ErrorNotice error={failure} message={failure instanceof WalletBalanceCheckError ? walletBalanceCheckMessage(failure.insufficient) : attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
                     <View ref={inputScroll.submitRef} collapsable={false}>
                       <View ref={questGuideTarget('transfer-submit')} collapsable={false}>
                         <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />

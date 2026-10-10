@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
+import { createApiError } from '../common/api-error';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { BinancePriceIngestionService } from '../providers/binance/binance-price.ingestion.service';
 import { ExchangeRateIngestionService } from '../providers/exchange-rate/exchange-rate.ingestion.service';
@@ -198,7 +199,11 @@ export class OperatorProviderIngestionService {
         );
       case 'koscom':
         if (!this.koscom)
-          throw new InternalServerErrorException('KOSCOM_UNAVAILABLE');
+          throw createApiError(
+            'INTERNAL_SERVER_ERROR',
+            'KOSCOM_UNAVAILABLE',
+            500,
+          );
         return summaryFromResult(
           input.provider,
           input.dryRun,

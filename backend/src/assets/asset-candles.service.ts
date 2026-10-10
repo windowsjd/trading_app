@@ -490,7 +490,10 @@ export class AssetCandlesService {
     query: ParsedAssetCandlesQuery,
   ): Promise<AssetCandlesResponse> {
     try {
-      if (!this.koscomReader) throw new KoscomError('KOSCOM_DISABLED');
+      if (!this.koscomReader)
+        throw /* @diagnosticSurface internal: Translated by the enclosing catch into the candle HTTP factory. */ new KoscomError(
+          'KOSCOM_DISABLED',
+        );
       return await this.koscomReader.read(asset, query);
     } catch (error) {
       if (error instanceof KoscomError)

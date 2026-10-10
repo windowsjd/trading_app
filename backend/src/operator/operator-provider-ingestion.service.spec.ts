@@ -23,6 +23,26 @@ describe('OperatorProviderIngestionService', () => {
     role: UserRole.operator,
   };
 
+  it('rejects a missing KOSCOM collector with a safe HTTP failure and failure audit', async () => {
+    const { service, audit, binance, kisCurrent } = createService();
+    await expect(
+      service.runProviderIngestion(actor, 'koscom', {}),
+    ).rejects.toMatchObject({
+      status: 500,
+      response: {
+        success: false,
+        error: {
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Request could not be completed.',
+        },
+      },
+    });
+    expect(audit.recordFailure).toHaveBeenCalledTimes(1);
+    expect(audit.recordSuccess).not.toHaveBeenCalled();
+    expect(binance.ingestPrices).not.toHaveBeenCalled();
+    expect(kisCurrent.ingestCurrentPrices).not.toHaveBeenCalled();
+  });
+
   it('runs Binance ingestion as dry-run by default and writes safe audit metadata', async () => {
     const { audit, binance, service } = createService();
     binance.ingestPrices.mockResolvedValueOnce({
