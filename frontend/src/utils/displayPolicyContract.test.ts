@@ -10,6 +10,8 @@ function read(sourcePath: string) {
 const marketRow = read('features/market/MarketAssetRow.tsx');
 const marketScreen = read('screens/market/MarketScreen.tsx');
 const marketSearch = read('screens/market/MarketSearchScreen.tsx');
+const marketSearchQuery = read('features/market/useMarketAssetSearch.ts');
+const orderAssetSheet = read('screens/order/OrderAssetSheet.tsx');
 const assetDetail = read('screens/asset/AssetDetailScreen.tsx');
 const assetChart = read('screens/asset/AssetChartScreen.tsx');
 const tradingScreen = read('screens/order/OrderScreen.tsx');
@@ -33,7 +35,14 @@ describe('numeric asset symbol display contract', () => {
   });
 
   it('keeps numeric-symbol search wired to the API query', () => {
-    assert.match(marketSearch, /search:\s*trimmedSearchText \|\| undefined/u);
+    // Search screen and order asset sheet share one query; neither builds its own.
+    assert.match(marketSearchQuery, /search:\s*trimmedSearchText \|\| undefined/u);
+    for (const source of [marketSearch, orderAssetSheet]) {
+      assert.match(source, /useMarketAssetSearch\(/u);
+      assert.doesNotMatch(source, /getAssets|useInfiniteQuery/u);
+      assert.match(source, /placeholder="종목명 또는 심볼 검색"/u);
+      assert.match(source, /<MarketAssetRow/u);
+    }
     assert.match(marketSearch, /placeholder="종목명 또는 심볼 검색"/u);
     assert.match(
       marketSearch,

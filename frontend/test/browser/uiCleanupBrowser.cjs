@@ -189,7 +189,7 @@ async function run() {
       const visible = await input.boundingBox(); assert.ok(visible.y >= 0 && visible.y + visible.height <= 381, 'focused amount is visible after web resize');
       await id('order-execute-submit').scrollIntoViewIfNeeded(); const submit = await id('order-execute-submit').boundingBox(); assert.ok(submit.y >= 0 && submit.y + submit.height <= 381);
       assert.equal(await input.inputValue(), '123.456');
-      await id('order-type-toggle-limit').click(); await id('order-limit-price-input').fill('0.8592'); await page.waitForTimeout(150);
+      await id('order-type-select').click(); await id('order-type-toggle-limit').click(); await id('order-limit-price-input').fill('0.8592'); await page.waitForTimeout(150);
       const limit = await id('order-limit-price-input').boundingBox(); assert.ok(limit.y >= 0 && limit.y + limit.height <= 381);
       await page.goto(`${base}/navigation?navigation=1&account=general&fontScale=${fontScale}`); await id('home-total-asset').waitFor();
       await page.getByRole('tab', { name: '지갑', exact: true }).click(); await id('wallet-exchange').click();

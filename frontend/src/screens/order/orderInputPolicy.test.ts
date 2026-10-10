@@ -20,7 +20,7 @@ for (const accountId of ['general', 'season']) {
       await h.mount();
       t.after(h.close);
       if (orderType === 'limit') {
-        await h.press(TEST_IDS.order.typeToggleLimit);
+        await h.selectOrderType('limit');
         await h.input(TEST_IDS.order.limitPriceInput, '700');
       }
       assert.match(h.node(input).props.accessibilityLabel, /매수 금액 USD/);
@@ -53,12 +53,8 @@ for (const accountId of ['general', 'season']) {
         await h.input(input, '0.5');
         assert.notEqual(h.node(submit).props.state, 'disabled');
         assert.match(json(h), /정규장 외에는 시장가 주문을 할 수 없습니다/);
-        assert.equal(
-          h.node(TEST_IDS.order.typeToggleMarket).props.accessibilityState
-            .selected,
-          true,
-        );
-        await h.press(TEST_IDS.order.typeToggleLimit);
+        assert.equal(h.orderType(), '시장가');
+        await h.selectOrderType('limit');
         await h.input(TEST_IDS.order.limitPriceInput, '70000');
         assert.equal(h.node(submit).props.state, 'disabled');
         assert.match(json(h), /소수점 수량은 시장가만/);
@@ -136,7 +132,7 @@ test('crypto amount ratios need cash and actual fee, not a price, and 100% cover
   const fee = amount.mul('0.003').toDecimalPlaces(8);
   assert.equal(amount.toFixed(8), '99.70089730');
   assert.ok(amount.add(fee).lte('100'));
-  await h.press(TEST_IDS.order.typeToggleLimit);
+  await h.selectOrderType('limit');
   await h.press('order-ratio-50');
   assert.equal(h.node(input).props.value, '49.85044865');
   assert.equal(h.requests.length, 0);

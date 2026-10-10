@@ -5,7 +5,7 @@ import {TEST_IDS} from '../../constants/testIds.ts';
 const {inlineTradingHarness,act,deferred}=createRequire(import.meta.url)('../../../test/inlineTradingHarness.cjs');
 for(const account of ['general','season'])test(`${account} BUY Limit attaches legs only to create; quote remains unchanged`,async t=>{
  const h=inlineTradingHarness();h.accountId=account;h.positions[account]='0';h.protections={tradingAccountId:account,capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};
- await h.mount();t.after(h.close);await h.press(TEST_IDS.order.typeToggleLimit);await h.input(TEST_IDS.order.limitPriceInput,'700');await h.input(TEST_IDS.order.quantityInput,'100');
+ await h.mount();t.after(h.close);await h.selectOrderType('limit');await h.input(TEST_IDS.order.limitPriceInput,'700');await h.input(TEST_IDS.order.quantityInput,'100');
  await h.press('protection-stop_loss-toggle');
  await act(async()=>h.renderer.root.findAll((n:any)=>n.type==='TextInput'&&n.props.accessibilityLabel==='손절 (Stop Loss) 조건 가격')[0].props.onChangeText('600'));
  await h.press('protection-take_profit-toggle');await h.press('protection-take_profit-limit');
@@ -16,12 +16,12 @@ for(const account of ['general','season'])test(`${account} BUY Limit attaches le
  assert.equal(h.requests[1].body.orderType,'limit');assert.equal(h.requests[1].body.side,'buy');
 });
 test('attached inputs are optional and never shown for Market or Sell',async t=>{
- const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};await h.mount();t.after(h.close);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);await h.press(TEST_IDS.assetDetail.sellButton);await h.press(TEST_IDS.order.typeToggleLimit);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+ const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};await h.mount();t.after(h.close);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);await h.press(TEST_IDS.assetDetail.sellButton);await h.selectOrderType('limit');assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
 });
 
 for(const phase of ['before-submit','quote-pending']) test(`disabled Spot attachment blocks ${phase} without hiding the editor`,async t=>{
  const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};
- await h.mount();t.after(h.close);await h.press(TEST_IDS.order.typeToggleLimit);await h.input(TEST_IDS.order.limitPriceInput,'700');await h.input(TEST_IDS.order.quantityInput,'100');await h.press('protection-stop_loss-toggle');
+ await h.mount();t.after(h.close);await h.selectOrderType('limit');await h.input(TEST_IDS.order.limitPriceInput,'700');await h.input(TEST_IDS.order.quantityInput,'100');await h.press('protection-stop_loss-toggle');
  await act(async()=>h.renderer.root.findAll((n:any)=>n.type==='TextInput'&&n.props.accessibilityLabel==='손절 (Stop Loss) 조건 가격')[0].props.onChangeText('600'));
  const submit=h.node(TEST_IDS.order.executeSubmit).props.onPress;
  if(phase==='quote-pending'){h.quoteGate=deferred();await act(async()=>submit());}

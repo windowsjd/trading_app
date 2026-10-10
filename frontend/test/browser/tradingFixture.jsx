@@ -47,6 +47,14 @@ function App() {
     );
     refresh();
   };
+  // Native-stack setParams merges into the current route (same screen).
+  state.setParams = (params) => {
+    state.paramCalls = [...(state.paramCalls ?? []), params];
+    if (params.assetId) state.assetId = params.assetId;
+    if (params.side) state.side = params.side;
+    if (params.accountId) state.accountId = params.accountId;
+    refresh();
+  };
   window.fixture = {
     state,
     client,

@@ -101,7 +101,7 @@ for (const width of [320, 360, 390]) {
     assert.match(amount.props.placeholder, /매수 금액/);
     await h.input('order-quantity-input', '123456789.123456789');
     assert.equal(h.node('order-quantity-input').props.value, '123456789.123456789');
-    await h.press('order-type-toggle-limit');
+    await h.selectOrderType('limit');
     const limit = h.node('order-limit-price-input');
     assert.ok(limit);
     const style = flatten(limit.props.style);

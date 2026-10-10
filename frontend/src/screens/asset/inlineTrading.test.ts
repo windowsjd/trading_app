@@ -23,7 +23,7 @@ describe('Order screen lifecycle with real React and query mutations', () => {
           t.after(h.close);
           if (side === 'sell') await h.press(sell);
           if (type === 'limit') {
-            await h.press(TEST_IDS.order.typeToggleLimit);
+            await h.selectOrderType('limit');
             await h.input(TEST_IDS.order.limitPriceInput, '700.12345678');
           }
           await h.input(qty, '0.125');
@@ -218,10 +218,17 @@ describe('Order screen lifecycle with real React and query mutations', () => {
   it('locks sell input and type controls through quote and create, including direct stale callbacks', async (t) => {
     const h = inlineTradingHarness(); h.quoteGate = deferred();
     await h.mount(); t.after(h.close);
-    await h.press(sell); await h.input(qty, '1'); await h.press(submit); await h.flush();
+    await h.press(sell); await h.input(qty, '1');
+    await h.press(TEST_IDS.order.typeSelect);
+    const staleLimit = h.node(TEST_IDS.order.typeToggleLimit).props.onPress;
+    await h.press('order-type-menu-backdrop');
+    await h.press(submit); await h.flush();
     assert.equal(h.node(qty).props.editable, false);
-    assert.equal(h.node(TEST_IDS.order.typeToggleLimit).props.disabled, true);
-    await h.input(qty, '2'); await h.press(TEST_IDS.order.typeToggleLimit);
+    assert.equal(h.node(TEST_IDS.order.typeSelect).props.disabled, true);
+    await h.input(qty, '2'); await h.press(TEST_IDS.order.typeSelect);
+    assert.equal(h.node(TEST_IDS.order.typeToggleLimit) === undefined, true);
+    await act(async () => staleLimit());
+    assert.equal(h.orderType(), '시장가');
     assert.equal(h.node(qty).props.value, '1');
     await act(async () => h.quoteGate.resolve()); await h.flush();
     assert.equal(h.requests.length, 2);
@@ -269,18 +276,17 @@ describe('Order screen lifecycle with real React and query mutations', () => {
 });
 
 describe('trading and chart screen boundaries', () => {
-  it('resets the display toggle and inputs on pair replacement and reuses the search route', async (t) => {
+  it('resets the display toggle and inputs on pair replacement and changes the pair in place', async (t) => {
     const h = inlineTradingHarness();
     await h.mount();
     t.after(h.close);
     await h.press('asset-krw-toggle');
     await h.input(qty, '1');
     await h.press('asset-change-pair');
+    assert.equal(h.node('order-asset-sheet') !== undefined, true);
+    await h.press('order-asset-sheet-close');
     await h.press('asset-open-chart');
-    assert.deepEqual(h.navigation, [
-      ['MarketSearch', { returnToAsset: true }],
-      ['AssetChart', { assetId: 'bnb' }],
-    ]);
+    assert.deepEqual(h.navigation, [['AssetChart', { assetId: 'bnb' }]]);
     h.assetId = 'btc';
     await h.update();
     assert.equal(h.node(qty).props.value, '');

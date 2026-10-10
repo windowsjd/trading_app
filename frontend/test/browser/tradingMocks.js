@@ -67,6 +67,7 @@ export const navigation = {
   popTo: (...args) => state.navigate(...args),
   goBack: () => state.navigate('AssetDetail'),
   reset: () => {},
+  setParams: (params) => state.setParams(params),
 };
 export const useRootNavigation = () => navigation;
 export const useIsFocused = () => true;
@@ -188,6 +189,8 @@ export const apiClient = {
         ...scoped,
         wallets: [
           {
+            // Spot crypto orders read the crypto_spot wallet.
+            walletScope: 'crypto_spot',
             currencyCode: 'USD',
             balanceAmount: String(state.balance),
             reservedAmount: '0',

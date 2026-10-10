@@ -22,17 +22,14 @@ for (const side of ['buy', 'sell']) {
     h.failure = new Error('response lost');
     await h.press(submit);
     await h.flush();
-    await h.press(TEST_IDS.order.typeToggleLimit);
-    assert.equal(
-      h.node(TEST_IDS.order.typeToggleLimit).props.accessibilityState.selected,
-      true,
-    );
+    await h.selectOrderType('limit');
+    assert.equal(h.orderType(), '지정가');
     await h.input(TEST_IDS.order.limitPriceInput, '100');
     await h.press(submit);
     await h.flush();
     assert.equal(h.requests[2].body.orderType, 'limit');
     assert.equal(h.requests[3].body.limitPrice, '100');
-    await h.press(TEST_IDS.order.typeToggleMarket);
+    await h.selectOrderType('market');
     assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
     h.failure = null;
     await h.press(submit);
@@ -127,7 +124,7 @@ for (const scenario of ['zero', 'wallet', 'price', 'limit', 'position']) {
     await h.mount();
     t.after(h.close);
     if (scenario === 'position') await h.press(TEST_IDS.assetDetail.sellButton);
-    if (scenario === 'limit') await h.press(TEST_IDS.order.typeToggleLimit);
+    if (scenario === 'limit') await h.selectOrderType('limit');
     assert.equal(h.node('order-ratio-25').props.disabled, false);
     await h.press('order-ratio-25');
     assert.equal(h.node(qty).props.value, '');
@@ -152,7 +149,7 @@ for (const quantity of ['1', '4'])
     await h.mount();
     t.after(h.close);
     await h.press(TEST_IDS.assetDetail.sellButton);
-    await h.press(TEST_IDS.order.typeToggleLimit);
+    await h.selectOrderType('limit');
     await h.input(TEST_IDS.order.limitPriceInput, '100');
     await h.input(qty, quantity);
     await h.press(submit);

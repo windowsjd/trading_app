@@ -98,7 +98,8 @@ const styles = StyleSheet.create({
   container: { minWidth: 0 },
   toggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 8 },
   toggleText: { flexShrink: 1, fontSize: 13, lineHeight: 20, color: semantic.secondaryActionForeground, fontWeight: '600' },
-  card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 12 },
+  // No outline: the transparent 1px border keeps the content inset unchanged.
+  card: { borderWidth: 1, borderColor: 'transparent', borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 12 },
   header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   heading: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.text },
   ranges: { flexDirection: 'row', flexBasis: 220, flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: '100%', flexWrap: 'wrap', justifyContent: 'flex-end' },

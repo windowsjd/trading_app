@@ -102,7 +102,8 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, gap: 8, backgroundColor: semantic.surface },
+  // No outline: the transparent 1px border keeps the content inset unchanged.
+  card: { borderWidth: 1, borderColor: 'transparent', borderRadius: 14, padding: 16, gap: 8, backgroundColor: semantic.surface },
   heading: { fontSize: 18, lineHeight: 27, fontWeight: '700' },
   tabs: { flexDirection: 'row', gap: 4, padding: 3, borderRadius: 10, backgroundColor: semantic.raised },
   tab: { flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 8, paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },

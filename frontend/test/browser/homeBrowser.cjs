@@ -72,7 +72,8 @@ async function run() {
         assert.equal(await page.getByText('환전 안내', { exact: true }).count(), 0);
         await theme.canvas(page, appearance);
         if (mode === 'general' || long) await theme.background(id('home-account-context'), appearance, 'surface');
-        await theme.background(id('home-summary-card'), appearance, 'screen');
+        // Borderless Home cards: Light Home paints the existing raised tone as its canvas.
+        await theme.background(id('home-summary-card'), appearance, appearance === 'light' ? 'raised' : 'screen');
         assert.equal(await id('home-competition').count(), 0);
         const heroText = await id('home-summary-card').textContent();
         assert.doesNotMatch(heroText, /\(초기자본 대비\)/);
@@ -110,9 +111,17 @@ async function run() {
             });
             return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
           };
+          const painted = (el) => {
+            for (let current = el; current; current = current.parentElement) {
+              const color = getComputedStyle(current).backgroundColor;
+              if (color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent') return color;
+            }
+            return getComputedStyle(document.documentElement).backgroundColor;
+          };
+          const canvas = painted(node('home-summary-card'));
           const contrasts = [...node('home-summary-card').querySelectorAll('div, span')].filter((el) => el.textContent.trim()).map((el) => {
             const css = getComputedStyle(el);
-            const fg = luminance(css.color), bg = luminance(getComputedStyle(document.documentElement).backgroundColor);
+            const fg = luminance(css.color), bg = luminance(canvas);
             return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
           });
           const content = node('home-account-context').parentElement;
@@ -127,7 +136,7 @@ async function run() {
             total: box('home-total-asset'),
             trigger: box('trading-account-switcher-trigger'),
             competition: node('home-competition') ? box('home-competition') : null,
-            text: node('home-account-context').textContent, clipped, titleTextRight, titleTextBottom, contrasts,
+            text: node('home-account-context').textContent, clipped, titleTextRight, titleTextBottom, contrasts, canvas,
             sectionGaps: sections.slice(1).map((el, i) =>
               el.getBoundingClientRect().top - sections[i].getBoundingClientRect().bottom),
             gap: parseFloat(contentStyle.rowGap),
@@ -146,10 +155,10 @@ async function run() {
         assert.ok(layout.context.height >= 96 && layout.trigger.height >= 44);
         assert.ok(layout.trigger.width >= 44);
         assert.ok(layout.context.paddingHorizontal >= (mode === 'season' ? 8 : 16) && layout.context.paddingVertical >= (mode === 'season' ? 14 : 20));
-        assert.equal(layout.context.borderWidth, hasBackground ? 0 : 1);
+        assert.ok(layout.context.borderWidth === 0 || layout.context.borderColor === 'rgba(0, 0, 0, 0)', 'Home cards have no visible outline');
         assert.equal(await id(`home-tier-background-silver-${appearance}`).count(), hasBackground ? 1 : 0);
-        assert.equal(layout.context.borderColor, appearance === 'light' ? 'rgb(229, 232, 235)' : 'rgb(59, 61, 67)');
         assert.notEqual(layout.context.background, theme.palettes[appearance].screen);
+        assert.notEqual(layout.context.background, layout.canvas, 'the card surface stands apart from the Home canvas');
         assert.ok(layout.trigger.right <= layout.context.right - (mode === 'season' ? 8 : 12));
         assert.ok(layout.titleTextRight <= layout.trigger.x + 1 || layout.titleTextBottom <= layout.trigger.y + 1, `title and change trigger never collide: ${layout.titleTextRight} / ${layout.trigger.x}`);
         assert.ok(layout.contrasts.every((ratio) => ratio >= 4.5), 'Hero text and financial colors have readable contrast');

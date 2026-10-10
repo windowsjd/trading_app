@@ -193,6 +193,8 @@ latest/timeframe reset and active gesture unmount.
 
 The focused `orderLayoutBrowser.cjs` checks 320/360/390px in light and dark mode: two simultaneous columns, visible native value/placeholder/caret colors, long-decimal caret scrolling, buy amount, limit price, sell quantity, ratios, and a quote/create action. Screenshots go to `/tmp/trading-order-browser` (override with `ORDER_BROWSER_OUTPUT`).
 
+`orderControlsBrowser.cjs` checks the Order screen's buy/sell segment, market/limit dropdown and asset sheet at 320/360/390/430px, Light/Dark and font scale 1/2, plus Reduced Motion: one track with equal halves and the existing BUY/SELL action colors on the sliding thumb, a full-width dropdown about 2/3 of the former 44px tabs with a 44px touch band, an onscreen anchored menu (outside tap/Escape close), and a sheet that rises from the bottom, lists assets without a search text, searches, keeps inputs on close and changes only the asset (keeping the account and side) on selection. Output defaults to `/tmp/trading-order-controls-browser` (`ORDER_CONTROLS_BROWSER_OUTPUT`); `ORDER_CONTROLS_CHROMIUM` overrides the browser executable. Physical keyboard/IME and native back remain device checks.
+
 Quantity controls additionally cover 320/390/768px × font scale 1/1.5/2:
 one-row presets at the default scale, selected styling, keyboard arrows/Home/End,
 track clicks and dragging beyond both ends, immediate quantity updates, and

@@ -419,8 +419,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 20,
     borderRadius: 14,
+    // No outline: the transparent 1px border keeps the content inset (and the
+    // season heading's wrap measurement) unchanged.
     borderWidth: 1,
-    borderColor: semantic.border,
+    borderColor: 'transparent',
     backgroundColor: semantic.surface,
     gap: 16,
   },

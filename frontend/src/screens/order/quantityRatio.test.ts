@@ -34,7 +34,7 @@ for (const screen of ['inline', 'standalone'])
           t.after(h.close);
           if (side === 'sell') await h.press(TEST_IDS.assetDetail.sellButton);
           if (type === 'limit') {
-            await h.press(TEST_IDS.order.typeToggleLimit);
+            await h.selectOrderType('limit');
             await h.input(TEST_IDS.order.limitPriceInput, '50');
           }
           const capacity =
@@ -143,7 +143,7 @@ test('manual edits, price, reservations, limit changes and side/account changes 
   assert.equal(h.node(qty).props.value, '2.5');
   assert.equal(h.node(slider).props.value, 100);
   assert.deepEqual(selected(h), []);
-  await h.press(TEST_IDS.order.typeToggleLimit);
+  await h.selectOrderType('limit');
   assert.equal(h.node(slider).props.disabled, true);
   await h.input(TEST_IDS.order.limitPriceInput, '100');
   await h.press('order-ratio-100');
@@ -152,7 +152,7 @@ test('manual edits, price, reservations, limit changes and side/account changes 
   assert.equal(h.node(slider).props.value, 50);
   assert.deepEqual(selected(h), []);
   await h.press('order-ratio-75');
-  await h.press(TEST_IDS.order.typeToggleMarket);
+  await h.selectOrderType('market');
   assert.deepEqual(selected(h), []);
   await h.press('order-ratio-75');
   for (const value of ['', 'abc', '0', '0.', '-1']) {
@@ -215,7 +215,7 @@ for (const scenario of [
       )
     )
       await h.press(TEST_IDS.assetDetail.sellButton);
-    if (scenario === 'limit') await h.press(TEST_IDS.order.typeToggleLimit);
+    if (scenario === 'limit') await h.selectOrderType('limit');
     assert.equal(h.node(slider).props.disabled, true);
     const reason = h.node(slider).props.title;
     assert.ok(reason);

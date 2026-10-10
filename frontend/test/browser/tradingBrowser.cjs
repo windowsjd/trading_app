@@ -119,8 +119,7 @@ async function run() {
     const geometry = async () =>
       JSON.parse(await page.locator('#geometry').textContent());
     const controls = [
-      'order-type-toggle-market',
-      'order-type-toggle-limit',
+      'order-type-select',
       'order-ratio-25',
       'order-ratio-50',
       'order-ratio-75',
@@ -168,7 +167,7 @@ async function run() {
           await open(
             'screen=order&asset=' + encodeURIComponent(asset) + '&fontScale=' + fontScale,
           );
-          await id('order-type-toggle-limit').waitFor();
+          await id('order-type-select').waitFor();
           assert.match(
             await page.locator('body').innerText(),
             /전일대비 \+1.01%/,
@@ -204,7 +203,7 @@ async function run() {
           }
           const filter = await id('holdings-filter-all').boundingBox();
           assert.ok(filter.width < width / 2, 'compact filter');
-          await id('order-type-toggle-limit').click();
+          await id('order-type-select').click(); await id('order-type-toggle-limit').click();
           await id('order-ratio-25').click();
           assert.match(
             await page.locator('body').innerText(),
@@ -213,7 +212,7 @@ async function run() {
           await id('order-limit-price-input').fill('100');
           await id('order-ratio-25').click();
           assert.ok(Number(await id('order-quantity-input').inputValue()) > 0);
-          await id('order-type-toggle-market').click();
+          await id('order-type-select').click(); await id('order-type-toggle-market').click();
           assert.equal(await id('order-limit-price-input').count(), 0);
           await id('asset-detail-sell-button').click();
           assert.equal(await id('order-quote-submit').count(), 0);
@@ -327,7 +326,7 @@ async function run() {
           await id('inline-order-panel').waitFor();
           if (side === 'sell') await id('asset-detail-sell-button').click();
           if (type === 'limit') {
-            await id('order-type-toggle-limit').click();
+            await id('order-type-select').click(); await id('order-type-toggle-limit').click();
             await id('order-limit-price-input').fill('100');
           }
           await id('order-quantity-input').fill('1');

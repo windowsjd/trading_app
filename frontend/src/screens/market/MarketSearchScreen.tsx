@@ -1,12 +1,17 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
-import { marketSortParams, nextMarketPage, type MarketSort } from '../../features/market/marketSort';
+import type { MarketSort } from '../../features/market/marketSort';
+import {
+  MARKET_SEARCH_SCOPES,
+  useMarketAssetSearch,
+  type MarketSearchScope,
+} from '../../features/market/useMarketAssetSearch';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import MarketAssetRow from '../../features/market/MarketAssetRow';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -18,81 +23,34 @@ import {
   Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
-import { useInfiniteQuery } from '@tanstack/react-query';
-
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MarketStackParamList } from '../../app/navigation/types';
-import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
-import {
-  getAssets,
-  type AssetType,
-  type MarketAssetItemDto,
-} from '../../features/market/api';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
 type Props = NativeStackScreenProps<MarketStackParamList, 'MarketSearch'>;
-type SearchScope = AssetType | 'all';
-
-const SEARCH_SCOPE: Array<{ key: SearchScope; label: string }> = [
-  { key: 'all', label: '전체' },
-  { key: 'domestic_stock', label: '국내' },
-  { key: 'us_stock', label: '미국' },
-  { key: 'crypto', label: '암호화폐' },
-];
 
 export default function MarketSearchScreen({ navigation, route }: Props) {
   const [sort, setSort] = useState<MarketSort>(route.params?.sort ?? 'turnover_desc');
-  const sortParams = marketSortParams(sort);
-  const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
-  const [assetType, setAssetType] = useState<SearchScope>('all');
+  const [assetType, setAssetType] = useState<MarketSearchScope>('all');
   const [searchText, setSearchText] = useState('');
-  const trimmedSearchText = searchText.trim();
-
-  const searchQuery = useInfiniteQuery({
-    queryKey: QUERY_KEYS.market.assets({
-      ...sortParams,
-      assetType: assetType === 'all' ? undefined : assetType,
-      search: trimmedSearchText,
-      withPrice: true,
-      limit: 20,
-      offset: 0,
-    }),
-    queryFn: ({ pageParam }) =>
-      getAssets({
-        ...sortParams,
-        sortSnapshot: pageParam.sortSnapshot,
-        sortRefresh: refreshSort.current && pageParam.offset === 0,
-        assetType: assetType === 'all' ? undefined : assetType,
-        search: trimmedSearchText || undefined,
-        withPrice: true,
-        offset: pageParam.offset,
-        limit: 20,
-      }),
-    getNextPageParam: nextMarketPage,
-    initialPageParam: { offset: 0 },
-    enabled: trimmedSearchText.length > 0,
-  });
+  // Search screen policy: no request until there is a search text.
+  const { searchQuery, items, hasPriceErrors, trimmedSearchText, refreshSort } =
+    useMarketAssetSearch({
+      scope: assetType,
+      searchText,
+      sort,
+      enabled: searchText.trim().length > 0,
+    });
 
   const refresh = usePullToRefresh([{ ...searchQuery, enabled: trimmedSearchText.length > 0 }],
     () => { refreshSort.current = true; },
     () => { refreshSort.current = false; });
 
-  const items = useMemo(() => {
-    const byId = new Map<string, MarketAssetItemDto>();
-
-    searchQuery.data?.pages.forEach((page) => {
-      page.assets.forEach((item) => {
-        byId.set(item.id, item);
-      });
-    });
-
-    return Array.from(byId.values());
-  }, [searchQuery.data]);
   const assetIds = useMemo(() => items.map((item) => item.id), [items]);
   const { tickersByAssetId, staleAssetIds } = useMarketTickers({
     assetIds,
@@ -104,14 +62,6 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     if (route.params?.returnToAsset) navigation.popTo('AssetDetail', { assetId });
     else navigation.navigate('AssetDetail', { assetId });
   }, [navigation, route.params?.returnToAsset]);
-
-  const hasPriceErrors = useMemo(
-    () =>
-      searchQuery.data?.pages.some(
-        (page) => (page.priceErrors?.length ?? 0) > 0,
-      ) ?? false,
-    [searchQuery.data],
-  );
 
   const viewState = useMemo(() => {
     if (!trimmedSearchText) return 'market_search_idle';
@@ -167,7 +117,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
             />
 
             <View style={styles.scopeRow}>
-              {SEARCH_SCOPE.map((scope) => {
+              {MARKET_SEARCH_SCOPES.map((scope) => {
                 const active = scope.key === assetType;
                 return (
                   <ActionPressable

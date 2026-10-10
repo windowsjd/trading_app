@@ -66,10 +66,10 @@ describe('order screen warning meaning', () => {
       assert.doesNotMatch(marketText, /현재 화면 시세가 없어|현재 화면 시세가 오래되어|현재 시장이 닫혀 있습니다/);
       assert.equal(panel(h).findAll((n: any) => n.props.testID === 'admin-diagnostic-panel').length, 0);
       assert.ok(panel(h).findAllByType('Text').every((n: any) => n.props.numberOfLines === undefined));
-      await h.press(TEST_IDS.order.typeToggleLimit);
+      await h.selectOrderType('limit');
       await h.input(TEST_IDS.order.limitPriceInput, '70000');
       assert.doesNotMatch(panelText(h), /정규장 외 지정가는|정규장 외에는 시장가|현재 화면 시세가 없어|현재 화면 시세가 오래되어/);
-      assert.equal(h.node(TEST_IDS.order.typeToggleLimit).props.accessibilityState.selected, true);
+      assert.equal(h.orderType(), '지정가');
       assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'enabled');
       await h.press(TEST_IDS.order.executeSubmit); await h.flush();
       assert.equal(h.requests[0].body.orderType, 'limit');

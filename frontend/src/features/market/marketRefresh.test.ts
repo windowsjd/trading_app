@@ -22,6 +22,25 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
       React.createElement('FlatList', props, props.ListHeaderComponent);
     const requests: GetAssetsParams[] = [];
     let token = 'initial-order';
+    const marketApi = {
+      getAssets: async (params: GetAssetsParams) => {
+        requests.push(params);
+        if (params.sortRefresh) token = 'refreshed-order';
+        const offset = params.offset ?? 0;
+        return {
+          assets: [{ id: `${token}-${offset}` }],
+          priceErrors: [],
+          sortSnapshot: token,
+          pagination: {
+            offset,
+            limit: 20,
+            returned: 20,
+            total: 60,
+            nextOffset: offset < 40 ? offset + 20 : null,
+          },
+        };
+      },
+    };
     const Screen = h.load(`src/screens/market/${screen}.tsx`, {
       './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
       '../../features/market/MarketSortControl': {
@@ -55,25 +74,12 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
           { __esModule: true, default: name },
         ]),
       ),
-      '../../features/market/api': {
-        getAssets: async (params: GetAssetsParams) => {
-          requests.push(params);
-          if (params.sortRefresh) token = 'refreshed-order';
-          const offset = params.offset ?? 0;
-          return {
-            assets: [{ id: `${token}-${offset}` }],
-            priceErrors: [],
-            sortSnapshot: token,
-            pagination: {
-              offset,
-              limit: 20,
-              returned: 20,
-              total: 60,
-              nextOffset: offset < 40 ? offset + 20 : null,
-            },
-          };
-        },
-      },
+      '../../features/market/api': marketApi,
+      // Both screens share the real search/list hook over the same fixture API.
+      '../../features/market/useMarketAssetSearch': h.load(
+        'src/features/market/useMarketAssetSearch.ts',
+        { './api': marketApi },
+      ),
     }).default;
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false, gcTime: Infinity } },

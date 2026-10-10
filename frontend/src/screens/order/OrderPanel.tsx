@@ -3,6 +3,8 @@ import { getProtections } from '../../features/conditional/api';
 import { ProtectionEditor, draftLegs, emptyProtection, protectionInputError } from '../../features/conditional/ProtectionEditor';
 import Decimal from 'decimal.js';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
+import OrderSideSegment, { type OrderSide } from './OrderSideSegment';
+import OrderTypeSelect from './OrderTypeSelect';
 import {
   validateOrderQuote,
   OrderQuoteValidationError,
@@ -11,6 +13,9 @@ import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { getAssetTradingWarning } from '../../features/asset/tradingUx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Easing,
+  Platform,
   View,
   Text,
   StyleSheet,
@@ -18,6 +23,7 @@ import {
   useWindowDimensions,
   type TextInputProps,
 } from '../../theme/native';
+import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -108,43 +114,40 @@ type Props = {
   onInputBlur?: () => void;
   submitRef?: React.RefObject<View | null>;
   onAttachedProtectionVisibilityChange?: (visible: boolean) => void;
+  /** Reports user side changes; the panel keeps owning the side. */
+  onSideChange?: (side: OrderSide) => void;
 };
 
 /** One flow per asset/account/side. Unmounting invalidates pending callbacks. */
-export default function OrderPanel(props: Props) {
-  const [side, setSide] = useState(props.initialSide ?? 'buy');
+export default function OrderPanel({ onSideChange, ...props }: Props) {
+  const [side, setSide] = useState<OrderSide>(props.initialSide ?? 'buy');
+  const reduced = useReducedMotion();
+  // The new side's form mounts at once (fresh inputs and quote state); only
+  // its appearance settles with a short fade.
+  const formOpacity = useRef(new Animated.Value(1)).current;
+  const changeSide = (next: OrderSide) => {
+    setSide(next);
+    onSideChange?.(next);
+    if (reduced) return;
+    formOpacity.setValue(0.35);
+    Animated.timing(formOpacity, {
+      toValue: 1,
+      duration: 180,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: Platform.OS !== 'web',
+      isInteraction: false,
+    }).start();
+  };
   return (
     <View style={styles.panel} testID="inline-order-panel">
-      <View style={styles.tabs}>
-        {(['buy', 'sell'] as const).map((value) => (
-          <ActionPressable
-            key={value}
-            testID={
-              value === 'buy'
-                ? TEST_IDS.assetDetail.buyButton
-                : TEST_IDS.assetDetail.sellButton
-            }
-            accessibilityRole="tab"
-            accessibilityLabel={value === 'buy' ? '매수' : '매도'}
-            accessibilityState={{ selected: side === value }}
-            style={[
-              styles.tab,
-              side === value &&
-                (value === 'buy' ? styles.buyActive : styles.sellActive),
-            ]}
-            onPress={() => setSide(value)}
-          >
-            <Text style={[styles.tabText, side === value && styles.activeText]}>
-              {value === 'buy' ? '매수' : '매도'}
-            </Text>
-          </ActionPressable>
-        ))}
-      </View>
-      <OrderForm
-        key={`${props.assetId}:${props.accountId}:${side}`}
-        {...props}
-        side={side}
-      />
+      <OrderSideSegment side={side} onChange={changeSide} />
+      <Animated.View style={[styles.formFade, { opacity: formOpacity }]}>
+        <OrderForm
+          key={`${props.assetId}:${props.accountId}:${side}`}
+          {...props}
+          side={side}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -878,44 +881,16 @@ export function OrderForm({
   };
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
-      <View style={styles.tabs}>
-        <ActionPressable
-          testID={TEST_IDS.order.typeToggleMarket}
-          accessibilityRole="tab"
-          accessibilityLabel="시장가"
-          accessibilityState={{
-            selected: orderType === 'market',
-            disabled: pending,
-          }}
-          disabled={pending}
-          style={[styles.typeTab, orderType === 'market' && styles.typeActive]}
-          onPress={() => {
-            if (orderType !== 'market')
-              resetInput(() => {
-                setOrderType('market');
-                setLimitPrice('');
-              });
-          }}
-        >
-          <Text style={styles.typeText}>시장가</Text>
-        </ActionPressable>
-        <ActionPressable
-          testID={TEST_IDS.order.typeToggleLimit}
-          accessibilityRole="tab"
-          accessibilityLabel="지정가"
-          accessibilityState={{
-            selected: orderType === 'limit',
-            disabled: pending,
-          }}
-          disabled={pending}
-          style={[styles.typeTab, orderType === 'limit' && styles.typeActive]}
-          onPress={() => {
-            if (orderType !== 'limit') resetInput(() => setOrderType('limit'));
-          }}
-        >
-          <Text style={styles.typeText}>지정가</Text>
-        </ActionPressable>
-      </View>
+      <OrderTypeSelect
+        value={orderType}
+        disabled={pending}
+        onChange={(next) =>
+          resetInput(() => {
+            setOrderType(next);
+            if (next === 'market') setLimitPrice('');
+          })
+        }
+      />
       <View style={styles.group}>
         <Text style={styles.label}>가격 ({asset.settlementCurrency})</Text>
         {orderType === 'limit' ? (
@@ -1274,45 +1249,10 @@ function Amount({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   panel: { minWidth: 0, gap: 12 },
-  tabs: { flexDirection: 'row', gap: 4, minWidth: 0 },
-  tab: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 44,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: semantic.raised,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: semantic.secondary,
-    textAlign: 'center',
-  },
+  formFade: { minWidth: 0 },
   buyActive: { backgroundColor: BUY_COLOR },
   sellActive: { backgroundColor: SELL_COLOR },
   activeText: { color: semantic.onAccent },
-  typeTab: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: 44,
-    paddingVertical: 8,
-    paddingHorizontal: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 2,
-    borderColor: 'transparent',
-  },
-  typeActive: { borderColor: semantic.selected, backgroundColor: semantic.raised },
-  typeText: {
-    fontSize: 13,
-    color: semantic.text,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
   group: { gap: 4, minWidth: 0 },
   label: { fontSize: 12, color: semantic.muted },
   helper: { fontSize: 12, color: semantic.secondary },

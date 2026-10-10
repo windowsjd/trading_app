@@ -59,6 +59,9 @@ function inlineTradingHarness() {
     candleStale: false,
     resync: 0,
     refetches: 0,
+    animations: [],
+    marketRequests: [],
+    keyboardDismissals: 0,
   };
   for (const [id, price, type] of [
     ['bnb', '763.79', 'crypto'],
@@ -191,18 +194,54 @@ function inlineTradingHarness() {
         'Pressable',
       ].map((name) => [name, name]),
     ),
-    StyleSheet: { create: (value) => value },
+    Modal: 'Modal',
+    ActivityIndicator: 'ActivityIndicator',
+    StyleSheet: { create: (value) => value, absoluteFillObject: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 } },
     Platform: { OS: 'android' },
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
-    Keyboard: { addListener: () => ({ remove() {} }) },
+    Keyboard: { addListener: () => ({ remove() {} }), dismiss: () => { h.keyboardDismissals++; } },
+    PanResponder: { create: (config) => { h.panConfig = config; return { panHandlers: {} }; } },
+    Easing: { out: (fn) => fn, in: (fn) => fn, quad: (n) => n * n, cubic: (n) => n * n * n },
+    // Motion is visual only here: every run lands on its target at once and
+    // is recorded, so screen/order tests stay independent of a clock.
+    Animated: {
+      Value: class {
+        constructor(value) { this.value = value; }
+        setValue(value) { this.value = value; }
+        interpolate(config) { return { value: this, ...config }; }
+      },
+      View: 'AnimatedView',
+      add: (a, b) => ({ add: [a, b] }),
+      timing: (value, options) => ({
+        start: (callback) => {
+          value.setValue(options.toValue);
+          h.animations.push(options);
+          callback?.({ finished: true });
+        },
+        stop: () => {},
+      }),
+    },
     useWindowDimensions: () => h.dimensions,
   };
   native.ScrollView = ({ refreshControl, children, ...props }) => React.createElement('ScrollView', props, refreshControl, children);
+  native.FlatList = ({ data, renderItem, keyExtractor, ListHeaderComponent, ListEmptyComponent, ListFooterComponent, ...props }) =>
+    React.createElement('FlatList', props, ListHeaderComponent ?? null,
+      data?.length
+        ? data.map((item, index) => React.createElement(React.Fragment, { key: keyExtractor(item, index) }, renderItem({ item, index })))
+        : ListEmptyComponent ?? null,
+      ListFooterComponent ?? null);
   const nav = {
     navigate: (...args) => h.navigation.push(args),
     goBack: () => h.navigation.push(['back']),
     reset: (...args) => h.navigation.push(args),
     popTo: (...args) => h.navigation.push(['popTo', ...args]),
+    // Native-stack setParams merges into the current route; h.update() renders it.
+    setParams: (params) => {
+      h.navigation.push(['setParams', params]);
+      if (params.assetId !== undefined) h.assetId = params.assetId;
+      if (params.side !== undefined) h.routeSide = params.side;
+      if (params.accountId !== undefined) h.routeAccountId = params.accountId;
+    },
   };
   const refetch = () => {
     h.refetches++;
@@ -230,11 +269,12 @@ function inlineTradingHarness() {
     './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
     'react-native': native,
-    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }) },
     '@react-navigation/elements': { useHeaderHeight: () => 48 },
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
     '../../features/auth/useAdminDiagnostics': adminHook,
     '@react-navigation/native': { useIsFocused: () => h.focused },
+    '../../theme/useReducedMotion': { useReducedMotion: () => h.reduced ?? false },
     '@tanstack/react-query': {
       ...query,
       useQuery: (options) => {
@@ -390,6 +430,36 @@ function inlineTradingHarness() {
     },
   );
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
+  // Order asset sheet: the real shared search hook over a fixture Assets API.
+  const marketApi = {
+    getAssets: async (params) => {
+      h.marketRequests.push(params);
+      const gate = h.marketGates?.[params.search ?? ''];
+      if (gate) await gate.promise;
+      if (h.marketFailure) throw h.marketFailure;
+      const search = params.search?.toUpperCase();
+      const rows = Object.values(h.assets).filter((asset) =>
+        (!params.assetType || asset.assetType === params.assetType) &&
+        (!search || asset.symbol.toUpperCase().includes(search) || asset.name.toUpperCase().includes(search)));
+      const offset = params.offset ?? 0;
+      const limit = params.limit ?? 20;
+      const page = rows.slice(offset, offset + limit);
+      return {
+        assets: page.map((asset) => ({ ...asset, changeRate: asset.price.changeRate })),
+        pagination: { offset, limit, total: rows.length, returned: page.length, nextOffset: offset + limit < rows.length ? offset + limit : null },
+        priceErrors: [],
+      };
+    },
+  };
+  mocks['../../features/market/useMarketAssetSearch'] = load(resolve('src/features/market/useMarketAssetSearch.ts'), {
+    './api': marketApi,
+  });
+  mocks['../../features/market/useMarketTickers'] = {
+    useMarketTickers: (options) => {
+      h.marketTickerOptions = options;
+      return { tickersByAssetId: new Map(), staleAssetIds: new Set() };
+    },
+  };
   mocks['../order/OrderPanel'] = load(
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,
@@ -450,6 +520,12 @@ function inlineTradingHarness() {
   };
   h.input = async (id, value) =>
     act(async () => h.node(id).props.onChangeText(value));
+  // The order type is one dropdown: open it, then pick the menu item.
+  h.selectOrderType = async (type) => {
+    await h.press('order-type-select');
+    await h.press(type === 'limit' ? 'order-type-toggle-limit' : 'order-type-toggle-market');
+  };
+  h.orderType = () => h.node('order-type-select').props.accessibilityValue.text;
   h.slide = async (percent) => act(async () =>
     h.node('order-quantity-slider').props.onChange({ currentTarget: { valueAsNumber: percent } }));
   h.success = () => h.renderer.root.findByType('OrderSuccessBottomSheet').props;

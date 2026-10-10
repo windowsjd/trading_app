@@ -86,6 +86,7 @@ export const TEST_IDS = {
     quantityInput: 'order-quantity-input',
     quoteSubmit: 'order-quote-submit',
     executeSubmit: 'order-execute-submit',
+    typeSelect: 'order-type-select',
     typeToggleMarket: 'order-type-toggle-market',
     typeToggleLimit: 'order-type-toggle-limit',
     limitPriceInput: 'order-limit-price-input',

@@ -40,9 +40,18 @@ function createTradingUiHarness(screenName) {
   const native = {
     ...Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput',
       'Pressable', 'KeyboardAvoidingView'].map(name => [name, name])),
-    StyleSheet: { create: styles => styles }, Platform: { OS: 'web' },
+    StyleSheet: { create: styles => styles, absoluteFillObject: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 } },
+    Platform: { OS: 'web' },
     useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
-    Keyboard: { addListener: () => ({ remove() {} }) },
+    Keyboard: { addListener: () => ({ remove() {} }), dismiss: () => {} },
+    Modal: 'Modal',
+    Easing: { out: fn => fn, in: fn => fn, quad: n => n * n, cubic: n => n * n * n },
+    // Side/order-type motion is visual; runs land on their targets at once.
+    Animated: {
+      Value: class { constructor(value) { this.value = value; } setValue(value) { this.value = value; } interpolate(config) { return { value: this, ...config }; } },
+      View: 'AnimatedView',
+      timing: (value, options) => ({ start: callback => { value.setValue(options.toValue); callback?.({ finished: true }); }, stop: () => {} }),
+    },
   };
   const mocks = {
     './QuantityRatioSlider': load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {}),
@@ -127,6 +136,8 @@ function createTradingUiHarness(screenName) {
     ...Object.fromEntries(['AccountSwitcher', 'PreviewAmounts'].map(name => ['../../components/tradingAccount/' + name, { default: name, __esModule: true }])),
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     './OrderSuccessBottomSheet': { default: 'OrderSuccessBottomSheet', __esModule: true },
+    // Only OrderTradingScreen renders here; the asset sheet belongs to its route wrapper.
+    './OrderAssetSheet': { default: 'OrderAssetSheet', __esModule: true },
     './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];

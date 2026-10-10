@@ -87,7 +87,8 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, paddingHorizontal: 16,
+  // No outline: the transparent 1px border keeps the content inset unchanged.
+  card: { borderWidth: 1, borderColor: 'transparent', borderRadius: 14, paddingHorizontal: 16,
     paddingVertical: 10, backgroundColor: semantic.surface, gap: 4 },
   title: { fontSize: 18, lineHeight: 27, fontWeight: '700', color: semantic.text },
   sectionTitle: { fontSize: 15, lineHeight: 23, fontWeight: '600' },

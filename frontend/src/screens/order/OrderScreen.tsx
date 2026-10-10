@@ -1,7 +1,7 @@
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -47,18 +47,65 @@ import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import OrderPanel from './OrderPanel';
+import OrderAssetSheet from './OrderAssetSheet';
+import type { OrderSide } from './OrderSideSegment';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { safeRuntimeCode } from '../../services/ws/runtimeDiagnostics';
 
 export default function OrderScreen(props: OrderScreenProps) {
   const { assetId, accountId, side } = props.route.params;
-  return <OrderTradingScreen key={`${assetId}:${accountId}:${side}`} {...props} />;
+  const { navigation } = props;
+  const [assetSheetOpen, setAssetSheetOpen] = useState(false);
+  // The side the user is on now, so an asset change keeps the direction.
+  const sideRef = useRef<OrderSide>(side ?? 'buy');
+  const entryAssetId = useRef(assetId).current;
+  useEffect(() => {
+    sideRef.current = side ?? 'buy';
+  }, [assetId, accountId, side]);
+  const selectAsset = (nextAssetId: string) => {
+    setAssetSheetOpen(false);
+    if (nextAssetId === assetId) return;
+    // Only the asset (and the current side) change. accountId stays the
+    // route's bound account, and the new key remounts every order input,
+    // quote and pending callback for the new asset.
+    navigation.setParams({ assetId: nextAssetId, side: sideRef.current });
+  };
+  return (
+    <>
+      <OrderTradingScreen
+        key={`${assetId}:${accountId}:${side}`}
+        {...props}
+        onOpenAssetSheet={() => setAssetSheetOpen(true)}
+        // The stack's own detail page is the entry asset's; after an in-place
+        // change, return to the detail of the asset being traded instead.
+        onReturnToAsset={() => {
+          if (assetId === entryAssetId) navigation.goBack();
+          else navigation.popTo('AssetDetail', { assetId });
+        }}
+        onSideChange={(next) => {
+          sideRef.current = next;
+        }}
+      />
+      <OrderAssetSheet
+        visible={assetSheetOpen}
+        onClose={() => setAssetSheetOpen(false)}
+        onSelect={selectAsset}
+      />
+    </>
+  );
 }
 
 export function OrderTradingScreen({
   route,
   navigation,
-}: OrderScreenProps) {
+  onOpenAssetSheet,
+  onSideChange,
+  onReturnToAsset,
+}: OrderScreenProps & {
+  onOpenAssetSheet?: () => void;
+  onSideChange?: (side: OrderSide) => void;
+  onReturnToAsset?: () => void;
+}) {
   const { assetId, accountId, side } = route.params;
   const rootNavigation = useRootNavigation();
   const isFocused = useIsFocused();
@@ -190,9 +237,8 @@ export function OrderTradingScreen({
                 style={styles.pairButton}
                 accessibilityRole="button"
                 accessibilityLabel={`종목 변경, ${pair}`}
-                onPress={() =>
-                  navigation.navigate('MarketSearch', { returnToAsset: true })
-                }
+                accessibilityHint="종목 검색 창을 엽니다"
+                onPress={() => onOpenAssetSheet?.()}
               >
                 <Text style={styles.pair}>{pair} ▾</Text>
               </ActionPressable>
@@ -301,7 +347,8 @@ export function OrderTradingScreen({
                   onInputBlur={inputScroll.onInputBlur}
                   submitRef={inputScroll.submitRef}
                   onAttachedProtectionVisibilityChange={setAttachedProtectionVisible}
-                  onReturnToAsset={() => navigation.goBack()}
+                  onSideChange={onSideChange}
+                  onReturnToAsset={onReturnToAsset ?? (() => navigation.goBack())}
                 />
               ) : (
                 <InlineEmptyState

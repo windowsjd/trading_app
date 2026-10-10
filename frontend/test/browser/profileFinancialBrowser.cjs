@@ -87,6 +87,20 @@ async function run() {
     });
     assert.deepEqual(clipped, [], `strong button label bounds: ${await locator.getAttribute('data-testid')}`);
   }
+  // The selected side paints its action color on the sliding thumb; its visible label is white.
+  async function selectedSide(side, background) {
+    await page.waitForFunction((side) => {
+      const layer = document.querySelector(`[data-testid="order-side-thumb-${side}"]`);
+      return layer && Number(getComputedStyle(layer.parentElement).opacity) === 1;
+    }, side);
+    assert.equal(await color(id(`order-side-thumb-${side}`), 'backgroundColor'), background);
+    const labels = await id(`asset-detail-${side}-button`).evaluate((host) => [...host.querySelectorAll('[dir="auto"]')].filter((text) => {
+      let opacity = 1;
+      for (let node = text; node && node !== host; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
+      return opacity > 0.99;
+    }).map((text) => getComputedStyle(text).color));
+    assert.deepEqual(labels, ['rgb(255, 255, 255)']);
+  }
   const open = async (screen, query = '', fixture = 'rootTabs') => {
     await page.goto(`${base}/${fixture}?screen=${screen}${query}`);
     if (screen === 'search') await id('market-search-input').fill('삼성');
@@ -226,14 +240,14 @@ async function run() {
       await id('asset-detail-open-buy-order').click(); await id('asset-trading-columns').waitFor();
       await theme.background(id('order-screen').first(), appearance, 'screen');
       await theme.background(id('asset-trading-columns'), appearance, 'surface');
-      await strongButton(id('asset-detail-buy-button'), expectedAction[0]);
+      await selectedSide('buy', expectedAction[0]);
       await strongButton(id('order-execute-submit'), expectedAction[0]);
       assert.equal(await color(id('asset-order-book-bids-1').locator('div').first()), up);
       assert.equal(await color(id('asset-order-book-asks-1').locator('div').first()), down);
       assert.equal(await color(id('asset-order-book-bids-1'), 'backgroundColor'), surfaces[appearance][palette][0]);
       assert.equal(await color(id('asset-order-book-asks-1'), 'backgroundColor'), surfaces[appearance][palette][1]);
       await id('asset-detail-sell-button').click();
-      await strongButton(id('asset-detail-sell-button'), expectedAction[1]);
+      await selectedSide('sell', expectedAction[1]);
       await strongButton(id('order-execute-submit'), expectedAction[1]);
       await theme.canvas(page, appearance);
       records.push({ screen: 'detail/order/chart', appearance, palette, width, fontScale });

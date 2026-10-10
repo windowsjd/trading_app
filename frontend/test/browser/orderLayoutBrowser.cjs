@@ -36,6 +36,8 @@ async function run() {
   await new Promise((resolve) => server.once('listening', resolve));
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
   const page = await browser.newPage();
+  // The app default is Light; follow the emulated scheme like the other browser checks.
+  await page.addInitScript(() => localStorage.setItem('trading-app:appearance', 'system'));
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -47,12 +49,14 @@ async function run() {
       await page.goto(`${base}/?screen=home`);
       await page.getByText('총 자산', { exact: true }).waitFor();
       await theme.canvas(page, appearance);
-      await theme.background(page.getByTestId('trading-account-general-summary'), appearance, 'screen');
-      await theme.background(page.getByText('총 자산', { exact: true }), appearance, 'screen');
+      // Borderless Home cards: Light Home paints the existing raised tone as its canvas.
+      const homeCanvas = appearance === 'light' ? 'raised' : 'screen';
+      await theme.background(page.getByTestId('trading-account-general-summary'), appearance, homeCanvas);
+      await theme.background(page.getByText('총 자산', { exact: true }), appearance, homeCanvas);
       await page.getByTestId('home-trend-toggle').click();
       await page.getByTestId('home-trend-chart').waitFor();
       assert.equal(await page.getByText('자금 구성', { exact: true }).count(), 0);
-      for (const label of ['보유 종목', 'HOT 🔥', '자산 추이']) {
+      for (const label of ['보유종목 및 포지션', 'HOT 🔥', '자산 추이']) {
         await theme.background(page.getByText(label, { exact: true }), appearance, 'surface');
       }
       await page.screenshot({ path: path.join(out, `home-${appearance}.png`), fullPage: true });
@@ -99,6 +103,7 @@ async function run() {
       await input.fill('123456789.123456789');
       assert.equal(await input.inputValue(), '123456789.123456789');
       assert.equal(await input.getAttribute('placeholder'), '매수 금액 입력');
+      await byId('order-type-select').click();
       await byId('order-type-toggle-limit').click();
       const limit = byId('order-limit-price-input');
       await limit.fill('0.000000123456789');

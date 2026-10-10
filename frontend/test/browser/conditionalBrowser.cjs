@@ -28,6 +28,7 @@ async function main(){
   const protection=scenario==='attached-holding'?'holding':editor?'editor':'active';
   await page.goto(`${base}/${kind}?fontScale=${fontScale}&kind=cross&protection=${protection}&screen=${scenario==='attached-entry'?'order':'detail'}&asset=BTC`);
   if(scenario==='attached-entry'){
+    await page.getByTestId('order-type-select').click();
     await page.getByTestId('order-type-toggle-limit').click();
     await page.getByTestId('attached-entry-editor').waitFor();
   }else {

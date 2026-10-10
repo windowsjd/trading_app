@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { StyleSheet, SafeAreaView, View } from '../../theme/native';
+import { useAppearance } from '../../theme/appearance';
 
 import type { HomeScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
@@ -53,6 +54,7 @@ export default function HomeScreen({ navigation }: Props) {
   } = useTradingAccount();
   const accountContext = useHomeAccountContext(selectedAccount);
   const hot = useHomeHotMarket(!!selectedAccount);
+  const { mode } = useAppearance();
 
   if (accountsLoading) {
     return <FullPageLoading message="홈 정보를 불러오는 중입니다." />;
@@ -96,7 +98,7 @@ export default function HomeScreen({ navigation }: Props) {
     });
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, mode === 'light' && styles.lightCanvas]}>
       <View style={styles.body}>
         {selectedAccount.mode !== 'season' ? (
           <GeneralAccountHome
@@ -131,5 +133,9 @@ export default function HomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
+  // Borderless Home cards are separated by surface over canvas. Light screen
+  // and surface are nearly identical, so Light Home uses the existing raised
+  // tone as its canvas; Dark keeps screen, already distinct from surface.
+  lightCanvas: { backgroundColor: semantic.raised },
   body: { flex: 1 },
 });
