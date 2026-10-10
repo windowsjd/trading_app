@@ -24,7 +24,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
-   - `docs/beginner-mode.md` — beginner account (all users when `BEGINNER_MODE_ENABLED=true`), funding/TWR, QUEST 01 progress and UI contract
+   - `docs/beginner-mode.md` — beginner account (always available to all authenticated users), funding/TWR, QUEST 01 progress and UI contract
    - `docs/trading-accounts-api-contract.md`
    - `docs/trading-account-finance-api-contract.md`
    - `docs/trading-account-orders-api-contract.md`

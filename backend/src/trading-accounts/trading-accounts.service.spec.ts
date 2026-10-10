@@ -130,14 +130,14 @@ describe('TradingAccountsService.listTradingAccounts', () => {
 
     expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: 'user-1', mode: { not: 'beginner' } },
+        where: { userId: 'user-1' },
         orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
     );
     expect(response).toEqual({
       success: true,
       data: {
-        beginnerModeEnabled: false,
+        beginnerModeEnabled: true,
         accounts: [
           {
             id: 'ta-season-1',

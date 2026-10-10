@@ -1,7 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  isBeginnerModeEnabled,
-} from './account-mode-policy';
+import { isStandaloneAccountMode } from './account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readGeneralFxFeeRate } from '../fx/general-fx.config';
@@ -75,7 +72,8 @@ export class TradingAccountsService {
       success: true,
       data: {
         accounts: accounts.map((account) => this.toView(account)),
-        beginnerModeEnabled: isBeginnerModeEnabled(),
+        // Legacy API compatibility: beginner is always available.
+        beginnerModeEnabled: true,
       },
     };
   }

@@ -59,7 +59,6 @@ export default function ModeSelectionScreen({
 }: ModeSelectionScreenProps) {
   const {
     accounts,
-    beginnerModeEnabled,
     isLoading: accountsLoading,
     isError: accountsError,
     refetchAccounts,
@@ -155,7 +154,7 @@ export default function ModeSelectionScreen({
           </View>
         )}
 
-        {beginnerModeEnabled ? <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} /> : null}
+        <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} />
 
         {model.seasonContinue.map((account) => {
           return (

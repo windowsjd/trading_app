@@ -237,11 +237,11 @@ async function run() {
     await tab('퀘스트').click();
     assert.equal(await questText('quest-card-progress'), '실습 2/2 완료');
     await open('enabled=0');
-    assert.notEqual(await id('home-account-title').textContent(), '초보 투자');
+    assert.equal(await id('home-account-title').textContent(), '초보 투자');
     await id('trading-account-switcher-trigger').click();
-    assert.equal(await page.getByTestId('trading-account-switcher-option-beginner-account').count(), 0);
+    assert.equal(await page.getByTestId('trading-account-switcher-option-beginner-account').count(), 1);
     assert.equal(await page.getByTestId('beginner-account-entry').count(), 0);
-    await open('newBeginner=1&account=general');
+    await open('newBeginner=1&account=general&enabled=0');
     await id('trading-account-switcher-trigger').click();
     assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
     await id('beginner-account-start').click();
@@ -249,8 +249,8 @@ async function run() {
     assert.deepEqual(await page.evaluate(() => window.beginnerFixture.posts), ['/trading-accounts/beginner']);
     await tab('퀘스트').waitFor();
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, practice, questUnknownState: 'pass', delayedQuestIsolation: 'pass', accountSwitching: 'pass', delayedFinancialIsolation: 'pass', disabledEntry: 'pass', explicitCreation: 'pass', errors }, null, 2));
-    console.log(`beginner browser checks passed: ${results.length} layouts with quest list/detail, practice navigation, unknown quest state, delayed quest isolation, guide navigation, three-mode switching, delayed financial isolation, disabled entry and explicit creation`);
+    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, practice, questUnknownState: 'pass', delayedQuestIsolation: 'pass', accountSwitching: 'pass', delayedFinancialIsolation: 'pass', legacyFieldCompatibility: 'pass', explicitCreation: 'pass', errors }, null, 2));
+    console.log(`beginner browser checks passed: ${results.length} layouts with quest list/detail, practice navigation, unknown quest state, delayed quest isolation, guide navigation, three-mode switching, delayed financial isolation, legacy field compatibility and explicit creation`);
   } finally { await browser?.close(); server.close(); }
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

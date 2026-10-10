@@ -31,7 +31,6 @@ if (
 process.env.GENERAL_FX_FEE_RATE = '0.001000';
 process.env.GENERAL_TRADE_FEE_RATE = '0.001000';
 process.env.LIMIT_ORDER_ENABLED = 'true';
-process.env.BEGINNER_MODE_ENABLED = 'true';
 const prisma = new PrismaService();
 function services(db: PrismaService, refresh?: UsdKrwRefreshService) {
   const access = new TradingAccountAccessService(db);

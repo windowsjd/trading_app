@@ -1,12 +1,12 @@
 # Frontend TradingAccount Switching (작업 9 + 작업 10 + 작업 11 + 작업 13)
 
-Beginner foundation: the server's `beginnerModeEnabled === true` permits
-development entry and selection of the independent `beginner` account.
-Otherwise even a cached beginner account is filtered out. Explicit creation
+Beginner foundation: all authenticated users can create and select the independent
+`beginner` account. The legacy `beginnerModeEnabled` response field is ignored
+even when missing or false. Explicit creation
 refreshes the list before selecting the returned ID. MainTabs now remounts by
 accountId, including switches within one mode; financial query/flow scope
-remains accountId. Its Quest tab uses the existing GuideStack with a
-quest/guide segment and preparation text, with no quest or unlock state.
+remains accountId. Its Quest tab provides QUEST 01 list/detail and the existing GuideStack via
+a quest/guide segment; progress is derived from account-scoped financial records.
 See [the backend contract](../../backend/docs/beginner-mode.md).
 
 Reference for the account-selection layer added by WORK-ID

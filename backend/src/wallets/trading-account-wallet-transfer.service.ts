@@ -1,7 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  assertBeginnerModeEnabled,
-} from '../trading-accounts/account-mode-policy';
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -129,7 +126,6 @@ export class TradingAccountWalletTransferService {
         );
         const raced = await tx.walletTransfer.findUnique({ where: commandKey });
         if (raced) return replay(raced);
-        assertBeginnerModeEnabled(lockedAccount.mode);
         if (lockedAccount.status !== TradingAccountStatus.active)
           fail(
             HttpStatus.CONFLICT,

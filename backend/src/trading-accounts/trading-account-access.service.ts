@@ -1,6 +1,5 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Prisma, TradingAccountMode } from '../generated/prisma/client';
-import { isBeginnerModeEnabled } from './account-mode-policy';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -63,9 +62,6 @@ export class TradingAccountAccessService {
     const accounts = await this.prisma.tradingAccount.findMany({
       where: {
         userId,
-        ...(!isBeginnerModeEnabled()
-          ? { mode: { not: TradingAccountMode.beginner } }
-          : {}),
       },
       orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       select: OWNED_ACCOUNT_SELECT,

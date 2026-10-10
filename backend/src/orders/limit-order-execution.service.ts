@@ -1,7 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  isBeginnerModeEnabled,
-} from '../trading-accounts/account-mode-policy';
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import {
   assertPendingChild,
@@ -321,9 +318,6 @@ export class LimitOrderExecutionService {
           'TRADING_SCOPE_REPAIR_REQUIRED',
           'Order has no valid trading account scope.',
         );
-      }
-      if (account.mode === 'beginner' && !isBeginnerModeEnabled()) {
-        return { state: 'skipped', orderId, reason: 'account_not_active' };
       }
       const participant = account.seasonParticipant;
       const season = participant?.season ?? null;

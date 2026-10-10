@@ -6,7 +6,7 @@ import ErrorNotice from '../states/ErrorNotice';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { useOpenBeginnerAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
 
-/** Mounted only for the server's explicit development opt-in. */
+/** Explicit beginner creation or selection for every authenticated user. */
 export default function BeginnerAccountEntry({ onEntered }: { onEntered: () => void }) {
   const { accounts, selectAccount } = useTradingAccount();
   const existing = accounts.find(account => account.mode === 'beginner');

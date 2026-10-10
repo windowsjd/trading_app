@@ -1,4 +1,5 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
+import { createApiError } from '../common/api-error';
 import type {
   CurrencyCode,
   WalletScope,
@@ -127,8 +128,7 @@ export class BeginnerQuestsService {
       );
     }
     // Same integrity gate as the account's FX/wallet reads: damaged financial
-    // rows fail closed instead of being read as progress. Reads stay available
-    // when beginner mode is switched off, like every owned-account read.
+    // rows fail closed instead of being read as progress.
     await this.performance.assertGeneralAccountReady(account);
 
     const fx = await this.firstProvenFx(account.id);
@@ -283,9 +283,6 @@ export class BeginnerQuestsService {
   }
 
   private fail(status: HttpStatus, code: string, message: string): never {
-    throw new HttpException(
-      { success: false, error: { code, message } },
-      status,
-    );
+    throw createApiError(code, message, status);
   }
 }

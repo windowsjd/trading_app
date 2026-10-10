@@ -108,6 +108,8 @@ const errorCode = async (work: Promise<unknown>) => {
     return {
       status: error.getStatus(),
       code: (error.getResponse() as { error: { code: string } }).error.code,
+      message: (error.getResponse() as { error: { message: string } }).error
+        .message,
     };
   }
   throw new Error('expected rejection');
@@ -313,7 +315,11 @@ describe('BeginnerQuestsService', () => {
       const { service, prisma, performance } = setup({ mode });
       expect(
         await errorCode(service.getQuestProgress('user-1', ACCOUNT)),
-      ).toEqual({ status: 409, code: 'BEGINNER_QUEST_ACCOUNT_ONLY' });
+      ).toEqual({
+        status: 409,
+        code: 'BEGINNER_QUEST_ACCOUNT_ONLY',
+        message: 'Quests are available only for beginner accounts.',
+      });
       expect(performance.assertGeneralAccountReady).not.toHaveBeenCalled();
       expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
     },
@@ -323,7 +329,7 @@ describe('BeginnerQuestsService', () => {
     const anonymous = setup({});
     expect(
       await errorCode(anonymous.service.getQuestProgress(undefined, ACCOUNT)),
-    ).toEqual({ status: 401, code: 'UNAUTHORIZED' });
+    ).toEqual({ status: 401, code: 'UNAUTHORIZED', message: 'Unauthorized' });
     expect(anonymous.access.getOwnedAccountOrThrow).not.toHaveBeenCalled();
 
     const damaged = setup({ integrityError: new Error('integrity') });

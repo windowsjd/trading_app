@@ -80,7 +80,6 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
   const { colors } = useAppearance();
   const {
     accounts,
-    beginnerModeEnabled,
     selectedAccount,
     selectedAccountId,
     isLoading,
@@ -285,7 +284,7 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
             />
           ))}
 
-          {beginnerModeEnabled && !accounts.some(account => account.mode === 'beginner') ? <BeginnerAccountEntry onEntered={() => setOpen(false)} /> : null}
+          {!accounts.some(account => account.mode === 'beginner') ? <BeginnerAccountEntry onEntered={() => setOpen(false)} /> : null}
 
           {seasonJoin.kind === 'available' ? (
             <View style={[styles.startRow, styles.seasonJoinBox]}>

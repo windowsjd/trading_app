@@ -40,7 +40,6 @@ if (
   throw new Error('Explicit test DB opt-in is required.');
 process.env.GENERAL_TRADE_FEE_RATE = '0.001000';
 process.env.FUTURES_TRADING_ENABLED = 'true';
-process.env.BEGINNER_MODE_ENABLED = 'true';
 const db = new PrismaService();
 const d = futuresDecimal;
 let checks = 0;

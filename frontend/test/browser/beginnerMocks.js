@@ -2,7 +2,7 @@
 import { apiClient as existing, transport } from './motionMocks';
 export { useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook, getRequestGeneration } from './motionMocks';
 const params = new URLSearchParams(location.search);
-const enabled = params.get('enabled') !== '0';
+const legacyFlag = params.get('enabled');
 const beginner = { ...transport.accounts.find(a => a.mode === 'general'), id: 'beginner-account', mode: 'beginner' };
 if (!params.has('newBeginner')) transport.accounts.push(beginner);
 transport.posts = [];
@@ -34,8 +34,8 @@ export const apiClient = {
     }
     if (path === '/trading-accounts') {
       transport.requests.push(path);
-      // Include a cached beginner even when disabled to exercise the client guard.
-      return response({ accounts: transport.accounts.map(account => ({ ...account })), beginnerModeEnabled: enabled });
+      // Exercise compatibility with legacy missing/false availability fields.
+      return response({ accounts: transport.accounts.map(account => ({ ...account })), ...(legacyFlag === null ? {} : { beginnerModeEnabled: legacyFlag !== '0' }) });
     }
     const result = await existing.get(path, config);
     if (path === '/trading-accounts/beginner-account/portfolio') {
@@ -48,7 +48,7 @@ export const apiClient = {
   },
   async post(path) {
     transport.posts.push(path);
-    if (path !== '/trading-accounts/beginner' || !enabled) throw Error('Unexpected fixture mutation');
+    if (path !== '/trading-accounts/beginner') throw Error('Unexpected fixture mutation');
     const created = !transport.accounts.some(a => a.mode === 'beginner');
     if (created) transport.accounts.push(beginner);
     return response({ created, account: beginner, wallets: [] });

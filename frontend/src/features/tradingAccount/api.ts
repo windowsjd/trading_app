@@ -84,7 +84,7 @@ export interface TradingAccountDto {
 
 export interface TradingAccountsDto {
   accounts: TradingAccountDto[];
-  /** Server development opt-in; absence means disabled. */
+  /** Legacy server field; availability and selection do not depend on it. */
   beginnerModeEnabled?: boolean;
 }
 

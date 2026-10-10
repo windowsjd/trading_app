@@ -152,18 +152,12 @@ function failCreationAt(delegateName: string, failCall: number): PrismaService {
 async function run() {
   await db.$connect();
   const owner = await user();
-  delete process.env.BEGINNER_MODE_ENABLED;
-  await rejectsCode(opens.openBeginnerAccount(owner), 'BEGINNER_MODE_DISABLED');
-  // The operator switch alone decides; production is not a separate gate.
+  // Production uses the same creation/list policy as every other environment.
   process.env.NODE_ENV = 'production';
-  process.env.BEGINNER_MODE_ENABLED = 'false';
-  await rejectsCode(opens.openBeginnerAccount(owner), 'BEGINNER_MODE_DISABLED');
-  process.env.BEGINNER_MODE_ENABLED = 'true';
   assert.equal(
     (await accounts.listTradingAccounts(owner)).data.beginnerModeEnabled,
     true,
   );
-  process.env.NODE_ENV = 'test';
   assert.equal(
     (await accounts.listTradingAccounts(owner)).data.accounts.length,
     0,
@@ -481,19 +475,14 @@ async function run() {
     afterTransfer.data.summary?.returnRate,
   );
 
-  delete process.env.BEGINNER_MODE_ENABLED;
-  const hidden = await accounts.listTradingAccounts(owner);
-  assert.equal(hidden.data.beginnerModeEnabled, false);
+  const visible = await accounts.listTradingAccounts(owner);
+  assert.equal(visible.data.beginnerModeEnabled, true);
   assert.equal(
-    hidden.data.accounts.some((a) => a.mode === 'beginner'),
-    false,
+    visible.data.accounts.some((a) => a.id === beginner.id),
+    true,
   );
-  await rejectsCode(
-    fx.quoteForTradingAccount(owner, beginner.id, body),
-    'BEGINNER_MODE_DISABLED',
-  );
-  await fx.executeForTradingAccount(owner, beginner.id, command); // committed replay survives disable
-  process.env.BEGINNER_MODE_ENABLED = 'true';
+  await fx.quoteForTradingAccount(owner, beginner.id, body);
+  await fx.executeForTradingAccount(owner, beginner.id, command); // committed replay
   await db.tradingAccount.update({
     where: { id: beginner.id },
     data: { status: 'closed', closedAt: new Date() },
@@ -518,7 +507,7 @@ async function run() {
     'damaged origins are never repaired by POST',
   );
   console.log(
-    'beginner account DB integration passed: opt-in, concurrent open, unique grants, rollback, ownership, three-mode isolation, TWR, daily history, replay and no repair',
+    'beginner account DB integration passed: always available, production, concurrent open, unique grants, rollback, ownership, three-mode isolation, TWR, daily history, replay and no repair',
   );
 }
 

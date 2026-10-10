@@ -1,8 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  assertBeginnerModeEnabled,
-  isBeginnerModeEnabled,
-} from '../trading-accounts/account-mode-policy';
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
 import { presentFuturesPerformance } from './futures-position-display';
 import { createApiError } from '../common/api-error';
@@ -119,8 +115,6 @@ export class FuturesService {
       ? null
       : await this.prisma.futuresExecuteRequest.findUnique({ where });
     if (committed) return replay(committed);
-    if (request.operation === 'open' || request.operation === 'increase')
-      assertBeginnerModeEnabled(account.mode);
     assertFuturesOperation(request.operation);
     await this.assertTradable(
       account,
@@ -217,8 +211,6 @@ export class FuturesService {
           );
         if (entry) await releaseFuturesEntryReservation(tx, entry);
         const executeNow = await this.dbNow(tx);
-        if (request.operation === 'open' || request.operation === 'increase')
-          assertBeginnerModeEnabled(account.mode);
         assertFuturesOperation(request.operation);
         const lockedAccount = await this.access.getOwnedAccountOrThrow(
           userId,
@@ -1100,14 +1092,8 @@ export function futuresCapabilities(account: OwnedTradingAccount, now: Date) {
         now < p.season.endAt));
   return {
     tradingMode: mode,
-    canOpen:
-      lifecycle &&
-      mode === 'ENABLED' &&
-      (account.mode !== 'beginner' || isBeginnerModeEnabled()),
-    canIncrease:
-      lifecycle &&
-      mode === 'ENABLED' &&
-      (account.mode !== 'beginner' || isBeginnerModeEnabled()),
+    canOpen: lifecycle && mode === 'ENABLED',
+    canIncrease: lifecycle && mode === 'ENABLED',
     canReduce: lifecycle && mode !== 'DISABLED',
     canClose: lifecycle && mode !== 'DISABLED',
     reason: !lifecycle

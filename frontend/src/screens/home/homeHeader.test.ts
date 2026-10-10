@@ -23,7 +23,7 @@ function setup({ visual = false, width = 390, fontScale = 1 } = {}) {
     '@tanstack/react-query': { useQuery: () => ({ isSuccess: false }) },
     '../../features/season/api': { getCurrentSeason: () => {} },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => context },
-    '../../features/tradingAccount/useOpenGeneralAccount': { useOpenGeneralAccount: () => ({}) },
+    '../../features/tradingAccount/useOpenGeneralAccount': { useOpenGeneralAccount: () => ({}), useOpenBeginnerAccount: () => ({}) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate() {} }) },
     '../common/ActionPressable': { default: h.ActionPressable, __esModule: true },
     '../common/CTAButton': { default: 'CTAButton', __esModule: true },

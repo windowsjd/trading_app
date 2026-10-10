@@ -1,17 +1,17 @@
 import { spawnSync } from 'node:child_process';
 
 /**
- * Opt-in PostgreSQL proof for the complete general-account trading lifecycle.
+ * Opt-in PostgreSQL proof for the complete general/beginner account trading lifecycle.
  * It applies existing migrations only and creates/cleans uniquely tagged rows;
  * it never resets, drops, or seeds the database.
  */
 const RUN_DB_INTEGRATION = process.env.GENERAL_TRADING_DB_INTEGRATION === '1';
 const itDbIntegration = RUN_DB_INTEGRATION ? it : it.skip;
 
-describe('General account trading DB integration', () => {
-  itDbIntegration(
-    'executes market and limit orders through the shared account core',
-    () => {
+describe('Standalone account trading DB integration', () => {
+  itDbIntegration.each(['general', 'beginner'] as const)(
+    '%s executes market and limit orders through the shared account core',
+    (mode) => {
       const prepare = spawnSync(
         process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
         ['run', '--silent', 'test:db:prepare'],
@@ -34,7 +34,16 @@ describe('General account trading DB integration', () => {
 
       const result = spawnSync(
         process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-        ['tsx', '-e', GENERAL_TRADING_DB_RUNNER],
+        [
+          'tsx',
+          '-e',
+          GENERAL_TRADING_DB_RUNNER.replace(
+            'generalAccounts.openGeneralAccount(userId)',
+            mode === 'beginner'
+              ? 'generalAccounts.openBeginnerAccount(userId)'
+              : 'generalAccounts.openGeneralAccount(userId)',
+          ),
+        ],
         {
           cwd: process.cwd(),
           env: process.env,
@@ -86,6 +95,7 @@ import { LimitOrderCreateService } from './src/orders/limit-order-create.service
 import { LimitOrderCancelService } from './src/orders/limit-order-cancel.service';
 import { LimitOrderCandleEvidenceService } from './src/orders/limit-order-candle-evidence.service';
 import { LimitOrderExecutionService } from './src/orders/limit-order-execution.service';
+import { LimitOrderCandidateRepository } from './src/orders/limit-order-candidate.repository';
 import { PositionsService } from './src/positions/positions.service';
 import { getAssetTradingStatus } from './src/orders/market-hours.policy';
 import { resolveStockMarketSessionState } from './src/orders/market-calendar.policy';
@@ -812,6 +822,11 @@ async function main() {
     '90.00000000',
     'limit-buy-fill-' + randomUUID(),
   );
+  // Both standalone account types must reach the scheduled matching job.
+  const candidates = new LimitOrderCandidateRepository(prisma);
+  assert.equal((await candidates.findAssetIdsWithFillableLimitBuys(new Date(), 1000)).includes(assetId), true);
+  const page = await candidates.findFillableLimitOrdersAfter(new Date(), 1000, null);
+  assert.equal(page.some(row => row.candidate?.id === limitBuyFill.response.data.order.orderId), true);
   const buyFillSnapshot = await price(assetId, '80.00000000');
   const buyFill = await limitExecution.fillLimitOrder({
     orderId: limitBuyFill.response.data.order.orderId,

@@ -400,7 +400,6 @@ describe('AppController (e2e)', () => {
   const originalKisWebSocketStreamingEnabled =
     process.env.KIS_WEBSOCKET_STREAMING_ENABLED;
   const originalNodeEnv = process.env.NODE_ENV;
-  const originalBeginnerModeEnabled = process.env.BEGINNER_MODE_ENABLED;
   const now = new Date('2026-05-09T00:00:00.000Z');
   const user = {
     id: 'user-1',
@@ -520,7 +519,6 @@ describe('AppController (e2e)', () => {
 
   beforeEach(async () => {
     process.env.NODE_ENV = 'test';
-    process.env.BEGINNER_MODE_ENABLED = 'false';
     jest.clearAllMocks();
     mockedArgon2.hash.mockResolvedValue('hashed-password');
     mockedArgon2.verify.mockResolvedValue(true);
@@ -710,9 +708,6 @@ describe('AppController (e2e)', () => {
     } finally {
       if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
       else process.env.NODE_ENV = originalNodeEnv;
-      if (originalBeginnerModeEnabled === undefined)
-        delete process.env.BEGINNER_MODE_ENABLED;
-      else process.env.BEGINNER_MODE_ENABLED = originalBeginnerModeEnabled;
     }
   });
 
@@ -2803,7 +2798,7 @@ describe('AppController (e2e)', () => {
       resetPrismaMocks();
       mockActiveUser();
       // Emulate the database WHERE over owned and foreign rows. A missing
-      // owner predicate or beginner exclusion must change the HTTP result.
+      // owner predicate or unexpected beginner exclusion must change the HTTP result.
       prisma.tradingAccount.findMany.mockImplementation(
         async ({
           where,
@@ -2837,7 +2832,7 @@ describe('AppController (e2e)', () => {
           expect(response.body).toMatchObject({
             success: true,
             data: {
-              beginnerModeEnabled: false,
+              beginnerModeEnabled: true,
               accounts: [
                 {
                   id: 'trading-account-1',
@@ -2861,38 +2856,27 @@ describe('AppController (e2e)', () => {
                   initialCapitalKrw: '10000000.00000000',
                   season: null,
                 },
+                { id: 'trading-account-3', mode: 'beginner', season: null },
               ],
             },
           });
         });
 
-      // Ownership and the disabled-mode exclusion are enforced in the query.
+      // Ownership and inclusion of every account mode are enforced in the query.
       expect(prisma.tradingAccount.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: user.id, mode: { not: 'beginner' } },
+          where: { userId: user.id },
           orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
         }),
       );
     });
 
-    it.each([
-      { nodeEnv: 'test', flag: 'true', enabled: true },
-      { nodeEnv: 'development', flag: 'true', enabled: true },
-      { nodeEnv: 'production', flag: 'true', enabled: true },
-      { nodeEnv: undefined, flag: 'true', enabled: true },
-      { nodeEnv: 'test', flag: undefined, enabled: false },
-      { nodeEnv: 'test', flag: '1', enabled: false },
-      { nodeEnv: 'development', flag: 'false', enabled: false },
-      { nodeEnv: 'production', flag: undefined, enabled: false },
-      { nodeEnv: 'production', flag: 'false', enabled: false },
-    ])(
-      '/api/v1/trading-accounts (GET) preserves ownership with NODE_ENV=$nodeEnv, flag=$flag, enabled=$enabled',
-      async ({ nodeEnv, flag, enabled }) => {
+    it.each(['test', 'development', 'production', undefined])(
+      '/api/v1/trading-accounts (GET) includes beginner and preserves ownership with NODE_ENV=%s',
+      async (nodeEnv) => {
         if (nodeEnv === undefined) delete process.env.NODE_ENV;
         else process.env.NODE_ENV = nodeEnv;
-        if (flag === undefined) delete process.env.BEGINNER_MODE_ENABLED;
-        else process.env.BEGINNER_MODE_ENABLED = flag;
         const token = await createValidAccessToken();
 
         await request(app.getHttpServer())
@@ -2901,41 +2885,33 @@ describe('AppController (e2e)', () => {
           .expect(200)
           .expect((response) => {
             expect(response.body.success).toBe(true);
-            expect(response.body.data.beginnerModeEnabled).toBe(enabled);
+            expect(response.body.data.beginnerModeEnabled).toBe(true);
             expect(
               response.body.data.accounts.map(
                 (account: { id: string }) => account.id,
               ),
-            ).toEqual(
-              enabled
-                ? [
-                    'trading-account-1',
-                    'trading-account-2',
-                    'trading-account-3',
-                  ]
-                : ['trading-account-1', 'trading-account-2'],
-            );
-            if (enabled) {
-              expect(response.body.data.accounts[2]).toEqual({
-                id: 'trading-account-3',
-                mode: 'beginner',
-                status: 'active',
-                initialCapitalKrw: '10000000.00000000',
-                openedAt: openedAt.toISOString(),
-                closedAt: null,
-                createdAt: openedAt.toISOString(),
-                updatedAt: openedAt.toISOString(),
-                season: null,
-              });
-            }
+            ).toEqual([
+              'trading-account-1',
+              'trading-account-2',
+              'trading-account-3',
+            ]);
+            expect(response.body.data.accounts[2]).toEqual({
+              id: 'trading-account-3',
+              mode: 'beginner',
+              status: 'active',
+              initialCapitalKrw: '10000000.00000000',
+              openedAt: openedAt.toISOString(),
+              closedAt: null,
+              createdAt: openedAt.toISOString(),
+              updatedAt: openedAt.toISOString(),
+              season: null,
+            });
           });
 
         expect(prisma.tradingAccount.findMany).toHaveBeenCalledTimes(1);
         expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: enabled
-              ? { userId: user.id }
-              : { userId: user.id, mode: { not: 'beginner' } },
+            where: { userId: user.id },
             orderBy: [
               { openedAt: 'desc' },
               { createdAt: 'desc' },

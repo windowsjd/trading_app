@@ -13,7 +13,6 @@ import {
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertGeneralAccountFinancialIntegrity } from './general-account-integrity';
-import { assertBeginnerModeEnabled } from './account-mode-policy';
 import {
   GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW,
   GENERAL_ACCOUNT_INITIAL_USD_BALANCE,
@@ -23,7 +22,7 @@ import {
 /**
  * Explicit general/beginner entry, each with its own owner partial unique index.
  * Retries converge on one account per mode, four canonical wallets and one
- * 10,000,000 KRW grant. Beginner entry additionally requires development opt-in.
+ * 10,000,000 KRW grant. Beginner entry is available to all authenticated users.
  *
  * Everything the first call writes lives in a SINGLE transaction: if any
  * step fails, the account, wallets, grant and TWR origin roll back together —
@@ -103,7 +102,6 @@ export class GeneralAccountsService {
     userId: string | undefined,
   ): Promise<OpenGeneralAccountResponse> {
     this.requireUserId(userId);
-    assertBeginnerModeEnabled(TradingAccountMode.beginner);
     return this.openStandaloneAccount(userId, TradingAccountMode.beginner);
   }
 

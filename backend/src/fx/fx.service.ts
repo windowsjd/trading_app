@@ -1,4 +1,3 @@
-import { assertBeginnerModeEnabled } from '../trading-accounts/account-mode-policy';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import {
   buildSelectionFailureEvidence,
@@ -2835,7 +2834,6 @@ export class FxService {
     status: TradingAccountStatus;
     mode?: TradingAccountMode;
   }) {
-    if (account.mode) assertBeginnerModeEnabled(account.mode);
     if (account.status !== TradingAccountStatus.active) {
       this.throwApiError(
         HttpStatus.CONFLICT,

@@ -59,7 +59,6 @@ import {
 
 export type TradingAccountContextValue = {
   accounts: TradingAccountDto[];
-  beginnerModeEnabled: boolean;
   selectedAccountId: string | null;
   selectedAccount: TradingAccountDto | null;
   capabilities: TradingAccountCapabilities | null;
@@ -131,9 +130,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
   });
 
   const accounts = useMemo(
-    () => sortAccountsForDisplay((accountsQuery.data?.accounts ?? []).filter(
-      account => account.mode !== 'beginner' || accountsQuery.data?.beginnerModeEnabled === true,
-    )),
+    () => sortAccountsForDisplay(accountsQuery.data?.accounts ?? []),
     [accountsQuery.data],
   );
 
@@ -230,7 +227,6 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
   const value = useMemo<TradingAccountContextValue>(
     () => ({
       accounts,
-      beginnerModeEnabled: accountsQuery.data?.beginnerModeEnabled === true,
       selectedAccountId: selection.accountId,
       selectedAccount,
       capabilities: getTradingAccountCapabilities(
@@ -253,7 +249,6 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     [
       accounts,
       capabilityNow,
-      accountsQuery.data?.beginnerModeEnabled,
       selection.accountId,
       selection.reason,
       selectedAccount,

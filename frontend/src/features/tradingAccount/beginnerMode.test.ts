@@ -21,7 +21,7 @@ it('beginner is a separately named TWR account without season or ad reward capab
   assert.equal(caps.isGeneral, false);
   assert.equal(caps.showsSeasonUi, false);
   assert.equal(caps.canClaimAdReward, false);
-  assert.equal(caps.canTrade, true); // Only reachable through server development opt-in.
+  assert.equal(caps.canTrade, true); // Beginner uses the same standalone financial capabilities.
   assert.equal(caps.canExchange, true);
   assert.equal(getLedgerTypeFilters('all', 'beginner', 'KRW').some(row => row.key === 'ad_reward'), false);
   const closed = getTradingAccountCapabilities({ ...beginner, status: 'closed' })!;

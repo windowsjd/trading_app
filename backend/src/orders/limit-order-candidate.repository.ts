@@ -1,4 +1,3 @@
-import { isBeginnerModeEnabled } from '../trading-accounts/account-mode-policy';
 import { Injectable } from '@nestjs/common';
 import {
   AssetType,
@@ -16,7 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * A submitted limit order that is currently fillable. Season rows require an
- * active/unexpired season and participant; general rows require an active
+ * active/unexpired season and participant; general/beginner rows require an active
  * participant-less account. The execution transaction re-verifies every fact,
  * so these filters are work-reduction only, never authority.
  */
@@ -97,7 +96,7 @@ export class LimitOrderCandidateRepository {
 
   /**
    * Shared candidate clause for submitted buy/sell reservations in either a
-   * tradable season account or an active participant-less general account.
+   * tradable season account or an active participant-less general/beginner account.
    */
   private fillableWhere(now: Date): Prisma.OrderWhereInput {
     return {
@@ -130,14 +129,9 @@ export class LimitOrderCandidateRepository {
             },
             {
               tradingAccount: {
-                mode: isBeginnerModeEnabled()
-                  ? {
-                      in: [
-                        TradingAccountMode.general,
-                        TradingAccountMode.beginner,
-                      ],
-                    }
-                  : TradingAccountMode.general,
+                mode: {
+                  in: [TradingAccountMode.general, TradingAccountMode.beginner],
+                },
                 status: TradingAccountStatus.active,
                 seasonParticipant: null,
               },

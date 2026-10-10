@@ -1,8 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  assertBeginnerModeEnabled,
-  isBeginnerModeEnabled,
-} from '../trading-accounts/account-mode-policy';
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -120,7 +116,6 @@ export class ConditionalService {
         accountId,
         tx,
       );
-      assertBeginnerModeEnabled(account.mode);
       if (!conditionalTradable(account, now))
         throw createApiError(
           'CONDITIONAL_ACCOUNT_NOT_TRADABLE',
@@ -295,9 +290,7 @@ export class ConditionalService {
       this.now(this.prisma),
     ]);
     const tradable =
-      conditionalTradable(account, clock) &&
-      conditionalEnabled() &&
-      (account.mode !== 'beginner' || isBeginnerModeEnabled());
+      conditionalTradable(account, clock) && conditionalEnabled();
     return {
       success: true,
       data: {

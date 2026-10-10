@@ -179,7 +179,6 @@ async function compositeKrwToSpot(userId: string, accountId: string) {
 
 async function run() {
   await db.$connect();
-  process.env.BEGINNER_MODE_ENABLED = 'true';
   process.env.GENERAL_FX_FEE_RATE = '0.001000';
   const owner = await user();
   const beginner = (await opens.openBeginnerAccount(owner)).data.account;
@@ -306,15 +305,13 @@ async function run() {
   await usdTransfer(owner, beginner.id, 'crypto_spot', 'securities', '3');
   assert.deepEqual(await progress(owner, beginner.id), done);
 
-  // Ownership, and reads survive the operator switch being turned off.
+  // Ownership and durable progress across repeated reads.
   const stranger = await user();
   await rejectsCode(
     quests.getQuestProgress(stranger, beginner.id),
     'TRADING_ACCOUNT_NOT_FOUND',
   );
-  delete process.env.BEGINNER_MODE_ENABLED;
   assert.deepEqual(await progress(owner, beginner.id), done);
-  process.env.BEGINNER_MODE_ENABLED = 'true';
   const settled = await rowCounts(beginner.id);
   await progress(owner, beginner.id);
   assert.deepEqual(await rowCounts(beginner.id), settled, 'GET never writes');
@@ -366,7 +363,7 @@ async function run() {
     moved.data.transferId,
   );
   console.log(
-    'beginner quest DB integration passed: derived 0/1/2 progress, quote/failure/composite/order/foreign-mode exclusion, replay, ownership, disabled read and no writes',
+    'beginner quest DB integration passed: derived 0/1/2 progress, quote/failure/composite/order/foreign-mode exclusion, replay, ownership, durable reads and no writes',
   );
 }
 

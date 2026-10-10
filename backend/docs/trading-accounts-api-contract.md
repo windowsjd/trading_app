@@ -4,7 +4,9 @@ Beginner foundation extension: [beginner-mode.md](beginner-mode.md) defines
 `POST /api/v1/trading-accounts/beginner`, the `beginner` mode, four-wallet
 response, the list's `beginnerModeEnabled` boolean and the read-only
 `GET /api/v1/trading-accounts/:accountId/quests` progress. Exposure and creation
-follow `BEGINNER_MODE_ENABLED=true` in every environment, production included.
+are always available to all authenticated users in every environment, production
+included. The list field is always `true` for compatibility with deployed apps;
+new clients do not use it as an activation gate.
 Existing general/season contracts below retain their financial policies.
 
 ## Status

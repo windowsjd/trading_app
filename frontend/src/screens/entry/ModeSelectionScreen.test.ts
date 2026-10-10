@@ -13,14 +13,14 @@ const season = { id: 'season', mode: 'season', status: 'active', season: {
 const current = { id: 'current', name: 'Season 1', status: 'active', joined: false,
   startAt: '2020-01-01T00:00:00Z', endAt: '2099-01-01T00:00:00Z' };
 function harness() {
-  const h: any = { accounts: [general, season], loading: false, failed: false, retries: 0, opens: 0, beginnerOpens: 0, beginnerModeEnabled: false,
+  const h: any = { accounts: [general, season], loading: false, failed: false, retries: 0, opens: 0, beginnerOpens: 0,
     selections: [], navigation: [], season: { isSuccess: true, data: current }, open: { isPending: false, errorMessage: null } };
   const Screen = load(resolve('src/screens/entry/ModeSelectionScreen.tsx'), {
     react: { ...React, useMemo: fn => fn() },
     'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', SafeAreaView: 'SafeAreaView', StyleSheet: { create: styles => styles } },
     '@tanstack/react-query': { useQuery: () => ({ ...h.season, refetch: () => { h.retries++; } }) },
     '../../features/season/api': { getCurrentSeason: () => {} },
-    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts, beginnerModeEnabled: h.beginnerModeEnabled,
+    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts,
       isLoading: h.loading, isError: h.failed, refetchAccounts: () => { h.retries++; }, selectAccount: id => h.selections.push(id) }) },
     '../../features/tradingAccount/useOpenGeneralAccount': { useOpenGeneralAccount: () => ({ ...h.open, start: () => { h.opens++; } }), useOpenBeginnerAccount: () => ({ ...h.open, start: () => { h.beginnerOpens++; } }) },
     '../../components/common/CTAButton': { default: 'CTA', __esModule: true },
@@ -73,10 +73,9 @@ it('keeps loading, account/season retries, general-open failure and past-season 
 });
 
 
-it('beginner entry is hidden by default and creation requires an explicit press', () => {
+it('beginner entry is always available and creation requires an explicit press', () => {
   const h = harness();
-  assert.equal(find(h.render(), 'beginner-account-entry') === undefined, true);
-  h.beginnerModeEnabled = true;
+  assert.equal(find(h.render(), 'beginner-account-entry') !== undefined, true);
   const tree = h.render();
   assert.equal(h.beginnerOpens, 0);
   assert.match(text(tree), /초보 계정 만들기/);
@@ -85,7 +84,7 @@ it('beginner entry is hidden by default and creation requires an explicit press'
   assert.equal(h.opens, 0);
 });
 it('existing beginner selection changes accounts without creating or moving data', () => {
-  const h = harness(); h.beginnerModeEnabled = true;
+  const h = harness();
   h.accounts.push({ ...general, id: 'beginner', mode: 'beginner' });
   const tree = h.render();
   find(tree, 'beginner-account-start').props.onPress();
@@ -97,8 +96,8 @@ it('existing beginner selection changes accounts without creating or moving data
 });
 
 it('beginner creation errors retain the original error for the shared diagnostic surface', () => {
-  const h = harness(); h.beginnerModeEnabled = true;
-  const failure = { response: { status: 403, data: { error: { code: 'BEGINNER_MODE_DISABLED' } } } };
+  const h = harness();
+  const failure = { response: { status: 409, data: { error: { code: 'TRADING_ACCOUNT_INTEGRITY_ERROR' } } } };
   h.open.error = failure;
   const tree = h.render();
   assert.equal(find(tree, 'beginner-account-error').props.error === failure, true);

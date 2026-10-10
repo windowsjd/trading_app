@@ -5,19 +5,14 @@
 광고 보상에서 제외한다. QUEST 01 진행 판정만 구현하며 기능 해금·보상 정책은
 미정이므로 구현하지 않는다.
 
-## 운영 활성화 경계 (2026-10-10 전체 공개)
+## 기본 제공 정책 (2026-10-10)
 
-`BEGINNER_MODE_ENABLED=true`(정확히 문자열 `true`)이면 `NODE_ENV`와 관계없이
-development·test·production 모두에서 신규 개설·계정 목록 노출·신규 금융 진입을
-허용한다. 모든 로그인 사용자가 대상이며 허용 목록·관리자·베타 자격은 없다.
-미설정·`false`·그 밖의 값은 비활성이며 기본값이다. 계정 목록의
-`beginnerModeEnabled`가 클라이언트 진입 표시의 근거이고 기능 해금 판정이 아니다.
-
-긴급 비활성화는 같은 변수를 `false`로 되돌리는 것이다. 신규 개설과 신규 거래만
-거절되고 계정·지갑·원장은 삭제·재생성·재지급되지 않는다. 이미 소유한 계정의
-accountId 기반 조회·주문 취소·선물 reduce/close·청산 및 커밋된 명령 재시도는
-자금 관리 안전성을 위해 유지한다. 다시 `true`로 바꾸면 기존 초보계정이 재지급 없이
-그대로 다시 노출된다.
+초보모드는 development·test·production에서 모든 로그인 사용자에게 항상
+제공되는 정식 계정 유형이다. 별도 활성화 환경변수나 허용 목록은 없다.
+기존 배포 앱과의 호환성을 위해 계정 목록의 `beginnerModeEnabled`는 항상
+`true`를 반환한다. 새 클라이언트는 이 필드의 누락이나 `false`에 의존하지 않는다.
+기존 계정은 재생성·재지급 없이 노출되며 계정 상태·소유권·금융 무결성 검사는
+유지한다. 선물과 조건부 주문의 독립적인 출시·안전 정책도 유지한다.
 
 ## API 및 금융
 
@@ -41,7 +36,7 @@ accountId 기반 조회·주문 취소·선물 reduce/close·청산 및 커밋�
 `GET /api/v1/trading-accounts/:accountId/quests`: 소유자 전용, beginner 계정만
 (그 외 모드는 409 `BEGINNER_QUEST_ACCOUNT_ONLY`, 남의/없는 계정은 404
 `TRADING_ACCOUNT_NOT_FOUND`). 기존 금융 무결성 게이트(`assertGeneralAccountReady`)를
-통과해야 응답하며 손상 시 실패한다. 플래그가 꺼져 있어도 소유 계정 조회로 유지된다.
+통과해야 응답하며 손상 시 실패한다.
 
 ```json
 { "success": true, "data": { "tradingAccountId": "…", "quests": [{
@@ -94,8 +89,8 @@ Prisma client를 재생성한다. 기존 일반·시즌 유일 제약 및 시즌
 
 DB migration을 먼저 적용하고 `prisma generate`로 client를 생성한 뒤 서버를
 배포한다. 새 enum을 사용하는 인덱스는 다음 migration에 분리되어 PostgreSQL의
-enum commit 경계를 지킨다. 기존 데이터에 대한 DML은 없다. 운영 활성화는
-배포 환경변수 `BEGINNER_MODE_ENABLED=true`로만 이루어진다(코드 배포 후 운영자가 설정).
+enum commit 경계를 지킨다. 기존 데이터에 대한 DML은 없다. 이 정책 변경에는 추가 migration이 없으며
+서버 배포 후 모든 로그인 사용자가 바로 초보모드를 이용할 수 있다.
 
 초보 기반의 실제 DB 검증은 `NODE_ENV=test`,
 `BEGINNER_ACCOUNT_DB_INTEGRATION=1` 및 명시적 `DATABASE_URL`로

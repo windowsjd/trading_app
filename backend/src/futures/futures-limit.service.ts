@@ -1,7 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  assertBeginnerModeEnabled,
-} from '../trading-accounts/account-mode-policy';
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { buildPagination } from '../common/pagination';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -165,7 +162,6 @@ export class FuturesLimitService {
           },
         };
       }
-      assertBeginnerModeEnabled(locked.mode);
       assertFuturesOperation('open');
       const now = await this.futures.dbNow(tx);
       await this.futures.assertTradable(locked, now, tx);

@@ -4,6 +4,8 @@
  */
 const PUBLIC_MESSAGES = new Set<string>([
   'Request could not be completed.',
+  'Unauthorized',
+  'Quests are available only for beginner accounts.',
   'Account information could not be verified. Please try again.',
   'Conditional orders are currently disabled.',
   'Futures user trading is disabled.',

@@ -27,7 +27,6 @@ import {
   markMarketSessionOverrideStoreRequired,
 } from '../src/orders/market-calendar/market-session-override.store';
 
-process.env.BEGINNER_MODE_ENABLED = 'true';
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
 const valuation = new PortfolioValuationService(prisma);

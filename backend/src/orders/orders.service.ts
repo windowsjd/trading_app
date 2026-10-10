@@ -1,7 +1,4 @@
-import {
-  isStandaloneAccountMode,
-  assertBeginnerModeEnabled,
-} from '../trading-accounts/account-mode-policy';
+import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
@@ -2543,7 +2540,6 @@ export class OrdersService {
     account: OwnedTradingAccount,
     now: Date,
   ): Promise<TradingContext> {
-    assertBeginnerModeEnabled(account.mode);
     if (account.status !== TradingAccountStatus.active) {
       this.throwApiError(
         HttpStatus.CONFLICT,
@@ -2677,7 +2673,6 @@ export class OrdersService {
       );
     }
 
-    assertBeginnerModeEnabled(locked.mode);
     const account = await tx.tradingAccount.findUnique({
       where: { id: context.tradingAccountId },
       select: {
