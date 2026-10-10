@@ -54,7 +54,8 @@ export const apiClient = {
     if (path.endsWith('/futures/positions')) {
       transport.requests.push(path);
       const accountId = path.split('/')[2];
-      return response({ tradingAccountId: accountId, evaluatedAt: new Date().toISOString(),
+      // Home holdings (117fdb01) also read this response; no open positions here.
+      return response({ tradingAccountId: accountId, evaluatedAt: new Date().toISOString(), positions: [],
         collateral: { walletId: accountId + ':futures', currencyCode: 'USD', freeCollateral: params.has('riskUnavailable') ? null : long ? '1234567890100.12345678' : '25.00000000' },
       });
     }

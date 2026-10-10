@@ -9,14 +9,16 @@ export function isStandaloneAccountMode(
   return mode === 'general' || mode === 'beginner';
 }
 
+/**
+ * Operator switch for every user, in every environment (production included).
+ * Default off; anything but the exact string `true` keeps it off, so clearing
+ * the variable is the emergency stop. Owned accounts are never deleted by it.
+ */
 export function isBeginnerModeEnabled(env = process.env): boolean {
-  return (
-    (env.NODE_ENV === 'development' || env.NODE_ENV === 'test') &&
-    env.BEGINNER_MODE_ENABLED === 'true'
-  );
+  return env.BEGINNER_MODE_ENABLED === 'true';
 }
 
-/** New exposure and financial risk require explicit development opt-in. */
+/** New exposure and financial risk require the explicit operator switch. */
 export function assertBeginnerModeEnabled(mode: TradingAccountMode): void {
   if (mode === 'beginner' && !isBeginnerModeEnabled()) {
     throw createApiError(

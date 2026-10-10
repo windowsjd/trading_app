@@ -7,7 +7,8 @@ import { stackTransition } from './transitionPolicy';
 
 import type { GuideStackParamList } from './types';
 import GuideScreen from '../../screens/guide/GuideScreen';
-import BeginnerLearningScreen from '../../screens/guide/BeginnerLearningScreen';
+import BeginnerLearningScreen from '../../screens/quest/BeginnerLearningScreen';
+import BeginnerQuestDetailScreen from '../../screens/quest/BeginnerQuestDetailScreen';
 import MarketBasicsScreen from '../../screens/guide/MarketBasicsScreen';
 import MarketBasicsChaptersScreen from '../../screens/guide/MarketBasicsChaptersScreen';
 import LiquidityScreen from '../../screens/guide/LiquidityScreen';
@@ -45,6 +46,9 @@ export default function GuideStack({ beginner = false }: { beginner?: boolean } 
       <Stack.Screen name="CorporateActions" component={GuideTopicScreen} options={{ title: '기업행동과 조정주가' }} />
       <Stack.Screen name="EtfIndex" component={GuideTopicScreen} options={{ title: 'ETF와 지수' }} />
       <Stack.Screen name="GuideChapter" component={GuideChapterScreen} options={{ title: '가이드 실습' }} />
+      {beginner ? (
+        <Stack.Screen name="QuestDetail" component={BeginnerQuestDetailScreen} options={{ title: '퀘스트 상세' }} />
+      ) : null}
     </Stack.Navigator>
   );
 }

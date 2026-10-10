@@ -154,9 +154,15 @@ async function run() {
   const owner = await user();
   delete process.env.BEGINNER_MODE_ENABLED;
   await rejectsCode(opens.openBeginnerAccount(owner), 'BEGINNER_MODE_DISABLED');
-  process.env.BEGINNER_MODE_ENABLED = 'true';
+  // The operator switch alone decides; production is not a separate gate.
   process.env.NODE_ENV = 'production';
+  process.env.BEGINNER_MODE_ENABLED = 'false';
   await rejectsCode(opens.openBeginnerAccount(owner), 'BEGINNER_MODE_DISABLED');
+  process.env.BEGINNER_MODE_ENABLED = 'true';
+  assert.equal(
+    (await accounts.listTradingAccounts(owner)).data.beginnerModeEnabled,
+    true,
+  );
   process.env.NODE_ENV = 'test';
   assert.equal(
     (await accounts.listTradingAccounts(owner)).data.accounts.length,

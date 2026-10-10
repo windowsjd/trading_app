@@ -41,6 +41,6 @@
     "test": "node --test --test-concurrency=1 'src/**/*.test.ts'",
     "check": "npm run lint:accounts:check && npm run lint:guides:check && npm run typecheck && npm run test",
     "export:web": "expo export --platform web --output-dir dist",
-    "lint:guides:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/screens/guide src/app/navigation/GuideStack.tsx src/app/navigation/types.ts src/components/charts/candleColors.ts src/components/charts/CandlestickChartRenderer.tsx"
+    "lint:guides:check": "eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern \"**/*.test.ts\" src/screens/guide src/screens/quest src/features/quest src/app/navigation/GuideStack.tsx src/app/navigation/types.ts src/components/charts/candleColors.ts src/components/charts/CandlestickChartRenderer.tsx"
   }
 }

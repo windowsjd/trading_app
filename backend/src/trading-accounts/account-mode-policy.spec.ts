@@ -6,28 +6,20 @@ import {
 } from './account-mode-policy';
 
 describe('beginner activation boundary', () => {
-  it.each([undefined, '', 'true', 'false', '1'])(
-    'production stays disabled with flag %s',
+  it.each([undefined, '', 'false', '1', 'TRUE', ' true'])(
+    'stays disabled in every environment with flag %s',
     (flag) => {
-      expect(
-        isBeginnerModeEnabled({
-          NODE_ENV: 'production',
-          BEGINNER_MODE_ENABLED: flag,
-        }),
-      ).toBe(false);
+      for (const NODE_ENV of [undefined, 'development', 'test', 'production'])
+        expect(
+          isBeginnerModeEnabled({ NODE_ENV, BEGINNER_MODE_ENABLED: flag }),
+        ).toBe(false);
     },
   );
-  it('requires both a development/test environment and explicit true', () => {
-    expect(isBeginnerModeEnabled({})).toBe(false);
-    expect(isBeginnerModeEnabled({ BEGINNER_MODE_ENABLED: 'true' })).toBe(
-      false,
-    );
-    for (const NODE_ENV of ['development', 'test']) {
-      expect(isBeginnerModeEnabled({ NODE_ENV })).toBe(false);
+  it('opens for every environment, production included, only with explicit true', () => {
+    for (const NODE_ENV of [undefined, 'development', 'test', 'production'])
       expect(
         isBeginnerModeEnabled({ NODE_ENV, BEGINNER_MODE_ENABLED: 'true' }),
       ).toBe(true);
-    }
   });
   it('gates only beginner exposure, leaving general and season policy intact', () => {
     const flag = process.env.BEGINNER_MODE_ENABLED;

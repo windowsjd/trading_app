@@ -74,25 +74,99 @@ async function run() {
       }));
       assert.equal(labelsFit, true, 'all five tab labels fit their separate touch targets');
     }
+    // Every visible text run stays inside the viewport and its own box; every
+    // button keeps a 44px target with its label inside (no truncation/clipping).
+    async function contentFits(testId) {
+      const issues = await page.evaluate(testId => {
+        const root = [...document.querySelectorAll(`[data-testid="${testId}"]`)].find(element => element.checkVisibility());
+        if (!root) return [`missing ${testId}`];
+        const found = [];
+        for (const element of root.querySelectorAll('*')) {
+          if (!element.checkVisibility()) continue;
+          if (![...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) continue;
+          const range = document.createRange(); range.selectNodeContents(element);
+          const glyph = range.getBoundingClientRect();
+          if (glyph.left < -1 || glyph.right > innerWidth + 1) found.push(`offscreen:${element.textContent.slice(0, 24)}`);
+          if (getComputedStyle(element).display !== 'inline'
+            && (element.scrollWidth > element.clientWidth + 2 || element.scrollHeight > element.clientHeight + 2)) found.push(`clipped:${element.textContent.slice(0, 24)}`);
+        }
+        for (const button of root.querySelectorAll('[role="button"]')) {
+          if (!button.checkVisibility()) continue;
+          const hit = button.getBoundingClientRect();
+          const range = document.createRange(); range.selectNodeContents(button);
+          const glyph = range.getBoundingClientRect();
+          if (hit.height < 44 || glyph.left < hit.left - 1 || glyph.right > hit.right + 1 || glyph.bottom > hit.bottom + 1) found.push(`button:${button.textContent.slice(0, 24)}`);
+        }
+        return found;
+      }, testId);
+      assert.deepEqual(issues, [], testId);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    }
+    const questText = async testId => (await id(testId).textContent()) ?? '';
     for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 2]) for (const theme of ['light', 'dark']) {
       await page.setViewportSize({ width, height: 844 });
-      await open(`fontScale=${fontScale}&theme=${theme}`);
+      // Longest states at the larger font: 2/2 shows the completion copy.
+      const level = fontScale === 2 ? '2' : '1';
+      await open(`fontScale=${fontScale}&theme=${theme}&quest=${level}`);
       assert.equal(await id('home-account-title').textContent(), '초보 투자');
-      await tab('퀘스트').click(); await id('beginner-quests-ready').waitFor();
-      await settled('beginner-quests-ready');
+      await tab('퀘스트').click(); await id('quest-card-progress').waitFor();
+      await settled('beginner-quest-list');
       assert.equal(await page.getByRole('tablist').getByRole('tab').count(), 5);
       await tab('MY').waitFor();
-      assert.doesNotMatch(await id('beginner-quests-ready').textContent(), /\d+%|경험치|레벨|해금|잠금/);
-      await geometry();
+      assert.doesNotMatch(await questText('beginner-quest-list'), /\d+%|경험치|레벨|해금|잠금|보상/);
+      assert.equal(await questText('quest-card-progress'), `실습 ${level}/2 완료`);
+      assert.equal(await questText('quest-card-status'), level === '2' ? '완료' : '진행 중');
+      await geometry(); await contentFits('beginner-quest-list');
       if (width === 320) await page.screenshot({ path: path.join(out, `quest-${fontScale}-${theme}.png`) });
+      await id('quest-card-open').click(); await id('quest-detail-progress-label').waitFor();
+      await settled('quest-detail-screen');
+      await contentFits('quest-detail-screen');
+      if (width === 320) {
+        await page.screenshot({ path: path.join(out, `quest-detail-${fontScale}-${theme}.png`) });
+        await id('quest-open-transfer').scrollIntoViewIfNeeded();
+        await page.screenshot({ path: path.join(out, `quest-detail-practice-${fontScale}-${theme}.png`) });
+      }
+      await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
+      await id('beginner-quest-list').waitFor();
       await id('beginner-segment-guide').click(); await id('guide-market-basics-card').waitFor();
       await geometry();
       await id('guide-market-basics-card').click();
       await page.getByRole('heading', { name: '시장기초', exact: true }).waitFor();
       await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
-      await id('beginner-segment-quests').click(); await id('beginner-quests-ready').waitFor();
-      results.push({ width, fontScale, theme, segments: 'pass', guideNavigation: 'pass' });
+      await id('beginner-segment-quests').click(); await id('beginner-quest-list').waitFor();
+      results.push({ width, fontScale, theme, quest: level, segments: 'pass', questList: 'pass', questDetail: 'pass', guideNavigation: 'pass' });
     }
+
+    // Practice opens the EXISTING Wallet screens; the quest stack is kept.
+    const practice = [];
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const [level, button, heading] of [['0', 'quest-open-fx', '환전'], ['1', 'quest-open-transfer', '이체하기']]) {
+      await open(`quest=${level}`);
+      await tab('퀘스트').click(); await id('quest-card-open').click(); await id('quest-detail-progress-label').waitFor();
+      assert.equal(await id('quest-open-transfer').getAttribute('aria-disabled'), level === '0' ? 'true' : null);
+      await id(button).scrollIntoViewIfNeeded(); await id(button).click();
+      await page.getByRole('heading', { name: heading, exact: true }).filter({ visible: true }).first().waitFor();
+      await tab('퀘스트').click(); await id('quest-detail-progress-label').waitFor();
+      practice.push({ level, opened: heading, returnedToDetail: true });
+    }
+    assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0, 'navigation never mutates');
+
+    // Unknown progress is shown as unknown at the narrowest, largest layout.
+    await page.setViewportSize({ width: 320, height: 844 });
+    await open('quest=error&fontScale=2&theme=dark');
+    await tab('퀘스트').click(); await id('quest-card-error').waitFor();
+    await settled('beginner-quest-list');
+    assert.equal(await questText('quest-card-status'), '확인 불가');
+    await contentFits('beginner-quest-list');
+    await page.screenshot({ path: path.join(out, 'quest-error-2-dark.png') });
+    await id('quest-card-open').click(); await id('quest-detail-error').waitFor();
+    await settled('quest-detail-screen');
+    await page.screenshot({ path: path.join(out, 'quest-detail-error-2-dark.png') });
+    assert.equal(await questText('quest-step-fx-state'), '확인 불가');
+    assert.equal(await questText('quest-step-transfer-state'), '확인 불가');
+    assert.equal(await page.getByTestId('quest-detail-completed').count(), 0);
+    assert.equal(await id('quest-open-transfer').getAttribute('aria-disabled'), 'true');
+    await contentFits('quest-detail-screen');
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
     for (const [account, title, third] of [['general-account', '일반 투자', '가이드'], ['season-account', 'Season 1', '랭킹'], ['beginner-account', '초보 투자', '퀘스트']]) {
@@ -149,6 +223,19 @@ async function run() {
     await tab('지갑').click(); await id('wallet-cash-KRW').waitFor();
     assert.match(await id('wallet-cash-KRW').textContent(), /8,800,000/);
     assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
+    // A quest answer that arrives after switching away never paints elsewhere.
+    await open('quest=2');
+    await page.evaluate(() => { window.beginnerFixture.questDelay = true; });
+    await tab('퀘스트').click(); await id('quest-card-loading').waitFor();
+    await page.waitForFunction(() => window.beginnerFixture.pending.length > 0);
+    await tab('홈').click(); await switchTo('general');
+    await page.evaluate(() => { window.beginnerFixture.questDelay = false; window.beginnerFixture.release(); });
+    await page.waitForFunction(() => window.beginnerFixture.responses.includes('/trading-accounts/beginner-account/quests'));
+    await tab('가이드').waitFor();
+    assert.equal(await page.locator('[data-testid^="quest-"]').filter({ visible: true }).count(), 0);
+    await switchTo('beginner');
+    await tab('퀘스트').click();
+    assert.equal(await questText('quest-card-progress'), '실습 2/2 완료');
     await open('enabled=0');
     assert.notEqual(await id('home-account-title').textContent(), '초보 투자');
     await id('trading-account-switcher-trigger').click();
@@ -162,8 +249,8 @@ async function run() {
     assert.deepEqual(await page.evaluate(() => window.beginnerFixture.posts), ['/trading-accounts/beginner']);
     await tab('퀘스트').waitFor();
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, accountSwitching: 'pass', delayedFinancialIsolation: 'pass', disabledEntry: 'pass', explicitCreation: 'pass', errors }, null, 2));
-    console.log(`beginner browser checks passed: ${results.length} layouts, guide navigation, three-mode switching, delayed financial isolation, disabled entry and explicit creation`);
+    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, practice, questUnknownState: 'pass', delayedQuestIsolation: 'pass', accountSwitching: 'pass', delayedFinancialIsolation: 'pass', disabledEntry: 'pass', explicitCreation: 'pass', errors }, null, 2));
+    console.log(`beginner browser checks passed: ${results.length} layouts with quest list/detail, practice navigation, unknown quest state, delayed quest isolation, guide navigation, three-mode switching, delayed financial isolation, disabled entry and explicit creation`);
   } finally { await browser?.close(); server.close(); }
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });

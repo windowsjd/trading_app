@@ -205,6 +205,7 @@ import {
 import { PrismaService } from './../src/prisma/prisma.service';
 import { RedisService } from './../src/redis/redis.service';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
+import { BeginnerQuestsService } from '../src/trading-accounts/beginner-quests.service';
 import { TradingAccountWalletFxTransferService } from '../src/wallets/trading-account-wallet-fx-transfer.service';
 import { emptyProtectionState } from './support/empty-protection-state';
 import { ConditionalService } from '../src/conditional/conditional.service';
@@ -2878,11 +2879,13 @@ describe('AppController (e2e)', () => {
     it.each([
       { nodeEnv: 'test', flag: 'true', enabled: true },
       { nodeEnv: 'development', flag: 'true', enabled: true },
-      { nodeEnv: 'production', flag: 'true', enabled: false },
+      { nodeEnv: 'production', flag: 'true', enabled: true },
+      { nodeEnv: undefined, flag: 'true', enabled: true },
       { nodeEnv: 'test', flag: undefined, enabled: false },
       { nodeEnv: 'test', flag: '1', enabled: false },
       { nodeEnv: 'development', flag: 'false', enabled: false },
-      { nodeEnv: undefined, flag: 'true', enabled: false },
+      { nodeEnv: 'production', flag: undefined, enabled: false },
+      { nodeEnv: 'production', flag: 'false', enabled: false },
     ])(
       '/api/v1/trading-accounts (GET) preserves ownership with NODE_ENV=$nodeEnv, flag=$flag, enabled=$enabled',
       async ({ nodeEnv, flag, enabled }) => {
@@ -2942,6 +2945,99 @@ describe('AppController (e2e)', () => {
         );
       },
     );
+  });
+
+  it('/api/v1/trading-accounts/:accountId/quests (GET) requires authentication', async () => {
+    const spy = jest.spyOn(app.get(BeginnerQuestsService), 'getQuestProgress');
+    try {
+      await request(app.getHttpServer())
+        .get('/api/v1/trading-accounts/trading-account-3/quests')
+        .expect(401)
+        .expect((response) => expectUnauthorizedBody(response.body));
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('/api/v1/trading-accounts/:accountId/quests (GET) dispatches the owner read for that account', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    const result = {
+      success: true as const,
+      data: {
+        tradingAccountId: 'trading-account-3',
+        quests: [
+          {
+            questId: 'common-01-trading-funds',
+            status: 'not_started' as const,
+            completedStepCount: 0,
+            totalStepCount: 2,
+            steps: [],
+          },
+        ],
+      },
+    };
+    const spy = jest
+      .spyOn(app.get(BeginnerQuestsService), 'getQuestProgress')
+      .mockResolvedValueOnce(result);
+    try {
+      const token = await createValidAccessToken();
+      await request(app.getHttpServer())
+        .get('/api/v1/trading-accounts/trading-account-3/quests')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200)
+        .expect((response) => expect(response.body).toEqual(result));
+      expect(spy).toHaveBeenCalledWith(user.id, 'trading-account-3');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('/api/v1/trading-accounts/:accountId/quests (GET) refuses non-beginner and foreign accounts without financial reads', async () => {
+    resetPrismaMocks();
+    mockActiveUser();
+    prisma.tradingAccount.findFirst.mockResolvedValueOnce({
+      id: 'trading-account-2',
+      userId: user.id,
+      mode: 'general',
+      status: 'active',
+      initialCapitalKrw: new Prisma.Decimal('10000000.00000000'),
+      openedAt: now,
+      closedAt: null,
+      createdAt: now,
+      updatedAt: now,
+      seasonParticipant: null,
+    });
+    const token = await createValidAccessToken();
+
+    await request(app.getHttpServer())
+      .get('/api/v1/trading-accounts/trading-account-2/quests')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(409)
+      .expect((response) =>
+        expect(response.body).toMatchObject({
+          success: false,
+          error: { code: 'BEGINNER_QUEST_ACCOUNT_ONLY' },
+        }),
+      );
+    prisma.tradingAccount.findFirst.mockResolvedValueOnce(null);
+    await request(app.getHttpServer())
+      .get('/api/v1/trading-accounts/other-users-account/quests')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(404)
+      .expect((response) =>
+        expect(response.body).toMatchObject({
+          success: false,
+          error: { code: 'TRADING_ACCOUNT_NOT_FOUND' },
+        }),
+      );
+    expect(prisma.tradingAccount.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'other-users-account', userId: user.id },
+      }),
+    );
+    expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
   });
 
   it('/api/v1/trading-accounts/:accountId (GET) answers the same 404 for missing and foreign accounts', async () => {

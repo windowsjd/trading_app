@@ -319,6 +319,9 @@ export const QUERY_KEYS = {
     listAll: ['tradingAccount', 'list'] as const,
     detail: (accountId: string) =>
       ['tradingAccount', 'detail', accountId] as const,
+    /** Beginner quest progress, derived server-side from this account's ledger. */
+    quests: (accountId: string) =>
+      ['tradingAccount', 'quests', accountId] as const,
 
     futuresCollateral: (accountId: string) =>
       ['tradingAccount', 'futures', accountId, 'collateral'] as const,

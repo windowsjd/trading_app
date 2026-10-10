@@ -165,9 +165,11 @@ describe('mode-aware bottom tabs', () => {
   });
 
   it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
-    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 10);
+    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 11);
     assert.match(guideStack, /name="Guide"/);
     assert.match(guideStack, /component=\{beginner \? BeginnerLearningScreen : GuideScreen\}/);
+    // The quest detail exists only in the beginner QuestStack, never in GuideTab.
+    assert.match(guideStack, /\{beginner \? \(\s*<Stack\.Screen name="QuestDetail" component=\{BeginnerQuestDetailScreen\}[^>]*\/>\s*\) : null\}/);
     assert.match(guideStack, /name="MarketBasics"/);
     assert.match(guideStack, /component=\{MarketBasicsScreen\}/);
     assert.match(guideStack, /component=\{MarketBasicsChaptersScreen\}/);

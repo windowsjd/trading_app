@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { GeneralPerformanceModule } from '../portfolio/general-performance.module';
+import { BeginnerQuestsService } from './beginner-quests.service';
 import { GeneralAccountsService } from './general-accounts.service';
 import { TradingAccountAccessService } from './trading-account-access.service';
 import { TradingAccountsController } from './trading-accounts.controller';
@@ -14,6 +15,7 @@ import { TradingAccountsService } from './trading-accounts.service';
     TradingAccountsService,
     TradingAccountAccessService,
     GeneralAccountsService,
+    BeginnerQuestsService,
   ],
   // Future accountId-based wallet/order/position/portfolio modules reuse the
   // ownership check through this export instead of re-implementing it.

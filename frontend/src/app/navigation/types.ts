@@ -1,4 +1,5 @@
 import type { GuideChapter } from '../../screens/guide/guideTopics';
+import type { BeginnerQuestId } from '../../features/quest/questProgress';
 import type { RecordOrderAccountScope } from '../../features/record/seasonAccountLookup';
 import type {
   CompositeScreenProps,
@@ -63,6 +64,8 @@ export type GuideStackParamList = {
   CorporateActions: undefined;
   EtfIndex: undefined;
   GuideChapter: { chapter: GuideChapter };
+  /** Registered only in the beginner QuestStack. */
+  QuestDetail: { questId: BeginnerQuestId };
 };
 
 export type RecordStackParamList = {
@@ -180,6 +183,11 @@ export type OrderScreenProps = CompositeScreenProps<
 export type GuideScreenProps = CompositeScreenProps<
   StackScreenProps<GuideStackParamList, 'Guide'>,
   CompositeScreenProps<TabScreenProps<'GuideTab'>, RootScreenProps<'MainTabs'>>
+>;
+
+export type QuestDetailScreenProps = CompositeScreenProps<
+  StackScreenProps<GuideStackParamList, 'QuestDetail'>,
+  CompositeScreenProps<TabScreenProps<'QuestTab'>, RootScreenProps<'MainTabs'>>
 >;
 
 export type RankingScreenProps = CompositeScreenProps<

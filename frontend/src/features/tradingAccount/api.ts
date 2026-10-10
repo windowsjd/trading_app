@@ -1,5 +1,6 @@
 import { parseWalletTransferResponse, parseWalletFxTransferQuote, parseWalletFxTransferResponse } from '../wallet/walletTransfer.ts';
 import { assertDailyEquity } from './dailyEquity.ts';
+import { parseQuestOneProgress } from '../quest/questProgress.ts';
 import { apiClient } from '../../services/api/client';
 import type {
   ApiSuccessResponse,
@@ -324,6 +325,19 @@ export async function openBeginnerAccount() {
     '/trading-accounts/beginner',
   );
   return response.data.data;
+}
+
+/** Beginner QUEST 01 progress; read-only and proven by this account's ledger. */
+export async function getBeginnerQuestProgress(accountId: string) {
+  const response = await apiClient.get<ApiSuccessResponse<unknown>>(
+    accountPath(accountId, '/quests'),
+  );
+  const payload = assertAccountScope(
+    'GET /trading-accounts/:accountId/quests',
+    accountId,
+    response.data.data,
+  );
+  return parseQuestOneProgress(payload, accountId);
 }
 
 export async function getTradingAccount(accountId: string) {

@@ -8,6 +8,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { BeginnerQuestsService } from './beginner-quests.service';
 import { GeneralAccountsService } from './general-accounts.service';
 import { TradingAccountsService } from './trading-accounts.service';
 
@@ -22,6 +23,7 @@ export class TradingAccountsController {
   constructor(
     private readonly tradingAccountsService: TradingAccountsService,
     private readonly generalAccountsService: GeneralAccountsService,
+    private readonly beginnerQuestsService: BeginnerQuestsService,
   ) {}
 
   @Get()
@@ -62,6 +64,18 @@ export class TradingAccountsController {
     @Param('accountId') accountId: string,
   ) {
     return this.tradingAccountsService.getTradingAccount(
+      this.extractUserId(request),
+      accountId,
+    );
+  }
+
+  /** Read-only: progress is derived from committed rows, nothing is written. */
+  @Get(':accountId/quests')
+  getQuestProgress(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+  ) {
+    return this.beginnerQuestsService.getQuestProgress(
       this.extractUserId(request),
       accountId,
     );

@@ -402,7 +402,10 @@ screens. Run with external esbuild/Playwright on `NODE_PATH` under the same
 memory containment policy. `BEGINNER_CHROMIUM` optionally selects Chromium;
 `BEGINNER_BROWSER_OUTPUT` defaults to `/tmp/trading-beginner-browser`.
 It checks 16 layouts (320/360/390/430px, font scale 1/2, light/dark), Korean
-segment/tab glyph bounds and hit areas, guide round trips, three-mode
+segment/tab glyph bounds and hit areas, QUEST 01 list/detail text and button
+fit (`quest=0|1|2|error` selects the fixture progress), practice navigation to
+the existing Wallet FX/Transfer screens and back, unknown-progress states, a
+late quest response after switching accounts, guide round trips, three-mode
 selection, explicit creation, hidden disabled entry and delayed portfolio/
 holdings responses during account switching. All external HTTP is blocked.
 These RN Web checks do not replace Android/iOS device acceptance.
