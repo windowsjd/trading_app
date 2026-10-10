@@ -104,3 +104,20 @@ it('beginner creation errors retain the original error for the shared diagnostic
   assert.equal(h.beginnerOpens, 0);
   assert.equal(h.selections.length, 0);
 });
+
+it('lists 초보모드 first, then 일반모드, then 시즌모드, keeping past seasons reachable', () => {
+  const order = (tree) => elements(tree).map(node => node.props.testID).filter(id => typeof id === 'string' && (
+    id === 'beginner-account-entry' || id.startsWith('mode-selection-general-') || id.startsWith('mode-selection-season-')
+    || id.startsWith('mode-selection-past-season-')));
+  const h = harness();
+  h.accounts.push({ ...general, id: 'beginner', mode: 'beginner' });
+  assert.deepEqual(order(h.render()), ['beginner-account-entry', 'mode-selection-general-use', 'mode-selection-season-continue-season']);
+  const fresh = harness(); fresh.accounts = [];
+  assert.deepEqual(order(fresh.render()), ['beginner-account-entry', 'mode-selection-general-start', 'mode-selection-season-join']);
+  const past = harness();
+  past.accounts = [general, { ...season, status: 'closed', season: { ...season.season, seasonStatus: 'settled' } }];
+  past.season = { isSuccess: true, data: null };
+  assert.deepEqual(order(past.render()), ['beginner-account-entry', 'mode-selection-general-use', 'mode-selection-season-none', 'mode-selection-past-season-season']);
+  // Order only: nothing is selected or created by rendering.
+  assert.deepEqual([h.selections, h.opens, h.beginnerOpens, fresh.opens, fresh.beginnerOpens], [[], 0, 0, 0, 0]);
+});

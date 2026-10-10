@@ -47,6 +47,56 @@ for (const [stack, root, label, icon] of [
   });
 }
 
+test('Quest: the beginner root reuses the shared tab title with its own quest icon', () => {
+  const file = resolve('src/app/navigation/GuideStack.tsx');
+  const mocks = {
+    'react-native': native,
+    '@react-navigation/native-stack': { createNativeStackNavigator: () => ({ Navigator: 'Navigator', Screen: 'Screen' }) },
+    '@react-navigation/elements': { HeaderTitle: 'HeaderTitle' },
+    '@react-navigation/native': navigationTheme,
+    'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
+    '../../theme/useReducedMotion': { useReducedMotion: () => true },
+    ...Object.fromEntries([...readFileSync(file, 'utf8').matchAll(/import (\w+) from '(\.\.\/\.\.\/screens\/[^']+)'/g)]
+      .map(match => [match[2], { default: match[1], __esModule: true }])),
+  };
+  const stack = load(file, mocks);
+  const screens = elements(stack.default({ beginner: true }), 'Screen');
+  const root = screens.find(screen => screen.props.name === 'Guide');
+  assert.equal(root.props.component, 'BeginnerLearningScreen');
+  assert.equal(root.props.options.title, '퀘스트');
+  const title = root.props.options.headerTitle({ children: '퀘스트', tintColor: '#f2f5f7' });
+  assert.equal(title.type, MainTabTitle(stack), 'the same component as every other tab root');
+  assert.equal(title.props.icon, 'quest');
+  assert.equal(title.props.children, '퀘스트');
+  assert.equal(screens.some(screen => screen.props.name === 'QuestDetail'), false);
+  for (const screen of screens) {
+    if (screen !== root) assert.equal(screen.props.options.headerTitle, undefined, screen.props.name);
+  }
+  // General accounts keep the guide book on the same stack.
+  const general = elements(stack.default(), 'Screen').find(screen => screen.props.name === 'Guide');
+  assert.equal(general.props.options.headerTitle({ children: '가이드' }).props.icon, 'guide');
+});
+
+function MainTabTitle(stack) {
+  return elements(stack.default(), 'Screen').find(screen => screen.props.name === 'Guide').props.options.headerTitle({ children: '가이드' }).type;
+}
+
+test('quest has its own flag in both states, distinct from the guide book and ranking trophy', () => {
+  const Icon = load(resolve('src/components/navigation/TabBarIcon.tsx'), {
+    'react-native': native,
+    'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
+  }).default;
+  for (const focused of [false, true]) {
+    const drawing = name => elements(Icon({ name, color: '#326FE5', size: 24, focused }), 'Path').map(path => path.props.d).join('|');
+    assert.ok(drawing('quest').length > 0);
+    assert.notEqual(drawing('quest'), drawing('guide'));
+    assert.notEqual(drawing('quest'), drawing('ranking'));
+    const svg = elements(Icon({ name: 'quest', color: '#326FE5', size: 24, focused }), 'Svg')[0];
+    assert.equal(svg.props.fill, focused ? '#326FE5' : 'none');
+    assert.equal(svg.props.stroke, focused ? 'none' : '#326FE5');
+  }
+});
+
 test('the root title keeps Navigation heading semantics, platform size, tint, and layout measurement', () => {
   const Title = load(resolve('src/components/navigation/MainTabHeaderTitle.tsx'), {
     'react-native': native,
@@ -86,7 +136,7 @@ test('header icons follow the navigation tint in both themes', () => {
       '../../theme/appearance': { useAppearance: () => ({ mode, colors: { text } }) },
       './TabBarIcon': { default: 'TabBarIcon', __esModule: true },
     }).default;
-    for (const icon of ['home', 'market', 'guide', 'ranking', 'wallet', 'menu']) {
+    for (const icon of ['home', 'market', 'guide', 'quest', 'ranking', 'wallet', 'menu']) {
       for (const tintColor of [undefined, '#ffffff']) {
         const tree = Title({ icon, children: '제목', tintColor });
         const svg = elements(tree, 'TabBarIcon')[0];

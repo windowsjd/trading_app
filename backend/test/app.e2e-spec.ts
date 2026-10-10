@@ -2945,10 +2945,17 @@ describe('AppController (e2e)', () => {
         tradingAccountId: 'trading-account-3',
         quests: [
           {
-            questId: 'common-01-trading-funds',
+            questId: 'common-01-exchange',
             status: 'not_started' as const,
             completedStepCount: 0,
-            totalStepCount: 2,
+            totalStepCount: 1,
+            steps: [],
+          },
+          {
+            questId: 'common-02-transfer',
+            status: 'not_started' as const,
+            completedStepCount: 0,
+            totalStepCount: 1,
             steps: [],
           },
         ],

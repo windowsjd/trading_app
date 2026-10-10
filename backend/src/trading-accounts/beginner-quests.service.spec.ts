@@ -116,7 +116,7 @@ const errorCode = async (work: Promise<unknown>) => {
 };
 
 describe('BeginnerQuestsService', () => {
-  it('starts a fresh beginner account at 0/2 without writing anything', async () => {
+  it('starts a fresh beginner account with both quests not started, writing nothing', async () => {
     const { service, prisma, access, performance } = setup({});
     const result = await service.getQuestProgress('user-1', ` ${ACCOUNT} `);
 
@@ -131,10 +131,10 @@ describe('BeginnerQuestsService', () => {
         tradingAccountId: ACCOUNT,
         quests: [
           {
-            questId: 'common-01-trading-funds',
+            questId: 'common-01-exchange',
             status: 'not_started',
             completedStepCount: 0,
-            totalStepCount: 2,
+            totalStepCount: 1,
             steps: [
               {
                 stepId: 'fx_krw_to_usd',
@@ -142,6 +142,14 @@ describe('BeginnerQuestsService', () => {
                 completedAt: null,
                 referenceId: null,
               },
+            ],
+          },
+          {
+            questId: 'common-02-transfer',
+            status: 'not_started',
+            completedStepCount: 0,
+            totalStepCount: 1,
+            steps: [
               {
                 stepId: 'transfer_securities_usd_to_crypto_spot_usd',
                 completed: false,
@@ -177,23 +185,34 @@ describe('BeginnerQuestsService', () => {
     });
   });
 
-  it('counts the FX step once its two Securities ledger legs prove it (1/2)', async () => {
+  it('completes QUEST 01 once its two Securities ledger legs prove the FX', async () => {
     const { service, prisma } = setup({
       exchanges: [{ id: 'fx-1', executedAt: FX_AT }],
       legs: fxLegs('fx-1'),
     });
-    const quest = (await service.getQuestProgress('user-1', ACCOUNT)).data
-      .quests[0];
+    const [exchange, transfer] = (
+      await service.getQuestProgress('user-1', ACCOUNT)
+    ).data.quests;
 
-    expect(quest.status).toBe('in_progress');
-    expect(quest.completedStepCount).toBe(1);
-    expect(quest.steps[0]).toEqual({
-      stepId: 'fx_krw_to_usd',
-      completed: true,
-      completedAt: FX_AT.toISOString(),
-      referenceId: 'fx-1',
+    expect(exchange).toEqual({
+      questId: 'common-01-exchange',
+      status: 'completed',
+      completedStepCount: 1,
+      totalStepCount: 1,
+      steps: [
+        {
+          stepId: 'fx_krw_to_usd',
+          completed: true,
+          completedAt: FX_AT.toISOString(),
+          referenceId: 'fx-1',
+        },
+      ],
     });
-    expect(quest.steps[1].completed).toBe(false);
+    // QUEST 02 is its own quest, still open.
+    expect(transfer.questId).toBe('common-02-transfer');
+    expect(transfer.status).toBe('not_started');
+    expect(transfer.completedStepCount).toBe(0);
+    expect(transfer.steps[0].completed).toBe(false);
     expect(prisma.walletTransaction.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
@@ -230,23 +249,47 @@ describe('BeginnerQuestsService', () => {
     });
   });
 
-  it('completes the quest with a proven transfer after the FX (2/2)', async () => {
+  it('completes QUEST 02 with a proven transfer after the FX, keeping QUEST 01', async () => {
     const { service } = setup({
       exchanges: [{ id: 'fx-1', executedAt: FX_AT }],
       transfers: [{ id: 'tr-1', executedAt: TRANSFER_AT }],
       legs: [...fxLegs('fx-1'), ...transferLegs('tr-1')],
     });
-    const quest = (await service.getQuestProgress('user-1', ACCOUNT)).data
-      .quests[0];
+    const [exchange, transfer] = (
+      await service.getQuestProgress('user-1', ACCOUNT)
+    ).data.quests;
 
-    expect(quest.status).toBe('completed');
-    expect(quest.completedStepCount).toBe(2);
-    expect(quest.steps[1]).toEqual({
-      stepId: 'transfer_securities_usd_to_crypto_spot_usd',
-      completed: true,
-      completedAt: TRANSFER_AT.toISOString(),
-      referenceId: 'tr-1',
+    expect(exchange.status).toBe('completed');
+    expect(exchange.steps[0].referenceId).toBe('fx-1');
+    expect(transfer).toEqual({
+      questId: 'common-02-transfer',
+      status: 'completed',
+      completedStepCount: 1,
+      totalStepCount: 1,
+      steps: [
+        {
+          stepId: 'transfer_securities_usd_to_crypto_spot_usd',
+          completed: true,
+          completedAt: TRANSFER_AT.toISOString(),
+          referenceId: 'tr-1',
+        },
+      ],
     });
+  });
+
+  it('never completes QUEST 02 without a proven QUEST 01, even with a transfer row', async () => {
+    const { service, prisma } = setup({
+      transfers: [{ id: 'tr-1', executedAt: TRANSFER_AT }],
+      legs: transferLegs('tr-1'),
+    });
+    const quests = (await service.getQuestProgress('user-1', ACCOUNT)).data
+      .quests;
+
+    expect(quests.map((quest) => quest.status)).toEqual([
+      'not_started',
+      'not_started',
+    ]);
+    expect(prisma.walletTransfer.findMany).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -272,10 +315,15 @@ describe('BeginnerQuestsService', () => {
       exchanges: [{ id: 'fx-1', executedAt: FX_AT }],
       legs,
     });
-    const quest = (await service.getQuestProgress('user-1', ACCOUNT)).data
-      .quests[0];
-    expect(quest.status).toBe('not_started');
-    expect(quest.steps.every((step) => !step.completed)).toBe(true);
+    const quests = (await service.getQuestProgress('user-1', ACCOUNT)).data
+      .quests;
+    expect(quests.map((quest) => quest.status)).toEqual([
+      'not_started',
+      'not_started',
+    ]);
+    expect(
+      quests.every((quest) => quest.steps.every((step) => !step.completed)),
+    ).toBe(true);
   });
 
   it('skips an unproven earliest FX and uses the first proven one', async () => {
@@ -303,10 +351,12 @@ describe('BeginnerQuestsService', () => {
         leg('tr-1', 'wallet_transfer', 'credit', 'USD', 'crypto_futures'),
       ],
     });
-    const quest = (await service.getQuestProgress('user-1', ACCOUNT)).data
-      .quests[0];
-    expect(quest.status).toBe('in_progress');
-    expect(quest.steps[1].completed).toBe(false);
+    const [exchange, transfer] = (
+      await service.getQuestProgress('user-1', ACCOUNT)
+    ).data.quests;
+    expect(exchange.status).toBe('completed');
+    expect(transfer.status).toBe('not_started');
+    expect(transfer.steps[0].completed).toBe(false);
   });
 
   it.each(['general', 'season'])(

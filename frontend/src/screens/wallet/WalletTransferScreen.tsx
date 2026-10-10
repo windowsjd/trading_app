@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
 import Svg, { Path } from 'react-native-svg';
@@ -27,6 +27,12 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
+import {
+  claimQuestGuideCommand,
+  publishQuestGuideFacts,
+  questGuideTarget,
+  registerQuestGuideReveal,
+} from '../../features/quest/questGuideBridge';
 
 type UsdWalletIdentity = Extract<TransferWalletIdentity, { currency: 'USD' }>;
 const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWalletIdentity => wallet.currency === 'USD');
@@ -93,6 +99,15 @@ function TransferForm({ account, capabilities, scope, readScope }: {
       void invalidateAfterWalletTransfer(queryClient, command.accountId, { futuresCollateral: command.futuresCollateral });
       if (!isTransferResponseInScope(command, readScope())) return;
       setResult(data); setFailure(null);
+      // QUEST 02 re-reads server progress itself; the receipt stays on screen.
+      claimQuestGuideCommand({
+        kind: 'transfer',
+        accountId: command.accountId,
+        source: data.source.walletScope,
+        destination: data.destination.walletScope,
+        currency: data.currencyCode,
+        summary: `보낸 금액 USD ${formatDisplayDecimal(data.amount)}`,
+      });
     },
     onError: (error, command) => {
       // A transport/response error may follow a committed command.
@@ -153,6 +168,32 @@ function TransferForm({ account, capabilities, scope, readScope }: {
     dismissAmount(); setOpenDropdown(null); setFailure(null);
     mutation.mutate(command);
   };
+  // What the beginner quest guide may point at next; it reads, never drives.
+  useEffect(() => {
+    publishQuestGuideFacts('transfer', {
+      screen: 'transfer',
+      accountId: account.id,
+      blocked: !!block,
+      source: sourceIdentity.scope,
+      destination: destinationIdentity.scope,
+      amountValid: !!canonicalAmount,
+      amountFits: transferAmountFits(canonicalAmount, available),
+      nothingToSend: available !== null && !/[1-9]/.test(available),
+      canExecute,
+      pending: locked,
+      failed: !!failure,
+      succeeded: !!result,
+    });
+  });
+  const { revealView } = inputScroll;
+  useEffect(() => {
+    registerQuestGuideReveal('transfer', node => revealView(node, 'start'));
+    return () => {
+      registerQuestGuideReveal('transfer', null);
+      publishQuestGuideFacts('transfer', null);
+    };
+  }, [revealView]);
+
   const toggleDropdown = (kind: 'source' | 'destination') => {
     if (locked || attempt.current?.running) return;
     dismissAmount();
@@ -168,6 +209,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
       <KeyboardAvoidingView style={styles.screen} keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View ref={questGuideTarget('transfer-viewport')} collapsable={false} style={styles.screen}>
         <ScrollView testID="wallet-transfer-screen" ref={inputScroll.scrollRef} onLayout={inputScroll.revealFocusedInput}
           onContentSizeChange={inputScroll.revealFocusedInput} onScroll={inputScroll.onScroll} scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled" keyboardDismissMode="none" contentContainerStyle={styles.content}>
@@ -190,6 +232,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                     <WalletSelector kind="destination" selected={destinationIdentity} excludedKey={sourceKey} expanded={openDropdown === 'destination'} disabled={locked} onToggle={() => toggleDropdown('destination')} onSelect={wallet => chooseWallet('destination', wallet)} />
                     <View style={styles.card}>
                       <Text style={styles.heading}>이체 금액 (USD)</Text>
+                      <View ref={questGuideTarget('transfer-amount')} collapsable={false} testID="wallet-transfer-amount-field">
                       <View ref={amountRef} collapsable={false}>
                         <TextInput ref={amountInputRef} testID="wallet-transfer-amount" accessibilityLabel="이체 금액 USD" value={amount}
                           onFocus={() => { setOpenDropdown(null); inputScroll.onInputFocus(amountRef.current); }} onBlur={inputScroll.onInputBlur}
@@ -200,8 +243,9 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                           }}
                           editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
                       </View>
+                      </View>
                       {sourceIsFutures && futures.isError && !futures.isFetching ? <ErrorNotice error={futures.error}
-                        message="현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다." testID="wallet-transfer-available" style={styles.money} /> : <Text testID="wallet-transfer-available" style={styles.money}>
+                        message="현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다." testID="wallet-transfer-available" style={styles.money} /> : <Text ref={questGuideTarget('transfer-available')} testID="wallet-transfer-available" style={styles.money}>
                         {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
                           : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
                       </Text>}
@@ -211,10 +255,13 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                     </View>
                     {failure ? <ErrorNotice error={failure} message={attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
                     <View ref={inputScroll.submitRef} collapsable={false}>
-                      <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />
+                      <View ref={questGuideTarget('transfer-submit')} collapsable={false}>
+                        <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />
+                      </View>
                     </View>
                   </>}
         </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -231,7 +278,7 @@ function WalletSelector({ kind, selected, excludedKey, expanded, disabled, onTog
 }) {
   const { colors } = useAppearance();
   const title = kind === 'source' ? '보내는 지갑' : '받는 지갑';
-  return <View style={styles.card}>
+  return <View ref={questGuideTarget(kind === 'source' ? 'transfer-source' : 'transfer-destination')} testID={'wallet-transfer-' + kind + '-card'} style={styles.card}>
     <Text style={styles.heading}>{title}</Text>
     <ActionPressable testID={'wallet-transfer-' + kind + '-selector'} accessibilityRole="button" accessibilityLabel={title + ': ' + walletLabel(selected)}
       accessibilityState={{ expanded, disabled }} aria-expanded={expanded} disabled={disabled} onPress={onToggle} style={[styles.selector, disabled && styles.disabled]}>

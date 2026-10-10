@@ -1,19 +1,21 @@
 /**
  * Beginner quest progress contract (GET /trading-accounts/:accountId/quests).
  *
- * The server derives every practice step from the account's committed FX and
- * wallet-transfer rows; this client never marks a step done by itself. A
- * payload that does not prove itself — other account, unknown shape, counts or
- * status that disagree with the steps — is rejected, so nothing is ever shown
- * as complete without server evidence.
+ * QUEST 01 (환전하기) and QUEST 02 (이체하기) are separate quests with one
+ * practice step each. The server derives both from the account's committed FX
+ * and wallet-transfer rows; this client never marks a quest done by itself.
+ * A payload that does not prove itself — other account, unknown shape, counts
+ * or status that disagree with the step, a transfer without an earlier FX — is
+ * rejected, so nothing is ever shown as complete without server evidence.
  */
 
-export const QUEST_01_ID = 'common-01-trading-funds';
-export const QUEST_01_FX_STEP = 'fx_krw_to_usd';
-export const QUEST_01_TRANSFER_STEP = 'transfer_securities_usd_to_crypto_spot_usd';
+export const QUEST_EXCHANGE_ID = 'common-01-exchange';
+export const QUEST_TRANSFER_ID = 'common-02-transfer';
+export const QUEST_FX_STEP = 'fx_krw_to_usd';
+export const QUEST_TRANSFER_STEP = 'transfer_securities_usd_to_crypto_spot_usd';
 
-export type BeginnerQuestId = typeof QUEST_01_ID;
-export type BeginnerQuestStatus = 'not_started' | 'in_progress' | 'completed';
+export type BeginnerQuestKey = 'exchange' | 'transfer';
+export type BeginnerQuestStatus = 'not_started' | 'completed';
 
 export interface BeginnerQuestStepDto {
   stepId: string;
@@ -35,19 +37,24 @@ export interface BeginnerQuestsDto {
   quests: BeginnerQuestProgressDto[];
 }
 
-export interface QuestPracticeStep {
+/** One quest as the screens consume it: only server-proven facts. */
+export interface BeginnerQuestProgress {
+  status: BeginnerQuestStatus;
   completed: boolean;
   completedAt: string | null;
 }
 
-/** QUEST 01 as the screens consume it: only server-proven facts. */
-export interface QuestOneProgress {
-  status: BeginnerQuestStatus;
-  completedCount: number;
-  totalCount: 2;
-  fx: QuestPracticeStep;
-  transfer: QuestPracticeStep;
+export interface BeginnerQuests {
+  exchange: BeginnerQuestProgress;
+  transfer: BeginnerQuestProgress;
 }
+
+export const BEGINNER_QUEST_KEYS: readonly BeginnerQuestKey[] = ['exchange', 'transfer'];
+
+const DEFINITIONS: Record<BeginnerQuestKey, { questId: string; stepId: string }> = {
+  exchange: { questId: QUEST_EXCHANGE_ID, stepId: QUEST_FX_STEP },
+  transfer: { questId: QUEST_TRANSFER_ID, stepId: QUEST_TRANSFER_STEP },
+};
 
 export class BeginnerQuestContractError extends Error {
   constructor() {
@@ -61,64 +68,75 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isInstant = (value: unknown): value is string =>
   typeof value === 'string' && value.endsWith('Z') && Number.isFinite(Date.parse(value));
 
-function parseStep(value: unknown, stepId: string): QuestPracticeStep {
-  if (!isRecord(value) || value.stepId !== stepId || typeof value.completed !== 'boolean') {
+function parseQuest(quests: unknown[], key: BeginnerQuestKey): BeginnerQuestProgress {
+  const { questId, stepId } = DEFINITIONS[key];
+  // Exactly one entry per known quest; a duplicate is ambiguous, not a choice.
+  const matches = quests.filter(item => isRecord(item) && item.questId === questId);
+  const quest = matches.length === 1 ? matches[0] : null;
+  if (!isRecord(quest) || !Array.isArray(quest.steps) || quest.steps.length !== 1 || quest.totalStepCount !== 1) {
     throw new BeginnerQuestContractError();
   }
-  const proven = value.completed
-    ? isInstant(value.completedAt) && typeof value.referenceId === 'string' && value.referenceId.length > 0
-    : value.completedAt === null && value.referenceId === null;
-  if (!proven) throw new BeginnerQuestContractError();
-  return { completed: value.completed, completedAt: value.completed ? value.completedAt as string : null };
+  const step: unknown = quest.steps[0];
+  if (!isRecord(step) || step.stepId !== stepId || typeof step.completed !== 'boolean') {
+    throw new BeginnerQuestContractError();
+  }
+  const proven = step.completed
+    ? isInstant(step.completedAt) && typeof step.referenceId === 'string' && step.referenceId.length > 0
+    : step.completedAt === null && step.referenceId === null;
+  const status: BeginnerQuestStatus = step.completed ? 'completed' : 'not_started';
+  if (!proven || quest.completedStepCount !== Number(step.completed) || quest.status !== status) {
+    throw new BeginnerQuestContractError();
+  }
+  return { status, completed: step.completed, completedAt: step.completed ? step.completedAt as string : null };
 }
 
-/** Throws unless the payload is QUEST 01 progress for exactly `accountId`. */
-export function parseQuestOneProgress(payload: unknown, accountId: string): QuestOneProgress {
+/** Throws unless the payload is both quests' progress for exactly `accountId`. */
+export function parseBeginnerQuests(payload: unknown, accountId: string): BeginnerQuests {
   if (!accountId || !isRecord(payload) || payload.tradingAccountId !== accountId || !Array.isArray(payload.quests)) {
     throw new BeginnerQuestContractError();
   }
   // Quests this client does not know yet are ignored, never guessed at.
-  const quest: unknown = payload.quests.find(item => isRecord(item) && item.questId === QUEST_01_ID);
-  if (!isRecord(quest) || !Array.isArray(quest.steps) || quest.steps.length !== 2 || quest.totalStepCount !== 2) {
-    throw new BeginnerQuestContractError();
-  }
-  const fx = parseStep(quest.steps[0], QUEST_01_FX_STEP);
-  const transfer = parseStep(quest.steps[1], QUEST_01_TRANSFER_STEP);
-  const completedCount = Number(fx.completed) + Number(transfer.completed);
-  const status: BeginnerQuestStatus =
-    completedCount === 0 ? 'not_started' : completedCount === 2 ? 'completed' : 'in_progress';
+  const exchange = parseQuest(payload.quests, 'exchange');
+  const transfer = parseQuest(payload.quests, 'transfer');
   // The transfer only counts after a proven FX, so it can never stand alone.
   const ordered = !transfer.completed
-    || (fx.completed && Date.parse(transfer.completedAt) > Date.parse(fx.completedAt));
-  if (!ordered || quest.completedStepCount !== completedCount || quest.status !== status) {
-    throw new BeginnerQuestContractError();
-  }
-  return { status, completedCount, totalCount: 2, fx, transfer };
+    || (exchange.completed && Date.parse(transfer.completedAt ?? '') > Date.parse(exchange.completedAt ?? ''));
+  if (!ordered) throw new BeginnerQuestContractError();
+  return { exchange, transfer };
 }
 
-export type QuestDisplayKind = 'loading' | 'error' | 'ready';
+export type QuestCardState = 'loading' | 'error' | 'waiting' | 'available' | 'active' | 'completed';
 
-export interface QuestDisplayState {
-  kind: QuestDisplayKind;
+export interface QuestCardDisplay {
+  state: QuestCardState;
   statusLabel: string;
-  progressLabel: string | null;
-  actionLabel: string;
+  /** null while progress is unknown: a practice cannot start without a baseline. */
+  actionLabel: string | null;
+  canStart: boolean;
 }
 
 /** Unknown progress is shown as unknown — never as not started or complete. */
-export function describeQuestOne(input: { progress: QuestOneProgress | null; isError: boolean }): QuestDisplayState {
+export function describeQuestCard(
+  key: BeginnerQuestKey,
+  input: { progress: BeginnerQuests | null; isError: boolean; active: boolean },
+): QuestCardDisplay {
   const { progress } = input;
   if (!progress) {
     return input.isError
-      ? { kind: 'error', statusLabel: '확인 불가', progressLabel: null, actionLabel: '퀘스트 열기' }
-      : { kind: 'loading', statusLabel: '확인 중', progressLabel: null, actionLabel: '퀘스트 열기' };
+      ? { state: 'error', statusLabel: '확인 불가', actionLabel: null, canStart: false }
+      : { state: 'loading', statusLabel: '확인 중', actionLabel: null, canStart: false };
   }
-  const progressLabel = `실습 ${progress.completedCount}/${progress.totalCount} 완료`;
-  if (progress.status === 'completed') {
-    return { kind: 'ready', statusLabel: '완료', progressLabel, actionLabel: '다시 살펴보기' };
+  const quest = progress[key];
+  if (input.active) {
+    return { state: 'active', statusLabel: quest.completed ? '완료' : '진행 중', actionLabel: '이어하기', canStart: true };
   }
-  if (progress.status === 'in_progress') {
-    return { kind: 'ready', statusLabel: '진행 중', progressLabel, actionLabel: '이어하기' };
+  if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시 둘러보기', canStart: true };
+  if (key === 'transfer' && !progress.exchange.completed) {
+    return { state: 'waiting', statusLabel: '대기', actionLabel: '퀘스트 시작하기', canStart: false };
   }
-  return { kind: 'ready', statusLabel: '미시작', progressLabel, actionLabel: '퀘스트 시작하기' };
+  return { state: 'available', statusLabel: '미시작', actionLabel: '퀘스트 시작하기', canStart: true };
+}
+
+export function completedQuestCount(progress: BeginnerQuests): number {
+  return BEGINNER_QUEST_KEYS.filter(key => progress[key].completed).length;
 }

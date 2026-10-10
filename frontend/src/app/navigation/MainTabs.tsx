@@ -12,6 +12,7 @@ import TabBarIcon from '../../components/navigation/TabBarIcon';
 import TabBarButton from '../../components/navigation/TabBarButton';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
 import type { MainTabParamList } from './types';
 import HomeStack from './HomeStack';
 import MarketStack from './MarketStack';
@@ -38,7 +39,7 @@ export default function MainTabs() {
 
   const mode = selectedAccount.mode;
 
-  return (
+  const tabs = (
     <Tab.Navigator
       key={selectedAccount.id}
       id="MainTabs"
@@ -88,7 +89,7 @@ export default function MainTabs() {
           title: '퀘스트',
           // Reserve room for the three-character label at larger text sizes.
           tabBarItemStyle: fontScale > 1 ? { flex: 1.4 } : undefined,
-          tabBarIcon: ({ color, size, focused }) => <TabBarIcon focused={focused} name="guide" color={color} size={size} />,
+          tabBarIcon: ({ color, size, focused }) => <TabBarIcon focused={focused} name="quest" color={color} size={size} />,
         }} />
       ) : mode === 'general' ? (
         <Tab.Screen
@@ -135,4 +136,10 @@ export default function MainTabs() {
       />
     </Tab.Navigator>
   );
+
+  // The quest guide spans the Quest and Wallet tabs of ONE beginner account;
+  // keyed like the navigator, a switch or logout discards it with the tabs.
+  return mode === 'beginner' ? (
+    <QuestGuideProvider key={selectedAccount.id} accountId={selectedAccount.id}>{tabs}</QuestGuideProvider>
+  ) : tabs;
 }

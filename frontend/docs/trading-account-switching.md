@@ -5,8 +5,15 @@ Beginner foundation: all authenticated users can create and select the independe
 even when missing or false. Explicit creation
 refreshes the list before selecting the returned ID. MainTabs now remounts by
 accountId, including switches within one mode; financial query/flow scope
-remains accountId. Its Quest tab provides QUEST 01 list/detail and the existing GuideStack via
-a quest/guide segment; progress is derived from account-scoped financial records.
+remains accountId. Its Quest tab lists QUEST 01 환전하기 and QUEST 02 이체하기 as separate
+cards beside the existing GuideStack (quest/guide segment); progress is derived from
+account-scoped financial records. Starting a quest opens the real Wallet screens under a
+spotlight guide (`features/quest/QuestGuideProvider`, mounted inside MainTabs and keyed by
+accountId, so a switch or logout discards it). The guide only reads what the screens
+publish through `features/quest/questGuideBridge.ts`; it celebrates completion only after
+the screen's own command succeeded AND a fresh server read proves the quest.
+The FX screen no longer embeds the account switcher; it stays bound to the selected
+account and resets on every switch made elsewhere (Home).
 See [the backend contract](../../backend/docs/beginner-mode.md).
 
 Reference for the account-selection layer added by WORK-ID

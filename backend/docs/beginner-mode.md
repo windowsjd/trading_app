@@ -2,8 +2,8 @@
 
 `beginner`는 사용자당 평생 하나인 독립 TradingAccount다. 일반·시즌계정과
 금융 행을 공유하거나 이전하지 않는다. 시즌 참가·랭킹·티어·정산·보상과
-광고 보상에서 제외한다. QUEST 01 진행 판정만 구현하며 기능 해금·보상 정책은
-미정이므로 구현하지 않는다.
+광고 보상에서 제외한다. QUEST 01(환전하기)·QUEST 02(이체하기) 진행 판정만
+구현하며 기능 해금·보상 정책은 미정이므로 구현하지 않는다.
 
 ## 기본 제공 정책 (2026-10-10)
 
@@ -31,7 +31,7 @@
   광고 및 추가 지급은 제공하지 않는다.
 - 계정 간 이체 API는 없다. 내부 지갑 이체는 같은 accountId에서만 처리한다.
 
-## QUEST 01 진행 상태 (읽기 전용)
+## QUEST 01·02 진행 상태 (읽기 전용)
 
 `GET /api/v1/trading-accounts/:accountId/quests`: 소유자 전용, beginner 계정만
 (그 외 모드는 409 `BEGINNER_QUEST_ACCOUNT_ONLY`, 남의/없는 계정은 404
@@ -39,37 +39,47 @@
 통과해야 응답하며 손상 시 실패한다.
 
 ```json
-{ "success": true, "data": { "tradingAccountId": "…", "quests": [{
-  "questId": "common-01-trading-funds",
-  "status": "not_started | in_progress | completed",
-  "completedStepCount": 0, "totalStepCount": 2,
-  "steps": [
-    { "stepId": "fx_krw_to_usd", "completed": false, "completedAt": null, "referenceId": null },
-    { "stepId": "transfer_securities_usd_to_crypto_spot_usd", "completed": false, "completedAt": null, "referenceId": null }
-  ] }] } }
+{ "success": true, "data": { "tradingAccountId": "…", "quests": [
+  { "questId": "common-01-exchange",
+    "status": "not_started | completed",
+    "completedStepCount": 0, "totalStepCount": 1,
+    "steps": [
+      { "stepId": "fx_krw_to_usd", "completed": false, "completedAt": null, "referenceId": null }
+    ] },
+  { "questId": "common-02-transfer",
+    "status": "not_started | completed",
+    "completedStepCount": 0, "totalStepCount": 1,
+    "steps": [
+      { "stepId": "transfer_securities_usd_to_crypto_spot_usd", "completed": false, "completedAt": null, "referenceId": null }
+    ] }
+] } }
 ```
 
-퀘스트 테이블·상태 저장·보상·해금은 없다. 진행은 매 요청마다 커밋된 금융 행에서
-도출하며 GET은 아무것도 쓰지 않는다.
+환전과 이체는 각각 독립된 퀘스트이며 단계는 하나씩이다(2026-10-10 분리, 이전
+`common-01-trading-funds` 2단계 퀘스트를 대체). `status`·`completedStepCount`는 각
+퀘스트의 단계와 일치해야 하며 클라이언트는 불일치 응답을 거부한다. 알 수 없는
+questId는 무시한다. 퀘스트 테이블·상태 저장·보상·해금은 없다. 진행은 매 요청마다
+커밋된 금융 행에서 도출하며 GET은 아무것도 쓰지 않는다.
 
-- 환전 단계: 같은 계정의 `ExchangeTransaction` KRW→USD 중 복합 명령
+- QUEST 01 환전 단계: 같은 계정의 `ExchangeTransaction` KRW→USD 중 복합 명령
   (`WalletTransferExecuteRequest`)에 연결되지 않고, 같은 계정의 `succeeded`
   `FxExecuteRequest`가 있으며, 원장(`referenceType=exchange_transaction`)이 정확히
   증권 KRW debit `exchange_source` + 증권 USD credit `exchange_target` 두 행인
   가장 이른 건. `referenceId`=ExchangeTransaction.id.
-- 이체 단계: 같은 계정의 `WalletTransfer` 중 복합 명령이 아니고, 원천이 이 계정의
+- QUEST 02 이체 단계: 같은 계정의 `WalletTransfer` 중 복합 명령이 아니고, 원천이 이 계정의
   증권 USD 지갑, 대상이 이 계정의 암호화폐 현물 USD 지갑이며, `executedAt`이 위 환전보다
   엄격히 늦고, 원장(`referenceType=wallet_transfer`)이 정확히 해당 두 지갑의
-  debit/credit인 가장 이른 건. 선물 지갑·역방향·다른 계정 이체는 제외.
+  debit/credit인 가장 이른 건. 선물 지갑·역방향·다른 계정 이체는 제외. 증명된
+  환전이 없으면 이체 행은 조회하지 않으며 QUEST 02는 완료될 수 없다.
 - 복합 FX+이체 명령은 두 단계 어느 쪽에도 인정하지 않는다(각 실습을 따로 수행).
 - 견적·실패·롤백된 명령은 행을 남기지 않으므로 인정될 수 없다. 잔액 변화는 근거가 아니다.
-- 멱등 재시도는 같은 커밋 행 하나를 재생하므로 중복 진행이 없다. 퀘스트 도입 전에
-  이미 같은 순서로 완료한 초보계정도 같은 규칙으로 복원된다.
+- 멱등 재시도는 같은 커밋 행 하나를 재생하므로 중복 진행이 없다. 퀘스트 도입·분리
+  전에 이미 같은 순서로 완료한 초보계정도 같은 규칙으로 두 퀘스트 모두 복원된다.
 - `executedAt`은 계정 잠금 뒤 DB `clock_timestamp()`로 기록되어 두 명령이 계정 행
   잠금으로 직렬화되므로 시간 순서가 실행 순서다.
 
-화면 문구·단계 구성(지갑 역할·환전 개념 학습 2단계 + 실습 2단계)은 클라이언트
-카탈로그에 있고, 학습 단계 열람은 진행에 포함하지 않는다.
+화면 문구와 스포트라이트 안내 단계는 클라이언트 카탈로그에 있고, 안내를 따라가거나
+읽는 것은 진행에 포함하지 않는다.
 
 ## DB 및 화면
 
@@ -78,10 +88,14 @@ enum 추가와 초보 사용자별 partial unique index를 별도 migration으�
 Prisma client를 재생성한다. 기존 일반·시즌 유일 제약 및 시즌 관계를 유지한다.
 
 초보 탭은 홈/마켓/퀘스트/지갑/MY다. 퀘스트 탭은 퀘스트/가이드 세그먼트를
-유지한다. 퀘스트 세그먼트는 확정된 QUEST 01(공통 기초 — 암호화폐 현물) 카드와
-상세 화면(`QuestDetail`, QuestStack 전용 라우트)을 제공하고 실습은 기존
-지갑 탭의 `WalletFx`/`WalletTransfer`로 이동한다. 가이드는 기존 GuideStack의
-콘텐츠와 학습 화면을 사용한다. 레벨·경험치·보상·잠금/해금은 표시하지 않는다.
+유지한다. 퀘스트 세그먼트는 QUEST 01 환전하기와 QUEST 02 이체하기 카드를 각각의
+상태·시작 버튼과 함께 보여준다(QUEST 02는 QUEST 01이 증명된 뒤 시작). 시작하면
+별도 설명 화면 없이 지갑 탭의 기존 `Wallet` → `WalletFx`/`WalletTransfer` 화면으로
+이동하고, 실제 컨트롤 위의 스포트라이트와 짧은 안내가 단계를 따라간다. 안내는
+화면이 공개한 상태를 읽기만 하며 금융 명령을 실행·재시도·우회하지 않는다. 사용자가
+직접 실행한 명령이 성공하면 이 API를 다시 읽어 완료가 증명된 경우에만 완료 연출 후
+퀘스트 탭으로 돌아간다. 가이드는 기존 GuideStack의 콘텐츠와 학습 화면을 사용한다.
+레벨·경험치·보상·해금은 표시하지 않는다.
 계정 변경 시 탭 내비게이터를 accountId로 다시 마운트하여 이전 계정의
 내비게이션·입력·표시 상태를 유지하지 않는다. 쿼리는 기존 accountId scope다.
 
@@ -92,7 +106,9 @@ DB migration을 먼저 적용하고 `prisma generate`로 client를 생성한 뒤
 enum commit 경계를 지킨다. 기존 데이터에 대한 DML은 없다. 이 정책 변경에는 추가 migration이 없으며
 서버 배포 후 모든 로그인 사용자가 바로 초보모드를 이용할 수 있다.
 
-초보 기반의 실제 DB 검증은 `NODE_ENV=test`,
+퀘스트 판정의 실제 DB 검증은 같은 조건에서
+`npm test -- --runInBand --testPathPatterns=beginner-quest.integration.spec.ts`로
+실행한다. 초보 기반의 실제 DB 검증은 `NODE_ENV=test`,
 `BEGINNER_ACCOUNT_DB_INTEGRATION=1` 및 명시적 `DATABASE_URL`로
 `npm test -- --runInBand --testPathPatterns=beginner-account.integration.spec.ts`를
 실행한다. 먼저 해당 테스트 DB에 `npm run test:db:prepare`를 실행한다.

@@ -1,4 +1,4 @@
-/** QUEST 01 progress against real PostgreSQL. Disposable local test DB only. */
+/** QUEST 01/02 progress against real PostgreSQL. Disposable local test DB only. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { HttpException } from '@nestjs/common';
@@ -99,18 +99,40 @@ async function freshRate(rate: string) {
   });
   rates.push(row.id);
 }
+/**
+ * Both quests, collapsed to the old 0/1/2 view so the scenarios read the same:
+ * `status`/`count` summarise QUEST 01 (FX) + QUEST 02 (transfer), and each
+ * quest's own status and counts are asserted to agree with its single step.
+ */
 async function progress(userId: string, accountId: string) {
   const response = await quests.getQuestProgress(userId, accountId);
   assert.equal(response.data.tradingAccountId, accountId);
-  assert.equal(response.data.quests.length, 1);
-  const [quest] = response.data.quests;
-  assert.equal(quest.questId, 'common-01-trading-funds');
-  assert.equal(quest.totalStepCount, 2);
+  assert.deepEqual(
+    response.data.quests.map((quest) => quest.questId),
+    ['common-01-exchange', 'common-02-transfer'],
+  );
+  const [exchange, transfer] = response.data.quests;
+  for (const quest of [exchange, transfer]) {
+    assert.equal(quest.totalStepCount, 1);
+    assert.equal(quest.steps.length, 1);
+    const done = quest.steps[0].completed;
+    assert.equal(quest.completedStepCount, done ? 1 : 0);
+    assert.equal(quest.status, done ? 'completed' : 'not_started');
+  }
+  // QUEST 02 is never proven without QUEST 01.
+  assert.equal(
+    transfer.steps[0].completed && !exchange.steps[0].completed,
+    false,
+  );
+  const count =
+    exchange.completedStepCount + transfer.completedStepCount;
   return {
-    status: quest.status,
-    count: quest.completedStepCount,
-    fxId: quest.steps[0].referenceId,
-    transferId: quest.steps[1].referenceId,
+    status: count === 0 ? 'not_started' : count === 2 ? 'completed' : 'in_progress',
+    count,
+    exchange: exchange.status,
+    transfer: transfer.status,
+    fxId: exchange.steps[0].referenceId,
+    transferId: transfer.steps[0].referenceId,
   };
 }
 async function rowCounts(accountId: string) {
@@ -206,6 +228,8 @@ async function run() {
   assert.deepEqual(await progress(owner, beginner.id), {
     status: 'not_started',
     count: 0,
+    exchange: 'not_started',
+    transfer: 'not_started',
     fxId: null,
     transferId: null,
   });
@@ -248,12 +272,14 @@ async function run() {
   }
   assert.equal((await progress(owner, beginner.id)).status, 'not_started');
 
-  // Step 1: a committed standalone KRW → USD FX.
+  // QUEST 01: a committed standalone KRW → USD FX completes it on its own.
   const { command, result } = await fxKrwToUsd(owner, beginner.id, '1500000');
   const afterFx = await progress(owner, beginner.id);
   assert.deepEqual(afterFx, {
     status: 'in_progress',
     count: 1,
+    exchange: 'completed',
+    transfer: 'not_started',
     fxId: result.data.exchangeId,
     transferId: null,
   });
@@ -276,7 +302,7 @@ async function run() {
   await usdTransfer(owner, beginner.id, 'securities', 'crypto_futures', '5');
   assert.equal((await progress(owner, beginner.id)).status, 'in_progress');
 
-  // Step 2: Securities USD → Crypto Spot USD, replayed once.
+  // QUEST 02: Securities USD → Crypto Spot USD, replayed once.
   const transferKey = randomUUID();
   const moved = await usdTransfer(
     owner,
@@ -290,6 +316,8 @@ async function run() {
   assert.deepEqual(done, {
     status: 'completed',
     count: 2,
+    exchange: 'completed',
+    transfer: 'completed',
     fxId: result.data.exchangeId,
     transferId: moved.data.transferId,
   });
@@ -339,6 +367,8 @@ async function run() {
   assert.deepEqual(await progress(second, other.id), {
     status: 'in_progress',
     count: 1,
+    exchange: 'completed',
+    transfer: 'not_started',
     fxId: otherFx.result.data.exchangeId,
     transferId: null,
   });
@@ -354,6 +384,8 @@ async function run() {
   assert.deepEqual(await progress(second, other.id), {
     status: 'completed',
     count: 2,
+    exchange: 'completed',
+    transfer: 'completed',
     fxId: otherFx.result.data.exchangeId,
     transferId: otherMove.data.transferId,
   });
@@ -363,7 +395,7 @@ async function run() {
     moved.data.transferId,
   );
   console.log(
-    'beginner quest DB integration passed: derived 0/1/2 progress, quote/failure/composite/order/foreign-mode exclusion, replay, ownership, durable reads and no writes',
+    'beginner quest DB integration passed: derived QUEST 01/02 progress, quote/failure/composite/order/foreign-mode exclusion, replay, ownership, durable reads and no writes',
   );
 }
 

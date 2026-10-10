@@ -9,7 +9,7 @@ import type { TradingAccountDto, TradingAccountStatus } from './api';
  */
 
 export type AccountDisplay = {
-  /** Primary line: "일반 투자" or the season's own name. */
+  /** Primary line: "초보모드"/"일반모드" or the season's own name. */
   title: string;
   /** Secondary line: mode meaning, or the season period/participation. */
   subtitle: string | null;
@@ -51,7 +51,7 @@ export function getAccountDisplay(account: DisplayInput): AccountDisplay {
 
   if (account.mode === 'general' || account.mode === 'beginner') {
     return {
-      title: account.mode === 'beginner' ? '초보 투자' : '일반 투자',
+      title: account.mode === 'beginner' ? '초보모드' : '일반모드',
       subtitle: account.mode === 'beginner' ? '독립된 초보 계정' : '시즌과 무관한 상시 계정',
       statusLabel,
       statusTone,

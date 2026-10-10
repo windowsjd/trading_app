@@ -60,6 +60,7 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
         isLoading,
       }),
     },
+    '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     ...Object.fromEntries(
       ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
         `./${name}Stack`,
@@ -165,11 +166,11 @@ describe('mode-aware bottom tabs', () => {
   });
 
   it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
-    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 11);
+    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 10);
     assert.match(guideStack, /name="Guide"/);
     assert.match(guideStack, /component=\{beginner \? BeginnerLearningScreen : GuideScreen\}/);
-    // The quest detail exists only in the beginner QuestStack, never in GuideTab.
-    assert.match(guideStack, /\{beginner \? \(\s*<Stack\.Screen name="QuestDetail" component=\{BeginnerQuestDetailScreen\}[^>]*\/>\s*\) : null\}/);
+    // Quests start the real Wallet practice directly: no text detail route.
+    assert.doesNotMatch(guideStack, /QuestDetail|BeginnerQuestDetailScreen/);
     assert.match(guideStack, /name="MarketBasics"/);
     assert.match(guideStack, /component=\{MarketBasicsScreen\}/);
     assert.match(guideStack, /component=\{MarketBasicsChaptersScreen\}/);
@@ -188,7 +189,7 @@ describe('bottom tab icon contract', () => {
     assert.match(icons, /import Svg, \{ Circle, Path \} from 'react-native-svg'/);
     assert.deepEqual(
       [...new Set([...icons.matchAll(/case '(\w+)':/g)].map((match) => match[1]))],
-      ['market', 'guide', 'ranking', 'wallet', 'record', 'menu', 'profile'],
+      ['market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu', 'profile'],
     );
     assert.match(icons, /width=\{size\}\s+height=\{size\}/);
     assert.match(icons, /viewBox="0 0 24 24"/);
@@ -232,7 +233,7 @@ describe('bottom tab visual states', () => {
       'react-native': { View: 'View' },
       'react-native-svg': { default: 'Svg', Circle: 'Circle', Path: 'Path', __esModule: true },
     }).default;
-    for (const name of ['home', 'market', 'guide', 'ranking', 'wallet', 'record', 'menu']) {
+    for (const name of ['home', 'market', 'guide', 'quest', 'ranking', 'wallet', 'record', 'menu']) {
       const active = elements(Icon({ name, color: '#ffffff', size: 25, focused: true }), 'Svg')[0];
       const inactive = elements(Icon({ name, color: '#aebbc8', size: 25, focused: false }), 'Svg')[0];
       assert.equal(active.props.fill, '#ffffff'); assert.equal(active.props.stroke, 'none');
@@ -284,9 +285,20 @@ describe('bottom tab visual states', () => {
 it('beginner has five tabs with Quest third and MY last', () => {
   assert.deepEqual(tabContract(renderTabs('beginner')), [
     ['HomeTab', 'HomeStack', '홈', 'home'], ['MarketTab', 'MarketStack', '마켓', 'market'],
-    ['QuestTab', 'QuestStack', '퀘스트', 'guide'], ['WalletTab', 'WalletStack', '지갑', 'wallet'],
+    ['QuestTab', 'QuestStack', '퀘스트', 'quest'], ['WalletTab', 'WalletStack', '지갑', 'wallet'],
     ['MyTab', 'MyStack', 'MY', 'menu'],
   ]);
+});
+it('beginner tabs run inside one quest guide keyed by the account, unlike other modes', () => {
+  const beginner = renderTabs('beginner', false, 'light', false, 'beginner-one');
+  assert.equal(beginner.type, 'QuestGuideProvider');
+  assert.equal(beginner.key, 'beginner-one');
+  assert.equal(beginner.props.accountId, 'beginner-one');
+  assert.equal(beginner.props.children.key, 'beginner-one', 'the navigator stays keyed by account too');
+  assert.notEqual(renderTabs('beginner', false, 'light', false, 'beginner-two').key, beginner.key);
+  for (const mode of ['general', 'season'] as const) {
+    assert.equal(renderTabs(mode).type, 'Navigator', `${mode} has no quest guide`);
+  }
 });
 it('even switching two season accounts resets nested navigation by account id', () => {
   assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);

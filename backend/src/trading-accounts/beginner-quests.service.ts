@@ -14,26 +14,29 @@ import { TradingAccountAccessService } from './trading-account-access.service';
 /**
  * Beginner quest progress, DERIVED read-only from committed financial rows.
  *
- * There is no quest table and nothing here writes: a quest step is complete
+ * There is no quest table and nothing here writes: a quest is complete
  * exactly when the account's own ledger proves the practice happened. That is
  * why app restarts, other devices, account switches and lost responses all
  * converge on the same answer, and why a retried command (one committed row)
- * can never count twice. The step catalogue and the teaching copy live in the
- * client; the server only answers "which practice steps are proven".
+ * can never count twice. The catalogue and the teaching copy live in the
+ * client; the server only answers "which practices are proven".
  *
- * QUEST 01 practice steps, in teaching order:
- *  1. a standalone KRW → USD FX (Securities KRW debit, Securities USD credit);
- *  2. a standalone USD transfer Securities USD → Crypto Spot USD executed
- *     strictly after the first proven FX.
+ * Two quests, one practice step each, in teaching order:
+ *  - QUEST 01 환전하기: a standalone KRW → USD FX (Securities KRW debit,
+ *    Securities USD credit);
+ *  - QUEST 02 이체하기: a standalone USD transfer Securities USD → Crypto Spot
+ *    USD executed strictly after QUEST 01's first proven FX.
  * A composite FX+transfer command records both legs at one instant; it is
- * excluded from both steps because the quest asks for each practice on its
- * own. Quotes, failed or rolled-back commands leave no rows, so they cannot
- * count. Balances are never used as evidence.
+ * excluded from both quests because each asks for its practice on its own.
+ * Quotes, failed or rolled-back commands leave no rows, so they cannot count.
+ * Balances are never used as evidence. Accounts that practised before the
+ * split are recognised by the same rules, so no progress is lost.
  */
 
-export const BEGINNER_QUEST_01_ID = 'common-01-trading-funds';
+export const BEGINNER_QUEST_01_ID = 'common-01-exchange';
+export const BEGINNER_QUEST_02_ID = 'common-02-transfer';
 export const BEGINNER_QUEST_01_FX_STEP = 'fx_krw_to_usd';
-export const BEGINNER_QUEST_01_TRANSFER_STEP =
+export const BEGINNER_QUEST_02_TRANSFER_STEP =
   'transfer_securities_usd_to_crypto_spot_usd';
 
 type QuestStatus = 'not_started' | 'in_progress' | 'completed';
@@ -132,32 +135,38 @@ export class BeginnerQuestsService {
     await this.performance.assertGeneralAccountReady(account);
 
     const fx = await this.firstProvenFx(account.id);
+    // QUEST 02 is only reachable after QUEST 01: no FX, no transfer lookup.
     const transfer = fx ? await this.firstProvenTransfer(account.id, fx) : null;
-    const steps = [
-      this.step(BEGINNER_QUEST_01_FX_STEP, fx),
-      this.step(BEGINNER_QUEST_01_TRANSFER_STEP, transfer),
-    ];
-    const completedStepCount = steps.filter((step) => step.completed).length;
 
     return {
       success: true,
       data: {
         tradingAccountId: account.id,
         quests: [
-          {
-            questId: BEGINNER_QUEST_01_ID,
-            status:
-              completedStepCount === 0
-                ? 'not_started'
-                : completedStepCount === steps.length
-                  ? 'completed'
-                  : 'in_progress',
-            completedStepCount,
-            totalStepCount: steps.length,
-            steps,
-          },
+          this.quest(BEGINNER_QUEST_01_ID, [
+            this.step(BEGINNER_QUEST_01_FX_STEP, fx),
+          ]),
+          this.quest(BEGINNER_QUEST_02_ID, [
+            this.step(BEGINNER_QUEST_02_TRANSFER_STEP, transfer),
+          ]),
         ],
       },
+    };
+  }
+
+  private quest(questId: string, steps: QuestStepView[]): QuestProgressView {
+    const completedStepCount = steps.filter((step) => step.completed).length;
+    return {
+      questId,
+      status:
+        completedStepCount === 0
+          ? 'not_started'
+          : completedStepCount === steps.length
+            ? 'completed'
+            : 'in_progress',
+      completedStepCount,
+      totalStepCount: steps.length,
+      steps,
     };
   }
 

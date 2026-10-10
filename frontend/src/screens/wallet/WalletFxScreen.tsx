@@ -8,7 +8,6 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  useWindowDimensions,
 } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -36,7 +35,6 @@ import {
   getCapabilityBlockMessage,
   isSeasonNotActiveReason,
 } from '../../features/tradingAccount/capabilities';
-import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
 import {
   ACCOUNT_INTEGRITY_TITLE,
   findAccountIntegrityFailure,
@@ -46,9 +44,8 @@ import {
   isFxResponseInScope,
   type FxRequestScope,
 } from '../../features/wallet/fxAccountScope';
-import AccountSwitcher from '../../components/tradingAccount/AccountSwitcher';
 import {
-  calculateUsdBalanceKrw,
+  getFxExecuteSuccessDisplay,
   getWalletBalanceAmount,
   getWalletViewState,
   isFxIdempotencyConflictCode,
@@ -66,7 +63,6 @@ import { createIdempotencyKey } from '../../utils/idempotency';
 import {
   formatDisplayDecimal,
   formatKrw,
-  formatKstDateTime,
   formatUsd,
 } from '../../utils/format';
 
@@ -82,6 +78,12 @@ import FxSuccessBottomSheet from './FxSuccessBottomSheet';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { useFxRateUpdates } from '../../features/wallet/useFxRateUpdates';
 import { FX_RATE_FALLBACK_INTERVAL_MS } from '../../features/wallet/fxRateUpdates';
+import {
+  claimQuestGuideCommand,
+  publishQuestGuideFacts,
+  questGuideTarget,
+  registerQuestGuideReveal,
+} from '../../features/quest/questGuideBridge';
 
 type Props = WalletFxScreenProps;
 type Currency = 'KRW' | 'USD';
@@ -124,12 +126,10 @@ export default function WalletFxScreen({ navigation }: Props) {
   const inputScroll = useFocusedInputScroll();
   const { onInputBlur: clearInputFocus } = inputScroll;
   const amountRef = useRef<View>(null);
-  const { fontScale } = useWindowDimensions();
   const queryClient = useQueryClient();
   const rootNavigation = useRootNavigation();
   const {
     selectedAccountId,
-    selectedAccount,
     capabilities,
     isLoading: accountsLoading,
     isError: accountsError,
@@ -150,9 +150,6 @@ export default function WalletFxScreen({ navigation }: Props) {
    */
   const accountId = selectedAccountId ?? '';
   const hasAccount = !!selectedAccountId;
-  const accountDisplay = selectedAccount
-    ? getAccountDisplay(selectedAccount)
-    : null;
 
   /**
    * The scope every FX request is stamped with (작업 12 §2).
@@ -249,7 +246,16 @@ export default function WalletFxScreen({ navigation }: Props) {
       if (!data) return;
       const request = action.request;
       if (isCurrent(request)) {
-        setSuccessData(data.result);
+        // A beginner following QUEST 01 sees the guide's server-checked
+        // completion instead of this sheet; the command itself is unchanged.
+        const adopted = claimQuestGuideCommand({
+          kind: 'fx',
+          accountId: request.scope.accountId,
+          fromCurrency: data.result.fromCurrency,
+          toCurrency: data.result.toCurrency,
+          summary: `받은 금액 ${getFxExecuteSuccessDisplay(data.result).netTargetAmount}`,
+        });
+        if (!adopted) setSuccessData(data.result);
         setAmount('');
         setFxDomainState(null);
         setFieldError(null);
@@ -329,6 +335,31 @@ export default function WalletFxScreen({ navigation }: Props) {
     !!preview && !inputInvalidReason && capabilities?.canExchange && !pending && !successData && !actionRef.current?.completed;
   const inputErrorMessage = fieldError ?? (amount.trim() ? inputInvalidReason : null);
 
+  // What the beginner quest guide may point at next; it reads, never drives.
+  const guideRate = availableRate ? 'available' : rateQuery.isLoading ? 'loading' : 'unavailable';
+  useEffect(() => {
+    publishQuestGuideFacts('fx', {
+      screen: 'fx',
+      accountId,
+      blocked: !capabilities?.canExchange,
+      fromCurrency,
+      amountValid: !inputInvalidReason,
+      rate: guideRate,
+      previewReady: !inputInvalidReason && !!preview && !!availableRate,
+      canExecute: !!canExecute,
+      pending,
+      failed: !!domainError,
+    });
+  });
+  const { revealView } = inputScroll;
+  useEffect(() => {
+    registerQuestGuideReveal('fx', node => revealView(node, 'start'));
+    return () => {
+      registerQuestGuideReveal('fx', null);
+      publishQuestGuideFacts('fx', null);
+    };
+  }, [revealView]);
+
   const resetFxActionState = () => {
     if (submitLockRef.current) return;
     actionRef.current = null;
@@ -376,7 +407,12 @@ export default function WalletFxScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.content}>
-          <AccountSwitcher />
+          <View style={styles.card} testID="wallet-fx-no-account">
+            <Text style={styles.blockedTitle}>환전할 투자 계정이 없습니다.</Text>
+            <Text style={styles.blockedMessage}>
+              홈에서 투자 계정을 시작하거나 선택한 뒤 환전할 수 있습니다.
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -397,7 +433,6 @@ export default function WalletFxScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.container}>
         <ScrollView contentContainerStyle={styles.content}>
-          <AccountSwitcher />
           <View
             testID={TEST_IDS.tradingAccount.capabilityNotice}
             style={styles.card}
@@ -427,7 +462,6 @@ export default function WalletFxScreen({ navigation }: Props) {
     return (
       <SafeAreaView style={styles.container} testID={TEST_IDS.tradingAccount.integrityError}>
         <View style={styles.content}>
-          <AccountSwitcher />
           <ErrorState
             title={ACCOUNT_INTEGRITY_TITLE}
             message={integrityFailure.message}
@@ -474,15 +508,13 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   const krwWallet = getWalletBalanceAmount(walletsQuery.data, 'KRW');
   const usdWallet = getWalletBalanceAmount(walletsQuery.data, 'USD');
-  const usdBalanceKrw = availableRate
-    ? calculateUsdBalanceKrw(usdWallet, availableRate)
-    : null;
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       <KeyboardAvoidingView style={styles.flex}
         keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View ref={questGuideTarget('fx-viewport')} collapsable={false} style={styles.flex}>
       <ScrollView
         ref={inputScroll.scrollRef}
         style={styles.flex}
@@ -495,78 +527,64 @@ export default function WalletFxScreen({ navigation }: Props) {
         testID={TEST_IDS.walletFx.screen}
         contentContainerStyle={styles.content}
       >
-        <AccountSwitcher />
-
-        <View style={styles.card}>
-          <Text style={styles.label}>
-            지갑 요약{accountDisplay ? ` · ${accountDisplay.title}` : ''}
-          </Text>
-          <Text style={styles.value}>KRW Wallet {formatKrw(krwWallet)}</Text>
-          <Text style={styles.value}>USD Wallet {formatUsd(usdWallet)}</Text>
-          <View style={[styles.convertedBalance, fontScale > 1 && { flexDirection: 'column' }]}>
-            <Text style={styles.helper}>USD 환산 KRW </Text>
-            <Text style={styles.helper}>{usdBalanceKrw === null ? '-' : formatKrw(usdBalanceKrw)}</Text>
-          </View>
+        {/* Three equal rows only. An unavailable rate is never replaced by a
+            number; its explanation, retry and diagnostics sit below. */}
+        <View style={styles.card} testID="fx-wallet-summary">
+          <SummaryRow label="KRW Wallet" value={formatKrw(krwWallet)} testID="fx-summary-krw" />
+          <SummaryRow label="USD Wallet" value={formatUsd(usdWallet)} testID="fx-summary-usd" />
           <View
             testID="fx-rate-status"
-            style={[styles.rateStatus, { minHeight: rateStatusMinHeight }]}
-            // Keep the measured loading status space when the shorter rate
+            style={[styles.summaryRow, { minHeight: rateStatusMinHeight }]}
+            // Keep the measured loading row height when the shorter rate
             // arrives. Text may still grow with wrapping or accessibility size.
             onLayout={rateQuery.isLoading ? (event) => {
               const height = event.nativeEvent.layout.height;
               setRateStatusMinHeight(previous => Math.max(previous, height));
             } : undefined}
           >
-            {availableRate ? (
-              <>
-                <Text style={styles.helper}>
-                  환율 {formatDisplayDecimal(availableRate.rate)}
-                </Text>
-                <Text style={styles.helper}>
-                  수집 시각 {formatKstDateTime(availableRate.capturedAt)}
-                </Text>
-                {availableRate.fallbackUsed ? (
-                  <Text style={styles.helper}>
-                    대체 환율 소스가 적용되었습니다.
-                  </Text>
-                ) : null}
-              </>
-            ) : (
-              <>
-                <Text style={styles.errorText}>
-                  현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다.
-                </Text>
-                <CTAButton
-                  variant="neutral"
-                  label={rateQuery.isLoading ? '환율 불러오는 중' : '환율 다시 불러오기'}
-                  state={rateQuery.isLoading ? 'loading' : 'enabled'}
-                  onPress={() => void rateQuery.refetch()}
-                />
-                <AdminDiagnosticPanel
-                  error={rateQuery.error}
-                  runtime={{
-                    ...fxRuntime,
-                    rateState: rateQuery.data?.state,
-                    capturedAt: rateQuery.data?.capturedAt,
-                    validUntil: rateQuery.data?.validUntil,
-                    previewRateAvailable: false,
-                    fallbackIntervalMs: FX_RATE_FALLBACK_INTERVAL_MS,
-                    lastRestDataUpdatedAt: rateQuery.dataUpdatedAt,
-                  }}
-                />
-              </>
-            )}
-            {availableRate && (fxRuntime?.socketStatus === 'disconnected' || fxRuntime?.socketStatus === 'reconnecting' ||
-              fxRuntime?.socketStatus === 'auth_failed' || fxRuntime?.subscriptionError === true) ? (
-              <AdminDiagnosticPanel runtime={fxRuntime} />
-            ) : null}
+            <Text style={styles.summaryLabel}>환율</Text>
+            <Text style={styles.summaryValue} testID="fx-summary-rate">
+              {availableRate
+                ? formatDisplayDecimal(availableRate.rate)
+                : rateQuery.isLoading ? '불러오는 중' : '-'}
+            </Text>
           </View>
         </View>
+
+        {!availableRate && !rateQuery.isLoading ? (
+          <View ref={questGuideTarget('fx-rate-error')} collapsable={false} style={styles.card} testID="fx-rate-unavailable">
+            <Text style={styles.errorText}>
+              현재 환율을 사용할 수 없어 환전 기능이 잠시 중단되었습니다.
+            </Text>
+            <CTAButton
+              variant="neutral"
+              label={rateQuery.isFetching ? '환율 불러오는 중' : '환율 다시 불러오기'}
+              state={rateQuery.isFetching ? 'loading' : 'enabled'}
+              onPress={() => void rateQuery.refetch()}
+            />
+            <AdminDiagnosticPanel
+              error={rateQuery.error}
+              runtime={{
+                ...fxRuntime,
+                rateState: rateQuery.data?.state,
+                capturedAt: rateQuery.data?.capturedAt,
+                validUntil: rateQuery.data?.validUntil,
+                previewRateAvailable: false,
+                fallbackIntervalMs: FX_RATE_FALLBACK_INTERVAL_MS,
+                lastRestDataUpdatedAt: rateQuery.dataUpdatedAt,
+              }}
+            />
+          </View>
+        ) : null}
+        {availableRate && (fxRuntime?.socketStatus === 'disconnected' || fxRuntime?.socketStatus === 'reconnecting' ||
+          fxRuntime?.socketStatus === 'auth_failed' || fxRuntime?.subscriptionError === true) ? (
+          <AdminDiagnosticPanel runtime={fxRuntime} />
+        ) : null}
 
         <View style={styles.card}>
           <Text style={styles.label}>환전 방향</Text>
 
-          <View style={styles.row}>
+          <View ref={questGuideTarget('fx-direction')} collapsable={false} style={styles.row} testID="wallet-fx-direction-row">
             <ActionPressable
               testID={TEST_IDS.walletFx.directionKrwUsd}
               disabled={pending}
@@ -618,6 +636,7 @@ export default function WalletFxScreen({ navigation }: Props) {
 
           <View ref={amountRef} collapsable={false}>
             <TextInput
+              ref={questGuideTarget('fx-amount')}
               testID={TEST_IDS.walletFx.amountInput}
               editable={!pending}
               style={styles.input}
@@ -644,13 +663,13 @@ export default function WalletFxScreen({ navigation }: Props) {
         </View>
 
         {!inputInvalidReason ? (
-          <View style={styles.card} testID="fx-indicative-preview">
-            <Text style={styles.label}>예상 환전 견적</Text>
+          <View ref={questGuideTarget('fx-preview')} collapsable={false} style={styles.card} testID="fx-indicative-preview">
+            <Text ref={questGuideTarget('fx-quote-title')} style={styles.label} testID="fx-quote-title">예상 환전 견적</Text>
             {preview && availableRate ? <>
               <PreviewAmounts rows={[
-                { label: '적용 환율 (USD/KRW)', value: formatDisplayDecimal(availableRate.rate) },
-                { label: '예상 수수료', value: formatPreviewMoney(preview.feeAmount, preview.feeCurrency) },
-                { label: '예상 수령액', value: formatPreviewMoney(preview.netTargetAmount, toCurrency) },
+                { label: '적용 환율 (USD/KRW)', value: formatDisplayDecimal(availableRate.rate), ref: questGuideTarget('fx-rate-row'), testID: 'fx-preview-rate' },
+                { label: '예상 수수료', value: formatPreviewMoney(preview.feeAmount, preview.feeCurrency), ref: questGuideTarget('fx-fee-row'), testID: 'fx-preview-fee' },
+                { label: '예상 수령액', value: formatPreviewMoney(preview.netTargetAmount, toCurrency), ref: questGuideTarget('fx-net-row'), testID: 'fx-preview-net' },
               ]} />
               <Text style={styles.helper}>받는 통화에서 수수료가 차감됩니다. 실제 환전 금액은 실행 시 확정됩니다.</Text>
             </> : <>
@@ -663,11 +682,14 @@ export default function WalletFxScreen({ navigation }: Props) {
           </View>
         ) : null}
         <View ref={inputScroll.submitRef} collapsable={false}>
-          <CTAButton testID={TEST_IDS.walletFx.executeSubmit} label="환전하기"
-            state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
-            onPress={executeQuote} />
+          <View ref={questGuideTarget('fx-submit')} collapsable={false}>
+            <CTAButton testID={TEST_IDS.walletFx.executeSubmit} label="환전하기"
+              state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
+              onPress={executeQuote} />
+          </View>
         </View>
       </ScrollView>
+      </View>
       </KeyboardAvoidingView>
 
       <FxSuccessBottomSheet
@@ -687,6 +709,15 @@ export default function WalletFxScreen({ navigation }: Props) {
   );
 }
 
+function SummaryRow({ label, value, testID }: { label: string; value: string; testID: string }) {
+  return (
+    <View style={styles.summaryRow} testID={testID}>
+      <Text style={styles.summaryLabel}>{label}</Text>
+      <Text style={styles.summaryValue}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, gap: 12, paddingBottom: 24 },
@@ -700,11 +731,29 @@ const styles = StyleSheet.create({
     backgroundColor: semantic.surface,
     gap: 10,
   },
-  rateStatus: { gap: 10 },
-  // Large text starts with a separate value line, even before the rate arrives.
-  convertedBalance: { flexDirection: 'row', flexWrap: 'wrap' },
+  // One row structure for all three summary items: label and value share the
+  // size and weight; a long value wraps under its label instead of clipping.
+  summaryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    columnGap: 12,
+    rowGap: 2,
+  },
+  summaryLabel: { fontSize: 18, fontWeight: '700', lineHeight: 26, color: semantic.secondary, flexShrink: 0 },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 26,
+    color: semantic.text,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    textAlign: 'right',
+    fontVariant: ['tabular-nums'],
+  },
   label: { fontSize: 13, color: semantic.secondary },
-  value: { fontSize: 16, fontWeight: '700', lineHeight: 24, flexShrink: 1 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 21, flexShrink: 1 },
   // Full text, wrapped: a capability notice that is cut to one ellipsised line
   // stops explaining why the button is gone.

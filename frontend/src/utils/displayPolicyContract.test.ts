@@ -84,7 +84,7 @@ const datetimeSources = [
   'screens/record/RecordSeasonDetailScreen.tsx',
   'screens/record/RecordSeasonListScreen.tsx',
   'screens/season/SeasonJoinScreen.tsx',
-  'screens/wallet/WalletFxScreen.tsx',
+  'screens/quest/BeginnerQuestList.tsx',
 ];
 
 describe('KST timestamp display contract', () => {
@@ -92,6 +92,9 @@ describe('KST timestamp display contract', () => {
     for (const sourcePath of datetimeSources) {
       assert.match(read(sourcePath), /formatKstDateTime/u, sourcePath);
     }
+    // The FX wallet summary no longer shows the rate capture time; the
+    // execution time stays in the success sheet via features/wallet/mapper.ts.
+    assert.doesNotMatch(walletFxScreen, /formatKstDateTime|capturedAt\)|수집 시각/u);
   });
 
   it('keeps date-only fields out of the datetime formatter', () => {

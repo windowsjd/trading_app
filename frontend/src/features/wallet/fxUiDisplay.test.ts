@@ -5,6 +5,9 @@ import { describe, it } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
 import { formatKstDateTime } from '../../utils/format.ts';
 
+const flat = (style: unknown): Record<string, unknown> =>
+  Array.isArray(style) ? Object.assign({}, ...style.map(flat)) : (style as Record<string, unknown>) ?? {};
+
 const require = createRequire(import.meta.url);
 const { createTradingUiHarness, textContent, elements } = require('../../../test/tradingUiHarness.cjs');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
@@ -16,13 +19,28 @@ const sheet = load(resolve('src/screens/wallet/FxSuccessBottomSheet.tsx'), {
   '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
 }).default;
 
+// The wallet summary is exactly KRW Wallet / USD Wallet / 환율 in one row
+// structure, at one size and weight. No title, account name, USD→KRW
+// conversion, capture time or other side notes.
 function assertCleanRateDisplay(h: any, tree: any) {
+  const summary = elements(tree, 'View').find((node: any) => node.props.testID === 'fx-wallet-summary');
+  assert.ok(summary);
+  const rows = elements(summary, 'View').filter((node: any) => elements(node, 'Text').length === 2 && node !== summary);
+  assert.deepEqual(rows.map((row: any) => elements(row, 'Text').map((text: any) => textContent(text))), [
+    ['KRW Wallet', '1,000,000'], ['USD Wallet', '100'], ['환율', '1350'],
+  ]);
+  const fonts = rows.flatMap((row: any) => elements(row, 'Text').map((text: any) => {
+    const style = flat(text.props.style);
+    return `${style.fontSize}/${style.fontWeight}`;
+  }));
+  assert.deepEqual([...new Set(fonts)], ['18/700'], 'same size and weight, larger than before');
+  assert.equal(rows.every((row: any) => flat(row.props.style).flexWrap === 'wrap'), true, 'long values wrap, never clip');
   const text = textContent(tree);
-  assert.match(text, /환율 1350/);
-  assert.ok(text.includes(`수집 시각 ${formatKstDateTime(h.rateQuery.data.capturedAt)}`));
-  for (const hidden of ['원장 보기', '기준 시각', '최신성', '최신 환율 기준', '2026-01-01']) {
+  for (const hidden of ['지갑 요약', '일반모드', 'USD 환산', '수집 시각', formatKstDateTime(h.rateQuery.data.capturedAt),
+    '대체 환율', '원장 보기', '기준 시각', '최신성', '최신 환율 기준', '2026-01-01']) {
     assert.ok(!text.includes(hidden), hidden);
   }
+  assert.equal(elements(tree).some((node: any) => node.type === 'AccountSwitcher'), false, 'no account switcher on FX');
 }
 
 it('retains the measured loading rate space after arrival without limiting larger text', () => {

@@ -16,7 +16,7 @@ const general = { ...beginner, id: 'general', mode: 'general' as const };
 
 it('beginner is a separately named TWR account without season or ad reward capabilities', () => {
   const caps = getTradingAccountCapabilities(beginner)!;
-  assert.equal(getAccountDisplay(beginner).title, '초보 투자');
+  assert.equal(getAccountDisplay(beginner).title, '초보모드');
   assert.equal(caps.returnRateMethod, 'time_weighted');
   assert.equal(caps.isGeneral, false);
   assert.equal(caps.showsSeasonUi, false);

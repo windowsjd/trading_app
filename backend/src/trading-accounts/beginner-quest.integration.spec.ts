@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 
 const itDb = process.env.BEGINNER_ACCOUNT_DB_INTEGRATION === '1' ? it : it.skip;
 
-describe('Beginner QUEST 01 PostgreSQL progress', () => {
+describe('Beginner QUEST 01/02 PostgreSQL progress', () => {
   itDb(
     'derives progress only from committed standalone FX and transfer rows',
     () => {

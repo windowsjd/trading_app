@@ -1,13 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import type { GuideScreenProps } from '../../app/navigation/types';
+import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import GuideScreen from '../guide/GuideScreen';
 import BeginnerQuestList from './BeginnerQuestList';
 
 export default function BeginnerLearningScreen(props: GuideScreenProps) {
   const [section, setSection] = useState<'quests' | 'guide'>('quests');
+  // A finished practice returns here; always land on the quest cards.
+  const returnCount = useQuestGuide()?.returnCount ?? 0;
+  useEffect(() => {
+    if (returnCount > 0) setSection('quests');
+  }, [returnCount]);
   return (
     <View style={styles.screen} testID="beginner-learning-screen">
       <View style={styles.segments}>
@@ -20,9 +26,7 @@ export default function BeginnerLearningScreen(props: GuideScreenProps) {
           </ActionPressable>
         ))}
       </View>
-      {section === 'guide' ? <GuideScreen {...props} /> : (
-        <BeginnerQuestList onOpen={questId => props.navigation.navigate('QuestDetail', { questId })} />
-      )}
+      {section === 'guide' ? <GuideScreen {...props} /> : <BeginnerQuestList />}
     </View>
   );
 }

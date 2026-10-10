@@ -16,6 +16,30 @@ export function getFocusedInputScrollDelta(viewport: Bounds, input: Bounds, subm
   return 0;
 }
 
+/**
+ * Scrolls `target` into the scroll view's visible area: the same rule as a
+ * focused input (`nearest`), or `start` to bring it near the top so a beginner
+ * quest guide card has room beside it.
+ */
+export function revealInScrollView(
+  scroll: ScrollView | null,
+  offset: number,
+  target: Pick<View, 'measureInWindow'>,
+  options: { align?: 'nearest' | 'start'; keyboardTop?: number } = {},
+) {
+  if (!scroll) return;
+  scroll.getNativeScrollRef()?.measureInWindow((_x, y, _width, height) => {
+    const viewport = { top: y, bottom: Math.min(y + height, options.keyboardTop ?? Infinity) };
+    if (viewport.bottom <= viewport.top) return;
+    target.measureInWindow((_targetX, targetY, _targetWidth, targetHeight) => {
+      const delta = options.align === 'start'
+        ? targetY - (viewport.top + 12)
+        : getFocusedInputScrollDelta(viewport, { top: targetY, bottom: targetY + targetHeight });
+      if (Math.abs(delta) > 1) scroll.scrollTo({ y: Math.max(0, offset + delta), animated: true });
+    });
+  });
+}
+
 /** Measure after keyboard/resize layout, rather than guessing an input offset. */
 export function useFocusedInputScroll() {
   const scrollRef = useRef<ScrollView>(null);
@@ -49,6 +73,11 @@ export function useFocusedInputScroll() {
         });
       });
     });
+  }, []);
+
+  // A control the beginner quest guide points at, above any open keyboard.
+  const revealView = useCallback((target: Pick<View, 'measureInWindow'>, align: 'nearest' | 'start' = 'nearest') => {
+    revealInScrollView(scrollRef.current, offsetRef.current, target, { align, keyboardTop: keyboardTopRef.current });
   }, []);
 
   const onInputFocus = useCallback((input: View | null) => {
@@ -85,5 +114,5 @@ export function useFocusedInputScroll() {
     };
   }, [revealFocusedInput]);
 
-  return { scrollRef, submitRef, onInputFocus, onInputBlur, onScroll, revealFocusedInput };
+  return { scrollRef, submitRef, onInputFocus, onInputBlur, onScroll, revealFocusedInput, revealView };
 }

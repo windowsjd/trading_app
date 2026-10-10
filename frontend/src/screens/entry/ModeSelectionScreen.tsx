@@ -125,6 +125,10 @@ export default function ModeSelectionScreen({
         testID={TEST_IDS.modeSelection.screen}
       >
         <Text style={styles.title}>계정 선택하기</Text>
+        {/* Display order only: 초보모드 → 일반모드 → 시즌모드. Selection and
+            creation still happen only on an explicit press of each card. */}
+        <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} />
+
         {generalOption.kind === 'existing' ? (
           <GeneralExistingCard
             account={generalOption.account}
@@ -153,8 +157,6 @@ export default function ModeSelectionScreen({
             ) : null}
           </View>
         )}
-
-        <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} />
 
         {model.seasonContinue.map((account) => {
           return (

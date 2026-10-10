@@ -248,7 +248,7 @@ describe('account display never shows a raw UUID and states the return meaning',
   it('names a general account and labels its TWR', () => {
     const display = getAccountDisplay(generalAccount());
 
-    assert.equal(display.title, '일반 투자');
+    assert.equal(display.title, '일반모드');
     assert.equal(display.returnRateLabel, '시간가중 수익률');
     assert.equal(display.statusLabel, '운영 중');
   });

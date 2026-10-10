@@ -6,14 +6,15 @@ import { StyleSheet, Text, View, useWindowDimensions } from '../../theme/native'
 export default function PreviewAmounts({
   rows,
 }: {
-  rows: Array<{ label: string; value: string }>;
+  /** `ref`/`testID` let a guide measure one row; they never change the row. */
+  rows: Array<{ label: string; value: string; ref?: React.Ref<View>; testID?: string }>;
 }) {
   const { width, fontScale } = useWindowDimensions();
   const stacked = width / fontScale < 380;
   return (
     <View style={styles.list}>
-      {rows.map(({ label, value }) => (
-        <View key={label} style={[styles.row, stacked && styles.stacked]}>
+      {rows.map(({ label, value, ref, testID }) => (
+        <View key={label} ref={ref} testID={testID} style={[styles.row, stacked && styles.stacked]}>
           <Text style={styles.label}>{label}</Text>
           <Text style={[styles.value, stacked && styles.stackedValue]}>
             {value}

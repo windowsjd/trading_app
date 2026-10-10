@@ -113,7 +113,7 @@ it('Home context is spacious, quiet and opens the existing account selection she
     h.context.selectedAccount = h.general;
     h.context.selectedAccountId = h.general.id;
     act(() => h.renderer.update(h.render()));
-    assert.equal(h.text(), '일반 투자');
+    assert.equal(h.text(), '일반모드');
   } finally { act(() => h.renderer.unmount()); }
 });
 

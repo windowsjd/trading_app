@@ -48,6 +48,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
     '../../features/tradingAccount/TradingAccountContext': {
       useTradingAccount: () => ({ selectedAccount: { id: 'account-1', mode }, isLoading: false }),
     },
+    '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
     ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
       `./${name}Stack`, { default: `${name}Stack`, __esModule: true },
     ])),

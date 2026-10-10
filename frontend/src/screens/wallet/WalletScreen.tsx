@@ -1,6 +1,7 @@
 import { portfolioReadPolicy } from '../../features/tradingAccount/portfolioReadPolicy';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
-import React, { useState } from 'react';
+import { revealInScrollView } from '../../hooks/useFocusedInputScroll';
+import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
 import { ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
@@ -36,6 +37,7 @@ import HomeAssetHero from '../home/HomeAssetHero';
 import HomeAssetTrend, { type HomeEquityRange } from '../home/HomeAssetTrend';
 import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
 import FuturesPositionsSection from '../../components/tradingAccount/FuturesPositionsSection';
+import { publishQuestGuideFacts, questGuideTarget, registerQuestGuideReveal, type QuestActionState } from '../../features/quest/questGuideBridge';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
@@ -104,6 +106,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
+      questTarget: questGuideTarget('wallet-transfer'),
       onPress: () => navigation.navigate('WalletTransfer'),
     },
     {
@@ -112,6 +115,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
+      questTarget: questGuideTarget('wallet-exchange'),
       onPress: () => navigation.navigate('WalletFx'),
     },
     {
@@ -120,6 +124,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       iconPath: 'M6 3h14v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M8 3v18 M11 8h6 M11 12h6 M11 16h4',
       disabled: false,
       hidden: false,
+      questTarget: undefined,
       onPress: () => navigation.navigate('WalletTransactions'),
     },
     {
@@ -128,12 +133,31 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       iconPath: 'M5 3h14v18l-3-2-4 2-4-2-3 2V3Z M8 7h8 M8 11h8 M8 15l2 2 5-4',
       disabled: false,
       hidden: false,
+      questTarget: undefined,
       onPress: () => rootNavigation.navigate('TradeHistory', { accountId }),
     },
   ];
 
+  // The beginner quest guide follows these buttons; it never presses them.
+  const questActions: QuestActionState = integrityFailure ? 'hidden' : capabilities?.canExchange ? 'enabled' : 'disabled';
+  useEffect(() => {
+    publishQuestGuideFacts('wallet', { screen: 'wallet', accountId, actions: questActions });
+  });
+  // No inputs here: only the guide's scroll-into-view, without keyboard tracking.
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollY = useRef(0);
+  useEffect(() => {
+    registerQuestGuideReveal('wallet', node => revealInScrollView(scrollRef.current, scrollY.current, node, { align: 'start' }));
+    return () => {
+      registerQuestGuideReveal('wallet', null);
+      publishQuestGuideFacts('wallet', null);
+    };
+  }, []);
+
   return (
-    <ScrollView refreshControl={refresh.refreshControl} testID="wallet-screen" contentContainerStyle={styles.content}>
+    <View ref={questGuideTarget('wallet-viewport')} collapsable={false} style={styles.viewport}>
+    <ScrollView ref={scrollRef} onScroll={event => { scrollY.current = event.nativeEvent.contentOffset.y; }} scrollEventThrottle={16}
+      refreshControl={refresh.refreshControl} testID="wallet-screen" contentContainerStyle={styles.content}>
       {integrityFailure ? (
         <View testID={TEST_IDS.tradingAccount.integrityError}>
           <ErrorState error={integrityFailure.error} title={ACCOUNT_INTEGRITY_TITLE} message={integrityFailure.message} onRetry={integrityFailure.retry} />
@@ -167,7 +191,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       )}
       <View testID="wallet-quick-actions" style={styles.quickActions}>
         {quickActions.filter((action) => !action.hidden).map((action) => (
-          <View key={action.testID} testID={`${action.testID}-item`} style={styles.quickActionItem}>
+          <View key={action.testID} ref={action.questTarget} collapsable={false} testID={`${action.testID}-item`} style={styles.quickActionItem}>
             <ActionPressable
               testID={action.testID}
               accessibilityRole="button"
@@ -265,11 +289,13 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
         </View>
       ) : null}
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
+  viewport: { flex: 1 },
   content: getHeaderScreenContentStyle(Platform.OS),
   card: { padding: 16, borderWidth: 1, borderColor: semantic.border, borderRadius: 14, backgroundColor: semantic.surface },
   title: { fontSize: 14, fontWeight: '600', lineHeight: 21, color: semantic.secondary, marginBottom: 8 },

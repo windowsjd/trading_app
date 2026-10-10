@@ -25,12 +25,12 @@ async function run() {
     res.end(script ? fs.readFileSync(path.join(out, 'app.js')) : '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}#root{display:flex;flex-direction:column}</style><div id="root"></div><script src="/app.js"></script>');
   }).listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
-  let browser;
-  const results = [], errors = [];
+  let browser, page;
+  const results = [], flows = [], errors = [], compactSteps = [];
   try {
     browser = await chromium.launch({ headless: true, args: ['--no-sandbox'],
       ...(process.env.BEGINNER_CHROMIUM ? { executablePath: process.env.BEGINNER_CHROMIUM } : {}) });
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     const base = `http://127.0.0.1:${server.address().port}`;
     page.on('pageerror', error => errors.push(error.message));
     await page.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
@@ -41,11 +41,12 @@ async function run() {
     });
     const id = value => page.getByTestId(value).filter({ visible: true }).first();
     const tab = label => page.getByRole('tablist').getByRole('tab', { name: label, exact: true });
+    const heading = label => page.getByRole('heading', { name: label, exact: true }).filter({ visible: true }).first();
     async function open(query = '') { await page.goto(`${base}/?${query}`); await id('home-account-title').waitFor(); }
     async function settled(testId) {
       await page.waitForFunction(testId => {
-        const element = document.querySelector(`[data-testid="${testId}"]`);
-        if (!element?.checkVisibility()) return false;
+        const element = [...document.querySelectorAll(`[data-testid="${testId}"]`)].find(node => node.checkVisibility());
+        if (!element) return false;
         for (let parent = element; parent; parent = parent.parentElement) {
           if (Number(getComputedStyle(parent).opacity) < 0.999) return false;
         }
@@ -81,7 +82,7 @@ async function run() {
         const root = [...document.querySelectorAll(`[data-testid="${testId}"]`)].find(element => element.checkVisibility());
         if (!root) return [`missing ${testId}`];
         const found = [];
-        for (const element of root.querySelectorAll('*')) {
+        for (const element of [root, ...root.querySelectorAll('*')]) {
           if (!element.checkVisibility()) continue;
           if (![...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim())) continue;
           const range = document.createRange(); range.selectNodeContents(element);
@@ -102,74 +103,348 @@ async function run() {
       assert.deepEqual(issues, [], testId);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     }
-    const questText = async testId => (await id(testId).textContent()) ?? '';
+    const text = async testId => (await id(testId).textContent()) ?? '';
+    const box = async locator => locator.evaluate(el => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
+    const union = boxes => ({ left: Math.min(...boxes.map(b => b.left)), top: Math.min(...boxes.map(b => b.top)), right: Math.max(...boxes.map(b => b.right)), bottom: Math.max(...boxes.map(b => b.bottom)) });
+    const intersects = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+
+    /**
+     * One spotlight step: the ring wraps exactly the real control (6px), the
+     * card is fully readable on screen, does not cover that control, and the
+     * control itself still receives the user's press (checked by the caller).
+     */
+    async function expectSpotlight(targets, { body, stepLabel, context }) {
+      await settled('quest-guide-card');
+      await page.getByTestId('quest-guide-ring').waitFor();
+      if (body) await page.waitForFunction(body => document.querySelector('[data-testid="quest-guide-body"]')?.textContent === body, body);
+      // A compact card (tight space, large text) drops the quest label and counter.
+      const compact = await page.getByTestId('quest-guide-head').count() === 0;
+      if (stepLabel && !compact) assert.equal(await text('quest-guide-step'), stepLabel);
+      if (compact) compactSteps.push(`${context}`);
+      const ring = await box(page.getByTestId('quest-guide-ring'));
+      const target = union(await Promise.all(targets.map(locator => box(locator))));
+      const viewport = page.viewportSize();
+      const visibleTarget = { left: Math.max(target.left, 0), top: Math.max(target.top, 0), right: Math.min(target.right, viewport.width), bottom: Math.min(target.bottom, viewport.height) };
+      for (const side of ['left', 'top']) assert.ok(ring[side] <= visibleTarget[side] + 1 && ring[side] >= visibleTarget[side] - 9, `${context} ring ${side} ${JSON.stringify({ ring, target })}`);
+      for (const side of ['right', 'bottom']) assert.ok(ring[side] >= visibleTarget[side] - 1 && ring[side] <= visibleTarget[side] + 9, `${context} ring ${side} ${JSON.stringify({ ring, target })}`);
+      const dim = await page.getByTestId('quest-guide-spotlight').evaluate(el => {
+        const svg = el.querySelector('svg'), path = svg?.querySelector('path'), r = svg?.getBoundingClientRect();
+        let opacity = 1;
+        for (let node = el; node; node = node.parentElement) opacity *= Number(getComputedStyle(node).opacity);
+        return { width: r?.width ?? 0, height: r?.height ?? 0, fill: path?.getAttribute('fill'), opacity,
+          rule: path?.getAttribute('fill-rule'), events: getComputedStyle(el).pointerEvents };
+      });
+      assert.ok(dim.width >= viewport.width - 1 && dim.height >= viewport.height - 1, `${context} dim covers the screen ${JSON.stringify(dim)}`);
+      assert.equal(dim.opacity, 1, `${context} dim fully shown`);
+      assert.equal(dim.rule, 'evenodd');
+      assert.match(dim.fill, /^rgba\(/);
+      assert.equal(dim.events, 'none', 'the dim never takes touches');
+      const card = await box(page.getByTestId('quest-guide-card'));
+      assert.equal(intersects(card, target), false, `${context} card must not cover the control ${JSON.stringify({ card, target })}`);
+      assert.ok(card.left >= 0 && card.right <= viewport.width && card.top >= 0 && card.bottom <= viewport.height, `${context} card on screen`);
+      await contentFits('quest-guide-card');
+      return { ring, card, target };
+    }
+
+    // The completion badge shows its check above the brand gradient.
+    async function expectBadgeCheck() {
+      const badge = await page.evaluate(() => {
+        const check = [...document.querySelectorAll('[data-testid="quest-guide-celebration"] path')].find(p => p.getAttribute('d') === 'M5 12.5l4.5 4.5L19 7.5');
+        if (!check) return { state: 'missing' };
+        const svg = check.closest('svg'), style = getComputedStyle(svg), r = svg.getBoundingClientRect();
+        // The gradient is an absolutely positioned earlier sibling; a static SVG
+        // would be painted underneath it on Web.
+        const gradient = [...svg.parentElement.children].find(node => node !== svg && getComputedStyle(node).position === 'absolute');
+        return { state: 'found', position: style.position, after: !!gradient && !!(gradient.compareDocumentPosition(svg) & Node.DOCUMENT_POSITION_FOLLOWING),
+          stroke: svg.getAttribute('stroke'), visible: svg.checkVisibility() && r.width > 0 && r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight };
+      });
+      assert.deepEqual(badge, { state: 'found', position: 'relative', after: true, stroke: '#FFFFFF', visible: true });
+    }
+
+    async function recordFrames() {
+      await page.evaluate(() => {
+        window.questFrames = [];
+        window.questFramesActive = true;
+        const visible = testId => [...document.querySelectorAll(`[data-testid="${testId}"]`)].some(node => node.checkVisibility());
+        const loop = () => {
+          const nav = window.fixture.navigationRef;
+          window.questFrames.push({
+            route: nav.isReady() ? nav.getCurrentRoute()?.name : null,
+            celebration: visible('quest-guide-celebration'),
+            fx: visible('wallet-fx-screen'), transfer: visible('wallet-transfer-screen'), list: visible('beginner-quest-list'),
+            sheet: document.body.textContent.includes('환전이 완료되었습니다'),
+          });
+          if (window.questFramesActive) requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+      });
+    }
+    async function stopFrames() {
+      return page.evaluate(() => { window.questFramesActive = false; return window.questFrames; });
+    }
+    function assertSmoothReturn(frames, practice) {
+      assert.equal(frames.some(frame => frame.sheet), false, 'no FX success sheet next to the celebration');
+      const routes = frames.map(frame => frame.route).filter((route, index, all) => route && route !== all[index - 1]);
+      assert.deepEqual(routes, [practice === 'fx' ? 'WalletFx' : 'WalletTransfer', 'Guide'], `one direct return, no Wallet flash: ${routes}`);
+      const firstList = frames.findIndex(frame => frame.route === 'Guide');
+      assert.ok(firstList > 0);
+      assert.equal(frames[firstList - 1].celebration, true, 'the celebration covers the tab switch');
+      // The practice screen is visible in one run only; once hidden it never
+      // returns, and while it fades out underneath the celebration covers it.
+      const shown = frames.map(frame => frame[practice]);
+      const lastShown = shown.lastIndexOf(true);
+      assert.equal(shown.slice(0, lastShown + 1).every(Boolean), true, 'the practice screen never reappears');
+      assert.equal(frames.slice(firstList, lastShown + 1).every(frame => frame.celebration), true, 'covered during the switch');
+      assert.ok(frames.filter(frame => frame.celebration).length >= 20, 'the completion is visible long enough to notice');
+    }
+
+    // A: quest list, header and tab icon at small widths, both themes, large fonts.
+    const headerOf = label => heading(label).evaluate(el => {
+      const row = el.parentElement, icon = row.querySelector('svg'), s = getComputedStyle(el);
+      const r = el.getBoundingClientRect(), i = icon.getBoundingClientRect();
+      return { weight: s.fontWeight, size: parseFloat(s.fontSize), family: s.fontFamily, color: s.color,
+        iconWidth: i.width, gap: Math.round(r.left - i.right), centerDelta: Math.abs((i.top + i.bottom) / 2 - (r.top + r.bottom) / 2),
+        paths: [...icon.querySelectorAll('path')].map(p => p.getAttribute('d')), stroke: icon.getAttribute('stroke') };
+    });
     for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 2]) for (const theme of ['light', 'dark']) {
       await page.setViewportSize({ width, height: 844 });
-      // Longest states at the larger font: 2/2 shows the completion copy.
-      const level = fontScale === 2 ? '2' : '1';
+      const level = fontScale === 2 ? '1' : '0';
       await open(`fontScale=${fontScale}&theme=${theme}&quest=${level}`);
-      assert.equal(await id('home-account-title').textContent(), '초보 투자');
-      await tab('퀘스트').click(); await id('quest-card-progress').waitFor();
+      assert.equal(await id('home-account-title').textContent(), '초보모드');
+      await tab('지갑').click(); await heading('지갑').waitFor();
+      const walletHeader = await headerOf('지갑');
+      await tab('퀘스트').click(); await id('quest-card-exchange').waitFor();
       await settled('beginner-quest-list');
-      assert.equal(await page.getByRole('tablist').getByRole('tab').count(), 5);
-      await tab('MY').waitFor();
-      assert.doesNotMatch(await questText('beginner-quest-list'), /\d+%|경험치|레벨|해금|잠금|보상/);
-      assert.equal(await questText('quest-card-progress'), `실습 ${level}/2 완료`);
-      assert.equal(await questText('quest-card-status'), level === '2' ? '완료' : '진행 중');
-      await geometry(); await contentFits('beginner-quest-list');
-      if (width === 320) await page.screenshot({ path: path.join(out, `quest-${fontScale}-${theme}.png`) });
-      await id('quest-card-open').click(); await id('quest-detail-progress-label').waitFor();
-      await settled('quest-detail-screen');
-      await contentFits('quest-detail-screen');
-      if (width === 320) {
-        await page.screenshot({ path: path.join(out, `quest-detail-${fontScale}-${theme}.png`) });
-        await id('quest-open-transfer').scrollIntoViewIfNeeded();
-        await page.screenshot({ path: path.join(out, `quest-detail-practice-${fontScale}-${theme}.png`) });
+      const questHeader = await headerOf('퀘스트');
+      for (const key of ['weight', 'size', 'family', 'color', 'iconWidth', 'gap', 'stroke']) {
+        assert.equal(questHeader[key], walletHeader[key], `quest header ${key} matches the other tabs`);
       }
-      await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
-      await id('beginner-quest-list').waitFor();
+      assert.ok(questHeader.centerDelta < 1);
+      assert.ok(questHeader.paths.some(d => d.includes('M5 21V3')), 'quest flag in the header');
+      const tabIcon = await tab('퀘스트').evaluate(el => [...el.querySelectorAll('path')].map(p => p.getAttribute('d')).join('|'));
+      assert.ok(tabIcon.includes('M4 3h2v18H4z'), 'filled quest flag on the selected tab');
+      assert.doesNotMatch(tabIcon, /M3 3h6c1\.3/, 'not the guide book');
+      assert.equal(await page.getByRole('tablist').getByRole('tab').count(), 5);
+      const list = await text('beginner-quest-list');
+      assert.doesNotMatch(list, /실제 거래 기능을 직접 사용해 보며 단계별로 배워요/);
+      assert.doesNotMatch(list, /\d+%|경험치|레벨|해금|잠금|보상/);
+      assert.equal(await text('quest-summary-progress'), `퀘스트 ${level}/2 완료`);
+      assert.equal(await text('quest-card-exchange-status'), level === '1' ? '완료' : '미시작');
+      assert.equal(await text('quest-card-transfer-status'), level === '1' ? '미시작' : '대기');
+      assert.equal(await id('quest-card-transfer-start').getAttribute('aria-disabled'), level === '1' ? null : 'true');
+      await geometry(); await contentFits('beginner-quest-list');
+      if (width === 320 || width === 430) await page.screenshot({ path: path.join(out, `quest-list-${width}-${fontScale}-${theme}.png`), fullPage: true });
       await id('beginner-segment-guide').click(); await id('guide-market-basics-card').waitFor();
       await geometry();
-      await id('guide-market-basics-card').click();
-      await page.getByRole('heading', { name: '시장기초', exact: true }).waitFor();
-      await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
       await id('beginner-segment-quests').click(); await id('beginner-quest-list').waitFor();
-      results.push({ width, fontScale, theme, quest: level, segments: 'pass', questList: 'pass', questDetail: 'pass', guideNavigation: 'pass' });
+      results.push({ width, fontScale, theme, quest: level, header: 'matches 지갑', list: 'pass' });
     }
 
-    // Practice opens the EXISTING Wallet screens; the quest stack is kept.
-    const practice = [];
+    // B: both practices end to end on the real Wallet screens.
+    async function practiceExchange(context) {
+      await tab('퀘스트').click(); await id('quest-card-exchange-start').waitFor();
+      await id('quest-card-exchange-start').click();
+      await id('wallet-screen').waitFor();
+      const entry = await expectSpotlight([id('wallet-exchange-item')], { body: '환전하기에서는 KRW와 USD 환전을 할 수 있어요.', stepLabel: '1/6', context: `${context} entry` });
+      if (context.endsWith('390')) assert.ok(page.viewportSize().width - entry.card.right <= 13, 'entry card sits top-right');
+      await page.screenshot({ path: path.join(out, `fx-1-entry-${context}.png`) });
+      await id('wallet-exchange').click(); // the real button, through the overlay
+      await id('wallet-fx-screen').waitFor();
+      await expectSpotlight([id('wallet-fx-direction-row')], { stepLabel: '2/6', context: `${context} direction` });
+      await page.screenshot({ path: path.join(out, `fx-2-direction-${context}.png`) });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('wallet-fx-amount-input')], { stepLabel: '3/6', context: `${context} amount` });
+      assert.equal(await id('quest-guide-next').getAttribute('aria-disabled'), 'true', 'no amount, no next');
+      await id('wallet-fx-amount-input').fill('135000');
+      await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
+      await page.screenshot({ path: path.join(out, `fx-3-amount-${context}.png`) });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('fx-quote-title'), id('fx-preview-rate')], { stepLabel: '4/6', context: `${context} quote` });
+      await page.screenshot({ path: path.join(out, `fx-4-quote-${context}.png`) });
+      await id('quest-guide-next').click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="fx-preview-fee"]') && (document.querySelector('[data-testid="quest-guide-step"]')?.textContent ?? '5/6') === '5/6');
+      await expectSpotlight([id('fx-preview-fee'), id('fx-preview-net')], { stepLabel: '5/6', context: `${context} fee` });
+      await page.screenshot({ path: path.join(out, `fx-5-fee-${context}.png`) });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('wallet-fx-execute-submit')], { stepLabel: '6/6', context: `${context} submit` });
+      await page.screenshot({ path: path.join(out, `fx-6-submit-${context}.png`) });
+      await recordFrames();
+      await id('wallet-fx-execute-submit').click();
+      await id('quest-guide-celebration').waitFor();
+      assert.equal(await text('quest-guide-celebration-title'), '환전하기 퀘스트 완료!');
+      await page.waitForTimeout(450);
+      await expectBadgeCheck();
+      await page.screenshot({ path: path.join(out, `fx-7-celebration-${context}.png`) });
+      await id('quest-card-exchange-completed').waitFor({ timeout: 8000 });
+      await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
+      await page.waitForTimeout(400);
+      assertSmoothReturn(await stopFrames(), 'fx');
+      assert.equal(await text('quest-card-exchange-status'), '완료');
+      assert.equal(await text('quest-card-transfer-status'), '미시작');
+      assert.equal(await id('quest-card-transfer-start').getAttribute('aria-disabled'), null, 'QUEST 02 can start now');
+      await page.screenshot({ path: path.join(out, `fx-8-returned-${context}.png`) });
+    }
+    async function practiceTransfer(context) {
+      await id('quest-card-transfer-start').click();
+      await id('wallet-screen').waitFor();
+      await expectSpotlight([id('wallet-transfer-item')], { body: '이체하기에서는 같은 통화를 내 지갑 사이에서 옮길 수 있어요.', stepLabel: '1/6', context: `${context} transfer entry` });
+      await page.screenshot({ path: path.join(out, `tr-1-entry-${context}.png`) });
+      await id('wallet-transfer').click();
+      await id('wallet-transfer-screen').waitFor();
+      await expectSpotlight([id('wallet-transfer-source-card')], { stepLabel: '2/6', context: `${context} source` });
+      await page.screenshot({ path: path.join(out, `tr-2-source-${context}.png`) });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('wallet-transfer-destination-card')], { stepLabel: '3/6', context: `${context} destination` });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('wallet-transfer-amount-field')], { stepLabel: '4/6', context: `${context} amount` });
+      await id('wallet-transfer-amount').fill('10');
+      await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
+      await page.screenshot({ path: path.join(out, `tr-4-amount-${context}.png`) });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('wallet-transfer-amount-field'), id('wallet-transfer-available')], { stepLabel: '5/6', context: `${context} review` });
+      await page.screenshot({ path: path.join(out, `tr-5-review-${context}.png`) });
+      await id('quest-guide-next').click();
+      await expectSpotlight([id('wallet-transfer-submit')], { stepLabel: '6/6', context: `${context} submit` });
+      await recordFrames();
+      await id('wallet-transfer-submit').click();
+      await id('quest-guide-celebration').waitFor();
+      assert.equal(await text('quest-guide-celebration-title'), '이체하기 퀘스트 완료!');
+      await page.waitForTimeout(450);
+      await expectBadgeCheck();
+      await page.screenshot({ path: path.join(out, `tr-7-celebration-${context}.png`) });
+      await id('quest-card-transfer-completed').waitFor({ timeout: 8000 });
+      await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
+      await page.waitForTimeout(400);
+      assertSmoothReturn(await stopFrames(), 'transfer');
+      assert.equal(await text('quest-summary-progress'), '퀘스트 2/2 완료');
+      await page.screenshot({ path: path.join(out, `tr-8-returned-${context}.png`) });
+    }
+    for (const [width, height, fontScale, theme, motion] of [
+      [390, 844, 1, 'light', 'no-preference'], [320, 640, 2, 'dark', 'no-preference'], [360, 740, 1, 'dark', 'reduce'],
+    ]) {
+      const context = `${theme}-${fontScale}x-${motion}-${width}`;
+      await page.setViewportSize({ width, height });
+      await page.emulateMedia({ reducedMotion: motion });
+      await open(`practice=1&fxState=available&fontScale=${fontScale}&theme=${theme}`);
+      await practiceExchange(context);
+      await practiceTransfer(context);
+      const posts = await page.evaluate(() => window.beginnerFixture.posts);
+      assert.deepEqual(posts.map(p => p.replace(/^\/trading-accounts\/[^/]+/, '')), ['/fx/quote', '/fx/execute', '/wallet-transfers'], 'exactly one user command per practice');
+      flows.push({ context, exchange: 'pass', transfer: 'pass', posts: posts.length });
+    }
+
+    // C: Reduced Motion keeps the guidance and the completion, without motion.
     await page.setViewportSize({ width: 390, height: 844 });
-    for (const [level, button, heading] of [['0', 'quest-open-fx', '환전'], ['1', 'quest-open-transfer', '이체하기']]) {
-      await open(`quest=${level}`);
-      await tab('퀘스트').click(); await id('quest-card-open').click(); await id('quest-detail-progress-label').waitFor();
-      assert.equal(await id('quest-open-transfer').getAttribute('aria-disabled'), level === '0' ? 'true' : null);
-      await id(button).scrollIntoViewIfNeeded(); await id(button).click();
-      await page.getByRole('heading', { name: heading, exact: true }).filter({ visible: true }).first().waitFor();
-      await tab('퀘스트').click(); await id('quest-detail-progress-label').waitFor();
-      practice.push({ level, opened: heading, returnedToDetail: true });
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await open('practice=1&fxState=available');
+    await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
+    await page.getByTestId('quest-guide-ring').waitFor();
+    await id('wallet-exchange').click();
+    await page.getByTestId('quest-guide-ring').waitFor();
+    assert.equal(await page.evaluate(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches), true);
+    await id('quest-guide-next').click();
+    await id('wallet-fx-amount-input').fill('27000');
+    for (const step of ['4/6', '5/6', '6/6']) {
+      await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
+      await id('quest-guide-next').click();
+      await page.waitForFunction(step => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === step, step);
     }
-    assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0, 'navigation never mutates');
+    await id('wallet-fx-execute-submit').click();
+    await id('quest-guide-celebration').waitFor();
+    assert.equal(await page.getByTestId('quest-confetti-piece').count(), 0, 'no confetti under Reduced Motion');
+    await page.screenshot({ path: path.join(out, 'reduced-motion-celebration.png') });
+    await id('quest-card-exchange-completed').waitFor({ timeout: 8000 });
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    flows.push({ context: 'reduced-motion', confetti: 0, returned: true });
 
-    // Unknown progress is shown as unknown at the narrowest, largest layout.
-    await page.setViewportSize({ width: 320, height: 844 });
-    await open('quest=error&fontScale=2&theme=dark');
-    await tab('퀘스트').click(); await id('quest-card-error').waitFor();
-    await settled('beginner-quest-list');
-    assert.equal(await questText('quest-card-status'), '확인 불가');
-    await contentFits('beginner-quest-list');
-    await page.screenshot({ path: path.join(out, 'quest-error-2-dark.png') });
-    await id('quest-card-open').click(); await id('quest-detail-error').waitFor();
-    await settled('quest-detail-screen');
-    await page.screenshot({ path: path.join(out, 'quest-detail-error-2-dark.png') });
-    assert.equal(await questText('quest-step-fx-state'), '확인 불가');
-    assert.equal(await questText('quest-step-transfer-state'), '확인 불가');
-    assert.equal(await page.getByTestId('quest-detail-completed').count(), 0);
-    assert.equal(await id('quest-open-transfer').getAttribute('aria-disabled'), 'true');
-    await contentFits('quest-detail-screen');
+    // D: an unconfirmed completion is never shown as done; retry confirms it.
+    await open('practice=1&fxState=available');
+    await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
+    await id('wallet-exchange').click();
+    await id('quest-guide-next').click();
+    await id('wallet-fx-amount-input').fill('13500');
+    for (const step of ['4/6', '5/6', '6/6']) {
+      await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
+      await id('quest-guide-next').click();
+      await page.waitForFunction(step => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === step, step);
+    }
+    await page.evaluate(() => { window.beginnerFixture.questFailures = 2; });
+    await id('wallet-fx-execute-submit').click();
+    await id('quest-guide-retry').waitFor({ timeout: 8000 });
+    assert.equal(await page.getByTestId('quest-guide-celebration').count(), 0, 'no celebration without proof');
+    await contentFits('quest-guide-card');
+    await page.screenshot({ path: path.join(out, 'unconfirmed.png') });
+    await id('quest-guide-retry').click();
+    await id('quest-guide-celebration').waitFor();
+    await id('quest-card-exchange-completed').waitFor({ timeout: 8000 });
+    assert.deepEqual((await page.evaluate(() => window.beginnerFixture.posts)).map(p => p.replace(/^\/trading-accounts\/[^/]+/, '')), ['/fx/quote', '/fx/execute'], 'retry re-reads progress, never re-executes');
+    flows.push({ context: 'unconfirmed-then-retry', pass: true });
+
+    // E: exit, Back and account switching never carry a guide elsewhere.
+    await open('practice=1&fxState=available');
+    await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
+    await page.getByTestId('quest-guide-ring').waitFor();
+    await id('quest-guide-exit').click();
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0);
+    await tab('퀘스트').click();
+    assert.equal(await text('quest-card-exchange-status'), '미시작');
+    await id('quest-card-exchange-start').click();
+    await id('wallet-exchange').click();
+    await page.getByTestId('quest-guide-ring').waitFor();
+    await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
+    await id('wallet-screen').waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === '1/6');
+    await tab('퀘스트').click();
+    assert.equal(await text('quest-card-exchange-status'), '진행 중');
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'the overlay pauses on other tabs');
+    await tab('홈').click();
+    await id('trading-account-switcher-trigger').click();
+    await id('trading-account-switcher-option-general-account').click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="home-account-title"]')?.textContent === '일반모드');
+    await tab('지갑').click(); await id('wallet-screen').waitFor();
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'no guide on the general account');
+    await tab('홈').click();
+    await id('trading-account-switcher-trigger').click();
+    await id('trading-account-switcher-option-beginner-account').click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="home-account-title"]')?.textContent === '초보모드');
+    await tab('퀘스트').click();
+    assert.equal(await text('quest-card-exchange-status'), '미시작', 'the old session did not survive the switch');
+    assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
+    flows.push({ context: 'exit-back-switch', pass: true });
+
+    // F: the FX screen for every mode: no account switcher, three equal rows.
+    for (const [account, width, fontScale, theme] of [['general', 320, 2, 'light'], ['season', 360, 1, 'dark'], ['beginner', 320, 1, 'dark']]) {
+      await page.setViewportSize({ width, height: 844 });
+      await open(`account=${account}&fxState=available&fontScale=${fontScale}&theme=${theme}${account === 'beginner' ? '&practice=1' : '&holdings=1'}`);
+      await tab('지갑').click(); await id('wallet-exchange').click();
+      await id('fx-wallet-summary').waitFor();
+      await settled('wallet-fx-screen');
+      const fxScreen = page.getByTestId('wallet-fx-screen').filter({ visible: true }).first();
+      assert.equal(await fxScreen.getByTestId('trading-account-switcher-trigger').count(), 0, `${account}: no switcher on FX`);
+      assert.equal(await fxScreen.getByText('투자 계정', { exact: true }).count(), 0, `${account}: no switcher label on FX`);
+      const summary = await page.getByTestId('fx-wallet-summary').filter({ visible: true }).first().evaluate(el => [...el.children].map(row => [...row.querySelectorAll('div')]
+        .filter(node => node.childNodes.length === 1 && node.firstChild.nodeType === Node.TEXT_NODE)
+        .map(node => ({ text: node.textContent, size: getComputedStyle(node).fontSize, weight: getComputedStyle(node).fontWeight }))));
+      assert.deepEqual(summary.map(row => row[0].text), ['KRW Wallet', 'USD Wallet', '환율']);
+      assert.equal(new Set(summary.flat().map(cell => `${cell.size}/${cell.weight}`)).size, 1, 'one size and weight');
+      assert.equal(summary.flat()[0].size, `${18 * fontScale}px`);
+      const fxText = await text('wallet-fx-screen');
+      assert.doesNotMatch(fxText, /지갑 요약|USD 환산|수집 시각|대체 환율/);
+      await contentFits('fx-wallet-summary');
+      await page.screenshot({ path: path.join(out, `fx-summary-${account}-${width}-${fontScale}-${theme}.png`) });
+      results.push({ fxSummary: account, width, fontScale, theme, switcher: 'absent', rows: 3 });
+    }
+    await open('account=general&fontScale=2&theme=light&holdings=1');
+    await tab('지갑').click(); await id('wallet-exchange').click();
+    await id('fx-rate-unavailable').waitFor();
+    assert.equal(await text('fx-summary-rate'), '-', 'no invented rate');
+    await contentFits('fx-rate-unavailable');
+    await page.screenshot({ path: path.join(out, 'fx-summary-rate-unavailable.png'), fullPage: true });
+
+    // G: delayed answers and switching keep every account's data separate.
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
-    for (const [account, title, third] of [['general-account', '일반 투자', '가이드'], ['season-account', 'Season 1', '랭킹'], ['beginner-account', '초보 투자', '퀘스트']]) {
+    for (const [account, title, third] of [['general-account', '일반모드', '가이드'], ['season-account', 'Season 1', '랭킹'], ['beginner-account', '초보모드', '퀘스트']]) {
       await id('trading-account-switcher-trigger').click();
       await id(`trading-account-switcher-option-${account}`).click();
       await page.waitForFunction(title => document.querySelector('[data-testid="home-account-title"]')?.textContent === title, title);
@@ -177,15 +452,13 @@ async function run() {
       await tab('MY').waitFor();
       assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
     }
-
-    // Exercise real Query observers and navigation while the transport holds responses.
     await open('account=general&holdings=1');
     await page.waitForFunction(() => document.querySelector('[data-testid="home-total-asset"]')?.textContent === '12,530,200원');
     await page.evaluate(() => {
       window.accountLeaks = [];
       new MutationObserver(() => {
         const title = document.querySelector('[data-testid="home-account-title"]')?.textContent;
-        const expected = title === '초보 투자' ? ['10,000,000원', 'beginner-account'] : title === '일반 투자' ? ['12,530,200원', 'general-account'] : null;
+        const expected = title === '초보모드' ? ['10,000,000원', 'beginner-account'] : title === '일반모드' ? ['12,530,200원', 'general-account'] : null;
         if (!expected) return;
         const amount = document.querySelector('[data-testid="home-total-asset"]')?.textContent;
         if (amount && amount !== expected[0]) window.accountLeaks.push({ title, amount });
@@ -198,7 +471,7 @@ async function run() {
     async function switchTo(account) {
       await id('trading-account-switcher-trigger').click();
       await id(`trading-account-switcher-option-${account}-account`).click();
-      await page.waitForFunction(title => document.querySelector('[data-testid="home-account-title"]')?.textContent === title, account === 'beginner' ? '초보 투자' : '일반 투자');
+      await page.waitForFunction(title => document.querySelector('[data-testid="home-account-title"]')?.textContent === title, account === 'beginner' ? '초보모드' : '일반모드');
     }
     await switchTo('beginner');
     await page.waitForFunction(() => window.beginnerFixture.pending.length > 0);
@@ -235,9 +508,20 @@ async function run() {
     assert.equal(await page.locator('[data-testid^="quest-"]').filter({ visible: true }).count(), 0);
     await switchTo('beginner');
     await tab('퀘스트').click();
-    assert.equal(await questText('quest-card-progress'), '실습 2/2 완료');
+    await id('quest-summary-progress').waitFor();
+    assert.equal(await text('quest-summary-progress'), '퀘스트 2/2 완료');
+    // Unknown progress is shown as unknown at the narrowest, largest layout.
+    await page.setViewportSize({ width: 320, height: 844 });
+    await open('quest=error&fontScale=2&theme=dark');
+    await tab('퀘스트').click(); await id('quest-card-error').waitFor();
+    await settled('beginner-quest-list');
+    assert.equal(await text('quest-card-exchange-status'), '확인 불가');
+    assert.equal(await id('quest-card-exchange-start').getAttribute('aria-disabled'), 'true');
+    await contentFits('beginner-quest-list');
+    await page.screenshot({ path: path.join(out, 'quest-error-2-dark.png'), fullPage: true });
+    await page.setViewportSize({ width: 390, height: 844 });
     await open('enabled=0');
-    assert.equal(await id('home-account-title').textContent(), '초보 투자');
+    assert.equal(await id('home-account-title').textContent(), '초보모드');
     await id('trading-account-switcher-trigger').click();
     assert.equal(await page.getByTestId('trading-account-switcher-option-beginner-account').count(), 1);
     assert.equal(await page.getByTestId('beginner-account-entry').count(), 0);
@@ -245,12 +529,15 @@ async function run() {
     await id('trading-account-switcher-trigger').click();
     assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
     await id('beginner-account-start').click();
-    await page.waitForFunction(() => document.querySelector('[data-testid="home-account-title"]')?.textContent === '초보 투자');
+    await page.waitForFunction(() => document.querySelector('[data-testid="home-account-title"]')?.textContent === '초보모드');
     assert.deepEqual(await page.evaluate(() => window.beginnerFixture.posts), ['/trading-accounts/beginner']);
     await tab('퀘스트').waitFor();
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, practice, questUnknownState: 'pass', delayedQuestIsolation: 'pass', accountSwitching: 'pass', delayedFinancialIsolation: 'pass', legacyFieldCompatibility: 'pass', explicitCreation: 'pass', errors }, null, 2));
-    console.log(`beginner browser checks passed: ${results.length} layouts with quest list/detail, practice navigation, unknown quest state, delayed quest isolation, guide navigation, three-mode switching, delayed financial isolation, legacy field compatibility and explicit creation`);
-  } finally { await browser?.close(); server.close(); }
+    fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, flows, compactSteps, accountSwitching: 'pass', delayedFinancialIsolation: 'pass', explicitCreation: 'pass', errors }, null, 2));
+    console.log(`beginner browser checks passed: ${results.length} layouts, ${flows.length} guided flows (spotlight geometry, real presses, celebration, smooth return, Reduced Motion, unconfirmed retry, exit/back/switch), FX summary for three modes, account isolation and explicit creation`);
+  } finally {
+    await page?.screenshot({ path: path.join(out, 'last-screen.png') }).catch(() => {});
+    await browser?.close(); server.close();
+  }
 }
 run().catch(error => { console.error(error); process.exitCode = 1; });
