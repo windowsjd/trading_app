@@ -77,6 +77,15 @@ function cpuTicks() {
   return { ticks, rssMiB: rssKiB / 1024 };
 }
 let trackedPids: number[] = [];
+async function refreshBackendPids() {
+  const rows = await db.$queryRaw<
+    Array<{ pid: number }>
+  >`SELECT pid FROM pg_stat_activity WHERE datname = current_database()`;
+  // The pool grows under concurrent reads. Include new backends rather than
+  // measuring only the connections present before the first load stage.
+  trackedPids = [...new Set([...trackedPids, ...rows.map((r) => r.pid)])];
+  return rows.length;
+}
 let closeHttp: (() => Promise<void>) | undefined;
 async function main() {
   const s = await fixture('general');
@@ -207,11 +216,7 @@ async function main() {
   };
   assert.equal((await request('instruments', randomUUID())).status, 404);
   assert.equal((await request('positions', randomUUID())).status, 404);
-  trackedPids = (
-    await db.$queryRaw<
-      Array<{ pid: number }>
-    >`SELECT pid FROM pg_stat_activity WHERE datname = current_database()`
-  ).map((r) => r.pid);
+  await refreshBackendPids();
   const settings = await dbSettings();
   const catalog = await request('instruments');
   assert.equal(catalog.body.data.instruments.length, 23);
@@ -241,6 +246,7 @@ async function main() {
     const stageSeconds = Number(process.env.BENCH_STAGE_SECONDS ?? 12);
     for (const concurrency of [1, 10, 50]) {
       const before = await stats();
+      await refreshBackendPids();
       const cpuBefore = process.cpuUsage(),
         pgBefore = cpuTicks(),
         start = performance.now();
@@ -257,13 +263,9 @@ async function main() {
         peakNodeRss = Math.max(peakNodeRss, process.memoryUsage().rss);
       }, 100);
       const dbMonitor = setInterval(() => {
-        void db.$queryRaw<
-          Array<{ n: bigint }>
-        >`SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database()`.then(
-          (r) => {
-            peakConnections = Math.max(peakConnections, Number(r[0].n));
-          },
-        );
+        void refreshBackendPids().then((count) => {
+          peakConnections = Math.max(peakConnections, count);
+        });
       }, 1000);
       await Promise.all(
         Array.from({ length: concurrency }, async (_, worker) => {
@@ -299,6 +301,7 @@ async function main() {
       clearInterval(monitor);
       clearInterval(dbMonitor);
       const elapsedSeconds = (performance.now() - start) / 1000;
+      await refreshBackendPids();
       const cpu = process.cpuUsage(cpuBefore),
         pg = cpuTicks(),
         after = await stats();

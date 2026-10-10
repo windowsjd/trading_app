@@ -1,0 +1,16 @@
+[Nest] 966638  - 10/10/2026, 5:17:24 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"85a8116c-ff27-43e0-a108-aaa9335d07ee"}
+PASS read-only CLI passes fresh complete DISABLED launch targets without idle Ops runs
+PASS CLI rejects expired coverage and disabled required collectors/risk
+PASS CLI rejects registered instrument missing prices
+PASS actual batched SQL matches individual Last/Mark readers for missing, fresh, future and stale newest trades; no older-trade resurrection
+(node:966638) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS actual CLI rejects disabled live protection config and successful preview-only worker observations
+PASS real execution, TP/SL, season pin, inclusive unpinned windows, latest per source preserved; repeat no-op; records immutable
+PASS both financial reference/delete race orderings preserve FK integrity
+PASS concurrent SKIP LOCKED batches delete each old observation exactly once at scale
+PASS multi-instance scheduler holds one actual Ops lease
+PASS failed job recorded, committed progress resumes safely, expired lease takeover fences old owner
+PASS actual CLI detects missing boundary evidence before the ended status update
+PASS actual CLI distinguishes missing historical settlement evidence, an unfixed boundary candidate and immutable Last pin
+Futures price safety PostgreSQL PASS (12 groups)

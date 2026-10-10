@@ -234,6 +234,29 @@ async function main() {
   const child = await db.protectionChild.findFirstOrThrow({
     where: { groupId: group.groupId },
   });
+  const protectionCheck = readiness({ CONDITIONAL_ORDERS_ENABLED: 'false' });
+  assert.equal(protectionCheck.status, 1);
+  assert.equal(
+    protectionCheck.report.blockers.some(
+      (b: { component: string }) => b.component === 'conditional_orders_config',
+    ),
+    true,
+  );
+  const preview = await runs.createRunning({
+    jobName: 'futures_liquidation',
+    trigger: 'manual_script',
+    dryRun: true,
+    startedAt: await now(),
+  });
+  await runs.recordSucceeded(preview, { finishedAt: await now() });
+  const previewWorker = readiness().report.workers.find(
+    (w: { jobName: string }) => w.jobName === 'futures_liquidation',
+  );
+  assert.equal(previewWorker.ready, false);
+  assert.equal(previewWorker.reason, 'WORKER_DRY_RUN_OR_EXECUTION_UNCONFIRMED');
+  pass(
+    'actual CLI rejects disabled live protection config and successful preview-only worker observations',
+  );
   assert.equal(child.futuresLastPriceSnapshotId !== null, true);
   const cutoff = new Date(+(await now()) + 86400000);
   const old = new Date(+(await now()) - 3 * 86400000);
@@ -293,7 +316,17 @@ async function main() {
     },
   });
   const unpinned = await snapshot(new Date(+unpinnedEnd - 10000));
-  const newestWs = await snapshot(new Date(+(await now()) + 1));
+  const latestStoredWs = await db.futuresLastPriceSnapshot.findFirstOrThrow({
+    where: {
+      instrumentId: i.instrument.id,
+      source: 'binance_usdm_agg_trade_ws',
+    },
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  });
+  // Establish an actually newest observation. A wall-clock regression between
+  // fixture inserts must not turn the "newest" fixture into an older row.
+  const newestWs = await snapshot(new Date(+latestStoredWs.capturedAt + 1));
   const oldestRest = await snapshot(old, 'binance_usdm_ticker_price_rest');
   const newestRest = await snapshot(
     new Date(+old + 1),
@@ -513,12 +546,25 @@ async function main() {
   const finalEnd = new Date(+(await now()) - 60000);
   await db.season.update({
     where: { id: final.season!.id },
-    data: { status: 'ended', endAt: finalEnd },
+    data: { endAt: finalEnd },
   });
   const finalState = () =>
     readiness().report.settlements.find(
       (item: { seasonId: string }) => item.seasonId === final.season!.id,
     ) as { ready: boolean; evidence: string };
+  assert.equal(finalState().ready, false);
+  assert.equal(
+    (await db.season.findUniqueOrThrow({ where: { id: final.season!.id } }))
+      .status,
+    'active',
+  );
+  pass(
+    'actual CLI detects missing boundary evidence before the ended status update',
+  );
+  await db.season.update({
+    where: { id: final.season!.id },
+    data: { status: 'ended' },
+  });
   assert.equal(finalState().ready, false);
   const finalSnapshot = await db.futuresLastPriceSnapshot.create({
     data: {

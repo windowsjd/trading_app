@@ -1,0 +1,21 @@
+[Nest] 962878  - 10/10/2026, 5:14:51 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a746a162-51d0-46a4-9e4f-c66f7b951f32"}
+PASS read-only CLI passes fresh complete DISABLED launch targets without idle Ops runs
+PASS CLI rejects expired coverage and disabled required collectors/risk
+PASS CLI rejects registered instrument missing prices
+PASS actual batched SQL matches individual Last/Mark readers for missing, fresh, future and stale newest trades; no older-trade resurrection
+(node:962878) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS actual CLI rejects disabled live protection config and successful preview-only worker observations
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+false !== true
+
+    at main (/home/nayuta/projects/trading-app/backend/scripts/futures-price-safety-integration.ts:340:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: false,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}

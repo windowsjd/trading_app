@@ -1,0 +1,24 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "jest",
+    "--runInBand",
+    "--runTestsByPath",
+    "src/trading-accounts/beginner-quest.integration.spec.ts",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/core-quest-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T08:14:08Z",
+  "elapsedSeconds": 2.088,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 581.8,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 18.2
+    }
+  ]
+}

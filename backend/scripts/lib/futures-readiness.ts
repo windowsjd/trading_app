@@ -18,6 +18,7 @@ export type FuturesWorkerObservation = {
   status: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  dryRun: boolean;
   resultJson?: unknown;
 };
 export type FuturesReadinessConfig = {
@@ -26,6 +27,7 @@ export type FuturesReadinessConfig = {
   riskEngine: boolean;
   markIngestion: boolean;
   lastPriceIngestion: boolean;
+  conditionalOrders: boolean;
 };
 export type FuturesSettlementReadiness = {
   seasonId: string;
@@ -82,6 +84,12 @@ export function evaluateFuturesReadiness(
     { component: 'mark_ingestion', ready: config.markIngestion },
     { component: 'risk_engine', ready: config.riskEngine },
   ].map((c) => ({ ...c, reason: c.ready ? null : 'CONFIG_DISABLED' }));
+  if (totals.liveProtections > 0)
+    components.push({
+      component: 'conditional_orders_config',
+      ready: config.conditionalOrders,
+      reason: config.conditionalOrders ? null : 'CONFIG_DISABLED',
+    });
   const demands: Record<string, number> = {
     futures_limit_matching: totals.pendingEntries,
     conditional_orders: totals.liveProtections,
@@ -124,7 +132,11 @@ export function evaluateFuturesReadiness(
             (r: unknown) =>
               !!r && typeof r === 'object' && 'failure' in r && !!r.failure,
           )));
-    const healthy = run.status === 'succeeded' && recent && !executionErrors;
+    const healthy =
+      run.status === 'succeeded' &&
+      run.dryRun === false &&
+      recent &&
+      !executionErrors;
     return {
       ...run,
       required,
@@ -141,9 +153,11 @@ export function evaluateFuturesReadiness(
             ? 'WORKER_UNOBSERVED'
             : run.status !== 'succeeded'
               ? 'WORKER_NOT_SUCCEEDED'
-              : !recent
-                ? 'WORKER_REPORT_STALE_OR_INVALID'
-                : 'WORKER_EXECUTION_ERRORS',
+              : run.dryRun !== false
+                ? 'WORKER_DRY_RUN_OR_EXECUTION_UNCONFIRMED'
+                : !recent
+                  ? 'WORKER_REPORT_STALE_OR_INVALID'
+                  : 'WORKER_EXECUTION_ERRORS',
     };
   });
   // A missing observation must never silently remove a required component.
@@ -154,6 +168,7 @@ export function evaluateFuturesReadiness(
         status: null,
         startedAt: null,
         finishedAt: null,
+        dryRun: false,
         required: true,
         ready: false,
         observation: 'unhealthy_or_unobserved',

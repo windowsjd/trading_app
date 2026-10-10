@@ -1,0 +1,620 @@
+{
+  "measurement": "actual loopback HTTP, real services/PG, fixture auth, independent owners with two cross positions; maximum-throughput closed-loop, not user arrival rate",
+  "accounts": 50,
+  "settings": [
+    {
+      "current_database": "futures_recheck_perf_test",
+      "version": "PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit",
+      "fsync": "on",
+      "synchronous_commit": "on",
+      "shared_buffers": "128MB"
+    }
+  ],
+  "instruments": 23,
+  "single": {
+    "instruments": {
+      "sqlQueries": 8,
+      "queries": [
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" LEFT JOIN \"public\".\"assets\" AS \"j0\" ON (\"j0\".\"id\") = (\"public\".\"futures_instruments\".\"underlying_asset_id\") WHERE (\"public\".\"futures_instruments\".\"is_active\" = $1 AND (\"j0\".\"is_active\" = $2 AND (\"j0\".\"id\" IS NOT NULL))) ORDER BY \"public\".\"futures_instruments\".\"id\" ASC OFFSET $3",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) OFFSET $24",
+          "calls": 1
+        },
+        {
+          "query": "SELECT clock_timestamp() AS \"now\"",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 1
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_last_price_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $26\n      ) m",
+          "calls": 1
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN (VALUES ($26::\"FuturesMarkSource\"), ($27::\"FuturesMarkSource\")) AS sources(source)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_mark_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.source = sources.source\n          AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $28\n      ) m",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"trading_account_id\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" IN ($1) OFFSET $2",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND \"public\".\"trading_accounts\".\"user_id\" = $2) LIMIT $3 OFFSET $4",
+          "calls": 1
+        }
+      ]
+    },
+    "positions": {
+      "sqlQueries": 31,
+      "queries": [
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"initial_capital_krw\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\", \"public\".\"seasons\".\"reward_policy_json\", \"public\".\"seasons\".\"created_at\", \"public\".\"seasons\".\"updated_at\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\")) ORDER BY \"public\".\"futures_positions\".\"created_at\" DESC, \"public\".\"futures_positions\".\"id\" DESC OFFSET $3",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"initial_capital_krw\", \"public\".\"season_participants\".\"total_asset_krw\", \"public\".\"season_participants\".\"total_return_rate\", \"public\".\"season_participants\".\"max_drawdown\", \"public\".\"season_participants\".\"total_fill_count\", \"public\".\"season_participants\".\"current_rank\", \"public\".\"season_participants\".\"final_rank\", \"public\".\"season_participants\".\"final_tier\", \"public\".\"season_participants\".\"reward_granted_at\", \"public\".\"season_participants\".\"excluded_at\", \"public\".\"season_participants\".\"excluded_reason\", \"public\".\"season_participants\".\"excluded_by_user_id\", \"public\".\"season_participants\".\"ranking_hidden_at\", \"public\".\"season_participants\".\"ranking_hidden_reason\", \"public\".\"season_participants\".\"ranking_hidden_by_user_id\", \"public\".\"season_participants\".\"result_corrected_at\", \"public\".\"season_participants\".\"result_corrected_reason\", \"public\".\"season_participants\".\"result_corrected_by_user_id\", \"public\".\"season_participants\".\"trading_account_id\", \"public\".\"season_participants\".\"created_at\", \"public\".\"season_participants\".\"updated_at\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"futures_mark_snapshots\".\"id\", \"public\".\"futures_mark_snapshots\".\"instrument_id\", \"public\".\"futures_mark_snapshots\".\"symbol\", \"public\".\"futures_mark_snapshots\".\"provider_product\", \"public\".\"futures_mark_snapshots\".\"currency_code\"::text, \"public\".\"futures_mark_snapshots\".\"source\"::text, \"public\".\"futures_mark_snapshots\".\"price\", \"public\".\"futures_mark_snapshots\".\"effective_at\", \"public\".\"futures_mark_snapshots\".\"captured_at\" FROM \"public\".\"futures_mark_snapshots\" WHERE (\"public\".\"futures_mark_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_mark_snapshots\".\"source\" = CAST($2::text AS \"public\".\"FuturesMarkSource\") AND \"public\".\"futures_mark_snapshots\".\"effective_at\" <= $3 AND \"public\".\"futures_mark_snapshots\".\"captured_at\" <= $4) ORDER BY \"public\".\"futures_mark_snapshots\".\"effective_at\" DESC, \"public\".\"futures_mark_snapshots\".\"captured_at\" DESC, \"public\".\"futures_mark_snapshots\".\"id\" DESC LIMIT $5 OFFSET $6",
+          "calls": 8
+        },
+        {
+          "query": "SELECT \"public\".\"cash_wallets\".\"id\", \"public\".\"cash_wallets\".\"trading_account_id\", \"public\".\"cash_wallets\".\"wallet_scope\"::text, \"public\".\"cash_wallets\".\"currency_code\"::text, \"public\".\"cash_wallets\".\"balance_amount\", \"public\".\"cash_wallets\".\"reserved_amount\", \"public\".\"cash_wallets\".\"created_at\", \"public\".\"cash_wallets\".\"updated_at\" FROM \"public\".\"cash_wallets\" WHERE \"public\".\"cash_wallets\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) ORDER BY \"public\".\"futures_positions\".\"id\" ASC OFFSET $4",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"futures_last_price_snapshots\".\"id\", \"public\".\"futures_last_price_snapshots\".\"instrument_id\", \"public\".\"futures_last_price_snapshots\".\"symbol\", \"public\".\"futures_last_price_snapshots\".\"provider_product\", \"public\".\"futures_last_price_snapshots\".\"currency_code\"::text, \"public\".\"futures_last_price_snapshots\".\"source\"::text, \"public\".\"futures_last_price_snapshots\".\"price\", \"public\".\"futures_last_price_snapshots\".\"effective_at\", \"public\".\"futures_last_price_snapshots\".\"captured_at\" FROM \"public\".\"futures_last_price_snapshots\" WHERE (\"public\".\"futures_last_price_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_last_price_snapshots\".\"captured_at\" <= $2 AND \"public\".\"futures_last_price_snapshots\".\"effective_at\" <= $3) ORDER BY \"public\".\"futures_last_price_snapshots\".\"effective_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"captured_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"id\" DESC LIMIT $4 OFFSET $5",
+          "calls": 2
+        },
+        {
+          "query": "SELECT clock_timestamp() AS \"now\"",
+          "calls": 1
+        },
+        {
+          "query": "-- TradingAccount canonical ownership hardening.\n--\n-- Legacy season_participant_id columns, foreign keys, indexes, uniques, and\n-- dual-write behavior are deliberately retained for the next removal work.\n-- This migration changes only account-scope identifiers:\n--   1. fail closed on participant/account ownership corruption,\n--   2. fill a NULL row.trading_account_id only from that row's own verified\n--      SeasonParticipant link,\n--   3. fail if any NULL or mismatch remains,\n--   4. make the canonical account link NOT NULL.\n--\n-- It never updates balances, reservations, quantities, costs, PnL, order or\n-- request status, prices, fees, rates, hashes, idempotency keys, snapshots,\n-- ranks, participant/season state, or timestamps.\n\nBEGIN",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 2
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 2
+        },
+        {
+          "query": "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"trading_account_id\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" IN ($1) OFFSET $2",
+          "calls": 2
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" WHERE \"public\".\"futures_instruments\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 2
+        },
+        {
+          "query": "COMMIT",
+          "calls": 1
+        },
+        {
+          "query": "SELECT SUM(\"isolated_margin\") AS \"_sum$isolated_margin\" FROM (SELECT \"public\".\"futures_positions\".\"isolated_margin\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) OFFSET $4) AS \"sub\"",
+          "calls": 1
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND \"public\".\"trading_accounts\".\"user_id\" = $2) LIMIT $3 OFFSET $4",
+          "calls": 2
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND $4=$5) LIMIT $2 OFFSET $3",
+          "calls": 1
+        }
+      ]
+    }
+  },
+  "stages": [
+    {
+      "concurrency": 1,
+      "elapsedSeconds": 12.010975159,
+      "requests": 1842,
+      "requestsPerSecond": 153.3597377078715,
+      "latencyMs": {
+        "instruments": {
+          "samples": 921,
+          "p50": 3.07,
+          "p95": 3.83,
+          "p99": 5.52,
+          "max": 7.18
+        },
+        "positions": {
+          "samples": 921,
+          "p50": 9.66,
+          "p95": 11.92,
+          "p99": 13.83,
+          "max": 16
+        }
+      },
+      "errors": {},
+      "missingPrices": 0,
+      "sqlQueries": 36041,
+      "queryDeltas": [
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"initial_capital_krw\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\", \"public\".\"seasons\".\"reward_policy_json\", \"public\".\"seasons\".\"created_at\", \"public\".\"seasons\".\"updated_at\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 921,
+          "executionMs": 0.7555559999999988
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" LEFT JOIN \"public\".\"assets\" AS \"j0\" ON (\"j0\".\"id\") = (\"public\".\"futures_instruments\".\"underlying_asset_id\") WHERE (\"public\".\"futures_instruments\".\"is_active\" = $1 AND (\"j0\".\"is_active\" = $2 AND (\"j0\".\"id\" IS NOT NULL))) ORDER BY \"public\".\"futures_instruments\".\"id\" ASC OFFSET $3",
+          "calls": 921,
+          "executionMs": 69.3086960000001
+        },
+        {
+          "query": "INSERT INTO \"public\".\"futures_last_price_snapshots\" (\"id\",\"instrument_id\",\"symbol\",\"provider_product\",\"currency_code\",\"source\",\"price\",\"effective_at\",\"captured_at\") VALUES ($1,$2,$3,$4,CAST($5::text AS \"public\".\"CurrencyCode\"),CAST($6::text AS \"public\".\"FuturesLastPriceSource\"),$7,$8,$9), ($10,$11,$12,$13,CAST($14::text AS \"public\".\"CurrencyCode\"),CAST($15::text AS \"public\".\"FuturesLastPriceSource\"),$16,$17,$18), ($19,$20,$21,$22,CAST($23::text AS \"public\".\"CurrencyCode\"),CAST($24::text AS \"public\".\"FuturesLastPriceSource\"),$25,$26,$27), ($28,$29,$30,$31,CAST($32::text AS \"public\".\"CurrencyCode\"),CAST($33::text AS \"public\".\"FuturesLastPriceSource\"),$34,$35,$36), ($37,$38,$39,$40,CAST($41::text AS \"public\".\"CurrencyCode\"),CAST($42::text AS \"public\".\"FuturesLastPriceSource\"),$43,$44,$45), ($46,$47,$48,$49,CAST($50::text AS \"public\".\"CurrencyCode\"),CAST($51::text AS \"public\".\"FuturesLastPriceSource\"),$52,$53,$54), ($55,$56,$57,$58,CAST($59::text AS \"public\".\"CurrencyCode\"),CAST($60::text AS \"public\".\"FuturesLastPriceSource\"),$61,$62,$63), ($64,$65,$66,$67,CAST($68::text AS \"public\".\"CurrencyCode\"),CAST($69::text AS \"public\".\"FuturesLastPriceSource\"),$70,$71,$72), ($73,$74,$75,$76,CAST($77::text AS \"public\".\"CurrencyCode\"),CAST($78::text AS \"public\".\"FuturesLastPriceSource\"),$79,$80,$81), ($82,$83,$84,$85,CAST($86::text AS \"public\".\"CurrencyCode\"),CAST($87::text AS \"public\".\"FuturesLastPriceSource\"),$88,$89,$90), ($91,$92,$93,$94,CAST($95::text AS \"public\".\"CurrencyCode\"),CAST($96::text AS \"public\".\"FuturesLastPriceSource\"),$97,$98,$99), ($100,$101,$102,$103,CAST($104::text AS \"public\".\"CurrencyCode\"),CAST($105::text AS \"public\".\"FuturesLastPriceSource\"),$106,$107,$108), ($109,$110,$111,$112,CAST($113::text AS \"public\".\"CurrencyCode\"),CAST($114::text AS \"public\".\"FuturesLastPriceSource\"),$115,$116,$117), ($118,$119,$120,$121,CAST($122::text AS \"public\".\"CurrencyCode\"),CAST($123::text AS \"public\".\"FuturesLastPriceSource\"),$124,$125,$126), ($127,$128,$129,$130,CAST($131::text AS \"public\".\"CurrencyCode\"),CAST($132::text AS \"public\".\"FuturesLastPriceSource\"),$133,$134,$135), ($136,$137,$138,$139,CAST($140::text AS \"public\".\"CurrencyCode\"),CAST($141::text AS \"public\".\"FuturesLastPriceSource\"),$142,$143,$144), ($145,$146,$147,$148,CAST($149::text AS \"public\".\"CurrencyCode\"),CAST($150::text AS \"public\".\"FuturesLastPriceSource\"),$151,$152,$153), ($154,$155,$156,$157,CAST($158::text AS \"public\".\"CurrencyCode\"),CAST($159::text AS \"public\".\"FuturesLastPriceSource\"),$160,$161,$162), ($163,$164,$165,$166,CAST($167::text AS \"public\".\"CurrencyCode\"),CAST($168::text AS \"public\".\"FuturesLastPriceSource\"),$169,$170,$171), ($172,$173,$174,$175,CAST($176::text AS \"public\".\"CurrencyCode\"),CAST($177::text AS \"public\".\"FuturesLastPriceSource\"),$178,$179,$180), ($181,$182,$183,$184,CAST($185::text AS \"public\".\"CurrencyCode\"),CAST($186::text AS \"public\".\"FuturesLastPriceSource\"),$187,$188,$189), ($190,$191,$192,$193,CAST($194::text AS \"public\".\"CurrencyCode\"),CAST($195::text AS \"public\".\"FuturesLastPriceSource\"),$196,$197,$198), ($199,$200,$201,$202,CAST($203::text AS \"public\".\"CurrencyCode\"),CAST($204::text AS \"public\".\"FuturesLastPriceSource\"),$205,$206,$207) ON CONFLICT DO NOTHING",
+          "calls": 12,
+          "executionMs": 5.852397
+        },
+        {
+          "query": "INSERT INTO \"public\".\"fx_rate_snapshots\" (\"id\",\"base_currency\",\"quote_currency\",\"rate\",\"source_type\",\"source_name\",\"effective_at\",\"captured_at\",\"created_at\") VALUES ($1,CAST($2::text AS \"public\".\"CurrencyCode\"),CAST($3::text AS \"public\".\"CurrencyCode\"),$4,CAST($5::text AS \"public\".\"FxRateSourceType\"),$6,$7,$8,$9) RETURNING \"public\".\"fx_rate_snapshots\".\"id\", \"public\".\"fx_rate_snapshots\".\"base_currency\"::text, \"public\".\"fx_rate_snapshots\".\"quote_currency\"::text, \"public\".\"fx_rate_snapshots\".\"rate\", \"public\".\"fx_rate_snapshots\".\"source_type\"::text, \"public\".\"fx_rate_snapshots\".\"source_name\", \"public\".\"fx_rate_snapshots\".\"source_timestamp\", \"public\".\"fx_rate_snapshots\".\"effective_at\", \"public\".\"fx_rate_snapshots\".\"captured_at\", \"public\".\"fx_rate_snapshots\".\"created_at\", \"public\".\"fx_rate_snapshots\".\"raw_payload_json\", \"public\".\"fx_rate_snapshots\".\"approved_by_user_id\", \"public\".\"fx_rate_snapshots\".\"note\"",
+          "calls": 12,
+          "executionMs": 0.3267380000000001
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) OFFSET $24",
+          "calls": 921,
+          "executionMs": 15.756252000000005
+        },
+        {
+          "query": "SELECT pid FROM pg_stat_activity WHERE datname = current_database()",
+          "calls": 14,
+          "executionMs": 0.9135909999999998
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\")) ORDER BY \"public\".\"futures_positions\".\"created_at\" DESC, \"public\".\"futures_positions\".\"id\" DESC OFFSET $3",
+          "calls": 921,
+          "executionMs": 15.112535000000005
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"initial_capital_krw\", \"public\".\"season_participants\".\"total_asset_krw\", \"public\".\"season_participants\".\"total_return_rate\", \"public\".\"season_participants\".\"max_drawdown\", \"public\".\"season_participants\".\"total_fill_count\", \"public\".\"season_participants\".\"current_rank\", \"public\".\"season_participants\".\"final_rank\", \"public\".\"season_participants\".\"final_tier\", \"public\".\"season_participants\".\"reward_granted_at\", \"public\".\"season_participants\".\"excluded_at\", \"public\".\"season_participants\".\"excluded_reason\", \"public\".\"season_participants\".\"excluded_by_user_id\", \"public\".\"season_participants\".\"ranking_hidden_at\", \"public\".\"season_participants\".\"ranking_hidden_reason\", \"public\".\"season_participants\".\"ranking_hidden_by_user_id\", \"public\".\"season_participants\".\"result_corrected_at\", \"public\".\"season_participants\".\"result_corrected_reason\", \"public\".\"season_participants\".\"result_corrected_by_user_id\", \"public\".\"season_participants\".\"trading_account_id\", \"public\".\"season_participants\".\"created_at\", \"public\".\"season_participants\".\"updated_at\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 921,
+          "executionMs": 2.069273000000003
+        },
+        {
+          "query": "SELECT \"public\".\"futures_mark_snapshots\".\"id\", \"public\".\"futures_mark_snapshots\".\"instrument_id\", \"public\".\"futures_mark_snapshots\".\"symbol\", \"public\".\"futures_mark_snapshots\".\"provider_product\", \"public\".\"futures_mark_snapshots\".\"currency_code\"::text, \"public\".\"futures_mark_snapshots\".\"source\"::text, \"public\".\"futures_mark_snapshots\".\"price\", \"public\".\"futures_mark_snapshots\".\"effective_at\", \"public\".\"futures_mark_snapshots\".\"captured_at\" FROM \"public\".\"futures_mark_snapshots\" WHERE (\"public\".\"futures_mark_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_mark_snapshots\".\"source\" = CAST($2::text AS \"public\".\"FuturesMarkSource\") AND \"public\".\"futures_mark_snapshots\".\"effective_at\" <= $3 AND \"public\".\"futures_mark_snapshots\".\"captured_at\" <= $4) ORDER BY \"public\".\"futures_mark_snapshots\".\"effective_at\" DESC, \"public\".\"futures_mark_snapshots\".\"captured_at\" DESC, \"public\".\"futures_mark_snapshots\".\"id\" DESC LIMIT $5 OFFSET $6",
+          "calls": 7368,
+          "executionMs": 86.44252100000006
+        },
+        {
+          "query": "SELECT \"public\".\"cash_wallets\".\"id\", \"public\".\"cash_wallets\".\"trading_account_id\", \"public\".\"cash_wallets\".\"wallet_scope\"::text, \"public\".\"cash_wallets\".\"currency_code\"::text, \"public\".\"cash_wallets\".\"balance_amount\", \"public\".\"cash_wallets\".\"reserved_amount\", \"public\".\"cash_wallets\".\"created_at\", \"public\".\"cash_wallets\".\"updated_at\" FROM \"public\".\"cash_wallets\" WHERE \"public\".\"cash_wallets\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 921,
+          "executionMs": 10.716921000000008
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) ORDER BY \"public\".\"futures_positions\".\"id\" ASC OFFSET $4",
+          "calls": 921,
+          "executionMs": 13.793571999999998
+        },
+        {
+          "query": "SELECT \"public\".\"futures_last_price_snapshots\".\"id\", \"public\".\"futures_last_price_snapshots\".\"instrument_id\", \"public\".\"futures_last_price_snapshots\".\"symbol\", \"public\".\"futures_last_price_snapshots\".\"provider_product\", \"public\".\"futures_last_price_snapshots\".\"currency_code\"::text, \"public\".\"futures_last_price_snapshots\".\"source\"::text, \"public\".\"futures_last_price_snapshots\".\"price\", \"public\".\"futures_last_price_snapshots\".\"effective_at\", \"public\".\"futures_last_price_snapshots\".\"captured_at\" FROM \"public\".\"futures_last_price_snapshots\" WHERE (\"public\".\"futures_last_price_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_last_price_snapshots\".\"captured_at\" <= $2 AND \"public\".\"futures_last_price_snapshots\".\"effective_at\" <= $3) ORDER BY \"public\".\"futures_last_price_snapshots\".\"effective_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"captured_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"id\" DESC LIMIT $4 OFFSET $5",
+          "calls": 1842,
+          "executionMs": 24.657325
+        },
+        {
+          "query": "SELECT clock_timestamp() AS \"now\"",
+          "calls": 1866,
+          "executionMs": 5.222148000000004
+        },
+        {
+          "query": "-- TradingAccount canonical ownership hardening.\n--\n-- Legacy season_participant_id columns, foreign keys, indexes, uniques, and\n-- dual-write behavior are deliberately retained for the next removal work.\n-- This migration changes only account-scope identifiers:\n--   1. fail closed on participant/account ownership corruption,\n--   2. fill a NULL row.trading_account_id only from that row's own verified\n--      SeasonParticipant link,\n--   3. fail if any NULL or mismatch remains,\n--   4. make the canonical account link NOT NULL.\n--\n-- It never updates balances, reservations, quantities, costs, PnL, order or\n-- request status, prices, fees, rates, hashes, idempotency keys, snapshots,\n-- ranks, participant/season state, or timestamps.\n\nBEGIN",
+          "calls": 945,
+          "executionMs": 0.4551640000000006
+        },
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 2763,
+          "executionMs": 2.3304210000000074
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_last_price_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $26\n      ) m",
+          "calls": 921,
+          "executionMs": 49.392996999999994
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 1842,
+          "executionMs": 16.462015000000022
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN (VALUES ($26::\"FuturesMarkSource\"), ($27::\"FuturesMarkSource\")) AS sources(source)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_mark_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.source = sources.source\n          AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $28\n      ) m",
+          "calls": 921,
+          "executionMs": 73.84899600000004
+        },
+        {
+          "query": "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+          "calls": 921,
+          "executionMs": 3.858780000000001
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"trading_account_id\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" IN ($1) OFFSET $2",
+          "calls": 2763,
+          "executionMs": 6.337599000000016
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" WHERE \"public\".\"futures_instruments\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 1842,
+          "executionMs": 20.670366999999978
+        },
+        {
+          "query": "COMMIT",
+          "calls": 945,
+          "executionMs": 0.4558269999999994
+        },
+        {
+          "query": "INSERT INTO \"public\".\"futures_mark_snapshots\" (\"id\",\"instrument_id\",\"symbol\",\"provider_product\",\"currency_code\",\"source\",\"price\",\"effective_at\",\"captured_at\") VALUES ($1,$2,$3,$4,CAST($5::text AS \"public\".\"CurrencyCode\"),CAST($6::text AS \"public\".\"FuturesMarkSource\"),$7,$8,$9), ($10,$11,$12,$13,CAST($14::text AS \"public\".\"CurrencyCode\"),CAST($15::text AS \"public\".\"FuturesMarkSource\"),$16,$17,$18), ($19,$20,$21,$22,CAST($23::text AS \"public\".\"CurrencyCode\"),CAST($24::text AS \"public\".\"FuturesMarkSource\"),$25,$26,$27), ($28,$29,$30,$31,CAST($32::text AS \"public\".\"CurrencyCode\"),CAST($33::text AS \"public\".\"FuturesMarkSource\"),$34,$35,$36), ($37,$38,$39,$40,CAST($41::text AS \"public\".\"CurrencyCode\"),CAST($42::text AS \"public\".\"FuturesMarkSource\"),$43,$44,$45), ($46,$47,$48,$49,CAST($50::text AS \"public\".\"CurrencyCode\"),CAST($51::text AS \"public\".\"FuturesMarkSource\"),$52,$53,$54), ($55,$56,$57,$58,CAST($59::text AS \"public\".\"CurrencyCode\"),CAST($60::text AS \"public\".\"FuturesMarkSource\"),$61,$62,$63), ($64,$65,$66,$67,CAST($68::text AS \"public\".\"CurrencyCode\"),CAST($69::text AS \"public\".\"FuturesMarkSource\"),$70,$71,$72), ($73,$74,$75,$76,CAST($77::text AS \"public\".\"CurrencyCode\"),CAST($78::text AS \"public\".\"FuturesMarkSource\"),$79,$80,$81), ($82,$83,$84,$85,CAST($86::text AS \"public\".\"CurrencyCode\"),CAST($87::text AS \"public\".\"FuturesMarkSource\"),$88,$89,$90), ($91,$92,$93,$94,CAST($95::text AS \"public\".\"CurrencyCode\"),CAST($96::text AS \"public\".\"FuturesMarkSource\"),$97,$98,$99), ($100,$101,$102,$103,CAST($104::text AS \"public\".\"CurrencyCode\"),CAST($105::text AS \"public\".\"FuturesMarkSource\"),$106,$107,$108), ($109,$110,$111,$112,CAST($113::text AS \"public\".\"CurrencyCode\"),CAST($114::text AS \"public\".\"FuturesMarkSource\"),$115,$116,$117), ($118,$119,$120,$121,CAST($122::text AS \"public\".\"CurrencyCode\"),CAST($123::text AS \"public\".\"FuturesMarkSource\"),$124,$125,$126), ($127,$128,$129,$130,CAST($131::text AS \"public\".\"CurrencyCode\"),CAST($132::text AS \"public\".\"FuturesMarkSource\"),$133,$134,$135), ($136,$137,$138,$139,CAST($140::text AS \"public\".\"CurrencyCode\"),CAST($141::text AS \"public\".\"FuturesMarkSource\"),$142,$143,$144), ($145,$146,$147,$148,CAST($149::text AS \"public\".\"CurrencyCode\"),CAST($150::text AS \"public\".\"FuturesMarkSource\"),$151,$152,$153), ($154,$155,$156,$157,CAST($158::text AS \"public\".\"CurrencyCode\"),CAST($159::text AS \"public\".\"FuturesMarkSource\"),$160,$161,$162), ($163,$164,$165,$166,CAST($167::text AS \"public\".\"CurrencyCode\"),CAST($168::text AS \"public\".\"FuturesMarkSource\"),$169,$170,$171), ($172,$173,$174,$175,CAST($176::text AS \"public\".\"CurrencyCode\"),CAST($177::text AS \"public\".\"FuturesMarkSource\"),$178,$179,$180), ($181,$182,$183,$184,CAST($185::text AS \"public\".\"CurrencyCode\"),CAST($186::text AS \"public\".\"FuturesMarkSource\"),$187,$188,$189), ($190,$191,$192,$193,CAST($194::text AS \"public\".\"CurrencyCode\"),CAST($195::text AS \"public\".\"FuturesMarkSource\"),$196,$197,$198), ($199,$200,$201,$202,CAST($203::text AS \"public\".\"CurrencyCode\"),CAST($204::text AS \"public\".\"FuturesMarkSource\"),$205,$206,$207) ON CONFLICT DO NOTHING",
+          "calls": 12,
+          "executionMs": 5.561502999999999
+        },
+        {
+          "query": "SELECT SUM(\"isolated_margin\") AS \"_sum$isolated_margin\" FROM (SELECT \"public\".\"futures_positions\".\"isolated_margin\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) OFFSET $4) AS \"sub\"",
+          "calls": 921,
+          "executionMs": 8.347081999999997
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND \"public\".\"trading_accounts\".\"user_id\" = $2) LIMIT $3 OFFSET $4",
+          "calls": 2763,
+          "executionMs": 22.847132000000013
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND $4=$5) LIMIT $2 OFFSET $3",
+          "calls": 921,
+          "executionMs": 6.700907999999994
+        }
+      ],
+      "nodeCpuCorePercent": 68.28801901112983,
+      "postgresBackendCpuCorePercent": 39.96344956556912,
+      "postgresBackendRssMiB": 113.76953125,
+      "peakNodeRssMiB": 522.5390625,
+      "peakConnections": 3
+    },
+    {
+      "concurrency": 10,
+      "elapsedSeconds": 12.017694056999998,
+      "requests": 3800,
+      "requestsPerSecond": 316.2004276341681,
+      "latencyMs": {
+        "instruments": {
+          "samples": 1900,
+          "p50": 15.48,
+          "p95": 19.38,
+          "p99": 21.72,
+          "max": 42.5
+        },
+        "positions": {
+          "samples": 1900,
+          "p50": 47.07,
+          "p95": 52.58,
+          "p99": 55.88,
+          "max": 84.99
+        }
+      },
+      "errors": {},
+      "missingPrices": 0,
+      "sqlQueries": 74222,
+      "queryDeltas": [
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"initial_capital_krw\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\", \"public\".\"seasons\".\"reward_policy_json\", \"public\".\"seasons\".\"created_at\", \"public\".\"seasons\".\"updated_at\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 1900,
+          "executionMs": 1.5841069999999768
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" LEFT JOIN \"public\".\"assets\" AS \"j0\" ON (\"j0\".\"id\") = (\"public\".\"futures_instruments\".\"underlying_asset_id\") WHERE (\"public\".\"futures_instruments\".\"is_active\" = $1 AND (\"j0\".\"is_active\" = $2 AND (\"j0\".\"id\" IS NOT NULL))) ORDER BY \"public\".\"futures_instruments\".\"id\" ASC OFFSET $3",
+          "calls": 1900,
+          "executionMs": 99.85043599999979
+        },
+        {
+          "query": "INSERT INTO \"public\".\"futures_last_price_snapshots\" (\"id\",\"instrument_id\",\"symbol\",\"provider_product\",\"currency_code\",\"source\",\"price\",\"effective_at\",\"captured_at\") VALUES ($1,$2,$3,$4,CAST($5::text AS \"public\".\"CurrencyCode\"),CAST($6::text AS \"public\".\"FuturesLastPriceSource\"),$7,$8,$9), ($10,$11,$12,$13,CAST($14::text AS \"public\".\"CurrencyCode\"),CAST($15::text AS \"public\".\"FuturesLastPriceSource\"),$16,$17,$18), ($19,$20,$21,$22,CAST($23::text AS \"public\".\"CurrencyCode\"),CAST($24::text AS \"public\".\"FuturesLastPriceSource\"),$25,$26,$27), ($28,$29,$30,$31,CAST($32::text AS \"public\".\"CurrencyCode\"),CAST($33::text AS \"public\".\"FuturesLastPriceSource\"),$34,$35,$36), ($37,$38,$39,$40,CAST($41::text AS \"public\".\"CurrencyCode\"),CAST($42::text AS \"public\".\"FuturesLastPriceSource\"),$43,$44,$45), ($46,$47,$48,$49,CAST($50::text AS \"public\".\"CurrencyCode\"),CAST($51::text AS \"public\".\"FuturesLastPriceSource\"),$52,$53,$54), ($55,$56,$57,$58,CAST($59::text AS \"public\".\"CurrencyCode\"),CAST($60::text AS \"public\".\"FuturesLastPriceSource\"),$61,$62,$63), ($64,$65,$66,$67,CAST($68::text AS \"public\".\"CurrencyCode\"),CAST($69::text AS \"public\".\"FuturesLastPriceSource\"),$70,$71,$72), ($73,$74,$75,$76,CAST($77::text AS \"public\".\"CurrencyCode\"),CAST($78::text AS \"public\".\"FuturesLastPriceSource\"),$79,$80,$81), ($82,$83,$84,$85,CAST($86::text AS \"public\".\"CurrencyCode\"),CAST($87::text AS \"public\".\"FuturesLastPriceSource\"),$88,$89,$90), ($91,$92,$93,$94,CAST($95::text AS \"public\".\"CurrencyCode\"),CAST($96::text AS \"public\".\"FuturesLastPriceSource\"),$97,$98,$99), ($100,$101,$102,$103,CAST($104::text AS \"public\".\"CurrencyCode\"),CAST($105::text AS \"public\".\"FuturesLastPriceSource\"),$106,$107,$108), ($109,$110,$111,$112,CAST($113::text AS \"public\".\"CurrencyCode\"),CAST($114::text AS \"public\".\"FuturesLastPriceSource\"),$115,$116,$117), ($118,$119,$120,$121,CAST($122::text AS \"public\".\"CurrencyCode\"),CAST($123::text AS \"public\".\"FuturesLastPriceSource\"),$124,$125,$126), ($127,$128,$129,$130,CAST($131::text AS \"public\".\"CurrencyCode\"),CAST($132::text AS \"public\".\"FuturesLastPriceSource\"),$133,$134,$135), ($136,$137,$138,$139,CAST($140::text AS \"public\".\"CurrencyCode\"),CAST($141::text AS \"public\".\"FuturesLastPriceSource\"),$142,$143,$144), ($145,$146,$147,$148,CAST($149::text AS \"public\".\"CurrencyCode\"),CAST($150::text AS \"public\".\"FuturesLastPriceSource\"),$151,$152,$153), ($154,$155,$156,$157,CAST($158::text AS \"public\".\"CurrencyCode\"),CAST($159::text AS \"public\".\"FuturesLastPriceSource\"),$160,$161,$162), ($163,$164,$165,$166,CAST($167::text AS \"public\".\"CurrencyCode\"),CAST($168::text AS \"public\".\"FuturesLastPriceSource\"),$169,$170,$171), ($172,$173,$174,$175,CAST($176::text AS \"public\".\"CurrencyCode\"),CAST($177::text AS \"public\".\"FuturesLastPriceSource\"),$178,$179,$180), ($181,$182,$183,$184,CAST($185::text AS \"public\".\"CurrencyCode\"),CAST($186::text AS \"public\".\"FuturesLastPriceSource\"),$187,$188,$189), ($190,$191,$192,$193,CAST($194::text AS \"public\".\"CurrencyCode\"),CAST($195::text AS \"public\".\"FuturesLastPriceSource\"),$196,$197,$198), ($199,$200,$201,$202,CAST($203::text AS \"public\".\"CurrencyCode\"),CAST($204::text AS \"public\".\"FuturesLastPriceSource\"),$205,$206,$207) ON CONFLICT DO NOTHING",
+          "calls": 12,
+          "executionMs": 9.925178000000004
+        },
+        {
+          "query": "INSERT INTO \"public\".\"fx_rate_snapshots\" (\"id\",\"base_currency\",\"quote_currency\",\"rate\",\"source_type\",\"source_name\",\"effective_at\",\"captured_at\",\"created_at\") VALUES ($1,CAST($2::text AS \"public\".\"CurrencyCode\"),CAST($3::text AS \"public\".\"CurrencyCode\"),$4,CAST($5::text AS \"public\".\"FxRateSourceType\"),$6,$7,$8,$9) RETURNING \"public\".\"fx_rate_snapshots\".\"id\", \"public\".\"fx_rate_snapshots\".\"base_currency\"::text, \"public\".\"fx_rate_snapshots\".\"quote_currency\"::text, \"public\".\"fx_rate_snapshots\".\"rate\", \"public\".\"fx_rate_snapshots\".\"source_type\"::text, \"public\".\"fx_rate_snapshots\".\"source_name\", \"public\".\"fx_rate_snapshots\".\"source_timestamp\", \"public\".\"fx_rate_snapshots\".\"effective_at\", \"public\".\"fx_rate_snapshots\".\"captured_at\", \"public\".\"fx_rate_snapshots\".\"created_at\", \"public\".\"fx_rate_snapshots\".\"raw_payload_json\", \"public\".\"fx_rate_snapshots\".\"approved_by_user_id\", \"public\".\"fx_rate_snapshots\".\"note\"",
+          "calls": 12,
+          "executionMs": 0.6875120000000001
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) OFFSET $24",
+          "calls": 1900,
+          "executionMs": 32.512760999999976
+        },
+        {
+          "query": "SELECT pid FROM pg_stat_activity WHERE datname = current_database()",
+          "calls": 14,
+          "executionMs": 0.954563
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\")) ORDER BY \"public\".\"futures_positions\".\"created_at\" DESC, \"public\".\"futures_positions\".\"id\" DESC OFFSET $3",
+          "calls": 1900,
+          "executionMs": 31.179077000000063
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"initial_capital_krw\", \"public\".\"season_participants\".\"total_asset_krw\", \"public\".\"season_participants\".\"total_return_rate\", \"public\".\"season_participants\".\"max_drawdown\", \"public\".\"season_participants\".\"total_fill_count\", \"public\".\"season_participants\".\"current_rank\", \"public\".\"season_participants\".\"final_rank\", \"public\".\"season_participants\".\"final_tier\", \"public\".\"season_participants\".\"reward_granted_at\", \"public\".\"season_participants\".\"excluded_at\", \"public\".\"season_participants\".\"excluded_reason\", \"public\".\"season_participants\".\"excluded_by_user_id\", \"public\".\"season_participants\".\"ranking_hidden_at\", \"public\".\"season_participants\".\"ranking_hidden_reason\", \"public\".\"season_participants\".\"ranking_hidden_by_user_id\", \"public\".\"season_participants\".\"result_corrected_at\", \"public\".\"season_participants\".\"result_corrected_reason\", \"public\".\"season_participants\".\"result_corrected_by_user_id\", \"public\".\"season_participants\".\"trading_account_id\", \"public\".\"season_participants\".\"created_at\", \"public\".\"season_participants\".\"updated_at\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 1900,
+          "executionMs": 4.415467999999998
+        },
+        {
+          "query": "SELECT \"public\".\"futures_mark_snapshots\".\"id\", \"public\".\"futures_mark_snapshots\".\"instrument_id\", \"public\".\"futures_mark_snapshots\".\"symbol\", \"public\".\"futures_mark_snapshots\".\"provider_product\", \"public\".\"futures_mark_snapshots\".\"currency_code\"::text, \"public\".\"futures_mark_snapshots\".\"source\"::text, \"public\".\"futures_mark_snapshots\".\"price\", \"public\".\"futures_mark_snapshots\".\"effective_at\", \"public\".\"futures_mark_snapshots\".\"captured_at\" FROM \"public\".\"futures_mark_snapshots\" WHERE (\"public\".\"futures_mark_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_mark_snapshots\".\"source\" = CAST($2::text AS \"public\".\"FuturesMarkSource\") AND \"public\".\"futures_mark_snapshots\".\"effective_at\" <= $3 AND \"public\".\"futures_mark_snapshots\".\"captured_at\" <= $4) ORDER BY \"public\".\"futures_mark_snapshots\".\"effective_at\" DESC, \"public\".\"futures_mark_snapshots\".\"captured_at\" DESC, \"public\".\"futures_mark_snapshots\".\"id\" DESC LIMIT $5 OFFSET $6",
+          "calls": 15200,
+          "executionMs": 209.39636300000225
+        },
+        {
+          "query": "SELECT \"public\".\"cash_wallets\".\"id\", \"public\".\"cash_wallets\".\"trading_account_id\", \"public\".\"cash_wallets\".\"wallet_scope\"::text, \"public\".\"cash_wallets\".\"currency_code\"::text, \"public\".\"cash_wallets\".\"balance_amount\", \"public\".\"cash_wallets\".\"reserved_amount\", \"public\".\"cash_wallets\".\"created_at\", \"public\".\"cash_wallets\".\"updated_at\" FROM \"public\".\"cash_wallets\" WHERE \"public\".\"cash_wallets\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 1900,
+          "executionMs": 22.08347300000009
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) ORDER BY \"public\".\"futures_positions\".\"id\" ASC OFFSET $4",
+          "calls": 1900,
+          "executionMs": 28.98716599999993
+        },
+        {
+          "query": "SELECT \"public\".\"futures_last_price_snapshots\".\"id\", \"public\".\"futures_last_price_snapshots\".\"instrument_id\", \"public\".\"futures_last_price_snapshots\".\"symbol\", \"public\".\"futures_last_price_snapshots\".\"provider_product\", \"public\".\"futures_last_price_snapshots\".\"currency_code\"::text, \"public\".\"futures_last_price_snapshots\".\"source\"::text, \"public\".\"futures_last_price_snapshots\".\"price\", \"public\".\"futures_last_price_snapshots\".\"effective_at\", \"public\".\"futures_last_price_snapshots\".\"captured_at\" FROM \"public\".\"futures_last_price_snapshots\" WHERE (\"public\".\"futures_last_price_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_last_price_snapshots\".\"captured_at\" <= $2 AND \"public\".\"futures_last_price_snapshots\".\"effective_at\" <= $3) ORDER BY \"public\".\"futures_last_price_snapshots\".\"effective_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"captured_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"id\" DESC LIMIT $4 OFFSET $5",
+          "calls": 3800,
+          "executionMs": 53.81215300000002
+        },
+        {
+          "query": "SELECT clock_timestamp() AS \"now\"",
+          "calls": 3824,
+          "executionMs": 10.511347000000054
+        },
+        {
+          "query": "-- TradingAccount canonical ownership hardening.\n--\n-- Legacy season_participant_id columns, foreign keys, indexes, uniques, and\n-- dual-write behavior are deliberately retained for the next removal work.\n-- This migration changes only account-scope identifiers:\n--   1. fail closed on participant/account ownership corruption,\n--   2. fill a NULL row.trading_account_id only from that row's own verified\n--      SeasonParticipant link,\n--   3. fail if any NULL or mismatch remains,\n--   4. make the canonical account link NOT NULL.\n--\n-- It never updates balances, reservations, quantities, costs, PnL, order or\n-- request status, prices, fees, rates, hashes, idempotency keys, snapshots,\n-- ranks, participant/season state, or timestamps.\n\nBEGIN",
+          "calls": 1924,
+          "executionMs": 0.8041970000000107
+        },
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 5700,
+          "executionMs": 4.840029000000129
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_last_price_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $26\n      ) m",
+          "calls": 1900,
+          "executionMs": 113.34092600000025
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 3800,
+          "executionMs": 34.668212000000125
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN (VALUES ($26::\"FuturesMarkSource\"), ($27::\"FuturesMarkSource\")) AS sources(source)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_mark_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.source = sources.source\n          AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $28\n      ) m",
+          "calls": 1900,
+          "executionMs": 151.8975230000002
+        },
+        {
+          "query": "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+          "calls": 1900,
+          "executionMs": 6.909999000000011
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"trading_account_id\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" IN ($1) OFFSET $2",
+          "calls": 5700,
+          "executionMs": 13.540661999999969
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" WHERE \"public\".\"futures_instruments\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 3800,
+          "executionMs": 42.64373599999979
+        },
+        {
+          "query": "COMMIT",
+          "calls": 1924,
+          "executionMs": 0.733105000000007
+        },
+        {
+          "query": "INSERT INTO \"public\".\"futures_mark_snapshots\" (\"id\",\"instrument_id\",\"symbol\",\"provider_product\",\"currency_code\",\"source\",\"price\",\"effective_at\",\"captured_at\") VALUES ($1,$2,$3,$4,CAST($5::text AS \"public\".\"CurrencyCode\"),CAST($6::text AS \"public\".\"FuturesMarkSource\"),$7,$8,$9), ($10,$11,$12,$13,CAST($14::text AS \"public\".\"CurrencyCode\"),CAST($15::text AS \"public\".\"FuturesMarkSource\"),$16,$17,$18), ($19,$20,$21,$22,CAST($23::text AS \"public\".\"CurrencyCode\"),CAST($24::text AS \"public\".\"FuturesMarkSource\"),$25,$26,$27), ($28,$29,$30,$31,CAST($32::text AS \"public\".\"CurrencyCode\"),CAST($33::text AS \"public\".\"FuturesMarkSource\"),$34,$35,$36), ($37,$38,$39,$40,CAST($41::text AS \"public\".\"CurrencyCode\"),CAST($42::text AS \"public\".\"FuturesMarkSource\"),$43,$44,$45), ($46,$47,$48,$49,CAST($50::text AS \"public\".\"CurrencyCode\"),CAST($51::text AS \"public\".\"FuturesMarkSource\"),$52,$53,$54), ($55,$56,$57,$58,CAST($59::text AS \"public\".\"CurrencyCode\"),CAST($60::text AS \"public\".\"FuturesMarkSource\"),$61,$62,$63), ($64,$65,$66,$67,CAST($68::text AS \"public\".\"CurrencyCode\"),CAST($69::text AS \"public\".\"FuturesMarkSource\"),$70,$71,$72), ($73,$74,$75,$76,CAST($77::text AS \"public\".\"CurrencyCode\"),CAST($78::text AS \"public\".\"FuturesMarkSource\"),$79,$80,$81), ($82,$83,$84,$85,CAST($86::text AS \"public\".\"CurrencyCode\"),CAST($87::text AS \"public\".\"FuturesMarkSource\"),$88,$89,$90), ($91,$92,$93,$94,CAST($95::text AS \"public\".\"CurrencyCode\"),CAST($96::text AS \"public\".\"FuturesMarkSource\"),$97,$98,$99), ($100,$101,$102,$103,CAST($104::text AS \"public\".\"CurrencyCode\"),CAST($105::text AS \"public\".\"FuturesMarkSource\"),$106,$107,$108), ($109,$110,$111,$112,CAST($113::text AS \"public\".\"CurrencyCode\"),CAST($114::text AS \"public\".\"FuturesMarkSource\"),$115,$116,$117), ($118,$119,$120,$121,CAST($122::text AS \"public\".\"CurrencyCode\"),CAST($123::text AS \"public\".\"FuturesMarkSource\"),$124,$125,$126), ($127,$128,$129,$130,CAST($131::text AS \"public\".\"CurrencyCode\"),CAST($132::text AS \"public\".\"FuturesMarkSource\"),$133,$134,$135), ($136,$137,$138,$139,CAST($140::text AS \"public\".\"CurrencyCode\"),CAST($141::text AS \"public\".\"FuturesMarkSource\"),$142,$143,$144), ($145,$146,$147,$148,CAST($149::text AS \"public\".\"CurrencyCode\"),CAST($150::text AS \"public\".\"FuturesMarkSource\"),$151,$152,$153), ($154,$155,$156,$157,CAST($158::text AS \"public\".\"CurrencyCode\"),CAST($159::text AS \"public\".\"FuturesMarkSource\"),$160,$161,$162), ($163,$164,$165,$166,CAST($167::text AS \"public\".\"CurrencyCode\"),CAST($168::text AS \"public\".\"FuturesMarkSource\"),$169,$170,$171), ($172,$173,$174,$175,CAST($176::text AS \"public\".\"CurrencyCode\"),CAST($177::text AS \"public\".\"FuturesMarkSource\"),$178,$179,$180), ($181,$182,$183,$184,CAST($185::text AS \"public\".\"CurrencyCode\"),CAST($186::text AS \"public\".\"FuturesMarkSource\"),$187,$188,$189), ($190,$191,$192,$193,CAST($194::text AS \"public\".\"CurrencyCode\"),CAST($195::text AS \"public\".\"FuturesMarkSource\"),$196,$197,$198), ($199,$200,$201,$202,CAST($203::text AS \"public\".\"CurrencyCode\"),CAST($204::text AS \"public\".\"FuturesMarkSource\"),$205,$206,$207) ON CONFLICT DO NOTHING",
+          "calls": 12,
+          "executionMs": 9.332523999999996
+        },
+        {
+          "query": "SELECT SUM(\"isolated_margin\") AS \"_sum$isolated_margin\" FROM (SELECT \"public\".\"futures_positions\".\"isolated_margin\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) OFFSET $4) AS \"sub\"",
+          "calls": 1900,
+          "executionMs": 17.836140999999984
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND \"public\".\"trading_accounts\".\"user_id\" = $2) LIMIT $3 OFFSET $4",
+          "calls": 5700,
+          "executionMs": 47.88228600000026
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND $4=$5) LIMIT $2 OFFSET $3",
+          "calls": 1900,
+          "executionMs": 14.20561099999994
+        }
+      ],
+      "nodeCpuCorePercent": 101.7277602676119,
+      "postgresBackendCpuCorePercent": 71.31151749539002,
+      "postgresBackendRssMiB": 325.4140625,
+      "peakNodeRssMiB": 616.7890625,
+      "peakConnections": 10
+    },
+    {
+      "concurrency": 50,
+      "elapsedSeconds": 12.090681837,
+      "requests": 3933,
+      "requestsPerSecond": 325.29182828748355,
+      "latencyMs": {
+        "instruments": {
+          "samples": 1970,
+          "p50": 166.8,
+          "p95": 189.61,
+          "p99": 204.48,
+          "max": 250.22
+        },
+        "positions": {
+          "samples": 1963,
+          "p50": 139.74,
+          "p95": 163.29,
+          "p99": 173.85,
+          "max": 250.07
+        }
+      },
+      "errors": {},
+      "missingPrices": 0,
+      "sqlQueries": 76735,
+      "queryDeltas": [
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"initial_capital_krw\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\", \"public\".\"seasons\".\"reward_policy_json\", \"public\".\"seasons\".\"created_at\", \"public\".\"seasons\".\"updated_at\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 1963,
+          "executionMs": 1.6782349999999937
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" LEFT JOIN \"public\".\"assets\" AS \"j0\" ON (\"j0\".\"id\") = (\"public\".\"futures_instruments\".\"underlying_asset_id\") WHERE (\"public\".\"futures_instruments\".\"is_active\" = $1 AND (\"j0\".\"is_active\" = $2 AND (\"j0\".\"id\" IS NOT NULL))) ORDER BY \"public\".\"futures_instruments\".\"id\" ASC OFFSET $3",
+          "calls": 1970,
+          "executionMs": 104.14608100000046
+        },
+        {
+          "query": "INSERT INTO \"public\".\"futures_last_price_snapshots\" (\"id\",\"instrument_id\",\"symbol\",\"provider_product\",\"currency_code\",\"source\",\"price\",\"effective_at\",\"captured_at\") VALUES ($1,$2,$3,$4,CAST($5::text AS \"public\".\"CurrencyCode\"),CAST($6::text AS \"public\".\"FuturesLastPriceSource\"),$7,$8,$9), ($10,$11,$12,$13,CAST($14::text AS \"public\".\"CurrencyCode\"),CAST($15::text AS \"public\".\"FuturesLastPriceSource\"),$16,$17,$18), ($19,$20,$21,$22,CAST($23::text AS \"public\".\"CurrencyCode\"),CAST($24::text AS \"public\".\"FuturesLastPriceSource\"),$25,$26,$27), ($28,$29,$30,$31,CAST($32::text AS \"public\".\"CurrencyCode\"),CAST($33::text AS \"public\".\"FuturesLastPriceSource\"),$34,$35,$36), ($37,$38,$39,$40,CAST($41::text AS \"public\".\"CurrencyCode\"),CAST($42::text AS \"public\".\"FuturesLastPriceSource\"),$43,$44,$45), ($46,$47,$48,$49,CAST($50::text AS \"public\".\"CurrencyCode\"),CAST($51::text AS \"public\".\"FuturesLastPriceSource\"),$52,$53,$54), ($55,$56,$57,$58,CAST($59::text AS \"public\".\"CurrencyCode\"),CAST($60::text AS \"public\".\"FuturesLastPriceSource\"),$61,$62,$63), ($64,$65,$66,$67,CAST($68::text AS \"public\".\"CurrencyCode\"),CAST($69::text AS \"public\".\"FuturesLastPriceSource\"),$70,$71,$72), ($73,$74,$75,$76,CAST($77::text AS \"public\".\"CurrencyCode\"),CAST($78::text AS \"public\".\"FuturesLastPriceSource\"),$79,$80,$81), ($82,$83,$84,$85,CAST($86::text AS \"public\".\"CurrencyCode\"),CAST($87::text AS \"public\".\"FuturesLastPriceSource\"),$88,$89,$90), ($91,$92,$93,$94,CAST($95::text AS \"public\".\"CurrencyCode\"),CAST($96::text AS \"public\".\"FuturesLastPriceSource\"),$97,$98,$99), ($100,$101,$102,$103,CAST($104::text AS \"public\".\"CurrencyCode\"),CAST($105::text AS \"public\".\"FuturesLastPriceSource\"),$106,$107,$108), ($109,$110,$111,$112,CAST($113::text AS \"public\".\"CurrencyCode\"),CAST($114::text AS \"public\".\"FuturesLastPriceSource\"),$115,$116,$117), ($118,$119,$120,$121,CAST($122::text AS \"public\".\"CurrencyCode\"),CAST($123::text AS \"public\".\"FuturesLastPriceSource\"),$124,$125,$126), ($127,$128,$129,$130,CAST($131::text AS \"public\".\"CurrencyCode\"),CAST($132::text AS \"public\".\"FuturesLastPriceSource\"),$133,$134,$135), ($136,$137,$138,$139,CAST($140::text AS \"public\".\"CurrencyCode\"),CAST($141::text AS \"public\".\"FuturesLastPriceSource\"),$142,$143,$144), ($145,$146,$147,$148,CAST($149::text AS \"public\".\"CurrencyCode\"),CAST($150::text AS \"public\".\"FuturesLastPriceSource\"),$151,$152,$153), ($154,$155,$156,$157,CAST($158::text AS \"public\".\"CurrencyCode\"),CAST($159::text AS \"public\".\"FuturesLastPriceSource\"),$160,$161,$162), ($163,$164,$165,$166,CAST($167::text AS \"public\".\"CurrencyCode\"),CAST($168::text AS \"public\".\"FuturesLastPriceSource\"),$169,$170,$171), ($172,$173,$174,$175,CAST($176::text AS \"public\".\"CurrencyCode\"),CAST($177::text AS \"public\".\"FuturesLastPriceSource\"),$178,$179,$180), ($181,$182,$183,$184,CAST($185::text AS \"public\".\"CurrencyCode\"),CAST($186::text AS \"public\".\"FuturesLastPriceSource\"),$187,$188,$189), ($190,$191,$192,$193,CAST($194::text AS \"public\".\"CurrencyCode\"),CAST($195::text AS \"public\".\"FuturesLastPriceSource\"),$196,$197,$198), ($199,$200,$201,$202,CAST($203::text AS \"public\".\"CurrencyCode\"),CAST($204::text AS \"public\".\"FuturesLastPriceSource\"),$205,$206,$207) ON CONFLICT DO NOTHING",
+          "calls": 12,
+          "executionMs": 7.188448000000008
+        },
+        {
+          "query": "INSERT INTO \"public\".\"fx_rate_snapshots\" (\"id\",\"base_currency\",\"quote_currency\",\"rate\",\"source_type\",\"source_name\",\"effective_at\",\"captured_at\",\"created_at\") VALUES ($1,CAST($2::text AS \"public\".\"CurrencyCode\"),CAST($3::text AS \"public\".\"CurrencyCode\"),$4,CAST($5::text AS \"public\".\"FxRateSourceType\"),$6,$7,$8,$9) RETURNING \"public\".\"fx_rate_snapshots\".\"id\", \"public\".\"fx_rate_snapshots\".\"base_currency\"::text, \"public\".\"fx_rate_snapshots\".\"quote_currency\"::text, \"public\".\"fx_rate_snapshots\".\"rate\", \"public\".\"fx_rate_snapshots\".\"source_type\"::text, \"public\".\"fx_rate_snapshots\".\"source_name\", \"public\".\"fx_rate_snapshots\".\"source_timestamp\", \"public\".\"fx_rate_snapshots\".\"effective_at\", \"public\".\"fx_rate_snapshots\".\"captured_at\", \"public\".\"fx_rate_snapshots\".\"created_at\", \"public\".\"fx_rate_snapshots\".\"raw_payload_json\", \"public\".\"fx_rate_snapshots\".\"approved_by_user_id\", \"public\".\"fx_rate_snapshots\".\"note\"",
+          "calls": 12,
+          "executionMs": 0.6048930000000001
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) OFFSET $24",
+          "calls": 1970,
+          "executionMs": 34.53833700000027
+        },
+        {
+          "query": "SELECT pid FROM pg_stat_activity WHERE datname = current_database()",
+          "calls": 14,
+          "executionMs": 0.7597179999999999
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\")) ORDER BY \"public\".\"futures_positions\".\"created_at\" DESC, \"public\".\"futures_positions\".\"id\" DESC OFFSET $3",
+          "calls": 1963,
+          "executionMs": 33.697238000000034
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"initial_capital_krw\", \"public\".\"season_participants\".\"total_asset_krw\", \"public\".\"season_participants\".\"total_return_rate\", \"public\".\"season_participants\".\"max_drawdown\", \"public\".\"season_participants\".\"total_fill_count\", \"public\".\"season_participants\".\"current_rank\", \"public\".\"season_participants\".\"final_rank\", \"public\".\"season_participants\".\"final_tier\", \"public\".\"season_participants\".\"reward_granted_at\", \"public\".\"season_participants\".\"excluded_at\", \"public\".\"season_participants\".\"excluded_reason\", \"public\".\"season_participants\".\"excluded_by_user_id\", \"public\".\"season_participants\".\"ranking_hidden_at\", \"public\".\"season_participants\".\"ranking_hidden_reason\", \"public\".\"season_participants\".\"ranking_hidden_by_user_id\", \"public\".\"season_participants\".\"result_corrected_at\", \"public\".\"season_participants\".\"result_corrected_reason\", \"public\".\"season_participants\".\"result_corrected_by_user_id\", \"public\".\"season_participants\".\"trading_account_id\", \"public\".\"season_participants\".\"created_at\", \"public\".\"season_participants\".\"updated_at\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 1963,
+          "executionMs": 4.515047999999966
+        },
+        {
+          "query": "SELECT \"public\".\"futures_mark_snapshots\".\"id\", \"public\".\"futures_mark_snapshots\".\"instrument_id\", \"public\".\"futures_mark_snapshots\".\"symbol\", \"public\".\"futures_mark_snapshots\".\"provider_product\", \"public\".\"futures_mark_snapshots\".\"currency_code\"::text, \"public\".\"futures_mark_snapshots\".\"source\"::text, \"public\".\"futures_mark_snapshots\".\"price\", \"public\".\"futures_mark_snapshots\".\"effective_at\", \"public\".\"futures_mark_snapshots\".\"captured_at\" FROM \"public\".\"futures_mark_snapshots\" WHERE (\"public\".\"futures_mark_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_mark_snapshots\".\"source\" = CAST($2::text AS \"public\".\"FuturesMarkSource\") AND \"public\".\"futures_mark_snapshots\".\"effective_at\" <= $3 AND \"public\".\"futures_mark_snapshots\".\"captured_at\" <= $4) ORDER BY \"public\".\"futures_mark_snapshots\".\"effective_at\" DESC, \"public\".\"futures_mark_snapshots\".\"captured_at\" DESC, \"public\".\"futures_mark_snapshots\".\"id\" DESC LIMIT $5 OFFSET $6",
+          "calls": 15704,
+          "executionMs": 251.79449299999987
+        },
+        {
+          "query": "SELECT \"public\".\"cash_wallets\".\"id\", \"public\".\"cash_wallets\".\"trading_account_id\", \"public\".\"cash_wallets\".\"wallet_scope\"::text, \"public\".\"cash_wallets\".\"currency_code\"::text, \"public\".\"cash_wallets\".\"balance_amount\", \"public\".\"cash_wallets\".\"reserved_amount\", \"public\".\"cash_wallets\".\"created_at\", \"public\".\"cash_wallets\".\"updated_at\" FROM \"public\".\"cash_wallets\" WHERE \"public\".\"cash_wallets\".\"trading_account_id\" = $1 OFFSET $2",
+          "calls": 1963,
+          "executionMs": 24.66467199999996
+        },
+        {
+          "query": "SELECT \"public\".\"futures_positions\".\"id\", \"public\".\"futures_positions\".\"trading_account_id\", \"public\".\"futures_positions\".\"instrument_id\", \"public\".\"futures_positions\".\"direction\"::text, \"public\".\"futures_positions\".\"margin_mode\"::text, \"public\".\"futures_positions\".\"status\"::text, \"public\".\"futures_positions\".\"quantity\", \"public\".\"futures_positions\".\"average_entry_price\", \"public\".\"futures_positions\".\"entry_notional\", \"public\".\"futures_positions\".\"leverage\", \"public\".\"futures_positions\".\"isolated_margin\", \"public\".\"futures_positions\".\"realized_pnl\", \"public\".\"futures_positions\".\"closed_at\", \"public\".\"futures_positions\".\"created_at\", \"public\".\"futures_positions\".\"updated_at\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) ORDER BY \"public\".\"futures_positions\".\"id\" ASC OFFSET $4",
+          "calls": 1963,
+          "executionMs": 30.670891999999903
+        },
+        {
+          "query": "SELECT \"public\".\"futures_last_price_snapshots\".\"id\", \"public\".\"futures_last_price_snapshots\".\"instrument_id\", \"public\".\"futures_last_price_snapshots\".\"symbol\", \"public\".\"futures_last_price_snapshots\".\"provider_product\", \"public\".\"futures_last_price_snapshots\".\"currency_code\"::text, \"public\".\"futures_last_price_snapshots\".\"source\"::text, \"public\".\"futures_last_price_snapshots\".\"price\", \"public\".\"futures_last_price_snapshots\".\"effective_at\", \"public\".\"futures_last_price_snapshots\".\"captured_at\" FROM \"public\".\"futures_last_price_snapshots\" WHERE (\"public\".\"futures_last_price_snapshots\".\"instrument_id\" = $1 AND \"public\".\"futures_last_price_snapshots\".\"captured_at\" <= $2 AND \"public\".\"futures_last_price_snapshots\".\"effective_at\" <= $3) ORDER BY \"public\".\"futures_last_price_snapshots\".\"effective_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"captured_at\" DESC, \"public\".\"futures_last_price_snapshots\".\"id\" DESC LIMIT $4 OFFSET $5",
+          "calls": 3926,
+          "executionMs": 56.552531999999914
+        },
+        {
+          "query": "SELECT clock_timestamp() AS \"now\"",
+          "calls": 3957,
+          "executionMs": 11.305098999999938
+        },
+        {
+          "query": "-- TradingAccount canonical ownership hardening.\n--\n-- Legacy season_participant_id columns, foreign keys, indexes, uniques, and\n-- dual-write behavior are deliberately retained for the next removal work.\n-- This migration changes only account-scope identifiers:\n--   1. fail closed on participant/account ownership corruption,\n--   2. fill a NULL row.trading_account_id only from that row's own verified\n--      SeasonParticipant link,\n--   3. fail if any NULL or mismatch remains,\n--   4. make the canonical account link NOT NULL.\n--\n-- It never updates balances, reservations, quantities, costs, PnL, order or\n-- request status, prices, fees, rates, hashes, idempotency keys, snapshots,\n-- ranks, participant/season state, or timestamps.\n\nBEGIN",
+          "calls": 1987,
+          "executionMs": 0.8322110000000102
+        },
+        {
+          "query": "SELECT \"public\".\"seasons\".\"id\", \"public\".\"seasons\".\"name\", \"public\".\"seasons\".\"status\"::text, \"public\".\"seasons\".\"start_at\", \"public\".\"seasons\".\"end_at\", \"public\".\"seasons\".\"trade_fee_rate\", \"public\".\"seasons\".\"fx_fee_rate\" FROM \"public\".\"seasons\" WHERE \"public\".\"seasons\".\"id\" IN ($2) OFFSET $1",
+          "calls": 5896,
+          "executionMs": 5.080171000000029
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_last_price_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $26\n      ) m",
+          "calls": 1970,
+          "executionMs": 134.7510670000004
+        },
+        {
+          "query": "SELECT \"public\".\"assets\".\"id\", \"public\".\"assets\".\"symbol\", \"public\".\"assets\".\"name\", \"public\".\"assets\".\"market\", \"public\".\"assets\".\"currency_code\"::text, \"public\".\"assets\".\"price_currency\"::text, \"public\".\"assets\".\"settlement_currency\"::text, \"public\".\"assets\".\"asset_type\"::text, \"public\".\"assets\".\"is_active\", \"public\".\"assets\".\"created_at\", \"public\".\"assets\".\"updated_at\" FROM \"public\".\"assets\" WHERE \"public\".\"assets\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 3926,
+          "executionMs": 36.59424699999954
+        },
+        {
+          "query": "SELECT m.id, m.instrument_id AS \"instrumentId\", m.symbol,\n        m.provider_product AS \"providerProduct\", m.currency_code AS \"currencyCode\",\n        m.source, m.price, m.effective_at AS \"effectiveAt\", m.captured_at AS \"capturedAt\"\n      FROM (VALUES ($1),($2),($3),($4),($5),($6),($7),($8),($9),($10),($11),($12),($13),($14),($15),($16),($17),($18),($19),($20),($21),($22),($23)) AS target(instrument_id)\n      CROSS JOIN (VALUES ($26::\"FuturesMarkSource\"), ($27::\"FuturesMarkSource\")) AS sources(source)\n      CROSS JOIN LATERAL (\n        SELECT s.* FROM futures_mark_snapshots s\n        WHERE s.instrument_id = target.instrument_id AND s.source = sources.source\n          AND s.effective_at <= $24 AND s.captured_at <= $25\n        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT $28\n      ) m",
+          "calls": 1970,
+          "executionMs": 177.803724000001
+        },
+        {
+          "query": "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ",
+          "calls": 1963,
+          "executionMs": 7.55385199999999
+        },
+        {
+          "query": "SELECT \"public\".\"season_participants\".\"id\", \"public\".\"season_participants\".\"user_id\", \"public\".\"season_participants\".\"participant_status\"::text, \"public\".\"season_participants\".\"joined_at\", \"public\".\"season_participants\".\"season_id\", \"public\".\"season_participants\".\"trading_account_id\" FROM \"public\".\"season_participants\" WHERE \"public\".\"season_participants\".\"trading_account_id\" IN ($1) OFFSET $2",
+          "calls": 5896,
+          "executionMs": 14.117613000000048
+        },
+        {
+          "query": "SELECT \"public\".\"futures_instruments\".\"id\", \"public\".\"futures_instruments\".\"underlying_asset_id\", \"public\".\"futures_instruments\".\"product_type\"::text, \"public\".\"futures_instruments\".\"settlement_currency\"::text, \"public\".\"futures_instruments\".\"is_active\", \"public\".\"futures_instruments\".\"mark_contract_json\", \"public\".\"futures_instruments\".\"mark_verified_at\", \"public\".\"futures_instruments\".\"created_at\", \"public\".\"futures_instruments\".\"updated_at\" FROM \"public\".\"futures_instruments\" WHERE \"public\".\"futures_instruments\".\"id\" IN ($1,$2) OFFSET $3",
+          "calls": 3926,
+          "executionMs": 43.97161299999953
+        },
+        {
+          "query": "COMMIT",
+          "calls": 1987,
+          "executionMs": 0.7645219999999899
+        },
+        {
+          "query": "INSERT INTO \"public\".\"futures_mark_snapshots\" (\"id\",\"instrument_id\",\"symbol\",\"provider_product\",\"currency_code\",\"source\",\"price\",\"effective_at\",\"captured_at\") VALUES ($1,$2,$3,$4,CAST($5::text AS \"public\".\"CurrencyCode\"),CAST($6::text AS \"public\".\"FuturesMarkSource\"),$7,$8,$9), ($10,$11,$12,$13,CAST($14::text AS \"public\".\"CurrencyCode\"),CAST($15::text AS \"public\".\"FuturesMarkSource\"),$16,$17,$18), ($19,$20,$21,$22,CAST($23::text AS \"public\".\"CurrencyCode\"),CAST($24::text AS \"public\".\"FuturesMarkSource\"),$25,$26,$27), ($28,$29,$30,$31,CAST($32::text AS \"public\".\"CurrencyCode\"),CAST($33::text AS \"public\".\"FuturesMarkSource\"),$34,$35,$36), ($37,$38,$39,$40,CAST($41::text AS \"public\".\"CurrencyCode\"),CAST($42::text AS \"public\".\"FuturesMarkSource\"),$43,$44,$45), ($46,$47,$48,$49,CAST($50::text AS \"public\".\"CurrencyCode\"),CAST($51::text AS \"public\".\"FuturesMarkSource\"),$52,$53,$54), ($55,$56,$57,$58,CAST($59::text AS \"public\".\"CurrencyCode\"),CAST($60::text AS \"public\".\"FuturesMarkSource\"),$61,$62,$63), ($64,$65,$66,$67,CAST($68::text AS \"public\".\"CurrencyCode\"),CAST($69::text AS \"public\".\"FuturesMarkSource\"),$70,$71,$72), ($73,$74,$75,$76,CAST($77::text AS \"public\".\"CurrencyCode\"),CAST($78::text AS \"public\".\"FuturesMarkSource\"),$79,$80,$81), ($82,$83,$84,$85,CAST($86::text AS \"public\".\"CurrencyCode\"),CAST($87::text AS \"public\".\"FuturesMarkSource\"),$88,$89,$90), ($91,$92,$93,$94,CAST($95::text AS \"public\".\"CurrencyCode\"),CAST($96::text AS \"public\".\"FuturesMarkSource\"),$97,$98,$99), ($100,$101,$102,$103,CAST($104::text AS \"public\".\"CurrencyCode\"),CAST($105::text AS \"public\".\"FuturesMarkSource\"),$106,$107,$108), ($109,$110,$111,$112,CAST($113::text AS \"public\".\"CurrencyCode\"),CAST($114::text AS \"public\".\"FuturesMarkSource\"),$115,$116,$117), ($118,$119,$120,$121,CAST($122::text AS \"public\".\"CurrencyCode\"),CAST($123::text AS \"public\".\"FuturesMarkSource\"),$124,$125,$126), ($127,$128,$129,$130,CAST($131::text AS \"public\".\"CurrencyCode\"),CAST($132::text AS \"public\".\"FuturesMarkSource\"),$133,$134,$135), ($136,$137,$138,$139,CAST($140::text AS \"public\".\"CurrencyCode\"),CAST($141::text AS \"public\".\"FuturesMarkSource\"),$142,$143,$144), ($145,$146,$147,$148,CAST($149::text AS \"public\".\"CurrencyCode\"),CAST($150::text AS \"public\".\"FuturesMarkSource\"),$151,$152,$153), ($154,$155,$156,$157,CAST($158::text AS \"public\".\"CurrencyCode\"),CAST($159::text AS \"public\".\"FuturesMarkSource\"),$160,$161,$162), ($163,$164,$165,$166,CAST($167::text AS \"public\".\"CurrencyCode\"),CAST($168::text AS \"public\".\"FuturesMarkSource\"),$169,$170,$171), ($172,$173,$174,$175,CAST($176::text AS \"public\".\"CurrencyCode\"),CAST($177::text AS \"public\".\"FuturesMarkSource\"),$178,$179,$180), ($181,$182,$183,$184,CAST($185::text AS \"public\".\"CurrencyCode\"),CAST($186::text AS \"public\".\"FuturesMarkSource\"),$187,$188,$189), ($190,$191,$192,$193,CAST($194::text AS \"public\".\"CurrencyCode\"),CAST($195::text AS \"public\".\"FuturesMarkSource\"),$196,$197,$198), ($199,$200,$201,$202,CAST($203::text AS \"public\".\"CurrencyCode\"),CAST($204::text AS \"public\".\"FuturesMarkSource\"),$205,$206,$207) ON CONFLICT DO NOTHING",
+          "calls": 12,
+          "executionMs": 6.6893860000000025
+        },
+        {
+          "query": "SELECT SUM(\"isolated_margin\") AS \"_sum$isolated_margin\" FROM (SELECT \"public\".\"futures_positions\".\"isolated_margin\" FROM \"public\".\"futures_positions\" WHERE (\"public\".\"futures_positions\".\"trading_account_id\" = $1 AND \"public\".\"futures_positions\".\"status\" = CAST($2::text AS \"public\".\"FuturesPositionStatus\") AND \"public\".\"futures_positions\".\"margin_mode\" = CAST($3::text AS \"public\".\"FuturesMarginMode\")) OFFSET $4) AS \"sub\"",
+          "calls": 1963,
+          "executionMs": 18.885893000000102
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND \"public\".\"trading_accounts\".\"user_id\" = $2) LIMIT $3 OFFSET $4",
+          "calls": 5896,
+          "executionMs": 50.28549000000011
+        },
+        {
+          "query": "SELECT \"public\".\"trading_accounts\".\"id\", \"public\".\"trading_accounts\".\"user_id\", \"public\".\"trading_accounts\".\"mode\"::text, \"public\".\"trading_accounts\".\"status\"::text, \"public\".\"trading_accounts\".\"initial_capital_krw\", \"public\".\"trading_accounts\".\"opened_at\", \"public\".\"trading_accounts\".\"closed_at\", \"public\".\"trading_accounts\".\"created_at\", \"public\".\"trading_accounts\".\"updated_at\" FROM \"public\".\"trading_accounts\" WHERE (\"public\".\"trading_accounts\".\"id\" = $1 AND $4=$5) LIMIT $2 OFFSET $3",
+          "calls": 1963,
+          "executionMs": 15.497679999999956
+        }
+      ],
+      "nodeCpuCorePercent": 100.96002991861708,
+      "postgresBackendCpuCorePercent": 74.68561427500576,
+      "postgresBackendRssMiB": 345.76953125,
+      "peakNodeRssMiB": 623.48046875,
+      "peakConnections": 10
+    }
+  ],
+  "feedErrors": 0,
+  "feedWrites": 1748
+}

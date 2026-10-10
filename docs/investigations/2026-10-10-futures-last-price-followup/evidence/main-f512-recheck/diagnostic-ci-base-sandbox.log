@@ -1,0 +1,51 @@
+node:child_process:964
+    throw err;
+    ^
+
+<ref *1> Error: spawnSync git EPERM
+    at Object.spawnSync (node:internal/child_process:1119:20)
+    at spawnSync (node:child_process:911:24)
+    at execFileSync (node:child_process:954:15)
+    at git (/home/nayuta/projects/trading-app/scripts/diagnostic-enforcement.cjs:349:5)
+    at runAudit (/home/nayuta/projects/trading-app/scripts/diagnostic-enforcement.cjs:354:18)
+    at Object.<anonymous> (/home/nayuta/projects/trading-app/scripts/diagnostic-enforcement.cjs:424:22)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12) {
+  errno: -1,
+  code: 'EPERM',
+  syscall: 'spawnSync git',
+  path: 'git',
+  spawnargs: [
+    'rev-parse',
+    '--verify',
+    '--end-of-options',
+    '64dc9e172aaa082fc1565c8a67a6f65539b56aaf^{commit}'
+  ],
+  error: [Circular *1],
+  status: 0,
+  signal: null,
+  output: [
+    null,
+    Buffer(41) [Uint8Array] [
+      54, 52, 100, 99, 57, 101, 49, 55,  50,  97,
+      97, 97,  48, 56, 50, 102, 99, 49,  53,  54,
+      53, 99,  56, 97, 54,  55, 97, 54, 102,  54,
+      53, 53,  51, 57, 98,  53, 54, 97,  97, 102,
+      10
+    ],
+    Buffer(0) [Uint8Array] []
+  ],
+  pid: 18,
+  stdout: Buffer(41) [Uint8Array] [
+    54, 52, 100, 99, 57, 101, 49, 55,  50,  97,
+    97, 97,  48, 56, 50, 102, 99, 49,  53,  54,
+    53, 99,  56, 97, 54,  55, 97, 54, 102,  54,
+    53, 53,  51, 57, 98,  53, 54, 97,  97, 102,
+    10
+  ],
+  stderr: Buffer(0) [Uint8Array] []
+}
+
+Node.js v24.14.1

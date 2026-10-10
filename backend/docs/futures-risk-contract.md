@@ -53,7 +53,7 @@ is introduced. F3 persists exact exchangeInfo coverage and filters the user cata
 and open/increase by recent verification. Verify intended coverage before activation.
 
 Missing/stale marks fail open/increase and Cross outgoing transfers closed.
-Reduce/close still require fresh Spot execution evidence but do not require marks.
+Reduce/close require fresh Futures Last execution evidence but do not require marks.
 No stale or fabricated automatic liquidation. Read risk is nullable with explicit
 freshness state. Incoming collateral needs no mark. Financial transactions perform
 no provider network I/O and reload marks after acquiring all financial locks.
@@ -69,7 +69,8 @@ commit wins; unique liquidation close per lifetime is additional durable protect
 Automatic risk action ignores user trading mode. It rechecks account lifecycle and
 financial scope. Suspended/excluded accounts may shed risk; closed accounts and
 ended/settled seasons are diagnosed and skipped so F2 cannot rewrite final results.
-F3 final Season exits use normal Spot execution at endAt, after existing reservation
+F3 final Season exits use pinned endAt Futures Last evidence (or reuse an existing
+legacy Spot pin), after existing reservation
 cleanup and before final ranking. They are not liquidations.
 
 `FUTURES_TRADING_MODE`: ENABLED / REDUCE_ONLY / DISABLED. Absent mode maps legacy
@@ -105,7 +106,8 @@ limit (1–100, default 20) and offset (0–1,000,000) conventions as executions
 
 The F3 UI and shared valuation reuse these Mark eligibility and UPNL primitives.
 SL/TP/OCO now belong to the separate [Conditional v1](conditional-orders-contract.md)
-user-exit domain: Spot triggers/execution, never Mark.
+user-exit domain: Spot uses Spot Last, Futures uses Futures Last for both trigger
+and execution, never Mark.
 [Limit Entry v1](futures-limit-entry-contract.md) uses the same collateral guard:
 pending reservations reduce available cash but contribute no Position, UPNL,
 maintenance or liquidation target. Fill rechecks fresh Mark and collateral under

@@ -1,0 +1,53 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/futures-price-safety-integration.ts"
+  ],
+  "startedAtUtc": "2026-10-10T08:17:23Z",
+  "elapsedSeconds": 66.052,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 984.1,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 4.546175763010979,
+      "stepMs": -2045.1773118402343
+    },
+    {
+      "elapsedSeconds": 36.95274296400021,
+      "stepMs": -1970.5581709858961
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 14.0
+    },
+    {
+      "elapsedSeconds": 10.616,
+      "rssMiB": 481.7
+    },
+    {
+      "elapsedSeconds": 21.254,
+      "rssMiB": 481.7
+    },
+    {
+      "elapsedSeconds": 32.012,
+      "rssMiB": 500.8
+    },
+    {
+      "elapsedSeconds": 42.761,
+      "rssMiB": 560.5
+    },
+    {
+      "elapsedSeconds": 53.434,
+      "rssMiB": 561.3
+    },
+    {
+      "elapsedSeconds": 64.246,
+      "rssMiB": 789.1
+    }
+  ]
+}

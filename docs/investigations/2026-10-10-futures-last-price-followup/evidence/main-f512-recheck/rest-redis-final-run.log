@@ -1,0 +1,6 @@
+Test Suites: 1 passed, 1 total
+Tests:       18 passed, 18 total
+Snapshots:   0 total
+Time:        1.07 s
+Ran all test suites within paths "src/providers/binance/binance-rest-coordinator.integration.spec.ts".
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/rest-redis-final-jest.json

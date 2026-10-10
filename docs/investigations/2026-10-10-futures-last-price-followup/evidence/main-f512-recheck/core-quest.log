@@ -1,0 +1,6 @@
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        1.437 s, estimated 2 s
+Ran all test suites within paths "src/trading-accounts/beginner-quest.integration.spec.ts".
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/core-quest-jest.json

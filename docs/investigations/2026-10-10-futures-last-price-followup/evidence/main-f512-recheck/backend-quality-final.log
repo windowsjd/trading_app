@@ -1,0 +1,10 @@
+
+> trading-app@0.0.1 typecheck /home/nayuta/projects/trading-app/backend
+> tsc --noEmit -p tsconfig.build.json
+
+
+> trading-app@0.0.1 build /home/nayuta/projects/trading-app/backend
+> nest build
+
+Checking formatting...
+All matched files use Prettier code style!

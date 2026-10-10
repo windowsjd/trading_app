@@ -11,6 +11,7 @@ pnpm exec jest --runInBand --json --outputFile="${CORE_GATE_JSON:?Set output pat
   src/seasons/trading-account-trading-scope.integration.spec.ts \
   src/trading-accounts/general-account.integration.spec.ts \
   src/trading-accounts/beginner-account.integration.spec.ts \
+  src/trading-accounts/beginner-quest.integration.spec.ts \
   src/wallets/wallet-scope.integration.spec.ts \
   src/orders/general-account-trading.integration.spec.ts \
   src/fx/general-account-fx.integration.spec.ts \

@@ -144,10 +144,16 @@ availability estimates; these are operational readiness estimates, not a change
 to command authorization. Existing Reduce/Close still follow their original
 Last-price rule even if Mark risk is unavailable. A worker with actual work needs
 a succeeded, completed Ops run no older than 120 seconds, with no execution
-failures. The explicit Limit/Conditional limit-not-reached outcomes are normal
+failures and `dryRun=false`. A preview run does not prove worker execution.
+Live Futures protections also require `CONDITIONAL_ORDERS_ENABLED=true`, even
+while DISABLED pauses their user execution; an otherwise successful disabled
+cycle cannot conceal the missing feature configuration.
+The explicit Limit/Conditional limit-not-reached outcomes are normal
 predicate waits; stale-price errors are failures. Idle workers are labeled
 `not_required_no_live_work`, not observed healthy. Retention runs remain visible
-diagnostics. Ended/settled seasons with open Futures lifetimes additionally need
+diagnostics. Seasons whose `endAt` has passed (including an active season whose
+lifecycle status update is delayed), or ended/settled seasons, with open Futures
+lifetimes additionally need
 their valid immutable Last/legacy Spot pin or an eligible end-boundary Last
 candidate. Live prices cannot satisfy that historical requirement.
 

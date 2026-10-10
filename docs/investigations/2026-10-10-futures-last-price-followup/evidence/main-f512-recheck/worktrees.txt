@@ -1,0 +1,5 @@
+/home/nayuta/projects/trading-app  f512dab0 [main]
+/tmp/trading-binance-rest-weight   f512dab0 [fix/binance-rest-weight-observability]
+/tmp/trading-fee-pinning           97587a62 [fix/trading-fee-pinning] prunable
+/tmp/trading-home-market-work      3aa37266 (detached HEAD) prunable
+/tmp/trading-transaction-time      e6a64626 [fix/trading-transaction-time] prunable

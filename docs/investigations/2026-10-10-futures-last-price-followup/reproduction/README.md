@@ -47,7 +47,7 @@ pnpm run typecheck
 pnpm run build
 pnpm run lint:accounts:check
 pnpm exec jest --runInBand
-pnpm run test:e2e -- --runInBand
+pnpm run test:e2e --runInBand
 node ../scripts/diagnostic-enforcement.cjs backend
 FUTURES_PRICE_SAFETY_DB_INTEGRATION=1 \
   pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts
@@ -67,7 +67,8 @@ FUTURES_PRICE_SAFETY_DB_INTEGRATION=1 \
 프로세스 제한으로 EPERM 또는 내부 테스트 누락이 발생하면 정상 실행
 환경에서 검증한다. 파일 개수만 표시한 Node test 성공을 인정하지 않는다.
 
-frontend는 `cd frontend && npm run check`; 실제 2,105개 테스트 결과를 확인한다.
+frontend는 `cd frontend && npm run check`; 실제 개별 테스트 결과를 확인한다.
+현재 `f512dab0`에는 2,120개가 있으며 파일/suite 개수와 구분한다.
 변경 테스트는 객체 자체의 존재 비교를 피하고 boolean/ID/개수로 단언한다.
 
 ## 조회 API 실측
@@ -135,3 +136,42 @@ timeout은 오류이며 이 처리로 숨기지 않는다.
 값을 명시해 실행했다. 최초 unit은 계측의 계획 장애 처리를 보완하기 위해
 정상 중단했으며 `evidence/soak-24h.json`의 INTERRUPTED 결과를 보존했다.
 최종 unit을 모니터링/중단할 때는 `-v2` 이름을 사용한다.
+
+## 현재 main 재검증 (`f512dab0`, 2026-10-10 KST)
+
+결과는 `../evidence/main-f512-recheck/`에 있다. 각 `*-run.json`과
+`backend-unit.json`, `frontend-check.json` 등에 실제 command, 시간/RSS 상한,
+종료 코드와 clock step을 저장했다. 이번 DB 이름은 `futures_recheck_*_test`,
+Redis는 10–15번이며 진행 중인 기존 soak의 DB/Redis 5번과 분리했다.
+
+순수 readiness 결함 재현(연결 없음):
+
+```bash
+bash docs/investigations/2026-10-10-futures-last-price-followup/reproduction/reproduce-readiness-regression.sh
+```
+
+새 PG safety 게이트는 active 상태의 종료 시즌, 보호 기능 비활성화,
+성공한 dry-run Worker를 함께 검증한다. 200만 행 시험도 동일 게이트의
+`RETENTION_TEST_ROWS=2000000` 설정이다. 최신 관측 fixture는 wall clock이
+아닌 실제 저장된 같은 종목/source의 최대 `capturedAt + 1ms`로 생성한다.
+삭제/금융 정책이나 실행 가격의 시각을 변경하지 않는다.
+
+REST fixture의 정확한 opt-in(실 HTTP 호출 없음):
+
+```bash
+NODE_ENV=test BINANCE_REST_REDIS_FIXTURE=1 \
+  BINANCE_REST_FIXTURE_REDIS_URL=redis://127.0.0.1:56389/10 \
+  pnpm exec jest --runInBand --runTestsByPath \
+  src/providers/binance/binance-rest-coordinator.integration.spec.ts
+```
+
+벤치마크는 현재 부하에서 새로 생성된 PostgreSQL backend PID도 CPU 계측에
+포함한다. 과거 수치의 PostgreSQL CPU는 시작 시의 PID만 포함했으므로
+현재 수치와 직접 비교하지 않는다. 전체 서버/OS CPU와도 구분한다.
+10,000명 추정은 실제 사용자 시험 결과가 아니다.
+
+기존 24시간 unit은 계속 실행하며 이번 재검증은 건드리지 않았다.
+고정 관측 사본 `soak-24h-observed.json`은 완료 결과가 아니다.
+`RUNNING`, `actual24hCompleted=false`, clock step이 있는 결과를 PASS로
+바꾸지 않는다. WSL 종료/로그아웃 및 불안정 시계 제약을 해결한 환경에서
+86,400초 이상을 마친 뒤 최종 assertions와 원시 표본을 검토해야 한다.

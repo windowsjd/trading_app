@@ -1,0 +1,12 @@
+[
+  {
+    "name": "disabled live protections",
+    "before": true,
+    "after": false
+  },
+  {
+    "name": "preview-only risk worker",
+    "before": true,
+    "after": false
+  }
+]

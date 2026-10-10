@@ -1,0 +1,25 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/futures-price-safety-integration.ts"
+  ],
+  "startedAtUtc": "2026-10-10T08:14:51Z",
+  "elapsedSeconds": 6.433,
+  "exitCode": 1,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 829.0,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 5.074094844982028,
+      "stepMs": -2063.9897033397574
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 17.5
+    }
+  ]
+}

@@ -1,0 +1,104 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "check"
+  ],
+  "startedAtUtc": "2026-10-10T08:09:19Z",
+  "elapsedSeconds": 173.942,
+  "exitCode": 1,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1363.4,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 31.91535401099827,
+      "stepMs": -1999.900695955148
+    },
+    {
+      "elapsedSeconds": 64.42714961399906,
+      "stepMs": -2045.750116900308
+    },
+    {
+      "elapsedSeconds": 96.93232321500545,
+      "stepMs": -1957.797379582189
+    },
+    {
+      "elapsedSeconds": 129.4297411919979,
+      "stepMs": -2028.6619431572035
+    },
+    {
+      "elapsedSeconds": 161.90898750102497,
+      "stepMs": -1988.9598834270146
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 17.8
+    },
+    {
+      "elapsedSeconds": 10.445,
+      "rssMiB": 523.8
+    },
+    {
+      "elapsedSeconds": 20.862,
+      "rssMiB": 294.2
+    },
+    {
+      "elapsedSeconds": 31.592,
+      "rssMiB": 598.4
+    },
+    {
+      "elapsedSeconds": 42.263,
+      "rssMiB": 665.8
+    },
+    {
+      "elapsedSeconds": 53.084,
+      "rssMiB": 286.0
+    },
+    {
+      "elapsedSeconds": 63.688,
+      "rssMiB": 373.4
+    },
+    {
+      "elapsedSeconds": 74.255,
+      "rssMiB": 614.6
+    },
+    {
+      "elapsedSeconds": 84.72,
+      "rssMiB": 612.4
+    },
+    {
+      "elapsedSeconds": 95.158,
+      "rssMiB": 576.6
+    },
+    {
+      "elapsedSeconds": 105.673,
+      "rssMiB": 388.8
+    },
+    {
+      "elapsedSeconds": 116.231,
+      "rssMiB": 659.7
+    },
+    {
+      "elapsedSeconds": 126.698,
+      "rssMiB": 692.7
+    },
+    {
+      "elapsedSeconds": 137.181,
+      "rssMiB": 327.1
+    },
+    {
+      "elapsedSeconds": 147.609,
+      "rssMiB": 369.8
+    },
+    {
+      "elapsedSeconds": 158.153,
+      "rssMiB": 620.3
+    },
+    {
+      "elapsedSeconds": 168.616,
+      "rssMiB": 557.9
+    }
+  ]
+}

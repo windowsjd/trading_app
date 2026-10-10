@@ -1,0 +1,2 @@
+ M docs/investigations/2026-10-10-futures-last-price-followup/evidence/soak-24h-final/soak-24h.json
+ M docs/investigations/2026-10-10-futures-last-price-followup/evidence/soak-24h-final/soak-24h.json.samples.jsonl

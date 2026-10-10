@@ -1,0 +1,24 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "jest",
+    "--runInBand",
+    "--runTestsByPath",
+    "src/providers/binance/binance-rest-coordinator.integration.spec.ts",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/rest-redis-final-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T08:17:43Z",
+  "elapsedSeconds": 1.662,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 272.1,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 17.5
+    }
+  ]
+}

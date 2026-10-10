@@ -1,0 +1,13 @@
+
+> trading-app@0.0.1 test:e2e /home/nayuta/projects/trading-app/backend
+> jest --config ./test/jest-e2e.json -- --runInBand --json --outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/backend-e2e-jest.json
+
+No tests found, exiting with code 1
+Run with `--passWithNoTests` to exit with code 0
+In /home/nayuta/projects/trading-app/backend/test
+  6 files checked.
+  testMatch:  - 0 matches
+  testPathIgnorePatterns: /node_modules/ - 6 matches
+  testRegex: .e2e-spec.ts$ - 2 matches
+Pattern: --runInBand|--json|--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/backend-e2e-jest.json - 0 matches
+ ELIFECYCLE  Command failed with exit code 1.

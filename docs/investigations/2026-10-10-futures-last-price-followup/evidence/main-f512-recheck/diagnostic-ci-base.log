@@ -1,0 +1,3 @@
+backend/src/trading-accounts/beginner-quests.service.ts:286: Use an approved HTTP factory; direct exceptions bypass public message policy.
+backend/src/trading-accounts/beginner-quests.service.ts:287: Unassigned structured error: use an HTTP factory, partial diagnostic or projectOpsFailure.
+Diagnostic bypass gate (backend): FAIL

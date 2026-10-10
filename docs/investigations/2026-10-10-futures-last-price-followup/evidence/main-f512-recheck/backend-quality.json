@@ -1,0 +1,32 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; pnpm run typecheck; pnpm run build; pnpm run lint:accounts:check; pnpm exec prettier --check scripts/futures-price-readiness.ts scripts/lib/futures-readiness.ts scripts/lib/futures-readiness.spec.ts scripts/futures-price-safety-integration.ts"
+  ],
+  "startedAtUtc": "2026-10-10T08:12:20Z",
+  "elapsedSeconds": 25.325,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1853.6,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 3.280175094027072,
+      "stepMs": -2045.2487902075518
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 4.5
+    },
+    {
+      "elapsedSeconds": 10.291,
+      "rssMiB": 1474.6
+    },
+    {
+      "elapsedSeconds": 20.606,
+      "rssMiB": 1120.6
+    }
+  ]
+}

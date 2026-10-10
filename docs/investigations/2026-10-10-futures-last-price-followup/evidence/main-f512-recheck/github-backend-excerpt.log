@@ -1,0 +1,29 @@
+2026-10-10T07:37:43.9560374Z PASS src/wallets/trading-account-wallets.spec.ts
+2026-10-10T07:37:45.1662288Z PASS src/wallets/wallets.service.spec.ts
+2026-10-10T07:37:45.7680356Z PASS src/futures/futures-diagnostics.spec.ts
+2026-10-10T07:37:47.6719894Z PASS src/futures/futures-risk-worker.spec.ts
+2026-10-10T07:37:48.3212099Z PASS src/futures/futures-last-price.spec.ts
+2026-10-10T07:37:48.8501204Z PASS src/futures/futures-final-diagnostics.spec.ts
+2026-10-10T07:37:49.5381576Z PASS src/futures/futures-risk.spec.ts
+2026-10-10T07:37:49.9810113Z PASS src/futures/futures-policy.spec.ts
+2026-10-10T07:37:50.0171203Z PASS src/futures/futures-last-price-ingestion.spec.ts
+2026-10-10T07:37:50.9014702Z PASS src/futures/futures-valuation.spec.ts
+2026-10-10T07:37:51.0625061Z PASS src/wallets/cash-wallet-failure-diagnosis.spec.ts
+2026-10-10T07:37:51.2011704Z PASS src/futures/futures-mark.spec.ts
+2026-10-10T07:37:51.3820347Z PASS src/futures/futures-mark-ingestion.spec.ts
+2026-10-10T07:37:52.1749968Z PASS src/wallets/canonical-cash-wallets.spec.ts
+2026-10-10T07:37:52.2700460Z PASS src/futures/futures-position-display.spec.ts
+2026-10-10T07:37:52.3910266Z PASS src/wallets/trading-account-wallet-transfer.service.spec.ts
+2026-10-10T07:37:53.0786687Z PASS src/conditional/conditional-worker.service.spec.ts
+2026-10-10T07:37:53.1887698Z PASS src/futures/futures-reference-prices.spec.ts
+2026-10-10T07:37:53.2176077Z PASS src/futures/futures-instrument-coverage.spec.ts
+2026-10-10T07:37:53.4643055Z PASS src/wallets/cash-wallet-scope.spec.ts
+2026-10-10T07:37:54.2198234Z PASS src/conditional/conditional-policy.spec.ts
+2026-10-10T07:37:54.6776215Z PASS src/conditional/conditional-diagnostics.spec.ts
+2026-10-10T07:37:56.4691072Z PASS src/futures/futures-mark-retention.config.spec.ts
+2026-10-10T07:37:56.8436893Z PASS src/wallets/trading-account-wallet-fx-transfer.service.spec.ts
+2026-10-10T07:37:58.0972670Z Test Suites: 62 skipped, 256 passed, 256 of 318 total
+2026-10-10T07:37:58.0973529Z Tests:       84 skipped, 4158 passed, 4242 total
+2026-10-10T07:37:58.4024344Z backend/src/trading-accounts/beginner-quests.service.ts:286: Use an approved HTTP factory; direct exceptions bypass public message policy.
+2026-10-10T07:37:58.4025738Z Diagnostic bypass gate (backend): FAIL
+2026-10-10T07:37:58.4027676Z backend/src/trading-accounts/beginner-quests.service.ts:287: Unassigned structured error: use an HTTP factory, partial diagnostic or projectOpsFailure.

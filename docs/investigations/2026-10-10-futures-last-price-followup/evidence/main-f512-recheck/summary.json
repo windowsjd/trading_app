@@ -1,0 +1,643 @@
+{
+  "testRuns": {
+    "readiness-unit": {
+      "numPassedTests": 32,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 2,
+      "numFailedTestSuites": 0
+    },
+    "backend-unit": {
+      "numPassedTests": 4162,
+      "numFailedTests": 0,
+      "numPendingTests": 84,
+      "numPassedTestSuites": 256,
+      "numFailedTestSuites": 0
+    },
+    "backend-e2e-final": {
+      "numPassedTests": 409,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 2,
+      "numFailedTestSuites": 0
+    },
+    "core": {
+      "numPassedTests": 23,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 22,
+      "numFailedTestSuites": 0
+    },
+    "core-quest": {
+      "numPassedTests": 1,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 1,
+      "numFailedTestSuites": 0
+    },
+    "financial": {
+      "numPassedTests": 21,
+      "numFailedTests": 2,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 20,
+      "numFailedTestSuites": 2
+    },
+    "price-safety-final": {
+      "numPassedTests": 1,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 1,
+      "numFailedTestSuites": 0
+    },
+    "rest-redis-final": {
+      "numPassedTests": 18,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "numPassedTestSuites": 1,
+      "numFailedTestSuites": 0
+    }
+  },
+  "resourceRuns": {
+    "rest-redis-final-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/providers/binance/binance-rest-coordinator.integration.spec.ts",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/rest-redis-final-jest.json"
+      ],
+      "elapsedSeconds": 1.662,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 272.1,
+      "clockStepCount": 0
+    },
+    "financial-run.json": {
+      "command": [
+        "bash",
+        "../docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-financial-gate.sh"
+      ],
+      "elapsedSeconds": 202.154,
+      "exitCode": 1,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 870.6,
+      "clockStepCount": 6
+    },
+    "api-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        "scripts/futures-read-api-benchmark.ts"
+      ],
+      "elapsedSeconds": 37.919,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 797.7,
+      "clockStepCount": 1
+    },
+    "core-quest.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/trading-accounts/beginner-quest.integration.spec.ts",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/core-quest-jest.json"
+      ],
+      "elapsedSeconds": 2.088,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 581.8,
+      "clockStepCount": 0
+    },
+    "backend-quality-final.json": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; pnpm run typecheck; pnpm run build; pnpm exec prettier --check scripts/futures-read-api-benchmark.ts scripts/futures-price-safety-integration.ts"
+      ],
+      "elapsedSeconds": 22.355,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 1856.0,
+      "clockStepCount": 1
+    },
+    "backend-unit.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/backend-unit-jest.json"
+      ],
+      "elapsedSeconds": 21.541,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 1662.2,
+      "clockStepCount": 1
+    },
+    "backend-e2e.json": {
+      "command": [
+        "pnpm",
+        "run",
+        "test:e2e",
+        "--",
+        "--runInBand",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/backend-e2e-jest.json"
+      ],
+      "elapsedSeconds": 0.531,
+      "exitCode": 1,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 169.0,
+      "clockStepCount": 0
+    },
+    "soak-300-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        "scripts/futures-collection-soak.ts"
+      ],
+      "elapsedSeconds": 310.19,
+      "exitCode": 1,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 566.5,
+      "clockStepCount": 10
+    },
+    "price-safety-final-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/futures/futures-price-safety.integration.spec.ts",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/price-safety-final-jest.json"
+      ],
+      "elapsedSeconds": 20.423,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 1129.4,
+      "clockStepCount": 1
+    },
+    "rest-redis-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/providers/binance/binance-rest-coordinator.integration.spec.ts",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/rest-redis-jest.json"
+      ],
+      "elapsedSeconds": 0.836,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 268.8,
+      "clockStepCount": 0
+    },
+    "retention-2m-final-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        "scripts/futures-price-safety-integration.ts"
+      ],
+      "elapsedSeconds": 66.052,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 984.1,
+      "clockStepCount": 2
+    },
+    "price-safety-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "src/futures/futures-price-safety.integration.spec.ts",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/price-safety-jest.json"
+      ],
+      "elapsedSeconds": 6.933,
+      "exitCode": 1,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 1144.0,
+      "clockStepCount": 0
+    },
+    "retention-2m-run.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "tsx",
+        "scripts/futures-price-safety-integration.ts"
+      ],
+      "elapsedSeconds": 6.433,
+      "exitCode": 1,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 829.0,
+      "clockStepCount": 1
+    },
+    "backend-quality.json": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; pnpm run typecheck; pnpm run build; pnpm run lint:accounts:check; pnpm exec prettier --check scripts/futures-price-readiness.ts scripts/lib/futures-readiness.ts scripts/lib/futures-readiness.spec.ts scripts/futures-price-safety-integration.ts"
+      ],
+      "elapsedSeconds": 25.325,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 1853.6,
+      "clockStepCount": 1
+    },
+    "frontend-check.json": {
+      "command": [
+        "npm",
+        "run",
+        "check"
+      ],
+      "elapsedSeconds": 173.942,
+      "exitCode": 1,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 1363.4,
+      "clockStepCount": 5
+    },
+    "core-run.json": {
+      "command": [
+        "bash",
+        "../docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-core-gate.sh"
+      ],
+      "elapsedSeconds": 58.316,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 857.7,
+      "clockStepCount": 2
+    },
+    "migration-status-drift.json": {
+      "command": [
+        "bash",
+        "-c",
+        "set -e; pnpm exec prisma migrate status; pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code"
+      ],
+      "elapsedSeconds": 1.677,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 312.7,
+      "clockStepCount": 0
+    },
+    "readiness-unit.json": {
+      "command": [
+        "pnpm",
+        "exec",
+        "jest",
+        "--runInBand",
+        "--runTestsByPath",
+        "scripts/lib/futures-readiness.spec.ts",
+        "src/futures/futures-reference-prices.spec.ts",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/readiness-unit-jest.json"
+      ],
+      "elapsedSeconds": 1.338,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 279.5,
+      "clockStepCount": 0
+    },
+    "backend-e2e-final.json": {
+      "command": [
+        "pnpm",
+        "run",
+        "test:e2e",
+        "--runInBand",
+        "--json",
+        "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/backend-e2e-final-jest.json"
+      ],
+      "elapsedSeconds": 13.042,
+      "exitCode": 0,
+      "terminationReason": null,
+      "peakProcessGroupRssMiB": 740.3,
+      "clockStepCount": 0
+    }
+  },
+  "api": {
+    "accounts": 50,
+    "singleQueryCounts": {
+      "instruments": 8,
+      "positions": 31
+    },
+    "stages": [
+      {
+        "concurrency": 1,
+        "elapsedSeconds": 12.010975159,
+        "requests": 1842,
+        "requestsPerSecond": 153.3597377078715,
+        "latencyMs": {
+          "instruments": {
+            "samples": 921,
+            "p50": 3.07,
+            "p95": 3.83,
+            "p99": 5.52,
+            "max": 7.18
+          },
+          "positions": {
+            "samples": 921,
+            "p50": 9.66,
+            "p95": 11.92,
+            "p99": 13.83,
+            "max": 16
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 36041,
+        "nodeCpuCorePercent": 68.28801901112983,
+        "postgresBackendCpuCorePercent": 39.96344956556912,
+        "postgresBackendRssMiB": 113.76953125,
+        "peakNodeRssMiB": 522.5390625,
+        "peakConnections": 3
+      },
+      {
+        "concurrency": 10,
+        "elapsedSeconds": 12.017694056999998,
+        "requests": 3800,
+        "requestsPerSecond": 316.2004276341681,
+        "latencyMs": {
+          "instruments": {
+            "samples": 1900,
+            "p50": 15.48,
+            "p95": 19.38,
+            "p99": 21.72,
+            "max": 42.5
+          },
+          "positions": {
+            "samples": 1900,
+            "p50": 47.07,
+            "p95": 52.58,
+            "p99": 55.88,
+            "max": 84.99
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 74222,
+        "nodeCpuCorePercent": 101.7277602676119,
+        "postgresBackendCpuCorePercent": 71.31151749539002,
+        "postgresBackendRssMiB": 325.4140625,
+        "peakNodeRssMiB": 616.7890625,
+        "peakConnections": 10
+      },
+      {
+        "concurrency": 50,
+        "elapsedSeconds": 12.090681837,
+        "requests": 3933,
+        "requestsPerSecond": 325.29182828748355,
+        "latencyMs": {
+          "instruments": {
+            "samples": 1970,
+            "p50": 166.8,
+            "p95": 189.61,
+            "p99": 204.48,
+            "max": 250.22
+          },
+          "positions": {
+            "samples": 1963,
+            "p50": 139.74,
+            "p95": 163.29,
+            "p99": 173.85,
+            "max": 250.07
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 76735,
+        "nodeCpuCorePercent": 100.96002991861708,
+        "postgresBackendCpuCorePercent": 74.68561427500576,
+        "postgresBackendRssMiB": 345.76953125,
+        "peakNodeRssMiB": 623.48046875,
+        "peakConnections": 10
+      }
+    ]
+  },
+  "soak": {
+    "soak-300": {
+      "state": "FAIL",
+      "elapsedSeconds": 300.015826804,
+      "actual24hCompleted": false,
+      "samples": 29,
+      "evaluatedFreshSamples": 23,
+      "badFreshSamples": 0,
+      "peakRssMiB": 417.015625,
+      "cpuCorePercent": 8.358445708393427,
+      "assertions": {
+        "allInvalidFramesRejected": true,
+        "collectedAllThree": true,
+        "recoveredFinalPrices": true,
+        "noUnplannedFinancialErrors": true,
+        "actualMarketAndLimitFills": true,
+        "freshOutsidePlannedFaults": true,
+        "noClockSteps": false
+      },
+      "after": [
+        {
+          "domain": "last",
+          "rows": "4269",
+          "bytes": "2482176"
+        },
+        {
+          "domain": "mark",
+          "rows": "6026",
+          "bytes": "3481600"
+        },
+        {
+          "domain": "spot",
+          "rows": "1197",
+          "bytes": "1794048"
+        }
+      ],
+      "commands": {
+        "marketLatencyMs": {
+          "samples": 9,
+          "p50": 41.57,
+          "p95": 66.25,
+          "p99": 66.25,
+          "max": 66.25
+        },
+        "limitEvaluationMs": {
+          "samples": 9,
+          "p50": 3.15,
+          "p95": 3.96,
+          "p99": 3.96,
+          "max": 3.96
+        },
+        "limitFillMs": {
+          "samples": 8,
+          "p50": 1945.45,
+          "p95": 3062.62,
+          "p99": 3062.62,
+          "max": 3062.62
+        },
+        "pendingLimitOutcomes": {
+          "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 9
+        },
+        "expectedOutageBlocks": 1,
+        "errors": {}
+      },
+      "connections": {
+        "last": 3,
+        "mark": 3
+      },
+      "rest": {
+        "fapi.binance.com/fapi/v1/exchangeInfo": {
+          "calls": 2,
+          "failures": 0,
+          "statuses": {
+            "200": 2
+          }
+        },
+        "fapi.binance.com/fapi/v2/ticker/price": {
+          "calls": 79,
+          "failures": 5,
+          "statuses": {
+            "200": 74
+          }
+        },
+        "api.binance.com/api/v3/ticker/24hr": {
+          "calls": 5,
+          "failures": 0,
+          "statuses": {
+            "200": 5
+          }
+        },
+        "fapi.binance.com/fapi/v1/premiumIndex": {
+          "calls": 8,
+          "failures": 6,
+          "statuses": {
+            "200": 2
+          }
+        }
+      },
+      "clockStepCount": 10,
+      "acceptedLastFrames": 11589,
+      "spotFrames": 11585
+    },
+    "soak-24h-observed": {
+      "state": "RUNNING",
+      "elapsedSeconds": 6896.288139417,
+      "actual24hCompleted": false,
+      "samples": 683,
+      "evaluatedFreshSamples": 677,
+      "badFreshSamples": 0,
+      "peakRssMiB": 444.97265625,
+      "cpuCorePercent": null,
+      "assertions": null,
+      "after": null,
+      "commands": {
+        "marketLatencyMs": {
+          "samples": 229,
+          "p50": 35.74,
+          "p95": 42.37,
+          "p99": 54.07,
+          "max": 66.78
+        },
+        "limitEvaluationMs": {
+          "samples": 229,
+          "p50": 2.88,
+          "p95": 3.71,
+          "p99": 4.69,
+          "max": 6.17
+        },
+        "limitFillMs": {
+          "samples": 228,
+          "p50": 2247.37,
+          "p95": 3674.2,
+          "p99": 3975.05,
+          "max": 4586.19
+        },
+        "pendingLimitOutcomes": {
+          "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 229
+        },
+        "expectedOutageBlocks": 1,
+        "errors": {}
+      },
+      "connections": {
+        "last": 3,
+        "mark": 3
+      },
+      "rest": {
+        "fapi.binance.com/fapi/v1/exchangeInfo": {
+          "calls": 23,
+          "failures": 0,
+          "statuses": {
+            "200": 23
+          }
+        },
+        "fapi.binance.com/fapi/v2/ticker/price": {
+          "calls": 1885,
+          "failures": 6,
+          "statuses": {
+            "200": 1879
+          }
+        },
+        "api.binance.com/api/v3/ticker/24hr": {
+          "calls": 115,
+          "failures": 0,
+          "statuses": {
+            "200": 115
+          }
+        },
+        "fapi.binance.com/fapi/v1/premiumIndex": {
+          "calls": 15,
+          "failures": 6,
+          "statuses": {
+            "200": 9
+          }
+        }
+      },
+      "clockStepCount": 212,
+      "acceptedLastFrames": 283313,
+      "spotFrames": 263411,
+      "observedTables": [
+        {
+          "domain": "spot",
+          "rows": "27372",
+          "bytes": "37658624"
+        },
+        {
+          "domain": "last",
+          "rows": "101510",
+          "bytes": "60358656"
+        },
+        {
+          "domain": "mark",
+          "rows": "148901",
+          "bytes": "85745664"
+        }
+      ]
+    }
+  },
+  "retention": {
+    "rows": 2000000,
+    "deleted": 2000000,
+    "measuredDeleteMs": 33350.96416,
+    "rowsPerSecond": 59938.29714816856,
+    "explainMs": 11.503
+  },
+  "frontend": {
+    "tests": 2120,
+    "suites": 205,
+    "pass": 2119,
+    "fail": 1,
+    "skipped": 0
+  }
+}

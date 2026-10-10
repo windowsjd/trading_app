@@ -1,0 +1,6 @@
+Test Suites: 1 skipped, 0 of 1 total
+Tests:       18 skipped, 18 total
+Snapshots:   0 total
+Time:        0.303 s, estimated 1 s
+Ran all test suites within paths "src/providers/binance/binance-rest-coordinator.integration.spec.ts".
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/rest-redis-jest.json

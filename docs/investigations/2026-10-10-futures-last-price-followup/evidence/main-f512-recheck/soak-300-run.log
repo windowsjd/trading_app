@@ -1,0 +1,17 @@
+[Nest] 959100  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1eac0172-4553-470e-8013-6a9d6cd3d892"}
+[Nest] 959100  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"00a7e999-f03e-4aa3-ba6d-14b811c8aada"}
+[Nest] 959100  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f87bb9a3-9e6c-4a75-8f01-04e2def6dbaa"}
+[Nest] 959100  - 10/10/2026, 5:13:21 PM     LOG [BinanceWebSocketStreamingService] Binance WebSocket streaming connected with 50 ticker/depth streams.
+(node:959100) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 959100  - 10/10/2026, 5:15:43 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 959100  - 10/10/2026, 5:15:44 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 959100  - 10/10/2026, 5:15:46 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 959100  - 10/10/2026, 5:15:47 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 959100  - 10/10/2026, 5:15:49 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 959100  - 10/10/2026, 5:15:50 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 959100  - 10/10/2026, 5:15:52 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 959100  - 10/10/2026, 5:15:54 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 959100  - 10/10/2026, 5:15:55 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 959100  - 10/10/2026, 5:15:57 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 959100  - 10/10/2026, 5:15:58 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED

@@ -1,14 +1,14 @@
 {
   "state": "RUNNING",
   "requestedSeconds": 86400,
-  "elapsedSeconds": 4080.833250608,
+  "elapsedSeconds": 7973.264918912,
   "actual24hCompleted": false,
   "startedAt": "2026-10-10T06:31:49.088Z",
   "database": "127.0.0.1:55439/futures_soak_24h_final_test",
   "instruments": 23,
   "spotSymbols": 25,
-  "samples": 404,
-  "evaluatedFreshSamples": 398,
+  "samples": 790,
+  "evaluatedFreshSamples": 784,
   "badFreshSamples": 0,
   "frames": {
     "?": {
@@ -18,171 +18,171 @@
       "lastAt": 1099.30199
     },
     "WLDUSDT": {
-      "accepted": 20304,
+      "accepted": 29695,
       "rejected": 0,
       "maxGapMs": 20489.75193,
-      "lastAt": 4079922.008808
+      "lastAt": 7973672.918761
     },
     "SOLUSDT": {
-      "accepted": 6453,
+      "accepted": 12297,
       "rejected": 0,
       "maxGapMs": 22108.419286999997,
-      "lastAt": 4081122.622824
+      "lastAt": 7973811.874216
     },
     "AVAXUSDT": {
-      "accepted": 4487,
+      "accepted": 9417,
       "rejected": 0,
       "maxGapMs": 22854.918517000013,
-      "lastAt": 4080951.465855
+      "lastAt": 7973672.680155
     },
     "NEARUSDT": {
-      "accepted": 11263,
+      "accepted": 23438,
       "rejected": 0,
       "maxGapMs": 20836.16622699998,
-      "lastAt": 4081519.46357
+      "lastAt": 7973656.363075
     },
     "DOGEUSDT": {
-      "accepted": 3478,
+      "accepted": 7562,
       "rejected": 0,
       "maxGapMs": 22111.571662000002,
-      "lastAt": 4081220.830694
+      "lastAt": 7970786.393522
     },
     "UNIUSDT": {
-      "accepted": 4008,
+      "accepted": 7551,
       "rejected": 0,
       "maxGapMs": 22314.80931499999,
-      "lastAt": 4080181.636287
+      "lastAt": 7973272.434035
     },
     "XLMUSDT": {
-      "accepted": 2805,
+      "accepted": 5740,
       "rejected": 0,
       "maxGapMs": 23102.212749999948,
-      "lastAt": 4080861.241531
+      "lastAt": 7972664.322654
     },
     "ETHUSDT": {
-      "accepted": 11270,
+      "accepted": 21863,
       "rejected": 0,
       "maxGapMs": 21558.37308000002,
-      "lastAt": 4081234.478505
+      "lastAt": 7973737.281977
     },
     "TAOUSDT": {
-      "accepted": 8607,
+      "accepted": 16944,
       "rejected": 0,
       "maxGapMs": 22964.161473000015,
-      "lastAt": 4080285.632086
+      "lastAt": 7971773.76623
     },
     "ZECUSDT": {
-      "accepted": 22338,
+      "accepted": 43275,
       "rejected": 0,
       "maxGapMs": 21942.804516000004,
-      "lastAt": 4080381.165924
+      "lastAt": 7973578.524521
     },
     "XRPUSDT": {
-      "accepted": 5679,
+      "accepted": 12602,
       "rejected": 0,
       "maxGapMs": 20570.308684000018,
-      "lastAt": 4080903.188152
+      "lastAt": 7973734.326035
     },
     "BNBUSDT": {
-      "accepted": 5395,
+      "accepted": 11611,
       "rejected": 0,
       "maxGapMs": 22238.022104999982,
-      "lastAt": 4080292.002391
+      "lastAt": 7970916.502875
     },
     "ASTERUSDT": {
-      "accepted": 3748,
+      "accepted": 7311,
       "rejected": 0,
       "maxGapMs": 26023.35874299999,
-      "lastAt": 4080678.676408
+      "lastAt": 7964273.394266
     },
     "LINKUSDT": {
-      "accepted": 2173,
+      "accepted": 4457,
       "rejected": 0,
       "maxGapMs": 23944.04217100001,
-      "lastAt": 4081404.998232
+      "lastAt": 7973050.550437
     },
     "LTCUSDT": {
-      "accepted": 1435,
+      "accepted": 3042,
       "rejected": 0,
-      "maxGapMs": 23633.229831999983,
-      "lastAt": 4073592.445306
+      "maxGapMs": 26245.030813999474,
+      "lastAt": 7973362.477411
     },
     "BTCUSDT": {
-      "accepted": 17907,
+      "accepted": 31883,
       "rejected": 0,
       "maxGapMs": 24258.161890999996,
-      "lastAt": 4081312.71414
+      "lastAt": 7973637.597884
     },
     "TRXUSDT": {
-      "accepted": 2217,
+      "accepted": 4469,
       "rejected": 0,
       "maxGapMs": 23622.703011999984,
-      "lastAt": 4079004.131386
+      "lastAt": 7971502.52711
     },
     "TRUMPUSDT": {
-      "accepted": 1885,
+      "accepted": 3790,
       "rejected": 0,
       "maxGapMs": 22277.37270800001,
-      "lastAt": 4079578.182197
+      "lastAt": 7970427.137862
     },
     "ADAUSDT": {
-      "accepted": 3973,
+      "accepted": 10047,
       "rejected": 0,
       "maxGapMs": 25088.758622000023,
-      "lastAt": 4080702.44831
+      "lastAt": 7973641.637122
     },
     "NIGHTUSDT": {
-      "accepted": 4718,
+      "accepted": 21588,
       "rejected": 0,
       "maxGapMs": 23833.66748100001,
-      "lastAt": 4081018.202932
+      "lastAt": 7972114.75373
     },
     "ENAUSDT": {
-      "accepted": 7351,
+      "accepted": 15009,
       "rejected": 0,
       "maxGapMs": 24207.87553999998,
-      "lastAt": 4079924.309803
+      "lastAt": 7973520.13606
     },
     "CHIPUSDT": {
-      "accepted": 3551,
+      "accepted": 5218,
       "rejected": 0,
-      "maxGapMs": 30650.527608999982,
-      "lastAt": 4073404.107643
+      "maxGapMs": 43776.89522300009,
+      "lastAt": 7967488.387569
     },
     "SUIUSDT": {
-      "accepted": 5352,
+      "accepted": 16539,
       "rejected": 0,
       "maxGapMs": 23800.39074999999,
-      "lastAt": 4079727.208572
+      "lastAt": 7973153.590764
     }
   },
   "rest": {
     "fapi.binance.com/fapi/v1/exchangeInfo": {
-      "calls": 14,
+      "calls": 26,
       "failures": 0,
       "statuses": {
-        "200": 14
+        "200": 26
       }
     },
     "fapi.binance.com/fapi/v2/ticker/price": {
-      "calls": 1134,
+      "calls": 2182,
       "failures": 6,
       "statuses": {
-        "200": 1128
+        "200": 2176
       }
     },
     "api.binance.com/api/v3/ticker/24hr": {
-      "calls": 68,
+      "calls": 133,
       "failures": 0,
       "statuses": {
-        "200": 68
+        "200": 133
       }
     },
     "fapi.binance.com/fapi/v1/premiumIndex": {
-      "calls": 11,
+      "calls": 15,
       "failures": 6,
       "statuses": {
-        "200": 5
+        "200": 9
       }
     }
   },
@@ -253,17 +253,17 @@
     "lastStartedAt": "2026-10-10T06:31:49.090Z",
     "lastConnectedAt": "2026-10-10T06:31:49.229Z",
     "lastDisconnectedAt": null,
-    "lastMessageAt": "2026-10-10T07:35:50.878Z",
-    "lastTickerAt": "2026-10-10T07:35:50.874Z",
-    "lastSnapshotAt": "2026-10-10T07:35:50.874Z",
+    "lastMessageAt": "2026-10-10T08:36:44.570Z",
+    "lastTickerAt": "2026-10-10T08:36:44.436Z",
+    "lastSnapshotAt": "2026-10-10T08:36:44.235Z",
     "reconnectCount": 0,
     "nextReconnectAt": null,
     "nextReconnectDelayMs": null,
-    "receivedFrames": 154650,
-    "receivedTickers": 66396,
+    "receivedFrames": 305171,
+    "receivedTickers": 131887,
     "acknowledged": 1,
-    "created": 16053,
-    "skipped": 50343,
+    "created": 31554,
+    "skipped": 100333,
     "failed": 0,
     "latestPriceCount": 25,
     "eventListenerCount": 0,
@@ -795,37 +795,513 @@
     {
       "elapsedSeconds": 4074.787515334,
       "stepMs": -1976.2516049998812
+    },
+    {
+      "elapsedSeconds": 4107.344391349,
+      "stepMs": -1925.2065849998035
+    },
+    {
+      "elapsedSeconds": 4139.752238305,
+      "stepMs": -1979.5853150002658
+    },
+    {
+      "elapsedSeconds": 4172.316378457,
+      "stepMs": -1894.3637470002286
+    },
+    {
+      "elapsedSeconds": 4204.803878156,
+      "stepMs": -1952.4506949996576
+    },
+    {
+      "elapsedSeconds": 4239.825682129999,
+      "stepMs": -1949.0903650000691
+    },
+    {
+      "elapsedSeconds": 4269.824102194,
+      "stepMs": -2009.6450370000675
+    },
+    {
+      "elapsedSeconds": 4302.281699212,
+      "stepMs": -1911.3451269995421
+    },
+    {
+      "elapsedSeconds": 4334.788201836001,
+      "stepMs": -1988.4334450000897
+    },
+    {
+      "elapsedSeconds": 4367.307595136,
+      "stepMs": -1929.865178000182
+    },
+    {
+      "elapsedSeconds": 4399.7759368629995,
+      "stepMs": -1967.8408359996974
+    },
+    {
+      "elapsedSeconds": 4432.2953059599995,
+      "stepMs": -1933.091895999387
+    },
+    {
+      "elapsedSeconds": 4464.7893778200005,
+      "stepMs": -1962.5707259997725
+    },
+    {
+      "elapsedSeconds": 4497.325072883,
+      "stepMs": -1980.868770999834
+    },
+    {
+      "elapsedSeconds": 4529.814816973,
+      "stepMs": -1950.3882609996945
+    },
+    {
+      "elapsedSeconds": 4562.314903807999,
+      "stepMs": -2035.2434739992023
+    },
+    {
+      "elapsedSeconds": 4594.76148229,
+      "stepMs": -1986.1591590000317
+    },
+    {
+      "elapsedSeconds": 4627.246001493,
+      "stepMs": -1892.7279890002683
+    },
+    {
+      "elapsedSeconds": 4661.13746031,
+      "stepMs": -2024.5057889996096
+    },
+    {
+      "elapsedSeconds": 4692.30822513,
+      "stepMs": -2022.7183340005577
+    },
+    {
+      "elapsedSeconds": 4724.804574005,
+      "stepMs": -1920.764508000575
+    },
+    {
+      "elapsedSeconds": 4757.3202446529995,
+      "stepMs": -1958.4742349991575
+    },
+    {
+      "elapsedSeconds": 4789.822047115,
+      "stepMs": -1968.219708999619
+    },
+    {
+      "elapsedSeconds": 4822.286787325001,
+      "stepMs": -1985.9577640006319
+    },
+    {
+      "elapsedSeconds": 4854.793888104,
+      "stepMs": -1980.3358770003542
+    },
+    {
+      "elapsedSeconds": 4887.261866858,
+      "stepMs": -2025.672814999707
+    },
+    {
+      "elapsedSeconds": 4919.855678485,
+      "stepMs": -2028.0881079994142
+    },
+    {
+      "elapsedSeconds": 4952.235112955999,
+      "stepMs": -1942.538935999386
+    },
+    {
+      "elapsedSeconds": 4984.749124540001,
+      "stepMs": -1964.1934940004721
+    },
+    {
+      "elapsedSeconds": 5017.3044127,
+      "stepMs": -1992.0991310002282
+    },
+    {
+      "elapsedSeconds": 5051.354422281,
+      "stepMs": -2048.3163320003077
+    },
+    {
+      "elapsedSeconds": 5082.287321762,
+      "stepMs": -1932.3761120000854
+    },
+    {
+      "elapsedSeconds": 5114.7435508749995,
+      "stepMs": -1994.0566859999672
+    },
+    {
+      "elapsedSeconds": 5147.334555429999,
+      "stepMs": -1978.3171389997005
+    },
+    {
+      "elapsedSeconds": 5179.780359474999,
+      "stepMs": -1973.3142029996961
+    },
+    {
+      "elapsedSeconds": 5212.31723465,
+      "stepMs": -2008.5512210000306
+    },
+    {
+      "elapsedSeconds": 5244.807709267,
+      "stepMs": -2037.9521079994738
+    },
+    {
+      "elapsedSeconds": 5277.3054592319995,
+      "stepMs": -1968.7846069997177
+    },
+    {
+      "elapsedSeconds": 5309.805651723999,
+      "stepMs": -2032.2705119997263
+    },
+    {
+      "elapsedSeconds": 5342.233343776,
+      "stepMs": -1944.109104999341
+    },
+    {
+      "elapsedSeconds": 5374.806266556,
+      "stepMs": -1973.104989000596
+    },
+    {
+      "elapsedSeconds": 5407.291357409999,
+      "stepMs": -2010.670714999549
+    },
+    {
+      "elapsedSeconds": 5442.5850512140005,
+      "stepMs": -1975.3553940001875
+    },
+    {
+      "elapsedSeconds": 5473.589652857,
+      "stepMs": -2033.9750749999657
+    },
+    {
+      "elapsedSeconds": 5504.781716292,
+      "stepMs": -1949.460119000636
+    },
+    {
+      "elapsedSeconds": 5537.321737758,
+      "stepMs": -1983.632591000758
+    },
+    {
+      "elapsedSeconds": 5569.836782471,
+      "stepMs": -2010.2203080002218
+    },
+    {
+      "elapsedSeconds": 5602.325034962,
+      "stepMs": -2077.503413000144
+    },
+    {
+      "elapsedSeconds": 5634.804566448999,
+      "stepMs": -1997.5594099992886
+    },
+    {
+      "elapsedSeconds": 5667.274883331,
+      "stepMs": -2047.8022069996223
+    },
+    {
+      "elapsedSeconds": 5699.752650605,
+      "stepMs": -1922.1743549993262
+    },
+    {
+      "elapsedSeconds": 5732.279531425,
+      "stepMs": -1986.1934289997444
+    },
+    {
+      "elapsedSeconds": 5764.821968636,
+      "stepMs": -2005.6172019997612
+    },
+    {
+      "elapsedSeconds": 5797.282809817,
+      "stepMs": -1988.4111590003595
+    },
+    {
+      "elapsedSeconds": 5829.7514773190005,
+      "stepMs": -2024.1747130006552
+    },
+    {
+      "elapsedSeconds": 5862.892777988,
+      "stepMs": -2069.98958399985
+    },
+    {
+      "elapsedSeconds": 5894.844031213001,
+      "stepMs": -2034.907667000778
+    },
+    {
+      "elapsedSeconds": 5927.235577382,
+      "stepMs": -1944.827564000152
+    },
+    {
+      "elapsedSeconds": 5959.7652843549995,
+      "stepMs": -2008.4067019997165
+    },
+    {
+      "elapsedSeconds": 5992.237447002,
+      "stepMs": -2016.289805000648
+    },
+    {
+      "elapsedSeconds": 6024.763142989001,
+      "stepMs": -2049.4163770005107
+    },
+    {
+      "elapsedSeconds": 6057.2222679960005,
+      "stepMs": -1938.506308999844
+    },
+    {
+      "elapsedSeconds": 6089.765764807,
+      "stepMs": -2012.6040500001982
+    },
+    {
+      "elapsedSeconds": 6122.335187199,
+      "stepMs": -2033.1730400007218
+    },
+    {
+      "elapsedSeconds": 6154.878740341001,
+      "stepMs": -2022.1228809999302
+    },
+    {
+      "elapsedSeconds": 6187.293632655001,
+      "stepMs": -1971.267219000496
+    },
+    {
+      "elapsedSeconds": 6219.7529978170005,
+      "stepMs": -2050.7435130001977
+    },
+    {
+      "elapsedSeconds": 6254.0487053589995,
+      "stepMs": -1999.645328999497
+    },
+    {
+      "elapsedSeconds": 6284.834792343,
+      "stepMs": -2046.0475260000676
+    },
+    {
+      "elapsedSeconds": 6317.224083401,
+      "stepMs": -1957.5683550005779
+    },
+    {
+      "elapsedSeconds": 6349.724680192,
+      "stepMs": -2027.9041800005361
+    },
+    {
+      "elapsedSeconds": 6382.282327555,
+      "stepMs": -1989.0888209994882
+    },
+    {
+      "elapsedSeconds": 6414.744572799,
+      "stepMs": -2045.2629549996927
+    },
+    {
+      "elapsedSeconds": 6447.3119403539995,
+      "stepMs": -2059.108059999533
+    },
+    {
+      "elapsedSeconds": 6479.8868318879995,
+      "stepMs": -1956.7295319996774
+    },
+    {
+      "elapsedSeconds": 6512.240552909,
+      "stepMs": -2012.239517999813
+    },
+    {
+      "elapsedSeconds": 6544.844105913,
+      "stepMs": -2004.318076000549
+    },
+    {
+      "elapsedSeconds": 6577.254667878,
+      "stepMs": -2063.4513969998807
+    },
+    {
+      "elapsedSeconds": 6609.8651738809995,
+      "stepMs": -2012.2004009997472
+    },
+    {
+      "elapsedSeconds": 6644.32819903,
+      "stepMs": -1966.377271999605
+    },
+    {
+      "elapsedSeconds": 6674.695352918,
+      "stepMs": -2008.1403710003942
+    },
+    {
+      "elapsedSeconds": 6707.241207484,
+      "stepMs": -2082.645781000145
+    },
+    {
+      "elapsedSeconds": 6739.786086686,
+      "stepMs": -2045.53163400013
+    },
+    {
+      "elapsedSeconds": 6772.2193651630005,
+      "stepMs": -1970.700582000427
+    },
+    {
+      "elapsedSeconds": 6804.823683771,
+      "stepMs": -2013.0928580006585
+    },
+    {
+      "elapsedSeconds": 6837.328641409001,
+      "stepMs": -2036.9226730000228
+    },
+    {
+      "elapsedSeconds": 6869.8278684550005,
+      "stepMs": -2028.234800000675
+    },
+    {
+      "elapsedSeconds": 6902.254368733,
+      "stepMs": -2044.502194000408
+    },
+    {
+      "elapsedSeconds": 6934.810751992,
+      "stepMs": -1995.626534000039
+    },
+    {
+      "elapsedSeconds": 6967.240566668,
+      "stepMs": -2003.500936999917
+    },
+    {
+      "elapsedSeconds": 6999.801192948999,
+      "stepMs": -2088.5157349994406
+    },
+    {
+      "elapsedSeconds": 7035.526972647001,
+      "stepMs": -2055.2520320005715
+    },
+    {
+      "elapsedSeconds": 7065.564401983001,
+      "stepMs": -1965.3230720004067
+    },
+    {
+      "elapsedSeconds": 7097.31618387,
+      "stepMs": -2025.2461930001155
+    },
+    {
+      "elapsedSeconds": 7129.83735331,
+      "stepMs": -2009.9086580006406
+    },
+    {
+      "elapsedSeconds": 7162.310414089,
+      "stepMs": -2078.8552679996938
+    },
+    {
+      "elapsedSeconds": 7194.828880551,
+      "stepMs": -1991.4109060000628
+    },
+    {
+      "elapsedSeconds": 7227.297552631,
+      "stepMs": -1998.9205339998007
+    },
+    {
+      "elapsedSeconds": 7259.734041305,
+      "stepMs": -2090.0960459997877
+    },
+    {
+      "elapsedSeconds": 7292.345277496,
+      "stepMs": -2104.203649999574
+    },
+    {
+      "elapsedSeconds": 7324.824353012,
+      "stepMs": -1956.0782440006733
+    },
+    {
+      "elapsedSeconds": 7357.283109054,
+      "stepMs": -2033.2765180002898
+    },
+    {
+      "elapsedSeconds": 7389.820768183001,
+      "stepMs": -2000.570815000683
+    },
+    {
+      "elapsedSeconds": 7422.21528142,
+      "stepMs": -2074.9008010001853
+    },
+    {
+      "elapsedSeconds": 7456.855785837,
+      "stepMs": -2046.7250549998134
+    },
+    {
+      "elapsedSeconds": 7487.252461151,
+      "stepMs": -1995.005952999927
+    },
+    {
+      "elapsedSeconds": 7519.77323291,
+      "stepMs": -2021.9742439994588
+    },
+    {
+      "elapsedSeconds": 7552.333657797,
+      "stepMs": -2065.2187700001523
+    },
+    {
+      "elapsedSeconds": 7584.816798264,
+      "stepMs": -2080.112591999583
+    },
+    {
+      "elapsedSeconds": 7617.295829625,
+      "stepMs": -1932.52400600072
+    },
+    {
+      "elapsedSeconds": 7649.779650712,
+      "stepMs": -2103.9359229998663
+    },
+    {
+      "elapsedSeconds": 7682.31177152,
+      "stepMs": -2089.0742239998654
+    },
+    {
+      "elapsedSeconds": 7714.749879611,
+      "stepMs": -1971.8987530004233
+    },
+    {
+      "elapsedSeconds": 7747.261178588,
+      "stepMs": -2054.9890580000356
+    },
+    {
+      "elapsedSeconds": 7779.775459002,
+      "stepMs": -2021.7420120006427
+    },
+    {
+      "elapsedSeconds": 7812.318040937,
+      "stepMs": -2058.9481100002304
+    },
+    {
+      "elapsedSeconds": 7847.115754385,
+      "stepMs": -2079.2635129997507
+    },
+    {
+      "elapsedSeconds": 7877.326719343,
+      "stepMs": -2007.3584280004725
+    },
+    {
+      "elapsedSeconds": 7909.791513588,
+      "stepMs": -2106.4314290005714
+    },
+    {
+      "elapsedSeconds": 7942.264970064,
+      "stepMs": -2079.549922000617
     }
   ],
   "commands": {
     "marketLatencyMs": {
-      "samples": 135,
-      "p50": 35.14,
-      "p95": 42.21,
+      "samples": 265,
+      "p50": 35.74,
+      "p95": 42.33,
       "p99": 54.07,
-      "max": 66.46
+      "max": 66.78
     },
     "limitEvaluationMs": {
-      "samples": 135,
-      "p50": 2.84,
-      "p95": 3.71,
-      "p99": 4.32,
-      "max": 5.03
+      "samples": 265,
+      "p50": 2.9,
+      "p95": 3.7,
+      "p99": 5.03,
+      "max": 6.17
     },
     "limitFillMs": {
-      "samples": 134,
-      "p50": 2247.37,
-      "p95": 3666.55,
-      "p99": 3964.3,
-      "max": 3975.05
+      "samples": 264,
+      "p50": 2245.84,
+      "p95": 3678.07,
+      "p99": 4585.76,
+      "max": 4788.07
     },
     "pendingLimitOutcomes": {
-      "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 135
+      "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 265
     },
     "expectedOutageBlocks": 1,
     "errors": {}
   },
-  "peakRssMiB": 440.87109375,
+  "peakRssMiB": 448.72265625,
   "before": [
     {
       "domain": "last",
@@ -844,337 +1320,359 @@
     }
   ],
   "latestSample": {
-    "elapsedSeconds": 4080.833250608,
-    "evaluatedAt": "2026-10-10T07:35:50.884Z",
+    "elapsedSeconds": 7973.264918912,
+    "evaluatedAt": "2026-10-10T08:36:44.641Z",
     "fresh": 23,
     "references": [
       {
         "symbol": "BTCUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.691Z",
-          "capturedAt": "2026-10-10T07:35:50.182Z"
+          "effectiveAt": "2026-10-10T08:36:42.158Z",
+          "capturedAt": "2026-10-10T08:36:44.237Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.397Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.953Z"
         }
       },
       {
         "symbol": "ETHUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.999Z",
-          "capturedAt": "2026-10-10T07:35:50.511Z"
+          "effectiveAt": "2026-10-10T08:36:41.915Z",
+          "capturedAt": "2026-10-10T08:36:43.977Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.398Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.954Z"
         }
       },
       {
         "symbol": "BNBUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.112Z",
-          "capturedAt": "2026-10-10T07:35:49.568Z"
+          "effectiveAt": "2026-10-10T08:36:39.608Z",
+          "capturedAt": "2026-10-10T08:36:41.516Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.399Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.956Z"
         }
       },
       {
         "symbol": "XRPUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.688Z",
-          "capturedAt": "2026-10-10T07:35:50.179Z"
+          "effectiveAt": "2026-10-10T08:36:39.613Z",
+          "capturedAt": "2026-10-10T08:36:41.523Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.398Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.955Z"
         }
       },
       {
         "symbol": "SOLUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.894Z",
-          "capturedAt": "2026-10-10T07:35:50.399Z"
+          "effectiveAt": "2026-10-10T08:36:40.884Z",
+          "capturedAt": "2026-10-10T08:36:42.879Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.400Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.956Z"
         }
       },
       {
         "symbol": "TRXUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:47.901Z",
-          "capturedAt": "2026-10-10T07:35:48.280Z"
+          "effectiveAt": "2026-10-10T08:36:40.156Z",
+          "capturedAt": "2026-10-10T08:36:42.102Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.398Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.955Z"
         }
       },
       {
         "symbol": "DOGEUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.986Z",
-          "capturedAt": "2026-10-10T07:35:50.497Z"
+          "effectiveAt": "2026-10-10T08:36:39.485Z",
+          "capturedAt": "2026-10-10T08:36:41.386Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.400Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.956Z"
         }
       },
       {
         "symbol": "ZECUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.195Z",
-          "capturedAt": "2026-10-10T07:35:49.657Z"
+          "effectiveAt": "2026-10-10T08:36:42.104Z",
+          "capturedAt": "2026-10-10T08:36:44.178Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.399Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.956Z"
         }
       },
       {
         "symbol": "XLMUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.649Z",
-          "capturedAt": "2026-10-10T07:35:50.137Z"
+          "effectiveAt": "2026-10-10T08:36:41.246Z",
+          "capturedAt": "2026-10-10T08:36:43.264Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.399Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.955Z"
         }
       },
       {
         "symbol": "LINKUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.146Z",
-          "capturedAt": "2026-10-10T07:35:49.603Z"
+          "effectiveAt": "2026-10-10T08:36:41.608Z",
+          "capturedAt": "2026-10-10T08:36:43.650Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.398Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.955Z"
         }
       },
       {
         "symbol": "SUIUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:48.581Z",
-          "capturedAt": "2026-10-10T07:35:49.003Z"
+          "effectiveAt": "2026-10-10T08:36:41.704Z",
+          "capturedAt": "2026-10-10T08:36:43.753Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.401Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.961Z"
         }
       },
       {
         "symbol": "NIGHTUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.796Z",
-          "capturedAt": "2026-10-10T07:35:50.294Z"
+          "effectiveAt": "2026-10-10T08:36:40.729Z",
+          "capturedAt": "2026-10-10T08:36:42.715Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.413Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.979Z"
         }
       },
       {
         "symbol": "NEARUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:50.032Z",
-          "capturedAt": "2026-10-10T07:35:50.545Z"
+          "effectiveAt": "2026-10-10T08:36:42.177Z",
+          "capturedAt": "2026-10-10T08:36:44.256Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.401Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.957Z"
         }
       },
       {
         "symbol": "ADAUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.498Z",
-          "capturedAt": "2026-10-10T07:35:49.979Z"
+          "effectiveAt": "2026-10-10T08:36:42.163Z",
+          "capturedAt": "2026-10-10T08:36:44.241Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.399Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.955Z"
         }
       },
       {
         "symbol": "TAOUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.107Z",
-          "capturedAt": "2026-10-10T07:35:49.562Z"
+          "effectiveAt": "2026-10-10T08:36:40.410Z",
+          "capturedAt": "2026-10-10T08:36:42.374Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.404Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.964Z"
         }
       },
       {
         "symbol": "WLDUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:48.763Z",
-          "capturedAt": "2026-10-10T07:35:49.198Z"
+          "effectiveAt": "2026-10-10T08:36:42.192Z",
+          "capturedAt": "2026-10-10T08:36:44.273Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.402Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.961Z"
         }
       },
       {
         "symbol": "ENAUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:48.767Z",
-          "capturedAt": "2026-10-10T07:35:49.201Z"
+          "effectiveAt": "2026-10-10T08:36:42.049Z",
+          "capturedAt": "2026-10-10T08:36:44.120Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.404Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.964Z"
         }
       },
       {
         "symbol": "AVAXUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.733Z",
-          "capturedAt": "2026-10-10T07:35:50.228Z"
+          "effectiveAt": "2026-10-10T08:36:42.191Z",
+          "capturedAt": "2026-10-10T08:36:44.273Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.400Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.957Z"
         }
       },
       {
         "symbol": "UNIUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.003Z",
-          "capturedAt": "2026-10-10T07:35:49.458Z"
+          "effectiveAt": "2026-10-10T08:36:41.816Z",
+          "capturedAt": "2026-10-10T08:36:43.872Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.400Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.957Z"
         }
       },
       {
         "symbol": "CHIPUSDT",
         "last": {
           "source": "binance_usdm_ticker_price_rest",
-          "effectiveAt": "2026-10-10T07:35:42.630Z",
-          "capturedAt": "2026-10-10T07:35:50.597Z"
+          "effectiveAt": "2026-10-10T08:36:36.399Z",
+          "capturedAt": "2026-10-10T08:36:43.330Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.413Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.980Z"
         }
       },
       {
         "symbol": "LTCUSDT",
         "last": {
-          "source": "binance_usdm_ticker_price_rest",
-          "effectiveAt": "2026-10-10T07:35:42.806Z",
-          "capturedAt": "2026-10-10T07:35:50.597Z"
+          "source": "binance_usdm_agg_trade_ws",
+          "effectiveAt": "2026-10-10T08:36:41.900Z",
+          "capturedAt": "2026-10-10T08:36:43.962Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.397Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.954Z"
         }
       },
       {
         "symbol": "ASTERUSDT",
         "last": {
-          "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:49.477Z",
-          "capturedAt": "2026-10-10T07:35:49.955Z"
+          "source": "binance_usdm_ticker_price_rest",
+          "effectiveAt": "2026-10-10T08:36:33.391Z",
+          "capturedAt": "2026-10-10T08:36:40.330Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.411Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.976Z"
         }
       },
       {
         "symbol": "TRUMPUSDT",
         "last": {
           "source": "binance_usdm_agg_trade_ws",
-          "effectiveAt": "2026-10-10T07:35:48.440Z",
-          "capturedAt": "2026-10-10T07:35:48.854Z"
+          "effectiveAt": "2026-10-10T08:36:39.149Z",
+          "capturedAt": "2026-10-10T08:36:41.027Z"
         },
         "mark": {
           "source": "binance_usdm_mark_ws",
-          "effectiveAt": "2026-10-10T07:35:50.000Z",
-          "capturedAt": "2026-10-10T07:35:50.407Z"
+          "effectiveAt": "2026-10-10T08:36:42.000Z",
+          "capturedAt": "2026-10-10T08:36:43.969Z"
         }
       }
     ],
     "expected": 23,
     "plannedFault": false,
     "memory": {
-      "rss": 461975552,
-      "heapTotal": 230051840,
-      "heapUsed": 90600728,
-      "external": 29861601,
-      "arrayBuffers": 1929301
+      "rss": 470519808,
+      "heapTotal": 230313984,
+      "heapUsed": 135804576,
+      "external": 31481740,
+      "arrayBuffers": 3549440
     },
     "processCpu": {
-      "user": 210660736,
-      "system": 96722875
+      "user": 412973805,
+      "system": 193109611
     },
     "databaseStats": [
       {
-        "xact_commit": "448596",
+        "xact_commit": "884310",
         "xact_rollback": "16",
-        "blks_read": "4",
-        "blks_hit": "7894447",
-        "tup_inserted": "165532",
-        "tup_updated": "28776",
-        "tup_deleted": "606",
+        "blks_read": "101872",
+        "blks_hit": "17378233",
+        "tup_inserted": "326625",
+        "tup_updated": "55793",
+        "tup_deleted": "990",
         "temp_bytes": "0",
         "connections": 5
       }
     ],
     "opsLocks": [
+      {
+        "id": "d4335726-d66d-4c2a-b9dc-b91de906f19a",
+        "lockKey": "futures_last_price_retention:current",
+        "jobName": "futures_last_price_retention",
+        "ownerId": "9840e9f5-fc55-4c83-a2b9-0728aee5bbe9",
+        "acquiredAt": "2026-10-10T08:35:53.518Z",
+        "expiresAt": "2026-10-10T08:36:23.522Z",
+        "releasedAt": "2026-10-10T08:35:53.526Z",
+        "createdAt": "2026-10-10T06:32:45.375Z",
+        "updatedAt": "2026-10-10T08:35:53.526Z"
+      },
+      {
+        "id": "5962fb50-f7a7-451a-8c0c-e07d6e5ac055",
+        "lockKey": "futures_mark_retention:current",
+        "jobName": "futures_mark_retention",
+        "ownerId": "21a9433a-bb7a-4c30-9351-421596f870c1",
+        "acquiredAt": "2026-10-10T08:35:53.518Z",
+        "expiresAt": "2026-10-10T08:36:23.522Z",
+        "releasedAt": "2026-10-10T08:35:53.526Z",
+        "createdAt": "2026-10-10T06:32:45.375Z",
+        "updatedAt": "2026-10-10T08:35:53.526Z"
+      },
       {
         "id": "081859ba-82aa-4026-8ccb-f07aff3fd1fb",
         "lockKey": "conditional_orders:current",
@@ -1187,65 +1685,43 @@
         "updatedAt": "2026-10-10T06:32:45.425Z"
       },
       {
-        "id": "5962fb50-f7a7-451a-8c0c-e07d6e5ac055",
-        "lockKey": "futures_mark_retention:current",
-        "jobName": "futures_mark_retention",
-        "ownerId": "7d0a5229-d1d3-4151-acf1-e2c97490aaaa",
-        "acquiredAt": "2026-10-10T07:35:50.083Z",
-        "expiresAt": "2026-10-10T07:36:20.088Z",
-        "releasedAt": "2026-10-10T07:35:50.092Z",
-        "createdAt": "2026-10-10T06:32:45.375Z",
-        "updatedAt": "2026-10-10T07:35:50.092Z"
-      },
-      {
-        "id": "d4335726-d66d-4c2a-b9dc-b91de906f19a",
-        "lockKey": "futures_last_price_retention:current",
-        "jobName": "futures_last_price_retention",
-        "ownerId": "f81becd5-30c5-49a0-be31-1d086907b52e",
-        "acquiredAt": "2026-10-10T07:35:50.083Z",
-        "expiresAt": "2026-10-10T07:36:20.087Z",
-        "releasedAt": "2026-10-10T07:35:50.093Z",
-        "createdAt": "2026-10-10T06:32:45.375Z",
-        "updatedAt": "2026-10-10T07:35:50.093Z"
-      },
-      {
         "id": "f15f7382-fe65-491c-b825-25404c78808b",
         "lockKey": "futures_limit_matching:current",
         "jobName": "futures_limit_matching",
-        "ownerId": "b2e64e52-d16e-41b3-a1a8-9b053a6fe7d6",
-        "acquiredAt": "2026-10-10T07:35:50.552Z",
-        "expiresAt": "2026-10-10T07:36:20.554Z",
-        "releasedAt": "2026-10-10T07:35:50.559Z",
+        "ownerId": "6c38cdeb-d193-4c15-85a0-57052853e222",
+        "acquiredAt": "2026-10-10T08:36:44.284Z",
+        "expiresAt": "2026-10-10T08:37:14.287Z",
+        "releasedAt": "2026-10-10T08:36:44.294Z",
         "createdAt": "2026-10-10T06:32:18.230Z",
-        "updatedAt": "2026-10-10T07:35:50.559Z"
+        "updatedAt": "2026-10-10T08:36:44.294Z"
       },
       {
         "id": "315eb870-04ef-496a-a476-778a0f959bec",
         "lockKey": "futures_liquidation:current",
         "jobName": "futures_liquidation",
-        "ownerId": "ed0afd26-13d8-4e66-928d-305bcd8b6df8",
-        "acquiredAt": "2026-10-10T07:35:50.552Z",
-        "expiresAt": "2026-10-10T07:36:20.561Z",
-        "releasedAt": "2026-10-10T07:35:50.563Z",
+        "ownerId": "e8b82405-3c58-4ae2-802b-bf2bd2ef6a0e",
+        "acquiredAt": "2026-10-10T08:36:44.283Z",
+        "expiresAt": "2026-10-10T08:37:14.293Z",
+        "releasedAt": "2026-10-10T08:36:44.295Z",
         "createdAt": "2026-10-10T06:31:50.099Z",
-        "updatedAt": "2026-10-10T07:35:50.563Z"
+        "updatedAt": "2026-10-10T08:36:44.295Z"
       }
     ],
     "tables": [
       {
         "domain": "spot",
-        "rows": "16121",
-        "bytes": "22085632"
+        "rows": "31687",
+        "bytes": "43458560"
       },
       {
         "domain": "last",
-        "rows": "58193",
-        "bytes": "34603008"
+        "rows": "117070",
+        "bytes": "69632000"
       },
       {
         "domain": "mark",
-        "rows": "88021",
-        "bytes": "50946048"
+        "rows": "172109",
+        "bytes": "99598336"
       }
     ],
     "spot": {
@@ -1311,17 +1787,17 @@
       "lastStartedAt": "2026-10-10T06:31:49.090Z",
       "lastConnectedAt": "2026-10-10T06:31:49.229Z",
       "lastDisconnectedAt": null,
-      "lastMessageAt": "2026-10-10T07:35:50.878Z",
-      "lastTickerAt": "2026-10-10T07:35:50.874Z",
-      "lastSnapshotAt": "2026-10-10T07:35:50.874Z",
+      "lastMessageAt": "2026-10-10T08:36:44.570Z",
+      "lastTickerAt": "2026-10-10T08:36:44.436Z",
+      "lastSnapshotAt": "2026-10-10T08:36:44.235Z",
       "reconnectCount": 0,
       "nextReconnectAt": null,
       "nextReconnectDelayMs": null,
-      "receivedFrames": 154650,
-      "receivedTickers": 66396,
+      "receivedFrames": 305171,
+      "receivedTickers": 131887,
       "acknowledged": 1,
-      "created": 16053,
-      "skipped": 50343,
+      "created": 31554,
+      "skipped": 100333,
       "failed": 0,
       "latestPriceCount": 25,
       "eventListenerCount": 0,
@@ -1330,66 +1806,14 @@
     },
     "workers": [
       {
-        "id": "70f81832-295f-4fa7-b491-8dec57cfdb13",
-        "jobName": "futures_last_price_retention",
-        "status": "succeeded",
-        "trigger": "scheduler",
-        "requestedBy": null,
-        "startedAt": "2026-10-10T07:35:50.086Z",
-        "finishedAt": "2026-10-10T07:35:50.092Z",
-        "durationMs": 6,
-        "lockKey": "futures_last_price_retention:current",
-        "idempotencyKey": null,
-        "dryRun": false,
-        "attempt": 1,
-        "maxAttempts": 1,
-        "errorCode": null,
-        "errorMessage": null,
-        "resultJson": {
-          "cutoff": "2026-10-09T07:35:50.085Z",
-          "batchCount": 1,
-          "deletedCount": 0,
-          "batchLimitReached": false
-        },
-        "metadataJson": null,
-        "createdAt": "2026-10-10T07:35:50.086Z",
-        "updatedAt": "2026-10-10T07:35:50.092Z"
-      },
-      {
-        "id": "be24c4b8-6c73-4f34-ab0c-ff7e591e1726",
-        "jobName": "futures_mark_retention",
-        "status": "succeeded",
-        "trigger": "scheduler",
-        "requestedBy": null,
-        "startedAt": "2026-10-10T07:35:50.086Z",
-        "finishedAt": "2026-10-10T07:35:50.091Z",
-        "durationMs": 5,
-        "lockKey": "futures_mark_retention:current",
-        "idempotencyKey": null,
-        "dryRun": false,
-        "attempt": 1,
-        "maxAttempts": 1,
-        "errorCode": null,
-        "errorMessage": null,
-        "resultJson": {
-          "cutoff": "2026-10-09T07:35:50.086Z",
-          "batchCount": 1,
-          "deletedCount": 0,
-          "batchLimitReached": false
-        },
-        "metadataJson": null,
-        "createdAt": "2026-10-10T07:35:50.086Z",
-        "updatedAt": "2026-10-10T07:35:50.091Z"
-      },
-      {
-        "id": "205914c5-f9a5-4802-9feb-e0ab5ee51ab6",
+        "id": "09d00e95-d41c-4c73-bffc-ccc7ceee80d7",
         "jobName": "futures_liquidation",
         "status": "succeeded",
         "trigger": "scheduler",
         "requestedBy": null,
-        "startedAt": "2026-10-10T07:35:36.516Z",
-        "finishedAt": "2026-10-10T07:35:36.528Z",
-        "durationMs": 12,
+        "startedAt": "2026-10-10T08:36:35.279Z",
+        "finishedAt": "2026-10-10T08:36:35.289Z",
+        "durationMs": 10,
         "lockKey": "futures_liquidation:current",
         "idempotencyKey": null,
         "dryRun": false,
@@ -1400,7 +1824,7 @@
         "resultJson": {
           "results": [
             {
-              "scope": "1a73e0ad-62c4-4a7c-8b42-705cb09b646e",
+              "scope": "292607e7-e039-4df2-9368-a2e8a97cf970",
               "state": "healthy",
               "accountId": "b3a31431-333c-4c2e-9363-584fe6258383"
             }
@@ -1408,17 +1832,17 @@
           "nextAccountCursor": ""
         },
         "metadataJson": null,
-        "createdAt": "2026-10-10T07:35:36.527Z",
-        "updatedAt": "2026-10-10T07:35:36.528Z"
+        "createdAt": "2026-10-10T08:36:35.288Z",
+        "updatedAt": "2026-10-10T08:36:35.290Z"
       },
       {
-        "id": "24c66039-d4e3-40d5-ae33-665560888922",
+        "id": "13096120-7a09-46ef-b2b8-0e757d0e85fc",
         "jobName": "futures_limit_matching",
         "status": "succeeded",
         "trigger": "scheduler",
         "requestedBy": null,
-        "startedAt": "2026-10-10T07:35:33.523Z",
-        "finishedAt": "2026-10-10T07:35:33.524Z",
+        "startedAt": "2026-10-10T08:35:58.341Z",
+        "finishedAt": "2026-10-10T08:35:58.342Z",
         "durationMs": 1,
         "lockKey": "futures_limit_matching:current",
         "idempotencyKey": null,
@@ -1433,8 +1857,60 @@
           }
         },
         "metadataJson": null,
-        "createdAt": "2026-10-10T07:35:33.524Z",
-        "updatedAt": "2026-10-10T07:35:33.525Z"
+        "createdAt": "2026-10-10T08:35:58.341Z",
+        "updatedAt": "2026-10-10T08:35:58.342Z"
+      },
+      {
+        "id": "0147e82b-265c-4591-a7fb-aa268629248d",
+        "jobName": "futures_last_price_retention",
+        "status": "succeeded",
+        "trigger": "scheduler",
+        "requestedBy": null,
+        "startedAt": "2026-10-10T08:35:53.521Z",
+        "finishedAt": "2026-10-10T08:35:53.525Z",
+        "durationMs": 4,
+        "lockKey": "futures_last_price_retention:current",
+        "idempotencyKey": null,
+        "dryRun": false,
+        "attempt": 1,
+        "maxAttempts": 1,
+        "errorCode": null,
+        "errorMessage": null,
+        "resultJson": {
+          "cutoff": "2026-10-09T08:35:53.520Z",
+          "batchCount": 1,
+          "deletedCount": 0,
+          "batchLimitReached": false
+        },
+        "metadataJson": null,
+        "createdAt": "2026-10-10T08:35:53.521Z",
+        "updatedAt": "2026-10-10T08:35:53.525Z"
+      },
+      {
+        "id": "989d7834-5f42-4a69-a5e9-2c145d38166f",
+        "jobName": "futures_mark_retention",
+        "status": "succeeded",
+        "trigger": "scheduler",
+        "requestedBy": null,
+        "startedAt": "2026-10-10T08:35:53.521Z",
+        "finishedAt": "2026-10-10T08:35:53.525Z",
+        "durationMs": 4,
+        "lockKey": "futures_mark_retention:current",
+        "idempotencyKey": null,
+        "dryRun": false,
+        "attempt": 1,
+        "maxAttempts": 1,
+        "errorCode": null,
+        "errorMessage": null,
+        "resultJson": {
+          "cutoff": "2026-10-09T08:35:53.521Z",
+          "batchCount": 1,
+          "deletedCount": 0,
+          "batchLimitReached": false
+        },
+        "metadataJson": null,
+        "createdAt": "2026-10-10T08:35:53.521Z",
+        "updatedAt": "2026-10-10T08:35:53.525Z"
       },
       {
         "id": "9f1886e7-e117-4ece-a0c9-956911f8f606",
@@ -1464,96 +1940,96 @@
     ],
     "coverageVerifiedAt": [
       {
-        "id": "3d7a5484-f5a1-4dd9-a43b-07031372b295",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "37a605b2-932a-45a8-b09b-48f690c68fcd",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
         "id": "b67356af-1b8f-45ce-a27d-710d9898b6b5",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "a2a1f91b-4773-4374-9579-bc380174e001",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "d3eff083-677f-45a0-aa89-b79e8e64595f",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "d0fcf895-7c04-4f1e-bbb0-927b44832a55",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "13c2fbbd-a7c8-4bc3-ad8e-b55968248458",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "73a7592a-ceb7-42c9-9f09-78ebb46b630d",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
-        "id": "e98dc550-49cb-4894-b063-6bed5ebe62d1",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "id": "3d7a5484-f5a1-4dd9-a43b-07031372b295",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
-        "id": "195e4578-0e0c-427a-98e0-680251c40344",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "be144369-6f38-4304-b193-bff2d821ca65",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "12ed0bc1-fd8d-4818-aa54-7f5ef85e6398",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "d09a80f6-0f6f-4a5f-834a-50615f3596e0",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "15fdb106-aea8-49b1-b748-9af66468738e",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "e608bb04-238d-492f-ac5a-699db5ce2926",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "5ed1c0d2-bae3-4cb4-8f66-8a23d779986c",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "cb80318d-3161-47de-b418-fee6c6834a2c",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "2bc4f722-7751-40f7-a3d5-932116a4d93a",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
-      },
-      {
-        "id": "64af96d4-0673-4996-a7d8-4fe02938a719",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "id": "37a605b2-932a-45a8-b09b-48f690c68fcd",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "0677ffa7-c3f4-48ac-982b-848b88392174",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "be144369-6f38-4304-b193-bff2d821ca65",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "12ed0bc1-fd8d-4818-aa54-7f5ef85e6398",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "64af96d4-0673-4996-a7d8-4fe02938a719",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "f8fc33f9-ada6-4973-936c-e33f943f1438",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "2bc4f722-7751-40f7-a3d5-932116a4d93a",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "c82e253d-8601-4965-91ee-47f4d3185ba4",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "d09a80f6-0f6f-4a5f-834a-50615f3596e0",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "15fdb106-aea8-49b1-b748-9af66468738e",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "e98dc550-49cb-4894-b063-6bed5ebe62d1",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "cb80318d-3161-47de-b418-fee6c6834a2c",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       },
       {
         "id": "b0a0acb5-b1d5-4e93-b3dc-c9770c314b10",
-        "markVerifiedAt": "2026-10-10T07:31:56.027Z"
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "e608bb04-238d-492f-ac5a-699db5ce2926",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "5ed1c0d2-bae3-4cb4-8f66-8a23d779986c",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
+      },
+      {
+        "id": "195e4578-0e0c-427a-98e0-680251c40344",
+        "markVerifiedAt": "2026-10-10T08:32:01.617Z"
       }
     ]
   }

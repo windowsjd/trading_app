@@ -1,0 +1,6 @@
+last|binance_usdm_agg_trade_ws|96468
+last|binance_usdm_ticker_price_rest|5085
+spot|binance_spot_ws_ticker|27274
+spot|binance_public_rest_24hr_ticker|115
+mark|binance_usdm_mark_rest|207
+mark|binance_usdm_mark_ws|148741

@@ -10,6 +10,7 @@ describe('Futures release readiness (independent of current mode)', () => {
     riskEngine: true,
     markIngestion: true,
     lastPriceIngestion: true,
+    conditionalOrders: true,
   };
   const row = (
     patch: Partial<FuturesReadinessRow> = {},
@@ -117,6 +118,7 @@ describe('Futures release readiness (independent of current mode)', () => {
         status: 'succeeded',
         startedAt: new Date(+now - 1000).toISOString(),
         finishedAt: now.toISOString(),
+        dryRun: false,
       };
       const test = (patch = {}) =>
         evaluateFuturesReadiness([work], [{ ...run, ...patch }], config, now)
@@ -124,6 +126,8 @@ describe('Futures release readiness (independent of current mode)', () => {
       expect(test()).toBe(true);
       expect(test({ status: 'failed' })).toBe(false);
       expect(test({ status: 'running', finishedAt: null })).toBe(false);
+      expect(test({ dryRun: true })).toBe(false);
+      expect(test({ dryRun: undefined })).toBe(false);
       expect(
         test({
           startedAt: new Date(+now - 121000).toISOString(),
@@ -154,6 +158,7 @@ describe('Futures release readiness (independent of current mode)', () => {
           status: 'failed',
           startedAt: now.toISOString(),
           finishedAt: now.toISOString(),
+          dryRun: true,
         },
       ],
       config,
@@ -178,6 +183,7 @@ describe('Futures release readiness (independent of current mode)', () => {
         status: 'succeeded',
         startedAt: now.toISOString(),
         finishedAt: now.toISOString(),
+        dryRun: false,
         resultJson: { states: { [state]: 1 } },
       };
       expect(
@@ -199,6 +205,37 @@ describe('Futures release readiness (independent of current mode)', () => {
       ).toBe(false);
     },
   );
+  it.each(['DISABLED', 'REDUCE_ONLY', 'ENABLED'])(
+    'requires protection configuration with live protections in %s, despite a successful disabled cycle',
+    (tradingMode) => {
+      const run = {
+        jobName: 'conditional_orders',
+        status: 'succeeded',
+        startedAt: now.toISOString(),
+        finishedAt: now.toISOString(),
+        dryRun: false,
+        resultJson: { states: { disabled: 1 } },
+      };
+      const result = evaluateFuturesReadiness(
+        [row({ liveProtections: 1 })],
+        [run],
+        { ...config, tradingMode, conditionalOrders: false },
+        now,
+      );
+      expect(result.readiness.launchReady).toBe(false);
+      expect(result.readiness.existingWorkReady).toBe(false);
+      expect(result.blockers).toContainEqual({
+        component: 'conditional_orders_config',
+        reason: 'CONFIG_DISABLED',
+      });
+    },
+  );
+  it('does not require the optional protection feature without live protections', () => {
+    expect(
+      evaluate(undefined, { ...config, conditionalOrders: false }).readiness
+        .launchReady,
+    ).toBe(true);
+  });
   it('fresh current prices cannot conceal missing historical season-end evidence', () => {
     const result = evaluateFuturesReadiness([row()], [], config, now, [
       {

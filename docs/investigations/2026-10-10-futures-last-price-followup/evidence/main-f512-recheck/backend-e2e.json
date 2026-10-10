@@ -1,0 +1,23 @@
+{
+  "command": [
+    "pnpm",
+    "run",
+    "test:e2e",
+    "--",
+    "--runInBand",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/backend-e2e-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T08:13:17Z",
+  "elapsedSeconds": 0.531,
+  "exitCode": 1,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 169.0,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 19.2
+    }
+  ]
+}

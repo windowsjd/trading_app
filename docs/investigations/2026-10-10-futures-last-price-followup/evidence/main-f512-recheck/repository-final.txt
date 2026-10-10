@@ -1,0 +1,16 @@
+HEAD f512dab0a612681b14e2320b6631a2bd7459a3c8
+ M backend/docs/codex-rulepack.md
+ M backend/docs/futures-last-price-contract.md
+ M backend/docs/futures-risk-contract.md
+ M backend/scripts/futures-price-readiness.ts
+ M backend/scripts/futures-price-safety-integration.ts
+ M backend/scripts/futures-read-api-benchmark.ts
+ M backend/scripts/lib/futures-readiness.spec.ts
+ M backend/scripts/lib/futures-readiness.ts
+ M docs/investigations/2026-10-10-futures-last-price-followup/evidence/soak-24h-final/soak-24h.json
+ M docs/investigations/2026-10-10-futures-last-price-followup/evidence/soak-24h-final/soak-24h.json.samples.jsonl
+ M docs/investigations/2026-10-10-futures-last-price-followup/report.md
+ M docs/investigations/2026-10-10-futures-last-price-followup/reproduction/README.md
+ M docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-core-gate.sh
+?? docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/
+?? docs/investigations/2026-10-10-futures-last-price-followup/reproduction/reproduce-readiness-regression.sh

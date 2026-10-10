@@ -22,6 +22,7 @@ import {
   futuresTradingMode,
 } from '../src/futures/futures.config';
 import { validLegacySpotFinalPrice } from '../src/futures/futures-price';
+import { conditionalEnabled } from '../src/conditional/conditional.config';
 
 loadRuntimeEnv();
 const requireReady = process.argv.includes('--require-ready');
@@ -64,6 +65,7 @@ type WorkerRun = {
   status: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  dryRun: boolean;
   resultJson: unknown;
 };
 
@@ -187,6 +189,7 @@ async function main() {
             status: true,
             startedAt: true,
             finishedAt: true,
+            dryRun: true,
             resultJson: true,
           },
         });
@@ -195,6 +198,7 @@ async function main() {
           status: run?.status ?? null,
           startedAt: run?.startedAt?.toISOString() ?? null,
           finishedAt: run?.finishedAt?.toISOString() ?? null,
+          dryRun: run?.dryRun ?? false,
           resultJson: run?.resultJson ?? null,
         });
       }
@@ -205,7 +209,12 @@ async function main() {
           status: 'open',
           tradingAccount: {
             seasonParticipant: {
-              season: { status: { in: ['ended', 'settled'] } },
+              season: {
+                OR: [
+                  { endAt: { lte: now } },
+                  { status: { in: ['ended', 'settled'] } },
+                ],
+              },
             },
           },
         },
@@ -299,6 +308,7 @@ async function main() {
         riskEngine: futuresRiskConfig().enabled,
         markIngestion: futuresRiskConfig().ingestion,
         lastPriceIngestion: futuresLastPriceConfig().ingestion,
+        conditionalOrders: conditionalEnabled(),
       };
       return {
         database: target(),

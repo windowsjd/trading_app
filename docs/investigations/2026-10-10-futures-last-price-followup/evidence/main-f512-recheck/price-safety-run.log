@@ -1,0 +1,59 @@
+FAIL src/futures/futures-price-safety.integration.spec.ts (6.246 s)
+  ● readiness CLI and Last retention preserve actual PostgreSQL financial evidence
+
+    [Nest] 947486  - 10/10/2026, 5:09:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"67bdb9fd-2157-4a15-96eb-b31d4fd573b6"}
+    PASS read-only CLI passes fresh complete DISABLED launch targets without idle Ops runs
+    PASS CLI rejects expired coverage and disabled required collectors/risk
+    PASS CLI rejects registered instrument missing prices
+    PASS actual batched SQL matches individual Last/Mark readers for missing, fresh, future and stale newest trades; no older-trade resurrection
+    (node:947486) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    PrismaClientValidationError: 
+    Invalid `this.prisma.opsJobRun.create()` invocation in
+    /home/nayuta/projects/trading-app/backend/src/ops/ops-job-run.service.ts:55:34
+
+      52 createRunning(input: OpsJobRunCreateInput) {
+      53   const startedAt = input.startedAt ?? new Date();
+      54 
+    → 55   return this.prisma.opsJobRun.create({
+             data: {
+               jobName: "futures_liquidation",
+               status: "running",
+               trigger: "manual",
+                        ~~~~~~~~
+               requestedBy: null,
+               startedAt: new Date("2026-10-10T08:10:05.174Z"),
+               lockKey: null,
+               idempotencyKey: null,
+               dryRun: true,
+               attempt: 1,
+               maxAttempts: 1
+             }
+           })
+
+    Invalid value for argument `trigger`. Expected OpsJobTrigger.
+
+      16 |     );
+      17 |     if (run.status !== 0)
+    > 18 |       throw new Error((run.stdout + run.stderr).slice(-16000));
+         |             ^
+      19 |     expect(run.stdout).toContain('Futures price safety PostgreSQL PASS');
+      20 |   },
+      21 |   310000,
+
+      at throwValidationException (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/core/errorRendering/throwValidationException.ts:46:9)
+      at Gr.handleRequestError (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:211:7)
+      at Gr.handleAndLogRequestError (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+      at Gr.request (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+      at async a (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+      at async main (../scripts/futures-price-safety-integration.ts:245:19) {
+        clientVersion: '7.6.0'
+      }
+      at Object.<anonymous> (futures/futures-price-safety.integration.spec.ts:18:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        6.37 s, estimated 11 s
+Ran all test suites within paths "src/futures/futures-price-safety.integration.spec.ts".
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/price-safety-jest.json

@@ -1,0 +1,18 @@
+2026-10-10T07:36:43.8759643Z Database schema is up to date!
+2026-10-10T07:36:43.9115407Z ##[group]Run pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+2026-10-10T07:36:43.9116273Z [36;1mpnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code[0m
+2026-10-10T07:36:45.3838925Z No difference detected.
+2026-10-10T07:38:30.2825643Z PASS src/wallets/wallet-fx-transfer.integration.spec.ts (20.129 s)
+2026-10-10T07:38:45.4441076Z PASS src/futures/futures-isolated-boundary.integration.spec.ts (15.156 s)
+2026-10-10T07:38:53.3694240Z PASS src/wallets/spot-wallet-transfer.integration.spec.ts (7.92 s)
+2026-10-10T07:39:05.2959760Z PASS src/futures/futures-f3.integration.spec.ts (11.919 s)
+2026-10-10T07:39:08.5052764Z PASS src/futures/futures-f31.integration.spec.ts
+2026-10-10T07:39:52.5299855Z PASS src/futures/futures-risk.integration.spec.ts (44.014 s)
+2026-10-10T07:40:19.6752326Z PASS src/futures/futures.integration.spec.ts (27.145 s)
+2026-10-10T07:40:47.3260057Z PASS src/conditional/conditional.integration.spec.ts (19.012 s)
+2026-10-10T07:40:59.0845018Z PASS src/futures/futures-limit.integration.spec.ts (11.755 s)
+2026-10-10T07:40:59.0872621Z Test Suites: 22 passed, 22 total
+2026-10-10T07:40:59.0873280Z Tests:       23 passed, 23 total
+2026-10-10T07:41:23.4898053Z PASS src/futures/futures-price-safety.integration.spec.ts (21.231 s)
+2026-10-10T07:41:23.4929571Z Test Suites: 1 passed, 1 total
+2026-10-10T07:41:23.4930008Z Tests:       1 passed, 1 total

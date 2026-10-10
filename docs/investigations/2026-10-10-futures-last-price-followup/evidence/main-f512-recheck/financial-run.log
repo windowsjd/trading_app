@@ -1,0 +1,231 @@
+FAIL src/conditional/conditional.integration.spec.ts
+  ● Conditional Orders actual PostgreSQL financial contract
+
+    [Nest] 959088  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7c09957e-0075-4f44-bd6b-65eb84466e8b"}
+    PASS Conditional same underlying: Spot SL fires on Spot only, Futures SL on Futures Last only; DB keeps evidence in its domain
+    [Nest] 959088  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b27e01ec-a7fb-4c6b-9779-e8ad9358dfe4"}
+    PASS Conditional general/spot/long/stop_loss/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"50b11f46-1597-42c5-b09c-827e22d71ace"}
+    PASS Conditional general/spot/long/stop_loss/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"95d36df7-6d42-443f-8171-ee3b22acd191"}
+    PASS Conditional general/spot/long/take_profit/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"807abdd9-e6fe-4fab-89af-2d7d59404a94"}
+    PASS Conditional general/spot/long/take_profit/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f5330347-a50f-434b-a7f1-c23d8c1e0064"}
+    PASS Conditional general/futures/long/stop_loss/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ced7faf4-e0b6-464b-8cb4-0fff09e02dc0"}
+    PASS Conditional general/futures/long/stop_loss/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"48f37689-fd64-4f10-8012-1d0f356c8c1a"}
+    PASS Conditional general/futures/long/take_profit/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ba4695bc-bafd-40a4-bdf6-bfb24234349c"}
+    PASS Conditional general/futures/long/take_profit/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a6ccba74-edc4-4cdf-992e-05e98c967916"}
+    PASS Conditional general/futures/short/stop_loss/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"71cc5083-4439-49aa-bcfc-c2b7684dfa04"}
+    PASS Conditional general/futures/short/stop_loss/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0791b27e-c731-4909-ade3-3615be3f6921"}
+    PASS Conditional general/futures/short/take_profit/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f8ad008e-d591-4b80-a443-2b165d4c97a4"}
+    PASS Conditional general/futures/short/take_profit/limit: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/stop_loss/market: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/stop_loss/limit: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/take_profit/market: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/take_profit/limit: one fill, full exit, terminal replay
+    PASS Conditional season/futures/long/stop_loss/market: one fill, full exit, terminal replay
+    PASS Conditional season/futures/long/stop_loss/limit: one fill, full exit, terminal replay
+    PASS Conditional season/futures/long/take_profit/market: one fill, full exit, terminal replay
+    (node:959088) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at createProtectionInTransaction (conditional/conditional-registration.ts:194:11)
+      at async <anonymous> (conditional/conditional.service.ts:130:21)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async protect (../scripts/conditional-orders-integration.ts:155:18)
+      at async matrix (../scripts/conditional-orders-integration.ts:260:26)
+      at async main (../scripts/conditional-orders-integration.ts:1760:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'CONDITIONAL_PRICE_UNAVAILABLE',
+            message: 'A fresh eligible reference price is required.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (conditional/conditional.integration.spec.ts:16:33)
+
+FAIL src/orders/order-input-policy.integration.spec.ts
+  ● order input policy PostgreSQL integration › keeps amount, replay, reservation and regular-session evidence consistent in General and Season
+
+    PASS season: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+    PASS season domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    PASS season us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    [Nest] 960189  - 10/10/2026, 5:13:53 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c8e12243-5332-4602-a032-3d12677b6469"}
+    PASS general: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+    [Nest] 960189  - 10/10/2026, 5:13:53 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2e3ac24b-ee65-4901-b5c9-0b1f62f8ced1"}
+    PASS general domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    [Nest] 960189  - 10/10/2026, 5:13:54 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6c8d1c22-7129-4e3c-a0e2-64bd3f49ff25"}
+    PASS general us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    [Nest] 960189  - 10/10/2026, 5:13:55 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"b1cbcc50-5427-4f6e-91c6-65c1e9234615"}
+    (node:960189) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      7442 |       { httpStatus: status },
+      7443 |     );
+    > 7444 |     const exception = new HttpException(
+           |                       ^
+      7445 |       this.createErrorBody(code, message),
+      7446 |       status,
+      7447 |     );
+
+      at OrdersService.throwApiError (orders/orders.service.ts:7444:23)
+      at OrdersService.resolveOrderPrice (orders/orders.service.ts:6399:12)
+      at async OrdersService.buildOrderQuoteForContext (orders/orders.service.ts:5215:26)
+      at async OrdersService.quoteOrderForTradingAccount (orders/orders.service.ts:863:19)
+      at async request (../scripts/order-input-policy-integration.ts:310:17)
+      at async cryptoAmount (../scripts/order-input-policy-integration.ts:395:15)
+      at async main (../scripts/order-input-policy-integration.ts:765:7) {
+        response: {
+          success: false,
+          error: {
+            code: 'ASSET_PRICE_UNAVAILABLE',
+            message: 'Asset price is unavailable.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (orders/order-input-policy.integration.spec.ts:18:38)
+
+
+Summary of all failing tests
+FAIL conditional/conditional.integration.spec.ts
+  ● Conditional Orders actual PostgreSQL financial contract
+
+    [Nest] 959088  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7c09957e-0075-4f44-bd6b-65eb84466e8b"}
+    PASS Conditional same underlying: Spot SL fires on Spot only, Futures SL on Futures Last only; DB keeps evidence in its domain
+    [Nest] 959088  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b27e01ec-a7fb-4c6b-9779-e8ad9358dfe4"}
+    PASS Conditional general/spot/long/stop_loss/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:21 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"50b11f46-1597-42c5-b09c-827e22d71ace"}
+    PASS Conditional general/spot/long/stop_loss/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"95d36df7-6d42-443f-8171-ee3b22acd191"}
+    PASS Conditional general/spot/long/take_profit/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"807abdd9-e6fe-4fab-89af-2d7d59404a94"}
+    PASS Conditional general/spot/long/take_profit/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f5330347-a50f-434b-a7f1-c23d8c1e0064"}
+    PASS Conditional general/futures/long/stop_loss/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ced7faf4-e0b6-464b-8cb4-0fff09e02dc0"}
+    PASS Conditional general/futures/long/stop_loss/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"48f37689-fd64-4f10-8012-1d0f356c8c1a"}
+    PASS Conditional general/futures/long/take_profit/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:22 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ba4695bc-bafd-40a4-bdf6-bfb24234349c"}
+    PASS Conditional general/futures/long/take_profit/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a6ccba74-edc4-4cdf-992e-05e98c967916"}
+    PASS Conditional general/futures/short/stop_loss/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"71cc5083-4439-49aa-bcfc-c2b7684dfa04"}
+    PASS Conditional general/futures/short/stop_loss/limit: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0791b27e-c731-4909-ade3-3615be3f6921"}
+    PASS Conditional general/futures/short/take_profit/market: one fill, full exit, terminal replay
+    [Nest] 959088  - 10/10/2026, 5:13:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f8ad008e-d591-4b80-a443-2b165d4c97a4"}
+    PASS Conditional general/futures/short/take_profit/limit: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/stop_loss/market: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/stop_loss/limit: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/take_profit/market: one fill, full exit, terminal replay
+    PASS Conditional season/spot/long/take_profit/limit: one fill, full exit, terminal replay
+    PASS Conditional season/futures/long/stop_loss/market: one fill, full exit, terminal replay
+    PASS Conditional season/futures/long/stop_loss/limit: one fill, full exit, terminal replay
+    PASS Conditional season/futures/long/take_profit/market: one fill, full exit, terminal replay
+    (node:959088) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at createProtectionInTransaction (conditional/conditional-registration.ts:194:11)
+      at async <anonymous> (conditional/conditional.service.ts:130:21)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async protect (../scripts/conditional-orders-integration.ts:155:18)
+      at async matrix (../scripts/conditional-orders-integration.ts:260:26)
+      at async main (../scripts/conditional-orders-integration.ts:1760:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'CONDITIONAL_PRICE_UNAVAILABLE',
+            message: 'A fresh eligible reference price is required.'
+          }
+        },
+        status: 409,
+        options: undefined
+      }
+      at Object.<anonymous> (conditional/conditional.integration.spec.ts:16:33)
+
+FAIL orders/order-input-policy.integration.spec.ts
+  ● order input policy PostgreSQL integration › keeps amount, replay, reservation and regular-session evidence consistent in General and Season
+
+    PASS season: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+    PASS season domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    PASS season us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    [Nest] 960189  - 10/10/2026, 5:13:53 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c8e12243-5332-4602-a032-3d12677b6469"}
+    PASS general: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+    [Nest] 960189  - 10/10/2026, 5:13:53 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2e3ac24b-ee65-4901-b5c9-0b1f62f8ced1"}
+    PASS general domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    [Nest] 960189  - 10/10/2026, 5:13:54 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6c8d1c22-7129-4e3c-a0e2-64bd3f49ff25"}
+    PASS general us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+    [Nest] 960189  - 10/10/2026, 5:13:55 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"b1cbcc50-5427-4f6e-91c6-65c1e9234615"}
+    (node:960189) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      7442 |       { httpStatus: status },
+      7443 |     );
+    > 7444 |     const exception = new HttpException(
+           |                       ^
+      7445 |       this.createErrorBody(code, message),
+      7446 |       status,
+      7447 |     );
+
+      at OrdersService.throwApiError (orders/orders.service.ts:7444:23)
+      at OrdersService.resolveOrderPrice (orders/orders.service.ts:6399:12)
+      at async OrdersService.buildOrderQuoteForContext (orders/orders.service.ts:5215:26)
+      at async OrdersService.quoteOrderForTradingAccount (orders/orders.service.ts:863:19)
+      at async request (../scripts/order-input-policy-integration.ts:310:17)
+      at async cryptoAmount (../scripts/order-input-policy-integration.ts:395:15)
+      at async main (../scripts/order-input-policy-integration.ts:765:7) {
+        response: {
+          success: false,
+          error: {
+            code: 'ASSET_PRICE_UNAVAILABLE',
+            message: 'Asset price is unavailable.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (orders/order-input-policy.integration.spec.ts:18:38)
+
+
+Test Suites: 2 failed, 20 passed, 22 total
+Tests:       2 failed, 21 passed, 23 total
+Snapshots:   0 total
+Time:        189.51 s
+Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/main-f512-recheck/financial-jest.json

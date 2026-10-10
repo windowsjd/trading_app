@@ -36,7 +36,7 @@ login → 계정/모드 선택 → 시즌 참가 또는 일반계정 개설/재�
 - 지정가: quote → create(submitted + 예약) → scheduler Path A/B 전량 체결 또는 cancel/시즌 cleanup
 - 매칭 권위: PostgreSQL submitted orders + scheduler polling + OpsJobLock + 주문별 execution transaction
 - 신규 지정가는 `LIMIT_ORDER_ENABLED`, 자동 체결은 `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`로 각각 제어
-- Futures는 별도 instrument/position/execution/command, USD synthetic perpetual Market Long/Short One-way Isolated/Cross를 지원한다. [F2 risk](futures-risk-contract.md)의 MMR 0.5%, Mark 기반 전량청산, bankruptcy evidence 및 mode별 collateral 경계를 따른다. leverage는 1~100 정수이며 열린 lifetime에서 고정한다. margin은 Futures 지갑 collateral 사용량으로 cash/reserved를 차감·재사용하지 않는다. 실제 fee/PnL만 cash와 원장에 쓴다. F3는 signed Mark UPNL만 valuation에 추가하고 endAt Spot으로 Season final exit한다. `FUTURES_TRADING_MODE` 기본 DISABLED (기존 boolean 호환), 실제 enable은 별도 운영 단계다.
+- Futures는 별도 instrument/position/execution/command, USD synthetic perpetual Market Long/Short One-way Isolated/Cross를 지원한다. [F2 risk](futures-risk-contract.md)의 MMR 0.5%, Mark 기반 전량청산, bankruptcy evidence 및 mode별 collateral 경계를 따른다. leverage는 1~100 정수이며 열린 lifetime에서 고정한다. margin은 Futures 지갑 collateral 사용량으로 cash/reserved를 차감·재사용하지 않는다. 실제 fee/PnL만 cash와 원장에 쓴다. F3는 signed Mark UPNL만 valuation에 추가하고 endAt Futures Last를 고정해 Season final exit한다. 전환 전 Spot pin은 재시도 시 그대로 재사용한다([Last 계약](futures-last-price-contract.md)). `FUTURES_TRADING_MODE` 기본 DISABLED (기존 boolean 호환), 실제 enable은 별도 운영 단계다.
 - lock order·fee 예외는 [주문 계약](orders-api-contract.md)과 [정책](policy-decisions.md) 참조
 
 ### 상태

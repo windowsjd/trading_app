@@ -1,0 +1,784 @@
+[
+  {
+    "id": 114163417286,
+    "name": "Limit order PostgreSQL integration",
+    "conclusion": "success",
+    "started_at": "2026-10-10T07:36:03Z",
+    "completed_at": "2026-10-10T07:41:27Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:04Z"
+      },
+      {
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-10T07:36:04Z",
+        "completed_at": "2026-10-10T07:36:25Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-10T07:36:25Z",
+        "completed_at": "2026-10-10T07:36:28Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-10T07:36:28Z",
+        "completed_at": "2026-10-10T07:36:30Z"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-10T07:36:30Z",
+        "completed_at": "2026-10-10T07:36:35Z"
+      },
+      {
+        "name": "Install dependencies (frozen lockfile)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-10T07:36:35Z",
+        "completed_at": "2026-10-10T07:36:37Z"
+      },
+      {
+        "name": "Prisma generate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-10T07:36:37Z",
+        "completed_at": "2026-10-10T07:36:40Z"
+      },
+      {
+        "name": "Apply migrations",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-10T07:36:40Z",
+        "completed_at": "2026-10-10T07:36:42Z"
+      },
+      {
+        "name": "Verify migrations are fully applied",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-10T07:36:42Z",
+        "completed_at": "2026-10-10T07:36:43Z"
+      },
+      {
+        "name": "Verify no schema drift against the deployed database",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-10-10T07:36:43Z",
+        "completed_at": "2026-10-10T07:36:45Z"
+      },
+      {
+        "name": "Limit order PostgreSQL integration tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-10-10T07:36:45Z",
+        "completed_at": "2026-10-10T07:40:59Z"
+      },
+      {
+        "name": "Futures readiness and Last retention PostgreSQL safety",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-10-10T07:40:59Z",
+        "completed_at": "2026-10-10T07:41:23Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-10-10T07:41:23Z",
+        "completed_at": "2026-10-10T07:41:23Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-10-10T07:41:23Z",
+        "completed_at": "2026-10-10T07:41:23Z"
+      },
+      {
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24,
+        "started_at": "2026-10-10T07:41:23Z",
+        "completed_at": "2026-10-10T07:41:24Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25,
+        "started_at": "2026-10-10T07:41:24Z",
+        "completed_at": "2026-10-10T07:41:24Z"
+      }
+    ]
+  },
+  {
+    "id": 114163417325,
+    "name": "Candle fixture integration",
+    "conclusion": "success",
+    "started_at": "2026-10-10T07:36:02Z",
+    "completed_at": "2026-10-10T07:36:48Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:04Z"
+      },
+      {
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-10T07:36:04Z",
+        "completed_at": "2026-10-10T07:36:19Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-10T07:36:19Z",
+        "completed_at": "2026-10-10T07:36:22Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-10T07:36:22Z",
+        "completed_at": "2026-10-10T07:36:24Z"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-10T07:36:24Z",
+        "completed_at": "2026-10-10T07:36:28Z"
+      },
+      {
+        "name": "Install dependencies (frozen lockfile)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-10T07:36:28Z",
+        "completed_at": "2026-10-10T07:36:30Z"
+      },
+      {
+        "name": "Prisma generate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-10T07:36:30Z",
+        "completed_at": "2026-10-10T07:36:33Z"
+      },
+      {
+        "name": "Apply migrations",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-10T07:36:33Z",
+        "completed_at": "2026-10-10T07:36:35Z"
+      },
+      {
+        "name": "Snapshot pre-existing fixture artifacts",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-10T07:36:35Z",
+        "completed_at": "2026-10-10T07:36:35Z"
+      },
+      {
+        "name": "Run release fixture smoke (no provider credentials)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-10-10T07:36:35Z",
+        "completed_at": "2026-10-10T07:36:38Z"
+      },
+      {
+        "name": "Binance REST shared cooldown fixture (mock HTTP)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-10-10T07:36:38Z",
+        "completed_at": "2026-10-10T07:36:41Z"
+      },
+      {
+        "name": "Candle checkpoint and daily recovery DB fixture (mock providers)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-10-10T07:36:41Z",
+        "completed_at": "2026-10-10T07:36:45Z"
+      },
+      {
+        "name": "Identify this run's fixture artifact",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-10-10T07:36:45Z",
+        "completed_at": "2026-10-10T07:36:45Z"
+      },
+      {
+        "name": "Verify artifact commit traceability",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-10-10T07:36:45Z",
+        "completed_at": "2026-10-10T07:36:45Z"
+      },
+      {
+        "name": "Upload this run's fixture artifact (kept on failure too)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-10-10T07:36:45Z",
+        "completed_at": "2026-10-10T07:36:46Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 28,
+        "started_at": "2026-10-10T07:36:46Z",
+        "completed_at": "2026-10-10T07:36:46Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29,
+        "started_at": "2026-10-10T07:36:46Z",
+        "completed_at": "2026-10-10T07:36:46Z"
+      },
+      {
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 30,
+        "started_at": "2026-10-10T07:36:46Z",
+        "completed_at": "2026-10-10T07:36:47Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 31,
+        "started_at": "2026-10-10T07:36:47Z",
+        "completed_at": "2026-10-10T07:36:47Z"
+      }
+    ]
+  },
+  {
+    "id": 114163417343,
+    "name": "Core account PostgreSQL integration",
+    "conclusion": "success",
+    "started_at": "2026-10-10T07:36:02Z",
+    "completed_at": "2026-10-10T07:37:53Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:04Z"
+      },
+      {
+        "name": "Initialize containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-10T07:36:04Z",
+        "completed_at": "2026-10-10T07:36:30Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-10T07:36:30Z",
+        "completed_at": "2026-10-10T07:36:33Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-10T07:36:33Z",
+        "completed_at": "2026-10-10T07:36:35Z"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-10T07:36:35Z",
+        "completed_at": "2026-10-10T07:36:38Z"
+      },
+      {
+        "name": "Install dependencies (frozen lockfile)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-10T07:36:38Z",
+        "completed_at": "2026-10-10T07:36:40Z"
+      },
+      {
+        "name": "Prisma generate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-10T07:36:40Z",
+        "completed_at": "2026-10-10T07:36:42Z"
+      },
+      {
+        "name": "Apply migrations",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-10T07:36:42Z",
+        "completed_at": "2026-10-10T07:36:44Z"
+      },
+      {
+        "name": "Verify migrations are fully applied",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-10T07:36:44Z",
+        "completed_at": "2026-10-10T07:36:45Z"
+      },
+      {
+        "name": "Verify no schema drift against the deployed database",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-10-10T07:36:45Z",
+        "completed_at": "2026-10-10T07:36:45Z"
+      },
+      {
+        "name": "Core account integration tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-10-10T07:36:45Z",
+        "completed_at": "2026-10-10T07:37:48Z"
+      },
+      {
+        "name": "Repair and audit tools (dry-run, no writes)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-10-10T07:37:48Z",
+        "completed_at": "2026-10-10T07:37:50Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 22,
+        "started_at": "2026-10-10T07:37:50Z",
+        "completed_at": "2026-10-10T07:37:50Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 23,
+        "started_at": "2026-10-10T07:37:50Z",
+        "completed_at": "2026-10-10T07:37:50Z"
+      },
+      {
+        "name": "Stop containers",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 24,
+        "started_at": "2026-10-10T07:37:50Z",
+        "completed_at": "2026-10-10T07:37:51Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 25,
+        "started_at": "2026-10-10T07:37:51Z",
+        "completed_at": "2026-10-10T07:37:51Z"
+      }
+    ]
+  },
+  {
+    "id": 114163417393,
+    "name": "Frontend quality",
+    "conclusion": "success",
+    "started_at": "2026-10-10T07:36:02Z",
+    "completed_at": "2026-10-10T07:41:23Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:04Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-10T07:36:04Z",
+        "completed_at": "2026-10-10T07:36:06Z"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-10T07:36:06Z",
+        "completed_at": "2026-10-10T07:36:09Z"
+      },
+      {
+        "name": "Install dependencies (frozen lockfile)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-10T07:36:09Z",
+        "completed_at": "2026-10-10T07:36:27Z"
+      },
+      {
+        "name": "Account/auth layer lint (check only, no fix)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-10T07:36:27Z",
+        "completed_at": "2026-10-10T07:36:36Z"
+      },
+      {
+        "name": "Guide layer lint (check only, no fix)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-10T07:36:36Z",
+        "completed_at": "2026-10-10T07:36:42Z"
+      },
+      {
+        "name": "Typecheck",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-10T07:36:42Z",
+        "completed_at": "2026-10-10T07:36:50Z"
+      },
+      {
+        "name": "Tests (node --test, Node 24 type stripping)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-10T07:36:50Z",
+        "completed_at": "2026-10-10T07:40:57Z"
+      },
+      {
+        "name": "Diagnostic presentation bypass gate (changed files)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-10T07:40:57Z",
+        "completed_at": "2026-10-10T07:40:57Z"
+      },
+      {
+        "name": "Web export (production bundle)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-10-10T07:40:57Z",
+        "completed_at": "2026-10-10T07:41:21Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 19,
+        "started_at": "2026-10-10T07:41:21Z",
+        "completed_at": "2026-10-10T07:41:21Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 20,
+        "started_at": "2026-10-10T07:41:21Z",
+        "completed_at": "2026-10-10T07:41:21Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 21,
+        "started_at": "2026-10-10T07:41:21Z",
+        "completed_at": "2026-10-10T07:41:21Z"
+      }
+    ]
+  },
+  {
+    "id": 114163417404,
+    "name": "Release-critical E2E",
+    "conclusion": "success",
+    "started_at": "2026-10-10T07:36:02Z",
+    "completed_at": "2026-10-10T07:36:45Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:03Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:06Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-10T07:36:06Z",
+        "completed_at": "2026-10-10T07:36:08Z"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-10T07:36:08Z",
+        "completed_at": "2026-10-10T07:36:11Z"
+      },
+      {
+        "name": "Install dependencies (frozen lockfile)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-10T07:36:11Z",
+        "completed_at": "2026-10-10T07:36:13Z"
+      },
+      {
+        "name": "Prisma generate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-10T07:36:13Z",
+        "completed_at": "2026-10-10T07:36:16Z"
+      },
+      {
+        "name": "Canonical e2e (no environment variables)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-10T07:36:16Z",
+        "completed_at": "2026-10-10T07:36:44Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-10-10T07:36:44Z",
+        "completed_at": "2026-10-10T07:36:44Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 14,
+        "started_at": "2026-10-10T07:36:44Z",
+        "completed_at": "2026-10-10T07:36:44Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 15,
+        "started_at": "2026-10-10T07:36:44Z",
+        "completed_at": "2026-10-10T07:36:44Z"
+      }
+    ]
+  },
+  {
+    "id": 114163417425,
+    "name": "Backend quality",
+    "conclusion": "failure",
+    "started_at": "2026-10-10T07:36:02Z",
+    "completed_at": "2026-10-10T07:38:00Z",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:03Z"
+      },
+      {
+        "name": "Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-10T07:36:03Z",
+        "completed_at": "2026-10-10T07:36:05Z"
+      },
+      {
+        "name": "Install pnpm",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-10T07:36:05Z",
+        "completed_at": "2026-10-10T07:36:09Z"
+      },
+      {
+        "name": "Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-10T07:36:09Z",
+        "completed_at": "2026-10-10T07:36:12Z"
+      },
+      {
+        "name": "Install dependencies (frozen lockfile)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-10T07:36:12Z",
+        "completed_at": "2026-10-10T07:36:14Z"
+      },
+      {
+        "name": "Prisma generate",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-10T07:36:14Z",
+        "completed_at": "2026-10-10T07:36:18Z"
+      },
+      {
+        "name": "Verify committed Prisma generated artifacts",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-10T07:36:18Z",
+        "completed_at": "2026-10-10T07:36:18Z"
+      },
+      {
+        "name": "Candle-layer lint (check only, no fix)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-10T07:36:18Z",
+        "completed_at": "2026-10-10T07:36:34Z"
+      },
+      {
+        "name": "Candle-layer format check",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-10T07:36:34Z",
+        "completed_at": "2026-10-10T07:36:37Z"
+      },
+      {
+        "name": "Trading-account layer lint (check only, no fix)",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 10,
+        "started_at": "2026-10-10T07:36:37Z",
+        "completed_at": "2026-10-10T07:36:51Z"
+      },
+      {
+        "name": "Production typecheck",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 11,
+        "started_at": "2026-10-10T07:36:51Z",
+        "completed_at": "2026-10-10T07:37:08Z"
+      },
+      {
+        "name": "Build",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 12,
+        "started_at": "2026-10-10T07:37:08Z",
+        "completed_at": "2026-10-10T07:37:32Z"
+      },
+      {
+        "name": "Unit tests",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 13,
+        "started_at": "2026-10-10T07:37:32Z",
+        "completed_at": "2026-10-10T07:37:58Z"
+      },
+      {
+        "name": "Diagnostic production bypass gate (changed files)",
+        "status": "completed",
+        "conclusion": "failure",
+        "number": 14,
+        "started_at": "2026-10-10T07:37:58Z",
+        "completed_at": "2026-10-10T07:37:58Z"
+      },
+      {
+        "name": "Post Run actions/setup-node@v4",
+        "status": "completed",
+        "conclusion": "skipped",
+        "number": 27,
+        "started_at": "2026-10-10T07:37:58Z",
+        "completed_at": "2026-10-10T07:37:58Z"
+      },
+      {
+        "name": "Post Run actions/checkout@v4",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 28,
+        "started_at": "2026-10-10T07:37:58Z",
+        "completed_at": "2026-10-10T07:37:58Z"
+      },
+      {
+        "name": "Complete job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 29,
+        "started_at": "2026-10-10T07:37:58Z",
+        "completed_at": "2026-10-10T07:37:58Z"
+      }
+    ]
+  }
+]

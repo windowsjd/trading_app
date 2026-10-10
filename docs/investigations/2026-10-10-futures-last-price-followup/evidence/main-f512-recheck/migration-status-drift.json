@@ -1,0 +1,19 @@
+{
+  "command": [
+    "bash",
+    "-c",
+    "set -e; pnpm exec prisma migrate status; pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code"
+  ],
+  "startedAtUtc": "2026-10-10T08:14:52Z",
+  "elapsedSeconds": 1.677,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 312.7,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 9.2
+    }
+  ]
+}
