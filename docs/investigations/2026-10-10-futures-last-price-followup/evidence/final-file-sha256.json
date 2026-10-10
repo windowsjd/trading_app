@@ -1,0 +1,21 @@
+{
+  ".github/workflows/ci.yml": "2c51cf1ec300b5f85e986c07efecd55230278bbf7a1783ee8571ad22a9d2fa3b",
+  "backend/docs/futures-f3-contract.md": "9303e96cedb24faff26c8c986546c9baba219a27ca75dda9ef1ddfd31f43f3ae",
+  "backend/docs/futures-last-price-contract.md": "fa199796bf339d2b4baf19aa96bdaf4ad4cef422150f616c17b45381ea2dce3e",
+  "backend/scripts/futures-price-readiness.ts": "aa59cb282c9cad3a18b6f8a4b029415bea5c1d3862b3265945ad19caa78391f8",
+  "backend/src/futures/futures.service.ts": "cbfed50870698c997883914de48531108ea95b3ef4d72cc6132abb7e16c91e08",
+  "backend/scripts/futures-collection-soak.ts": "85926c8e926c7c131f8f6a8cec0effbb9b02495a204f20f3e608e55dbef15512",
+  "backend/scripts/futures-price-safety-integration.ts": "d23a2d1236abff6423cf6d003e268c1bd1c266717da90c81ffd84b61ae856e44",
+  "backend/scripts/futures-read-api-benchmark.ts": "bccb776572c1136c44c04be50371cf78e41cc346d2b99d596a8e433cff5064ac",
+  "backend/scripts/lib/futures-readiness.spec.ts": "9abb9cc718786247e25b6790d829bae44b86b7268744a8511c7684bf23dab18c",
+  "backend/scripts/lib/futures-readiness.ts": "815bd7795200f57e77fdf0711060615113c047681d44e7a480de833ddce28d54",
+  "backend/src/futures/futures-price-safety.integration.spec.ts": "029e706c1b7abb1a02b99ff20449f87677ca089118ba1c370f89bb88b11ad35c",
+  "backend/src/futures/futures-reference-prices.spec.ts": "2ceb93a927d43d196c0e671bc80acd6bc268c1f34da1f037d5a036afda89e40c",
+  "backend/src/futures/futures-reference-prices.ts": "a142675bd451c49d9376bd9e60fc06d5d46b16b0af6ce3989411f8fdd0e8a2d8",
+  "docs/investigations/2026-10-10-futures-last-price-followup/report.md": "f97ad8284bfa933e2bc919bee660267d3838347afe1476cb1574db6ce217e803",
+  "docs/investigations/2026-10-10-futures-last-price-followup/reproduction/README.md": "820eed2a8223c6050887a2ebd87501f6cffb3c381ea3f90d5f3379da71499a29",
+  "docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-bounded.py": "53ae770786385cc002cfe6ecf6c57701b756b7775ae4ae473579ac5cd1549162",
+  "docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-core-gate.sh": "3290b7a79c1db5a293221cac4d689a6f6db0e7c128f494120d6deee6e9876fa3",
+  "docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-financial-gate.sh": "5438247292040241176be469ec85d65e599d7ca817e7f1cf60d87c5289235fdf",
+  "docs/investigations/2026-10-10-futures-last-price-followup/reproduction/start-soak-24h.sh": "146b83a2957527e4b0f2f1eba5a54b71ce10f05c356912ccb2b86596a5bd9ad4"
+}

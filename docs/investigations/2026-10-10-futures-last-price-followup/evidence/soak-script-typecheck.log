@@ -1,0 +1,197 @@
+scripts/futures-collection-soak.ts(514,30): error TS2339: Property 'positionId' does not exist on type '{ id: string; status: OrderStatus; createdAt: Date; updatedAt: Date; tradingAccountId: string; reservedAmount: Decimal; direction: FuturesDirection; ... 10 more ...; endedAt: Date | null; }'.
+scripts/futures-collection-soak.ts(519,34): error TS2339: Property 'positionId' does not exist on type '{ id: string; status: OrderStatus; createdAt: Date; updatedAt: Date; tradingAccountId: string; reservedAmount: Decimal; direction: FuturesDirection; ... 10 more ...; endedAt: Date | null; }'.
+src/app.service.spec.ts(120,14): error TS18048: 'krx' is possibly 'undefined'.
+src/app.service.spec.ts(121,14): error TS18048: 'krx' is possibly 'undefined'.
+src/app.service.spec.ts(149,14): error TS18048: 'krx' is possibly 'undefined'.
+src/app.service.spec.ts(150,14): error TS18048: 'krx' is possibly 'undefined'.
+src/app.service.spec.ts(154,14): error TS18048: 'us' is possibly 'undefined'.
+src/app.service.spec.ts(155,14): error TS18048: 'us' is possibly 'undefined'.
+src/assets/asset-admin-input.validation.spec.ts(159,7): error TS2345: Argument of type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' is not assignable to parameter of type 'AdminAssetPriceAssetCandidate'.
+  Property 'priceCurrency' is missing in type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' but required in type 'AdminAssetPriceAssetCandidate'.
+src/assets/asset-admin-input.validation.spec.ts(187,7): error TS2345: Argument of type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' is not assignable to parameter of type 'AdminAssetPriceAssetCandidate'.
+  Property 'priceCurrency' is missing in type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' but required in type 'AdminAssetPriceAssetCandidate'.
+src/assets/asset-admin-input.validation.spec.ts(204,7): error TS2345: Argument of type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' is not assignable to parameter of type 'AdminAssetPriceAssetCandidate'.
+  Property 'priceCurrency' is missing in type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' but required in type 'AdminAssetPriceAssetCandidate'.
+src/assets/asset-admin-input.validation.spec.ts(272,9): error TS2345: Argument of type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' is not assignable to parameter of type 'AdminAssetPriceAssetCandidate'.
+  Property 'priceCurrency' is missing in type '{ id: string; symbol: string; market: string; currencyCode: "USD"; isActive: boolean; }' but required in type 'AdminAssetPriceAssetCandidate'.
+src/assets/asset-admin-input.validation.spec.ts(281,9): error TS2345: Argument of type '{ isActive: false; id: string; symbol: string; market: string; currencyCode: "USD"; }' is not assignable to parameter of type 'AdminAssetPriceAssetCandidate'.
+  Property 'priceCurrency' is missing in type '{ isActive: false; id: string; symbol: string; market: string; currencyCode: "USD"; }' but required in type 'AdminAssetPriceAssetCandidate'.
+src/assets/assets.service.spec.ts(736,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(787,52): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(961,55): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1024,9): error TS2345: Argument of type '"KRW" | "USD"' is not assignable to parameter of type '"KRW" | undefined'.
+  Type '"USD"' is not assignable to type '"KRW"'.
+src/assets/assets.service.spec.ts(1110,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1157,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1208,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1241,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1282,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1425,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1531,11): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1681,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(1750,75): error TS2345: Argument of type '"KRW" | "USD"' is not assignable to parameter of type '"KRW" | undefined'.
+  Type '"USD"' is not assignable to type '"KRW"'.
+src/assets/assets.service.spec.ts(1784,115): error TS2345: Argument of type '"KRW" | "USD"' is not assignable to parameter of type '"KRW" | undefined'.
+  Type '"USD"' is not assignable to type '"KRW"'.
+src/assets/assets.service.spec.ts(2022,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(2077,92): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/assets.service.spec.ts(2079,9): error TS2322: Type 'ProviderRawPayloadJson' is not assignable to type 'JsonValue'.
+  Type '{ truncated: false; payload: unknown; }' is not assignable to type 'JsonValue'.
+    Type '{ truncated: false; payload: unknown; }' is not assignable to type 'JsonObject'.
+      Property 'payload' is incompatible with index signature.
+        Type 'unknown' is not assignable to type 'JsonValue | undefined'.
+src/assets/assets.service.spec.ts(2598,45): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/assets/candle-chart-window.fixture.spec.ts(388,19): error TS2345: Argument of type '{ openTime: Date; closeTime: Date; open: Decimal; high: Decimal; low: Decimal; close: Decimal; volume: Decimal; amount: Decimal; isClosed: boolean; sourceUpdatedAt: Date; }' is not assignable to parameter of type 'never'.
+src/assets/market-candle-sync.service.spec.ts(1393,34): error TS2345: Argument of type '{ asset: { id: string; symbol: string; market: string; assetType: string; isActive: boolean; }; price: string; effectiveAt: Date; now: Date; }' is not assignable to parameter of type '{ asset: MarketCalendarAsset & { id: string; }; price: string | Decimal; effectiveAt: Date; now: Date; }'.
+  Types of property 'asset' are incompatible.
+    Type '{ id: string; symbol: string; market: string; assetType: string; isActive: boolean; }' is not assignable to type 'MarketCalendarAsset & { id: string; }'.
+      Type '{ id: string; symbol: string; market: string; assetType: string; isActive: boolean; }' is not assignable to type 'MarketCalendarAsset'.
+        Types of property 'assetType' are incompatible.
+          Type 'string' is not assignable to type 'AssetType'.
+src/assets/market-candle-sync.service.spec.ts(1410,9): error TS2345: Argument of type '{ asset: { id: string; symbol: string; market: string; assetType: string; isActive: boolean; }; price: string; effectiveAt: Date; now: Date; }' is not assignable to parameter of type '{ asset: MarketCalendarAsset & { id: string; }; price: string | Decimal; effectiveAt: Date; now: Date; }'.
+  Types of property 'asset' are incompatible.
+    Type '{ id: string; symbol: string; market: string; assetType: string; isActive: boolean; }' is not assignable to type 'MarketCalendarAsset & { id: string; }'.
+      Type '{ id: string; symbol: string; market: string; assetType: string; isActive: boolean; }' is not assignable to type 'MarketCalendarAsset'.
+        Types of property 'assetType' are incompatible.
+          Type 'string' is not assignable to type 'AssetType'.
+src/assets/market-candle-sync.service.spec.ts(1448,9): error TS2345: Argument of type '{ asset: { id: string; symbol: string; market: string; assetType: string; isActive: boolean; }; price: string; effectiveAt: Date; now: Date; }' is not assignable to parameter of type '{ asset: MarketCalendarAsset & { id: string; }; price: string | Decimal; effectiveAt: Date; now: Date; }'.
+  Types of property 'asset' are incompatible.
+    Type '{ id: string; symbol: string; market: string; assetType: string; isActive: boolean; }' is not assignable to type 'MarketCalendarAsset & { id: string; }'.
+      Type '{ id: string; symbol: string; market: string; assetType: string; isActive: boolean; }' is not assignable to type 'MarketCalendarAsset'.
+        Types of property 'assetType' are incompatible.
+          Type 'string' is not assignable to type 'AssetType'.
+src/batch/general-daily-snapshot-job.service.spec.ts(464,7): error TS2322: Type '"closed"' is not assignable to type '"active" | "suspended"'.
+src/common/global-http-exception.filter.spec.ts(15,23): error TS2743: No overload expects 1 type arguments, but overloads do exist that expect either 0 or 2 type arguments.
+src/common/global-http-exception.filter.spec.ts(16,21): error TS2743: No overload expects 1 type arguments, but overloads do exist that expect either 0 or 2 type arguments.
+src/futures/futures-final-diagnostics.spec.ts(296,57): error TS2345: Argument of type '{}' is not assignable to parameter of type 'AuthenticatedRequest'.
+  Type '{}' is missing the following properties from type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>': get, header, accepts, acceptsCharsets, and 97 more.
+src/futures/futures-last-price.spec.ts(326,38): error TS2345: Argument of type '{ assetId: string; sourceName: string | null; sourceType: AssetPriceSourceType; capturedAt: Date; effectiveAt: Date; price: Decimal; id: string; ... 5 more ...; note: string | null; } | ... 4 more ... | { ...; }' is not assignable to parameter of type '{ id: string; createdAt: Date; currencyCode: CurrencyCode; assetId: string; price: Decimal; effectiveAt: Date; capturedAt: Date; sourceType: AssetPriceSourceType; ... 4 more ...; note: string | null; }'.
+  Type '{ sourceType: string; assetId: string; sourceName: string | null; capturedAt: Date; effectiveAt: Date; price: Decimal; id: string; createdAt: Date; currencyCode: CurrencyCode; priceKrw: Decimal | null; sourceTimestamp: Date | null; rawPayloadJson: JsonValue | null; note: string | null; }' is not assignable to type '{ id: string; createdAt: Date; currencyCode: CurrencyCode; assetId: string; price: Decimal; effectiveAt: Date; capturedAt: Date; sourceType: AssetPriceSourceType; ... 4 more ...; note: string | null; }'.
+    Types of property 'sourceType' are incompatible.
+      Type 'string' is not assignable to type 'AssetPriceSourceType'.
+src/fx/fx-execute-orchestration-policy.spec.ts(127,7): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(128,7): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(204,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(220,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(236,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(251,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(274,7): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(296,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(354,26): error TS2345: Argument of type '{ sourceWallet: null; } | { targetWallet: null; } | { snapshots: FxExecuteSnapshotWithId[]; } | { sourceWallet: FxExecuteWalletCandidate; }' is not assignable to parameter of type 'Partial<{ body: FxExecuteRequestBodyLike; context: { userId: string; seasonParticipantId: string; tradingAccountId: string; }; existingCommand: null; sourceWallet: FxExecuteWalletCandidate; targetWallet: FxExecuteWalletCandidate; snapshots: FxExecuteSnapshotWithId[]; fxFeeRate: string; executeNow: Date; }> | undefined'.
+  Type '{ sourceWallet: null; }' is not assignable to type 'Partial<{ body: FxExecuteRequestBodyLike; context: { userId: string; seasonParticipantId: string; tradingAccountId: string; }; existingCommand: null; sourceWallet: FxExecuteWalletCandidate; targetWallet: FxExecuteWalletCandidate; snapshots: FxExecuteSnapshotWithId[]; fxFeeRate: string; executeNow: Date; }>'.
+    Types of property 'sourceWallet' are incompatible.
+      Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(403,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(408,9): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(409,9): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(446,9): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(447,9): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(448,9): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(465,7): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(468,7): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(469,7): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(487,9): error TS2322: Type 'null' is not assignable to type 'FxExecuteWalletCandidate | undefined'.
+src/fx/fx-execute-orchestration-policy.spec.ts(510,7): error TS2322: Type 'FxExecuteCommandCandidate' is not assignable to type 'null | undefined'.
+src/fx/fx-trading-account-scope.spec.ts(97,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/fx/fx-trading-account-scope.spec.ts(100,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/fx/fx-trading-account-scope.spec.ts(104,5): error TS1117: An object literal cannot have multiple properties with the same name.
+src/home/home.service.spec.ts(398,15): error TS2367: This comparison appears to be unintentional because the types '"KRW"' and '"USD"' have no overlap.
+src/home/home.service.spec.ts(679,34): error TS18046: 'response.data.sectionErrors' is of type 'unknown'.
+src/home/home.service.spec.ts(771,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/home/home.service.spec.ts(780,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/home/home.service.spec.ts(802,11): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/home/home.service.spec.ts(812,11): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/home/home.service.spec.ts(973,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/operator/operator-season-moderation.service.spec.ts(331,7): error TS2322: Type '"finished"' is not assignable to type '"active"'.
+src/operator/operator-season-moderation.service.spec.ts(334,9): error TS2322: Type '"ended"' is not assignable to type '"active"'.
+src/operator/operator-season-moderation.service.spec.ts(369,45): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+src/operator/operator-season-moderation.service.spec.ts(463,11): error TS2322: Type '"settled"' is not assignable to type '"active"'.
+src/operator/operator-season-moderation.service.spec.ts(565,9): error TS2322: Type '"settled"' is not assignable to type '"active"'.
+src/operator/operator-season-moderation.service.spec.ts(651,9): error TS2322: Type '"settled"' is not assignable to type '"active"'.
+src/orders/execution-realism.policy.spec.ts(30,3): error TS2322: Type '{ assetId: string; side: OrderSide; priceCurrency: string; quantityUnit: string; limitPrice?: string | undefined; quantity: string; amount?: undefined; } | { assetId: string; side: "buy"; ... 4 more ...; quantity: string; }' is not assignable to type 'ExecutionRealismOrder'.
+  Type '{ assetId: string; side: "buy"; priceCurrency: string; quantityUnit: string; limitPrice?: string | undefined; amount?: string | undefined; quantity: string; }' is not assignable to type 'ExecutionRealismOrder'.
+    Type '{ assetId: string; side: "buy"; priceCurrency: string; quantityUnit: string; limitPrice?: string | undefined; amount?: string | undefined; quantity: string; }' is not assignable to type '{ assetId: string; side: OrderSide; priceCurrency: string; quantityUnit: string; limitPrice?: string | undefined; } & { quantity: string; amount?: undefined; }'.
+      Type '{ assetId: string; side: "buy"; priceCurrency: string; quantityUnit: string; limitPrice?: string | undefined; amount?: string | undefined; quantity: string; }' is not assignable to type '{ quantity: string; amount?: undefined; }'.
+        Types of property 'amount' are incompatible.
+          Type 'string | undefined' is not assignable to type 'undefined'.
+            Type 'string' is not assignable to type 'undefined'.
+src/orders/limit-order-create.service.spec.ts(845,38): error TS2339: Property 'reservationFeeRate' does not exist on type '{ state: "submitted"; submittedAt: string; quoteId: string | null; reservedAmount: string | null; reservedQuantity: string | null; reservationFeeRate: string | null; duplicate: boolean; } | { ...; }'.
+  Property 'reservationFeeRate' does not exist on type '{ state: "executed" | "already_executed"; executedAt: string | null; priceSource: "provider_api" | "admin_manual"; quoteId: string | null; quotedPrice?: string | null | undefined; ... 13 more ...; duplicate: boolean; }'.
+src/orders/limit-order-matching.liveness.spec.ts(195,11): error TS2322: Type '"canceled"' is not assignable to type '"submitted"'.
+src/orders/limit-order-matching.liveness.spec.ts(199,9): error TS2322: Type '"executed"' is not assignable to type '"submitted"'.
+src/orders/order-reservation.service.spec.ts(211,21): error TS2367: This comparison appears to be unintentional because the types '"buy"' and '"sell"' have no overlap.
+src/orders/order-reservation.service.spec.ts(615,45): error TS2345: Argument of type '"buy" | "sell"' is not assignable to parameter of type '"buy" | undefined'.
+  Type '"sell"' is not assignable to type '"buy"'.
+src/orders/order-reservation.service.spec.ts(688,45): error TS2345: Argument of type '"sell"' is not assignable to parameter of type '"buy"'.
+src/orders/order-reservation.service.spec.ts(773,53): error TS2345: Argument of type '"buy" | "sell"' is not assignable to parameter of type '"buy" | undefined'.
+  Type '"sell"' is not assignable to type '"buy"'.
+src/orders/order-reservation.service.spec.ts(829,45): error TS2345: Argument of type '"buy" | "sell"' is not assignable to parameter of type '"buy" | undefined'.
+  Type '"sell"' is not assignable to type '"buy"'.
+src/orders/order-reservation.service.spec.ts(835,17): error TS2345: Argument of type '"buy" | "sell"' is not assignable to parameter of type '"buy" | undefined'.
+  Type '"sell"' is not assignable to type '"buy"'.
+src/orders/order-reservation.service.spec.ts(943,43): error TS2345: Argument of type '"sell"' is not assignable to parameter of type '"buy"'.
+src/orders/order-reservation.service.spec.ts(980,45): error TS2345: Argument of type '"buy" | "sell"' is not assignable to parameter of type '"buy" | undefined'.
+  Type '"sell"' is not assignable to type '"buy"'.
+src/orders/orders.service.spec.ts(1838,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(1859,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(1898,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(1953,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(2014,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(2308,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/orders/orders.service.spec.ts(2510,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(2530,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(2547,23): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/orders/orders.service.spec.ts(3632,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/orders/orders.service.spec.ts(3739,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/orders/orders.service.spec.ts(4015,11): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/orders/orders.service.spec.ts(4316,9): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/orders/orders.service.spec.ts(4964,43): error TS2345: Argument of type '"sell"' is not assignable to parameter of type '"buy"'.
+src/orders/orders.service.spec.ts(5011,43): error TS2345: Argument of type '"sell"' is not assignable to parameter of type '"buy"'.
+src/orders/orders.service.spec.ts(5035,43): error TS2345: Argument of type '"sell"' is not assignable to parameter of type '"buy"'.
+src/portfolio/portfolio-valuation-source-reads.spec.ts(291,7): error TS2322: Type '"admin_manual"' is not assignable to type '"provider_api"'.
+src/portfolio/portfolio-valuation-source-reads.spec.ts(296,7): error TS2322: Type '"admin_manual"' is not assignable to type '"provider_api"'.
+src/portfolio/snapshot-ranking-generation.spec.ts(28,7): error TS2322: Type '{ seasonParticipantId: string; totalAssetKrw: string; returnRate: string; krwCash: string; usdCashKrw: string; assetValueKrw: string; domesticStockValueKrw: string; usStockValueKrw: string; cryptoValueKrw: string; realizedPnlKrw: string; unrealizedPnlKrw: string; valuationAt: Date; }' is not assignable to type 'PortfolioValuationResult'.
+  Type '{ seasonParticipantId: string; totalAssetKrw: string; returnRate: string; krwCash: string; usdCashKrw: string; assetValueKrw: string; domesticStockValueKrw: string; usStockValueKrw: string; cryptoValueKrw: string; realizedPnlKrw: string; unrealizedPnlKrw: string; valuationAt: Date; }' is missing the following properties from type '{ positionValues: { assetId: string; valueKrw: string; }[]; seasonParticipantId: string | null; tradingAccountId: string | null; totalAssetKrw: string; returnRate: string; krwCash: string; ... 10 more ...; fxRateSourceDecision: SourceDecision | null; }': positionValues, tradingAccountId, sourceSummary, assetPriceSourceDecisions, fxRateSourceDecision
+src/portfolio/valuation-semantic-parity.spec.ts(64,9): error TS2367: This comparison appears to be unintentional because the types '"crypto"' and '"domestic_stock"' have no overlap.
+src/portfolio/valuation-semantic-parity.spec.ts(66,13): error TS2367: This comparison appears to be unintentional because the types '"crypto"' and '"us_stock"' have no overlap.
+src/portfolio/valuation-semantic-parity.spec.ts(83,7): error TS2367: This comparison appears to be unintentional because the types '"crypto"' and '"domestic_stock"' have no overlap.
+src/portfolio/valuation-semantic-parity.spec.ts(232,11): error TS2345: Argument of type '"us_stock"' is not assignable to parameter of type '"crypto"'.
+src/portfolio/valuation-semantic-parity.spec.ts(376,13): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/portfolio/valuation-semantic-parity.spec.ts(382,43): error TS2345: Argument of type '"us_stock"' is not assignable to parameter of type '"crypto"'.
+src/portfolio/valuation-semantic-parity.spec.ts(415,11): error TS2345: Argument of type '"KRW"' is not assignable to parameter of type '"USD"'.
+src/portfolio/valuation-semantic-parity.spec.ts(468,11): error TS2322: Type '"KRW"' is not assignable to type '"USD"'.
+src/portfolio/valuation-semantic-parity.spec.ts(471,11): error TS2322: Type '"KRW"' is not assignable to type '"USD"'.
+src/positions/positions.service.spec.ts(800,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/positions/positions.service.spec.ts(901,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/positions/positions.service.spec.ts(1001,50): error TS2345: Argument of type '"USD"' is not assignable to parameter of type '"KRW"'.
+src/positions/positions.service.spec.ts(1295,17): error TS2345: Argument of type '{ id: string; assetId: string; quantity: Decimal; averageCost: Decimal; currencyCode: CurrencyCode; realizedPnl: Decimal; realizedPnlKrw: Decimal; ... 6 more ...; asset: { ...; }; }' is not assignable to parameter of type 'PositionRecord'.
+  Types of property 'asset' are incompatible.
+    Type '{ id: string; symbol: string; name: string; market: string; assetType: AssetType; currencyCode: CurrencyCode; }' is missing the following properties from type '{ id: string; symbol: string; name: string; market: string; assetType: AssetType; currencyCode: CurrencyCode; priceCurrency: CurrencyCode; settlementCurrency: CurrencyCode; }': priceCurrency, settlementCurrency
+src/positions/positions.service.spec.ts(1377,13): error TS2345: Argument of type '{ id: string; assetId: string; quantity: Decimal; averageCost: Decimal; currencyCode: CurrencyCode; realizedPnl: Decimal; realizedPnlKrw: Decimal; ... 6 more ...; asset: { ...; }; }' is not assignable to parameter of type 'PositionRecord'.
+  Types of property 'asset' are incompatible.
+    Type '{ id: string; symbol: string; name: string; market: string; assetType: AssetType; currencyCode: CurrencyCode; }' is missing the following properties from type '{ id: string; symbol: string; name: string; market: string; assetType: AssetType; currencyCode: CurrencyCode; priceCurrency: CurrencyCode; settlementCurrency: CurrencyCode; }': priceCurrency, settlementCurrency
+src/providers/binance/binance-websocket-streaming.service.spec.ts(469,5): error TS2345: Argument of type 'Partial<BinanceWebSocketIngestionService>' is not assignable to parameter of type 'BinanceWebSocketIngestionService'.
+  Type 'Partial<BinanceWebSocketIngestionService>' is missing the following properties from type 'BinanceWebSocketIngestionService': prisma, configService, ingestOneTicker, findMappedAsset, and 3 more.
+src/providers/kis/kis-websocket-streaming.service.spec.ts(478,5): error TS2345: Argument of type 'Partial<KisAuthClient>' is not assignable to parameter of type 'KisAuthClient'.
+  Type 'Partial<KisAuthClient>' is missing the following properties from type 'KisAuthClient': tokenCache, approvalKeyCache, tokenRefreshPromise, approvalKeyRefreshPromise, and 4 more.
+src/providers/market-price-event.service.spec.ts(30,7): error TS2322: Type '{ kind: "us_delayed_trade"; key: string; trId: string; providerSymbol: string; symbol: string; marketCode: string; updatedAt: string; price: string; currencyCode: string; sourceName: string; effectiveAt: string; capturedAt: string; }' is not assignable to type 'KisRealtimePriceCacheEntry'.
+  Types of property 'currencyCode' are incompatible.
+    Type 'string' is not assignable to type 'CurrencyCode'.
+src/providers/market-price-event.service.spec.ts(45,7): error TS2322: Type '{ sourceName: string; key: string; providerSymbol: string; streamName: string; changeRate: null; bidPrice: string; askPrice: string; updatedAt: string; price: string; currencyCode: string; effectiveAt: string; capturedAt: string; }' is not assignable to type 'BinanceRealtimePriceCacheEntry'.
+  Types of property 'currencyCode' are incompatible.
+    Type 'string' is not assignable to type '"USD"'.
+src/ranking/ranking-source-scope.spec.ts(208,15): error TS2322: Type 'null' is not assignable to type 'string'.
+src/realtime/live-candle-stream-supervisor.service.spec.ts(241,5): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/redis/redis.service.spec.ts(11,7): error TS2420: Class 'FakeRedisClient' incorrectly implements interface 'RawRedisClient'.
+  Property 'zadd' is missing in type 'FakeRedisClient' but required in type 'RawRedisClient'.
+src/redis/redis.service.spec.ts(53,5): error TS2345: Argument of type 'Mock<FakeRedisClient, [], any>' is not assignable to parameter of type 'RawRedisClientFactory'.
+  Property 'zadd' is missing in type 'FakeRedisClient' but required in type 'RawRedisClient'.
+src/redis/redis.service.spec.ts(253,28): error TS2345: Argument of type 'FakeRedisClient' is not assignable to parameter of type 'RawRedisClient'.
+  Property 'zadd' is missing in type 'FakeRedisClient' but required in type 'RawRedisClient'.
+src/redis/redis.service.spec.ts(254,28): error TS2345: Argument of type 'FakeRedisClient' is not assignable to parameter of type 'RawRedisClient'.
+  Property 'zadd' is missing in type 'FakeRedisClient' but required in type 'RawRedisClient'.
+src/redis/redis.service.spec.ts(290,7): error TS2345: Argument of type '() => FakeRedisClient' is not assignable to parameter of type 'RawRedisClientFactory'.
+  Property 'zadd' is missing in type 'FakeRedisClient' but required in type 'RawRedisClient'.
+src/wallets/canonical-cash-wallets.spec.ts(116,7): error TS2741: Property 'realizedPnl' is missing in type '{ assetId: string; assetType: "crypto"; currencyCode: "USD"; quantity: string; averageCost: string; realizedPnlKrw: string; latestPriceSnapshot: { assetId: string; currencyCode: "USD"; price: string; sourceType: "admin_manual"; effectiveAt: Date; capturedAt: Date; createdAt: Date; }; }' but required in type 'PortfolioPositionInput'.
+src/wallets/trading-account-wallets.spec.ts(363,8): error TS2554: Expected 1 arguments, but got 0.

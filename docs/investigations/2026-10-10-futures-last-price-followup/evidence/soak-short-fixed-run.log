@@ -1,0 +1,17 @@
+[Nest] 861452  - 10/10/2026, 3:08:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"483ad8bd-bc59-4fd5-97de-45a38c471d72"}
+[Nest] 861452  - 10/10/2026, 3:08:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d2981e04-fba1-4911-b5cb-2122a5a08acf"}
+[Nest] 861452  - 10/10/2026, 3:08:06 PM     LOG [BinanceWebSocketStreamingService] Binance WebSocket streaming connected with 50 ticker/depth streams.
+(node:861452) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 861452  - 10/10/2026, 3:10:30 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 861452  - 10/10/2026, 3:10:31 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 861452  - 10/10/2026, 3:10:33 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 861452  - 10/10/2026, 3:10:34 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 861452  - 10/10/2026, 3:10:36 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 861452  - 10/10/2026, 3:10:37 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 861452  - 10/10/2026, 3:10:39 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 861452  - 10/10/2026, 3:10:40 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 861452  - 10/10/2026, 3:10:42 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 861452  - 10/10/2026, 3:10:43 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 861452  - 10/10/2026, 3:10:45 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 861452  - 10/10/2026, 3:10:46 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE

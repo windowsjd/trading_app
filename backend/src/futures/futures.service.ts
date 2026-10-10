@@ -38,6 +38,7 @@ import { verifiedFuturesInstrument } from './futures-instrument-coverage';
 import { settleFuturesCash } from './futures-settlement';
 import { FuturesPerformanceService } from './futures-performance.service';
 import { readFuturesMark } from './futures-mark';
+import { readFuturesReferencePrices } from './futures-reference-prices';
 import {
   riskStrings,
   assertCrossSafe,
@@ -671,44 +672,40 @@ export class FuturesService {
       include: futuresInstrumentInclude,
       orderBy: { id: 'asc' },
     });
+    const verified = rows.filter((row) => verifiedFuturesInstrument(row, now));
+    const references = await readFuturesReferencePrices(
+      this.prisma,
+      verified,
+      now,
+    );
     return {
       success: true,
       data: {
         tradingAccountId: accountId,
         capabilities: futuresCapabilities(account, now),
         evaluatedAt: now.toISOString(),
-        instruments: await Promise.all(
-          rows
-            .filter((row) => verifiedFuturesInstrument(row, now))
-            .map(async (row) => {
-              const mark = await readFuturesMark(this.prisma, row, now, false);
-              const price = await readFuturesLastPrice(
-                this.prisma,
-                row,
-                now,
-                false,
-              );
-              return {
-                ...presentFuturesInstrument(row),
-                markPrice: mark?.price.toFixed(8) ?? null,
-                referencePrice: price?.price.toFixed(8) ?? null,
-                markState: mark ? 'fresh' : 'unavailable_or_stale',
-                markCapturedAt: mark?.capturedAt.toISOString() ?? null,
-                markEvidence: mark
-                  ? {
-                      snapshotId: mark.id,
-                      source: mark.source,
-                      effectiveAt: mark.effectiveAt.toISOString(),
-                      capturedAt: mark.capturedAt.toISOString(),
-                    }
-                  : null,
-                referencePriceEvidence: price
-                  ? presentFuturesLastEvidence(price)
-                  : null,
-                coverageVerifiedAt: row.markVerifiedAt!.toISOString(),
-              };
-            }),
-        ),
+        instruments: verified.map((row) => {
+          const { mark, last: price } = references.get(row.id)!;
+          return {
+            ...presentFuturesInstrument(row),
+            markPrice: mark?.price.toFixed(8) ?? null,
+            referencePrice: price?.price.toFixed(8) ?? null,
+            markState: mark ? 'fresh' : 'unavailable_or_stale',
+            markCapturedAt: mark?.capturedAt.toISOString() ?? null,
+            markEvidence: mark
+              ? {
+                  snapshotId: mark.id,
+                  source: mark.source,
+                  effectiveAt: mark.effectiveAt.toISOString(),
+                  capturedAt: mark.capturedAt.toISOString(),
+                }
+              : null,
+            referencePriceEvidence: price
+              ? presentFuturesLastEvidence(price)
+              : null,
+            coverageVerifiedAt: row.markVerifiedAt!.toISOString(),
+          };
+        }),
       },
     };
   }

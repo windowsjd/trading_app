@@ -1,0 +1,3 @@
+[Nest] 847948  - 10/10/2026, 2:52:19 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ee9af5f7-90b9-4115-9b5f-cc7ea9cff3b0"}
+(node:847948) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

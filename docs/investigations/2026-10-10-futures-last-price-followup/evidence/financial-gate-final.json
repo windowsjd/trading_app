@@ -1,0 +1,107 @@
+{
+  "command": [
+    "bash",
+    "../docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-financial-gate.sh"
+  ],
+  "startedAtUtc": "2026-10-10T06:17:03Z",
+  "elapsedSeconds": 171.47,
+  "exitCode": 1,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 827.3,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 8.121430223007337,
+      "stepMs": -1803.2608107168926
+    },
+    {
+      "elapsedSeconds": 40.628530846996,
+      "stepMs": -1801.780870577204
+    },
+    {
+      "elapsedSeconds": 73.11790078300692,
+      "stepMs": -1821.6165313351667
+    },
+    {
+      "elapsedSeconds": 105.56507732500904,
+      "stepMs": -1849.8322669765912
+    },
+    {
+      "elapsedSeconds": 138.11252589100332,
+      "stepMs": -1796.4374726143433
+    },
+    {
+      "elapsedSeconds": 170.63607218700054,
+      "stepMs": -1796.2131104141008
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 17.2
+    },
+    {
+      "elapsedSeconds": 10.407,
+      "rssMiB": 779.5
+    },
+    {
+      "elapsedSeconds": 20.843,
+      "rssMiB": 682.9
+    },
+    {
+      "elapsedSeconds": 31.372,
+      "rssMiB": 729.4
+    },
+    {
+      "elapsedSeconds": 41.883,
+      "rssMiB": 743.1
+    },
+    {
+      "elapsedSeconds": 52.304,
+      "rssMiB": 743.4
+    },
+    {
+      "elapsedSeconds": 62.791,
+      "rssMiB": 746.3
+    },
+    {
+      "elapsedSeconds": 73.326,
+      "rssMiB": 357.4
+    },
+    {
+      "elapsedSeconds": 83.772,
+      "rssMiB": 809.6
+    },
+    {
+      "elapsedSeconds": 94.219,
+      "rssMiB": 809.3
+    },
+    {
+      "elapsedSeconds": 104.629,
+      "rssMiB": 801.7
+    },
+    {
+      "elapsedSeconds": 115.049,
+      "rssMiB": 722.8
+    },
+    {
+      "elapsedSeconds": 125.486,
+      "rssMiB": 799.2
+    },
+    {
+      "elapsedSeconds": 136.018,
+      "rssMiB": 262.1
+    },
+    {
+      "elapsedSeconds": 146.539,
+      "rssMiB": 685.0
+    },
+    {
+      "elapsedSeconds": 157.055,
+      "rssMiB": 693.2
+    },
+    {
+      "elapsedSeconds": 167.607,
+      "rssMiB": 717.0
+    }
+  ]
+}

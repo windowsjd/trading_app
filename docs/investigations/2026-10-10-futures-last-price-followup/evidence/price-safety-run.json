@@ -1,0 +1,22 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "jest",
+    "--runInBand",
+    "--runTestsByPath",
+    "src/futures/futures-price-safety.integration.spec.ts"
+  ],
+  "startedAtUtc": "2026-10-10T05:55:53Z",
+  "elapsedSeconds": 9.349,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1139.7,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 18.2
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "jest",
+    "--runInBand",
+    "--runTestsByPath",
+    "src/futures/futures-price-safety.integration.spec.ts",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/price-safety-verified-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T06:22:21Z",
+  "elapsedSeconds": 11.297,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1090.2,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 16.8
+    },
+    {
+      "elapsedSeconds": 10.658,
+      "rssMiB": 920.4
+    }
+  ]
+}

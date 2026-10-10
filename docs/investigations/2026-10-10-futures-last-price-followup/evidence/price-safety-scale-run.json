@@ -1,0 +1,47 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "jest",
+    "--runInBand",
+    "--runTestsByPath",
+    "src/futures/futures-price-safety.integration.spec.ts"
+  ],
+  "startedAtUtc": "2026-10-10T06:06:29Z",
+  "elapsedSeconds": 56.598,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1064.5,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 28.29044067900395,
+      "stepMs": -1828.8419678574428
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 17.2
+    },
+    {
+      "elapsedSeconds": 10.5,
+      "rssMiB": 668.2
+    },
+    {
+      "elapsedSeconds": 21.238,
+      "rssMiB": 668.2
+    },
+    {
+      "elapsedSeconds": 31.914,
+      "rssMiB": 707.4
+    },
+    {
+      "elapsedSeconds": 42.604,
+      "rssMiB": 747.4
+    },
+    {
+      "elapsedSeconds": 53.297,
+      "rssMiB": 748.4
+    }
+  ]
+}

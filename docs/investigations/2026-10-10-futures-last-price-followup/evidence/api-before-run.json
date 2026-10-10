@@ -1,0 +1,109 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/futures-read-api-benchmark.ts"
+  ],
+  "startedAtUtc": "2026-10-10T05:50:50Z",
+  "elapsedSeconds": 180.11,
+  "exitCode": -15,
+  "terminationReason": "timeout",
+  "peakProcessGroupRssMiB": 480.7,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 14.439570759001072,
+      "stepMs": -1756.7773311893689
+    },
+    {
+      "elapsedSeconds": 47.01202061900403,
+      "stepMs": -1720.1675450342009
+    },
+    {
+      "elapsedSeconds": 79.52065121500345,
+      "stepMs": -1803.7678647815483
+    },
+    {
+      "elapsedSeconds": 111.90231208999467,
+      "stepMs": -1799.294717842713
+    },
+    {
+      "elapsedSeconds": 144.42316880400176,
+      "stepMs": -1755.1997922128066
+    },
+    {
+      "elapsedSeconds": 176.99231149100524,
+      "stepMs": -1745.8722775190836
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 17.0
+    },
+    {
+      "elapsedSeconds": 10.498,
+      "rssMiB": 480.2
+    },
+    {
+      "elapsedSeconds": 21.135,
+      "rssMiB": 480.2
+    },
+    {
+      "elapsedSeconds": 31.8,
+      "rssMiB": 480.2
+    },
+    {
+      "elapsedSeconds": 42.516,
+      "rssMiB": 480.2
+    },
+    {
+      "elapsedSeconds": 53.173,
+      "rssMiB": 480.2
+    },
+    {
+      "elapsedSeconds": 63.9,
+      "rssMiB": 480.5
+    },
+    {
+      "elapsedSeconds": 74.595,
+      "rssMiB": 480.7
+    },
+    {
+      "elapsedSeconds": 85.311,
+      "rssMiB": 480.7
+    },
+    {
+      "elapsedSeconds": 95.923,
+      "rssMiB": 480.7
+    },
+    {
+      "elapsedSeconds": 106.427,
+      "rssMiB": 428.0
+    },
+    {
+      "elapsedSeconds": 116.962,
+      "rssMiB": 428.0
+    },
+    {
+      "elapsedSeconds": 127.477,
+      "rssMiB": 429.5
+    },
+    {
+      "elapsedSeconds": 138.088,
+      "rssMiB": 429.5
+    },
+    {
+      "elapsedSeconds": 148.631,
+      "rssMiB": 429.5
+    },
+    {
+      "elapsedSeconds": 159.357,
+      "rssMiB": 429.5
+    },
+    {
+      "elapsedSeconds": 170.027,
+      "rssMiB": 430.0
+    }
+  ]
+}

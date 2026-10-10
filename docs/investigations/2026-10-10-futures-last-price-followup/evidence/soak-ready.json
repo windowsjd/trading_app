@@ -1,0 +1,400 @@
+{
+  "state": "FAIL",
+  "requestedSeconds": 240,
+  "elapsedSeconds": 240.08758433,
+  "actual24hCompleted": false,
+  "startedAt": "2026-10-10T06:25:23.821Z",
+  "database": "127.0.0.1:55439/futures_soak_ready_test",
+  "instruments": 23,
+  "spotSymbols": 25,
+  "samples": 24,
+  "evaluatedFreshSamples": 17,
+  "badFreshSamples": 0,
+  "frames": {
+    "?": {
+      "accepted": 0,
+      "rejected": 3,
+      "maxGapMs": 0,
+      "lastAt": 1184.778717
+    },
+    "BTCUSDT": {
+      "accepted": 725,
+      "rejected": 0,
+      "maxGapMs": 20958.07546999998,
+      "lastAt": 237455.058004
+    },
+    "ETHUSDT": {
+      "accepted": 403,
+      "rejected": 0,
+      "maxGapMs": 21908.64624100001,
+      "lastAt": 239973.458854
+    },
+    "LTCUSDT": {
+      "accepted": 101,
+      "rejected": 0,
+      "maxGapMs": 28285.25737399998,
+      "lastAt": 233226.041191
+    },
+    "BNBUSDT": {
+      "accepted": 354,
+      "rejected": 0,
+      "maxGapMs": 22745.646731000015,
+      "lastAt": 240049.747315
+    },
+    "CHIPUSDT": {
+      "accepted": 71,
+      "rejected": 0,
+      "maxGapMs": 23626.18771300002,
+      "lastAt": 234088.064398
+    },
+    "TAOUSDT": {
+      "accepted": 242,
+      "rejected": 0,
+      "maxGapMs": 21377.367134,
+      "lastAt": 234440.800954
+    },
+    "SOLUSDT": {
+      "accepted": 371,
+      "rejected": 0,
+      "maxGapMs": 21139.21213,
+      "lastAt": 239534.966265
+    },
+    "XLMUSDT": {
+      "accepted": 266,
+      "rejected": 0,
+      "maxGapMs": 21479.83762800001,
+      "lastAt": 233422.891255
+    },
+    "NIGHTUSDT": {
+      "accepted": 184,
+      "rejected": 0,
+      "maxGapMs": 21964.145613,
+      "lastAt": 239521.535929
+    },
+    "XRPUSDT": {
+      "accepted": 197,
+      "rejected": 0,
+      "maxGapMs": 21482.770694999985,
+      "lastAt": 240069.067512
+    },
+    "ADAUSDT": {
+      "accepted": 171,
+      "rejected": 0,
+      "maxGapMs": 24638.971890000015,
+      "lastAt": 235099.067984
+    },
+    "UNIUSDT": {
+      "accepted": 266,
+      "rejected": 0,
+      "maxGapMs": 21698.67275299999,
+      "lastAt": 236451.088937
+    },
+    "WLDUSDT": {
+      "accepted": 615,
+      "rejected": 0,
+      "maxGapMs": 20642.81231900002,
+      "lastAt": 240722.161352
+    },
+    "ENAUSDT": {
+      "accepted": 330,
+      "rejected": 0,
+      "maxGapMs": 23862.45147499998,
+      "lastAt": 239798.511148
+    },
+    "NEARUSDT": {
+      "accepted": 464,
+      "rejected": 0,
+      "maxGapMs": 21483.75838700001,
+      "lastAt": 240931.891882
+    },
+    "SUIUSDT": {
+      "accepted": 295,
+      "rejected": 0,
+      "maxGapMs": 20611.50357900001,
+      "lastAt": 239799.060846
+    },
+    "ASTERUSDT": {
+      "accepted": 100,
+      "rejected": 0,
+      "maxGapMs": 24689.083309999987,
+      "lastAt": 240684.90264
+    },
+    "AVAXUSDT": {
+      "accepted": 214,
+      "rejected": 0,
+      "maxGapMs": 21275.036173,
+      "lastAt": 240101.275439
+    },
+    "ZECUSDT": {
+      "accepted": 734,
+      "rejected": 0,
+      "maxGapMs": 21857.63101099999,
+      "lastAt": 239535.348558
+    },
+    "DOGEUSDT": {
+      "accepted": 198,
+      "rejected": 0,
+      "maxGapMs": 22913.342002999998,
+      "lastAt": 240842.114039
+    },
+    "LINKUSDT": {
+      "accepted": 88,
+      "rejected": 0,
+      "maxGapMs": 20948.918699,
+      "lastAt": 240077.321383
+    },
+    "TRUMPUSDT": {
+      "accepted": 93,
+      "rejected": 0,
+      "maxGapMs": 26607.138474999985,
+      "lastAt": 239392.000715
+    },
+    "TRXUSDT": {
+      "accepted": 75,
+      "rejected": 0,
+      "maxGapMs": 21219.762592000014,
+      "lastAt": 239760.945374
+    }
+  },
+  "rest": {
+    "fapi.binance.com/fapi/v1/exchangeInfo": {
+      "calls": 2,
+      "failures": 0,
+      "statuses": {
+        "200": 2
+      }
+    },
+    "fapi.binance.com/fapi/v2/ticker/price": {
+      "calls": 69,
+      "failures": 6,
+      "statuses": {
+        "200": 63
+      }
+    },
+    "api.binance.com/api/v3/ticker/24hr": {
+      "calls": 4,
+      "failures": 0,
+      "statuses": {
+        "200": 4
+      }
+    },
+    "fapi.binance.com/fapi/v1/premiumIndex": {
+      "calls": 8,
+      "failures": 6,
+      "statuses": {
+        "200": 2
+      }
+    }
+  },
+  "connections": {
+    "last": 3,
+    "mark": 3
+  },
+  "spot": {
+    "enabled": true,
+    "running": true,
+    "state": "connected",
+    "connected": true,
+    "connecting": false,
+    "reconnecting": false,
+    "subscribedSymbolCount": 25,
+    "subscribedStreams": [
+      "btcusdt@ticker",
+      "ethusdt@ticker",
+      "bnbusdt@ticker",
+      "xrpusdt@ticker",
+      "solusdt@ticker",
+      "trxusdt@ticker",
+      "dogeusdt@ticker",
+      "zecusdt@ticker",
+      "xlmusdt@ticker",
+      "linkusdt@ticker",
+      "suiusdt@ticker",
+      "nightusdt@ticker",
+      "nearusdt@ticker",
+      "pepeusdt@ticker",
+      "adausdt@ticker",
+      "taousdt@ticker",
+      "wldusdt@ticker",
+      "enausdt@ticker",
+      "avaxusdt@ticker",
+      "uniusdt@ticker",
+      "chipusdt@ticker",
+      "ltcusdt@ticker",
+      "asterusdt@ticker",
+      "币安人生usdt@ticker",
+      "trumpusdt@ticker",
+      "btcusdt@depth10",
+      "ethusdt@depth10",
+      "bnbusdt@depth10",
+      "xrpusdt@depth10",
+      "solusdt@depth10",
+      "trxusdt@depth10",
+      "dogeusdt@depth10",
+      "zecusdt@depth10",
+      "xlmusdt@depth10",
+      "linkusdt@depth10",
+      "suiusdt@depth10",
+      "nightusdt@depth10",
+      "nearusdt@depth10",
+      "pepeusdt@depth10",
+      "adausdt@depth10",
+      "taousdt@depth10",
+      "wldusdt@depth10",
+      "enausdt@depth10",
+      "avaxusdt@depth10",
+      "uniusdt@depth10",
+      "chipusdt@depth10",
+      "ltcusdt@depth10",
+      "asterusdt@depth10",
+      "币安人生usdt@depth10",
+      "trumpusdt@depth10"
+    ],
+    "lastStartedAt": "2026-10-10T06:25:23.824Z",
+    "lastConnectedAt": "2026-10-10T06:25:23.964Z",
+    "lastDisconnectedAt": null,
+    "lastMessageAt": "2026-10-10T06:29:11.011Z",
+    "lastTickerAt": "2026-10-10T06:29:11.011Z",
+    "lastSnapshotAt": "2026-10-10T06:29:10.533Z",
+    "reconnectCount": 0,
+    "nextReconnectAt": null,
+    "nextReconnectDelayMs": null,
+    "receivedFrames": 8618,
+    "receivedTickers": 3595,
+    "acknowledged": 1,
+    "created": 927,
+    "skipped": 2668,
+    "failed": 0,
+    "latestPriceCount": 25,
+    "eventListenerCount": 0,
+    "lastErrorCode": null,
+    "lastErrorMessage": null
+  },
+  "rejectionChecks": {
+    "duplicate": true,
+    "outOfOrder": true,
+    "nonPositive": true,
+    "future": true,
+    "wrongDomain": true
+  },
+  "faults": [
+    {
+      "elapsedSeconds": 60.046428389,
+      "type": "last_mark_socket_disconnect"
+    },
+    {
+      "elapsedSeconds": 150.08715723600002,
+      "type": "20s_last_mark_ws_rest_outage"
+    },
+    {
+      "elapsedSeconds": 170.034609732,
+      "type": "transport_restored"
+    }
+  ],
+  "clockSteps": [
+    {
+      "elapsedSeconds": 29.438267765,
+      "stepMs": -1807.1593160000011
+    },
+    {
+      "elapsedSeconds": 61.995859568,
+      "stepMs": -1846.0917550000013
+    },
+    {
+      "elapsedSeconds": 94.465408071,
+      "stepMs": -1904.924973999994
+    },
+    {
+      "elapsedSeconds": 126.976684656,
+      "stepMs": -1831.0503940000053
+    },
+    {
+      "elapsedSeconds": 159.481120796,
+      "stepMs": -1820.264142
+    },
+    {
+      "elapsedSeconds": 192.03144114500003,
+      "stepMs": -1833.5986029999913
+    },
+    {
+      "elapsedSeconds": 224.45184949400002,
+      "stepMs": -1847.58181600002
+    }
+  ],
+  "commands": {
+    "marketLatencyMs": {
+      "samples": 7,
+      "p50": 49.95,
+      "p95": 62.25,
+      "p99": 62.25,
+      "max": 62.25
+    },
+    "limitEvaluationMs": {
+      "samples": 7,
+      "p50": 3.26,
+      "p95": 4.1,
+      "p99": 4.1,
+      "max": 4.1
+    },
+    "limitFillMs": {
+      "samples": 1,
+      "p50": 2970.67,
+      "p95": 2970.67,
+      "p99": 2970.67,
+      "max": 2970.67
+    },
+    "pendingLimitOutcomes": {
+      "limit:FUTURES_ENTRY_LIMIT_NOT_REACHED": 7
+    },
+    "errors": {
+      "fill:INVALID_FUTURES_LEVERAGE": 1,
+      "fill:FUTURES_ENTRY_PENDING": 6
+    }
+  },
+  "peakRssMiB": 439.58203125,
+  "before": [
+    {
+      "domain": "last",
+      "rows": "0",
+      "bytes": "40960"
+    },
+    {
+      "domain": "mark",
+      "rows": "0",
+      "bytes": "40960"
+    },
+    {
+      "domain": "spot",
+      "rows": "0",
+      "bytes": "40960"
+    }
+  ],
+  "after": [
+    {
+      "domain": "last",
+      "rows": "3049",
+      "bytes": "1818624"
+    },
+    {
+      "domain": "mark",
+      "rows": "4784",
+      "bytes": "2662400"
+    },
+    {
+      "domain": "spot",
+      "rows": "931",
+      "bytes": "1392640"
+    }
+  ],
+  "assertions": {
+    "allInvalidFramesRejected": true,
+    "collectedAllThree": true,
+    "recoveredFinalPrices": true,
+    "noUnplannedFinancialErrors": false,
+    "actualMarketAndLimitFills": true,
+    "freshOutsidePlannedFaults": true,
+    "noClockSteps": false
+  },
+  "cpuCorePercent": 8.034567074274833,
+  "completedAt": "2026-10-10T06:29:11.022Z"
+}

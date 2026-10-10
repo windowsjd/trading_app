@@ -1,0 +1,108 @@
+{
+  "command": [
+    "npm",
+    "run",
+    "check"
+  ],
+  "startedAtUtc": "2026-10-10T06:14:27Z",
+  "elapsedSeconds": 174.187,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1342.9,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 11.157425119992695,
+      "stepMs": -1806.3419418904232
+    },
+    {
+      "elapsedSeconds": 43.71215583500452,
+      "stepMs": -1821.1098078027135
+    },
+    {
+      "elapsedSeconds": 76.16800016000343,
+      "stepMs": -1829.0486034966307
+    },
+    {
+      "elapsedSeconds": 108.63119617699704,
+      "stepMs": -1811.1652515945025
+    },
+    {
+      "elapsedSeconds": 141.1247405699978,
+      "stepMs": -1814.4852607510984
+    },
+    {
+      "elapsedSeconds": 173.66889106399321,
+      "stepMs": -1803.2608870562399
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 17.2
+    },
+    {
+      "elapsedSeconds": 10.637,
+      "rssMiB": 834.0
+    },
+    {
+      "elapsedSeconds": 21.192,
+      "rssMiB": 320.8
+    },
+    {
+      "elapsedSeconds": 31.784,
+      "rssMiB": 525.5
+    },
+    {
+      "elapsedSeconds": 42.329,
+      "rssMiB": 229.8
+    },
+    {
+      "elapsedSeconds": 52.844,
+      "rssMiB": 427.0
+    },
+    {
+      "elapsedSeconds": 63.396,
+      "rssMiB": 517.2
+    },
+    {
+      "elapsedSeconds": 73.943,
+      "rssMiB": 522.5
+    },
+    {
+      "elapsedSeconds": 84.57,
+      "rssMiB": 521.8
+    },
+    {
+      "elapsedSeconds": 95.194,
+      "rssMiB": 521.7
+    },
+    {
+      "elapsedSeconds": 105.781,
+      "rssMiB": 387.6
+    },
+    {
+      "elapsedSeconds": 116.351,
+      "rssMiB": 582.8
+    },
+    {
+      "elapsedSeconds": 126.998,
+      "rssMiB": 591.3
+    },
+    {
+      "elapsedSeconds": 137.514,
+      "rssMiB": 523.4
+    },
+    {
+      "elapsedSeconds": 148.141,
+      "rssMiB": 365.0
+    },
+    {
+      "elapsedSeconds": 158.669,
+      "rssMiB": 519.3
+    },
+    {
+      "elapsedSeconds": 169.211,
+      "rssMiB": 498.2
+    }
+  ]
+}

@@ -1,6 +1,11 @@
 /** Read-only operator check before/after enabling Futures: contract coverage,
  * Futures Last and Mark freshness per instrument, pending work and workers.
  * Runs inside a READ ONLY transaction; it never repairs, refreshes or writes. */
+import {
+  evaluateFuturesReadiness,
+  FUTURES_WORKER_REPORT_MAX_AGE_MS,
+  type FuturesSettlementReadiness,
+} from './lib/futures-readiness';
 import { loadRuntimeEnv } from './lib/load-runtime-env';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { verifiedFuturesInstrument } from '../src/futures/futures-instrument-coverage';
@@ -8,6 +13,7 @@ import {
   FUTURES_LAST_MAX_CAPTURE_AGE_MS,
   FUTURES_LAST_MAX_TRADE_AGE_MS,
   validFuturesLastPrice,
+  validFuturesFinalLastPrice,
 } from '../src/futures/futures-last-price';
 import { MARK_MAX_AGE_MS, readFuturesMark } from '../src/futures/futures-mark';
 import {
@@ -15,6 +21,7 @@ import {
   futuresRiskConfig,
   futuresTradingMode,
 } from '../src/futures/futures.config';
+import { validLegacySpotFinalPrice } from '../src/futures/futures-price';
 
 loadRuntimeEnv();
 const requireReady = process.argv.includes('--require-ready');
@@ -34,10 +41,19 @@ type ReadinessRow = {
     valid: boolean;
     price: string;
     source: string;
+    effectiveAt: string;
+    capturedAt: string;
     tradeAgeMs: number;
     receiptAgeMs: number;
   } | null;
-  mark: { valid: boolean; receiptAgeMs?: number };
+  mark: {
+    valid: boolean;
+    receiptAgeMs?: number;
+    price?: string;
+    source?: string;
+    effectiveAt?: string;
+    capturedAt?: string;
+  };
   openPositions: number;
   pendingEntries: number;
   liveProtections: number;
@@ -48,6 +64,7 @@ type WorkerRun = {
   status: string | null;
   startedAt: string | null;
   finishedAt: string | null;
+  resultJson: unknown;
 };
 
 function target() {
@@ -87,6 +104,18 @@ async function main() {
           ],
         });
         const mark = await readFuturesMark(tx, instrument, now, false);
+        // Show rejected evidence too, so stale/future Mark failures have ages
+        // and a source. Only the existing reader decides validity/priority.
+        const observedMark =
+          mark ??
+          (await tx.futuresMarkSnapshot.findFirst({
+            where: { instrumentId: instrument.id },
+            orderBy: [
+              { effectiveAt: 'desc' },
+              { capturedAt: 'desc' },
+              { id: 'desc' },
+            ],
+          }));
         const verified = verifiedFuturesInstrument(instrument, now);
         const lastValid =
           !!last && validFuturesLastPrice(last, instrument, now);
@@ -120,12 +149,21 @@ async function main() {
                 valid: lastValid,
                 price: last.price.toFixed(8),
                 source: last.source,
+                effectiveAt: last.effectiveAt.toISOString(),
+                capturedAt: last.capturedAt.toISOString(),
                 tradeAgeMs: +now - +last.effectiveAt,
                 receiptAgeMs: +now - +last.capturedAt,
               }
             : null,
-          mark: mark
-            ? { valid: true, receiptAgeMs: +now - +mark.capturedAt }
+          mark: observedMark
+            ? {
+                valid: !!mark,
+                receiptAgeMs: +now - +observedMark.capturedAt,
+                price: observedMark.price.toFixed(8),
+                source: observedMark.source,
+                effectiveAt: observedMark.effectiveAt.toISOString(),
+                capturedAt: observedMark.capturedAt.toISOString(),
+              }
             : { valid: false },
           openPositions,
           pendingEntries,
@@ -145,51 +183,144 @@ async function main() {
         const run = await tx.opsJobRun.findFirst({
           where: { jobName },
           orderBy: { startedAt: 'desc' },
-          select: { status: true, startedAt: true, finishedAt: true },
+          select: {
+            status: true,
+            startedAt: true,
+            finishedAt: true,
+            resultJson: true,
+          },
         });
         workers.push({
           jobName,
           status: run?.status ?? null,
           startedAt: run?.startedAt?.toISOString() ?? null,
           finishedAt: run?.finishedAt?.toISOString() ?? null,
+          resultJson: run?.resultJson ?? null,
         });
       }
+      // Fresh live prices cannot repair an ended season's missing historical
+      // evidence. Check all remaining lifetimes, including inactive instruments.
+      const finalPositions = await tx.futuresPosition.findMany({
+        where: {
+          status: 'open',
+          tradingAccount: {
+            seasonParticipant: {
+              season: { status: { in: ['ended', 'settled'] } },
+            },
+          },
+        },
+        include: {
+          instrument: { include: { underlyingAsset: true } },
+          tradingAccount: {
+            include: { seasonParticipant: { include: { season: true } } },
+          },
+        },
+      });
+      const settlements: FuturesSettlementReadiness[] = [];
+      for (const position of finalPositions) {
+        const season = position.tradingAccount.seasonParticipant!.season;
+        if (
+          settlements.some(
+            (s) =>
+              s.seasonId === season.id &&
+              s.instrumentId === position.instrumentId,
+          )
+        )
+          continue;
+        const pin = await tx.futuresSeasonPrice.findUnique({
+          where: {
+            seasonId_instrumentId: {
+              seasonId: season.id,
+              instrumentId: position.instrumentId,
+            },
+          },
+          include: { snapshot: true, lastPriceSnapshot: true },
+        });
+        let evidence: FuturesSettlementReadiness['evidence'] =
+          'missing_or_invalid';
+        if (pin) {
+          const sameBoundary =
+            +pin.endAt === +season.endAt && pin.feeRate.eq(season.tradeFeeRate);
+          if (
+            sameBoundary &&
+            !pin.snapshot &&
+            pin.lastPriceSnapshot &&
+            validFuturesFinalLastPrice(
+              pin.lastPriceSnapshot,
+              position.instrument,
+              season.endAt,
+            )
+          )
+            evidence = 'pinned_last';
+          else if (
+            sameBoundary &&
+            !pin.lastPriceSnapshot &&
+            pin.snapshot &&
+            validLegacySpotFinalPrice(
+              pin.snapshot,
+              position.instrument.underlyingAsset,
+              season.endAt,
+            )
+          )
+            evidence = 'pinned_legacy_spot';
+        } else {
+          const candidate = await tx.futuresLastPriceSnapshot.findFirst({
+            where: {
+              instrumentId: position.instrumentId,
+              capturedAt: { lte: season.endAt },
+              effectiveAt: { lte: season.endAt },
+            },
+            orderBy: [
+              { effectiveAt: 'desc' },
+              { capturedAt: 'desc' },
+              { id: 'desc' },
+            ],
+          });
+          if (
+            candidate &&
+            validFuturesFinalLastPrice(
+              candidate,
+              position.instrument,
+              season.endAt,
+            )
+          )
+            evidence = 'unfixed_last_candidate';
+        }
+        settlements.push({
+          seasonId: season.id,
+          instrumentId: position.instrumentId,
+          endAt: season.endAt.toISOString(),
+          evidence,
+          ready: evidence !== 'missing_or_invalid',
+        });
+      }
+      const config = {
+        tradingMode: futuresTradingMode(),
+        riskEngine: futuresRiskConfig().enabled,
+        markIngestion: futuresRiskConfig().ingestion,
+        lastPriceIngestion: futuresLastPriceConfig().ingestion,
+      };
       return {
         database: target(),
         evaluatedAt: now.toISOString(),
         policy: {
+          target:
+            'all active registered instruments plus inactive instruments with live financial work',
+          releaseMode: 'ENABLED (independent of current trading mode)',
           lastMaxReceiptAgeMs: FUTURES_LAST_MAX_CAPTURE_AGE_MS,
           lastMaxTradeAgeMs: FUTURES_LAST_MAX_TRADE_AGE_MS,
           markMaxAgeMs: MARK_MAX_AGE_MS,
+          workerMaxReportAgeMs: FUTURES_WORKER_REPORT_MAX_AGE_MS,
+          workerObservation:
+            'Ops runs are demand-driven, not idle heartbeats; fresh prices prove receipt, not transport connectivity',
         },
-        config: {
-          tradingMode: futuresTradingMode(),
-          riskEngine: futuresRiskConfig().enabled,
-          markIngestion: futuresRiskConfig().ingestion,
-          lastPriceIngestion: futuresLastPriceConfig().ingestion,
-        },
-        summary: {
-          instruments: rows.length,
-          activeVerified: rows.filter(
-            (r) => r.active && r.coverage === 'verified',
-          ).length,
-          ready: rows.filter((r) => r.ready).length,
-          openPositions: rows.reduce((n, r) => n + r.openPositions, 0),
-          pendingEntries: rows.reduce((n, r) => n + r.pendingEntries, 0),
-          liveProtections: rows.reduce((n, r) => n + r.liveProtections, 0),
-        },
-        instruments: rows,
-        workers,
+        ...evaluateFuturesReadiness(rows, workers, config, now, settlements),
       };
     },
     { isolationLevel: 'RepeatableRead' },
   );
   console.log(JSON.stringify(report, null, 2));
-  const blocking = report.instruments.filter(
-    (r) => r.active && r.coverage === 'verified' && !r.ready,
-  );
-  if (requireReady && (blocking.length || !report.summary.ready))
-    process.exitCode = 1;
+  if (requireReady && !report.readiness.launchReady) process.exitCode = 1;
 }
 main()
   .catch((error: unknown) => {

@@ -1,0 +1,33 @@
+﻿2026-10-10T05:25:10.2721113Z Current runner version: '2.337.0'
+2026-10-10T05:25:10.2748453Z Ubuntu
+2026-10-10T05:25:10.2748924Z 24.04.5
+2026-10-10T05:25:10.2750838Z Image: ubuntu-24.04
+2026-10-10T05:25:10.2752397Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20261004.327/images/ubuntu/Ubuntu2404-Readme.md
+2026-10-10T05:25:36.9102719Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4e61bc4ae42e30e5c6d2ce4c8dc8f6ddc51619a4:refs/remotes/origin/main
+2026-10-10T05:25:39.5003058Z  * [new ref]         4e61bc4ae42e30e5c6d2ce4c8dc8f6ddc51619a4 -> origin/main
+2026-10-10T05:25:39.6681840Z 4e61bc4ae42e30e5c6d2ce4c8dc8f6ddc51619a4
+2026-10-10T05:25:58.0739904Z PASS src/fx/fx.execute.integration.spec.ts
+2026-10-10T05:25:59.8113195Z PASS src/mvp-flow.integration.spec.ts
+2026-10-10T05:26:05.0108299Z PASS src/orders/orders.execute.integration.spec.ts (5.194 s)
+2026-10-10T05:26:06.5180169Z PASS src/orders/limit-order-create-race.integration.spec.ts
+2026-10-10T05:26:07.6585531Z PASS src/orders/limit-order-reservation.integration.spec.ts
+2026-10-10T05:26:12.9549252Z PASS src/orders/limit-order-transaction-time.integration.spec.ts (5.293 s)
+2026-10-10T05:26:14.0760326Z PASS src/orders/limit-order-create-no-redis.integration.spec.ts
+2026-10-10T05:26:15.4263308Z PASS src/orders/limit-order-idempotent-replay.integration.spec.ts
+2026-10-10T05:26:17.2419507Z PASS src/orders/limit-order-matching.integration.spec.ts
+2026-10-10T05:27:01.8157957Z PASS src/orders/trading-transaction-time.integration.spec.ts (44.571 s)
+2026-10-10T05:27:05.8657494Z PASS src/orders/market-execution.integration.spec.ts
+2026-10-10T05:27:11.0371894Z PASS src/orders/trading-fee-pinning.integration.spec.ts (5.167 s)
+2026-10-10T05:27:28.7541868Z PASS src/wallets/wallet-fx-transfer.integration.spec.ts (17.711 s)
+2026-10-10T05:27:40.4432647Z PASS src/futures/futures-isolated-boundary.integration.spec.ts (11.684 s)
+2026-10-10T05:27:47.2955258Z PASS src/wallets/spot-wallet-transfer.integration.spec.ts (6.849 s)
+2026-10-10T05:27:56.8689544Z PASS src/futures/futures-f3.integration.spec.ts (9.568 s)
+2026-10-10T05:27:59.3883031Z PASS src/futures/futures-f31.integration.spec.ts
+2026-10-10T05:28:37.2210516Z PASS src/futures/futures-risk.integration.spec.ts (37.825 s)
+2026-10-10T05:29:01.0586976Z PASS src/futures/futures.integration.spec.ts (23.835 s)
+2026-10-10T05:29:07.6559564Z PASS src/orders/order-input-policy.integration.spec.ts (6.59 s)
+2026-10-10T05:29:23.9076367Z PASS src/conditional/conditional.integration.spec.ts (16.249 s)
+2026-10-10T05:29:34.5117792Z PASS src/futures/futures-limit.integration.spec.ts (10.599 s)
+2026-10-10T05:29:34.5140153Z Test Suites: 22 passed, 22 total
+2026-10-10T05:29:34.5140590Z Tests:       23 passed, 23 total
+2026-10-10T05:29:34.5141265Z Time:        219.701 s

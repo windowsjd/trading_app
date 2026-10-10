@@ -1,0 +1,8 @@
+[Nest] 885112  - 10/10/2026, 3:22:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bc08fb69-b89d-43e3-8311-c6354e85b860"}
+[Nest] 885112  - 10/10/2026, 3:22:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"17089ea9-284a-4b5b-9e7c-50f0d2a42afb"}
+[Nest] 885112  - 10/10/2026, 3:22:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"45854473-8f96-45a7-814e-d6c0e736e25c"}
+[Nest] 885112  - 10/10/2026, 3:22:23 PM     LOG [BinanceWebSocketStreamingService] Binance WebSocket streaming connected with 50 ticker/depth streams.
+TypeError: Do not know how to serialize a BigInt
+    at JSON.stringify (<anonymous>)
+    at main (/home/nayuta/projects/trading-app/backend/scripts/futures-collection-soak.ts:612:16)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

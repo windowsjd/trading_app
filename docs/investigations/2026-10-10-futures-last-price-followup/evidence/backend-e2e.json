@@ -1,0 +1,31 @@
+{
+  "command": [
+    "pnpm",
+    "run",
+    "test:e2e",
+    "--runInBand",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/backend-e2e-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T06:02:45Z",
+  "elapsedSeconds": 13.745,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 627.1,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 6.356645830994239,
+      "stepMs": -1790.481167001417
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 17.5
+    },
+    {
+      "elapsedSeconds": 10.423,
+      "rssMiB": 619.1
+    }
+  ]
+}

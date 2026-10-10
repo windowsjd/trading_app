@@ -1,0 +1,37 @@
+$ git rev-parse HEAD
+4e61bc4ae42e30e5c6d2ce4c8dc8f6ddc51619a4
+
+$ git branch --show-current
+main
+
+$ git status --short
+ M .github/workflows/ci.yml
+ M backend/docs/futures-f3-contract.md
+ M backend/docs/futures-last-price-contract.md
+ M backend/scripts/futures-price-readiness.ts
+ M backend/src/futures/futures.service.ts
+?? backend/scripts/futures-collection-soak.ts
+?? backend/scripts/futures-price-safety-integration.ts
+?? backend/scripts/futures-read-api-benchmark.ts
+?? backend/scripts/lib/futures-readiness.spec.ts
+?? backend/scripts/lib/futures-readiness.ts
+?? backend/src/futures/futures-price-safety.integration.spec.ts
+?? backend/src/futures/futures-reference-prices.spec.ts
+?? backend/src/futures/futures-reference-prices.ts
+?? docs/investigations/2026-10-10-futures-last-price-followup/
+
+$ git diff --stat
+ .github/workflows/ci.yml                    |   9 ++
+ backend/docs/futures-f3-contract.md         |  34 ++++-
+ backend/docs/futures-last-price-contract.md |  31 +++++
+ backend/scripts/futures-price-readiness.ts  | 185 ++++++++++++++++++++++++----
+ backend/src/futures/futures.service.ts      |  61 +++++----
+ 5 files changed, 257 insertions(+), 63 deletions(-)
+
+$ git worktree list
+/home/nayuta/projects/trading-app  4e61bc4a [main]
+/tmp/trading-fee-pinning           97587a62 [fix/trading-fee-pinning] prunable
+/tmp/trading-home-market-work      3aa37266 (detached HEAD) prunable
+/tmp/trading-transaction-time      e6a64626 [fix/trading-transaction-time] prunable
+
+Read-only remote main check: 4e61bc4ae42e30e5c6d2ce4c8dc8f6ddc51619a4 (unchanged). No commit/push/merge/deploy performed.

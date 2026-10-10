@@ -1,0 +1,17 @@
+[32m[Nest] 889584  - [39m10/10/2026, 3:27:59 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"919b82e3-2ec5-4aa9-836b-2375715fdbec"}[39m
+[32m[Nest] 889584  - [39m10/10/2026, 3:27:59 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"a3b4ad12-3e3c-4631-80a1-1f4516f4c2bf"}[39m
+[32m[Nest] 889584  - [39m10/10/2026, 3:27:59 PM [32m    LOG[39m [38;5;3m[GeneralAccountsService] [39m[32m{"event":"general_account_opened","tradingAccountId":"398f0eda-446f-4f31-835d-255a4fe496cc"}[39m
+[32m[Nest] 889584  - [39m10/10/2026, 3:27:59 PM [32m    LOG[39m [38;5;3m[BinanceWebSocketStreamingService] [39m[32mBinance WebSocket streaming connected with 50 ticker/depth streams.[39m
+(node:889584) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:22 PM [33m   WARN[39m [38;5;3m[FuturesLastPriceIngestion] [39m[33mFUTURES_LAST_PRICE_REST_UNAVAILABLE[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:24 PM [33m   WARN[39m [38;5;3m[FuturesMarkIngestion] [39m[33mFUTURES_MARK_INGESTION_FAILED[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:26 PM [33m   WARN[39m [38;5;3m[FuturesLastPriceIngestion] [39m[33mFUTURES_LAST_PRICE_REST_UNAVAILABLE[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:27 PM [33m   WARN[39m [38;5;3m[FuturesMarkIngestion] [39m[33mFUTURES_MARK_INGESTION_FAILED[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:29 PM [33m   WARN[39m [38;5;3m[FuturesLastPriceIngestion] [39m[33mFUTURES_LAST_PRICE_REST_UNAVAILABLE[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:30 PM [33m   WARN[39m [38;5;3m[FuturesMarkIngestion] [39m[33mFUTURES_MARK_INGESTION_FAILED[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:32 PM [33m   WARN[39m [38;5;3m[FuturesLastPriceIngestion] [39m[33mFUTURES_LAST_PRICE_REST_UNAVAILABLE[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:34 PM [33m   WARN[39m [38;5;3m[FuturesMarkIngestion] [39m[33mFUTURES_MARK_INGESTION_FAILED[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:35 PM [33m   WARN[39m [38;5;3m[FuturesLastPriceIngestion] [39m[33mFUTURES_LAST_PRICE_REST_UNAVAILABLE[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:37 PM [33m   WARN[39m [38;5;3m[FuturesMarkIngestion] [39m[33mFUTURES_MARK_INGESTION_FAILED[39m
+[33m[Nest] 889584  - [39m10/10/2026, 3:30:39 PM [33m   WARN[39m [38;5;3m[FuturesLastPriceIngestion] [39m[33mFUTURES_LAST_PRICE_REST_UNAVAILABLE[39m

@@ -1,0 +1,30 @@
+{
+  "command": [
+    "pnpm",
+    "test",
+    "--runInBand",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/backend-unit-unsandboxed-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T05:47:19Z",
+  "elapsedSeconds": 20.339,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1335.7,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 11.066712547995849,
+      "stepMs": -1770.1694393908838
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 18.2
+    },
+    {
+      "elapsedSeconds": 10.436,
+      "rssMiB": 917.6
+    }
+  ]
+}

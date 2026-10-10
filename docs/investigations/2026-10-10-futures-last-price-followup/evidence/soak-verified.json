@@ -1,0 +1,102 @@
+{
+  "state": "RUNNING",
+  "requestedSeconds": 240,
+  "elapsedSeconds": 0,
+  "actual24hCompleted": false,
+  "startedAt": "2026-10-10T06:22:23.531Z",
+  "database": "127.0.0.1:55439/futures_soak_verified_test",
+  "instruments": 23,
+  "spotSymbols": 25,
+  "samples": 0,
+  "evaluatedFreshSamples": 0,
+  "badFreshSamples": 0,
+  "frames": {},
+  "rest": {
+    "fapi.binance.com/fapi/v1/exchangeInfo": {
+      "calls": 1,
+      "failures": 0,
+      "statuses": {
+        "200": 1
+      }
+    }
+  },
+  "connections": {
+    "last": 0,
+    "mark": 0
+  },
+  "spot": {
+    "enabled": false,
+    "running": false,
+    "state": "disabled",
+    "connected": false,
+    "connecting": false,
+    "reconnecting": false,
+    "subscribedSymbolCount": 0,
+    "subscribedStreams": [],
+    "lastStartedAt": null,
+    "lastConnectedAt": null,
+    "lastDisconnectedAt": null,
+    "lastMessageAt": null,
+    "lastTickerAt": null,
+    "lastSnapshotAt": null,
+    "reconnectCount": 0,
+    "nextReconnectAt": null,
+    "nextReconnectDelayMs": null,
+    "receivedFrames": 0,
+    "receivedTickers": 0,
+    "acknowledged": 0,
+    "created": 0,
+    "skipped": 0,
+    "failed": 0,
+    "latestPriceCount": 0,
+    "eventListenerCount": 0,
+    "lastErrorCode": null,
+    "lastErrorMessage": null
+  },
+  "rejectionChecks": {},
+  "faults": [],
+  "clockSteps": [],
+  "commands": {
+    "marketLatencyMs": {
+      "samples": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0
+    },
+    "limitEvaluationMs": {
+      "samples": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0
+    },
+    "limitFillMs": {
+      "samples": 0,
+      "p50": 0,
+      "p95": 0,
+      "p99": 0,
+      "max": 0
+    },
+    "pendingLimitOutcomes": {},
+    "errors": {}
+  },
+  "peakRssMiB": 0,
+  "before": [
+    {
+      "domain": "last",
+      "rows": "0",
+      "bytes": "40960"
+    },
+    {
+      "domain": "mark",
+      "rows": "0",
+      "bytes": "40960"
+    },
+    {
+      "domain": "spot",
+      "rows": "0",
+      "bytes": "40960"
+    }
+  ]
+}

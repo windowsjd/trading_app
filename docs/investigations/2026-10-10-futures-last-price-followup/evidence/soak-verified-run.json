@@ -1,0 +1,20 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/futures-collection-soak.ts"
+  ],
+  "startedAtUtc": "2026-10-10T06:22:22Z",
+  "elapsedSeconds": 10.195,
+  "exitCode": 1,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 512.1,
+  "clockSteps": [],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.001,
+      "rssMiB": 17.5
+    }
+  ]
+}

@@ -242,6 +242,15 @@ jobs:
           src/orders/market-execution.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
           src/mvp-flow.integration.spec.ts
+      - name: Futures readiness and Last retention PostgreSQL safety
+        env:
+          # Keep destructive retention fixtures separate from the financial suites.
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/futures_price_safety_test?schema=public
+          FUTURES_PRICE_SAFETY_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE futures_price_safety_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts
 
   core-account-db-integration:
     name: Core account PostgreSQL integration

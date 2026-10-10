@@ -1,0 +1,667 @@
+FAIL src/wallets/wallet-fx-transfer.integration.spec.ts (5.797 s)
+  ● Atomic cross-currency wallet transfer PostgreSQL integration › proves economic parity, rollback, repricing, reservations, lifecycle and concurrency in both modes
+
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1c0cff36-406d-486b-9d73-bdf335b71c12"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5cc4454e-6422-4cdd-a822-f797f9fb888c"}
+    PASS parity/evidence/reservation/replay general crypto_spot KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"091c3b2f-32ac-49da-ad48-c3bc879f28b3"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"65585efb-94bd-4751-a183-e6da0a1dbb81"}
+    PASS parity/evidence/reservation/replay general crypto_spot USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dc61cbe1-97e0-4aca-b59a-253bc81795cd"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b2344d71-a802-4c8f-ba93-e60880db12ad"}
+    PASS parity/evidence/reservation/replay general crypto_futures KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"88b04b22-90b1-4f31-93ea-031e9925d9b0"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0247b493-d853-4b0a-961b-814144c463cf"}
+    PASS parity/evidence/reservation/replay general crypto_futures USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0a5635b4-1e50-40dd-a0d3-d5c08dacffbe"}
+    PASS 13 rollback fault points general forward
+    [Nest] 871170  - 10/10/2026, 3:17:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e0b730a0-1eb2-4305-b11c-56d230493064"}
+    PASS 13 rollback fault points general reverse
+    [Nest] 871170  - 10/10/2026, 3:17:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bd8bf7d4-27d4-4ba6-9644-f8281ba53688"}
+    [Nest] 871170  - 10/10/2026, 3:17:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3627293e-84a7-4a94-9b49-9a4313794472"}
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation general
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fea34057-faad-4f69-9b5f-4da0470d8564"}
+    PASS concurrent general replay
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8a529fbb-7c93-46e3-8b64-50ace0510556"}
+    PASS concurrent general distinct
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5eb670a5-5c30-4d19-938a-540ac8776f3e"}
+    PASS concurrent general opposite
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fc9fff2a-beec-494e-b043-73d0bb58a571"}
+    PASS concurrent general same-currency
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fd97428c-328d-4d4f-b0b0-6cd3344b2604"}
+    PASS concurrent general standalone-fx
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c4176f23-8097-4ee7-a7a0-5cc34771c728"}
+    PASS concurrent general limit
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"99a318d5-3bc7-41f2-8a87-0f3ecd39ce51"}
+    PASS concurrent general market
+    PASS parity/evidence/reservation/replay season crypto_spot KRW→USD
+    PASS parity/evidence/reservation/replay season crypto_spot USD→KRW
+    PASS parity/evidence/reservation/replay season crypto_futures KRW→USD
+    PASS parity/evidence/reservation/replay season crypto_futures USD→KRW
+    PASS 13 rollback fault points season forward
+    PASS 13 rollback fault points season reverse
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation season
+    PASS concurrent season replay
+    PASS concurrent season distinct
+    PASS concurrent season opposite
+    PASS concurrent season same-currency
+    PASS concurrent season standalone-fx
+    PASS concurrent season limit
+    PASS concurrent season market
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"344e5189-4a5e-4fb7-ae66-26ea01991b03"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"48f48228-75bc-4d95-ac3c-a128975362c3"}
+    PASS parity/evidence/reservation/replay beginner crypto_spot KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1974d3c7-ab41-4ed2-9c4e-55cc5012e051"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"a6b080cb-d57e-41c8-92ca-871a01101834"}
+    PASS parity/evidence/reservation/replay beginner crypto_spot USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"5557f779-bd05-4784-88fc-1ec0084ef60e"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"2abf5440-35fd-4b61-9fb7-31a2993a11e9"}
+    PASS parity/evidence/reservation/replay beginner crypto_futures KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"82ace207-b433-482f-8312-09bee1e6e6de"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"3f0f1922-ef10-41e1-a970-34de7192b6fe"}
+    PASS parity/evidence/reservation/replay beginner crypto_futures USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1290c889-6597-4c00-ae83-338c463ed919"}
+    PASS 13 rollback fault points beginner forward
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"4341eef1-9972-49f3-a723-4ad692fbeee5"}
+    PASS 13 rollback fault points beginner reverse
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"f65cee6d-fa71-4162-9ba1-1b06ec4917b3"}
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"c6424a98-1095-4ccb-93da-5635877da6c9"}
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation beginner
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"e79432dc-076d-45c5-beec-a9844e9749d6"}
+    PASS concurrent beginner replay
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"6e6dc970-3af1-44ed-aefd-c28c4c83d873"}
+    PASS concurrent beginner distinct
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"31fbb0f4-cecf-4d2b-acae-98e01f03d28b"}
+    PASS concurrent beginner opposite
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"5b000dbc-e587-4613-a8bc-f8084ab20a66"}
+    PASS concurrent beginner same-currency
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"13965090-768d-48e8-a4f8-9906b1c55d1f"}
+    PASS concurrent beginner standalone-fx
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"3bfc6984-af5a-422e-9ac5-483a789efb22"}
+    PASS concurrent beginner limit
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"6a6570f9-5f56-4147-9ae2-b6904b3c9383"}
+    (node:871170) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      3434 |       { httpStatus: status },
+      3435 |     );
+    > 3436 |     throw new HttpException(this.createErrorBody(code, message), status);
+           |           ^
+      3437 |   }
+      3438 |
+      3439 |   private throwFxExecuteError(
+
+      at FxService.throwApiError (fx/fx.service.ts:3436:11)
+      at FxService.findFxQuoteRateSnapshot (fx/fx.service.ts:1632:12)
+      at async FxService.createFxQuote (fx/fx.service.ts:839:28)
+      at async FxService.quoteForTradingAccount (fx/fx.service.ts:794:14)
+      at async TradingAccountWalletFxTransferService.quote (wallets/trading-account-wallet-fx-transfer.service.ts:82:19)
+      at async concurrency (../scripts/wallet-fx-transfer-integration.ts:800:17)
+      at async main (../scripts/wallet-fx-transfer-integration.ts:1174:7) {
+        response: {
+          success: false,
+          error: { code: 'FX_RATE_UNAVAILABLE', message: 'FX rate is unavailable' }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (wallets/wallet-fx-transfer.integration.spec.ts:18:38)
+
+FAIL src/futures/futures-risk.integration.spec.ts (11.23 s)
+  ● Futures F2 actual PostgreSQL financial integration › proves risk, atomic liquidation, bankruptcy, transfers, lifecycle, races and rollback
+
+    [Nest] 873253  - 10/10/2026, 3:18:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b0e355e2-94bd-4853-aa94-7ca330b52812"}
+    PASS F2 admin financial guards retain scope/predicates without exact amounts; failures roll back
+    PASS F2 admin wallet integrity evidence excludes canonical financial rows
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3c3fb47d-ba58-4169-b3b1-c0426e881a25"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"3c3fb47d-ba58-4169-b3b1-c0426e881a25","capturedAt":"2026-10-10T06:18:01.181Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 DB typed immutable Mark, duplicate/out-of-order/WS priority, Spot selector isolation and lifetime margin mode
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8ec48e44-5dbc-4936-858c-a6f43290d8d6"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8ec48e44-5dbc-4936-858c-a6f43290d8d6","capturedAt":"2026-10-10T06:18:01.357Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8ec48e44-5dbc-4936-858c-a6f43290d8d6","capturedAt":"2026-10-10T06:18:01.396Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 gap liquidation closes quantity even when Mark notional rounds to zero
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bd176073-bb5a-4d8e-99de-2a292589a4d8"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"bd176073-bb5a-4d8e-99de-2a292589a4d8","capturedAt":"2026-10-10T06:18:01.521Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"bd176073-bb5a-4d8e-99de-2a292589a4d8","capturedAt":"2026-10-10T06:18:01.584Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 rollback after positive PnL credit and current-fee-policy liquidation
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.702Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.744Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.781Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.818Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.894Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 reserved cash plus isolated allocation both survive Cross bankruptcy; manual isolated close cannot raid Cross
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4c437ed1-cced-4328-a65b-c0f7f6ce2a78"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"4c437ed1-cced-4328-a65b-c0f7f6ce2a78","capturedAt":"2026-10-10T06:18:01.994Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/long/1 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"972158c1-0df1-4015-9d48-a04973ecc5e3"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"972158c1-0df1-4015-9d48-a04973ecc5e3","capturedAt":"2026-10-10T06:18:02.117Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"972158c1-0df1-4015-9d48-a04973ecc5e3","capturedAt":"2026-10-10T06:18:02.171Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/long/37 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"33319118-7bb4-45b3-827e-77d3925be440"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"33319118-7bb4-45b3-827e-77d3925be440","capturedAt":"2026-10-10T06:18:02.269Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"33319118-7bb4-45b3-827e-77d3925be440","capturedAt":"2026-10-10T06:18:02.318Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/long/100 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c352f809-7883-4282-a7a1-ca301a043a55"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c352f809-7883-4282-a7a1-ca301a043a55","capturedAt":"2026-10-10T06:18:02.411Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c352f809-7883-4282-a7a1-ca301a043a55","capturedAt":"2026-10-10T06:18:02.460Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/short/1 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dc77b277-8656-447b-8211-387ced8c9d19"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dc77b277-8656-447b-8211-387ced8c9d19","capturedAt":"2026-10-10T06:18:02.552Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dc77b277-8656-447b-8211-387ced8c9d19","capturedAt":"2026-10-10T06:18:02.599Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/short/37 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dcaa7ceb-5794-44c2-88cc-9511958bc76a"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dcaa7ceb-5794-44c2-88cc-9511958bc76a","capturedAt":"2026-10-10T06:18:02.687Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dcaa7ceb-5794-44c2-88cc-9511958bc76a","capturedAt":"2026-10-10T06:18:02.731Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/short/100 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"be001a3a-596f-4e8c-a3ca-ae842be7a3be"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"be001a3a-596f-4e8c-a3ca-ae842be7a3be","capturedAt":"2026-10-10T06:18:02.831Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general exact isolated maintenance 0.00000001
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c4caaed0-68cd-4943-9f09-c7a6165a1a03"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c4caaed0-68cd-4943-9f09-c7a6165a1a03","capturedAt":"2026-10-10T06:18:02.941Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c4caaed0-68cd-4943-9f09-c7a6165a1a03","capturedAt":"2026-10-10T06:18:02.965Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general exact isolated maintenance 0
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"993cd197-cfcc-4477-8a9d-fabc42ff0b92"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"993cd197-cfcc-4477-8a9d-fabc42ff0b92","capturedAt":"2026-10-10T06:18:03.063Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"993cd197-cfcc-4477-8a9d-fabc42ff0b92","capturedAt":"2026-10-10T06:18:03.087Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general exact isolated maintenance -0.00000001
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.184Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.213Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.241Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.275Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.379Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.522Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.550Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.580Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.615Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.646Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"97c4f185-3d67-4ddf-a2d1-5b2925b19031"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"97c4f185-3d67-4ddf-a2d1-5b2925b19031","capturedAt":"2026-10-10T06:18:03.749Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general usd outgoing exact free/over limit/stale; incoming allowed
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"75e6f1c0-11b6-407a-8053-3533de932b7a"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"75e6f1c0-11b6-407a-8053-3533de932b7a","capturedAt":"2026-10-10T06:18:03.901Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general fx outgoing exact free/over limit/stale; incoming allowed
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7eba47a3-6a22-4be8-bc70-c7a777a6f8d0"}
+    PASS F2 general Cross and new Isolated cannot double-spend collateral
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"716034ec-4f8a-42e5-afd9-26dcdf8928eb"}
+    PASS F2 general maintenance plus normal fee blocks a transfer even within initial free collateral
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7a70197a-1abb-4864-8e4a-85b099c319b3"}
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"7a70197a-1abb-4864-8e4a-85b099c319b3","capturedAt":"2026-10-10T06:18:04.506Z","code":"FUTURES_MARK_UNAVAILABLE"}
+    PASS F2 general modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0c3560e5-fd73-4833-ad34-5518b56bcdc1"}
+    PASS F2 general rollback futuresLiquidation.create #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"55ad1bf3-1c9a-486f-a881-524a59e2cded"}
+    PASS F2 general rollback futuresPosition.update #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d70c9d91-f908-4bbb-aef2-fee78acc9bae"}
+    PASS F2 general rollback futuresPosition.update #2 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d7d68a4c-a553-46e7-9426-32070b59cc44"}
+    PASS F2 general rollback futuresPosition.update #3 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"886082ac-e8d2-4c1f-8b32-49a2b5596db7"}
+    PASS F2 general rollback futuresLiquidationClose.create #2 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f39b2352-1ee6-43c4-8f43-ea800aa795fc"}
+    PASS F2 general rollback futuresLiquidationClose.create #3 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9f17d336-da85-4a3e-8a24-3a33decb1498"}
+    PASS F2 general rollback $executeRaw #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1452e96f-55e7-43d0-8873-691f8bdace75"}
+    PASS F2 general rollback walletTransaction.createMany #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c02c9162-4c0e-4634-9884-7852a5b1b2ad"}
+    PASS F2 general rollback after fee cash debit
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ad1e507f-6b54-4b9b-9cad-06b750d2920f"}
+    PASS F2 general liquidation wins locked race vs close, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"028add32-0633-4984-acde-7afe03430756"}
+    PASS F2 general liquidation wins locked race vs reduce, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1a3378ad-144d-45d3-9a0f-45daf90782f6"}
+    PASS F2 general liquidation wins locked race vs increase, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"89d1d409-565c-463a-b396-a580066071f8"}
+    PASS F2 general liquidation wins locked race vs transfer, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"79cd49d6-4b4d-4189-8a4b-a7c2345ad6d3"}
+    PASS F2 general liquidation wins locked race vs cross-open, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b0428c71-7ede-4066-94c8-e5f6853f99c0"}
+    PASS F2 general liquidation wins locked race vs isolated-execution, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c17f3d22-9680-4ac8-bad8-dd26a1faf8df"}
+    PASS F2 general liquidation wins locked race vs unrelated-cross, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e67e51bb-c6b7-4955-9af7-079a6330debf"}
+    PASS F2 general latest fresh Mark re-read after actual PostgreSQL lock wait
+    [Nest] 873253  - 10/10/2026, 3:18:09 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8ea313e2-7f52-4e6d-a94b-123db839d87e"}
+    PASS F2 general user close wins PostgreSQL race with exactly one PnL/fee settlement
+    PASS F2 season/long/1 isolated read, full close or unlevered protection
+    PASS F2 season/long/37 isolated read, full close or unlevered protection
+    PASS F2 season/long/100 isolated read, full close or unlevered protection
+    PASS F2 season/short/1 isolated read, full close or unlevered protection
+    PASS F2 season/short/37 isolated read, full close or unlevered protection
+    PASS F2 season/short/100 isolated read, full close or unlevered protection
+    PASS F2 season exact isolated maintenance 0.00000001
+    PASS F2 season exact isolated maintenance 0
+    PASS F2 season exact isolated maintenance -0.00000001
+    PASS F2 season atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+    PASS F2 season isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+    PASS F2 season usd outgoing exact free/over limit/stale; incoming allowed
+    PASS F2 season fx outgoing exact free/over limit/stale; incoming allowed
+    PASS F2 season Cross and new Isolated cannot double-spend collateral
+    PASS F2 season maintenance plus normal fee blocks a transfer even within initial free collateral
+    [Nest] 873253  - 10/10/2026, 3:18:11 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a0f683ad-8f26-4dcb-a284-537b05829773","capturedAt":"2026-10-10T06:18:11.353Z","code":"FUTURES_MARK_UNAVAILABLE"}
+    PASS F2 season modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+    PASS F2 season rollback futuresLiquidation.create #1 then successful retry
+    PASS F2 season rollback futuresPosition.update #1 then successful retry
+    PASS F2 season rollback futuresPosition.update #2 then successful retry
+    PASS F2 season rollback futuresPosition.update #3 then successful retry
+    PASS F2 season rollback futuresLiquidationClose.create #2 then successful retry
+    PASS F2 season rollback futuresLiquidationClose.create #3 then successful retry
+    PASS F2 season rollback $executeRaw #1 then successful retry
+    (node:873253) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at readFuturesLastPrice (futures/futures-last-price.ts:225:3)
+      at async FuturesService.execute (futures/futures.service.ts:133:5)
+      at async mixed (../scripts/futures-risk-integration.ts:156:3)
+      at async rollbackCases (../scripts/futures-risk-integration.ts:577:7)
+      at async main (../scripts/futures-risk-integration.ts:1429:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_PRICE_UNAVAILABLE',
+            message: 'The current execution price is unavailable. Please try again.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-risk.integration.spec.ts:17:38)
+
+FAIL src/futures/futures-f3.integration.spec.ts
+  ● Futures F3 actual PostgreSQL integration › proves valuation, performance, final settlement, retries, collateral boundaries and races
+
+    PASS F3 legacy Spot Season pin is re-verified and reused unchanged on retry
+    [Nest] 879888  - 10/10/2026, 3:19:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f6a8d3cb-fb5e-47fd-9471-51a1a78e39f1"}
+    PASS F3 general long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"44ddc281-e33d-4d6b-ab2d-95eb2aa0f990"}
+    PASS F3 general long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"813fa6e0-405d-4d62-b15a-14f2bcad0a98"}
+    PASS F3 general long isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c5384c62-e584-42cf-b685-90f4a06f702f"}
+    PASS F3 general long cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cc87cd5f-aae1-4663-a90a-47cb8c6d1700"}
+    (node:879888) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at readFuturesLastPrice (futures/futures-last-price.ts:225:3)
+      at async FuturesService.execute (futures/futures.service.ts:133:5)
+      at async valuationTransitions (../scripts/futures-f3-integration.ts:227:29)
+      at async main (../scripts/futures-f3-integration.ts:1158:3) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_PRICE_UNAVAILABLE',
+            message: 'The current execution price is unavailable. Please try again.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-f3.integration.spec.ts:17:38)
+
+
+Summary of all failing tests
+FAIL wallets/wallet-fx-transfer.integration.spec.ts (5.797 s)
+  ● Atomic cross-currency wallet transfer PostgreSQL integration › proves economic parity, rollback, repricing, reservations, lifecycle and concurrency in both modes
+
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1c0cff36-406d-486b-9d73-bdf335b71c12"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5cc4454e-6422-4cdd-a822-f797f9fb888c"}
+    PASS parity/evidence/reservation/replay general crypto_spot KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"091c3b2f-32ac-49da-ad48-c3bc879f28b3"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"65585efb-94bd-4751-a183-e6da0a1dbb81"}
+    PASS parity/evidence/reservation/replay general crypto_spot USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dc61cbe1-97e0-4aca-b59a-253bc81795cd"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b2344d71-a802-4c8f-ba93-e60880db12ad"}
+    PASS parity/evidence/reservation/replay general crypto_futures KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"88b04b22-90b1-4f31-93ea-031e9925d9b0"}
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0247b493-d853-4b0a-961b-814144c463cf"}
+    PASS parity/evidence/reservation/replay general crypto_futures USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0a5635b4-1e50-40dd-a0d3-d5c08dacffbe"}
+    PASS 13 rollback fault points general forward
+    [Nest] 871170  - 10/10/2026, 3:17:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e0b730a0-1eb2-4305-b11c-56d230493064"}
+    PASS 13 rollback fault points general reverse
+    [Nest] 871170  - 10/10/2026, 3:17:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bd8bf7d4-27d4-4ba6-9644-f8281ba53688"}
+    [Nest] 871170  - 10/10/2026, 3:17:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3627293e-84a7-4a94-9b49-9a4313794472"}
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation general
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fea34057-faad-4f69-9b5f-4da0470d8564"}
+    PASS concurrent general replay
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8a529fbb-7c93-46e3-8b64-50ace0510556"}
+    PASS concurrent general distinct
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5eb670a5-5c30-4d19-938a-540ac8776f3e"}
+    PASS concurrent general opposite
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fc9fff2a-beec-494e-b043-73d0bb58a571"}
+    PASS concurrent general same-currency
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fd97428c-328d-4d4f-b0b0-6cd3344b2604"}
+    PASS concurrent general standalone-fx
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c4176f23-8097-4ee7-a7a0-5cc34771c728"}
+    PASS concurrent general limit
+    [Nest] 871170  - 10/10/2026, 3:17:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"99a318d5-3bc7-41f2-8a87-0f3ecd39ce51"}
+    PASS concurrent general market
+    PASS parity/evidence/reservation/replay season crypto_spot KRW→USD
+    PASS parity/evidence/reservation/replay season crypto_spot USD→KRW
+    PASS parity/evidence/reservation/replay season crypto_futures KRW→USD
+    PASS parity/evidence/reservation/replay season crypto_futures USD→KRW
+    PASS 13 rollback fault points season forward
+    PASS 13 rollback fault points season reverse
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation season
+    PASS concurrent season replay
+    PASS concurrent season distinct
+    PASS concurrent season opposite
+    PASS concurrent season same-currency
+    PASS concurrent season standalone-fx
+    PASS concurrent season limit
+    PASS concurrent season market
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"344e5189-4a5e-4fb7-ae66-26ea01991b03"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"48f48228-75bc-4d95-ac3c-a128975362c3"}
+    PASS parity/evidence/reservation/replay beginner crypto_spot KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1974d3c7-ab41-4ed2-9c4e-55cc5012e051"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"a6b080cb-d57e-41c8-92ca-871a01101834"}
+    PASS parity/evidence/reservation/replay beginner crypto_spot USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"5557f779-bd05-4784-88fc-1ec0084ef60e"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"2abf5440-35fd-4b61-9fb7-31a2993a11e9"}
+    PASS parity/evidence/reservation/replay beginner crypto_futures KRW→USD
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"82ace207-b433-482f-8312-09bee1e6e6de"}
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"3f0f1922-ef10-41e1-a970-34de7192b6fe"}
+    PASS parity/evidence/reservation/replay beginner crypto_futures USD→KRW
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1290c889-6597-4c00-ae83-338c463ed919"}
+    PASS 13 rollback fault points beginner forward
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"4341eef1-9972-49f3-a723-4ad692fbeee5"}
+    PASS 13 rollback fault points beginner reverse
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"f65cee6d-fa71-4162-9ba1-1b06ec4917b3"}
+    [Nest] 871170  - 10/10/2026, 3:17:10 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"c6424a98-1095-4ccb-93da-5635877da6c9"}
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation beginner
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"e79432dc-076d-45c5-beec-a9844e9749d6"}
+    PASS concurrent beginner replay
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"6e6dc970-3af1-44ed-aefd-c28c4c83d873"}
+    PASS concurrent beginner distinct
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"31fbb0f4-cecf-4d2b-acae-98e01f03d28b"}
+    PASS concurrent beginner opposite
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"5b000dbc-e587-4613-a8bc-f8084ab20a66"}
+    PASS concurrent beginner same-currency
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"13965090-768d-48e8-a4f8-9906b1c55d1f"}
+    PASS concurrent beginner standalone-fx
+    [Nest] 871170  - 10/10/2026, 3:17:11 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"3bfc6984-af5a-422e-9ac5-483a789efb22"}
+    PASS concurrent beginner limit
+    [Nest] 871170  - 10/10/2026, 3:17:09 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"6a6570f9-5f56-4147-9ae2-b6904b3c9383"}
+    (node:871170) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      3434 |       { httpStatus: status },
+      3435 |     );
+    > 3436 |     throw new HttpException(this.createErrorBody(code, message), status);
+           |           ^
+      3437 |   }
+      3438 |
+      3439 |   private throwFxExecuteError(
+
+      at FxService.throwApiError (fx/fx.service.ts:3436:11)
+      at FxService.findFxQuoteRateSnapshot (fx/fx.service.ts:1632:12)
+      at async FxService.createFxQuote (fx/fx.service.ts:839:28)
+      at async FxService.quoteForTradingAccount (fx/fx.service.ts:794:14)
+      at async TradingAccountWalletFxTransferService.quote (wallets/trading-account-wallet-fx-transfer.service.ts:82:19)
+      at async concurrency (../scripts/wallet-fx-transfer-integration.ts:800:17)
+      at async main (../scripts/wallet-fx-transfer-integration.ts:1174:7) {
+        response: {
+          success: false,
+          error: { code: 'FX_RATE_UNAVAILABLE', message: 'FX rate is unavailable' }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (wallets/wallet-fx-transfer.integration.spec.ts:18:38)
+
+FAIL futures/futures-risk.integration.spec.ts (11.23 s)
+  ● Futures F2 actual PostgreSQL financial integration › proves risk, atomic liquidation, bankruptcy, transfers, lifecycle, races and rollback
+
+    [Nest] 873253  - 10/10/2026, 3:18:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b0e355e2-94bd-4853-aa94-7ca330b52812"}
+    PASS F2 admin financial guards retain scope/predicates without exact amounts; failures roll back
+    PASS F2 admin wallet integrity evidence excludes canonical financial rows
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3c3fb47d-ba58-4169-b3b1-c0426e881a25"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"3c3fb47d-ba58-4169-b3b1-c0426e881a25","capturedAt":"2026-10-10T06:18:01.181Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 DB typed immutable Mark, duplicate/out-of-order/WS priority, Spot selector isolation and lifetime margin mode
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8ec48e44-5dbc-4936-858c-a6f43290d8d6"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8ec48e44-5dbc-4936-858c-a6f43290d8d6","capturedAt":"2026-10-10T06:18:01.357Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8ec48e44-5dbc-4936-858c-a6f43290d8d6","capturedAt":"2026-10-10T06:18:01.396Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 gap liquidation closes quantity even when Mark notional rounds to zero
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bd176073-bb5a-4d8e-99de-2a292589a4d8"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"bd176073-bb5a-4d8e-99de-2a292589a4d8","capturedAt":"2026-10-10T06:18:01.521Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"bd176073-bb5a-4d8e-99de-2a292589a4d8","capturedAt":"2026-10-10T06:18:01.584Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 rollback after positive PnL credit and current-fee-policy liquidation
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.702Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.744Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.781Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.818Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"42a1043f-7ba4-4771-b0a4-638f7828cfaf","capturedAt":"2026-10-10T06:18:01.894Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 reserved cash plus isolated allocation both survive Cross bankruptcy; manual isolated close cannot raid Cross
+    [Nest] 873253  - 10/10/2026, 3:18:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4c437ed1-cced-4328-a65b-c0f7f6ce2a78"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"4c437ed1-cced-4328-a65b-c0f7f6ce2a78","capturedAt":"2026-10-10T06:18:01.994Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/long/1 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"972158c1-0df1-4015-9d48-a04973ecc5e3"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"972158c1-0df1-4015-9d48-a04973ecc5e3","capturedAt":"2026-10-10T06:18:02.117Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"972158c1-0df1-4015-9d48-a04973ecc5e3","capturedAt":"2026-10-10T06:18:02.171Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/long/37 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"33319118-7bb4-45b3-827e-77d3925be440"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"33319118-7bb4-45b3-827e-77d3925be440","capturedAt":"2026-10-10T06:18:02.269Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"33319118-7bb4-45b3-827e-77d3925be440","capturedAt":"2026-10-10T06:18:02.318Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/long/100 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c352f809-7883-4282-a7a1-ca301a043a55"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c352f809-7883-4282-a7a1-ca301a043a55","capturedAt":"2026-10-10T06:18:02.411Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c352f809-7883-4282-a7a1-ca301a043a55","capturedAt":"2026-10-10T06:18:02.460Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/short/1 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dc77b277-8656-447b-8211-387ced8c9d19"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dc77b277-8656-447b-8211-387ced8c9d19","capturedAt":"2026-10-10T06:18:02.552Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dc77b277-8656-447b-8211-387ced8c9d19","capturedAt":"2026-10-10T06:18:02.599Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/short/37 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dcaa7ceb-5794-44c2-88cc-9511958bc76a"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dcaa7ceb-5794-44c2-88cc-9511958bc76a","capturedAt":"2026-10-10T06:18:02.687Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dcaa7ceb-5794-44c2-88cc-9511958bc76a","capturedAt":"2026-10-10T06:18:02.731Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general/short/100 isolated read, full close or unlevered protection
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"be001a3a-596f-4e8c-a3ca-ae842be7a3be"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"be001a3a-596f-4e8c-a3ca-ae842be7a3be","capturedAt":"2026-10-10T06:18:02.831Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general exact isolated maintenance 0.00000001
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c4caaed0-68cd-4943-9f09-c7a6165a1a03"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c4caaed0-68cd-4943-9f09-c7a6165a1a03","capturedAt":"2026-10-10T06:18:02.941Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:02 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c4caaed0-68cd-4943-9f09-c7a6165a1a03","capturedAt":"2026-10-10T06:18:02.965Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general exact isolated maintenance 0
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"993cd197-cfcc-4477-8a9d-fabc42ff0b92"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"993cd197-cfcc-4477-8a9d-fabc42ff0b92","capturedAt":"2026-10-10T06:18:03.063Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"993cd197-cfcc-4477-8a9d-fabc42ff0b92","capturedAt":"2026-10-10T06:18:03.087Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general exact isolated maintenance -0.00000001
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.184Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.213Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.241Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.275Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a77a6252-2157-4ae8-b1c8-71dc05b80bb0","capturedAt":"2026-10-10T06:18:03.379Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.522Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.550Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.580Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.615Z","code":"FX_RATE_UNAVAILABLE"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a6eabe0f-fb93-4ae3-bec4-7a2425b188bd","capturedAt":"2026-10-10T06:18:03.646Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"97c4f185-3d67-4ddf-a2d1-5b2925b19031"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"97c4f185-3d67-4ddf-a2d1-5b2925b19031","capturedAt":"2026-10-10T06:18:03.749Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general usd outgoing exact free/over limit/stale; incoming allowed
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"75e6f1c0-11b6-407a-8053-3533de932b7a"}
+    [Nest] 873253  - 10/10/2026, 3:18:03 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"75e6f1c0-11b6-407a-8053-3533de932b7a","capturedAt":"2026-10-10T06:18:03.901Z","code":"FX_RATE_UNAVAILABLE"}
+    PASS F2 general fx outgoing exact free/over limit/stale; incoming allowed
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7eba47a3-6a22-4be8-bc70-c7a777a6f8d0"}
+    PASS F2 general Cross and new Isolated cannot double-spend collateral
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"716034ec-4f8a-42e5-afd9-26dcdf8928eb"}
+    PASS F2 general maintenance plus normal fee blocks a transfer even within initial free collateral
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7a70197a-1abb-4864-8e4a-85b099c319b3"}
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"7a70197a-1abb-4864-8e4a-85b099c319b3","capturedAt":"2026-10-10T06:18:04.506Z","code":"FUTURES_MARK_UNAVAILABLE"}
+    PASS F2 general modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0c3560e5-fd73-4833-ad34-5518b56bcdc1"}
+    PASS F2 general rollback futuresLiquidation.create #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:04 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"55ad1bf3-1c9a-486f-a881-524a59e2cded"}
+    PASS F2 general rollback futuresPosition.update #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d70c9d91-f908-4bbb-aef2-fee78acc9bae"}
+    PASS F2 general rollback futuresPosition.update #2 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d7d68a4c-a553-46e7-9426-32070b59cc44"}
+    PASS F2 general rollback futuresPosition.update #3 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"886082ac-e8d2-4c1f-8b32-49a2b5596db7"}
+    PASS F2 general rollback futuresLiquidationClose.create #2 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f39b2352-1ee6-43c4-8f43-ea800aa795fc"}
+    PASS F2 general rollback futuresLiquidationClose.create #3 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9f17d336-da85-4a3e-8a24-3a33decb1498"}
+    PASS F2 general rollback $executeRaw #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1452e96f-55e7-43d0-8873-691f8bdace75"}
+    PASS F2 general rollback walletTransaction.createMany #1 then successful retry
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c02c9162-4c0e-4634-9884-7852a5b1b2ad"}
+    PASS F2 general rollback after fee cash debit
+    [Nest] 873253  - 10/10/2026, 3:18:06 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ad1e507f-6b54-4b9b-9cad-06b750d2920f"}
+    PASS F2 general liquidation wins locked race vs close, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"028add32-0633-4984-acde-7afe03430756"}
+    PASS F2 general liquidation wins locked race vs reduce, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1a3378ad-144d-45d3-9a0f-45daf90782f6"}
+    PASS F2 general liquidation wins locked race vs increase, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"89d1d409-565c-463a-b396-a580066071f8"}
+    PASS F2 general liquidation wins locked race vs transfer, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"79cd49d6-4b4d-4189-8a4b-a7c2345ad6d3"}
+    PASS F2 general liquidation wins locked race vs cross-open, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b0428c71-7ede-4066-94c8-e5f6853f99c0"}
+    PASS F2 general liquidation wins locked race vs isolated-execution, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c17f3d22-9680-4ac8-bad8-dd26a1faf8df"}
+    PASS F2 general liquidation wins locked race vs unrelated-cross, no double settlement/deadlock
+    [Nest] 873253  - 10/10/2026, 3:18:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e67e51bb-c6b7-4955-9af7-079a6330debf"}
+    PASS F2 general latest fresh Mark re-read after actual PostgreSQL lock wait
+    [Nest] 873253  - 10/10/2026, 3:18:09 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8ea313e2-7f52-4e6d-a94b-123db839d87e"}
+    PASS F2 general user close wins PostgreSQL race with exactly one PnL/fee settlement
+    PASS F2 season/long/1 isolated read, full close or unlevered protection
+    PASS F2 season/long/37 isolated read, full close or unlevered protection
+    PASS F2 season/long/100 isolated read, full close or unlevered protection
+    PASS F2 season/short/1 isolated read, full close or unlevered protection
+    PASS F2 season/short/37 isolated read, full close or unlevered protection
+    PASS F2 season/short/100 isolated read, full close or unlevered protection
+    PASS F2 season exact isolated maintenance 0.00000001
+    PASS F2 season exact isolated maintenance 0
+    PASS F2 season exact isolated maintenance -0.00000001
+    PASS F2 season atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+    PASS F2 season isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+    PASS F2 season usd outgoing exact free/over limit/stale; incoming allowed
+    PASS F2 season fx outgoing exact free/over limit/stale; incoming allowed
+    PASS F2 season Cross and new Isolated cannot double-spend collateral
+    PASS F2 season maintenance plus normal fee blocks a transfer even within initial free collateral
+    [Nest] 873253  - 10/10/2026, 3:18:11 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a0f683ad-8f26-4dcb-a284-537b05829773","capturedAt":"2026-10-10T06:18:11.353Z","code":"FUTURES_MARK_UNAVAILABLE"}
+    PASS F2 season modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+    PASS F2 season rollback futuresLiquidation.create #1 then successful retry
+    PASS F2 season rollback futuresPosition.update #1 then successful retry
+    PASS F2 season rollback futuresPosition.update #2 then successful retry
+    PASS F2 season rollback futuresPosition.update #3 then successful retry
+    PASS F2 season rollback futuresLiquidationClose.create #2 then successful retry
+    PASS F2 season rollback futuresLiquidationClose.create #3 then successful retry
+    PASS F2 season rollback $executeRaw #1 then successful retry
+    (node:873253) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at readFuturesLastPrice (futures/futures-last-price.ts:225:3)
+      at async FuturesService.execute (futures/futures.service.ts:133:5)
+      at async mixed (../scripts/futures-risk-integration.ts:156:3)
+      at async rollbackCases (../scripts/futures-risk-integration.ts:577:7)
+      at async main (../scripts/futures-risk-integration.ts:1429:5) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_PRICE_UNAVAILABLE',
+            message: 'The current execution price is unavailable. Please try again.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-risk.integration.spec.ts:17:38)
+
+FAIL futures/futures-f3.integration.spec.ts
+  ● Futures F3 actual PostgreSQL integration › proves valuation, performance, final settlement, retries, collateral boundaries and races
+
+    PASS F3 legacy Spot Season pin is re-verified and reused unchanged on retry
+    [Nest] 879888  - 10/10/2026, 3:19:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f6a8d3cb-fb5e-47fd-9471-51a1a78e39f1"}
+    PASS F3 general long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"44ddc281-e33d-4d6b-ab2d-95eb2aa0f990"}
+    PASS F3 general long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"813fa6e0-405d-4d62-b15a-14f2bcad0a98"}
+    PASS F3 general long isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c5384c62-e584-42cf-b685-90f4a06f702f"}
+    PASS F3 general long cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+    [Nest] 879888  - 10/10/2026, 3:19:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cc87cd5f-aae1-4663-a90a-47cb8c6d1700"}
+    (node:879888) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at readFuturesLastPrice (futures/futures-last-price.ts:225:3)
+      at async FuturesService.execute (futures/futures.service.ts:133:5)
+      at async valuationTransitions (../scripts/futures-f3-integration.ts:227:29)
+      at async main (../scripts/futures-f3-integration.ts:1158:3) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_PRICE_UNAVAILABLE',
+            message: 'The current execution price is unavailable. Please try again.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-f3.integration.spec.ts:17:38)
+
+
+Test Suites: 3 failed, 19 passed, 22 total
+Tests:       3 failed, 20 passed, 23 total
+Snapshots:   0 total
+Time:        160.001 s, estimated 190 s
+Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/financial-gate-final-jest.json

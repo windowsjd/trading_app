@@ -1,0 +1,6 @@
+[{"domain":"last","source":"binance_usdm_agg_trade_ws","rows":"3803"}, 
+ {"domain":"last","source":"binance_usdm_ticker_price_rest","rows":"277"}, 
+ {"domain":"mark","source":"binance_usdm_mark_rest","rows":"23"}, 
+ {"domain":"mark","source":"binance_usdm_mark_ws","rows":"6279"}, 
+ {"domain":"spot","source":"binance_spot_ws_ticker","rows":"1221"}, 
+ {"domain":"spot","source":"binance_public_rest_24hr_ticker","rows":"6"}]

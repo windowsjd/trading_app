@@ -1,0 +1,4 @@
+
+> trading-app@0.0.1 typecheck /home/nayuta/projects/trading-app/backend
+> tsc --noEmit -p tsconfig.build.json
+

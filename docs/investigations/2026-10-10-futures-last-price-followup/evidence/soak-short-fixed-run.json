@@ -1,0 +1,169 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/futures-collection-soak.ts"
+  ],
+  "startedAtUtc": "2026-10-10T06:08:05Z",
+  "elapsedSeconds": 308.211,
+  "exitCode": 1,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 584.0,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 24.43923312300467,
+      "stepMs": -1805.1615910808323
+    },
+    {
+      "elapsedSeconds": 56.992502905006404,
+      "stepMs": -1890.89419854281
+    },
+    {
+      "elapsedSeconds": 89.46016118000261,
+      "stepMs": -1767.700093012536
+    },
+    {
+      "elapsedSeconds": 121.99822356499499,
+      "stepMs": -1781.5271991566988
+    },
+    {
+      "elapsedSeconds": 154.4176448979997,
+      "stepMs": -1795.353887588135
+    },
+    {
+      "elapsedSeconds": 186.94227196200518,
+      "stepMs": -1808.5634531016694
+    },
+    {
+      "elapsedSeconds": 219.421656505001,
+      "stepMs": -1822.944536615978
+    },
+    {
+      "elapsedSeconds": 251.9926297320053,
+      "stepMs": -1806.9316798064392
+    },
+    {
+      "elapsedSeconds": 284.45259452299797,
+      "stepMs": -1796.469150489429
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 17.8
+    },
+    {
+      "elapsedSeconds": 10.47,
+      "rssMiB": 554.7
+    },
+    {
+      "elapsedSeconds": 20.916,
+      "rssMiB": 575.9
+    },
+    {
+      "elapsedSeconds": 31.296,
+      "rssMiB": 578.9
+    },
+    {
+      "elapsedSeconds": 41.842,
+      "rssMiB": 579.9
+    },
+    {
+      "elapsedSeconds": 52.425,
+      "rssMiB": 582.9
+    },
+    {
+      "elapsedSeconds": 63.103,
+      "rssMiB": 583.2
+    },
+    {
+      "elapsedSeconds": 73.906,
+      "rssMiB": 584.0
+    },
+    {
+      "elapsedSeconds": 84.705,
+      "rssMiB": 579.3
+    },
+    {
+      "elapsedSeconds": 95.496,
+      "rssMiB": 579.6
+    },
+    {
+      "elapsedSeconds": 106.273,
+      "rssMiB": 566.4
+    },
+    {
+      "elapsedSeconds": 117.044,
+      "rssMiB": 566.9
+    },
+    {
+      "elapsedSeconds": 127.797,
+      "rssMiB": 567.6
+    },
+    {
+      "elapsedSeconds": 138.482,
+      "rssMiB": 568.1
+    },
+    {
+      "elapsedSeconds": 149.249,
+      "rssMiB": 568.1
+    },
+    {
+      "elapsedSeconds": 160.005,
+      "rssMiB": 568.6
+    },
+    {
+      "elapsedSeconds": 170.786,
+      "rssMiB": 568.9
+    },
+    {
+      "elapsedSeconds": 181.373,
+      "rssMiB": 568.9
+    },
+    {
+      "elapsedSeconds": 192.034,
+      "rssMiB": 570.1
+    },
+    {
+      "elapsedSeconds": 202.733,
+      "rssMiB": 570.6
+    },
+    {
+      "elapsedSeconds": 213.375,
+      "rssMiB": 569.2
+    },
+    {
+      "elapsedSeconds": 224.049,
+      "rssMiB": 569.4
+    },
+    {
+      "elapsedSeconds": 234.857,
+      "rssMiB": 569.4
+    },
+    {
+      "elapsedSeconds": 245.561,
+      "rssMiB": 567.7
+    },
+    {
+      "elapsedSeconds": 256.07,
+      "rssMiB": 568.0
+    },
+    {
+      "elapsedSeconds": 266.745,
+      "rssMiB": 568.0
+    },
+    {
+      "elapsedSeconds": 277.547,
+      "rssMiB": 568.2
+    },
+    {
+      "elapsedSeconds": 288.267,
+      "rssMiB": 568.2
+    },
+    {
+      "elapsedSeconds": 299.01,
+      "rssMiB": 568.5
+    }
+  ]
+}

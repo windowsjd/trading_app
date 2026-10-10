@@ -1,0 +1,16 @@
+[Nest] 853765  - 10/10/2026, 3:01:48 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9b176554-ab08-4df4-b8e2-5f2032997b56"}
+[Nest] 853765  - 10/10/2026, 3:01:48 PM     LOG [BinanceWebSocketStreamingService] Binance WebSocket streaming connected with 50 ticker/depth streams.
+(node:853765) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 853765  - 10/10/2026, 3:04:10 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 853765  - 10/10/2026, 3:04:11 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 853765  - 10/10/2026, 3:04:13 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 853765  - 10/10/2026, 3:04:14 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 853765  - 10/10/2026, 3:04:16 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 853765  - 10/10/2026, 3:04:17 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 853765  - 10/10/2026, 3:04:19 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 853765  - 10/10/2026, 3:04:20 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 853765  - 10/10/2026, 3:04:22 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 853765  - 10/10/2026, 3:04:23 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 853765  - 10/10/2026, 3:04:25 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 853765  - 10/10/2026, 3:04:26 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED

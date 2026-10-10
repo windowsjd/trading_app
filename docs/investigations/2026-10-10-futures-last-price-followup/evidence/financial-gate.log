@@ -1,0 +1,225 @@
+FAIL src/wallets/wallet-fx-transfer.integration.spec.ts
+  ● Atomic cross-currency wallet transfer PostgreSQL integration › proves economic parity, rollback, repricing, reservations, lifecycle and concurrency in both modes
+
+    [Nest] 842422  - 10/10/2026, 2:47:57 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c2cb4713-4ddf-4af9-95f8-ad5338a37547"}
+    [Nest] 842422  - 10/10/2026, 2:47:57 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d80d0882-9b5f-4f0f-bede-cf61663695d6"}
+    PASS parity/evidence/reservation/replay general crypto_spot KRW→USD
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fe733b01-b9c4-41e8-ad64-5c95198be32a"}
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d02c033a-0904-4e9c-9841-d14adabfd284"}
+    PASS parity/evidence/reservation/replay general crypto_spot USD→KRW
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1bd1f48f-9e4c-413b-8fdc-91f015826b7d"}
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f4285c98-2d66-4dc7-a36b-d751ebd3888d"}
+    PASS parity/evidence/reservation/replay general crypto_futures KRW→USD
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"32ac65e6-b799-445e-836a-c4087edebd86"}
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"62bfec9d-5ba1-4408-801e-58a5fa91daf5"}
+    PASS parity/evidence/reservation/replay general crypto_futures USD→KRW
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fa0a1746-1db4-48c0-a302-94c369e4b175"}
+    PASS 13 rollback fault points general forward
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"88b35c29-d8ef-40ba-82b3-8e7c1551ab0d"}
+    PASS 13 rollback fault points general reverse
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ea1f6562-72c9-444c-a9cb-04a9b1d3b360"}
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"55c1e68e-8a15-404a-800c-0ea205d2ca2b"}
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation general
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8683d3e5-c1cc-4a1f-a661-e4468eb223b3"}
+    PASS concurrent general replay
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d9ab15c0-1836-445a-8312-f9f7ceba145d"}
+    PASS concurrent general distinct
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"40ba89a1-08d2-4f9a-9a06-2076e36e46e3"}
+    PASS concurrent general opposite
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"aa4463c0-5b22-47e5-b3b8-871b3624bad8"}
+    PASS concurrent general same-currency
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"35e42400-2e98-410b-80f2-07d1213a4fcb"}
+    PASS concurrent general standalone-fx
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cec879c9-eb65-4fb7-b005-11ae1151fa56"}
+    PASS concurrent general limit
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"be0a3b3b-0bc3-409a-9d10-94c8abcbf432"}
+    PASS concurrent general market
+    PASS parity/evidence/reservation/replay season crypto_spot KRW→USD
+    PASS parity/evidence/reservation/replay season crypto_spot USD→KRW
+    PASS parity/evidence/reservation/replay season crypto_futures KRW→USD
+    (node:842422) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      3450 |     );
+      3451 |
+    > 3452 |     const exception = new HttpException(
+           |                       ^
+      3453 |       buildFxExecuteErrorEnvelope(code),
+      3454 |       metadata.httpStatus,
+      3455 |     );
+
+      at FxService.throwFxExecuteError (fx/fx.service.ts:3452:23)
+      at FxService.findProviderFxExecuteSnapshot (fx/fx.service.ts:1910:10)
+          at async Promise.all (index 2)
+      at async <anonymous> (fx/fx.service.ts:1339:11)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FxService.executeFxTradingContext (fx/fx.service.ts:1269:24)
+      at async FxService.executeForTradingAccount (fx/fx.service.ts:1446:14)
+      at async parity (../scripts/wallet-fx-transfer-integration.ts:335:25)
+      at async main (../scripts/wallet-fx-transfer-integration.ts:1171:11) {
+        response: {
+          success: false,
+          error: {
+            code: 'PROVIDER_RATE_UNAVAILABLE',
+            message: 'Provider FX rate is unavailable'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (wallets/wallet-fx-transfer.integration.spec.ts:18:38)
+
+FAIL src/orders/order-input-policy.integration.spec.ts
+  ● order input policy PostgreSQL integration › keeps amount, replay, reservation and regular-session evidence consistent in General and Season
+
+    PASS season: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+    (node:845025) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      7442 |       { httpStatus: status },
+      7443 |     );
+    > 7444 |     const exception = new HttpException(
+           |                       ^
+      7445 |       this.createErrorBody(code, message),
+      7446 |       status,
+      7447 |     );
+
+      at OrdersService.throwApiError (orders/orders.service.ts:7444:23)
+      at OrdersService.findLatestUsdKrwRateForPortfolio (orders/orders.service.ts:4687:12)
+      at async OrdersService.calculateParticipantValuationInTransaction (orders/orders.service.ts:4461:11)
+      at async OrdersService.recordOrderExecutedPortfolioSnapshot (orders/orders.service.ts:4289:19)
+      at async executeInTransaction (orders/limit-order-execution.service.ts:770:7)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async stockPolicy (../scripts/order-input-policy-integration.ts:746:9)
+      at async main (../scripts/order-input-policy-integration.ts:766:7) {
+        response: {
+          success: false,
+          error: {
+            code: 'FX_RATE_UNAVAILABLE',
+            message: 'USD/KRW FX rate snapshot is unavailable.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (orders/order-input-policy.integration.spec.ts:18:38)
+
+
+Summary of all failing tests
+FAIL wallets/wallet-fx-transfer.integration.spec.ts
+  ● Atomic cross-currency wallet transfer PostgreSQL integration › proves economic parity, rollback, repricing, reservations, lifecycle and concurrency in both modes
+
+    [Nest] 842422  - 10/10/2026, 2:47:57 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c2cb4713-4ddf-4af9-95f8-ad5338a37547"}
+    [Nest] 842422  - 10/10/2026, 2:47:57 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d80d0882-9b5f-4f0f-bede-cf61663695d6"}
+    PASS parity/evidence/reservation/replay general crypto_spot KRW→USD
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fe733b01-b9c4-41e8-ad64-5c95198be32a"}
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d02c033a-0904-4e9c-9841-d14adabfd284"}
+    PASS parity/evidence/reservation/replay general crypto_spot USD→KRW
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1bd1f48f-9e4c-413b-8fdc-91f015826b7d"}
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f4285c98-2d66-4dc7-a36b-d751ebd3888d"}
+    PASS parity/evidence/reservation/replay general crypto_futures KRW→USD
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"32ac65e6-b799-445e-836a-c4087edebd86"}
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"62bfec9d-5ba1-4408-801e-58a5fa91daf5"}
+    PASS parity/evidence/reservation/replay general crypto_futures USD→KRW
+    [Nest] 842422  - 10/10/2026, 2:47:58 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fa0a1746-1db4-48c0-a302-94c369e4b175"}
+    PASS 13 rollback fault points general forward
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"88b35c29-d8ef-40ba-82b3-8e7c1551ab0d"}
+    PASS 13 rollback fault points general reverse
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ea1f6562-72c9-444c-a9cb-04a9b1d3b360"}
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"55c1e68e-8a15-404a-800c-0ea205d2ca2b"}
+    PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation general
+    [Nest] 842422  - 10/10/2026, 2:47:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8683d3e5-c1cc-4a1f-a661-e4468eb223b3"}
+    PASS concurrent general replay
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d9ab15c0-1836-445a-8312-f9f7ceba145d"}
+    PASS concurrent general distinct
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"40ba89a1-08d2-4f9a-9a06-2076e36e46e3"}
+    PASS concurrent general opposite
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"aa4463c0-5b22-47e5-b3b8-871b3624bad8"}
+    PASS concurrent general same-currency
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"35e42400-2e98-410b-80f2-07d1213a4fcb"}
+    PASS concurrent general standalone-fx
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cec879c9-eb65-4fb7-b005-11ae1151fa56"}
+    PASS concurrent general limit
+    [Nest] 842422  - 10/10/2026, 2:48:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"be0a3b3b-0bc3-409a-9d10-94c8abcbf432"}
+    PASS concurrent general market
+    PASS parity/evidence/reservation/replay season crypto_spot KRW→USD
+    PASS parity/evidence/reservation/replay season crypto_spot USD→KRW
+    PASS parity/evidence/reservation/replay season crypto_futures KRW→USD
+    (node:842422) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      3450 |     );
+      3451 |
+    > 3452 |     const exception = new HttpException(
+           |                       ^
+      3453 |       buildFxExecuteErrorEnvelope(code),
+      3454 |       metadata.httpStatus,
+      3455 |     );
+
+      at FxService.throwFxExecuteError (fx/fx.service.ts:3452:23)
+      at FxService.findProviderFxExecuteSnapshot (fx/fx.service.ts:1910:10)
+          at async Promise.all (index 2)
+      at async <anonymous> (fx/fx.service.ts:1339:11)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FxService.executeFxTradingContext (fx/fx.service.ts:1269:24)
+      at async FxService.executeForTradingAccount (fx/fx.service.ts:1446:14)
+      at async parity (../scripts/wallet-fx-transfer-integration.ts:335:25)
+      at async main (../scripts/wallet-fx-transfer-integration.ts:1171:11) {
+        response: {
+          success: false,
+          error: {
+            code: 'PROVIDER_RATE_UNAVAILABLE',
+            message: 'Provider FX rate is unavailable'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (wallets/wallet-fx-transfer.integration.spec.ts:18:38)
+
+FAIL orders/order-input-policy.integration.spec.ts
+  ● order input policy PostgreSQL integration › keeps amount, replay, reservation and regular-session evidence consistent in General and Season
+
+    PASS season: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+    (node:845025) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      7442 |       { httpStatus: status },
+      7443 |     );
+    > 7444 |     const exception = new HttpException(
+           |                       ^
+      7445 |       this.createErrorBody(code, message),
+      7446 |       status,
+      7447 |     );
+
+      at OrdersService.throwApiError (orders/orders.service.ts:7444:23)
+      at OrdersService.findLatestUsdKrwRateForPortfolio (orders/orders.service.ts:4687:12)
+      at async OrdersService.calculateParticipantValuationInTransaction (orders/orders.service.ts:4461:11)
+      at async OrdersService.recordOrderExecutedPortfolioSnapshot (orders/orders.service.ts:4289:19)
+      at async executeInTransaction (orders/limit-order-execution.service.ts:770:7)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async stockPolicy (../scripts/order-input-policy-integration.ts:746:9)
+      at async main (../scripts/order-input-policy-integration.ts:766:7) {
+        response: {
+          success: false,
+          error: {
+            code: 'FX_RATE_UNAVAILABLE',
+            message: 'USD/KRW FX rate snapshot is unavailable.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (orders/order-input-policy.integration.spec.ts:18:38)
+
+
+Test Suites: 2 failed, 20 passed, 22 total
+Tests:       2 failed, 21 passed, 23 total
+Snapshots:   0 total
+Time:        190.145 s
+Ran all test suites matching src/orders/order-input-policy.integration.spec.ts|src/orders/limit-order-reservation.integration.spec.ts|src/wallets/spot-wallet-transfer.integration.spec.ts|src/wallets/wallet-fx-transfer.integration.spec.ts|src/futures/futures.integration.spec.ts|src/futures/futures-risk.integration.spec.ts|src/futures/futures-f3.integration.spec.ts|src/futures/futures-f31.integration.spec.ts|src/conditional/conditional.integration.spec.ts|src/futures/futures-limit.integration.spec.ts|src/futures/futures-isolated-boundary.integration.spec.ts|src/orders/limit-order-create-race.integration.spec.ts|src/orders/limit-order-transaction-time.integration.spec.ts|src/orders/trading-transaction-time.integration.spec.ts|src/orders/trading-fee-pinning.integration.spec.ts|src/orders/limit-order-create-no-redis.integration.spec.ts|src/orders/limit-order-idempotent-replay.integration.spec.ts|src/orders/limit-order-matching.integration.spec.ts|src/orders/orders.execute.integration.spec.ts|src/orders/market-execution.integration.spec.ts|src/fx/fx.execute.integration.spec.ts|src/mvp-flow.integration.spec.ts.
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/financial-gate-jest.json

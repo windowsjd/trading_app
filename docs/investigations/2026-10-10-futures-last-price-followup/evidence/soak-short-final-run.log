@@ -1,0 +1,18 @@
+[Nest] 871243  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9dca30e0-b665-4a82-8930-102de9f35b8b"}
+[Nest] 871243  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"89271666-ee81-4209-9eca-a56acd0e5aa8"}
+[Nest] 871243  - 10/10/2026, 3:17:05 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4c789d2b-45c9-4e65-ad07-c039eec61884"}
+[Nest] 871243  - 10/10/2026, 3:17:06 PM     LOG [BinanceWebSocketStreamingService] Binance WebSocket streaming connected with 50 ticker/depth streams.
+(node:871243) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 871243  - 10/10/2026, 3:19:27 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 871243  - 10/10/2026, 3:19:28 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 871243  - 10/10/2026, 3:19:30 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 871243  - 10/10/2026, 3:19:32 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 871243  - 10/10/2026, 3:19:33 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 871243  - 10/10/2026, 3:19:35 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 871243  - 10/10/2026, 3:19:36 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 871243  - 10/10/2026, 3:19:38 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 871243  - 10/10/2026, 3:19:40 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 871243  - 10/10/2026, 3:19:41 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED
+[Nest] 871243  - 10/10/2026, 3:19:43 PM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 871243  - 10/10/2026, 3:19:44 PM    WARN [FuturesMarkIngestion] FUTURES_MARK_INGESTION_FAILED

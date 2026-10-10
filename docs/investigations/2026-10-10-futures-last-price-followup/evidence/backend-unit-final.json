@@ -1,0 +1,34 @@
+{
+  "command": [
+    "pnpm",
+    "test",
+    "--runInBand",
+    "--json",
+    "--outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/backend-unit-final-jest.json"
+  ],
+  "startedAtUtc": "2026-10-10T06:02:42Z",
+  "elapsedSeconds": 21.293,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 1375.6,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 9.53627866700117,
+      "stepMs": -1790.4814232315402
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 18.0
+    },
+    {
+      "elapsedSeconds": 10.595,
+      "rssMiB": 997.8
+    },
+    {
+      "elapsedSeconds": 21.085,
+      "rssMiB": 1367.9
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+FAIL src/futures/futures-price-safety.integration.spec.ts (9.074 s)
+  ● readiness CLI and Last retention preserve actual PostgreSQL financial evidence
+
+    [Nest] 878385  - 10/10/2026, 3:18:57 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"202535fd-0f09-47e2-bc0b-e5775dee9e0f"}
+    PASS read-only CLI passes fresh complete DISABLED launch targets without idle Ops runs
+    PASS CLI rejects expired coverage and disabled required collectors/risk
+    PASS CLI rejects registered instrument missing prices
+    PASS actual batched SQL matches individual Last/Mark readers for missing, fresh, future and stale newest trades; no older-trade resurrection
+    PASS real execution, TP/SL, season pin, inclusive unpinned windows, latest per source preserved; repeat no-op; records immutable
+    PASS both financial reference/delete race orderings preserve FK integrity
+    PASS concurrent SKIP LOCKED batches delete each old observation exactly once at scale
+    PASS multi-instance scheduler holds one actual Ops lease
+    PASS failed job recorded, committed progress resumes safely, expired lease takeover fences old owner
+    (node:878385) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+    (Use `node --trace-deprecation ...` to show where the warning was created)
+    HttpException: Http Exception
+
+      23 |   const publicMessage =
+      24 |     safePublicErrorMessage(message) ?? 'Request could not be completed.';
+    > 25 |   const exception = new HttpException(
+         |                     ^
+      26 |     {
+      27 |       success: false,
+      28 |       error: {
+
+      at createApiError (common/api-error.ts:25:21)
+      at futuresError (futures/futures-error.ts:9:9)
+      at readFuturesMark (futures/futures-mark.ts:92:3)
+      at async <anonymous> (futures/futures.service.ts:346:25)
+      at async Proxy._transactionWithCallback (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:785:18)
+      at async FuturesService.execute (futures/futures.service.ts:139:14)
+      at async main (../scripts/futures-price-safety-integration.ts:501:3) {
+        response: {
+          success: false,
+          error: {
+            code: 'FUTURES_MARK_UNAVAILABLE',
+            message: 'The current Mark Price is unavailable for risk evaluation. Please try again.'
+          }
+        },
+        status: 503,
+        options: undefined
+      }
+      at Object.<anonymous> (futures/futures-price-safety.integration.spec.ts:18:13)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 1 total
+Snapshots:   0 total
+Time:        9.211 s, estimated 55 s
+Ran all test suites within paths "src/futures/futures-price-safety.integration.spec.ts".
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/price-safety-final-jest.json

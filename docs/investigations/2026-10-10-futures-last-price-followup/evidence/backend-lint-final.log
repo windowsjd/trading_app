@@ -1,0 +1,4 @@
+
+> trading-app@0.0.1 lint:accounts:check /home/nayuta/projects/trading-app/backend
+> eslint --no-fix --max-warnings=0 --no-warn-ignored --ignore-pattern "**/*.spec.ts" src/trading-accounts src/ad-rewards src/portfolio/trading-account-portfolio* src/orders/trading-account-orders* src/fx/trading-account-fx* src/wallets/trading-account-wallet* src/positions/trading-account-positions* src/futures src/conditional
+

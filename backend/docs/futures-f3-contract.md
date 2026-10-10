@@ -177,20 +177,46 @@ Before a separately authorized production enable:
 1. Complete code review and the existing backend/frontend/financial/core gates,
    PG16/17 migration chain/status/drift and Season final-exit dry-run/integration.
 2. Review the intended exact catalog, ingestion lag, fresh DB Mark/Futures Last
-   coverage (`pnpm futures:price-readiness`) and endAt evidence retention. A missing historical end price cannot be repaired
+   coverage (`pnpm futures:price-readiness --require-ready`) and endAt evidence retention. Check every active registered target, including expired contracts,
+   and separate launch readiness from current DISABLED mode. A missing historical end price cannot be repaired
    with a new live price. Preserve evidence referenced by final pins.
-3. Run Mark ingestion and the independent risk engine, inspect Ops failures and
+3. Register only the reviewed exact USDⓈ-M contracts with the existing provision
+   command, then verify official coverage again. Registration and each production
+   mode/environment/deploy change require separate operator authorization.
+   Upgrade every API and financial worker to evidence-aware code before the
+   cutover; mixed pre-Last/Last writers are not a supported transition. DISABLED
+   alone does not stop automatic liquidation or Season settlement workers.
+   Enable Mark ingestion (also refreshes contract verification), Last ingestion
+   and the independent risk engine while DISABLED. Keep these enabled for existing
+   lifetimes and Season end evidence. Wait for fresh prices for all targets,
+   inspect actual matcher/Conditional/risk Ops runs where work exists, and run
+   `--require-ready` immediately before the mode change and again afterward.
+   Inspect Ops failures and
    measure the intended workload with performance recording enabled. F2.1's prior
    1,000-account benchmark is evidence, not a production SLA; 10,000-account sweep
    exceeded the prompt-revisit operating range. Also monitor ranking/daily duration.
 4. Review frontend native keyboard/device behavior and the rollout/rollback plan.
    Enable only by a separate operator change. ENABLED startup requires ingestion
    and risk-engine configuration. User mode remains DISABLED by default.
-5. Roll back user entry with REDUCE_ONLY, keeping risk/Mark running and allowing
+5. Roll back user entry with REDUCE_ONLY, keeping risk/Mark/**Last** running and allowing
    eligible exits. DISABLED stops all new user mutations but not committed replay
    or independently enabled risk protection. Do not roll back migrations or remove
    durable evidence, and do not downgrade to a pre-F3 valuation server while open
-   Futures or final-exit evidence exists. Fix/roll forward compatible code instead.
+   Futures or final-exit evidence exists. After the first Last execution, trigger
+   or Season pin, a pre-Last server is also unsafe: it assumes the legacy Spot
+   relation and may reject/misread the new nullable evidence branch or change the
+   next execution basis. Preserve the additive migration and all evidence;
+   use compatible code or roll forward. Legacy Spot Season pins and newer Last
+   pins must each be reused unchanged on settlement retry.
+
+   On stale/missing Last, expired official coverage, unavailable Mark for entry
+   or failed/unobserved required workers, stop new entry with REDUCE_ONLY and
+   investigate using the readiness report. If exits also lack Last evidence,
+   they fail closed; DISABLED may be required for an integrity incident. Keep
+   ingestion and independent risk protection running, verify open lifetimes,
+   submitted entries, TP/SL and ended-season evidence, then repeat readiness and
+   the failed-path checks before restoring ENABLED. Do not repair a missing
+   historical boundary by substituting a live/Spot/Mark price.
 
 F3 itself introduced no conditional orders. The subsequent
 [Conditional v1](conditional-orders-contract.md) adds SL/TP/OCO exits, triggered

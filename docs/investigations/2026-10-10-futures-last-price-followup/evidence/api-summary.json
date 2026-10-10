@@ -1,0 +1,302 @@
+{
+  "api-before": {
+    "accounts": 1,
+    "instruments": 23,
+    "singleSqlQueries": {
+      "instruments": 75,
+      "positions": 31
+    },
+    "stages": [
+      {
+        "concurrency": 1,
+        "elapsedSeconds": 12.009550673000001,
+        "requests": 1110,
+        "requestsPerSecond": 92.42643877555834,
+        "latencyMs": {
+          "instruments": {
+            "samples": 555,
+            "p50": 11.51,
+            "p95": 14.97,
+            "p99": 19.66,
+            "max": 25.47
+          },
+          "positions": {
+            "samples": 555,
+            "p50": 9.29,
+            "p95": 11.5,
+            "p99": 13.14,
+            "max": 15.01
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 58950,
+        "nodeCpuCorePercent": 82.93388546494207,
+        "postgresBackendCpuCorePercent": 20.483697242150765,
+        "postgresBackendRssMiB": 95.8984375,
+        "peakNodeRssMiB": 498.42578125,
+        "peakConnections": 10
+      },
+      {
+        "concurrency": 10,
+        "elapsedSeconds": 12.047739838000002,
+        "requests": 1573,
+        "requestsPerSecond": 130.56390834723797,
+        "latencyMs": {
+          "instruments": {
+            "samples": 787,
+            "p50": 84.36,
+            "p95": 98.09,
+            "p99": 107.37,
+            "max": 122.44
+          },
+          "positions": {
+            "samples": 786,
+            "p50": 60.34,
+            "p95": 108.32,
+            "p99": 118.95,
+            "max": 123.42
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 83511,
+        "nodeCpuCorePercent": 100.74412431879739,
+        "postgresBackendCpuCorePercent": 27.225023482450133,
+        "postgresBackendRssMiB": 104.6796875,
+        "peakNodeRssMiB": 602.67578125,
+        "peakConnections": 10
+      },
+      {
+        "concurrency": 50,
+        "elapsedSeconds": 12.312288072000003,
+        "requests": 1556,
+        "requestsPerSecond": 126.3778097865155,
+        "latencyMs": {
+          "instruments": {
+            "samples": 777,
+            "p50": 615.97,
+            "p95": 654.8,
+            "p99": 667.31,
+            "max": 674.72
+          },
+          "positions": {
+            "samples": 779,
+            "p50": 170.88,
+            "p95": 311.96,
+            "p99": 409.08,
+            "max": 436.31
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 82544,
+        "nodeCpuCorePercent": 103.81681231995135,
+        "postgresBackendCpuCorePercent": 26.64005244857139,
+        "postgresBackendRssMiB": 107.6796875,
+        "peakNodeRssMiB": 666.92578125,
+        "peakConnections": 10
+      }
+    ]
+  },
+  "api-after": {
+    "accounts": 1,
+    "instruments": 23,
+    "singleSqlQueries": {
+      "instruments": 8,
+      "positions": 31
+    },
+    "stages": [
+      {
+        "concurrency": 1,
+        "elapsedSeconds": 12.008778611999999,
+        "requests": 1872,
+        "requestsPerSecond": 155.88596146900142,
+        "latencyMs": {
+          "instruments": {
+            "samples": 936,
+            "p50": 3.01,
+            "p95": 4.06,
+            "p99": 6.08,
+            "max": 7.24
+          },
+          "positions": {
+            "samples": 936,
+            "p50": 9.45,
+            "p95": 11.5,
+            "p99": 13.63,
+            "max": 18.47
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 36624,
+        "nodeCpuCorePercent": 67.95369673853057,
+        "postgresBackendCpuCorePercent": 40.55366625822847,
+        "postgresBackendRssMiB": 98.734375,
+        "peakNodeRssMiB": 544.5,
+        "peakConnections": 3
+      },
+      {
+        "concurrency": 10,
+        "elapsedSeconds": 12.019966981,
+        "requests": 3874,
+        "requestsPerSecond": 322.2970583965534,
+        "latencyMs": {
+          "instruments": {
+            "samples": 1936,
+            "p50": 15.19,
+            "p95": 18.89,
+            "p99": 21.09,
+            "max": 51.22
+          },
+          "positions": {
+            "samples": 1938,
+            "p50": 46.16,
+            "p95": 52.12,
+            "p99": 55.65,
+            "max": 79.9
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 75686,
+        "nodeCpuCorePercent": 103.01384371165604,
+        "postgresBackendCpuCorePercent": 22.213039388714442,
+        "postgresBackendRssMiB": 100.70703125,
+        "peakNodeRssMiB": 647.25,
+        "peakConnections": 10
+      },
+      {
+        "concurrency": 50,
+        "elapsedSeconds": 12.101936634000001,
+        "requests": 3912,
+        "requestsPerSecond": 323.2540475389172,
+        "latencyMs": {
+          "instruments": {
+            "samples": 1959,
+            "p50": 168.52,
+            "p95": 190.22,
+            "p99": 203.64,
+            "max": 243.79
+          },
+          "positions": {
+            "samples": 1953,
+            "p50": 139.85,
+            "p95": 165.82,
+            "p99": 175.4,
+            "max": 238.16
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 76335,
+        "nodeCpuCorePercent": 101.32636098547266,
+        "postgresBackendCpuCorePercent": 22.39311014392806,
+        "postgresBackendRssMiB": 101.71875,
+        "peakNodeRssMiB": 654,
+        "peakConnections": 10
+      }
+    ]
+  },
+  "api-50-owners": {
+    "accounts": 50,
+    "instruments": 23,
+    "singleSqlQueries": {
+      "instruments": 8,
+      "positions": 31
+    },
+    "stages": [
+      {
+        "concurrency": 1,
+        "elapsedSeconds": 12.007147161999999,
+        "requests": 1908,
+        "requestsPerSecond": 158.90535647288505,
+        "latencyMs": {
+          "instruments": {
+            "samples": 954,
+            "p50": 2.96,
+            "p95": 3.89,
+            "p99": 5.73,
+            "max": 7.83
+          },
+          "positions": {
+            "samples": 954,
+            "p50": 9.31,
+            "p95": 11.4,
+            "p99": 12.97,
+            "max": 15.36
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 37326,
+        "nodeCpuCorePercent": 67.5092167242982,
+        "postgresBackendCpuCorePercent": 28.316468134581196,
+        "postgresBackendRssMiB": 120.8359375,
+        "peakNodeRssMiB": 536.58984375,
+        "peakConnections": 4
+      },
+      {
+        "concurrency": 10,
+        "elapsedSeconds": 12.022551841999999,
+        "requests": 3787,
+        "requestsPerSecond": 314.9913637111851,
+        "latencyMs": {
+          "instruments": {
+            "samples": 1892,
+            "p50": 15.54,
+            "p95": 19.07,
+            "p99": 21.27,
+            "max": 53.69
+          },
+          "positions": {
+            "samples": 1895,
+            "p50": 47.26,
+            "p95": 52.34,
+            "p99": 57.41,
+            "max": 96.64
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 74001,
+        "nodeCpuCorePercent": 101.786044766718,
+        "postgresBackendCpuCorePercent": 21.626024442806475,
+        "postgresBackendRssMiB": 123.80859375,
+        "peakNodeRssMiB": 596.75,
+        "peakConnections": 10
+      },
+      {
+        "concurrency": 50,
+        "elapsedSeconds": 12.117547431000002,
+        "requests": 3969,
+        "requestsPerSecond": 327.54152790408824,
+        "latencyMs": {
+          "instruments": {
+            "samples": 1984,
+            "p50": 165.92,
+            "p95": 185.16,
+            "p99": 195.63,
+            "max": 233.35
+          },
+          "positions": {
+            "samples": 1985,
+            "p50": 138.3,
+            "p95": 158.76,
+            "p99": 167.35,
+            "max": 227.7
+          }
+        },
+        "errors": {},
+        "missingPrices": 0,
+        "sqlQueries": 77527,
+        "nodeCpuCorePercent": 102.43897183553759,
+        "postgresBackendCpuCorePercent": 23.10698609552651,
+        "postgresBackendRssMiB": 126.30859375,
+        "peakNodeRssMiB": 604.25,
+        "peakConnections": 10
+      }
+    ]
+  }
+}

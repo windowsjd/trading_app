@@ -1,0 +1,5 @@
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        8.798 s
+Ran all test suites within paths "src/futures/futures-price-safety.integration.spec.ts".

@@ -1,0 +1,24 @@
+
+> trading-app@0.0.1 test:e2e /home/nayuta/projects/trading-app/backend
+> jest --config ./test/jest-e2e.json --runInBand --json --outputFile=../docs/investigations/2026-10-10-futures-last-price-followup/evidence/backend-e2e-jest.json
+
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"dcf150e2-0447-47ee-9f59-11ac1f108b85","code":"AD_REWARD_DISABLED","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"9bbee59f-74cf-4621-bc57-0e8ef85724c0","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_connection_failed","errorType":"Error","code":"P1001"}}
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"c39cf618-bdd1-4fbc-933d-dbf8a2dec745","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_connection_failed","errorType":"Error","code":"P1001"}}
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"d9aaf263-650d-4e4f-bea8-6ac434bf1620","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_connection_failed","errorType":"Error","code":"P1001"}}
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"p0-admin","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"p0-operator","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 855024  - 10/10/2026, 3:02:50 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"p0-user","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 855024  - 10/10/2026, 3:02:57 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"a3c82d4e-2364-419f-bdeb-a6d341c58c7e","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"TypeError","safeCause":{"category":"unexpected_error","errorType":"TypeError"}}
+[Nest] 855024  - 10/10/2026, 3:02:57 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"98a1d1ba-0ce5-41eb-acd9-cf5c09759986","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"unexpected_error","errorType":"Error"}}
+[Nest] 855024  - 10/10/2026, 3:02:57 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"PROFILE_IMAGE_STORAGE_UNAVAILABLE","httpStatus":503,"exceptionType":"ServiceUnavailableException","safeCause":{"category":"unexpected_error","errorType":"ServiceUnavailableException"}}
+[Nest] 855024  - 10/10/2026, 3:02:57 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"PROFILE_IMAGE_STORAGE_UNAVAILABLE","httpStatus":503,"exceptionType":"ServiceUnavailableException","safeCause":{"category":"unexpected_error","errorType":"ServiceUnavailableException"}}
+[Nest] 855024  - 10/10/2026, 3:02:57 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"PROFILE_IMAGE_UPLOAD_FAILED","httpStatus":503,"exceptionType":"ServiceUnavailableException","safeCause":{"category":"unexpected_error","errorType":"ServiceUnavailableException"}}
+[Nest] 855024  - 10/10/2026, 3:02:57 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"unexpected_error","errorType":"Error"}}
+
+Test Suites: 2 passed, 2 total
+Tests:       404 passed, 404 total
+Snapshots:   0 total
+Time:        11.38 s
+Ran all test suites.
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/backend-e2e-jest.json

@@ -131,6 +131,37 @@ the effective flags. Logs use fixed codes: `FUTURES_LAST_PRICE_INGESTION_FAILED`
 `FUTURES_LAST_PRICE_WS_UNAVAILABLE`, `FUTURES_LAST_PRICE_REST_UNAVAILABLE`,
 `FUTURES_LAST_PRICE_INVALID_FRAME`, `FUTURES_LAST_PRICE_RETENTION_FAILED`.
 
+`--require-ready` checks **every active registered launch target**, including
+expired/unverified contracts. An intentionally inactive instrument without live
+financial work is excluded; inactive instruments with open positions, submitted
+entries or live protections still need prices. An empty active catalog fails.
+Last ingestion, Mark ingestion and risk configuration are mandatory for this
+release gate even while the current trading mode is DISABLED. Stored fresh rows
+alone do not prove the required configuration is enabled.
+
+The report separates `launchReady`, `existingWorkReady` and mode-dependent
+availability estimates; these are operational readiness estimates, not a change
+to command authorization. Existing Reduce/Close still follow their original
+Last-price rule even if Mark risk is unavailable. A worker with actual work needs
+a succeeded, completed Ops run no older than 120 seconds, with no execution
+failures. The explicit Limit/Conditional limit-not-reached outcomes are normal
+predicate waits; stale-price errors are failures. Idle workers are labeled
+`not_required_no_live_work`, not observed healthy. Retention runs remain visible
+diagnostics. Ended/settled seasons with open Futures lifetimes additionally need
+their valid immutable Last/legacy Spot pin or an eligible end-boundary Last
+candidate. Live prices cannot satisfy that historical requirement.
+
+The catalog API batches the existing Last and per-source Mark reads into two
+parameterized queries. It selects the newest observations first, then applies
+the same validators and Mark WS/REST priority. It does not add a price cache.
+Execution, trigger, liquidation and settlement paths retain their locked reads.
+
+Release sequencing and rollback remain in
+[F3 release operations](futures-f3-contract.md#migrations-and-release-operations).
+The [follow-up verification report](../../docs/investigations/2026-10-10-futures-last-price-followup/report.md)
+contains measured limits and outstanding release checks; a short soak or an
+estimated user workload is not evidence of a 24-hour or 10,000-user PASS.
+
 Limitation kept from the existing point-in-time policy: fills and triggers are
 judged on stored observations (at most one per symbol per second, matcher and
 Conditional workers poll every second). A touch shorter than that sampling can

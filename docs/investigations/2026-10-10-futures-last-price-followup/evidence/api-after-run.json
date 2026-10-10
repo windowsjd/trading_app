@@ -1,0 +1,37 @@
+{
+  "command": [
+    "pnpm",
+    "exec",
+    "tsx",
+    "scripts/futures-read-api-benchmark.ts"
+  ],
+  "startedAtUtc": "2026-10-10T05:55:55Z",
+  "elapsedSeconds": 37.521,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 829.7,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 17.286810058008996,
+      "stepMs": -1749.229113353067
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 18.0
+    },
+    {
+      "elapsedSeconds": 10.467,
+      "rssMiB": 711.8
+    },
+    {
+      "elapsedSeconds": 21.0,
+      "rssMiB": 809.3
+    },
+    {
+      "elapsedSeconds": 31.552,
+      "rssMiB": 827.3
+    }
+  ]
+}

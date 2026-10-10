@@ -1,0 +1,6 @@
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        10.701 s
+Ran all test suites within paths "src/futures/futures-price-safety.integration.spec.ts".
+Test results written to: ../docs/investigations/2026-10-10-futures-last-price-followup/evidence/price-safety-verified-jest.json

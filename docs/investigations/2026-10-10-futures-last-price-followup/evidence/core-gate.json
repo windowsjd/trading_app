@@ -1,0 +1,43 @@
+{
+  "command": [
+    "bash",
+    "../docs/investigations/2026-10-10-futures-last-price-followup/reproduction/run-core-gate.sh"
+  ],
+  "startedAtUtc": "2026-10-10T06:18:17Z",
+  "elapsedSeconds": 58.377,
+  "exitCode": 0,
+  "terminationReason": null,
+  "peakProcessGroupRssMiB": 811.0,
+  "clockSteps": [
+    {
+      "elapsedSeconds": 26.43302404099086,
+      "stepMs": -1849.8324755346403
+    }
+  ],
+  "rssSamples": [
+    {
+      "elapsedSeconds": 0.0,
+      "rssMiB": 20.8
+    },
+    {
+      "elapsedSeconds": 10.46,
+      "rssMiB": 524.6
+    },
+    {
+      "elapsedSeconds": 20.916,
+      "rssMiB": 330.6
+    },
+    {
+      "elapsedSeconds": 31.325,
+      "rssMiB": 610.1
+    },
+    {
+      "elapsedSeconds": 41.729,
+      "rssMiB": 767.7
+    },
+    {
+      "elapsedSeconds": 52.124,
+      "rssMiB": 711.7
+    }
+  ]
+}

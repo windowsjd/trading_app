@@ -1,0 +1,852 @@
+{
+  "database": "127.0.0.1:55439/futures_soak_24h_final_test",
+  "evaluatedAt": "2026-10-10T06:36:40.430Z",
+  "policy": {
+    "target": "all active registered instruments plus inactive instruments with live financial work",
+    "releaseMode": "ENABLED (independent of current trading mode)",
+    "lastMaxReceiptAgeMs": 10000,
+    "lastMaxTradeAgeMs": 60000,
+    "markMaxAgeMs": 5000,
+    "workerMaxReportAgeMs": 120000,
+    "workerObservation": "Ops runs are demand-driven, not idle heartbeats; fresh prices prove receipt, not transport connectivity"
+  },
+  "config": {
+    "tradingMode": "DISABLED",
+    "riskEngine": true,
+    "markIngestion": true,
+    "lastPriceIngestion": true
+  },
+  "instruments": [
+    {
+      "symbol": "SUIUSDT",
+      "instrumentId": "0677ffa7-c3f4-48ac-982b-848b88392174",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "1.10460000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:36.721Z",
+        "capturedAt": "2026-10-10T06:36:37.015Z",
+        "tradeAgeMs": 3709,
+        "receiptAgeMs": 3415
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1112,
+        "price": "1.10482394",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.318Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "LINKUSDT",
+      "instrumentId": "12ed0bc1-fd8d-4818-aa54-7f5ef85e6398",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "12.92000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:39.053Z",
+        "capturedAt": "2026-10-10T06:36:39.486Z",
+        "tradeAgeMs": 1377,
+        "receiptAgeMs": 944
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1119,
+        "price": "12.92300000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.311Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "instrumentId": "13c2fbbd-a7c8-4bc3-ad8e-b55968248458",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.05290000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:35.090Z",
+        "capturedAt": "2026-10-10T06:36:35.286Z",
+        "tradeAgeMs": 5340,
+        "receiptAgeMs": 5144
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1088,
+        "price": "0.05291510",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.342Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "ZECUSDT",
+      "instrumentId": "15fdb106-aea8-49b1-b748-9af66468738e",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "1223.99000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.706Z",
+        "capturedAt": "2026-10-10T06:36:39.118Z",
+        "tradeAgeMs": 1724,
+        "receiptAgeMs": 1312
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1118,
+        "price": "1223.98000000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.312Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "instrumentId": "195e4578-0e0c-427a-98e0-680251c40344",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "10.58200000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:37.699Z",
+        "capturedAt": "2026-10-10T06:36:38.051Z",
+        "tradeAgeMs": 2731,
+        "receiptAgeMs": 2379
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1117,
+        "price": "10.58200000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.313Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "NEARUSDT",
+      "instrumentId": "2bc4f722-7751-40f7-a3d5-932116a4d93a",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "5.17200000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:39.068Z",
+        "capturedAt": "2026-10-10T06:36:39.502Z",
+        "tradeAgeMs": 1362,
+        "receiptAgeMs": 928
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1117,
+        "price": "5.17200000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.313Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "TRUMPUSDT",
+      "instrumentId": "37a605b2-932a-45a8-b09b-48f690c68fcd",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "1.90400000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.571Z",
+        "capturedAt": "2026-10-10T06:36:38.976Z",
+        "tradeAgeMs": 1859,
+        "receiptAgeMs": 1454
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1100,
+        "price": "1.90351425",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.330Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "ASTERUSDT",
+      "instrumentId": "3d7a5484-f5a1-4dd9-a43b-07031372b295",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.71120000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:36.196Z",
+        "capturedAt": "2026-10-10T06:36:36.459Z",
+        "tradeAgeMs": 4234,
+        "receiptAgeMs": 3971
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1092,
+        "price": "0.71120000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.338Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "ENAUSDT",
+      "instrumentId": "5ed1c0d2-bae3-4cb4-8f66-8a23d779986c",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.22031000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.675Z",
+        "capturedAt": "2026-10-10T06:36:39.087Z",
+        "tradeAgeMs": 1755,
+        "receiptAgeMs": 1343
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1107,
+        "price": "0.22031000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.323Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "UNIUSDT",
+      "instrumentId": "64af96d4-0673-4996-a7d8-4fe02938a719",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "7.48500000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:39.147Z",
+        "capturedAt": "2026-10-10T06:36:39.587Z",
+        "tradeAgeMs": 1283,
+        "receiptAgeMs": 843
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1117,
+        "price": "7.48500000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.313Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "LTCUSDT",
+      "instrumentId": "73a7592a-ceb7-42c9-9f09-78ebb46b630d",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "63.82000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.036Z",
+        "capturedAt": "2026-10-10T06:36:38.409Z",
+        "tradeAgeMs": 2394,
+        "receiptAgeMs": 2021
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1119,
+        "price": "63.82588235",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.311Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "ETHUSDT",
+      "instrumentId": "a2a1f91b-4773-4374-9579-bc380174e001",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "2494.99000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:39.250Z",
+        "capturedAt": "2026-10-10T06:36:39.695Z",
+        "tradeAgeMs": 1180,
+        "receiptAgeMs": 735
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1120,
+        "price": "2494.99000000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.310Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "SOLUSDT",
+      "instrumentId": "b0a0acb5-b1d5-4e93-b3dc-c9770c314b10",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "109.87000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.051Z",
+        "capturedAt": "2026-10-10T06:36:38.426Z",
+        "tradeAgeMs": 2379,
+        "receiptAgeMs": 2004
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1117,
+        "price": "109.87000000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.313Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "BTCUSDT",
+      "instrumentId": "b67356af-1b8f-45ce-a27d-710d9898b6b5",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "82745.30000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:37.695Z",
+        "capturedAt": "2026-10-10T06:36:38.047Z",
+        "tradeAgeMs": 2735,
+        "receiptAgeMs": 2383
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1120,
+        "price": "82745.30000000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.310Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 1,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "XLMUSDT",
+      "instrumentId": "be144369-6f38-4304-b193-bff2d821ca65",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.19709000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:35.272Z",
+        "capturedAt": "2026-10-10T06:36:35.479Z",
+        "tradeAgeMs": 5158,
+        "receiptAgeMs": 4951
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1118,
+        "price": "0.19709000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.312Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "TRXUSDT",
+      "instrumentId": "c82e253d-8601-4965-91ee-47f4d3185ba4",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.33053000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:32.984Z",
+        "capturedAt": "2026-10-10T06:36:34.887Z",
+        "tradeAgeMs": 7446,
+        "receiptAgeMs": 5543
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1119,
+        "price": "0.33055326",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.311Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "WLDUSDT",
+      "instrumentId": "cb80318d-3161-47de-b418-fee6c6834a2c",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.57290000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:39.156Z",
+        "capturedAt": "2026-10-10T06:36:39.596Z",
+        "tradeAgeMs": 1274,
+        "receiptAgeMs": 834
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1111,
+        "price": "0.57327698",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.319Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "instrumentId": "d09a80f6-0f6f-4a5f-834a-50615f3596e0",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.08621000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:35.785Z",
+        "capturedAt": "2026-10-10T06:36:36.023Z",
+        "tradeAgeMs": 4645,
+        "receiptAgeMs": 4407
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1118,
+        "price": "0.08621135",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.312Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "XRPUSDT",
+      "instrumentId": "d0fcf895-7c04-4f1e-bbb0-927b44832a55",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "1.40850000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:36.799Z",
+        "capturedAt": "2026-10-10T06:36:37.099Z",
+        "tradeAgeMs": 3631,
+        "receiptAgeMs": 3331
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1119,
+        "price": "1.40857883",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.311Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "BNBUSDT",
+      "instrumentId": "d3eff083-677f-45a0-aa89-b79e8e64595f",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "748.27000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:35.577Z",
+        "capturedAt": "2026-10-10T06:36:35.804Z",
+        "tradeAgeMs": 4853,
+        "receiptAgeMs": 4626
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1118,
+        "price": "748.27000000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.312Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "TAOUSDT",
+      "instrumentId": "e608bb04-238d-492f-ac5a-699db5ce2926",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "280.67000000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:37.164Z",
+        "capturedAt": "2026-10-10T06:36:37.485Z",
+        "tradeAgeMs": 3266,
+        "receiptAgeMs": 2945
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1106,
+        "price": "280.67136540",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.324Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "ADAUSDT",
+      "instrumentId": "e98dc550-49cb-4894-b063-6bed5ebe62d1",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.25280000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.485Z",
+        "capturedAt": "2026-10-10T06:36:38.885Z",
+        "tradeAgeMs": 1945,
+        "receiptAgeMs": 1545
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1119,
+        "price": "0.25290000",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.311Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "instrumentId": "f8fc33f9-ada6-4973-936c-e33f943f1438",
+      "active": true,
+      "coverage": "verified",
+      "last": {
+        "valid": true,
+        "price": "0.04880000",
+        "source": "binance_usdm_agg_trade_ws",
+        "effectiveAt": "2026-10-10T06:36:38.373Z",
+        "capturedAt": "2026-10-10T06:36:38.766Z",
+        "tradeAgeMs": 2057,
+        "receiptAgeMs": 1664
+      },
+      "mark": {
+        "valid": true,
+        "receiptAgeMs": 1089,
+        "price": "0.04879143",
+        "source": "binance_usdm_mark_ws",
+        "effectiveAt": "2026-10-10T06:36:39.000Z",
+        "capturedAt": "2026-10-10T06:36:39.341Z"
+      },
+      "openPositions": 0,
+      "pendingEntries": 0,
+      "liveProtections": 0,
+      "ready": true,
+      "required": true,
+      "targetReason": "active_registered",
+      "reasons": [],
+      "exitPricesReady": true
+    }
+  ],
+  "workers": [
+    {
+      "jobName": "futures_limit_matching",
+      "status": "succeeded",
+      "startedAt": "2026-10-10T06:36:19.624Z",
+      "finishedAt": "2026-10-10T06:36:19.625Z",
+      "resultJson": {
+        "states": {
+          "FUTURES_ENTRY_LIMIT_NOT_REACHED": 1
+        }
+      },
+      "required": true,
+      "ready": true,
+      "observation": "recent_success",
+      "reason": null
+    },
+    {
+      "jobName": "conditional_orders",
+      "status": "succeeded",
+      "startedAt": "2026-10-10T06:32:18.259Z",
+      "finishedAt": "2026-10-10T06:32:18.260Z",
+      "resultJson": {
+        "states": {
+          "armed": 1
+        }
+      },
+      "required": false,
+      "ready": true,
+      "observation": "not_required_no_live_work",
+      "reason": null
+    },
+    {
+      "jobName": "futures_liquidation",
+      "status": "succeeded",
+      "startedAt": "2026-10-10T06:36:19.615Z",
+      "finishedAt": "2026-10-10T06:36:19.628Z",
+      "resultJson": {
+        "results": [
+          {
+            "scope": "d27f3304-75d3-4cc2-b3bd-9490d9a8f0fd",
+            "state": "healthy",
+            "accountId": "b3a31431-333c-4c2e-9363-584fe6258383"
+          }
+        ],
+        "nextAccountCursor": ""
+      },
+      "required": false,
+      "ready": true,
+      "observation": "not_required_no_live_work",
+      "reason": null
+    },
+    {
+      "jobName": "futures_mark_retention",
+      "status": "succeeded",
+      "startedAt": "2026-10-10T06:36:32.433Z",
+      "finishedAt": "2026-10-10T06:36:32.437Z",
+      "resultJson": {
+        "cutoff": "2026-10-09T06:36:32.433Z",
+        "batchCount": 1,
+        "deletedCount": 0,
+        "batchLimitReached": false
+      },
+      "required": false,
+      "ready": true,
+      "observation": "not_required_no_live_work",
+      "reason": null
+    },
+    {
+      "jobName": "futures_last_price_retention",
+      "status": "succeeded",
+      "startedAt": "2026-10-10T06:36:32.433Z",
+      "finishedAt": "2026-10-10T06:36:32.437Z",
+      "resultJson": {
+        "cutoff": "2026-10-09T06:36:32.433Z",
+        "batchCount": 1,
+        "deletedCount": 0,
+        "batchLimitReached": false
+      },
+      "required": false,
+      "ready": true,
+      "observation": "not_required_no_live_work",
+      "reason": null
+    }
+  ],
+  "components": [
+    {
+      "component": "last_ingestion",
+      "ready": true,
+      "reason": null
+    },
+    {
+      "component": "mark_ingestion",
+      "ready": true,
+      "reason": null
+    },
+    {
+      "component": "risk_engine",
+      "ready": true,
+      "reason": null
+    }
+  ],
+  "settlements": [],
+  "blockers": [],
+  "summary": {
+    "instruments": 23,
+    "required": 23,
+    "activeVerified": 23,
+    "ready": 23,
+    "openPositions": 0,
+    "pendingEntries": 1,
+    "liveProtections": 0
+  },
+  "readiness": {
+    "launchReady": true,
+    "existingWorkReady": true,
+    "newTradingAvailable": false,
+    "userExitsAvailable": false
+  }
+}

@@ -1,0 +1,9 @@
+Running as unit: trading-futures-soak-followup-24h.service; invocation ID: e42b4a210ca74255a9257d8daccb30c6
+RuntimeMaxUSec=1d 3h
+MainPID=889571
+ExecMainStartTimestamp=Sat 2026-10-10 15:27:58 KST
+ExecMainStartTimestampMonotonic=130857976382
+MemoryMax=4294967296
+Id=trading-futures-soak-followup-24h.service
+ActiveState=active
+SubState=running
