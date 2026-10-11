@@ -1,5 +1,4 @@
 import { randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
@@ -9,10 +8,11 @@ import {
   ROOT,
   observerCredentials,
   isLocal,
+  validateCommandApproval,
 } from './manifest';
 import { Metrics, writeJson } from './metrics';
 import { installNetworkGuard } from './network-guard';
-import { preflight } from './preflight';
+import { preflight, migrate } from './preflight';
 
 async function main() {
   const command = process.argv[2];
@@ -59,6 +59,7 @@ async function main() {
   }
   const inputs = readInputs(manifestFile, credentialFile);
   const { m, git, manifestHash } = inputs;
+  validateCommandApproval(m, command);
   const c = command === 'serve' ? inputs.c : observerCredentials(inputs.c);
   if (
     command === 'run' &&
@@ -78,28 +79,7 @@ async function main() {
   );
   const metrics = new Metrics();
   if (command === 'migrate') {
-    await preflight(m, c, false, true);
-    // Guard BEFORE Prisma can connect. Existing migrations only, no seed or
-    // schema change; this operation is explicit, never run by serve/run.
-    execFileSync(
-      resolve(ROOT, 'node_modules/.bin/prisma'),
-      [
-        'migrate',
-        'deploy',
-        '--config',
-        resolve(ROOT, 'scripts/load-test/prisma.config.ts'),
-      ],
-      {
-        cwd: ROOT,
-        stdio: 'inherit',
-        env: {
-          PATH: process.env.PATH,
-          LANG: process.env.LANG,
-          LOAD_TEST_MANIFEST: manifestFile,
-          LOAD_TEST_CREDENTIALS: credentialFile,
-        },
-      },
-    );
+    await migrate(m, c, manifestHash, manifestFile, credentialFile);
     return;
   }
   const restore = await installNetworkGuard(

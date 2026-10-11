@@ -6,7 +6,11 @@ import { mkdirSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
-import type { Manifest, Credentials } from './manifest';
+import {
+  validateServerEnvironment,
+  type Manifest,
+  type Credentials,
+} from './manifest';
 import { preflight, controlKey, identitySignature } from './preflight';
 import { Metrics, ProcessSampler, writeJson, jsonl } from './metrics';
 import { Replay } from './replay';
@@ -89,6 +93,7 @@ export async function serve(
   out: string,
   metrics = new Metrics(),
 ) {
+  validateServerEnvironment(m, c);
   mkdirSync(out, { recursive: true });
   const environment = await preflight(m, c, true);
   applyTestEnvironment(m, c);

@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { setTimeout as delay } from 'node:timers/promises';
 import type { Credentials, Manifest } from './manifest';
-import { hash, workloadHash } from './manifest';
+import { hash, workloadHash, validateCommandApproval } from './manifest';
 import {
   Histogram,
   jsonl,
@@ -26,6 +26,7 @@ export async function run(
   out: string,
   metrics: Metrics,
 ) {
+  validateCommandApproval(m, 'run');
   await preflight(m, c);
   await verifyApi(m, c, manifestHash);
   const fixture = JSON.parse(readFileSync(fixtureFile, 'utf8')) as Fixture;

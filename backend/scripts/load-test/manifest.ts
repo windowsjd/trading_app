@@ -16,6 +16,11 @@ export type Manifest = {
   expectedGitSha: string;
   allowDirtyLocalSmoke: boolean;
   cloudExecutionApproved: boolean;
+  renderReuse?: {
+    transitionApproved: boolean;
+    restorePlanRecorded: boolean;
+    exclusiveApiServiceConfirmed: boolean;
+  };
   profile: 'smoke' | 'baseline' | 'diagnostic';
   target: {
     apiOrigin: string;
@@ -114,6 +119,31 @@ export const PRODUCTION_HOSTS = [
   'trading-app-qtsw.onrender.com',
   ...PRODUCTION_IDS,
 ];
+// This is one reviewed transition, not a generic production allowlist.
+export const RENDER_REUSE = {
+  apiResourceId: PRODUCTION_IDS[0],
+  apiOrigin: 'https://trading-app-qtsw.onrender.com',
+  databaseResourceId: PRODUCTION_IDS[1],
+  databaseName: 'trading_class_loadtest',
+  databaseUser: 'load_test_trading_class',
+  preservedDatabase: 'trading_app_fbbk',
+} as const;
+const reuseDatabaseHost = (host: string) =>
+  [
+    RENDER_REUSE.databaseResourceId,
+    `${RENDER_REUSE.databaseResourceId}.singapore-postgres.render.com`,
+  ].includes(host);
+const approvedReuseTarget = (m: Manifest, field: string, value: string) => {
+  if (!m.renderReuse) return false;
+  if (field === 'apiOrigin') return value === RENDER_REUSE.apiOrigin;
+  if (field === 'apiResourceId') return value === RENDER_REUSE.apiResourceId;
+  if (field === 'databaseResourceId')
+    return value === RENDER_REUSE.databaseResourceId;
+  return (
+    ['databaseHost', 'databaseObserverHost'].includes(field) &&
+    reuseDatabaseHost(value)
+  );
+};
 const loopback = (host: string) =>
   ['127.0.0.1', 'localhost', '[::1]', '::1'].includes(host);
 export const isLocal = (m: Manifest) =>
@@ -153,6 +183,7 @@ export function workloadHash(m: Manifest) {
     allowDirtyLocalSmoke,
     maxReceivedBytes,
     generator,
+    renderReuse,
     ...workload
   } = m;
   return hash(workload);
@@ -190,21 +221,61 @@ export function validateManifest(m: Manifest): void {
     !['http:', 'https:'].includes(u.protocol)
   )
     fail('API origin');
-  for (const v of Object.values(m.target)) {
+  for (const [field, v] of Object.entries(m.target)) {
     if (
       typeof v === 'string' &&
-      PRODUCTION_HOSTS.some((p) => v.toLowerCase().includes(p))
+      PRODUCTION_HOSTS.some((p) => v.toLowerCase().includes(p)) &&
+      !approvedReuseTarget(m, field, v)
     )
       fail('production target');
   }
-  if (
+  if (m.renderReuse) {
+    if (
+      m.renderReuse.transitionApproved !== true ||
+      m.renderReuse.restorePlanRecorded !== true ||
+      m.renderReuse.exclusiveApiServiceConfirmed !== true
+    )
+      fail(
+        'Render reuse transition / restore / exclusive service approval required',
+      );
+    if (
+      m.target.apiOrigin !== RENDER_REUSE.apiOrigin ||
+      m.target.apiResourceId !== RENDER_REUSE.apiResourceId ||
+      m.target.databaseResourceId !== RENDER_REUSE.databaseResourceId ||
+      m.target.databaseName !== RENDER_REUSE.databaseName ||
+      m.target.databaseUser !== RENDER_REUSE.databaseUser ||
+      !reuseDatabaseHost(m.target.databaseHost) ||
+      m.target.databasePort !== 5432 ||
+      (m.target.databaseObserverHost !== undefined &&
+        !reuseDatabaseHost(m.target.databaseObserverHost)) ||
+      (m.target.databaseObserverPort !== undefined &&
+        m.target.databaseObserverPort !== 5432)
+    )
+      fail(
+        'Render reuse target must match the reviewed API / test database / role',
+      );
+    const valkeyHosts = [
+      m.target.valkeyResourceId,
+      `${m.target.valkeyResourceId}.singapore-redis.render.com`,
+    ];
+    if (
+      !/^red-[a-z0-9]+$/.test(m.target.valkeyResourceId) ||
+      !valkeyHosts.includes(m.target.valkeyHost) ||
+      m.target.valkeyPort !== 6379 ||
+      (m.target.valkeyObserverHost !== undefined &&
+        !valkeyHosts.includes(m.target.valkeyObserverHost)) ||
+      (m.target.valkeyObserverPort !== undefined &&
+        m.target.valkeyObserverPort !== 6379)
+    )
+      fail('Render reuse requires dedicated same-region Valkey identity');
+  } else if (
     !/^[a-z0-9_]+_load_test$/.test(m.target.databaseName) ||
     !/^load_test_[a-z0-9_]+$/.test(m.target.databaseUser)
   )
     fail('dedicated database and role required');
   if (
     !isLocal(m) &&
-    (!m.cloudExecutionApproved ||
+    ((!m.renderReuse && m.cloudExecutionApproved !== true) ||
       u.protocol !== 'https:' ||
       m.allowDirtyLocalSmoke)
   )
@@ -320,7 +391,15 @@ export function validateCredentials(m: Manifest, c: Credentials): void {
     [c.valkeyUrl, m.target.valkeyHost, m.target.valkeyPort, 'redis:'],
   ] as const) {
     const u = new URL(raw);
-    if (PRODUCTION_HOSTS.some((p) => raw.toLowerCase().includes(p)))
+    // Exempt only the reviewed PG hostname, retaining the original URL-wide
+    // production-token check for every other component and dedicated target.
+    const guardedUrl =
+      protocol === 'postgresql:' &&
+      m.renderReuse &&
+      reuseDatabaseHost(u.hostname)
+        ? raw.replace(u.hostname, 'approved-load-test-database')
+        : raw;
+    if (PRODUCTION_HOSTS.some((p) => guardedUrl.toLowerCase().includes(p)))
       fail('production credential target');
     if (
       u.hostname !== host ||
@@ -344,10 +423,28 @@ export function validateCredentials(m: Manifest, c: Credentials): void {
       [...u.searchParams.keys()].some((k) => !['schema', 'sslmode'].includes(k))
     )
       fail('database query parameter override');
+    if (m.renderReuse && protocol === 'postgresql:') {
+      if (!u.password)
+        fail('Render reuse requires dedicated database password');
+      if (
+        u.hostname.endsWith('.render.com') &&
+        !['require', 'verify-ca', 'verify-full'].includes(
+          u.searchParams.get('sslmode') ?? '',
+        )
+      )
+        fail('external PostgreSQL TLS required');
+    }
     if (protocol === 'redis:' && !['', '/', '/0'].includes(u.pathname))
       fail('Valkey must be a separate physical instance, DB 0');
     if (protocol === 'redis:' && u.search)
       fail('Valkey query parameter override');
+    if (
+      m.renderReuse &&
+      protocol === 'redis:' &&
+      u.hostname.endsWith('.render.com') &&
+      (u.protocol !== 'rediss:' || !u.password)
+    )
+      fail('external Valkey TLS and authentication required');
   }
   if (
     ![c.jwtSecret, c.userPassword, c.controlSecret].every(
@@ -356,6 +453,62 @@ export function validateCredentials(m: Manifest, c: Credentials): void {
     )
   )
     fail('test-only secrets required');
+}
+
+export function validateCommandApproval(m: Manifest, command: string) {
+  validateManifest(m);
+  if (
+    !isLocal(m) &&
+    ['prepare', 'run'].includes(command) &&
+    m.cloudExecutionApproved !== true
+  )
+    fail('separate cloud workload execution approval required');
+}
+
+/** Validate Render's ambient identity before claiming resources or clearing env. */
+export function validateServerEnvironment(
+  m: Manifest,
+  c: Credentials,
+  environment: Record<string, string | undefined> = process.env,
+) {
+  validateCredentials(m, c);
+  if (!m.renderReuse) {
+    if (environment.LOAD_TEST_MODE)
+      fail('Render reuse mode requires approved manifest');
+    return;
+  }
+  if (
+    environment.LOAD_TEST_MODE !== 'render-reuse' ||
+    environment.RENDER_SERVICE_ID !== m.target.apiResourceId ||
+    environment.RENDER_GIT_COMMIT !== m.expectedGitSha ||
+    environment.DATABASE_URL !== c.databaseUrl ||
+    environment.REDIS_URL !== c.valkeyUrl
+  )
+    fail('Render reuse runtime mode / identity / database / Valkey mismatch');
+}
+
+/** Normal build/start must never migrate or boot against a harness target. */
+export function assertNormalEnvironment(
+  environment: Record<string, string | undefined>,
+  prismaArgs?: readonly string[],
+) {
+  // Client generation does not connect to a DB; test builds must omit migration.
+  if (prismaArgs?.[0] === 'generate') return;
+  let testTarget = false;
+  if (environment.DATABASE_URL) {
+    try {
+      const url = new URL(environment.DATABASE_URL);
+      const db = decodeURIComponent(url.pathname.slice(1));
+      testTarget =
+        db === RENDER_REUSE.databaseName ||
+        db.endsWith('_load_test') ||
+        decodeURIComponent(url.username).startsWith('load_test_');
+    } catch {
+      fail('invalid DATABASE_URL in normal entry');
+    }
+  }
+  if (environment.LOAD_TEST_MODE || testTarget)
+    fail('normal entry refused; use the approved load-test CLI');
 }
 export function readInputs(manifestFile: string, credentialFile: string) {
   if (statSync(credentialFile).mode & 0o077)

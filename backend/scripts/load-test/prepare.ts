@@ -15,7 +15,11 @@ import {
   resolveStockMarketSessionState,
 } from '../../src/orders/market-calendar.policy';
 import { KIS_US_DELAYED_TRADE_SOURCE_NAME } from '../../src/providers/kis/kis-websocket.types';
-import type { Credentials, Manifest } from './manifest';
+import {
+  validateCommandApproval,
+  type Credentials,
+  type Manifest,
+} from './manifest';
 import { Metrics, writeJson } from './metrics';
 import { CRYPTO, STOCKS, replayPrice, contract } from './replay';
 import { AppClient } from './client';
@@ -30,6 +34,7 @@ export async function prepare(
   out: string,
   metrics: Metrics,
 ) {
+  validateCommandApproval(m, 'prepare');
   await preflight(m, c);
   await verifyApi(m, c, manifestHash);
   process.env.DATABASE_URL = c.databaseUrl;
