@@ -70,6 +70,11 @@ describe('Standalone account trading DB integration', () => {
 
 const GENERAL_TRADING_DB_RUNNER = `
 import { tradingSessions } from './test/support/trading-session-fixture';
+import {
+  prepareLearnedBeginner,
+  cleanupLearningPractice,
+  releaseLearningAssets,
+} from './scripts/lib/beginner-quest-practice';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -178,6 +183,9 @@ async function createUser(label) {
 async function openGeneral(userId) {
   const opened = await generalAccounts.openGeneralAccount(userId);
   accountIds.push(opened.data.account.id);
+  if (opened.data.account.mode === 'beginner') {
+    await prepareLearnedBeginner(prisma, userId, opened.data.account.id);
+  }
   return opened.data.account.id;
 }
 
@@ -307,6 +315,10 @@ async function limit(userId, accountId, assetId, side, quantity, limitPrice, key
 async function cleanup() {
   tradingSessions.reset();
   resetMarketSessionOverrideStoreForTest();
+  const learningFixtures = [];
+  for (const accountId of accountIds) {
+    learningFixtures.push(await cleanupLearningPractice(prisma, accountId));
+  }
   if (accountIds.length) {
     await prisma.limitOrderCandleEvidence.deleteMany({
       where: {
@@ -314,6 +326,15 @@ async function cleanup() {
       },
     });
     await prisma.walletTransaction.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
+    await prisma.walletTransfer.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
+    await prisma.fxExecuteRequest.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
+    await prisma.exchangeTransaction.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.equitySnapshot.deleteMany({
@@ -347,6 +368,9 @@ async function cleanup() {
     });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });
   }
+  for (const learning of learningFixtures) {
+    await releaseLearningAssets(prisma, learning);
+  }
   if (fxSnapshotIds.length) {
     await prisma.fxRateSnapshot.deleteMany({
       where: { id: { in: fxSnapshotIds } },
@@ -363,6 +387,12 @@ async function main() {
   const userId = await createUser('owner');
   const strangerId = await createUser('stranger');
   const accountId = await openGeneral(userId);
+  const initialOrderSnapshotIds = new Set(
+    (await prisma.equitySnapshot.findMany({
+      where: { tradingAccountId: accountId, snapshotReason: SnapshotReason.order_executed },
+      select: { id: true },
+    })).map(row => row.id),
+  );
   tradingSessions.set(new Date());
   assert.deepEqual(
     getAssetTradingStatus(
@@ -950,7 +980,7 @@ async function main() {
   const orderSnapshots = snapshots.filter(
     (row) => row.snapshotReason === SnapshotReason.order_executed,
   );
-  assert.equal(orderSnapshots.length, 5);
+  assert.equal(orderSnapshots.filter(row => !initialOrderSnapshotIds.has(row.id)).length, 5);
   for (const row of orderSnapshots) {
     assert.notEqual(row.cumulativeExternalFundingKrw, null);
     assert.notEqual(row.investmentPnlKrw, null);
