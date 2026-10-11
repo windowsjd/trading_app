@@ -1,0 +1,94 @@
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0e297a01-a929-463d-be04-7bf56f5fac25"}
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"29f927da-eac2-4b12-ae1a-b48319fa61e2"}
+(node:1559643) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS parity/evidence/reservation/replay general crypto_spot KRW→USD
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b50737b3-9baa-462c-bc46-c6f8a4ac1e95"}
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e21ec63a-a97a-464e-aa10-50459ff88d58"}
+PASS parity/evidence/reservation/replay general crypto_spot USD→KRW
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c922aa6c-0ea2-447f-8711-59629a74d17e"}
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c7b8fb47-fe58-40b5-851b-2654954267b9"}
+PASS parity/evidence/reservation/replay general crypto_futures KRW→USD
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ff6e6ff9-4114-4d32-b025-82bbd4fdcc5f"}
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1eaafc2c-e51d-42eb-8ef1-fd1e7200c938"}
+PASS parity/evidence/reservation/replay general crypto_futures USD→KRW
+[Nest] 1559643  - 10/11/2026, 1:33:33 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"db711006-f5b0-4604-9e14-3cb955fbe0d5"}
+PASS 13 rollback fault points general forward
+[Nest] 1559643  - 10/11/2026, 1:33:34 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"994608cc-535b-4046-ad18-3d34ec341592"}
+PASS 13 rollback fault points general reverse
+[Nest] 1559643  - 10/11/2026, 1:33:34 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"52892095-03a9-4a7e-8332-ef2bdf3e8ddd"}
+[Nest] 1559643  - 10/11/2026, 1:33:34 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"baac478d-b488-4d8e-8730-129d326f96f6"}
+PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation general
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ce0e38ad-6c8d-4032-b575-da2815cd48fc"}
+PASS concurrent general replay
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"560ce9c3-78a8-4185-a6c4-645ccfa05c34"}
+PASS concurrent general distinct
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6bc504ad-788b-40da-922f-7d99fe66de2b"}
+PASS concurrent general opposite
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c33f027d-9b44-410d-b0f2-69e90c78462b"}
+PASS concurrent general same-currency
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d4db876b-e5fa-4dc5-a8b7-ff886ac78636"}
+PASS concurrent general standalone-fx
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0de6b922-ae2c-4e08-a2d1-bd31374bd83a"}
+PASS concurrent general limit
+[Nest] 1559643  - 10/11/2026, 1:33:35 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6b883609-868b-4f97-a60e-1608d32a6d17"}
+PASS concurrent general market
+PASS parity/evidence/reservation/replay season crypto_spot KRW→USD
+PASS parity/evidence/reservation/replay season crypto_spot USD→KRW
+PASS parity/evidence/reservation/replay season crypto_futures KRW→USD
+PASS parity/evidence/reservation/replay season crypto_futures USD→KRW
+PASS 13 rollback fault points season forward
+PASS 13 rollback fault points season reverse
+PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation season
+PASS concurrent season replay
+PASS concurrent season distinct
+PASS concurrent season opposite
+PASS concurrent season same-currency
+PASS concurrent season standalone-fx
+PASS concurrent season limit
+PASS concurrent season market
+[Nest] 1559643  - 10/11/2026, 1:33:37 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"acd09957-847a-4329-9997-9c865ff281ce"}
+[Nest] 1559643  - 10/11/2026, 1:33:37 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"c3cda2ce-d2c1-4c7c-9694-344b64c02dd6"}
+PASS parity/evidence/reservation/replay beginner crypto_spot KRW→USD
+[Nest] 1559643  - 10/11/2026, 1:33:38 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"11765bcc-4210-4a02-926f-f004eb8ca484"}
+[Nest] 1559643  - 10/11/2026, 1:33:38 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"83ac59e5-e534-4d06-92d4-4d15416f0a31"}
+PASS parity/evidence/reservation/replay beginner crypto_spot USD→KRW
+[Nest] 1559643  - 10/11/2026, 1:33:39 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"0d92e3d0-967e-4ea1-a8b2-486581235d11"}
+[Nest] 1559643  - 10/11/2026, 1:33:39 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"6cb274e1-e56b-4866-a700-aa21b36a193b"}
+PASS parity/evidence/reservation/replay beginner crypto_futures KRW→USD
+[Nest] 1559643  - 10/11/2026, 1:33:40 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"8b9cd280-a8a1-4166-9d3e-93d16230a9e0"}
+[Nest] 1559643  - 10/11/2026, 1:33:40 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"b4035d61-fce0-408c-8906-ca4bb95da0b2"}
+PASS parity/evidence/reservation/replay beginner crypto_futures USD→KRW
+[Nest] 1559643  - 10/11/2026, 1:33:40 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"58b2612b-30e5-4047-a76a-ac4d9996d6bd"}
+PASS 13 rollback fault points beginner forward
+[Nest] 1559643  - 10/11/2026, 1:33:41 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"b13bddb2-0d79-4704-a8ba-abddd5796043"}
+PASS 13 rollback fault points beginner reverse
+[Nest] 1559643  - 10/11/2026, 1:33:42 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"03dcba81-f63f-4191-a6ab-bbd4f5160f6c"}
+[Nest] 1559643  - 10/11/2026, 1:33:43 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"08061b22-ab81-41fb-93f0-33585375477a"}
+PASS quote isolation/routes/expiry/repricing/maxChangeBps/pinned fee/source reservation beginner
+[Nest] 1559643  - 10/11/2026, 1:33:43 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"37229018-253c-4b84-b2de-655a09716d4d"}
+PASS concurrent beginner replay
+[Nest] 1559643  - 10/11/2026, 1:33:44 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"0556c45c-08ec-4fa6-86f3-246bb1cc81c2"}
+PASS concurrent beginner distinct
+[Nest] 1559643  - 10/11/2026, 1:33:44 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"f39c09c8-7a7e-435f-b63c-d29da43abbc8"}
+PASS concurrent beginner opposite
+[Nest] 1559643  - 10/11/2026, 1:33:44 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"83eba7a5-771f-4fee-a72d-8eddaee66b88"}
+PASS concurrent beginner same-currency
+[Nest] 1559643  - 10/11/2026, 1:33:45 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"f88f0902-997f-40a8-9ab5-cc8659c83ab8"}
+PASS concurrent beginner standalone-fx
+[Nest] 1559643  - 10/11/2026, 1:33:45 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"e621d34c-26c9-491d-afaf-42a941d73718"}
+PASS concurrent beginner limit
+[Nest] 1559643  - 10/11/2026, 1:33:46 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"270b6b6f-d1ab-471f-9e30-ea030dd38c6e"}
+PASS concurrent beginner market
+[Nest] 1559643  - 10/11/2026, 1:33:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2fb01725-307b-4f8f-9b0b-aab9fcc7f160"}
+PASS post-wallet-lock quote general: DB clock/evidence rejects and rolls back
+PASS post-wallet-lock quote season: DB clock/evidence rejects and rolls back
+[Nest] 1559643  - 10/11/2026, 1:33:50 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1a033eb6-4417-4fb1-9c6f-39208361301f"}
+PASS post-wallet-lock quote beginner: DB clock/evidence rejects and rolls back
+PASS post-wallet-lock season season: DB clock/evidence rejects and rolls back
+[Nest] 1559643  - 10/11/2026, 1:33:54 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b31084b9-88d7-4388-946b-68782674b6e7"}
+PASS post-wallet-lock provider general: DB clock/evidence rejects and rolls back
+PASS committed Season composite replay across a locked deadline
+[Nest] 1559643  - 10/11/2026, 1:33:56 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8d58a1be-8d6a-46a1-a390-08caf43a5ac1"}
+PASS provider stale/source priority/eligibility/network outside locks/replay without provider
+wallet FX transfer db integration ok

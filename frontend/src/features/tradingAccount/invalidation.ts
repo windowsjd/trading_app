@@ -59,6 +59,7 @@ export function invalidateAfterOrderCreate(
   options: { seasonUi?: boolean } = {},
 ) {
   const keys: QueryKey[] = [
+    QUERY_KEYS.tradingAccount.quests(accountId),
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
     QUERY_KEYS.tradingAccount.protections.all(accountId),
     QUERY_KEYS.tradingAccount.positionsAll(accountId),
@@ -84,6 +85,7 @@ export function invalidateAfterOrderCancel(
   options: { seasonUi?: boolean } = {},
 ) {
   const keys: QueryKey[] = [
+    QUERY_KEYS.tradingAccount.quests(accountId),
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
     QUERY_KEYS.tradingAccount.protections.all(accountId),
     QUERY_KEYS.tradingAccount.positionsAll(accountId),
@@ -109,6 +111,7 @@ export function invalidateAfterFx(
   _options: { seasonUi?: boolean } = {},
 ) {
   const keys: QueryKey[] = [
+    QUERY_KEYS.tradingAccount.quests(accountId),
     ...walletKeys(accountId),
     ...portfolioKeys(accountId),
     // Nothing season-wide to refresh: an exchange moves cash between two of
@@ -123,6 +126,7 @@ export function invalidateAfterFx(
 /** Internal cash relocation changes cash/ledger and affected Futures collateral. */
 export function invalidateAfterWalletTransfer(client: InvalidatorClient, accountId: string, options: { futuresCollateral?: boolean } = {}) {
   return invalidateAll(client, [
+    QUERY_KEYS.tradingAccount.quests(accountId),
     ...walletKeys(accountId),
     ...(options.futuresCollateral ? [QUERY_KEYS.tradingAccount.futuresCollateral(accountId)] : []),
   ]);
@@ -131,6 +135,7 @@ export function invalidateAfterWalletTransfer(client: InvalidatorClient, account
 /** FX fees affect valuation; the internal transfer adds no funding boundary. */
 export function invalidateAfterWalletFxTransfer(client: InvalidatorClient, accountId: string, options: { seasonUi?: boolean } = {}) {
   return invalidateAll(client, [
+    QUERY_KEYS.tradingAccount.quests(accountId),
     ...walletKeys(accountId), ...portfolioKeys(accountId),
     ...(options.seasonUi ? [QUERY_KEYS.ranking.all] : []),
   ]);

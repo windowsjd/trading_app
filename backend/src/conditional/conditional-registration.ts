@@ -1,3 +1,4 @@
+import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { createApiError } from '../common/api-error';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { Prisma } from '../generated/prisma/client';
@@ -178,6 +179,13 @@ export async function createProtectionInTransaction(
     where: { id: input.accountId },
     include: { seasonParticipant: { include: { season: true } } },
   });
+  await assertBeginnerLearningAccess(
+    tx,
+    account,
+    input.domain === 'spot' && asset.assetType === 'crypto'
+      ? 'spotProtection'
+      : 'allTrading',
+  );
   if (!conditionalTradable(account, now))
     throw createApiError(
       'CONDITIONAL_ACCOUNT_NOT_TRADABLE',

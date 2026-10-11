@@ -1,3 +1,4 @@
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -20,6 +21,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
   leverage: string; quantity: string; allowed: boolean; onBusy: (busy: boolean) => void;
   onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
 }) {
+  const learning = useLearningAccess(accountId).gate('allTrading');
   const [limitPrice, setLimitPrice] = useState('');
   const [draft, setDraft] = useState(emptyProtection);
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
@@ -68,7 +70,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
     <Text style={styles.text}>체결 후 TP/SL (선택)</Text>
     {!canAttach ? <Text style={styles.hint}>현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다.</Text> : null}
     <ProtectionEditor value={draft} onChange={setDraft} disabled={busy || uncertain || !canAttach} canLimit onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
-    <CTAButton testID="futures-limit-submit" label={uncertain ? '동일 진입 요청 확인' : `지정가 ${direction === 'long' ? 'Long' : 'Short'} 진입`} onPress={() => void submit()} state={busy ? 'loading' : uncertain || (allowed && validPrice) ? 'enabled' : 'disabled'} />
+    <CTAButton testID="futures-limit-submit" label={uncertain ? '동일 진입 요청 확인' : `지정가 ${direction === 'long' ? 'Long' : 'Short'} 진입`} learningHint={learning.locked ? learning.message : null} onPress={() => learning.guard(() => void submit())} state={busy ? 'loading' : uncertain || (allowed && validPrice) ? 'enabled' : 'disabled'} />
     {message ? failure ? <ErrorNotice error={failure} message={message} /> : <Text style={styles.text} accessibilityLiveRegion="polite">{message}</Text> : null}
   </View>;
 }

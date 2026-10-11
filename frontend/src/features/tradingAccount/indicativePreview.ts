@@ -57,6 +57,7 @@ export function isPreviewPriceAvailable(price: DisplayPrice, now: number) {
 }
 
 export function orderPreview(input: {
+  side?: 'buy' | 'sell';
   quantity: string;
   price: string | null | undefined;
   feeRate: string | null | undefined;
@@ -75,7 +76,7 @@ export function orderPreview(input: {
     price: input.price,
     grossAmount: money(gross),
     feeAmount: money(fee),
-    totalAmount: money(gross.add(fee)),
+    totalAmount: money(input.side === 'sell' ? gross.sub(fee) : gross.add(fee)),
   };
 }
 

@@ -1,0 +1,31 @@
+PASS different instances: participant vs scheduled
+PASS different instances: participant vs participant
+PASS stale scheduled writer cannot append equity snapshots
+PASS equal capturedAt: first published generation wins
+PASS stale previous date cannot rewind participant state
+PASS same instance: different trigger keys overlap safely
+PASS same instance: pending latest trigger is not dropped
+PASS pending latest trigger survives first calculation failure
+PASS in-flight refresh vs ended
+PASS in-flight refresh vs settled
+PASS empty generation cannot be resurrected after exclusion
+PASS season start inclusive / end exclusive
+PASS reader all/metadata-after
+PASS reader all/count-after
+PASS reader all/my-before
+PASS reader all/my-after
+PASS reader all/page-before
+PASS reader top10/metadata-after
+PASS reader top10/count-after
+PASS reader top10/my-before
+PASS reader top10/my-after
+PASS reader top10/page-before
+PASS reader friends/metadata-after
+PASS reader friends/count-after
+PASS reader friends/my-before
+PASS reader friends/my-after
+PASS reader friends/page-before
+PASS reader pagination, hidden/excluded/not_joined/final
+PASS reader and stale/fresh writer retain scope errors
+PASS CLI daily writer cannot replace a newer/same snapshot
+ranking consistency PostgreSQL ok (30 scenarios)

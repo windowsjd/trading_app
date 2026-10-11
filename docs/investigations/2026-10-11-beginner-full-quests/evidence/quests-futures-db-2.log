@@ -1,0 +1,110 @@
+[Nest] 1555668  - 10/11/2026, 1:26:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b28e9b65-117d-4949-b32c-ea8aae69362a"}
+(node:1555668) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 1555668  - 10/11/2026, 1:26:08 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"b28e9b65-117d-4949-b32c-ea8aae69362a","capturedAt":"2026-10-11T04:26:08.925Z","code":"FX_RATE_UNAVAILABLE"}
+PASS direct PostgreSQL structural writes reject invalid leverage/quantity/direction/state, hedge, identity and wrong evidence
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fd5f27c5-6459-4d1b-a79c-d5093978a67a"}
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"fd5f27c5-6459-4d1b-a79c-d5093978a67a","capturedAt":"2026-10-11T04:26:09.235Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"fd5f27c5-6459-4d1b-a79c-d5093978a67a","capturedAt":"2026-10-11T04:26:09.297Z","code":"FX_RATE_UNAVAILABLE"}
+PASS general Spot-era execution/replay preserved; Spot, Futures Last and Mark stay isolated
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"20f2e193-10c2-4b76-81eb-ed7a88cfa3f2"}
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"20f2e193-10c2-4b76-81eb-ed7a88cfa3f2","capturedAt":"2026-10-11T04:26:09.457Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"dcdbf63a-1a2b-499b-b52a-5f00e596a334","capturedAt":"2026-10-11T04:26:09.494Z","code":"FX_RATE_UNAVAILABLE"}
+PASS General/Season same instrument and key keep positions, wallets, history, fees and ownership isolated
+[Nest] 1555668  - 10/11/2026, 1:26:09 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b8abce29-6901-442e-b3e0-3002f801c44c"}
+PASS general/long complete lifetime, average, fee/PnL, history and committed replay
+[Nest] 1555668  - 10/11/2026, 1:26:10 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d3819867-6b16-483e-8d9c-dc50d9dca47f"}
+PASS general/long extreme loss full rollback, no clamp/delete/negative wallet
+[Nest] 1555668  - 10/11/2026, 1:26:10 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"24661e81-5378-41a4-b9cd-420c3f180565"}
+PASS general/long partial loss cannot spend remaining isolated margin
+[Nest] 1555668  - 10/11/2026, 1:26:10 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"172af973-8701-4c29-9aea-61bac2960003"}
+PASS general/short complete lifetime, average, fee/PnL, history and committed replay
+[Nest] 1555668  - 10/11/2026, 1:26:10 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a697669d-3d49-465f-8e22-4de2c5598470"}
+PASS general/short extreme loss full rollback, no clamp/delete/negative wallet
+[Nest] 1555668  - 10/11/2026, 1:26:10 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b76bfa08-c3df-4209-9a16-613694c13616"}
+PASS general/short partial loss cannot spend remaining isolated margin
+[Nest] 1555668  - 10/11/2026, 1:26:10 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1b3839c5-3145-4f7d-b106-94bf368ae185"}
+PASS general leverage/margin/fee boundaries, flag and both outgoing/incoming transfer routes
+[Nest] 1555668  - 10/11/2026, 1:26:11 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"58c3d78d-f51a-4330-8bda-961651c8ebd0"}
+PASS general DB price identity/staleness and account/season lifecycle
+[Nest] 1555668  - 10/11/2026, 1:26:13 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2ba16c64-a6ef-49c4-8b94-8cc10e108957"}
+PASS general 17 fault points after actual cash/position/evidence/ledger/command writes
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9ab6ba05-a0d5-4dab-9546-de324a530fe9"}
+PASS general concurrent duplicate, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1f42a4bb-7358-4f36-8cb1-6f6f0243a24e"}
+PASS general concurrent same-open, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"306f232d-2bee-47d9-a51b-e3db3f63746e"}
+PASS general concurrent increase, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6e634151-c609-4c37-b7c2-d94766fa3134"}
+PASS general concurrent increase-reduce, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6008c423-a527-47be-aeaf-0ee7ec60fff8"}
+PASS general concurrent reduce-close, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"08248542-b9cd-4153-9536-e30385d8028e"}
+PASS general concurrent different-instruments, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3fa567a5-c5c6-4cd9-8e66-78605f058a1f"}
+PASS general concurrent transfer, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"01b2b588-9a34-4a46-a3b2-ca87b36e40cf"}
+PASS general concurrent fx-transfer, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:14 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c3db78d3-2882-4912-8b4c-8c4fc9ce980e"}
+PASS general post-wallet-lock price boundary rejects with no financial writes
+[Nest] 1555668  - 10/11/2026, 1:26:16 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"67beb958-0e36-4ba5-a7bc-214fb3137ca4"}
+PASS general post-wallet-lock flag boundary rejects with no financial writes
+PASS season/long complete lifetime, average, fee/PnL, history and committed replay
+PASS season/long extreme loss full rollback, no clamp/delete/negative wallet
+PASS season/long partial loss cannot spend remaining isolated margin
+PASS season/short complete lifetime, average, fee/PnL, history and committed replay
+PASS season/short extreme loss full rollback, no clamp/delete/negative wallet
+PASS season/short partial loss cannot spend remaining isolated margin
+PASS season leverage/margin/fee boundaries, flag and both outgoing/incoming transfer routes
+PASS season DB price identity/staleness and account/season lifecycle
+PASS season 17 fault points after actual cash/position/evidence/ledger/command writes
+PASS season concurrent duplicate, no duplicate fee/execution or collateral allocation
+PASS season concurrent same-open, no duplicate fee/execution or collateral allocation
+PASS season concurrent increase, no duplicate fee/execution or collateral allocation
+PASS season concurrent increase-reduce, no duplicate fee/execution or collateral allocation
+PASS season concurrent reduce-close, no duplicate fee/execution or collateral allocation
+PASS season concurrent different-instruments, no duplicate fee/execution or collateral allocation
+PASS season concurrent transfer, no duplicate fee/execution or collateral allocation
+PASS season concurrent fx-transfer, no duplicate fee/execution or collateral allocation
+PASS season post-wallet-lock price boundary rejects with no financial writes
+PASS season post-wallet-lock flag boundary rejects with no financial writes
+[Nest] 1555668  - 10/11/2026, 1:26:23 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"d7d1f711-61d2-46c3-92f9-c89de597e9d3"}
+PASS beginner/long complete lifetime, average, fee/PnL, history and committed replay
+[Nest] 1555668  - 10/11/2026, 1:26:24 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"9223aae6-370f-48ba-a883-e15ad53f94ad"}
+PASS beginner/long extreme loss full rollback, no clamp/delete/negative wallet
+[Nest] 1555668  - 10/11/2026, 1:26:24 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"f53b005c-e9a6-4276-90da-53a08d121426"}
+PASS beginner/long partial loss cannot spend remaining isolated margin
+[Nest] 1555668  - 10/11/2026, 1:26:25 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"0ef52adc-341e-44b8-b211-0828e7e1d634"}
+PASS beginner/short complete lifetime, average, fee/PnL, history and committed replay
+[Nest] 1555668  - 10/11/2026, 1:26:25 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"e61a3632-a551-412f-9b84-45122436f047"}
+PASS beginner/short extreme loss full rollback, no clamp/delete/negative wallet
+[Nest] 1555668  - 10/11/2026, 1:26:26 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"4004abea-7784-489b-be3e-d28c826ad65a"}
+PASS beginner/short partial loss cannot spend remaining isolated margin
+[Nest] 1555668  - 10/11/2026, 1:26:26 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"887697df-29fc-4088-b06a-441f9f572f56"}
+PASS beginner leverage/margin/fee boundaries, flag and both outgoing/incoming transfer routes
+[Nest] 1555668  - 10/11/2026, 1:26:27 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"45635642-df63-44b4-a233-05358ada8021"}
+PASS beginner DB price identity/staleness and account/season lifecycle
+[Nest] 1555668  - 10/11/2026, 1:26:29 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"c5812df6-b94d-4f8d-af71-f4f78dd29655"}
+PASS beginner 17 fault points after actual cash/position/evidence/ledger/command writes
+[Nest] 1555668  - 10/11/2026, 1:26:30 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"9c066904-00a7-41c5-ad5c-96df456630f5"}
+PASS beginner concurrent duplicate, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:31 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"d3f7395d-00a0-4a9f-afe9-c6df8ea0a7fe"}
+PASS beginner concurrent same-open, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:31 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1ea0b1fd-5022-4f9c-a7c0-05eecfa92974"}
+PASS beginner concurrent increase, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:32 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"de429e3e-1913-47d2-bd75-acc403db45ac"}
+PASS beginner concurrent increase-reduce, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:32 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"74473b3c-5553-4600-a7e5-746d3a68e264"}
+PASS beginner concurrent reduce-close, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:33 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"c8182fcd-d004-40ed-9a73-565e572b34ac"}
+PASS beginner concurrent different-instruments, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:33 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"1c8320cf-0cd8-4ad9-92eb-b9b4324fa805"}
+PASS beginner concurrent transfer, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:34 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"4cb32239-439e-46e6-8553-15b94cb119c1"}
+PASS beginner concurrent fx-transfer, no duplicate fee/execution or collateral allocation
+[Nest] 1555668  - 10/11/2026, 1:26:34 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"029cfcb8-40ff-40f0-b68b-0a7b9c826307"}
+PASS beginner post-wallet-lock price boundary rejects with no financial writes
+[Nest] 1555668  - 10/11/2026, 1:26:37 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"9991809a-d28f-4cd2-af5f-aaab865163d3"}
+PASS beginner post-wallet-lock flag boundary rejects with no financial writes
+PASS season post-wallet-lock season boundary rejects with no financial writes
+futures F1 db integration ok (290 financial/guard/race/rollback checks)

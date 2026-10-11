@@ -8,11 +8,14 @@ import {
   ViewStyle,
 } from '../../theme/native';
 import ActionPressable from './ActionPressable';
+import LearningLock from '../../features/quest/LearningLock';
 
 type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';
 
 interface CTAButtonProps {
   label: string;
+  /** Only server-confirmed learning restrictions; operational disabled remains separate. */
+  learningHint?: string | null;
   leadingIcon?: React.ReactNode;
   state?: CTAState;
   onPress?: () => void;
@@ -24,6 +27,7 @@ interface CTAButtonProps {
 
 export default function CTAButton({
   label,
+  learningHint,
   leadingIcon,
   state = 'enabled',
   onPress,
@@ -36,12 +40,12 @@ export default function CTAButton({
   return (
     <ActionPressable
       feedback="button"
-      primary={variant === 'primary' && style?.backgroundColor === undefined}
+      primary={!learningHint && variant === 'primary' && style?.backgroundColor === undefined}
       gradient={variant === 'logout' ? logoutGradient : undefined}
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled, busy: state === 'loading' }}
+      accessibilityLabel={learningHint ? `${label}, 학습 제한. ${learningHint}` : label}
+      accessibilityState={{ disabled: disabled || !!learningHint, busy: state === 'loading' }}
       style={[
         styles.button,
         variant === 'logout' && styles.logout,
@@ -49,16 +53,18 @@ export default function CTAButton({
         state === 'blocked' && styles.blocked,
         state === 'disabled' && styles.disabled,
         style,
+        learningHint && styles.learning,
       ]}
       onPress={onPress}
       disabled={disabled}
     >
       {state === 'loading' ? (
         <ActivityIndicator color={variant === 'secondary' ? semantic.secondaryActionForeground : primaryGradient.foreground} />
-      ) : leadingIcon ? (
+      ) : leadingIcon || learningHint ? (
         <View style={styles.labelGroup}>
           <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.icon}>{leadingIcon}</View>
-          <Text style={[styles.text, styles.iconLabel, variant === 'secondary' && styles.secondaryText]}>{label}</Text>
+          {learningHint ? <LearningLock /> : null}
+          <Text style={[styles.text, styles.iconLabel, variant === 'secondary' && styles.secondaryText, !!learningHint && styles.learningText]}>{label}</Text>
         </View>
       ) : (
         <Text style={variant === 'secondary' ? [styles.text, styles.secondaryText] : styles.text}>{label}</Text>
@@ -68,6 +74,8 @@ export default function CTAButton({
 }
 
 const styles = StyleSheet.create({
+  learning: { backgroundColor: semantic.raised, borderWidth: 1, borderColor: semantic.border },
+  learningText: { color: semantic.secondary },
   labelGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' },
   icon: { flexShrink: 0 },
   iconLabel: { flexShrink: 1 },

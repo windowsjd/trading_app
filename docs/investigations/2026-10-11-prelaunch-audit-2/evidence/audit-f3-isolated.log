@@ -1,0 +1,80 @@
+(node:1565165) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS F3 legacy Spot Season pin is re-verified and reused unchanged on retry
+[Nest] 1565165  - 10/11/2026, 1:42:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"40b1b630-9745-478c-8d64-d56489ab85c5"}
+PASS F3 general long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f3900f03-5d8c-4f18-a76f-63f7d710d0e9"}
+PASS F3 general long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fcecdceb-941d-451c-afae-56aeacdfd60b"}
+PASS F3 general long isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:23 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"34e540e6-9943-4bf7-9051-11518d621537"}
+PASS F3 general long cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:24 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3c780c60-1c3d-4962-9731-e5da4e7bfd47"}
+PASS F3 general long cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:24 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c06033c5-7402-44d0-96c7-8cc39b5ed027"}
+PASS F3 general long cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:24 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"86a2079b-4b60-4a11-9f53-9d6f161d03ec"}
+PASS F3 general short isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:24 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a76f04f7-5ba1-466c-ae03-a2e390d7d14d"}
+PASS F3 general short isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:24 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d7aaba36-fea9-45f8-b3b5-97694887fcc5"}
+PASS F3 general short isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:25 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b380f932-64bf-4d33-aecc-579881472c61"}
+PASS F3 general short cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:25 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ef929f98-782e-46ec-b377-e144694ab22d"}
+PASS F3 general short cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+[Nest] 1565165  - 10/11/2026, 1:42:25 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2098ea6c-9863-4570-b7a6-ffc4f1b14b9f"}
+PASS F3 general short cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season long isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season long isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season long isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season long cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season long cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season long cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season short isolated 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season short isolated 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season short isolated 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season short cross 1x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season short cross 37x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 season short cross 100x valuation/open fee/increase/reduce/Spot-Mark basis/close/history
+PASS F3 fresh Spot + stale Mark fails valuation but allows close
+[Nest] 1565165  - 10/11/2026, 1:42:27 PM     LOG [RankingRefreshService] Current ranking refreshed for season 4b84c36d-7d7b-4edc-a966-ab2ac1e60df3: 1 participants.
+PASS F3 generation reuses Mark evidence and durable daily component
+PASS F3 final long isolated Last=110 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final long isolated Last=90 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final long cross Last=110 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final long cross Last=90 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final short isolated Last=110 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final short isolated Last=90 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final short cross Last=110 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 final short cross Last=90 (Spot 777 ignored) preview/exact endAt/fee/shortfall/retry
+PASS F3 mixed three-position bankruptcy / duplicate final workers / one atomic scope settlement
+PASS F3 atomic final rollback futuresSeasonSettlement.create
+PASS F3 atomic final rollback futuresPosition.update
+PASS F3 atomic final rollback futuresSeasonClose.create
+PASS F3 atomic final rollback cashWallet.updateMany
+PASS F3 atomic final rollback walletTransaction.createMany
+PASS F3 Season pipeline closes before final ranking/tier/closed/settled; idempotent new job retry
+PASS F3 missing bounded end evidence leaves Season ended, position and cash intact
+PASS F3 real PG lock: Season end wins liquidation/user close/increase; duplicate final worker settles once
+PASS F3 liquidation commits before end: final exit never double settles
+[Nest] 1565165  - 10/11/2026, 1:42:30 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"93f20a81-dd1a-4f3a-9155-9b067628a281"}
+PASS F3 General Mark TWR / internal USD and FX transfer / external funding neutral boundary / daily and 1d-all history / close and bankruptcy liquidation
+[Nest] 1565165  - 10/11/2026, 1:42:31 PM     LOG [RankingRefreshService] Current ranking refreshed for season 9cb07c6f-2ba0-4273-8b66-1442462ed310: 2 participants.
+[Nest] 1565165  - 10/11/2026, 1:42:31 PM     LOG [RankingRefreshService] Current ranking refreshed for season 9cb07c6f-2ba0-4273-8b66-1442462ed310: 2 participants.
+[Nest] 1565165  - 10/11/2026, 1:42:31 PM   ERROR [RankingRefreshService] Current ranking refresh failed for season 9cb07c6f-2ba0-4273-8b66-1442462ed310.
+PortfolioValuationError: Fresh Futures Mark Price is required to value this account.
+    at <anonymous> (/home/nayuta/projects/trading-app/backend/src/portfolio/portfolio-valuation.policy.ts:198:13)
+    at Array.map (<anonymous>)
+    at calculatePortfolioValuation (/home/nayuta/projects/trading-app/backend/src/portfolio/portfolio-valuation.policy.ts:182:35)
+    at PortfolioValuationService.calculateValuationForHoldings (/home/nayuta/projects/trading-app/backend/src/portfolio/portfolio-valuation.service.ts:432:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async RankingRefreshService.calculateAndReplace (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:257:13)
+    at async RankingRefreshService.drainRefreshes (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:165:20)
+    at async waitForActual (node:assert:646:5)
+    at async strict.rejects (node:assert:769:25)
+    at async multiAccountRetry (/home/nayuta/projects/trading-app/backend/scripts/futures-f3-integration.ts:921:5)
+PASS F3 Season Long/Short Isolated/Cross Mark moves ranking and drawdown; excluded omitted; missing Mark keeps the previous generation intact
+PASS F3 partial Season batch retry pins one Spot price across accounts, closes excluded accounts, publishes final ranking only after all exits
+PASS F3 mixed profitable Isolated cannot subsidize bankrupt Cross; iteration invariant; failure after second close rolls back all three
+futures F3 db integration ok (49 scenarios)

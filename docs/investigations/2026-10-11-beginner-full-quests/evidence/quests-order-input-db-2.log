@@ -1,0 +1,18 @@
+(node:1556283) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS season: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+PASS season domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+PASS season us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+[Nest] 1556283  - 10/11/2026, 1:27:27 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"19268535-86f0-475f-a926-7996cf743ad8"}
+PASS general: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+[Nest] 1556283  - 10/11/2026, 1:27:28 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ec852581-3f8f-4d57-a05f-11441be8973f"}
+PASS general domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+[Nest] 1556283  - 10/11/2026, 1:27:28 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"72797fc0-e183-4ab4-9f75-59533ec6558e"}
+PASS general us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+[Nest] 1556283  - 10/11/2026, 1:27:29 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"68abc420-66b6-46d4-ad67-9940157c6e38"}
+PASS beginner: amount intent, repricing, replay, accounting, limit improvement, fractional sell
+[Nest] 1556283  - 10/11/2026, 1:27:30 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"77cd772a-51fe-4d1b-a533-4dab7e78e27b"}
+PASS beginner domestic_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+[Nest] 1556283  - 10/11/2026, 1:27:31 PM     LOG [GeneralAccountsService] {"event":"beginner_account_opened","tradingAccountId":"babb926d-5994-4be9-a5fc-1dabf61df316"}
+PASS beginner us_stock: stock fractional market, integer limit CLOSED registration, session transitions, evidence guards and matcher Path A/B
+order input policy db integration ok

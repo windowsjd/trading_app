@@ -1,0 +1,224 @@
+
+> trading-app@0.0.1 test
+> jest --runInBand --testPathPatterns=(trading-accounts/.*spec|orders/.*spec|conditional/.*spec|futures/.*spec|wallets/.*spec|fx/.*spec)
+
+FAIL src/orders/trading-session-fixture.spec.ts
+  ● PostgreSQL runner calendar fixture › keeps open/close, candle and unavailable boundaries on 2026-07-10 without mocking Date
+
+    node:net:1926
+          const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                        ^
+
+    Error: listen EPERM: operation not permitted /tmp/tsx-1000/53.pipe
+
+      44 |         },
+      45 |       );
+    > 46 |       if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+         |                                      ^
+      47 |       expect(result.stdout).toContain('calendar fixture boundaries passed');
+      48 |     },
+      49 |   );
+
+      at ../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+      at createIpcServer (../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+      at ../async file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+        code: 'EPERM',
+        errno: -1,
+        syscall: 'listen',
+        address: '/tmp/tsx-1000/53.pipe',
+        port: -1
+      }
+      Node.js v24.14.1
+      at orders/trading-session-fixture.spec.ts:46:38
+
+  ● PostgreSQL runner calendar fixture › keeps open/close, candle and unavailable boundaries on 2026-07-11 without mocking Date
+
+    node:net:1926
+          const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                        ^
+
+    Error: listen EPERM: operation not permitted /tmp/tsx-1000/93.pipe
+
+      44 |         },
+      45 |       );
+    > 46 |       if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+         |                                      ^
+      47 |       expect(result.stdout).toContain('calendar fixture boundaries passed');
+      48 |     },
+      49 |   );
+
+      at ../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+      at createIpcServer (../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+      at ../async file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+        code: 'EPERM',
+        errno: -1,
+        syscall: 'listen',
+        address: '/tmp/tsx-1000/93.pipe',
+        port: -1
+      }
+      Node.js v24.14.1
+      at orders/trading-session-fixture.spec.ts:46:38
+
+  ● PostgreSQL runner calendar fixture › keeps open/close, candle and unavailable boundaries on 2026-07-12 without mocking Date
+
+    node:net:1926
+          const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                        ^
+
+    Error: listen EPERM: operation not permitted /tmp/tsx-1000/132.pipe
+
+      44 |         },
+      45 |       );
+    > 46 |       if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+         |                                      ^
+      47 |       expect(result.stdout).toContain('calendar fixture boundaries passed');
+      48 |     },
+      49 |   );
+
+      at ../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+      at createIpcServer (../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+      at ../async file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+        code: 'EPERM',
+        errno: -1,
+        syscall: 'listen',
+        address: '/tmp/tsx-1000/132.pipe',
+        port: -1
+      }
+      Node.js v24.14.1
+      at orders/trading-session-fixture.spec.ts:46:38
+
+[Nest] 20  - 10/11/2026, 1:07:03 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"FUTURES_LIQUIDATION_REQUIRED","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"FUTURES_MAINTENANCE_UNSAFE","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"FINANCIAL_SCOPE_REPAIR_REQUIRED","httpStatus":500,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"INSUFFICIENT_FUTURES_FREE_COLLATERAL","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"INSUFFICIENT_FUTURES_FREE_COLLATERAL","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:03 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"futures-p0-request","code":"INSUFFICIENT_FUTURES_FREE_COLLATERAL","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM     LOG [LimitOrderCancelService] {"event":"limit_order_season_end_cleanup","canceledOrderCount":2}
+[Nest] 20  - 10/10/2026, 9:00:00 AM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_INVALID_FRAME
+[Nest] 20  - 10/10/2026, 9:00:00 AM    WARN [FuturesLastPriceIngestion] FUTURES_LAST_PRICE_REST_UNAVAILABLE
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_FINAL_PRICE_UNAVAILABLE","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_PRICE_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_PRICE_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_FINAL_SETTLEMENT_REQUIRED","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_FINAL_EVIDENCE_INTEGRITY","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"TRADING_ACCOUNT_SCOPE_MISMATCH","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_FINAL_SETTLEMENT_INTEGRITY","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FINANCIAL_SCOPE_REPAIR_REQUIRED","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_FINAL_PRICE_UNAVAILABLE","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_COLLATERAL_INTEGRITY","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"FUTURES_FINAL_PRICE_UNAVAILABLE","httpStatus":409,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM    WARN [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"f3-diagnostic","code":"UNAUTHORIZED","httpStatus":401,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [LimitOrderMatchingService] {"event":"limit_order_fill_failed","orderId":"A1","assetId":"A","phase":"execution_error","path":"snapshot","reason":"unexpected_error","category":"unexpected_error","stage":"not_observed"}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [LimitOrderMatchingService] {"event":"limit_order_fill_failed","orderId":"A2","assetId":"A","phase":"execution_error","path":"snapshot","reason":"unexpected_error","category":"unexpected_error","stage":"not_observed"}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [LimitOrderMatchingService] {"event":"limit_order_fill_failed","orderId":"A1","assetId":"A","phase":"execution_error","path":"snapshot","reason":"unexpected_error","category":"unexpected_error","stage":"not_observed"}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [LimitOrderMatchingService] {"event":"limit_order_fill_failed","orderId":"A2","assetId":"A","phase":"execution_error","path":"snapshot","reason":"unexpected_error","category":"unexpected_error","stage":"not_observed"}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_UNAVAILABLE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/11/2026, 1:07:04 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"pre_auth_http","code":"FUTURES_MARK_STALE","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 20  - 10/07/2026, 9:00:00 AM    WARN [FuturesMarkIngestion] FUTURES_COVERAGE_UNAVAILABLE
+[Nest] 20  - 10/07/2026, 9:00:00 AM    WARN [FuturesMarkIngestion] FUTURES_COVERAGE_UNAVAILABLE
+[Nest] 20  - 10/07/2026, 9:00:00 AM    WARN [FuturesMarkIngestion] FUTURES_COVERAGE_UNAVAILABLE
+[Nest] 20  - 10/07/2026, 9:00:06 AM    WARN [FuturesMarkIngestion] FUTURES_MARK_WS_UNAVAILABLE
+[Nest] 20  - 10/11/2026, 1:07:05 PM   ERROR [TradingAccountAccessService] Trading account integrity violation (account=ta-season-1): season account has no participant
+[Nest] 20  - 10/11/2026, 1:07:05 PM   ERROR [TradingAccountAccessService] Trading account integrity violation (account=ta-general-1): non-season account has a season participant attached
+[Nest] 20  - 10/11/2026, 1:07:05 PM   ERROR [TradingAccountAccessService] Trading account integrity violation (account=ta-season-1): season account participant belongs to a different user
+[Nest] 20  - 10/11/2026, 1:07:05 PM    WARN [MarketSessionOverrideLoaderService] {"event":"market_session_override_refresh_failed","trigger":"startup","storeLoaded":false,"effect":"store not ready; stock calendar remains fail-closed","error":"db down"}
+
+Summary of all failing tests
+FAIL orders/trading-session-fixture.spec.ts
+  ● PostgreSQL runner calendar fixture › keeps open/close, candle and unavailable boundaries on 2026-07-10 without mocking Date
+
+    node:net:1926
+          const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                        ^
+
+    Error: listen EPERM: operation not permitted /tmp/tsx-1000/53.pipe
+
+      44 |         },
+      45 |       );
+    > 46 |       if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+         |                                      ^
+      47 |       expect(result.stdout).toContain('calendar fixture boundaries passed');
+      48 |     },
+      49 |   );
+
+      at ../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+      at createIpcServer (../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+      at ../async file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+        code: 'EPERM',
+        errno: -1,
+        syscall: 'listen',
+        address: '/tmp/tsx-1000/53.pipe',
+        port: -1
+      }
+      Node.js v24.14.1
+      at orders/trading-session-fixture.spec.ts:46:38
+
+  ● PostgreSQL runner calendar fixture › keeps open/close, candle and unavailable boundaries on 2026-07-11 without mocking Date
+
+    node:net:1926
+          const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                        ^
+
+    Error: listen EPERM: operation not permitted /tmp/tsx-1000/93.pipe
+
+      44 |         },
+      45 |       );
+    > 46 |       if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+         |                                      ^
+      47 |       expect(result.stdout).toContain('calendar fixture boundaries passed');
+      48 |     },
+      49 |   );
+
+      at ../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+      at createIpcServer (../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+      at ../async file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+        code: 'EPERM',
+        errno: -1,
+        syscall: 'listen',
+        address: '/tmp/tsx-1000/93.pipe',
+        port: -1
+      }
+      Node.js v24.14.1
+      at orders/trading-session-fixture.spec.ts:46:38
+
+  ● PostgreSQL runner calendar fixture › keeps open/close, candle and unavailable boundaries on 2026-07-12 without mocking Date
+
+    node:net:1926
+          const error = new UVExceptionWithHostPort(rval, 'listen', address, port);
+                        ^
+
+    Error: listen EPERM: operation not permitted /tmp/tsx-1000/132.pipe
+
+      44 |         },
+      45 |       );
+    > 46 |       if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+         |                                      ^
+      47 |       expect(result.stdout).toContain('calendar fixture boundaries passed');
+      48 |     },
+      49 |   );
+
+      at ../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31537
+      at createIpcServer (../file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:53:31515)
+      at ../async file:/home/nayuta/projects/trading-app/backend/node_modules/.pnpm/tsx@4.21.0/node_modules/tsx/dist/cli.mjs:55:459 {
+        code: 'EPERM',
+        errno: -1,
+        syscall: 'listen',
+        address: '/tmp/tsx-1000/132.pipe',
+        port: -1
+      }
+      Node.js v24.14.1
+      at orders/trading-session-fixture.spec.ts:46:38
+
+
+Test Suites: 1 failed, 30 skipped, 62 passed, 63 of 93 total
+Tests:       3 failed, 32 skipped, 1375 passed, 1410 total
+Snapshots:   0 total
+Time:        4.605 s, estimated 233 s
+Ran all test suites matching (trading-accounts/.*spec|orders/.*spec|conditional/.*spec|futures/.*spec|wallets/.*spec|fx/.*spec).

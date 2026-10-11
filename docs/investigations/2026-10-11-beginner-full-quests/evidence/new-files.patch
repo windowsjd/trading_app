@@ -1,0 +1,3518 @@
+diff --git a/backend/prisma/migrations/20261011120000_beginner_quest_acknowledgements/migration.sql b/backend/prisma/migrations/20261011120000_beginner_quest_acknowledgements/migration.sql
+new file mode 100644
+index 00000000..f13f983c
+--- /dev/null
++++ b/backend/prisma/migrations/20261011120000_beginner_quest_acknowledgements/migration.sql
+@@ -0,0 +1,13 @@
++-- Only non-financial UI confirmations; no account/ledger/order backfill.
++CREATE UNIQUE INDEX "orders_id_trading_account_id_key" ON "orders" ("id", "trading_account_id");
++CREATE TABLE "beginner_quest_acknowledgements" (
++  "trading_account_id" TEXT NOT NULL,
++  "step_id" TEXT NOT NULL,
++  "order_id" TEXT NOT NULL,
++  "acknowledged_at" TIMESTAMP(3) NOT NULL,
++  CONSTRAINT "beginner_quest_acknowledgements_pkey" PRIMARY KEY ("trading_account_id", "step_id"),
++  CONSTRAINT "beginner_quest_acknowledgements_step_check" CHECK ("step_id" IN ('holdings_reviewed', 'limit_result_reviewed')),
++  CONSTRAINT "beginner_quest_acknowledgements_account_fkey" FOREIGN KEY ("trading_account_id") REFERENCES "trading_accounts" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
++  CONSTRAINT "beginner_quest_acknowledgements_order_fkey" FOREIGN KEY ("order_id", "trading_account_id") REFERENCES "orders" ("id", "trading_account_id") ON DELETE RESTRICT ON UPDATE CASCADE
++);
++CREATE INDEX "beginner_quest_acknowledgements_order_id_trading_account_id_idx" ON "beginner_quest_acknowledgements" ("order_id", "trading_account_id");
+diff --git a/backend/scripts/beginner-full-quest-integration.ts b/backend/scripts/beginner-full-quest-integration.ts
+new file mode 100644
+index 00000000..fd178522
+--- /dev/null
++++ b/backend/scripts/beginner-full-quest-integration.ts
+@@ -0,0 +1,447 @@
++import { tradingSessions } from '../test/support/trading-session-fixture';
++import assert from 'node:assert/strict';
++import { randomUUID } from 'node:crypto';
++import { HttpException } from '@nestjs/common';
++import {
++  db,
++  fixture,
++  cleanup,
++  now,
++  price,
++  spotPrice,
++  fxEvidence,
++  fxEvidenceIds,
++  openBody,
++} from './futures-integration';
++import {
++  practiceFoundation,
++  practiceOrder,
++  practiceServices,
++} from './lib/beginner-quest-practice';
++import { assertBeginnerLearningAccess } from '../src/trading-accounts/beginner-learning-policy';
++import { FuturesLimitService } from '../src/futures/futures-limit.service';
++
++const target = new URL(process.env.DATABASE_URL ?? 'http://invalid');
++if (
++  process.env.NODE_ENV !== 'test' ||
++  process.env.BEGINNER_ACCOUNT_DB_INTEGRATION !== '1' ||
++  !['localhost', '127.0.0.1'].includes(target.hostname) ||
++  !target.pathname.endsWith('_test')
++)
++  throw new Error('Disposable local test database opt-in required');
++// Isolated subprocess fixtures only; application/default configuration is untouched.
++process.env.LIMIT_ORDER_ENABLED = 'true';
++process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
++process.env.FUTURES_TRADING_MODE = 'ENABLED';
++process.env.FUTURES_RISK_ENGINE_ENABLED = 'true';
++async function rejects(work: Promise<unknown>, code: string) {
++  try {
++    await work;
++  } catch (error) {
++    if (!(error instanceof HttpException)) throw error;
++    assert.equal(
++      (error.getResponse() as { error: { code: string } }).error.code,
++      code,
++    );
++    return;
++  }
++  assert.fail(`Expected ${code}`);
++}
++let checks = 0;
++async function main() {
++  await db.$connect();
++  const s = await fixture('beginner', '10000', true);
++  const other = await fixture('general');
++  const stocks: string[] = [];
++  const account = { id: s.accountId, mode: 'beginner' };
++  const app = practiceServices(db);
++  const read = async () =>
++    (await app.quests.getQuestProgress(s.userId, s.accountId)).data;
++  const assetId = s.instruments[0].asset.id;
++  const buy = { assetId, side: 'buy', orderType: 'market', amount: '100' };
++  const limit = { ...buy, orderType: 'limit', limitPrice: '90' };
++  const fresh = async () => {
++    await fxEvidence();
++    await spotPrice(s, '100', 0, 0);
++    await price(s, '100', 0, 0);
++    const at = await now();
++    await db.futuresMarkSnapshot.createMany({
++      data: [
++        {
++          instrumentId: s.instruments[0].instrument.id,
++          symbol: s.instruments[0].asset.symbol,
++          source: 'binance_usdm_mark_ws',
++          price: '100',
++          effectiveAt: at,
++          capturedAt: at,
++        },
++      ],
++      skipDuplicates: true,
++    });
++  };
++  try {
++    await fresh();
++    await rejects(
++      app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, buy),
++      'BEGINNER_FEATURE_LOCKED',
++    );
++    await rejects(
++      app.quests.acknowledge(s.userId, s.accountId, {
++        stepId: 'holdings_reviewed',
++        orderId: 'invented',
++      }),
++      'BEGINNER_QUEST_PREREQUISITE',
++    );
++    await rejects(
++      app.quests.getQuestProgress(other.userId, s.accountId),
++      'TRADING_ACCOUNT_NOT_FOUND',
++    );
++    const entries = new FuturesLimitService(db, app.access, app.futures);
++    await rejects(
++      entries.create(s.userId, s.accountId, {
++        instrumentId: s.instruments[0].instrument.id,
++        direction: 'long',
++        marginMode: 'isolated',
++        leverage: 2,
++        quantity: '1',
++        limitPrice: '90',
++        idempotencyKey: randomUUID(),
++      }),
++      'BEGINNER_FEATURE_LOCKED',
++    );
++    // Legacy exposure may predate learning locks. Every existing safety action
++    // still follows the actual settlement/cancellation services before Q1.
++    await spotPrice(other, '100', 0, 0);
++    const otherAssetId = other.instruments[0].asset.id;
++    await practiceOrder(app, other.userId, other.accountId, {
++      assetId: otherAssetId,
++      side: 'buy',
++      orderType: 'market',
++      amount: '100',
++    });
++    const pending = await practiceOrder(app, other.userId, other.accountId, {
++      assetId: otherAssetId,
++      side: 'buy',
++      orderType: 'limit',
++      amount: '90',
++      limitPrice: '90',
++    });
++    const holding = await db.position.findFirstOrThrow({
++      where: { tradingAccountId: other.accountId, assetId: otherAssetId },
++    });
++    const protection = await app.conditional.create(
++      other.userId,
++      other.accountId,
++      {
++        domain: 'spot',
++        assetId: otherAssetId,
++        positionId: holding.id,
++        idempotencyKey: randomUUID(),
++        legs: [
++          {
++            kind: 'take_profit',
++            triggerPrice: '120',
++            childOrderType: 'market',
++          },
++          { kind: 'stop_loss', triggerPrice: '80', childOrderType: 'market' },
++        ],
++      },
++    );
++    const markAt = await now();
++    await db.futuresMarkSnapshot.create({
++      data: {
++        instrumentId: other.instruments[0].instrument.id,
++        symbol: other.instruments[0].asset.symbol,
++        price: '100',
++        source: 'binance_usdm_mark_ws',
++        capturedAt: markAt,
++        effectiveAt: markAt,
++      },
++    });
++    const legacyPosition = await app.futures.execute(
++      other.userId,
++      other.accountId,
++      openBody(other, { leverage: 2, marginMode: 'isolated' }),
++    );
++    await db.tradingAccount.update({
++      where: { id: other.accountId },
++      data: { mode: 'beginner' },
++    });
++    assert.equal(
++      (
++        await app.quests.getQuestProgress(other.userId, other.accountId)
++      ).data.quests.some((q) => q.status !== 'not_started'),
++      false,
++    );
++    await app.orders.cancelOrderForTradingAccount(
++      other.userId,
++      other.accountId,
++      pending.data.order.orderId,
++    );
++    await app.conditional.cancelGroup(
++      other.userId,
++      other.accountId,
++      (protection as { data: { groupId: string } }).data.groupId,
++      { idempotencyKey: randomUUID() },
++    );
++    await practiceOrder(app, other.userId, other.accountId, {
++      assetId: otherAssetId,
++      side: 'sell',
++      orderType: 'market',
++      quantity: holding.quantity.toFixed(8),
++    });
++    await app.futures.execute(other.userId, other.accountId, {
++      instrumentId: other.instruments[0].instrument.id,
++      positionId: legacyPosition.data.position.id,
++      operation: 'close',
++      direction: 'long',
++      leverage: 2,
++      marginMode: 'isolated',
++      quantity: '1',
++      idempotencyKey: randomUUID(),
++    });
++    assert.equal(
++      (await app.quests.getQuestProgress(other.userId, other.accountId)).data
++        .learningAccess.allTrading,
++      false,
++    );
++    await rejects(
++      app.quests.acknowledge(s.userId, s.accountId, {
++        stepId: 'holdings_reviewed',
++        orderId: pending.data.order.orderId,
++      }),
++      'BEGINNER_QUEST_PREREQUISITE',
++    );
++    checks++;
++    await practiceFoundation(
++      db,
++      s.userId,
++      s.accountId,
++      assetId,
++      async (stage) => {
++        await fresh();
++        const p = await read();
++        const count =
++          stage === 21 ? 2 : stage === 51 || stage === 52 ? 5 : stage;
++        assert.equal(
++          p.quests.slice(0, 6).filter((q) => q.status === 'completed').length,
++          count,
++        );
++        assert.equal(p.learningAccess.allTrading, stage === 6);
++        if (stage < 6 || stage > 6) {
++          await rejects(
++            assertBeginnerLearningAccess(db, account, 'allTrading'),
++            'BEGINNER_FEATURE_LOCKED',
++          );
++          await rejects(
++            app.futures.execute(
++              s.userId,
++              s.accountId,
++              openBody(s, { leverage: 2 }),
++            ),
++            'BEGINNER_FEATURE_LOCKED',
++          );
++        }
++        if ([0, 1, 2, 21, 3, 4].includes(stage))
++          await rejects(
++            app.orders.quoteOrderForTradingAccount(
++              s.userId,
++              s.accountId,
++              limit,
++            ),
++            'BEGINNER_FEATURE_LOCKED',
++          );
++        if (stage === 21) {
++          assert.equal(p.quests[2].status, 'in_progress');
++          await rejects(
++            assertBeginnerLearningAccess(db, account, 'spotProtection'),
++            'BEGINNER_FEATURE_LOCKED',
++          );
++        }
++        if (stage === 51) {
++          const id = p.quests[5].steps[0].referenceId!;
++          await rejects(
++            app.quests.acknowledge(s.userId, s.accountId, {
++              stepId: 'limit_result_reviewed',
++              orderId: id,
++            }),
++            'BEGINNER_QUEST_EVIDENCE_REQUIRED',
++          );
++        }
++        if (stage === 52)
++          assert.equal(
++            p.quests[5].status,
++            'in_progress',
++            'cancellation alone is not UI review',
++          );
++        await new Promise((resolve) => setTimeout(resolve, 5)); // Distinct persisted millisecond evidence instants.
++        checks++;
++      },
++    );
++    const completed = await read();
++    const counts = async () =>
++      Promise.all([
++        db.order.count({ where: { tradingAccountId: s.accountId } }),
++        db.walletTransaction.count({
++          where: { tradingAccountId: s.accountId },
++        }),
++        db.beginnerQuestAcknowledgement.count({
++          where: { tradingAccountId: s.accountId },
++        }),
++      ]);
++    const before = await counts();
++    assert.deepEqual(await read(), completed);
++    assert.deepEqual(await counts(), before);
++    for (const [index, stepId] of [
++      [2, 'holdings_reviewed'],
++      [5, 'limit_result_reviewed'],
++    ] as const) {
++      await app.quests.acknowledge(s.userId, s.accountId, {
++        stepId,
++        orderId: completed.quests[index].steps[0].referenceId,
++      });
++    }
++    assert.deepEqual(await read(), completed);
++    assert.deepEqual(await counts(), before);
++    // The learned capability never overrides operational flags.
++    process.env.LIMIT_ORDER_ENABLED = 'false';
++    await rejects(
++      app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, limit),
++      'LIMIT_ORDER_DISABLED',
++    );
++    process.env.LIMIT_ORDER_ENABLED = 'true';
++    process.env.FUTURES_TRADING_MODE = 'DISABLED';
++    await rejects(
++      app.futures.execute(s.userId, s.accountId, openBody(s, { leverage: 2 })),
++      'FUTURES_TRADING_DISABLED',
++    );
++    process.env.FUTURES_TRADING_MODE = 'ENABLED';
++    // Short first: no dependency on Long or either stock quest.
++    for (const direction of ['short', 'long'] as const) {
++      await fresh();
++      const opened = await app.futures.execute(
++        s.userId,
++        s.accountId,
++        openBody(s, { direction, leverage: 2, marginMode: 'isolated' }),
++      );
++      const index = direction === 'short' ? 9 : 8;
++      assert.equal((await read()).quests[index].status, 'in_progress');
++      const partial = await app.futures.execute(s.userId, s.accountId, {
++        instrumentId: s.instruments[0].instrument.id,
++        positionId: opened.data.position.id,
++        direction,
++        leverage: 2,
++        marginMode: 'isolated',
++        operation: 'reduce',
++        quantity: '0.25',
++        idempotencyKey: randomUUID(),
++      });
++      assert.equal(partial.data.position.quantity, '0.75000000');
++      assert.equal((await read()).quests[index].status, 'in_progress');
++      await app.futures.execute(s.userId, s.accountId, {
++        instrumentId: s.instruments[0].instrument.id,
++        positionId: opened.data.position.id,
++        direction,
++        leverage: 2,
++        marginMode: 'isolated',
++        operation: 'close',
++        quantity: '0.75',
++        idempotencyKey: randomUUID(),
++      });
++      assert.equal((await read()).quests[index].status, 'completed');
++      assert.equal((await read()).quests[6].status, 'not_started');
++      checks++;
++    }
++    // US first; use real trading validators with the existing deterministic calendar fixture.
++    for (const [type, market, currency, index, source] of [
++      ['us_stock', 'NASDAQ', 'USD', 7, 'kis_us_delayed_trade'],
++      ['domestic_stock', 'KRX', 'KRW', 6, 'koscom_krx_realtime_price'],
++    ] as const) {
++      const asset = await db.asset.create({
++        data: {
++          assetType: type,
++          market,
++          symbol: `Q${randomUUID().slice(0, 7)}`,
++          name: 'Quest integration fixture',
++          currencyCode: currency,
++          priceCurrency: currency,
++          settlementCurrency: currency,
++        },
++      });
++      stocks.push(asset.id);
++      const at = await now();
++      tradingSessions.set(at, new Date(at.getTime() + 86400000), ['KRX', 'US']);
++      await db.assetPriceSnapshot.create({
++        data: {
++          assetId: asset.id,
++          price: '100',
++          currencyCode: currency,
++          sourceType: 'provider_api',
++          sourceName: source,
++          effectiveAt: at,
++          capturedAt: at,
++        },
++      });
++      await practiceOrder(app, s.userId, s.accountId, {
++        assetId: asset.id,
++        side: 'buy',
++        orderType: 'market',
++        quantity: '1',
++      });
++      assert.equal((await read()).quests[index].status, 'completed');
++      if (index === 7)
++        assert.equal((await read()).quests[6].status, 'not_started');
++      checks++;
++    }
++    assert.equal(
++      (await read()).quests.every((q) => q.status === 'completed'),
++      true,
++    );
++    assert.equal(
++      await db.beginnerQuestAcknowledgement.count({
++        where: { tradingAccountId: s.accountId },
++      }),
++      2,
++    );
++    console.log(
++      `beginner full quest DB integration passed (${checks} staged/independent practice checks)`,
++    );
++  } finally {
++    tradingSessions.reset();
++    const where = { tradingAccountId: s.accountId };
++    await db.beginnerQuestAcknowledgement.deleteMany({ where });
++    await db.protectionChild.deleteMany({ where: { group: where } });
++    await db.protectionLeg.deleteMany({ where: { group: where } });
++    await db.protectionGroup.deleteMany({ where });
++    await db.protectionCommand.deleteMany({ where });
++    await db.walletTransaction.deleteMany({ where });
++    await db.order.deleteMany({ where });
++    await db.position.deleteMany({ where });
++    await db.dailyPortfolioSnapshot.deleteMany({ where });
++    await cleanup(s);
++    const otherWhere = { tradingAccountId: other.accountId };
++    await db.protectionLeg.deleteMany({ where: { group: otherWhere } });
++    await db.protectionGroup.deleteMany({ where: otherWhere });
++    await db.protectionCommand.deleteMany({ where: otherWhere });
++    await db.walletTransaction.deleteMany({ where: otherWhere });
++    await db.order.deleteMany({ where: otherWhere });
++    await db.position.deleteMany({ where: otherWhere });
++    await db.dailyPortfolioSnapshot.deleteMany({ where: otherWhere });
++    await cleanup(other);
++    await db.assetPriceSnapshot.deleteMany({
++      where: { assetId: { in: stocks } },
++    });
++    await db.asset.deleteMany({ where: { id: { in: stocks } } });
++  }
++}
++main()
++  .catch((error) => {
++    console.error(error);
++    process.exitCode = 1;
++  })
++  .finally(async () => {
++    await db.fxRateSnapshot.deleteMany({
++      where: { id: { in: fxEvidenceIds } },
++    });
++    await db.$disconnect();
++  });
+diff --git a/backend/scripts/lib/beginner-quest-practice.ts b/backend/scripts/lib/beginner-quest-practice.ts
+new file mode 100644
+index 00000000..27222a1b
+--- /dev/null
++++ b/backend/scripts/lib/beginner-quest-practice.ts
+@@ -0,0 +1,328 @@
++/** Test-only real financial practice. Never imported by application code. */
++import { randomUUID } from 'node:crypto';
++import assert from 'node:assert/strict';
++import { PrismaService } from '../../src/prisma/prisma.service';
++import { TradingAccountAccessService } from '../../src/trading-accounts/trading-account-access.service';
++import { BeginnerQuestsService } from '../../src/trading-accounts/beginner-quests.service';
++import { PortfolioValuationService } from '../../src/portfolio/portfolio-valuation.service';
++import { GeneralAccountPerformanceService } from '../../src/portfolio/general-account-performance.service';
++import { GeneralExternalFundingService } from '../../src/portfolio/general-external-funding.service';
++import {
++  OrdersService,
++  type OrderRequestBody,
++} from '../../src/orders/orders.service';
++import { OrderReservationService } from '../../src/orders/order-reservation.service';
++import { LimitOrderCreateService } from '../../src/orders/limit-order-create.service';
++import { LimitOrderCancelService } from '../../src/orders/limit-order-cancel.service';
++import { ConditionalService } from '../../src/conditional/conditional.service';
++import { FuturesService } from '../../src/futures/futures.service';
++import { FxService } from '../../src/fx/fx.service';
++import { TradingAccountWalletTransferService } from '../../src/wallets/trading-account-wallet-transfer.service';
++
++export function practiceServices(db: PrismaService) {
++  const access = new TradingAccountAccessService(db);
++  const valuation = new PortfolioValuationService(db);
++  const performance = new GeneralAccountPerformanceService(
++    db,
++    valuation,
++    new GeneralExternalFundingService(db),
++  );
++  const reservations = new OrderReservationService();
++  const cancel = new LimitOrderCancelService(db, reservations);
++  const orders = new OrdersService(
++    db,
++    undefined,
++    new LimitOrderCreateService(db, reservations),
++    cancel,
++    access,
++    performance,
++  );
++  const futures = new FuturesService(db, access, performance);
++  return {
++    access,
++    performance,
++    orders,
++    futures,
++    quests: new BeginnerQuestsService(db, access, performance),
++    fx: new FxService(db, undefined, undefined, access, performance, valuation),
++    transfers: new TradingAccountWalletTransferService(db, access, performance),
++    conditional: new ConditionalService(db, access, orders, cancel, futures),
++  };
++}
++
++export async function practiceOrder(
++  app: ReturnType<typeof practiceServices>,
++  userId: string,
++  accountId: string,
++  body: OrderRequestBody,
++) {
++  const quote = await app.orders.quoteOrderForTradingAccount(
++    userId,
++    accountId,
++    body,
++  );
++  return app.orders.createOrderForTradingAccount(userId, accountId, {
++    ...body,
++    quoteId: quote.data.quoteId,
++    idempotencyKey: randomUUID(),
++  });
++}
++
++/** Callers provide fresh market/FX observations and enabled TEST flags. */
++export async function practiceFoundation(
++  db: PrismaService,
++  userId: string,
++  accountId: string,
++  assetId: string,
++  check: (
++    stage: number,
++    app: ReturnType<typeof practiceServices>,
++  ) => Promise<void> = async () => {},
++) {
++  const app = practiceServices(db);
++  const progress = async () =>
++    (await app.quests.getQuestProgress(userId, accountId)).data;
++  let p = await progress();
++  await check(0, app);
++  if (p.quests[0].status !== 'completed') {
++    const body = {
++      fromCurrency: 'KRW',
++      toCurrency: 'USD',
++      sourceAmount: '1400000',
++    };
++    const quote = await app.fx.quoteForTradingAccount(userId, accountId, body);
++    await app.fx.executeForTradingAccount(userId, accountId, {
++      ...body,
++      quoteId: quote.data.quoteId,
++      idempotencyKey: randomUUID(),
++    });
++  }
++  await check(1, app);
++  p = await progress();
++  if (p.quests[1].status !== 'completed') {
++    const wallets = await db.cashWallet.findMany({
++      where: { tradingAccountId: accountId },
++    });
++    await app.transfers.transfer(userId, accountId, {
++      sourceWalletId: wallets.find(
++        (w) => w.walletScope === 'securities' && w.currencyCode === 'USD',
++      )!.id,
++      destinationWalletId: wallets.find((w) => w.walletScope === 'crypto_spot')!
++        .id,
++      amount: '200',
++      idempotencyKey: randomUUID(),
++    });
++  }
++  await check(2, app);
++  const buy = await practiceOrder(app, userId, accountId, {
++    assetId,
++    side: 'buy',
++    orderType: 'market',
++    amount: '100',
++  });
++  assert.equal(buy.data.order.status, 'executed');
++  await check(21, app);
++  await app.quests.acknowledge(userId, accountId, {
++    stepId: 'holdings_reviewed',
++    orderId: buy.data.order.orderId,
++  });
++  await check(3, app);
++  const position = await db.position.findFirstOrThrow({
++    where: { tradingAccountId: accountId, assetId },
++  });
++  const protectedResult = await app.conditional.create(userId, accountId, {
++    domain: 'spot',
++    assetId,
++    positionId: position.id,
++    idempotencyKey: randomUUID(),
++    legs: [
++      { kind: 'take_profit', triggerPrice: '120', childOrderType: 'market' },
++      { kind: 'stop_loss', triggerPrice: '80', childOrderType: 'market' },
++    ],
++  });
++  await check(4, app);
++  await app.conditional.cancelGroup(
++    userId,
++    accountId,
++    (protectedResult as { data: { groupId: string } }).data.groupId,
++    { idempotencyKey: randomUUID() },
++  );
++  await practiceOrder(app, userId, accountId, {
++    assetId,
++    side: 'sell',
++    orderType: 'market',
++    quantity: position.quantity.toFixed(8),
++  });
++  await check(5, app);
++  const limit = await practiceOrder(app, userId, accountId, {
++    assetId,
++    side: 'buy',
++    orderType: 'limit',
++    amount: '90',
++    limitPrice: '90',
++  });
++  assert.equal(limit.data.order.status, 'submitted');
++  await check(51, app);
++  await app.orders.cancelOrderForTradingAccount(
++    userId,
++    accountId,
++    limit.data.order.orderId,
++  );
++  await check(52, app);
++  await app.quests.acknowledge(userId, accountId, {
++    stepId: 'limit_result_reviewed',
++    orderId: limit.data.order.orderId,
++  });
++  await check(6, app);
++  assert.equal((await progress()).learningAccess.allTrading, true);
++  return {
++    app,
++    buyId: buy.data.order.orderId,
++    limitId: limit.data.order.orderId,
++  };
++}
++
++/** Existing financial regression fixtures exercise a fully learned beginner.
++ * Their explicit starting balances are restored after REAL foundation commands;
++ * the immutable orders/acknowledgements remain available to the policy reader. */
++let preparation: Promise<unknown> = Promise.resolve();
++export function prepareLearnedBeginner(
++  db: PrismaService,
++  userId: string,
++  accountId: string,
++) {
++  const pending = preparation.then(() =>
++    prepareLearningFixture(db, userId, accountId),
++  );
++  preparation = pending.catch(() => undefined);
++  return pending;
++}
++async function prepareLearningFixture(
++  db: PrismaService,
++  userId: string,
++  accountId: string,
++) {
++  if (process.env.NODE_ENV !== 'test')
++    throw new Error('Learning fixture is test-only');
++  const saved = await db.cashWallet.findMany({
++    where: { tradingAccountId: accountId },
++  });
++  const flags = {
++    limit: process.env.LIMIT_ORDER_ENABLED,
++    protection: process.env.CONDITIONAL_ORDERS_ENABLED,
++  };
++  process.env.LIMIT_ORDER_ENABLED = 'true';
++  process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
++  const asset = await db.asset.create({
++    data: {
++      symbol: `LEARN-${randomUUID()}`,
++      name: `learning-fixture:${accountId}`,
++      market: 'BINANCE',
++      assetType: 'crypto',
++      currencyCode: 'USD',
++      priceCurrency: 'USD',
++      settlementCurrency: 'USD',
++    },
++  });
++  const at = new Date(Date.now() - 1000);
++  const rate = await db.fxRateSnapshot.create({
++    data: {
++      baseCurrency: 'USD',
++      quoteCurrency: 'KRW',
++      rate: '1400',
++      sourceType: 'provider_api',
++      sourceName: 'korea_exim_exchange_rate',
++      capturedAt: at,
++      effectiveAt: at,
++    },
++  });
++  try {
++    await db.assetPriceSnapshot.create({
++      data: {
++        assetId: asset.id,
++        price: '100',
++        currencyCode: 'USD',
++        sourceType: 'provider_api',
++        sourceName: 'binance_spot_ws_ticker',
++        effectiveAt: at,
++        capturedAt: at,
++      },
++    });
++    await db.cashWallet.updateMany({
++      where: { tradingAccountId: accountId },
++      data: { reservedAmount: '0' },
++    });
++    await practiceFoundation(db, userId, accountId, asset.id, async () => {
++      await new Promise((resolve) => setTimeout(resolve, 5));
++    });
++    for (const wallet of saved)
++      await db.cashWallet.update({
++        where: { id: wallet.id },
++        data: {
++          balanceAmount: wallet.balanceAmount,
++          reservedAmount: wallet.reservedAmount,
++        },
++      });
++  } finally {
++    if (flags.limit === undefined) delete process.env.LIMIT_ORDER_ENABLED;
++    else process.env.LIMIT_ORDER_ENABLED = flags.limit;
++    if (flags.protection === undefined)
++      delete process.env.CONDITIONAL_ORDERS_ENABLED;
++    else process.env.CONDITIONAL_ORDERS_ENABLED = flags.protection;
++    // Keep the rate while ExchangeTransaction references it; cleanup below owns it.
++  }
++  return rate.id;
++}
++
++export async function cleanupLearningPractice(
++  db: PrismaService,
++  accountId: string,
++) {
++  const assets = await db.asset.findMany({
++    where: { name: `learning-fixture:${accountId}` },
++    select: { id: true },
++  });
++  if (!assets.length) return;
++  const where = { tradingAccountId: accountId };
++  const rates = await db.exchangeTransaction.findMany({
++    where,
++    select: { fxRateSnapshotId: true },
++  });
++  await db.beginnerQuestAcknowledgement.deleteMany({ where });
++  await db.protectionChild.deleteMany({ where: { group: where } });
++  await db.protectionLeg.deleteMany({ where: { group: where } });
++  await db.protectionGroup.deleteMany({ where });
++  await db.protectionCommand.deleteMany({ where });
++  await db.order.deleteMany({
++    where: { ...where, assetId: { in: assets.map((a) => a.id) } },
++  });
++  await db.position.deleteMany({
++    where: { ...where, assetId: { in: assets.map((a) => a.id) } },
++  });
++  // Quote rows retain their asset FK until the account's ordinary cleanup runs.
++  return {
++    assetIds: assets.map((a) => a.id),
++    rateIds: rates
++      .map((r) => r.fxRateSnapshotId)
++      .filter((id): id is string => !!id),
++  };
++}
++
++export async function releaseLearningAssets(
++  db: PrismaService,
++  learning: Awaited<ReturnType<typeof cleanupLearningPractice>>,
++) {
++  if (!learning) return;
++  await db.assetPriceSnapshot.deleteMany({
++    where: { assetId: { in: learning.assetIds } },
++  });
++  await db.asset.deleteMany({ where: { id: { in: learning.assetIds } } });
++  await db.fxRateSnapshot.deleteMany({
++    where: {
++      id: { in: learning.rateIds },
++      exchangeTransactions: { none: {} },
++      orders: { none: {} },
++      quotes: { none: {} },
++    },
++  });
++}
+diff --git a/backend/src/generated/prisma/models/BeginnerQuestAcknowledgement.ts b/backend/src/generated/prisma/models/BeginnerQuestAcknowledgement.ts
+new file mode 100644
+index 00000000..7b6ce84e
+--- /dev/null
++++ b/backend/src/generated/prisma/models/BeginnerQuestAcknowledgement.ts
+@@ -0,0 +1,1426 @@
++
++/* !!! This is code generated by Prisma. Do not edit directly. !!! */
++/* eslint-disable */
++// biome-ignore-all lint: generated file
++// @ts-nocheck 
++/*
++ * This file exports the `BeginnerQuestAcknowledgement` model and its related types.
++ *
++ * 🟢 You can import this file directly.
++ */
++import type * as runtime from "@prisma/client/runtime/client"
++import type * as $Enums from "../enums.js"
++import type * as Prisma from "../internal/prismaNamespace.js"
++
++/**
++ * Model BeginnerQuestAcknowledgement
++ * 
++ */
++export type BeginnerQuestAcknowledgementModel = runtime.Types.Result.DefaultSelection<Prisma.$BeginnerQuestAcknowledgementPayload>
++
++export type AggregateBeginnerQuestAcknowledgement = {
++  _count: BeginnerQuestAcknowledgementCountAggregateOutputType | null
++  _min: BeginnerQuestAcknowledgementMinAggregateOutputType | null
++  _max: BeginnerQuestAcknowledgementMaxAggregateOutputType | null
++}
++
++export type BeginnerQuestAcknowledgementMinAggregateOutputType = {
++  tradingAccountId: string | null
++  stepId: string | null
++  orderId: string | null
++  acknowledgedAt: Date | null
++}
++
++export type BeginnerQuestAcknowledgementMaxAggregateOutputType = {
++  tradingAccountId: string | null
++  stepId: string | null
++  orderId: string | null
++  acknowledgedAt: Date | null
++}
++
++export type BeginnerQuestAcknowledgementCountAggregateOutputType = {
++  tradingAccountId: number
++  stepId: number
++  orderId: number
++  acknowledgedAt: number
++  _all: number
++}
++
++
++export type BeginnerQuestAcknowledgementMinAggregateInputType = {
++  tradingAccountId?: true
++  stepId?: true
++  orderId?: true
++  acknowledgedAt?: true
++}
++
++export type BeginnerQuestAcknowledgementMaxAggregateInputType = {
++  tradingAccountId?: true
++  stepId?: true
++  orderId?: true
++  acknowledgedAt?: true
++}
++
++export type BeginnerQuestAcknowledgementCountAggregateInputType = {
++  tradingAccountId?: true
++  stepId?: true
++  orderId?: true
++  acknowledgedAt?: true
++  _all?: true
++}
++
++export type BeginnerQuestAcknowledgementAggregateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Filter which BeginnerQuestAcknowledgement to aggregate.
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
++   * 
++   * Determine the order of BeginnerQuestAcknowledgements to fetch.
++   */
++  orderBy?: Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput | Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput[]
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
++   * 
++   * Sets the start position
++   */
++  cursor?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Take `±n` BeginnerQuestAcknowledgements from the position of the cursor.
++   */
++  take?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Skip the first `n` BeginnerQuestAcknowledgements.
++   */
++  skip?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
++   * 
++   * Count returned BeginnerQuestAcknowledgements
++  **/
++  _count?: true | BeginnerQuestAcknowledgementCountAggregateInputType
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
++   * 
++   * Select which fields to find the minimum value
++  **/
++  _min?: BeginnerQuestAcknowledgementMinAggregateInputType
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
++   * 
++   * Select which fields to find the maximum value
++  **/
++  _max?: BeginnerQuestAcknowledgementMaxAggregateInputType
++}
++
++export type GetBeginnerQuestAcknowledgementAggregateType<T extends BeginnerQuestAcknowledgementAggregateArgs> = {
++      [P in keyof T & keyof AggregateBeginnerQuestAcknowledgement]: P extends '_count' | 'count'
++    ? T[P] extends true
++      ? number
++      : Prisma.GetScalarType<T[P], AggregateBeginnerQuestAcknowledgement[P]>
++    : Prisma.GetScalarType<T[P], AggregateBeginnerQuestAcknowledgement[P]>
++}
++
++
++
++
++export type BeginnerQuestAcknowledgementGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  orderBy?: Prisma.BeginnerQuestAcknowledgementOrderByWithAggregationInput | Prisma.BeginnerQuestAcknowledgementOrderByWithAggregationInput[]
++  by: Prisma.BeginnerQuestAcknowledgementScalarFieldEnum[] | Prisma.BeginnerQuestAcknowledgementScalarFieldEnum
++  having?: Prisma.BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput
++  take?: number
++  skip?: number
++  _count?: BeginnerQuestAcknowledgementCountAggregateInputType | true
++  _min?: BeginnerQuestAcknowledgementMinAggregateInputType
++  _max?: BeginnerQuestAcknowledgementMaxAggregateInputType
++}
++
++export type BeginnerQuestAcknowledgementGroupByOutputType = {
++  tradingAccountId: string
++  stepId: string
++  orderId: string
++  acknowledgedAt: Date
++  _count: BeginnerQuestAcknowledgementCountAggregateOutputType | null
++  _min: BeginnerQuestAcknowledgementMinAggregateOutputType | null
++  _max: BeginnerQuestAcknowledgementMaxAggregateOutputType | null
++}
++
++export type GetBeginnerQuestAcknowledgementGroupByPayload<T extends BeginnerQuestAcknowledgementGroupByArgs> = Prisma.PrismaPromise<
++  Array<
++    Prisma.PickEnumerable<BeginnerQuestAcknowledgementGroupByOutputType, T['by']> &
++      {
++        [P in ((keyof T) & (keyof BeginnerQuestAcknowledgementGroupByOutputType))]: P extends '_count'
++          ? T[P] extends boolean
++            ? number
++            : Prisma.GetScalarType<T[P], BeginnerQuestAcknowledgementGroupByOutputType[P]>
++          : Prisma.GetScalarType<T[P], BeginnerQuestAcknowledgementGroupByOutputType[P]>
++      }
++    >
++  >
++
++
++
++export type BeginnerQuestAcknowledgementWhereInput = {
++  AND?: Prisma.BeginnerQuestAcknowledgementWhereInput | Prisma.BeginnerQuestAcknowledgementWhereInput[]
++  OR?: Prisma.BeginnerQuestAcknowledgementWhereInput[]
++  NOT?: Prisma.BeginnerQuestAcknowledgementWhereInput | Prisma.BeginnerQuestAcknowledgementWhereInput[]
++  tradingAccountId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  stepId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  orderId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  acknowledgedAt?: Prisma.DateTimeFilter<"BeginnerQuestAcknowledgement"> | Date | string
++  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
++  order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
++}
++
++export type BeginnerQuestAcknowledgementOrderByWithRelationInput = {
++  tradingAccountId?: Prisma.SortOrder
++  stepId?: Prisma.SortOrder
++  orderId?: Prisma.SortOrder
++  acknowledgedAt?: Prisma.SortOrder
++  tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
++  order?: Prisma.OrderOrderByWithRelationInput
++}
++
++export type BeginnerQuestAcknowledgementWhereUniqueInput = Prisma.AtLeast<{
++  tradingAccountId_stepId?: Prisma.BeginnerQuestAcknowledgementTradingAccountIdStepIdCompoundUniqueInput
++  AND?: Prisma.BeginnerQuestAcknowledgementWhereInput | Prisma.BeginnerQuestAcknowledgementWhereInput[]
++  OR?: Prisma.BeginnerQuestAcknowledgementWhereInput[]
++  NOT?: Prisma.BeginnerQuestAcknowledgementWhereInput | Prisma.BeginnerQuestAcknowledgementWhereInput[]
++  tradingAccountId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  stepId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  orderId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  acknowledgedAt?: Prisma.DateTimeFilter<"BeginnerQuestAcknowledgement"> | Date | string
++  tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
++  order?: Prisma.XOR<Prisma.OrderScalarRelationFilter, Prisma.OrderWhereInput>
++}, "tradingAccountId_stepId">
++
++export type BeginnerQuestAcknowledgementOrderByWithAggregationInput = {
++  tradingAccountId?: Prisma.SortOrder
++  stepId?: Prisma.SortOrder
++  orderId?: Prisma.SortOrder
++  acknowledgedAt?: Prisma.SortOrder
++  _count?: Prisma.BeginnerQuestAcknowledgementCountOrderByAggregateInput
++  _max?: Prisma.BeginnerQuestAcknowledgementMaxOrderByAggregateInput
++  _min?: Prisma.BeginnerQuestAcknowledgementMinOrderByAggregateInput
++}
++
++export type BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput = {
++  AND?: Prisma.BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput | Prisma.BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput[]
++  OR?: Prisma.BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput[]
++  NOT?: Prisma.BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput | Prisma.BeginnerQuestAcknowledgementScalarWhereWithAggregatesInput[]
++  tradingAccountId?: Prisma.StringWithAggregatesFilter<"BeginnerQuestAcknowledgement"> | string
++  stepId?: Prisma.StringWithAggregatesFilter<"BeginnerQuestAcknowledgement"> | string
++  orderId?: Prisma.StringWithAggregatesFilter<"BeginnerQuestAcknowledgement"> | string
++  acknowledgedAt?: Prisma.DateTimeWithAggregatesFilter<"BeginnerQuestAcknowledgement"> | Date | string
++}
++
++export type BeginnerQuestAcknowledgementCreateInput = {
++  stepId: string
++  acknowledgedAt: Date | string
++  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutBeginnerQuestAcknowledgementsInput
++  order: Prisma.OrderCreateNestedOneWithoutBeginnerQuestAcknowledgementsInput
++}
++
++export type BeginnerQuestAcknowledgementUncheckedCreateInput = {
++  tradingAccountId: string
++  stepId: string
++  orderId: string
++  acknowledgedAt: Date | string
++}
++
++export type BeginnerQuestAcknowledgementUpdateInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutBeginnerQuestAcknowledgementsNestedInput
++  order?: Prisma.OrderUpdateOneRequiredWithoutBeginnerQuestAcknowledgementsNestedInput
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateInput = {
++  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  orderId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++export type BeginnerQuestAcknowledgementCreateManyInput = {
++  tradingAccountId: string
++  stepId: string
++  orderId: string
++  acknowledgedAt: Date | string
++}
++
++export type BeginnerQuestAcknowledgementUpdateManyMutationInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateManyInput = {
++  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  orderId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++export type BeginnerQuestAcknowledgementListRelationFilter = {
++  every?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  some?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  none?: Prisma.BeginnerQuestAcknowledgementWhereInput
++}
++
++export type BeginnerQuestAcknowledgementOrderByRelationAggregateInput = {
++  _count?: Prisma.SortOrder
++}
++
++export type BeginnerQuestAcknowledgementTradingAccountIdStepIdCompoundUniqueInput = {
++  tradingAccountId: string
++  stepId: string
++}
++
++export type BeginnerQuestAcknowledgementCountOrderByAggregateInput = {
++  tradingAccountId?: Prisma.SortOrder
++  stepId?: Prisma.SortOrder
++  orderId?: Prisma.SortOrder
++  acknowledgedAt?: Prisma.SortOrder
++}
++
++export type BeginnerQuestAcknowledgementMaxOrderByAggregateInput = {
++  tradingAccountId?: Prisma.SortOrder
++  stepId?: Prisma.SortOrder
++  orderId?: Prisma.SortOrder
++  acknowledgedAt?: Prisma.SortOrder
++}
++
++export type BeginnerQuestAcknowledgementMinOrderByAggregateInput = {
++  tradingAccountId?: Prisma.SortOrder
++  stepId?: Prisma.SortOrder
++  orderId?: Prisma.SortOrder
++  acknowledgedAt?: Prisma.SortOrder
++}
++
++export type BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyTradingAccountInputEnvelope
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++}
++
++export type BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyTradingAccountInputEnvelope
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++}
++
++export type BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput[]
++  upsert?: Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutTradingAccountInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyTradingAccountInputEnvelope
++  set?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  disconnect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  delete?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  update?: Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutTradingAccountInput[]
++  updateMany?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutTradingAccountInput[]
++  deleteMany?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput | Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput[]
++  upsert?: Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutTradingAccountInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyTradingAccountInputEnvelope
++  set?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  disconnect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  delete?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  update?: Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutTradingAccountInput[]
++  updateMany?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutTradingAccountInput | Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutTradingAccountInput[]
++  deleteMany?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput | Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++}
++
++export type BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyOrderInputEnvelope
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++}
++
++export type BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyOrderInputEnvelope
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++}
++
++export type BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput[]
++  upsert?: Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutOrderInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyOrderInputEnvelope
++  set?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  disconnect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  delete?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  update?: Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutOrderInput[]
++  updateMany?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutOrderInput[]
++  deleteMany?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput | Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput = {
++  create?: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput> | Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput[] | Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput[]
++  connectOrCreate?: Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput[]
++  upsert?: Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutOrderInput[]
++  createMany?: Prisma.BeginnerQuestAcknowledgementCreateManyOrderInputEnvelope
++  set?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  disconnect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  delete?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  connect?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput | Prisma.BeginnerQuestAcknowledgementWhereUniqueInput[]
++  update?: Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutOrderInput[]
++  updateMany?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutOrderInput | Prisma.BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutOrderInput[]
++  deleteMany?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput | Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++}
++
++export type BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput = {
++  stepId: string
++  acknowledgedAt: Date | string
++  order: Prisma.OrderCreateNestedOneWithoutBeginnerQuestAcknowledgementsInput
++}
++
++export type BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput = {
++  stepId: string
++  orderId: string
++  acknowledgedAt: Date | string
++}
++
++export type BeginnerQuestAcknowledgementCreateOrConnectWithoutTradingAccountInput = {
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  create: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput>
++}
++
++export type BeginnerQuestAcknowledgementCreateManyTradingAccountInputEnvelope = {
++  data: Prisma.BeginnerQuestAcknowledgementCreateManyTradingAccountInput | Prisma.BeginnerQuestAcknowledgementCreateManyTradingAccountInput[]
++  skipDuplicates?: boolean
++}
++
++export type BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutTradingAccountInput = {
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  update: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateWithoutTradingAccountInput>
++  create: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutTradingAccountInput>
++}
++
++export type BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutTradingAccountInput = {
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateWithoutTradingAccountInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateWithoutTradingAccountInput>
++}
++
++export type BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutTradingAccountInput = {
++  where: Prisma.BeginnerQuestAcknowledgementScalarWhereInput
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateManyMutationInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountInput>
++}
++
++export type BeginnerQuestAcknowledgementScalarWhereInput = {
++  AND?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput | Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++  OR?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++  NOT?: Prisma.BeginnerQuestAcknowledgementScalarWhereInput | Prisma.BeginnerQuestAcknowledgementScalarWhereInput[]
++  tradingAccountId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  stepId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  orderId?: Prisma.StringFilter<"BeginnerQuestAcknowledgement"> | string
++  acknowledgedAt?: Prisma.DateTimeFilter<"BeginnerQuestAcknowledgement"> | Date | string
++}
++
++export type BeginnerQuestAcknowledgementCreateWithoutOrderInput = {
++  stepId: string
++  acknowledgedAt: Date | string
++  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutBeginnerQuestAcknowledgementsInput
++}
++
++export type BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput = {
++  stepId: string
++  acknowledgedAt: Date | string
++}
++
++export type BeginnerQuestAcknowledgementCreateOrConnectWithoutOrderInput = {
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  create: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput>
++}
++
++export type BeginnerQuestAcknowledgementCreateManyOrderInputEnvelope = {
++  data: Prisma.BeginnerQuestAcknowledgementCreateManyOrderInput | Prisma.BeginnerQuestAcknowledgementCreateManyOrderInput[]
++  skipDuplicates?: boolean
++}
++
++export type BeginnerQuestAcknowledgementUpsertWithWhereUniqueWithoutOrderInput = {
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  update: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateWithoutOrderInput>
++  create: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateWithoutOrderInput>
++}
++
++export type BeginnerQuestAcknowledgementUpdateWithWhereUniqueWithoutOrderInput = {
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateWithoutOrderInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateWithoutOrderInput>
++}
++
++export type BeginnerQuestAcknowledgementUpdateManyWithWhereWithoutOrderInput = {
++  where: Prisma.BeginnerQuestAcknowledgementScalarWhereInput
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateManyMutationInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderInput>
++}
++
++export type BeginnerQuestAcknowledgementCreateManyTradingAccountInput = {
++  stepId: string
++  orderId: string
++  acknowledgedAt: Date | string
++}
++
++export type BeginnerQuestAcknowledgementUpdateWithoutTradingAccountInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++  order?: Prisma.OrderUpdateOneRequiredWithoutBeginnerQuestAcknowledgementsNestedInput
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateWithoutTradingAccountInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  orderId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  orderId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++export type BeginnerQuestAcknowledgementCreateManyOrderInput = {
++  stepId: string
++  acknowledgedAt: Date | string
++}
++
++export type BeginnerQuestAcknowledgementUpdateWithoutOrderInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutBeginnerQuestAcknowledgementsNestedInput
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateWithoutOrderInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++export type BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderInput = {
++  stepId?: Prisma.StringFieldUpdateOperationsInput | string
++  acknowledgedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
++}
++
++
++
++export type BeginnerQuestAcknowledgementSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
++  tradingAccountId?: boolean
++  stepId?: boolean
++  orderId?: boolean
++  acknowledgedAt?: boolean
++  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
++  order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
++}, ExtArgs["result"]["beginnerQuestAcknowledgement"]>
++
++export type BeginnerQuestAcknowledgementSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
++  tradingAccountId?: boolean
++  stepId?: boolean
++  orderId?: boolean
++  acknowledgedAt?: boolean
++  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
++  order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
++}, ExtArgs["result"]["beginnerQuestAcknowledgement"]>
++
++export type BeginnerQuestAcknowledgementSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
++  tradingAccountId?: boolean
++  stepId?: boolean
++  orderId?: boolean
++  acknowledgedAt?: boolean
++  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
++  order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
++}, ExtArgs["result"]["beginnerQuestAcknowledgement"]>
++
++export type BeginnerQuestAcknowledgementSelectScalar = {
++  tradingAccountId?: boolean
++  stepId?: boolean
++  orderId?: boolean
++  acknowledgedAt?: boolean
++}
++
++export type BeginnerQuestAcknowledgementOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"tradingAccountId" | "stepId" | "orderId" | "acknowledgedAt", ExtArgs["result"]["beginnerQuestAcknowledgement"]>
++export type BeginnerQuestAcknowledgementInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
++  order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
++}
++export type BeginnerQuestAcknowledgementIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
++  order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
++}
++export type BeginnerQuestAcknowledgementIncludeUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
++  order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
++}
++
++export type $BeginnerQuestAcknowledgementPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  name: "BeginnerQuestAcknowledgement"
++  objects: {
++    tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
++    order: Prisma.$OrderPayload<ExtArgs>
++  }
++  scalars: runtime.Types.Extensions.GetPayloadResult<{
++    tradingAccountId: string
++    stepId: string
++    orderId: string
++    acknowledgedAt: Date
++  }, ExtArgs["result"]["beginnerQuestAcknowledgement"]>
++  composites: {}
++}
++
++export type BeginnerQuestAcknowledgementGetPayload<S extends boolean | null | undefined | BeginnerQuestAcknowledgementDefaultArgs> = runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload, S>
++
++export type BeginnerQuestAcknowledgementCountArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> =
++  Omit<BeginnerQuestAcknowledgementFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
++    select?: BeginnerQuestAcknowledgementCountAggregateInputType | true
++  }
++
++export interface BeginnerQuestAcknowledgementDelegate<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> {
++  [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['BeginnerQuestAcknowledgement'], meta: { name: 'BeginnerQuestAcknowledgement' } }
++  /**
++   * Find zero or one BeginnerQuestAcknowledgement that matches the filter.
++   * @param {BeginnerQuestAcknowledgementFindUniqueArgs} args - Arguments to find a BeginnerQuestAcknowledgement
++   * @example
++   * // Get one BeginnerQuestAcknowledgement
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.findUnique({
++   *   where: {
++   *     // ... provide filter here
++   *   }
++   * })
++   */
++  findUnique<T extends BeginnerQuestAcknowledgementFindUniqueArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementFindUniqueArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Find one BeginnerQuestAcknowledgement that matches the filter or throw an error with `error.code='P2025'`
++   * if no matches were found.
++   * @param {BeginnerQuestAcknowledgementFindUniqueOrThrowArgs} args - Arguments to find a BeginnerQuestAcknowledgement
++   * @example
++   * // Get one BeginnerQuestAcknowledgement
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.findUniqueOrThrow({
++   *   where: {
++   *     // ... provide filter here
++   *   }
++   * })
++   */
++  findUniqueOrThrow<T extends BeginnerQuestAcknowledgementFindUniqueOrThrowArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementFindUniqueOrThrowArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Find the first BeginnerQuestAcknowledgement that matches the filter.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementFindFirstArgs} args - Arguments to find a BeginnerQuestAcknowledgement
++   * @example
++   * // Get one BeginnerQuestAcknowledgement
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.findFirst({
++   *   where: {
++   *     // ... provide filter here
++   *   }
++   * })
++   */
++  findFirst<T extends BeginnerQuestAcknowledgementFindFirstArgs>(args?: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementFindFirstArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Find the first BeginnerQuestAcknowledgement that matches the filter or
++   * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementFindFirstOrThrowArgs} args - Arguments to find a BeginnerQuestAcknowledgement
++   * @example
++   * // Get one BeginnerQuestAcknowledgement
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.findFirstOrThrow({
++   *   where: {
++   *     // ... provide filter here
++   *   }
++   * })
++   */
++  findFirstOrThrow<T extends BeginnerQuestAcknowledgementFindFirstOrThrowArgs>(args?: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementFindFirstOrThrowArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Find zero or more BeginnerQuestAcknowledgements that matches the filter.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementFindManyArgs} args - Arguments to filter and select certain fields only.
++   * @example
++   * // Get all BeginnerQuestAcknowledgements
++   * const beginnerQuestAcknowledgements = await prisma.beginnerQuestAcknowledgement.findMany()
++   * 
++   * // Get first 10 BeginnerQuestAcknowledgements
++   * const beginnerQuestAcknowledgements = await prisma.beginnerQuestAcknowledgement.findMany({ take: 10 })
++   * 
++   * // Only select the `tradingAccountId`
++   * const beginnerQuestAcknowledgementWithTradingAccountIdOnly = await prisma.beginnerQuestAcknowledgement.findMany({ select: { tradingAccountId: true } })
++   * 
++   */
++  findMany<T extends BeginnerQuestAcknowledgementFindManyArgs>(args?: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
++
++  /**
++   * Create a BeginnerQuestAcknowledgement.
++   * @param {BeginnerQuestAcknowledgementCreateArgs} args - Arguments to create a BeginnerQuestAcknowledgement.
++   * @example
++   * // Create one BeginnerQuestAcknowledgement
++   * const BeginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.create({
++   *   data: {
++   *     // ... data to create a BeginnerQuestAcknowledgement
++   *   }
++   * })
++   * 
++   */
++  create<T extends BeginnerQuestAcknowledgementCreateArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementCreateArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Create many BeginnerQuestAcknowledgements.
++   * @param {BeginnerQuestAcknowledgementCreateManyArgs} args - Arguments to create many BeginnerQuestAcknowledgements.
++   * @example
++   * // Create many BeginnerQuestAcknowledgements
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.createMany({
++   *   data: [
++   *     // ... provide data here
++   *   ]
++   * })
++   *     
++   */
++  createMany<T extends BeginnerQuestAcknowledgementCreateManyArgs>(args?: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
++
++  /**
++   * Create many BeginnerQuestAcknowledgements and returns the data saved in the database.
++   * @param {BeginnerQuestAcknowledgementCreateManyAndReturnArgs} args - Arguments to create many BeginnerQuestAcknowledgements.
++   * @example
++   * // Create many BeginnerQuestAcknowledgements
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.createManyAndReturn({
++   *   data: [
++   *     // ... provide data here
++   *   ]
++   * })
++   * 
++   * // Create many BeginnerQuestAcknowledgements and only return the `tradingAccountId`
++   * const beginnerQuestAcknowledgementWithTradingAccountIdOnly = await prisma.beginnerQuestAcknowledgement.createManyAndReturn({
++   *   select: { tradingAccountId: true },
++   *   data: [
++   *     // ... provide data here
++   *   ]
++   * })
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * 
++   */
++  createManyAndReturn<T extends BeginnerQuestAcknowledgementCreateManyAndReturnArgs>(args?: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
++
++  /**
++   * Delete a BeginnerQuestAcknowledgement.
++   * @param {BeginnerQuestAcknowledgementDeleteArgs} args - Arguments to delete one BeginnerQuestAcknowledgement.
++   * @example
++   * // Delete one BeginnerQuestAcknowledgement
++   * const BeginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.delete({
++   *   where: {
++   *     // ... filter to delete one BeginnerQuestAcknowledgement
++   *   }
++   * })
++   * 
++   */
++  delete<T extends BeginnerQuestAcknowledgementDeleteArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementDeleteArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Update one BeginnerQuestAcknowledgement.
++   * @param {BeginnerQuestAcknowledgementUpdateArgs} args - Arguments to update one BeginnerQuestAcknowledgement.
++   * @example
++   * // Update one BeginnerQuestAcknowledgement
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.update({
++   *   where: {
++   *     // ... provide filter here
++   *   },
++   *   data: {
++   *     // ... provide data here
++   *   }
++   * })
++   * 
++   */
++  update<T extends BeginnerQuestAcknowledgementUpdateArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementUpdateArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
++
++  /**
++   * Delete zero or more BeginnerQuestAcknowledgements.
++   * @param {BeginnerQuestAcknowledgementDeleteManyArgs} args - Arguments to filter BeginnerQuestAcknowledgements to delete.
++   * @example
++   * // Delete a few BeginnerQuestAcknowledgements
++   * const { count } = await prisma.beginnerQuestAcknowledgement.deleteMany({
++   *   where: {
++   *     // ... provide filter here
++   *   }
++   * })
++   * 
++   */
++  deleteMany<T extends BeginnerQuestAcknowledgementDeleteManyArgs>(args?: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
++
++  /**
++   * Update zero or more BeginnerQuestAcknowledgements.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementUpdateManyArgs} args - Arguments to update one or more rows.
++   * @example
++   * // Update many BeginnerQuestAcknowledgements
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.updateMany({
++   *   where: {
++   *     // ... provide filter here
++   *   },
++   *   data: {
++   *     // ... provide data here
++   *   }
++   * })
++   * 
++   */
++  updateMany<T extends BeginnerQuestAcknowledgementUpdateManyArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<Prisma.BatchPayload>
++
++  /**
++   * Update zero or more BeginnerQuestAcknowledgements and returns the data updated in the database.
++   * @param {BeginnerQuestAcknowledgementUpdateManyAndReturnArgs} args - Arguments to update many BeginnerQuestAcknowledgements.
++   * @example
++   * // Update many BeginnerQuestAcknowledgements
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.updateManyAndReturn({
++   *   where: {
++   *     // ... provide filter here
++   *   },
++   *   data: [
++   *     // ... provide data here
++   *   ]
++   * })
++   * 
++   * // Update zero or more BeginnerQuestAcknowledgements and only return the `tradingAccountId`
++   * const beginnerQuestAcknowledgementWithTradingAccountIdOnly = await prisma.beginnerQuestAcknowledgement.updateManyAndReturn({
++   *   select: { tradingAccountId: true },
++   *   where: {
++   *     // ... provide filter here
++   *   },
++   *   data: [
++   *     // ... provide data here
++   *   ]
++   * })
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * 
++   */
++  updateManyAndReturn<T extends BeginnerQuestAcknowledgementUpdateManyAndReturnArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
++
++  /**
++   * Create or update one BeginnerQuestAcknowledgement.
++   * @param {BeginnerQuestAcknowledgementUpsertArgs} args - Arguments to update or create a BeginnerQuestAcknowledgement.
++   * @example
++   * // Update or create a BeginnerQuestAcknowledgement
++   * const beginnerQuestAcknowledgement = await prisma.beginnerQuestAcknowledgement.upsert({
++   *   create: {
++   *     // ... data to create a BeginnerQuestAcknowledgement
++   *   },
++   *   update: {
++   *     // ... in case it already exists, update
++   *   },
++   *   where: {
++   *     // ... the filter for the BeginnerQuestAcknowledgement we want to update
++   *   }
++   * })
++   */
++  upsert<T extends BeginnerQuestAcknowledgementUpsertArgs>(args: Prisma.SelectSubset<T, BeginnerQuestAcknowledgementUpsertArgs<ExtArgs>>): Prisma.Prisma__BeginnerQuestAcknowledgementClient<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
++
++
++  /**
++   * Count the number of BeginnerQuestAcknowledgements.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementCountArgs} args - Arguments to filter BeginnerQuestAcknowledgements to count.
++   * @example
++   * // Count the number of BeginnerQuestAcknowledgements
++   * const count = await prisma.beginnerQuestAcknowledgement.count({
++   *   where: {
++   *     // ... the filter for the BeginnerQuestAcknowledgements we want to count
++   *   }
++   * })
++  **/
++  count<T extends BeginnerQuestAcknowledgementCountArgs>(
++    args?: Prisma.Subset<T, BeginnerQuestAcknowledgementCountArgs>,
++  ): Prisma.PrismaPromise<
++    T extends runtime.Types.Utils.Record<'select', any>
++      ? T['select'] extends true
++        ? number
++        : Prisma.GetScalarType<T['select'], BeginnerQuestAcknowledgementCountAggregateOutputType>
++      : number
++  >
++
++  /**
++   * Allows you to perform aggregations operations on a BeginnerQuestAcknowledgement.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
++   * @example
++   * // Ordered by age ascending
++   * // Where email contains prisma.io
++   * // Limited to the 10 users
++   * const aggregations = await prisma.user.aggregate({
++   *   _avg: {
++   *     age: true,
++   *   },
++   *   where: {
++   *     email: {
++   *       contains: "prisma.io",
++   *     },
++   *   },
++   *   orderBy: {
++   *     age: "asc",
++   *   },
++   *   take: 10,
++   * })
++  **/
++  aggregate<T extends BeginnerQuestAcknowledgementAggregateArgs>(args: Prisma.Subset<T, BeginnerQuestAcknowledgementAggregateArgs>): Prisma.PrismaPromise<GetBeginnerQuestAcknowledgementAggregateType<T>>
++
++  /**
++   * Group by BeginnerQuestAcknowledgement.
++   * Note, that providing `undefined` is treated as the value not being there.
++   * Read more here: https://pris.ly/d/null-undefined
++   * @param {BeginnerQuestAcknowledgementGroupByArgs} args - Group by arguments.
++   * @example
++   * // Group by city, order by createdAt, get count
++   * const result = await prisma.user.groupBy({
++   *   by: ['city', 'createdAt'],
++   *   orderBy: {
++   *     createdAt: true
++   *   },
++   *   _count: {
++   *     _all: true
++   *   },
++   * })
++   * 
++  **/
++  groupBy<
++    T extends BeginnerQuestAcknowledgementGroupByArgs,
++    HasSelectOrTake extends Prisma.Or<
++      Prisma.Extends<'skip', Prisma.Keys<T>>,
++      Prisma.Extends<'take', Prisma.Keys<T>>
++    >,
++    OrderByArg extends Prisma.True extends HasSelectOrTake
++      ? { orderBy: BeginnerQuestAcknowledgementGroupByArgs['orderBy'] }
++      : { orderBy?: BeginnerQuestAcknowledgementGroupByArgs['orderBy'] },
++    OrderFields extends Prisma.ExcludeUnderscoreKeys<Prisma.Keys<Prisma.MaybeTupleToUnion<T['orderBy']>>>,
++    ByFields extends Prisma.MaybeTupleToUnion<T['by']>,
++    ByValid extends Prisma.Has<ByFields, OrderFields>,
++    HavingFields extends Prisma.GetHavingFields<T['having']>,
++    HavingValid extends Prisma.Has<ByFields, HavingFields>,
++    ByEmpty extends T['by'] extends never[] ? Prisma.True : Prisma.False,
++    InputErrors extends ByEmpty extends Prisma.True
++    ? `Error: "by" must not be empty.`
++    : HavingValid extends Prisma.False
++    ? {
++        [P in HavingFields]: P extends ByFields
++          ? never
++          : P extends string
++          ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
++          : [
++              Error,
++              'Field ',
++              P,
++              ` in "having" needs to be provided in "by"`,
++            ]
++      }[HavingFields]
++    : 'take' extends Prisma.Keys<T>
++    ? 'orderBy' extends Prisma.Keys<T>
++      ? ByValid extends Prisma.True
++        ? {}
++        : {
++            [P in OrderFields]: P extends ByFields
++              ? never
++              : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
++          }[OrderFields]
++      : 'Error: If you provide "take", you also need to provide "orderBy"'
++    : 'skip' extends Prisma.Keys<T>
++    ? 'orderBy' extends Prisma.Keys<T>
++      ? ByValid extends Prisma.True
++        ? {}
++        : {
++            [P in OrderFields]: P extends ByFields
++              ? never
++              : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
++          }[OrderFields]
++      : 'Error: If you provide "skip", you also need to provide "orderBy"'
++    : ByValid extends Prisma.True
++    ? {}
++    : {
++        [P in OrderFields]: P extends ByFields
++          ? never
++          : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
++      }[OrderFields]
++  >(args: Prisma.SubsetIntersection<T, BeginnerQuestAcknowledgementGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetBeginnerQuestAcknowledgementGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
++/**
++ * Fields of the BeginnerQuestAcknowledgement model
++ */
++readonly fields: BeginnerQuestAcknowledgementFieldRefs;
++}
++
++/**
++ * The delegate class that acts as a "Promise-like" for BeginnerQuestAcknowledgement.
++ * Why is this prefixed with `Prisma__`?
++ * Because we want to prevent naming conflicts as mentioned in
++ * https://github.com/prisma/prisma-client-js/issues/707
++ */
++export interface Prisma__BeginnerQuestAcknowledgementClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
++  readonly [Symbol.toStringTag]: "PrismaPromise"
++  tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
++  order<T extends Prisma.OrderDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.OrderDefaultArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
++  /**
++   * Attaches callbacks for the resolution and/or rejection of the Promise.
++   * @param onfulfilled The callback to execute when the Promise is resolved.
++   * @param onrejected The callback to execute when the Promise is rejected.
++   * @returns A Promise for the completion of which ever callback is executed.
++   */
++  then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): runtime.Types.Utils.JsPromise<TResult1 | TResult2>
++  /**
++   * Attaches a callback for only the rejection of the Promise.
++   * @param onrejected The callback to execute when the Promise is rejected.
++   * @returns A Promise for the completion of the callback.
++   */
++  catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): runtime.Types.Utils.JsPromise<T | TResult>
++  /**
++   * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
++   * resolved value cannot be modified from the callback.
++   * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
++   * @returns A Promise for the completion of the callback.
++   */
++  finally(onfinally?: (() => void) | undefined | null): runtime.Types.Utils.JsPromise<T>
++}
++
++
++
++
++/**
++ * Fields of the BeginnerQuestAcknowledgement model
++ */
++export interface BeginnerQuestAcknowledgementFieldRefs {
++  readonly tradingAccountId: Prisma.FieldRef<"BeginnerQuestAcknowledgement", 'String'>
++  readonly stepId: Prisma.FieldRef<"BeginnerQuestAcknowledgement", 'String'>
++  readonly orderId: Prisma.FieldRef<"BeginnerQuestAcknowledgement", 'String'>
++  readonly acknowledgedAt: Prisma.FieldRef<"BeginnerQuestAcknowledgement", 'DateTime'>
++}
++    
++
++// Custom InputTypes
++/**
++ * BeginnerQuestAcknowledgement findUnique
++ */
++export type BeginnerQuestAcknowledgementFindUniqueArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * Filter, which BeginnerQuestAcknowledgement to fetch.
++   */
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++}
++
++/**
++ * BeginnerQuestAcknowledgement findUniqueOrThrow
++ */
++export type BeginnerQuestAcknowledgementFindUniqueOrThrowArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * Filter, which BeginnerQuestAcknowledgement to fetch.
++   */
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++}
++
++/**
++ * BeginnerQuestAcknowledgement findFirst
++ */
++export type BeginnerQuestAcknowledgementFindFirstArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * Filter, which BeginnerQuestAcknowledgement to fetch.
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
++   * 
++   * Determine the order of BeginnerQuestAcknowledgements to fetch.
++   */
++  orderBy?: Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput | Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput[]
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
++   * 
++   * Sets the position for searching for BeginnerQuestAcknowledgements.
++   */
++  cursor?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Take `±n` BeginnerQuestAcknowledgements from the position of the cursor.
++   */
++  take?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Skip the first `n` BeginnerQuestAcknowledgements.
++   */
++  skip?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
++   * 
++   * Filter by unique combinations of BeginnerQuestAcknowledgements.
++   */
++  distinct?: Prisma.BeginnerQuestAcknowledgementScalarFieldEnum | Prisma.BeginnerQuestAcknowledgementScalarFieldEnum[]
++}
++
++/**
++ * BeginnerQuestAcknowledgement findFirstOrThrow
++ */
++export type BeginnerQuestAcknowledgementFindFirstOrThrowArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * Filter, which BeginnerQuestAcknowledgement to fetch.
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
++   * 
++   * Determine the order of BeginnerQuestAcknowledgements to fetch.
++   */
++  orderBy?: Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput | Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput[]
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
++   * 
++   * Sets the position for searching for BeginnerQuestAcknowledgements.
++   */
++  cursor?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Take `±n` BeginnerQuestAcknowledgements from the position of the cursor.
++   */
++  take?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Skip the first `n` BeginnerQuestAcknowledgements.
++   */
++  skip?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
++   * 
++   * Filter by unique combinations of BeginnerQuestAcknowledgements.
++   */
++  distinct?: Prisma.BeginnerQuestAcknowledgementScalarFieldEnum | Prisma.BeginnerQuestAcknowledgementScalarFieldEnum[]
++}
++
++/**
++ * BeginnerQuestAcknowledgement findMany
++ */
++export type BeginnerQuestAcknowledgementFindManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * Filter, which BeginnerQuestAcknowledgements to fetch.
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
++   * 
++   * Determine the order of BeginnerQuestAcknowledgements to fetch.
++   */
++  orderBy?: Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput | Prisma.BeginnerQuestAcknowledgementOrderByWithRelationInput[]
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
++   * 
++   * Sets the position for listing BeginnerQuestAcknowledgements.
++   */
++  cursor?: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Take `±n` BeginnerQuestAcknowledgements from the position of the cursor.
++   */
++  take?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
++   * 
++   * Skip the first `n` BeginnerQuestAcknowledgements.
++   */
++  skip?: number
++  /**
++   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
++   * 
++   * Filter by unique combinations of BeginnerQuestAcknowledgements.
++   */
++  distinct?: Prisma.BeginnerQuestAcknowledgementScalarFieldEnum | Prisma.BeginnerQuestAcknowledgementScalarFieldEnum[]
++}
++
++/**
++ * BeginnerQuestAcknowledgement create
++ */
++export type BeginnerQuestAcknowledgementCreateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * The data needed to create a BeginnerQuestAcknowledgement.
++   */
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateInput>
++}
++
++/**
++ * BeginnerQuestAcknowledgement createMany
++ */
++export type BeginnerQuestAcknowledgementCreateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * The data used to create many BeginnerQuestAcknowledgements.
++   */
++  data: Prisma.BeginnerQuestAcknowledgementCreateManyInput | Prisma.BeginnerQuestAcknowledgementCreateManyInput[]
++  skipDuplicates?: boolean
++}
++
++/**
++ * BeginnerQuestAcknowledgement createManyAndReturn
++ */
++export type BeginnerQuestAcknowledgementCreateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelectCreateManyAndReturn<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * The data used to create many BeginnerQuestAcknowledgements.
++   */
++  data: Prisma.BeginnerQuestAcknowledgementCreateManyInput | Prisma.BeginnerQuestAcknowledgementCreateManyInput[]
++  skipDuplicates?: boolean
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementIncludeCreateManyAndReturn<ExtArgs> | null
++}
++
++/**
++ * BeginnerQuestAcknowledgement update
++ */
++export type BeginnerQuestAcknowledgementUpdateArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * The data needed to update a BeginnerQuestAcknowledgement.
++   */
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateInput>
++  /**
++   * Choose, which BeginnerQuestAcknowledgement to update.
++   */
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++}
++
++/**
++ * BeginnerQuestAcknowledgement updateMany
++ */
++export type BeginnerQuestAcknowledgementUpdateManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * The data used to update BeginnerQuestAcknowledgements.
++   */
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateManyMutationInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyInput>
++  /**
++   * Filter which BeginnerQuestAcknowledgements to update
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * Limit how many BeginnerQuestAcknowledgements to update.
++   */
++  limit?: number
++}
++
++/**
++ * BeginnerQuestAcknowledgement updateManyAndReturn
++ */
++export type BeginnerQuestAcknowledgementUpdateManyAndReturnArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelectUpdateManyAndReturn<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * The data used to update BeginnerQuestAcknowledgements.
++   */
++  data: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateManyMutationInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyInput>
++  /**
++   * Filter which BeginnerQuestAcknowledgements to update
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * Limit how many BeginnerQuestAcknowledgements to update.
++   */
++  limit?: number
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementIncludeUpdateManyAndReturn<ExtArgs> | null
++}
++
++/**
++ * BeginnerQuestAcknowledgement upsert
++ */
++export type BeginnerQuestAcknowledgementUpsertArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * The filter to search for the BeginnerQuestAcknowledgement to update in case it exists.
++   */
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++  /**
++   * In case the BeginnerQuestAcknowledgement found by the `where` argument doesn't exist, create a new BeginnerQuestAcknowledgement with this data.
++   */
++  create: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementCreateInput, Prisma.BeginnerQuestAcknowledgementUncheckedCreateInput>
++  /**
++   * In case the BeginnerQuestAcknowledgement was found with the provided `where` argument, update it with this data.
++   */
++  update: Prisma.XOR<Prisma.BeginnerQuestAcknowledgementUpdateInput, Prisma.BeginnerQuestAcknowledgementUncheckedUpdateInput>
++}
++
++/**
++ * BeginnerQuestAcknowledgement delete
++ */
++export type BeginnerQuestAcknowledgementDeleteArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++  /**
++   * Filter which BeginnerQuestAcknowledgement to delete.
++   */
++  where: Prisma.BeginnerQuestAcknowledgementWhereUniqueInput
++}
++
++/**
++ * BeginnerQuestAcknowledgement deleteMany
++ */
++export type BeginnerQuestAcknowledgementDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Filter which BeginnerQuestAcknowledgements to delete
++   */
++  where?: Prisma.BeginnerQuestAcknowledgementWhereInput
++  /**
++   * Limit how many BeginnerQuestAcknowledgements to delete.
++   */
++  limit?: number
++}
++
++/**
++ * BeginnerQuestAcknowledgement without action
++ */
++export type BeginnerQuestAcknowledgementDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
++  /**
++   * Select specific fields to fetch from the BeginnerQuestAcknowledgement
++   */
++  select?: Prisma.BeginnerQuestAcknowledgementSelect<ExtArgs> | null
++  /**
++   * Omit specific fields from the BeginnerQuestAcknowledgement
++   */
++  omit?: Prisma.BeginnerQuestAcknowledgementOmit<ExtArgs> | null
++  /**
++   * Choose, which related nodes to fetch as well
++   */
++  include?: Prisma.BeginnerQuestAcknowledgementInclude<ExtArgs> | null
++}
+diff --git a/backend/src/trading-accounts/beginner-learning-policy.spec.ts b/backend/src/trading-accounts/beginner-learning-policy.spec.ts
+new file mode 100644
+index 00000000..c2fa2ccc
+--- /dev/null
++++ b/backend/src/trading-accounts/beginner-learning-policy.spec.ts
+@@ -0,0 +1,85 @@
++import { BeginnerQuestEvidence } from './beginner-quest-evidence';
++import {
++  assertBeginnerLearningAccess,
++  beginnerOrderAction,
++  type BeginnerLearningAction,
++} from './beginner-learning-policy';
++import type { QuestClient } from './beginner-quest-evidence';
++
++const client = {} as QuestClient;
++const beginner = { id: 'beginner-a', mode: 'beginner' };
++afterEach(() => jest.restoreAllMocks());
++it.each(['general', 'season'])(
++  '%s never reads beginner evidence',
++  async (mode) => {
++    const spy = jest.spyOn(BeginnerQuestEvidence.prototype, 'read');
++    for (const action of [
++      'transfer',
++      'cryptoMarketBuy',
++      'spotProtection',
++      'cryptoLimitBuy',
++      'allTrading',
++    ] as const)
++      await assertBeginnerLearningAccess(client, { id: 'other', mode }, action);
++    expect(spy).not.toHaveBeenCalled();
++  },
++);
++it('risk reduction and exchange never require progress, including unavailable database', async () => {
++  await assertBeginnerLearningAccess(client, beginner, 'riskReduction');
++  await assertBeginnerLearningAccess(client, beginner, 'exchange');
++});
++it.each([0, 1, 2, 3, 4, 5, 6])(
++  'allows the current practice before completion, foundation count %s',
++  async (count) => {
++    const access = {
++      exchange: true,
++      transfer: count >= 1,
++      cryptoMarketBuy: count >= 2,
++      spotProtection: count >= 3,
++      cryptoLimitBuy: count >= 5,
++      allTrading: count >= 6,
++    };
++    const spy = jest
++      .spyOn(BeginnerQuestEvidence.prototype, 'read')
++      .mockResolvedValue({ learningAccess: access } as Awaited<
++        ReturnType<BeginnerQuestEvidence['read']>
++      >);
++    for (const action of Object.keys(access) as Exclude<
++      BeginnerLearningAction,
++      'riskReduction'
++    >[]) {
++      const work = assertBeginnerLearningAccess(client, beginner, action);
++      if (access[action]) await work;
++      else
++        await expect(work).rejects.toMatchObject({
++          response: { error: { code: 'BEGINNER_FEATURE_LOCKED' } },
++          status: 403,
++        });
++    }
++    expect(spy).toHaveBeenCalledWith('beginner-a', false);
++  },
++);
++it('an evidence failure cannot grant permission', async () => {
++  jest
++    .spyOn(BeginnerQuestEvidence.prototype, 'read')
++    .mockRejectedValue(new Error('unavailable'));
++  await expect(
++    assertBeginnerLearningAccess(client, beginner, 'allTrading'),
++  ).rejects.toThrow('unavailable');
++});
++it('never mistakes sell/cancel safety for a learning prerequisite', () => {
++  for (const assetType of ['crypto', 'domestic_stock', 'us_stock'])
++    for (const orderType of ['market', 'limit'])
++      expect(beginnerOrderAction({ side: 'sell', orderType }, assetType)).toBe(
++        'riskReduction',
++      );
++  expect(
++    beginnerOrderAction({ side: 'buy', orderType: 'market' }, 'crypto'),
++  ).toBe('cryptoMarketBuy');
++  expect(
++    beginnerOrderAction({ side: 'buy', orderType: 'limit' }, 'crypto'),
++  ).toBe('cryptoLimitBuy');
++  expect(
++    beginnerOrderAction({ side: 'buy', orderType: 'market' }, 'us_stock'),
++  ).toBe('allTrading');
++});
+diff --git a/backend/src/trading-accounts/beginner-learning-policy.ts b/backend/src/trading-accounts/beginner-learning-policy.ts
+new file mode 100644
+index 00000000..6c7745cf
+--- /dev/null
++++ b/backend/src/trading-accounts/beginner-learning-policy.ts
+@@ -0,0 +1,68 @@
++import { createApiError } from '../common/api-error';
++import {
++  BeginnerQuestEvidence,
++  type QuestClient,
++} from './beginner-quest-evidence';
++
++export type BeginnerLearningAction =
++  | 'exchange'
++  | 'transfer'
++  | 'cryptoMarketBuy'
++  | 'spotProtection'
++  | 'cryptoLimitBuy'
++  | 'allTrading'
++  | 'riskReduction';
++export type LearningAccount = {
++  id?: string;
++  tradingAccountId?: string;
++  mode: string;
++};
++
++const conditions: Record<
++  Exclude<BeginnerLearningAction, 'riskReduction'>,
++  string
++> = {
++  exchange: '환전하기 퀘스트에서 사용할 수 있어요.',
++  transfer: '환전하기 퀘스트를 완료하면 사용할 수 있어요.',
++  cryptoMarketBuy: '암호화폐 시장가 매수 퀘스트에서 사용할 수 있어요.',
++  spotProtection: 'TP/SL 설정 퀘스트에서 사용할 수 있어요.',
++  cryptoLimitBuy: '암호화폐 지정가 매수 퀘스트에서 사용할 수 있어요.',
++  allTrading: '암호화폐 지정가 매수 퀘스트를 완료하면 사용할 수 있어요.',
++};
++
++/** Call after ownership; commands call again inside their existing account fence.
++ * Never changes operational gates, money, replay, cancellation or exit policy. */
++export async function assertBeginnerLearningAccess(
++  client: QuestClient,
++  account: LearningAccount,
++  action: BeginnerLearningAction,
++) {
++  if (
++    account.mode !== 'beginner' ||
++    action === 'riskReduction' ||
++    action === 'exchange'
++  )
++    return;
++  const accountId = account.id ?? account.tradingAccountId;
++  if (!accountId)
++    throw createApiError(
++      'TRADING_ACCOUNT_SCOPE_MISMATCH',
++      'Account scope is required.',
++      500,
++    );
++  const { learningAccess } = await new BeginnerQuestEvidence(client).read(
++    accountId,
++    false,
++  );
++  if (!learningAccess[action])
++    throw createApiError('BEGINNER_FEATURE_LOCKED', conditions[action], 403);
++}
++
++export function beginnerOrderAction(
++  order: { side: string; orderType: string },
++  assetType: string,
++): BeginnerLearningAction {
++  if (order.side === 'sell') return 'riskReduction';
++  if (assetType !== 'crypto') return 'allTrading';
++  return order.orderType === 'market' ? 'cryptoMarketBuy' : 'cryptoLimitBuy';
++}
+diff --git a/backend/src/trading-accounts/beginner-quest-evidence.spec.ts b/backend/src/trading-accounts/beginner-quest-evidence.spec.ts
+new file mode 100644
+index 00000000..fcf55521
+--- /dev/null
++++ b/backend/src/trading-accounts/beginner-quest-evidence.spec.ts
+@@ -0,0 +1,118 @@
++import {
++  BeginnerQuestEvidence,
++  type QuestClient,
++} from './beginner-quest-evidence';
++const at = (seconds: number) => new Date(Date.UTC(2026, 9, 11, 0, 0, seconds));
++const decimal = (value: number) => ({ gt: (other: number) => value > other });
++function setup() {
++  const db = {
++    order: { findFirst: jest.fn().mockResolvedValue(null) },
++    futuresExecution: {
++      findMany: jest.fn().mockResolvedValue([]),
++      findFirst: jest.fn().mockResolvedValue(null),
++    },
++  };
++  const reader = new BeginnerQuestEvidence(db as unknown as QuestClient);
++  return { db, reader };
++}
++it('market evidence requires actual filled quantity, matching account/market/side and strict chronology; automated exits excluded', async () => {
++  const { db, reader } = setup();
++  await reader.filledOrder(
++    'A',
++    { id: 'prior', executedAt: at(2) },
++    'crypto',
++    'sell',
++    'manual',
++  );
++  expect(db.order.findFirst.mock.calls[0][0].where).toEqual({
++    id: 'manual',
++    tradingAccountId: 'A',
++    asset: { assetType: 'crypto' },
++    orderType: 'market',
++    side: 'sell',
++    status: 'executed',
++    executedAt: { gt: at(2) },
++    protectionChild: { is: null },
++    OR: [
++      { executedQuantity: { gt: 0 } },
++      { executedQuantity: null, quantity: { gt: 0 } },
++    ],
++  });
++});
++it('limit registration requires real reservation and rejects failed/automatic-cancel orders', async () => {
++  const { db, reader } = setup();
++  await reader.limitOrder('A', { id: 'sell', executedAt: at(5) }, 'limit');
++  const where = db.order.findFirst.mock.calls[0][0].where;
++  expect(where.tradingAccountId).toBe('A');
++  expect(where.orderType).toBe('limit');
++  expect(where.submittedAt.gt.getTime()).toBe(at(5).getTime());
++  expect(where.reservedAmount.gt).toBe(0);
++  expect(where.protectionChild.is === null).toBe(true);
++  expect(where.OR.map((r: { status: string }) => r.status)).toEqual([
++    'submitted',
++    'executed',
++    'canceled',
++  ]);
++  expect(where.OR[2].cancelReason).toBe('user_canceled');
++});
++it.each([
++  ['submitted', null, 1, null, false],
++  ['executed', null, 1, null, false],
++  ['executed', at(8), 0, null, false],
++  ['executed', at(8), 0.1, null, true],
++  ['canceled', at(8), 0, 'user_canceled', true],
++  ['canceled', at(8), 0, 'season_closed', false],
++  ['rejected', at(8), 0, null, false],
++])(
++  'terminal evidence requires settlement: %s reservation=%s qty=%s reason=%s',
++  (status, released, qty, reason, done) => {
++    const { reader } = setup();
++    const value = reader.limitResolvedAt({
++      status,
++      reservationReleasedAt: released,
++      executedQuantity: decimal(qty as number),
++      quantity: decimal(1),
++      executedAt: at(7),
++      canceledAt: at(7),
++      cancelReason: reason,
++    } as never);
++    expect(value !== null).toBe(done);
++  },
++);
++it('futures evidence ties a manual full close to its opening lifetime and excludes liquidation, settlement and protection exits', async () => {
++  const { reader, db } = setup();
++  db.futuresExecution.findMany.mockResolvedValue([
++    { id: 'open', positionId: 'lifetime-A', executedAt: at(7) },
++  ]);
++  db.futuresExecution.findFirst.mockResolvedValue({
++    id: 'close',
++    executedAt: at(8),
++  });
++  // Test the query boundary that PostgreSQL enforces, independently of mocks returning rows.
++  const result = await (
++    reader as unknown as {
++      futuresLifetime: (
++        a: string,
++        b: { id: string; executedAt: Date },
++        d: string,
++      ) => Promise<{ open: { id: string }; close: { id: string } }>;
++    }
++  ).futuresLifetime('A', { id: 'q6', executedAt: at(6) }, 'short');
++  expect(result.close.id).toBe('close');
++  const open = db.futuresExecution.findMany.mock.calls[0][0].where,
++    close = db.futuresExecution.findFirst.mock.calls[0][0].where;
++  expect(open.direction).toBe('short');
++  expect(open.leverage.gt).toBe(1);
++  expect(open.executedAt.gt.getTime()).toBe(at(6).getTime());
++  expect(close.positionId).toBe('lifetime-A');
++  expect(close.tradingAccountId).toBe('A');
++  expect(close.positionQuantityAfter).toBe(0);
++  expect(close.executeRequest.is.tradingAccountId).toBe('A');
++  expect(close.protectionChild.is === null).toBe(true);
++  expect(close.position.is).toEqual({
++    status: 'closed',
++    quantity: 0,
++    liquidationClose: { is: null },
++    seasonClose: { is: null },
++  });
++});
+diff --git a/backend/src/trading-accounts/beginner-quest-evidence.ts b/backend/src/trading-accounts/beginner-quest-evidence.ts
+new file mode 100644
+index 00000000..673384e0
+--- /dev/null
++++ b/backend/src/trading-accounts/beginner-quest-evidence.ts
+@@ -0,0 +1,497 @@
++import type {
++  Prisma,
++  CurrencyCode,
++  WalletScope,
++  WalletTransactionDirection,
++  WalletTransactionReferenceType,
++  WalletTransactionType,
++  AssetType,
++} from '../generated/prisma/client';
++import type { PrismaService } from '../prisma/prisma.service';
++
++export type QuestClient = PrismaService | Prisma.TransactionClient;
++export const BEGINNER_QUEST_01_ID = 'common-01-exchange';
++export const BEGINNER_QUEST_02_ID = 'common-02-transfer';
++export const BEGINNER_QUEST_01_FX_STEP = 'fx_krw_to_usd';
++export const BEGINNER_QUEST_02_TRANSFER_STEP =
++  'transfer_securities_usd_to_crypto_spot_usd';
++
++type QuestStatus = 'not_started' | 'in_progress' | 'completed';
++
++type QuestStepView = {
++  stepId: string;
++  completed: boolean;
++  completedAt: string | null;
++  /** ExchangeTransaction.id or WalletTransfer.id that proves the step. */
++  referenceId: string | null;
++};
++
++type QuestProgressView = {
++  questId: string;
++  status: QuestStatus;
++  completedStepCount: number;
++  totalStepCount: number;
++  steps: QuestStepView[];
++};
++
++export type Evidence = { id: string; executedAt: Date };
++
++type LedgerLegRule = {
++  txType: WalletTransactionType;
++  direction: WalletTransactionDirection;
++  currencyCode: CurrencyCode;
++  walletScope: WalletScope;
++};
++
++const FX_LEGS: LedgerLegRule[] = [
++  {
++    txType: 'exchange_source',
++    direction: 'debit',
++    currencyCode: 'KRW',
++    walletScope: 'securities',
++  },
++  {
++    txType: 'exchange_target',
++    direction: 'credit',
++    currencyCode: 'USD',
++    walletScope: 'securities',
++  },
++];
++
++const TRANSFER_LEGS: LedgerLegRule[] = [
++  {
++    txType: 'wallet_transfer',
++    direction: 'debit',
++    currencyCode: 'USD',
++    walletScope: 'securities',
++  },
++  {
++    txType: 'wallet_transfer',
++    direction: 'credit',
++    currencyCode: 'USD',
++    walletScope: 'crypto_spot',
++  },
++];
++
++const EVIDENCE_ORDER = [{ executedAt: 'asc' as const }, { id: 'asc' as const }];
++
++/** Read-only evidence reader, also used inside the existing financial fences. */
++export class BeginnerQuestEvidence {
++  constructor(private readonly prisma: QuestClient) {}
++
++  async read(accountId: string, includeAdvanced = true) {
++    const fx = await this.firstProvenFx(accountId);
++    const transfer = fx ? await this.firstProvenTransfer(accountId, fx) : null;
++    const acknowledgements = transfer
++      ? await this.prisma.beginnerQuestAcknowledgement.findMany({
++          where: { tradingAccountId: accountId },
++        })
++      : [];
++    const buyReview = acknowledgements.find(
++      (row) => row.stepId === 'holdings_reviewed',
++    );
++    const buy = transfer
++      ? await this.filledOrder(
++          accountId,
++          transfer,
++          'crypto',
++          'buy',
++          buyReview?.orderId,
++        )
++      : null;
++    const holdings =
++      buy &&
++      buyReview &&
++      buyReview.orderId === buy.id &&
++      buyReview.acknowledgedAt > buy.executedAt
++        ? { id: buy.id, executedAt: buyReview.acknowledgedAt }
++        : null;
++    const protectionRow =
++      holdings && buy
++        ? await this.prisma.protectionGroup.findFirst({
++            where: {
++              tradingAccountId: accountId,
++              domain: 'spot',
++              assetId: buy.assetId,
++              position: {
++                is: { tradingAccountId: accountId, assetId: buy.assetId },
++              },
++              parentOrderId: null,
++              activatedAt: { gt: holdings.executedAt },
++              AND: [
++                {
++                  legs: {
++                    some: { kind: 'take_profit', triggerPrice: { gt: 0 } },
++                  },
++                },
++                {
++                  legs: {
++                    some: { kind: 'stop_loss', triggerPrice: { gt: 0 } },
++                  },
++                },
++              ],
++            },
++            orderBy: [{ activatedAt: 'asc' }, { id: 'asc' }],
++            select: { id: true, activatedAt: true },
++          })
++        : null;
++    const protection = protectionRow?.activatedAt
++      ? { id: protectionRow.id, executedAt: protectionRow.activatedAt }
++      : null;
++    const sell = protection
++      ? await this.filledOrder(accountId, protection, 'crypto', 'sell')
++      : null;
++    const limitReview = acknowledgements.find(
++      (row) => row.stepId === 'limit_result_reviewed',
++    );
++    const limit = sell
++      ? await this.limitOrder(accountId, sell, limitReview?.orderId)
++      : null;
++    const limitResult =
++      limit &&
++      limitReview &&
++      limitReview.orderId === limit.id &&
++      this.limitResolvedAt(limit) &&
++      limitReview.acknowledgedAt > this.limitResolvedAt(limit)!
++        ? { id: limit.id, executedAt: limitReview.acknowledgedAt }
++        : null;
++    const [kr, us, long, short] =
++      limitResult && includeAdvanced
++        ? await Promise.all([
++            this.filledOrder(accountId, limitResult, 'domestic_stock', 'buy'),
++            this.filledOrder(accountId, limitResult, 'us_stock', 'buy'),
++            this.futuresLifetime(accountId, limitResult, 'long'),
++            this.futuresLifetime(accountId, limitResult, 'short'),
++          ])
++        : [null, null, null, null];
++    return {
++      tradingAccountId: accountId,
++      practice: {
++        spotAssetId: buy?.assetId ?? null,
++        limitAssetId: limit?.assetId ?? null,
++        longPositionId: long?.open.positionId ?? null,
++        shortPositionId: short?.open.positionId ?? null,
++      },
++      quests: [
++        this.quest(BEGINNER_QUEST_01_ID, [
++          this.step(BEGINNER_QUEST_01_FX_STEP, fx),
++        ]),
++        this.quest(BEGINNER_QUEST_02_ID, [
++          this.step(BEGINNER_QUEST_02_TRANSFER_STEP, transfer),
++        ]),
++        this.quest('common-03-market-buy', [
++          this.step('market_buy_filled', buy),
++          this.step('holdings_reviewed', holdings),
++        ]),
++        this.quest('common-04-protection', [
++          this.step('tp_sl_registered', protection),
++        ]),
++        this.quest('common-05-market-sell', [
++          this.step('market_sell_filled', sell),
++        ]),
++        this.quest('common-06-limit-buy', [
++          this.step(
++            'limit_buy_registered',
++            limit ? { id: limit.id, executedAt: limit.submittedAt } : null,
++          ),
++          this.step('limit_result_reviewed', limitResult),
++        ]),
++        this.quest('market-kr-stock', [this.step('kr_stock_buy_filled', kr)]),
++        this.quest('market-us-stock', [this.step('us_stock_buy_filled', us)]),
++        this.quest('market-futures-long', [
++          this.step('long_opened', long?.open ?? null),
++          this.step('long_closed', long?.close ?? null),
++        ]),
++        this.quest('market-futures-short', [
++          this.step('short_opened', short?.open ?? null),
++          this.step('short_closed', short?.close ?? null),
++        ]),
++      ],
++      learningAccess: {
++        exchange: true,
++        transfer: !!fx,
++        cryptoMarketBuy: !!transfer,
++        spotProtection: !!holdings,
++        cryptoLimitBuy: !!sell,
++        allTrading: !!limitResult,
++      },
++    };
++  }
++
++  /** Only committed fills, including terminal ERS partial fills, never quotes. */
++  async filledOrder(
++    accountId: string,
++    after: Evidence,
++    assetType: AssetType,
++    side: 'buy' | 'sell',
++    id?: string,
++  ) {
++    const row = await this.prisma.order.findFirst({
++      where: {
++        ...(id ? { id } : {}),
++        tradingAccountId: accountId,
++        asset: { assetType },
++        orderType: 'market',
++        side,
++        status: 'executed',
++        executedAt: { gt: after.executedAt },
++        protectionChild: { is: null },
++        OR: [
++          { executedQuantity: { gt: 0 } },
++          { executedQuantity: null, quantity: { gt: 0 } },
++        ],
++      },
++      orderBy: [{ executedAt: 'asc' }, { id: 'asc' }],
++      select: { id: true, executedAt: true, assetId: true },
++    });
++    return row?.executedAt ? { ...row, executedAt: row.executedAt } : null;
++  }
++
++  async limitOrder(accountId: string, after: Evidence, id?: string) {
++    return this.prisma.order.findFirst({
++      where: {
++        ...(id ? { id } : {}),
++        tradingAccountId: accountId,
++        asset: { assetType: 'crypto' },
++        side: 'buy',
++        orderType: 'limit',
++        submittedAt: { gt: after.executedAt },
++        limitPrice: { gt: 0 },
++        quantity: { gt: 0 },
++        reservedAmount: { gt: 0 },
++        reservationFeeRate: { not: null },
++        protectionChild: { is: null },
++        OR: [
++          { status: 'submitted' },
++          { status: 'executed', executedAt: { not: null } },
++          {
++            status: 'canceled',
++            cancelReason: 'user_canceled',
++            canceledAt: { not: null },
++          },
++        ],
++      },
++      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
++      select: {
++        id: true,
++        assetId: true,
++        submittedAt: true,
++        status: true,
++        executedAt: true,
++        quantity: true,
++        executedQuantity: true,
++        canceledAt: true,
++        cancelReason: true,
++        reservationReleasedAt: true,
++      },
++    });
++  }
++
++  limitResolvedAt(
++    order: NonNullable<
++      Awaited<ReturnType<BeginnerQuestEvidence['limitOrder']>>
++    >,
++  ) {
++    if (!order.reservationReleasedAt) return null;
++    if (
++      order.status === 'executed' &&
++      (order.executedQuantity ?? order.quantity).gt(0)
++    )
++      return order.executedAt;
++    if (order.status === 'canceled' && order.cancelReason === 'user_canceled')
++      return order.canceledAt;
++    return null;
++  }
++
++  private async futuresLifetime(
++    accountId: string,
++    after: Evidence,
++    direction: 'long' | 'short',
++  ) {
++    // Prefer a completed lifetime; an older unclosed practice cannot hide a later success.
++    const openings = await this.prisma.futuresExecution.findMany({
++      where: {
++        tradingAccountId: accountId,
++        direction,
++        operation: 'open',
++        leverage: { gt: 1 },
++        quantity: { gt: 0 },
++        executedAt: { gt: after.executedAt },
++        position: {
++          is: {
++            tradingAccountId: accountId,
++            direction,
++            liquidationClose: { is: null },
++            seasonClose: { is: null },
++          },
++        },
++      },
++      orderBy: EVIDENCE_ORDER,
++      select: { id: true, positionId: true, executedAt: true },
++    });
++    for (const open of openings) {
++      const close = await this.prisma.futuresExecution.findFirst({
++        where: {
++          tradingAccountId: accountId,
++          positionId: open.positionId,
++          direction,
++          operation: { in: ['close', 'reduce'] },
++          positionQuantityAfter: 0,
++          quantity: { gt: 0 },
++          executedAt: { gt: open.executedAt },
++          executeRequest: { is: { tradingAccountId: accountId } },
++          protectionChild: { is: null },
++          position: {
++            is: {
++              status: 'closed',
++              quantity: 0,
++              liquidationClose: { is: null },
++              seasonClose: { is: null },
++            },
++          },
++        },
++        orderBy: EVIDENCE_ORDER,
++        select: { id: true, executedAt: true },
++      });
++      if (close) return { open, close };
++    }
++    return openings[0] ? { open: openings[0], close: null } : null;
++  }
++
++  private quest(questId: string, steps: QuestStepView[]): QuestProgressView {
++    const completedStepCount = steps.filter((step) => step.completed).length;
++    return {
++      questId,
++      status:
++        completedStepCount === 0
++          ? 'not_started'
++          : completedStepCount === steps.length
++            ? 'completed'
++            : 'in_progress',
++      completedStepCount,
++      totalStepCount: steps.length,
++      steps,
++    };
++  }
++
++  private async firstProvenFx(accountId: string): Promise<Evidence | null> {
++    const candidates = await this.prisma.exchangeTransaction.findMany({
++      where: {
++        tradingAccountId: accountId,
++        fromCurrency: 'KRW',
++        toCurrency: 'USD',
++        // Composite FX+transfer legs are not a standalone FX practice.
++        walletTransferExecuteRequest: { is: null },
++        fxExecuteRequests: {
++          some: {
++            tradingAccountId: accountId,
++            status: 'succeeded',
++          },
++        },
++      },
++      orderBy: EVIDENCE_ORDER,
++      select: { id: true, executedAt: true },
++    });
++    return this.firstWithLedgerLegs(
++      accountId,
++      'exchange_transaction',
++      candidates,
++      FX_LEGS,
++    );
++  }
++
++  private async firstProvenTransfer(
++    accountId: string,
++    fx: Evidence,
++  ): Promise<Evidence | null> {
++    const candidates = await this.prisma.walletTransfer.findMany({
++      where: {
++        tradingAccountId: accountId,
++        currencyCode: 'USD',
++        compositeCommand: { is: null },
++        executedAt: { gt: fx.executedAt },
++        sourceWallet: {
++          is: {
++            tradingAccountId: accountId,
++            walletScope: 'securities',
++            currencyCode: 'USD',
++          },
++        },
++        destinationWallet: {
++          is: {
++            tradingAccountId: accountId,
++            walletScope: 'crypto_spot',
++            currencyCode: 'USD',
++          },
++        },
++      },
++      orderBy: EVIDENCE_ORDER,
++      select: { id: true, executedAt: true },
++    });
++    return this.firstWithLedgerLegs(
++      accountId,
++      'wallet_transfer',
++      candidates,
++      TRANSFER_LEGS,
++    );
++  }
++
++  /** A row counts only with exactly its committed ledger legs on this account. */
++  private async firstWithLedgerLegs(
++    accountId: string,
++    referenceType: WalletTransactionReferenceType,
++    candidates: Evidence[],
++    rules: LedgerLegRule[],
++  ): Promise<Evidence | null> {
++    if (candidates.length === 0) return null;
++    const legs = await this.prisma.walletTransaction.findMany({
++      where: {
++        tradingAccountId: accountId,
++        referenceType,
++        referenceId: { in: candidates.map((row) => row.id) },
++      },
++      select: {
++        referenceId: true,
++        txType: true,
++        direction: true,
++        currencyCode: true,
++        wallet: {
++          select: {
++            tradingAccountId: true,
++            walletScope: true,
++            currencyCode: true,
++          },
++        },
++      },
++    });
++    return (
++      candidates.find((candidate) => {
++        const own = legs.filter((leg) => leg.referenceId === candidate.id);
++        return (
++          own.length === rules.length &&
++          rules.every(
++            (rule) =>
++              own.filter(
++                (leg) =>
++                  leg.txType === rule.txType &&
++                  leg.direction === rule.direction &&
++                  leg.currencyCode === rule.currencyCode &&
++                  leg.wallet.tradingAccountId === accountId &&
++                  leg.wallet.walletScope === rule.walletScope &&
++                  leg.wallet.currencyCode === rule.currencyCode,
++              ).length === 1,
++          )
++        );
++      }) ?? null
++    );
++  }
++
++  private step(stepId: string, evidence: Evidence | null): QuestStepView {
++    return {
++      stepId,
++      completed: evidence !== null,
++      completedAt: evidence?.executedAt.toISOString() ?? null,
++      referenceId: evidence?.id ?? null,
++    };
++  }
++}
+diff --git a/frontend/src/features/quest/LearningLock.tsx b/frontend/src/features/quest/LearningLock.tsx
+new file mode 100644
+index 00000000..986b3304
+--- /dev/null
++++ b/frontend/src/features/quest/LearningLock.tsx
+@@ -0,0 +1,10 @@
++import React from 'react';
++import Svg, { Path, Rect } from 'react-native-svg';
++import { semantic } from '../../theme/tokens';
++/** Small shape cue complements desaturated controls; the owner supplies the label. */
++export default function LearningLock() {
++  return <Svg width={14} height={16} viewBox="0 0 14 16" accessible={false} testID="learning-lock-icon">
++    <Path d="M4 7V5a3 3 0 0 1 6 0v2" stroke={semantic.secondary} strokeWidth={1.6} fill="none" />
++    <Rect x={2} y={7} width={10} height={8} rx={2} fill={semantic.secondary} />
++  </Svg>;
++}
+diff --git a/frontend/src/features/quest/QuestLimitReview.tsx b/frontend/src/features/quest/QuestLimitReview.tsx
+new file mode 100644
+index 00000000..6d727b7a
+--- /dev/null
++++ b/frontend/src/features/quest/QuestLimitReview.tsx
+@@ -0,0 +1,53 @@
++import React, { useEffect, useRef, useState } from 'react';
++import { useQuery, useQueryClient } from '@tanstack/react-query';
++import { View, Text, StyleSheet } from '../../theme/native';
++import { semantic } from '../../theme/tokens';
++import { QUERY_KEYS } from '../../constants/queryKeys';
++import { cancelTradingAccountOrder, getTradingAccountOrder } from '../tradingAccount/api';
++import { invalidateAfterOrderCancel } from '../tradingAccount/invalidation';
++import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
++import { formatDisplayDecimal } from '../../utils/format';
++import CTAButton from '../../components/common/CTAButton';
++import ErrorNotice from '../../components/states/ErrorNotice';
++import QuestTarget from './QuestTarget';
++import { useTradingGuideFacts } from './useTradingGuideFacts';
++
++const textValue = (value: unknown) => typeof value === 'string' ? value : '-';
++
++/** Shows the actual registered order, including terminal states absent from pending lists. */
++export default function QuestLimitReview({ accountId, orderId, focused }: { accountId: string; orderId: string; focused: boolean }) {
++  const client = useQueryClient();
++  const mounted = useRef(true), running = useRef(false);
++  const [busy, setBusy] = useState(false), [failure, setFailure] = useState<unknown>(null);
++  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
++  const query = useQuery({ queryKey: [...QUERY_KEYS.tradingAccount.ordersAll(accountId), 'quest-review', orderId],
++    queryFn: () => getTradingAccountOrder(accountId, orderId), enabled: focused,
++    refetchOnMount: 'always', refetchInterval: focused ? 2000 : false, retry: false });
++  const order = !query.isError && query.data?.tradingAccountId === accountId ? query.data.order : undefined;
++  const resolved = order?.status === 'executed' || order?.status === 'canceled' && order.cancelReason === 'user_canceled';
++  useTradingGuideFacts({ screen: 'limitReview', accountId, orderResolved: !!resolved }, focused);
++  const cancel = async () => {
++    if (running.current || !focused || order?.status !== 'submitted') return;
++    const session = getSessionGeneration();
++    running.current = true; setBusy(true); setFailure(null);
++    try {
++      await cancelTradingAccountOrder(accountId, orderId);
++      if (isCurrentSession(session)) await invalidateAfterOrderCancel(client, accountId);
++    } catch (error) { if (mounted.current && isCurrentSession(session)) setFailure(error); }
++    finally { running.current = false; if (mounted.current && isCurrentSession(session)) setBusy(false); }
++  };
++  return <QuestTarget id="limit-review" enabled={focused}><View style={styles.card} testID="quest-limit-review">
++    <Text style={styles.title}>실습 주문 상태</Text>
++    {query.isError ? <><ErrorNotice error={query.error} /><CTAButton label="주문 상태 다시 확인" onPress={() => void query.refetch()} /></>
++      : !order ? <Text>주문 상태 확인 중…</Text> : <>
++        <Text>지정가 매수 · {order.status === 'submitted' ? '미체결' : order.status === 'executed' ? '체결' : order.status === 'canceled' ? '취소' : '처리 상태 확인 필요'}</Text>
++        <Text>지정가 {formatDisplayDecimal(textValue(order.limitPrice))} · 수량 {formatDisplayDecimal(textValue(order.quantity))}</Text>
++        <Text>{order.reservationReleasedAt ? '예약 해제됨' : `예약금 ${formatDisplayDecimal(textValue(order.reservedAmount))}`} {textValue(order.currencyCode)}</Text>
++        {order.status === 'executed' ? <Text>실제 체결가 {formatDisplayDecimal(textValue(order.executedPrice))}</Text> : null}
++        {order.status === 'submitted' ? <CTAButton label="주문 취소" testID="quest-limit-cancel" variant="secondary" state={busy ? 'loading' : 'enabled'} onPress={() => void cancel()} /> : null}
++        {resolved ? <Text>결과를 확인한 뒤 안내의 다음을 눌러 주세요.</Text> : null}
++      </>}
++    {failure ? <ErrorNotice error={failure} message="취소 결과를 확인하지 못했어요. 주문 상태를 다시 확인해 주세요." /> : null}
++  </View></QuestTarget>;
++}
++const styles = StyleSheet.create({ card: { padding: 16, gap: 10, borderRadius: 12, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface }, title: { fontSize: 17, fontWeight: '700' } });
+diff --git a/frontend/src/features/quest/QuestTarget.tsx b/frontend/src/features/quest/QuestTarget.tsx
+new file mode 100644
+index 00000000..7b83dfb2
+--- /dev/null
++++ b/frontend/src/features/quest/QuestTarget.tsx
+@@ -0,0 +1,12 @@
++import React from 'react';
++import { View, type ViewStyle } from '../../theme/native';
++import { questGuideTarget, type QuestGuideTargetId } from './questGuideBridge';
++import { useQuestGuide } from './QuestGuideProvider';
++import QuestTargetHighlight from './QuestTargetHighlight';
++/** Reuses the Wallet shimmer/glow on real controls; never intercepts a touch. */
++export default function QuestTarget({ id, children, style, enabled = true }: { id: QuestGuideTargetId; children: React.ReactNode; style?: ViewStyle; enabled?: boolean }) {
++  const guide = useQuestGuide();
++  return <View ref={enabled ? questGuideTarget(id) : undefined} collapsable={false} style={style}>
++    {children}{enabled && guide?.highlightedTarget === id ? <QuestTargetHighlight active radius={10} /> : null}
++  </View>;
++}
+diff --git a/frontend/src/features/quest/tradingGuideSteps.ts b/frontend/src/features/quest/tradingGuideSteps.ts
+new file mode 100644
+index 00000000..5bf47c9b
+--- /dev/null
++++ b/frontend/src/features/quest/tradingGuideSteps.ts
+@@ -0,0 +1,45 @@
++import type { BeginnerQuestKey } from './questProgress';
++import type { TradeGuideScreen, QuestGuideTargetId } from './questGuideBridge';
++export type TradingQuestKey = Exclude<BeginnerQuestKey, 'exchange' | 'transfer'>;
++export type TradingGuideStep = { screen: TradeGuideScreen; target: QuestGuideTargetId; title: string; body: string; next?: boolean };
++const market: TradingGuideStep = { screen: 'market', target: 'market-assets', title: '종목 선택', body: '목록에서 현재 거래 가능한 종목을 선택해 주세요. 시세와 차트는 언제든 확인할 수 있어요.' };
++const price: TradingGuideStep = { screen: 'asset', target: 'asset-price', title: '현재가', body: '암호화폐의 현재 가격은 여기에 표시돼요.', next: true };
++const buy: TradingGuideStep = { screen: 'asset', target: 'asset-buy', title: '구매하기', body: '구매하기를 눌러 실제 주문 화면으로 이동해 주세요.' };
++const marketType: TradingGuideStep = { screen: 'order', target: 'order-type', title: '시장가 주문', body: '시장가 주문은 가격을 직접 지정하지 않고, 주문이 체결되는 시점에 시장에서 거래 가능한 가격으로 매수하는 방식이에요.', next: true };
++const amount: TradingGuideStep = { screen: 'order', target: 'order-input', title: '금액과 수량', body: '사용 가능한 잔액 안에서 실습할 금액이나 수량을 입력해 주세요. 수수료도 필요해요.', next: true };
++const preview: TradingGuideStep = { screen: 'order', target: 'order-preview', title: '금액과 수수료 확인', body: '예상 금액과 거래 수수료를 확인해 주세요. 시장가의 최종 가격과 수수료는 실행 시 확정돼요.', next: true };
++const submit: TradingGuideStep = { screen: 'order', target: 'order-submit', title: '주문 실행', body: '화면의 주문 버튼으로 실행해 주세요. 실패하거나 시세를 확인할 수 없으면 화면 안내에 따라 다시 확인해 주세요.' };
++const holdings: TradingGuideStep = { screen: 'asset', target: 'asset-holdings', title: '보유종목과 수익률', body: '보유수량과 수익률을 확인해 주세요. 수익률은 가격과 수수료에 따라 음수일 수도 있어요. 표시를 확인한 뒤 다음을 눌러 주세요.', next: true };
++const stock = (us: boolean): TradingGuideStep[] => [market, { ...price, body: us
++  ? '미국 주식은 미국 시장 운영시간에 증권 USD 지갑으로 거래해요. 환율도 원화 기준 자산 평가에 영향을 줘요. 휴장 또는 시세 미준비 시 다른 심화 퀘스트를 진행할 수 있어요.'
++  : '국내 주식은 한국 시장 운영시간에 KRW로 거래해요. 휴장 중에는 다른 심화 퀘스트를 진행할 수 있어요.' }, buy, marketType, amount, preview, submit, holdings];
++const futures = (short: boolean): TradingGuideStep[] => [
++  { screen: 'futures', target: 'futures-funding', title: '선물 지갑 준비', body: '선물 USD 지갑의 잔액을 확인해 주세요. 부족하면 지갑 탭에서 USD를 이체한 뒤 퀘스트 이어하기로 돌아올 수 있어요.', next: true },
++  { screen: 'futures', target: 'futures-instrument', title: '선물 종목', body: '거래 가능한 선물 상품을 선택해 주세요. 같은 종목은 One-way 방식이에요. 반대 포지션이 열려 있다면 먼저 종료해야 해요.', next: true },
++  { screen: 'futures', target: 'futures-direction', title: short ? 'Short · 숏' : 'Long · 롱', body: short ? '숏은 가격이 하락하면 이익, 상승하면 손실이 발생해요. Short를 선택해 주세요.' : '롱은 가격이 상승하면 이익, 하락하면 손실이 발생해요. Long을 선택해 주세요.', next: true },
++  { screen: 'futures', target: 'futures-margin', title: '레버리지와 격리마진', body: '낮은 레버리지(예: 2배)와 Isolated 격리마진을 권장해요. 적은 증거금으로 큰 포지션을 만들 수 있지만 손실과 청산 위험도 커져요.', next: true },
++  { screen: 'futures', target: 'futures-submit', title: '포지션 진입', body: '수량·증거금·수수료를 확인한 뒤 진입해 주세요. 이 실습은 1배보다 높은 레버리지로 진입해야 해요.' },
++  { screen: 'futures', target: 'futures-position', title: '손익과 청산가격', body: '같은 포지션의 미실현손익과 청산가격을 확인해 주세요. 포지션 카드에서 전량 종료를 선택하고 종료 주문을 실행해 주세요. 강제청산은 종료 실습에 포함되지 않아요.' },
++];
++export const TRADING_GUIDE_STEPS: Record<TradingQuestKey, TradingGuideStep[]> = {
++  marketBuy: [market, price, buy, marketType, amount, preview, submit, holdings],
++  protection: [
++    { screen: 'asset', target: 'asset-protection', title: '보유 현물 보호', body: '앞서 매수한 종목의 TP/SL 설정·관리를 눌러 주세요. 보유수량이 없다면 구매하기에서 정상 시장가 매수로 다시 준비할 수 있어요.' },
++    { screen: 'asset', target: 'protection-editor', title: '익절과 손절', body: 'TP는 이익을 실현할 목표가격, SL은 손실을 줄이려는 가격이에요. 두 조건을 함께 입력해 주세요. 기존 보호가 있다면 취소 후 다시 등록할 수 있어요.', next: true },
++    { screen: 'asset', target: 'protection-submit', title: '보호 주문 등록', body: '두 가격을 확인한 뒤 보호 조건 등록을 눌러 주세요. 등록 확정으로 완료되며 발동까지 기다리지 않아요.' },
++  ],
++  marketSell: [
++    { ...holdings, body: '매도 가능한 수량을 확인해 주세요. 수량이 없으면 정상 시장가 매수로 다시 준비할 수 있어요. 보호 주문과 충돌하면 기존 보호를 취소한 뒤 진행해 주세요.' },
++    { screen: 'asset', target: 'asset-sell', title: '판매하기', body: '판매하기를 눌러 매도 화면으로 이동해 주세요.' },
++    { ...marketType, body: '시장가를 선택해 주세요. 보유 위험을 줄이는 매도는 학습 진행도와 관계없이 사용할 수 있어요.' }, amount,
++    { ...preview, body: '미실현손익은 아직 보유한 자산의 평가 변화예요. 매도가 체결되면 실현손익이 확정돼요. 매도 수수료와 예상 수령액도 확인해 주세요.' }, submit,
++  ],
++  limitBuy: [market, price, buy,
++    { ...marketType, title: '지정가 주문', body: '지정가를 선택해 주세요. 원하는 가격을 지정하며 접수만으로 체결되지는 않아요.' },
++    { ...amount, body: '원하는 지정가격과 매수 금액을 입력해 주세요. 주문에는 수수료를 포함한 예약금이 필요해요.' },
++    { ...preview, body: '미체결 주문의 예약금은 다른 거래에 사용할 수 없어요. 취소하면 예약이 해제되고, 체결되면 실제 매수가 이루어져요.' }, submit,
++    { screen: 'asset', target: 'limit-review', title: '주문 상태와 예약금', body: '등록한 주문의 상태를 확인해 주세요. 미체결이면 주문 취소를 실습해 주세요. 이미 체결되었다면 취소할 필요 없이 결과를 확인하면 돼요.', next: true },
++  ],
++  krStock: stock(false), usStock: stock(true), futuresLong: futures(false), futuresShort: futures(true),
++};
++export function isTradingQuest(key: BeginnerQuestKey): key is TradingQuestKey { return key !== 'exchange' && key !== 'transfer'; }
+diff --git a/frontend/src/features/quest/tradingQuests.test.ts b/frontend/src/features/quest/tradingQuests.test.ts
+new file mode 100644
+index 00000000..3a2dff49
+--- /dev/null
++++ b/frontend/src/features/quest/tradingQuests.test.ts
+@@ -0,0 +1,69 @@
++import assert from 'node:assert/strict';
++import { test } from 'node:test';
++import { questProgress, questPayload } from '../../../test/questFixtures.ts';
++import { BEGINNER_QUEST_KEYS, canStartQuest, parseBeginnerQuests } from './questProgress.ts';
++import { startGuideSession, followGuideFocus, claimGuideCommand, settleGuideVerification, observeGuideProgress, resolveGuideView } from './questGuideModel.ts';
++const account='beginner-1';
++const spot={kind:'spot' as const,accountId:account,assetId:'crypto-1',assetType:'crypto',side:'buy',orderType:'market',orderId:'new-fill',summary:'실제 체결'};
++for(let count=0;count<=6;count++)test(`foundation ${count}: next practice usable; later practice cannot start`,()=>{
++  const progress=questProgress(count);
++  BEGINNER_QUEST_KEYS.forEach((key,index)=>assert.equal(canStartQuest(key,progress),index<6?index<=count:count>=6));
++});
++test('advanced quests are independent, including Short before Long and US before KR',()=>{
++  const payload=questPayload(6);const done=questPayload(10);
++  payload.quests[7]=done.quests[7];payload.quests[9]=done.quests[9];
++  const progress=parseBeginnerQuests(payload,account);
++  for(const key of ['krStock','usStock','futuresLong','futuresShort'] as const)assert.equal(canStartQuest(key,progress),true);
++  assert.equal(progress.learningAccess.allTrading,true);
++});
++test('a click/quote/old progress never replaces committed fill plus holdings review',()=>{
++  const session=startGuideSession(1,account,'marketBuy',questProgress(2))!;
++  assert.equal(session.phase,'guiding');
++  assert.equal(claimGuideCommand(session,account,{...spot,accountId:'foreign'}).claimed,false);
++  assert.equal(claimGuideCommand(session,account,{...spot,orderType:'limit'}).claimed,false);
++  const fill=claimGuideCommand(session,account,spot).session!;
++  assert.equal(fill.step,7);assert.equal(fill.phase,'guiding');assert.equal(fill.orderId,'new-fill');
++  assert.equal(settleGuideVerification({...fill,phase:'verifying'},questProgress(2)).phase,'unconfirmed');
++  assert.equal(settleGuideVerification({...fill,phase:'verifying'},questProgress(3)).phase,'celebrating');
++});
++test('holdings Next requires the matching account and asset valuation to be visible',()=>{
++  const session=claimGuideCommand(startGuideSession(1,account,'marketBuy',questProgress(2)),account,spot).session!;
++  for(const visible of [false,true]) {
++    const view=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account,assetId:'crypto-1',assetType:'crypto'},holdings:{screen:'holdings',accountId:account,assetId:'crypto-1',holdingsVisible:visible}}});
++    assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.equal(view.card.next,visible?'enabled':'disabled');
++  }
++});
++test('navigation updates preserve an already advanced order step',()=>{
++  const session=startGuideSession(1,account,'marketBuy',questProgress(2))!;
++  assert.equal(followGuideFocus({...session,step:5},'order').step,5);
++  assert.equal(followGuideFocus(session,'order').step,3);
++});
++test('limit registration waits for terminal result review and survives reconnect',()=>{
++  const payload=questPayload(5);payload.quests[5]=questPayload(6).quests[5];
++  payload.quests[5].status='in_progress';payload.quests[5].completedStepCount=1;payload.quests[5].steps[1]={stepId:'limit_result_reviewed',completed:false,completedAt:null,referenceId:null};payload.practice.limitAssetId='crypto-1';
++  const session=startGuideSession(2,account,'limitBuy',parseBeginnerQuests(payload,account))!;
++  assert.equal(session.step,7);assert.equal(session.orderId,'limitBuy-ref');
++  const view=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account},limitReview:{screen:'limitReview',accountId:account,orderResolved:false}}});
++  assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.equal(view.card.next,'disabled');
++});
++test('futures requires leverage, direction and manual full close of the same lifetime',()=>{
++  const session=startGuideSession(3,account,'futuresShort',questProgress(6))!;
++  const command={kind:'futures' as const,accountId:account,positionId:'lifetime-1',direction:'short',operation:'open',leverage:2,quantityAfter:'1.00000000',summary:'체결'};
++  assert.equal(claimGuideCommand(session,account,{...command,leverage:1}).claimed,false);
++  assert.equal(claimGuideCommand(session,account,{...command,direction:'long'}).claimed,false);
++  const opened=claimGuideCommand(session,account,command).session!;
++  for(const patch of [{operation:'reduce',quantityAfter:'0.5'},{operation:'close',quantityAfter:'0',positionId:'foreign'},{operation:'liquidation',quantityAfter:'0'}])assert.equal(claimGuideCommand(opened,account,{...command,...patch}).claimed,false);
++  assert.equal(claimGuideCommand(opened,account,{...command,operation:'close',quantityAfter:'0'}).session?.phase,'verifying');
++});
++test('replay preserves completion and returns without fireworks only after new practice',()=>{
++  const session=startGuideSession(4,account,'marketBuy',questProgress(6))!;
++  assert.equal(observeGuideProgress(session,questProgress(6),false).phase,'guiding');
++  const filled=claimGuideCommand(session,account,spot).session!;
++  assert.equal(settleGuideVerification({...filled,phase:'verifying'},questProgress(6)).phase,'replaySucceeded');
++});
++test('the client rejects forged unlocks and out-of-order financial evidence',()=>{
++  const forged=questPayload(2);forged.learningAccess.allTrading=true;
++  assert.throws(()=>parseBeginnerQuests(forged,account));
++  const unordered=questPayload(6);unordered.quests[4].steps[0].completedAt=unordered.quests[3].steps[0].completedAt;
++  assert.throws(()=>parseBeginnerQuests(unordered,account));
++});
+diff --git a/frontend/src/features/quest/useLearningAccess.test.ts b/frontend/src/features/quest/useLearningAccess.test.ts
+new file mode 100644
+index 00000000..2caf5a1b
+--- /dev/null
++++ b/frontend/src/features/quest/useLearningAccess.test.ts
+@@ -0,0 +1,37 @@
++import assert from 'node:assert/strict';
++import {createRequire} from 'node:module';
++import {resolve} from 'node:path';
++import {test} from 'node:test';
++import {questProgress} from '../../../test/questFixtures.ts';
++const {load}=createRequire(import.meta.url)('../../../test/ledgerTestHarness.cjs');
++function harness(mode='beginner',data:ReturnType<typeof questProgress>|undefined=undefined,isError=false){
++ const h={alerts:[] as unknown[][],queries:[] as any[],runs:0,refresh:0};
++ const {useLearningAccess}=load(resolve('src/features/quest/useLearningAccess.ts'),{
++  'react-native':{Alert:{alert:(...args:unknown[])=>h.alerts.push(args)}},
++  '../tradingAccount/TradingAccountContext':{useTradingAccount:()=>({selectedAccount:{id:'A',mode}})},
++  '../tradingAccount/api':{getBeginnerQuestProgress:async()=>data},
++  '@tanstack/react-query':{useQuery:(options:unknown)=>{h.queries.push(options);return{data,isError,refetch:async()=>{h.refresh++;}};}},
++ });
++ return {...h,access:useLearningAccess('A'),state:h};
++}
++for(const mode of ['general','season'])test(`${mode}: no learning query or lock even when progress is unavailable`,()=>{
++ const h=harness(mode);assert.equal(h.queries[0].enabled,false);assert.deepEqual(h.queries[0].queryKey,['tradingAccount','quests','A']);
++ for(const action of ['transfer','cryptoMarketBuy','spotProtection','cryptoLimitBuy','allTrading','riskReduction'])assert.equal(h.access.gate(action).allowed,true);
++});
++test('fresh server progress keeps locked functions visible and explains why on press',()=>{
++ const h=harness('beginner',questProgress(2));const gate=h.access.gate('cryptoLimitBuy');
++ assert.equal(gate.allowed,false);assert.equal(gate.locked,true);gate.guard(()=>{h.state.runs++;});
++ assert.equal(h.state.runs,0);assert.equal(h.alerts.length,1);assert.match(h.alerts[0][1] as string,/지정가 매수/);
++ assert.equal(h.access.gate('cryptoMarketBuy').allowed,true);assert.equal(h.access.gate('riskReduction').allowed,true);
++});
++test('unknown/error progress is a refresh failure, never a fabricated learning lock or unlock',()=>{
++ for(const [data,isError] of [[undefined,false],[questProgress(2),true]] as const){
++  const h=harness('beginner',data,isError);const gate=h.access.gate('allTrading');
++  assert.equal(gate.allowed,false);assert.equal(gate.locked,false);gate.guard(()=>{h.state.runs++;});
++  assert.equal(h.state.runs,0);assert.equal(h.state.refresh,1);
++ }
++});
++test('QUEST 06 server completion removes every learning restriction even with operational flags off',()=>{
++ const p=questProgress(6);p.operations={limitOrdersEnabled:false,conditionalOrdersEnabled:false,futuresTradingMode:'DISABLED'};
++ const h=harness('beginner',p);for(const action of Object.keys(p.learningAccess)){assert.equal(h.access.gate(action).allowed,true);assert.equal(h.access.gate(action).locked,false);}
++});
+diff --git a/frontend/src/features/quest/useLearningAccess.ts b/frontend/src/features/quest/useLearningAccess.ts
+new file mode 100644
+index 00000000..6ef23d49
+--- /dev/null
++++ b/frontend/src/features/quest/useLearningAccess.ts
+@@ -0,0 +1,35 @@
++import { useQuery } from '@tanstack/react-query';
++import { Alert } from '../../theme/native';
++import { QUERY_KEYS } from '../../constants/queryKeys';
++import { getBeginnerQuestProgress } from '../tradingAccount/api';
++import { useTradingAccount } from '../tradingAccount/TradingAccountContext';
++import type { LearningAction } from './questProgress';
++
++export const LEARNING_CONDITION: Record<LearningAction, string> = {
++  exchange: '환전하기 퀘스트에서 사용할 수 있어요.',
++  transfer: '환전하기 퀘스트를 완료하면 사용할 수 있어요.',
++  cryptoMarketBuy: '암호화폐 시장가 매수 퀘스트에서 사용할 수 있어요.',
++  spotProtection: 'TP/SL 설정 퀘스트에서 사용할 수 있어요.',
++  cryptoLimitBuy: '암호화폐 지정가 매수 퀘스트에서 사용할 수 있어요.',
++  allTrading: '암호화폐 지정가 매수 퀘스트를 완료하면 사용할 수 있어요.',
++};
++
++/** Server evidence only. Unknown/error is a refresh state, not a learning lock. */
++export function useLearningAccess(accountId?: string | null) {
++  const { selectedAccount } = useTradingAccount();
++  const beginner = selectedAccount?.mode === 'beginner' && (!accountId || selectedAccount.id === accountId);
++  const id = accountId ?? selectedAccount?.id ?? '';
++  const query = useQuery({ queryKey: QUERY_KEYS.tradingAccount.quests(id),
++    queryFn: () => getBeginnerQuestProgress(id), enabled: beginner, staleTime: 0 });
++  const gate = (action: LearningAction | 'riskReduction') => {
++    const exempt = !beginner || action === 'riskReduction' || action === 'exchange';
++    const allowed = exempt || query.data?.learningAccess[action as LearningAction] === true;
++    const locked = !allowed && !!query.data && !query.isError;
++    const message = allowed ? null : locked ? LEARNING_CONDITION[action as LearningAction]
++      : '학습 진행 상황을 확인하지 못했어요. 잠시 후 다시 시도해 주세요.';
++    return { allowed, locked, message,
++      guard: (work: () => void) => { if (allowed) work(); else { Alert.alert('기능 안내', message ?? ''); if (!locked) void query.refetch(); } },
++    };
++  };
++  return { gate, progress: beginner ? query.data ?? null : null };
++}
+diff --git a/frontend/src/features/quest/useTradingGuideFacts.ts b/frontend/src/features/quest/useTradingGuideFacts.ts
+new file mode 100644
+index 00000000..47edf323
+--- /dev/null
++++ b/frontend/src/features/quest/useTradingGuideFacts.ts
+@@ -0,0 +1,13 @@
++import { useEffect } from 'react';
++import { getQuestGuideFacts, publishQuestGuideFacts, type TradeGuideFacts } from './questGuideBridge';
++/** Each actual screen owns and cleans up its own facts. */
++export function useTradingGuideFacts(facts: TradeGuideFacts, enabled = true) {
++  const serialized = JSON.stringify(facts);
++  const screen = facts.screen;
++  useEffect(() => {
++    if (!enabled) return;
++    const value = JSON.parse(serialized) as TradeGuideFacts;
++    publishQuestGuideFacts(screen, value);
++    return () => { if (getQuestGuideFacts(screen) === value) publishQuestGuideFacts(screen, null); };
++  }, [screen, serialized, enabled]);
++}
+diff --git a/frontend/test/browser/tradingQuestFlows.cjs b/frontend/test/browser/tradingQuestFlows.cjs
+new file mode 100644
+index 00000000..d0b3c8d3
+--- /dev/null
++++ b/frontend/test/browser/tradingQuestFlows.cjs
+@@ -0,0 +1,50 @@
++const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
++module.exports=async function({page,open,id,tab,out,errors}){
++ const done=[];
++ const next=async()=>{await id('quest-guide-next').waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('[data-testid="quest-guide-next"]')].some(el=>el.checkVisibility()&&el.getAttribute('aria-disabled')!=='true'));await id('quest-guide-next').click();};
++ const finish=async key=>{
++  await id('quest-guide-celebration').waitFor();
++  await page.screenshot({path:path.join(out,`${key}-complete.png`)});
++  await page.waitForFunction(key=>[...document.querySelectorAll(`[data-testid="quest-card-${key}-status"]`)].some(el=>el.checkVisibility()&&el.textContent==='완료'),key);
++  await page.waitForFunction(()=>!document.querySelector('[data-testid="quest-guide-celebration"]'));
++  done.push(key);
++ };
++ const start=async key=>{await tab('퀘스트').click();await id(`quest-card-${key}-start`).click();};
++ const buy=async(key,asset)=>{
++  await start(key);await id(`market-item-${asset}`).click();await next();await id('asset-detail-open-buy-order').click();
++  if(key==='limitBuy'){await id('order-type-select').click();await id('order-type-toggle-limit').click();await id('order-limit-price-input').fill('90');}
++  await next();await id('order-quantity-input').fill(asset==='BTC'?'100':'1');await next();await next();
++  await id('quest-guide-card').waitFor();
++  await page.waitForFunction(()=>{const el=document.querySelector('[data-testid="quest-guide-card"]'); return el && Number(getComputedStyle(el).opacity)===1;});
++  const clipped = await id('quest-guide-card').evaluate(el=>{const r=el.getBoundingClientRect();return r.left<0 || r.right>innerWidth || r.top<0 || r.bottom>innerHeight || el.scrollHeight>el.clientHeight+2;});
++  assert.equal(clipped,false,'guide card remains inside the viewport');
++  await page.screenshot({path:path.join(out,`${key}-submit.png`)});
++  await id('order-execute-submit').click();
++  if(key==='limitBuy')await id('quest-limit-cancel').click();
++  await next();await finish(key);
++ };
++ if (process.env.QUEST_COMPACT === '1') { await page.setViewportSize({ width: 320, height: 740 }); await page.emulateMedia({ reducedMotion: 'reduce' }); }
++ await open('practice=1&fullQuests=1&quest=2&fxState=available'+(process.env.QUEST_COMPACT === '1'?'&fontScale=2&theme=dark':''));
++ await tab('퀘스트').click();
++ assert.equal(await page.getByTestId('quest-card-futuresShort-start').getAttribute('aria-disabled'),'true');
++ await buy('marketBuy','BTC');
++ await start('protection');await id('holding-protection-BTC').click();
++ await id('protection-take_profit-toggle').click();await page.getByLabel('익절 (Take Profit) 조건 가격',{exact:true}).fill('120');
++ await id('protection-stop_loss-toggle').click();await page.getByLabel('손절 (Stop Loss) 조건 가격',{exact:true}).fill('80');
++ await next();await page.getByRole('button',{name:'보호 조건 등록',exact:true}).click();await finish('protection');
++ await start('marketSell');await next();await id('asset-detail-open-sell-order').click();await next();
++ await id('order-quantity-input').fill('1');await next();await next();await id('order-execute-submit').click();await finish('marketSell');
++ await buy('limitBuy','BTC');
++ for(const key of ['krStock','usStock','futuresLong','futuresShort'])assert.notEqual(await id(`quest-card-${key}-start`).getAttribute('aria-disabled'),'true');
++ await buy('usStock','US');await buy('krStock','KR');
++ for(const [key,direction] of [['futuresShort','숏(Short)'],['futuresLong','롱(Long)']]){
++  await start(key);await next();await next();await page.getByRole('button',{name:direction,exact:true}).click();await next();
++  await id('futures-leverage').fill('2');await next();await id('futures-quantity').fill('1');await id('futures-submit').click();
++  await page.getByRole('button',{name:'전량 종료',exact:true}).filter({visible:true}).first().click();
++  await id('futures-submit').click();await finish(key);
++ }
++ assert.equal((await id('quest-summary-progress').textContent()),'퀘스트 10/10 완료');
++ assert.deepEqual(errors,[]);
++ fs.writeFileSync(path.join(out,'full-quest-results.json'),JSON.stringify({done,errors,transport:'fixture; real screens and buttons',backend:'separate PostgreSQL integration'},null,2));
++ console.log('full quest browser checks passed: '+done.join(', '));
++};
+diff --git a/frontend/test/browser/tradingQuestMocks.js b/frontend/test/browser/tradingQuestMocks.js
+new file mode 100644
+index 00000000..0ed11729
+--- /dev/null
++++ b/frontend/test/browser/tradingQuestMocks.js
+@@ -0,0 +1,80 @@
++// Transport-only browser fixture. Real screens/commands/guide remain mounted.
++import { questPayload } from '../questFixtures';
++import { assets as cryptoAssets, apiClient as chartClient } from './tradingMocks';
++import { futuresFixture } from '../futuresFixtures.cjs';
++import { conditionalFixture } from '../conditionalFixtures.cjs';
++export function tradingQuestTransport(response, committedAt, accountId, level) {
++  const progress = questPayload(level, accountId), orders = new Map(), holdings = new Map();
++  const stock = (id, us) => ({ ...cryptoAssets[0], id, symbol: us ? 'TCUS' : '000001', name: us ? '미국 실습 주식' : '한국 실습 주식', assetType: us ? 'us_stock' : 'domestic_stock', market: us ? 'NASDAQ' : 'KRX', priceCurrency: us ? 'USD' : 'KRW', settlementCurrency: us ? 'USD' : 'KRW', marketStatus: 'open', price: { ...cryptoAssets[0].price, currentPrice:'100', priceCurrency:us?'USD':'KRW' } });
++  const assets = [{ ...cryptoAssets[0], price: { ...cryptoAssets[0].price, currentPrice:'100' } },stock('KR',false),stock('US',true)];
++  const spot = assets[0];let protection=null, position=null, quote=null, serial=0;
++  const page=rows=>({offset:0,limit:100,returned:rows.length,total:rows.length,nextOffset:null});
++  const complete=(index,step,id)=>{const row=progress.quests[index];if(!row.steps[step].completed)row.steps[step]={...row.steps[step],completed:true,completedAt:committedAt(),referenceId:id};row.completedStepCount=row.steps.filter(s=>s.completed).length;row.status=row.completedStepCount===row.totalStepCount?'completed':'in_progress';};
++  const snapshot=()=>{
++    const done=i=>progress.quests[i].status==='completed';
++    progress.learningAccess={exchange:true,transfer:done(0),cryptoMarketBuy:done(1),spotProtection:done(2),cryptoLimitBuy:done(4),allTrading:done(5)};
++    return response(structuredClone(progress));
++  };
++  const hold=asset=>({ ...asset,assetId:asset.id,positionId:`position-${asset.id}`,quantity:'1.00000000',availableQuantity:'1.00000000',reservedQuantity:'0',averageCost:'100',currencyCode:asset.settlementCurrency,
++    valuation:{state:'available',price:'100',currentPrice:'100',marketValue:'100',marketValueKrw:'135000',costBasis:'100',unrealizedPnl:'-0.1',unrealizedPnlKrw:'-135',returnRate:'-0.1',unrealizedReturnRate:'-0.1',evaluatedAt:committedAt()}});
++  if(level>=3&&level<5)holdings.set(spot.id,hold(spot));
++  if(level>=3)progress.practice.spotAssetId=spot.id;
++  return {
++    progress:snapshot,
++    async get(path,config){
++      const url=new URL(path,'https://fixture.invalid'),parts=url.pathname.split('/');
++      if(parts[1]==='assets'){
++        if(!parts[2]){const rows=assets.filter(a=>a.assetType===(config?.params?.assetType??url.searchParams.get('assetType')??'crypto'));return response({assets:rows,pagination:page(rows),sortSnapshot:'quests'});}
++        const asset=assets.find(a=>a.id===decodeURIComponent(parts[2]));
++        if(asset&&parts.length===3)return response({asset});
++        if(asset&&parts[3]==='candles')return chartClient.get(path.replace(`/assets/${asset.id}`,`/assets/BTC`),config);
++      }
++      if(!path.startsWith(`/trading-accounts/${accountId}/`))return undefined;
++      if(path.includes('/futures/')){
++        const f=futuresFixture(accountId,{position:!!position,direction:position?.direction,leverage:position?.leverage??2});
++        if(position){f.positions.positions[0]={...f.positions.positions[0],id:position.id,quantity:position.quantity};}
++        if(path.endsWith('/instruments'))return response(f.catalog);
++        if(path.endsWith('/positions'))return response(f.positions);
++        if(path.includes('/limit-orders'))return response({tradingAccountId:accountId,orders:[],pagination:page([])});
++        if(path.includes('/executions'))return response({...f.executions,executions:[],pagination:page([])});
++        if(path.includes('/liquidations'))return response({...f.liquidations,liquidations:[],pagination:page([])});
++        return response(f.final);
++      }
++      if(path.endsWith('/positions')){const rows=[...holdings.values()];return response({tradingAccountId:accountId,state:'available',positions:rows,pagination:page(rows)});}
++      if(path.includes('/orders/'))return response({tradingAccountId:accountId,order:orders.get(parts[4])});
++      if(path.endsWith('/orders')){const rows=[...orders.values()].filter(o=>o.status==='submitted');return response({tradingAccountId:accountId,state:'available',orders:rows,pagination:page(rows)});}
++      if(path.includes('/protections')){const result=conditionalFixture(accountId,{domain:'spot',enabled:true});result.groups=protection?[protection]:[];result.pagination=page(result.groups);return response(result);}
++      return undefined;
++    },
++    async post(path,body){
++      if(!path.startsWith(`/trading-accounts/${accountId}/`))return undefined;
++      if(path.endsWith('/quests/acknowledgements')){
++        const order=orders.get(body.orderId);if(!order)throw Error('No committed practice order');
++        if(body.stepId==='holdings_reviewed'&&order.status==='executed')complete(2,1,body.orderId);
++        else if(body.stepId==='limit_result_reviewed'&&['canceled','executed'].includes(order.status))complete(5,1,body.orderId);
++        else throw Error('Terminal financial result required');return snapshot();
++      }
++      if(path.endsWith('/orders/quote')){
++        const asset=assets.find(a=>a.id===body.assetId);quote={...body,orderType:body.orderType??'market',asset,quoteId:`q-${++serial}`,tradingAccountId:accountId,quantity:body.quantity??String(Number(body.amount)/Number(body.limitPrice??100)),expiresAt:new Date(Date.now()+60000).toISOString(),price:'100',currencyCode:asset.settlementCurrency,grossAmount:body.amount??'100',feeAmount:'0.1',netAmount:'100.1',state:'available'};return response(quote);
++      }
++      if(path.endsWith('/orders')){
++        const asset=assets.find(a=>a.id===body.assetId),id=`order-${++serial}`,at=committedAt();
++        const order={...quote,...body,orderId:id,asset,tradingAccountId:accountId,status:body.orderType==='limit'?'submitted':'executed',submittedAt:at,executedAt:body.orderType==='limit'?null:at,executedPrice:body.orderType==='limit'?null:'100',reservedAmount:body.orderType==='limit'?'100.1':null,reservationReleasedAt:null};orders.set(id,order);
++        if(body.orderType==='limit'){complete(5,0,id);progress.practice.limitAssetId=asset.id;}
++        else if(body.side==='sell'){holdings.delete(asset.id);complete(4,0,id);}
++        else {holdings.set(asset.id,hold(asset));complete(asset.assetType==='crypto'?2:asset.assetType==='us_stock'?7:6,0,id);if(asset.assetType==='crypto')progress.practice.spotAssetId=asset.id;}
++        return response({tradingAccountId:accountId,order,execution:{state:order.status},executionPolicy:{autoExecutionEnabled:false,mode:'reservation_only'}});
++      }
++      if(/\/orders\/[^/]+\/cancel$/.test(path)){const order=orders.get(path.split('/')[4]);order.status='canceled';order.cancelReason='user_canceled';order.reservationReleasedAt=committedAt();return response({tradingAccountId:accountId,order});}
++      if(path.endsWith('/protections')){const id=`group-${++serial}`;protection={id,domain:'spot',assetId:body.assetId,positionId:body.positionId,parentOrderId:null,direction:'long',status:'active',currencyCode:'USD',remainingQuantity:'1',createdAt:committedAt(),endedAt:null,terminalReason:null,legs:body.legs.map((l,i)=>({...l,id:`leg-${i}`,state:'armed'})),children:[]};complete(3,0,id);return response({tradingAccountId:accountId,groupId:id,status:'active'});}
++      if(/\/protections\/[^/]+\/cancel$/.test(path)){protection=null;return response({tradingAccountId:accountId,groupId:'group',status:'canceled'});}
++      if(path.endsWith('/futures/execute')){
++        const id=body.positionId??`lifetime-${++serial}`,index=body.direction==='short'?9:8;
++        if(body.operation==='open'){position={id,direction:body.direction,leverage:body.leverage,quantity:body.quantity};complete(index,0,`open-${id}`);progress.practice[body.direction==='short'?'shortPositionId':'longPositionId']=id;}
++        else if(body.operation==='close'){complete(index,1,`close-${id}`);position=null;}
++        return response({tradingAccountId:accountId,commandId:`command-${++serial}`,execution:{positionId:id,operation:body.operation,direction:body.direction,leverage:body.leverage,feeAmount:'0.1',positionAfter:{quantity:position?.quantity??'0.00000000'}}});
++      }
++      return undefined;
++    },
++  };
++}
+diff --git a/frontend/test/questFixtures.ts b/frontend/test/questFixtures.ts
+new file mode 100644
+index 00000000..0680a529
+--- /dev/null
++++ b/frontend/test/questFixtures.ts
+@@ -0,0 +1,18 @@
++import { parseBeginnerQuests, QUEST_DEFINITIONS, type BeginnerQuestsDto } from '../src/features/quest/questProgress.ts';
++/** Ten-quest server fixture; timestamps increase across each prerequisite. */
++export function questPayload(completed = 0, accountId = 'beginner-1'): BeginnerQuestsDto {
++  return {
++    tradingAccountId: accountId,
++    practice: { spotAssetId: completed >= 3 ? 'crypto-1' : null, limitAssetId: completed >= 6 ? 'crypto-1' : null, longPositionId: null, shortPositionId: null },
++    operations: { limitOrdersEnabled: true, conditionalOrdersEnabled: true, futuresTradingMode: 'ENABLED' },
++    learningAccess: { exchange: true, transfer: completed >= 1, cryptoMarketBuy: completed >= 2, spotProtection: completed >= 3, cryptoLimitBuy: completed >= 5, allTrading: completed >= 6 },
++    quests: Object.entries(QUEST_DEFINITIONS).map(([key, definition], index) => {
++      const done = index < completed;
++      return { questId: definition.questId, status: done ? 'completed' : 'not_started', totalStepCount: definition.steps.length, completedStepCount: done ? definition.steps.length : 0,
++        steps: definition.steps.map((stepId, stepIndex) => ({ stepId, completed: done,
++          completedAt: done ? new Date(Date.parse('2026-10-10T01:00:00.000Z') + index * 300000 + stepIndex * 60000).toISOString() : null,
++          referenceId: done ? `${key}-ref` : null })) };
++    }),
++  };
++}
++export function questProgress(completed = 0) { return parseBeginnerQuests(questPayload(completed), 'beginner-1'); }

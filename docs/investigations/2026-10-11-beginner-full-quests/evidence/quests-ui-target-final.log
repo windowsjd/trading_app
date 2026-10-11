@@ -1,0 +1,31 @@
+✔ src/features/quest/QuestGuideOverlay.test.ts (649.096367ms)
+✔ src/features/quest/QuestGuideProvider.test.ts (407.63782ms)
+✔ src/features/quest/QuestTargetHighlight.test.ts (213.68464ms)
+✔ src/features/quest/questGuideBridge.test.ts (55.72771ms)
+✔ src/features/quest/questGuideModel.test.ts (75.986406ms)
+✔ src/features/quest/questProgress.test.ts (255.904075ms)
+✔ src/features/quest/tradingQuests.test.ts (70.675049ms)
+✔ src/features/quest/useLearningAccess.test.ts (237.712512ms)
+✔ src/features/tradingAccount/indicativePreview.test.ts (79.961211ms)
+✖ src/screens/futures/FuturesLimitEntry.test.ts (14274.530436ms)
+✔ src/screens/futures/FuturesScreen.test.ts (9188.991021ms)
+✔ src/screens/order/orderAssetSheet.test.ts (2162.890106ms)
+✔ src/screens/order/orderControls.test.ts (1199.735412ms)
+✔ src/screens/order/orderInputPolicy.test.ts (4699.740212ms)
+✔ src/screens/order/orderWarningUx.test.ts (1890.941742ms)
+✔ src/screens/order/quantityRatio.test.ts (5495.112215ms)
+✔ src/screens/order/quantityRatioNative.test.ts (278.872865ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 16
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 41246.380345
+
+✖ failing tests:
+
+test at src/screens/futures/FuturesLimitEntry.test.ts:1:1
+✖ src/screens/futures/FuturesLimitEntry.test.ts (14274.530436ms)
+  'test failed'

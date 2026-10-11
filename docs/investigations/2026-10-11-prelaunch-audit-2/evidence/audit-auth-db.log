@@ -1,0 +1,9 @@
+
+> trading-app@0.0.1 test
+> jest --runInBand auth.integration.spec
+
+Test Suites: 1 passed, 1 total
+Tests:       1 passed, 1 total
+Snapshots:   0 total
+Time:        1.435 s
+Ran all test suites matching auth.integration.spec.

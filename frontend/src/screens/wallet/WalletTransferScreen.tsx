@@ -1,3 +1,4 @@
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -63,6 +64,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   readScope: () => TransferScope;
 }) {
   const queryClient = useQueryClient();
+  const transferGate = useLearningAccess(account.id).gate('transfer');
   const headerHeight = useHeaderHeight();
   const inputScroll = useFocusedInputScroll();
   const amountRef = useRef<View>(null);
@@ -285,7 +287,7 @@ function TransferForm({ account, capabilities, scope, readScope }: {
                     {failure ? <ErrorNotice error={failure} message={failure instanceof WalletBalanceCheckError ? walletBalanceCheckMessage(failure.insufficient) : attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
                     <View ref={inputScroll.submitRef} collapsable={false}>
                       <View ref={questGuideTarget('transfer-submit')} collapsable={false}>
-                        <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} onPress={execute} />
+                        <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} learningHint={transferGate.locked ? transferGate.message : null} onPress={() => transferGate.guard(execute)} />
                       </View>
                     </View>
                   </>}

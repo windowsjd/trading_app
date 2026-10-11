@@ -1,0 +1,10 @@
+
+> trading-app@0.0.1 test
+> jest --runInBand beginner-quest-evidence.spec beginner-learning-policy.spec beginner-quests.service.spec
+
+
+Test Suites: 3 passed, 3 total
+Tests:       37 passed, 37 total
+Snapshots:   0 total
+Time:        0.46 s, estimated 1 s
+Ran all test suites matching beginner-quest-evidence.spec|beginner-learning-policy.spec|beginner-quests.service.spec.

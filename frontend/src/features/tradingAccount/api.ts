@@ -1,3 +1,4 @@
+import type { BeginnerQuestsDto } from '../quest/questProgress';
 import { parseWalletTransferResponse, parseWalletFxTransferQuote, parseWalletFxTransferResponse } from '../wallet/walletTransfer.ts';
 import { assertDailyEquity } from './dailyEquity.ts';
 import { parseBeginnerQuests } from '../quest/questProgress.ts';
@@ -692,4 +693,11 @@ export async function claimAdReward(
     accountId,
     response.data.data,
   );
+}
+
+/** Persist a UI check only after the server verifies the referenced order. */
+export async function acknowledgeBeginnerQuest(accountId: string, stepId: 'holdings_reviewed' | 'limit_result_reviewed', orderId: string) {
+  const response = await apiClient.post<ApiSuccessResponse<BeginnerQuestsDto>>(
+    accountPath(accountId, '/quests/acknowledgements'), { stepId, orderId });
+  return parseBeginnerQuests(response.data.data, accountId);
 }

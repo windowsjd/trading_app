@@ -1,0 +1,15 @@
+{
+  "done": [
+    "marketBuy",
+    "protection",
+    "marketSell",
+    "limitBuy",
+    "usStock",
+    "krStock",
+    "futuresShort",
+    "futuresLong"
+  ],
+  "errors": [],
+  "transport": "fixture; real screens and buttons",
+  "backend": "separate PostgreSQL integration"
+}

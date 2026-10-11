@@ -1,3 +1,6 @@
+import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
+import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
+import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import FuturesMarketList from './FuturesMarketList';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
@@ -46,6 +49,7 @@ const TABS: Array<{ key: AssetType; label: string }> = [
 
 export default function MarketScreen({ navigation, route }: Props) {
   const isAdmin = useAdminDiagnostics();
+  const guide = useQuestGuide();
   const [cryptoProduct, setCryptoProduct] = useState<'spot' | 'futures'>('spot');
   const [selectedTab, setSelectedTab] = useState<AssetType>(route?.params?.assetType ?? 'domestic_stock');
   // Consume each explicit navigation intent. Clearing it also lets a later
@@ -53,11 +57,13 @@ export default function MarketScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (route?.params?.assetType) {
       setSelectedTab(route.params.assetType);
+      setCryptoProduct('spot');
       navigation.setParams({ assetType: undefined });
     }
   }, [route?.params?.assetType, navigation]);
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
   const futuresMarket = selectedTab === 'crypto' && cryptoProduct === 'futures';
+  useTradingGuideFacts({ screen: 'market', accountId: guide?.active?.accountId ?? '', assetType: selectedTab });
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -155,7 +161,8 @@ export default function MarketScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.container}>
-      <FlatList
+      <View ref={questGuideTarget('market-viewport')} collapsable={false} style={{ flex: 1 }}>
+      <View ref={questGuideTarget('market-assets')} collapsable={false} style={{ flex: 1 }}><FlatList
         testID={TEST_IDS.market.screen}
         data={futuresMarket ? [] : items}
         keyExtractor={(item) => item.id}
@@ -169,7 +176,7 @@ export default function MarketScreen({ navigation, route }: Props) {
         refreshControl={refresh.refreshControl}
         ListHeaderComponent={
           <View style={styles.headerSection}>
-            <View style={styles.tabRow}>
+            <View ref={questGuideTarget('market-tabs')} collapsable={false} style={styles.tabRow}>
               {TABS.map((tab) => {
                 const active = tab.key === selectedTab;
                 const testID =
@@ -264,6 +271,8 @@ export default function MarketScreen({ navigation, route }: Props) {
           ) : null
         }
       />
+    </View>
+      </View>
     </SafeAreaView>
   );
 }

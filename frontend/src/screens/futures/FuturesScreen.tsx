@@ -1,3 +1,8 @@
+import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
+import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
+import QuestTarget from '../../features/quest/QuestTarget';
 import FuturesLimitEntryForm from './FuturesLimitEntryForm';
 import PendingOrders from '../asset/PendingOrders';
 import React, { useEffect, useRef, useState } from "react";
@@ -66,6 +71,8 @@ export default function FuturesScreen(props: FuturesScreenProps) {
 }
 export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const accountId = route.params.accountId;
+  const learning = useLearningAccess(accountId);
+  const guide = useQuestGuide();
   const { accounts, selectedAccountId, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   const binding = resolveAccountBinding({
     boundAccountId: accountId,
@@ -77,6 +84,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const focused = useIsFocused();
   const queryClient = useQueryClient();
   const inputScroll = useFocusedInputScroll();
+  const { revealView } = inputScroll;
+  useEffect(() => { registerQuestGuideReveal('futures', node => revealView(node, 'start')); return () => { registerQuestGuideReveal('futures', null); }; }, [revealView]);
   const headerHeight = useHeaderHeight();
   const quantityRef = useRef<TextInput>(null);
   const leverageRef = useRef<TextInput>(null);
@@ -108,6 +117,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       mounted: true,
     };
   const action = useRef<{
+    reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
     signature: string;
     command: FuturesCommand;
     epoch: number;
@@ -166,6 +176,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     onSuccess: (result, request) => {
       if (!isCurrentSession(request.session)) return;
       for (const queryKey of [
+        QUERY_KEYS.tradingAccount.quests(accountId),
         QUERY_KEYS.tradingAccount.futures.all(accountId),
         QUERY_KEYS.tradingAccount.protections.all(accountId),
         QUERY_KEYS.tradingAccount.futuresCollateral(accountId),
@@ -176,6 +187,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       ])
         void queryClient.invalidateQueries({ queryKey });
       if (!current(request)) return;
+      const execution = result.execution;
+      request.reportQuestCommand({ kind: 'futures', accountId, positionId: execution.positionId, direction: execution.direction, operation: execution.operation, leverage: execution.leverage, quantityAfter: execution.positionAfter.quantity, summary: '선물 실행 기록이 확인됐어요.' });
       action.current = null;
       setFailure(null);
       setQuantity("");
@@ -201,6 +214,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     submitLock.current = true;
     mutation.mutate(action.current);
   };
+  const practicePosition = positions.data?.positions.find(p => p.id === guide?.active?.positionId)
+    ?? positions.data?.positions.find(p => p.instrumentId === selectedId);
+  useTradingGuideFacts({ screen: 'futures', accountId, direction, leverage: Number(leverage), marginMode,
+    positionId: practicePosition?.id, positionDirection: practicePosition?.direction, pending: mutation.isPending,
+    blocked: (guide?.active?.step === 5 ? positions.data?.capabilities.canClose : positions.data?.capabilities.canOpen) !== true }, focused && bound);
   if (binding.state === "loading")
     return <FullPageLoading message="선물 계정을 확인하고 있습니다." />;
   if (isError)
@@ -306,7 +324,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setNotice(null);
     action.current = null;
   };
+  const entryGate = learning.gate(selectedOperation === 'close' || selectedOperation === 'reduce' ? 'riskReduction' : 'allTrading');
   const submit = () => {
+    if (!entryGate.allowed) { entryGate.guard(() => undefined); return; }
     if (!allowed || inputError || submitLock.current || !instrument) return;
     const signature = JSON.stringify([
       scope.current.epoch,
@@ -321,6 +341,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     if (action.current?.signature !== signature) {
       const key = createIdempotencyKey("futures");
       action.current = {
+        reportQuestCommand: captureQuestGuideCommand(),
         signature,
         epoch: scope.current.epoch,
         session,
@@ -353,6 +374,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={headerHeight}
     >
+      <View ref={questGuideTarget('futures-viewport')} collapsable={false} style={{ flex: 1 }}>
       <ScrollView
         ref={inputScroll.scrollRef}
         contentContainerStyle={styles.content}
@@ -370,7 +392,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             : (binding.account.season?.seasonName ?? "시즌 투자")}{" "}
           · USD 가상 무기한 계약
         </Text>
-        <View style={styles.card}>
+        <View ref={questGuideTarget('futures-funding')} collapsable={false} style={styles.card}>
           <Text style={styles.heading}>
             {modeLabel[data.capabilities.tradingMode]}
           </Text>
@@ -475,7 +497,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               />
             </>
           ) : null}
-          <View style={styles.choices}>
+          <View ref={questGuideTarget('futures-instrument')} collapsable={false} style={styles.choices}>
             {matchingInstruments.slice(0, 12).map((i) => (
               <Choice
                 key={i.id}
@@ -551,7 +573,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 </>
               ) : (
                 <>
-                  <View style={styles.choices}>
+                  <View ref={questGuideTarget('futures-direction')} collapsable={false} style={styles.choices}>
                     {(["long", "short"] as const).map((dir) => (
                       <Choice
                         key={dir}
@@ -562,7 +584,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       />
                     ))}
                   </View>
-                  <View style={styles.choices}>
+                  <View ref={questGuideTarget('futures-margin')} collapsable={false} style={styles.choices}>
                     {(["isolated", "cross"] as const).map((m) => (
                       <Choice
                         key={m}
@@ -613,7 +635,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 <Text style={styles.warning}>{inputError}</Text>
               ) : null}
               {!position && entryType === 'limit' ? <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id} assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage} quantity={quantity} allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !pendingResult} onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : <View ref={inputScroll.submitRef}>
-                <CTAButton
+                <QuestTarget id="futures-submit"><CTAButton
+                  learningHint={entryGate.locked ? entryGate.message : null}
                   label={`${operationLabel[selectedOperation]} · ${directionLabel[position?.direction ?? direction]}`}
                   testID="futures-submit"
                   onPress={submit}
@@ -624,7 +647,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         ? "enabled"
                         : "disabled"
                   }
-                />
+                /></QuestTarget>
               </View>}
               {notice ? (
                 failure ? (
@@ -807,6 +830,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           </View>
         ) : null}
       </ScrollView>
+    </View>
     </KeyboardAvoidingView>
   );
 }

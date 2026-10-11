@@ -1,0 +1,422 @@
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7d49ece6-3e65-42f3-85a0-25950ecd0499"}
+PASS F2 admin financial guards retain scope/predicates without exact amounts; failures roll back
+PASS F2 admin wallet integrity evidence excludes canonical financial rows
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7dac122c-63eb-4b88-9150-de1d5392ff0a"}
+(node:1564851) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"7dac122c-63eb-4b88-9150-de1d5392ff0a","capturedAt":"2026-10-11T04:41:45.684Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 DB typed immutable Mark, duplicate/out-of-order/WS priority, Spot selector isolation and lifetime margin mode
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e7a77ab8-dcb4-44b3-9b68-90cb1ab1fa8d"}
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"e7a77ab8-dcb4-44b3-9b68-90cb1ab1fa8d","capturedAt":"2026-10-11T04:41:45.852Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"e7a77ab8-dcb4-44b3-9b68-90cb1ab1fa8d","capturedAt":"2026-10-11T04:41:45.892Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 gap liquidation closes quantity even when Mark notional rounds to zero
+[Nest] 1564851  - 10/11/2026, 1:41:45 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a95e4172-44d0-4902-8f17-847261ee8aa3"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a95e4172-44d0-4902-8f17-847261ee8aa3","capturedAt":"2026-10-11T04:41:46.025Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a95e4172-44d0-4902-8f17-847261ee8aa3","capturedAt":"2026-10-11T04:41:46.086Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 rollback after positive PnL credit and current-fee-policy liquidation
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"978648e5-77bd-49d0-a5a1-17504566505d"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"978648e5-77bd-49d0-a5a1-17504566505d","capturedAt":"2026-10-11T04:41:46.191Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"978648e5-77bd-49d0-a5a1-17504566505d","capturedAt":"2026-10-11T04:41:46.222Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"978648e5-77bd-49d0-a5a1-17504566505d","capturedAt":"2026-10-11T04:41:46.259Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"978648e5-77bd-49d0-a5a1-17504566505d","capturedAt":"2026-10-11T04:41:46.297Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"978648e5-77bd-49d0-a5a1-17504566505d","capturedAt":"2026-10-11T04:41:46.378Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 reserved cash plus isolated allocation both survive Cross bankruptcy; manual isolated close cannot raid Cross
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d3368bdd-a607-4fd9-b364-b84c8af44896"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"d3368bdd-a607-4fd9-b364-b84c8af44896","capturedAt":"2026-10-11T04:41:46.470Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general/long/1 isolated read, full close or unlevered protection
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8294349d-bca5-4bb1-809d-8001b19aa382"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8294349d-bca5-4bb1-809d-8001b19aa382","capturedAt":"2026-10-11T04:41:46.575Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8294349d-bca5-4bb1-809d-8001b19aa382","capturedAt":"2026-10-11T04:41:46.620Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general/long/37 isolated read, full close or unlevered protection
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"56251479-65d0-49ab-b9c3-b50152724021"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"56251479-65d0-49ab-b9c3-b50152724021","capturedAt":"2026-10-11T04:41:46.711Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"56251479-65d0-49ab-b9c3-b50152724021","capturedAt":"2026-10-11T04:41:46.763Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general/long/100 isolated read, full close or unlevered protection
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6d6e46de-bd5f-4b93-ac49-abf50fe9fc89"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"6d6e46de-bd5f-4b93-ac49-abf50fe9fc89","capturedAt":"2026-10-11T04:41:46.856Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"6d6e46de-bd5f-4b93-ac49-abf50fe9fc89","capturedAt":"2026-10-11T04:41:46.904Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general/short/1 isolated read, full close or unlevered protection
+[Nest] 1564851  - 10/11/2026, 1:41:46 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"791e6584-8e9a-4491-8125-4497793a0d62"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"791e6584-8e9a-4491-8125-4497793a0d62","capturedAt":"2026-10-11T04:41:46.998Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"791e6584-8e9a-4491-8125-4497793a0d62","capturedAt":"2026-10-11T04:41:47.047Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general/short/37 isolated read, full close or unlevered protection
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a014e2db-0ccf-427e-9d53-2ed986bcd95d"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a014e2db-0ccf-427e-9d53-2ed986bcd95d","capturedAt":"2026-10-11T04:41:47.143Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a014e2db-0ccf-427e-9d53-2ed986bcd95d","capturedAt":"2026-10-11T04:41:47.193Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general/short/100 isolated read, full close or unlevered protection
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"eb68616a-0143-4767-99dc-8780acda6f3d"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"eb68616a-0143-4767-99dc-8780acda6f3d","capturedAt":"2026-10-11T04:41:47.296Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general exact isolated maintenance 0.00000001
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ae51743a-a551-4290-b16d-1ab5c24c4449"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"ae51743a-a551-4290-b16d-1ab5c24c4449","capturedAt":"2026-10-11T04:41:47.404Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"ae51743a-a551-4290-b16d-1ab5c24c4449","capturedAt":"2026-10-11T04:41:47.430Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general exact isolated maintenance 0
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1804e8b0-6e9e-4ffc-971c-f83737cb75f8"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"1804e8b0-6e9e-4ffc-971c-f83737cb75f8","capturedAt":"2026-10-11T04:41:47.539Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"1804e8b0-6e9e-4ffc-971c-f83737cb75f8","capturedAt":"2026-10-11T04:41:47.565Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general exact isolated maintenance -0.00000001
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"673224e0-a986-4e0a-a531-a7278f9dbde6"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"673224e0-a986-4e0a-a531-a7278f9dbde6","capturedAt":"2026-10-11T04:41:47.670Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"673224e0-a986-4e0a-a531-a7278f9dbde6","capturedAt":"2026-10-11T04:41:47.700Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"673224e0-a986-4e0a-a531-a7278f9dbde6","capturedAt":"2026-10-11T04:41:47.733Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"673224e0-a986-4e0a-a531-a7278f9dbde6","capturedAt":"2026-10-11T04:41:47.767Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"673224e0-a986-4e0a-a531-a7278f9dbde6","capturedAt":"2026-10-11T04:41:47.875Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+[Nest] 1564851  - 10/11/2026, 1:41:47 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"085759e1-51d8-4c58-84e9-a652090f1889"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"085759e1-51d8-4c58-84e9-a652090f1889","capturedAt":"2026-10-11T04:41:48.025Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"085759e1-51d8-4c58-84e9-a652090f1889","capturedAt":"2026-10-11T04:41:48.056Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"085759e1-51d8-4c58-84e9-a652090f1889","capturedAt":"2026-10-11T04:41:48.087Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"085759e1-51d8-4c58-84e9-a652090f1889","capturedAt":"2026-10-11T04:41:48.120Z","code":"FX_RATE_UNAVAILABLE"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"085759e1-51d8-4c58-84e9-a652090f1889","capturedAt":"2026-10-11T04:41:48.153Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8ad302ed-5341-4d74-8c55-883d646b6e18"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"8ad302ed-5341-4d74-8c55-883d646b6e18","capturedAt":"2026-10-11T04:41:48.261Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general usd outgoing exact free/over limit/stale; incoming allowed
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a31f4f3a-6495-44c3-943b-4c755e9b6bb4"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"a31f4f3a-6495-44c3-943b-4c755e9b6bb4","capturedAt":"2026-10-11T04:41:48.425Z","code":"FX_RATE_UNAVAILABLE"}
+PASS F2 general fx outgoing exact free/over limit/stale; incoming allowed
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a3be76d9-24b2-4bae-907d-a6ae07a52d2e"}
+PASS F2 general Cross and new Isolated cannot double-spend collateral
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ab19d984-1c76-418d-b73f-ce7a1ebd57ef"}
+PASS F2 general maintenance plus normal fee blocks a transfer even within initial free collateral
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c9a8f420-c9bd-43e7-a5af-ec59c0bf78ea"}
+[Nest] 1564851  - 10/11/2026, 1:41:48 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"c9a8f420-c9bd-43e7-a5af-ec59c0bf78ea","capturedAt":"2026-10-11T04:41:48.973Z","code":"FUTURES_MARK_UNAVAILABLE"}
+PASS F2 general modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+[Nest] 1564851  - 10/11/2026, 1:41:49 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"dcfae138-76a8-4d5f-b9ab-98b828c38c77"}
+PASS F2 general rollback futuresLiquidation.create #1 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:49 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"25f9f5a6-14a0-4c6b-acb1-bd5104e885f3"}
+PASS F2 general rollback futuresPosition.update #1 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:49 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"546097d2-0d60-4c90-a553-177c5c4bba12"}
+PASS F2 general rollback futuresPosition.update #2 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:49 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4af08041-6f4f-4138-91af-3437c7d80116"}
+PASS F2 general rollback futuresPosition.update #3 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:50 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0309ddd6-0185-4188-b01e-20c47f9dfda8"}
+PASS F2 general rollback futuresLiquidationClose.create #2 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:50 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"77c6ee97-5b3a-4f04-a4ac-518ad89f8dc5"}
+PASS F2 general rollback futuresLiquidationClose.create #3 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:50 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e45c248f-5254-4260-a4ec-623d35911951"}
+PASS F2 general rollback $executeRaw #1 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:50 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cf2b3c5a-042c-4252-bfa4-c234664ae71b"}
+PASS F2 general rollback walletTransaction.createMany #1 then successful retry
+[Nest] 1564851  - 10/11/2026, 1:41:51 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3078b049-d26b-460d-aedc-b8794a368df5"}
+PASS F2 general rollback after fee cash debit
+[Nest] 1564851  - 10/11/2026, 1:41:51 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2b999420-1c73-4565-9a4b-6058b730ab22"}
+PASS F2 general liquidation wins locked race vs close, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:51 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1a66dc94-9ea4-4664-83f4-66aba4d9a6fd"}
+PASS F2 general liquidation wins locked race vs reduce, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:51 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d29bed43-4c1b-4535-b97e-15522e921600"}
+PASS F2 general liquidation wins locked race vs increase, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:52 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"432dae57-1a33-472e-b25e-409e89805cf1"}
+PASS F2 general liquidation wins locked race vs transfer, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:52 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9b6cfc90-1207-4767-8064-8ca0365d0650"}
+PASS F2 general liquidation wins locked race vs cross-open, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:52 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"00055c60-f55a-4b3d-8e5c-f1f8b2355e63"}
+PASS F2 general liquidation wins locked race vs isolated-execution, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:52 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cabaf1e5-ffa5-4d91-ab46-42c3282a9431"}
+PASS F2 general liquidation wins locked race vs unrelated-cross, no double settlement/deadlock
+[Nest] 1564851  - 10/11/2026, 1:41:53 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c2458f92-67b8-4c79-8f36-179a674fced1"}
+PASS F2 general latest fresh Mark re-read after actual PostgreSQL lock wait
+[Nest] 1564851  - 10/11/2026, 1:41:53 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e2e90f78-57b3-475a-947d-8aaaf5c622c0"}
+PASS F2 general user close wins PostgreSQL race with exactly one PnL/fee settlement
+PASS F2 season/long/1 isolated read, full close or unlevered protection
+PASS F2 season/long/37 isolated read, full close or unlevered protection
+PASS F2 season/long/100 isolated read, full close or unlevered protection
+PASS F2 season/short/1 isolated read, full close or unlevered protection
+PASS F2 season/short/37 isolated read, full close or unlevered protection
+PASS F2 season/short/100 isolated read, full close or unlevered protection
+PASS F2 season exact isolated maintenance 0.00000001
+PASS F2 season exact isolated maintenance 0
+PASS F2 season exact isolated maintenance -0.00000001
+PASS F2 season atomic three-position Cross bankruptcy, mixed protection, disabled-mode risk, duplicate worker and history
+PASS F2 season isolated bankruptcy preserves Cross pool in REDUCE_ONLY
+PASS F2 season usd outgoing exact free/over limit/stale; incoming allowed
+PASS F2 season fx outgoing exact free/over limit/stale; incoming allowed
+PASS F2 season Cross and new Isolated cannot double-spend collateral
+PASS F2 season maintenance plus normal fee blocks a transfer even within initial free collateral
+[Nest] 1564851  - 10/11/2026, 1:41:55 PM    WARN [FuturesPerformanceService] {"event":"futures_performance_observation_unavailable","tradingAccountId":"65fc7d1b-c15b-4906-b804-357178904552","capturedAt":"2026-10-11T04:41:55.533Z","code":"FUTURES_MARK_UNAVAILABLE"}
+PASS F2 season modes, committed replay, stale mark fail-closed and stale reduce/close allowed
+PASS F2 season rollback futuresLiquidation.create #1 then successful retry
+PASS F2 season rollback futuresPosition.update #1 then successful retry
+PASS F2 season rollback futuresPosition.update #2 then successful retry
+PASS F2 season rollback futuresPosition.update #3 then successful retry
+PASS F2 season rollback futuresLiquidationClose.create #2 then successful retry
+PASS F2 season rollback futuresLiquidationClose.create #3 then successful retry
+PASS F2 season rollback $executeRaw #1 then successful retry
+PASS F2 season rollback walletTransaction.createMany #1 then successful retry
+PASS F2 season rollback after fee cash debit
+PASS F2 season liquidation wins locked race vs close, no double settlement/deadlock
+PASS F2 season liquidation wins locked race vs reduce, no double settlement/deadlock
+PASS F2 season liquidation wins locked race vs increase, no double settlement/deadlock
+PASS F2 season liquidation wins locked race vs transfer, no double settlement/deadlock
+PASS F2 season liquidation wins locked race vs cross-open, no double settlement/deadlock
+PASS F2 season liquidation wins locked race vs isolated-execution, no double settlement/deadlock
+PASS F2 season liquidation wins locked race vs unrelated-cross, no double settlement/deadlock
+PASS F2 season latest fresh Mark re-read after actual PostgreSQL lock wait
+PASS F2 season user close wins PostgreSQL race with exactly one PnL/fee settlement
+PASS F2 Season ended forced risk reduction boundary
+PASS F2 Season settled forced risk reduction boundary
+PASS F2 Season closed forced risk reduction boundary
+PASS F2 Season excluded forced risk reduction boundary
+PASS F2 Season suspended forced risk reduction boundary
+[Nest] 1564851  - 10/11/2026, 1:41:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"63195463-21b3-431f-900e-4caaa6958b8c"}
+PASS F2 worker stale durable diagnosis, OpsJobLock overlap, disabled user mode and restart idempotency
+[Nest] 1564851  - 10/11/2026, 1:41:59 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4cabb522-d00b-4a6b-a4c7-cb46d2a6bb1c"}
+PASS F2 readonly hints never authorize liquidation: recovery/stale/underfunded evidence rechecked by the original transaction
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a36fa49e-bddc-4b84-ad00-123e181fc5ae"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"224a7716-2f0d-4371-b99f-7c08a487b89d"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fd436203-2c80-4b79-adf5-50ecc50dbb70"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"aee8e51d-3ed7-4c12-bcd1-740feae355e3"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"118ea02c-3399-49d9-8495-785165868a6e"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"144c46c9-de2e-4356-bbe8-42d9e9f7efaf"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"425b589b-282c-42d5-85f8-6862ce88a76c"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"77e0055f-304e-4fb6-8e1c-4e8b29578749"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bcad712b-4c91-4a39-a998-4a93cf9f1a47"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3d27e44a-b697-482d-acf5-50b723b0d389"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6332996d-bfd2-4a44-a565-f40a5e78885d"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b8d065c2-0c27-4794-ae1f-3f9b3114a52f"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a9eacd76-6a3c-4de9-bd92-c7b5480df654"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"227178ca-741f-4246-a554-76e610afeeee"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8c327296-2a89-464a-8e02-d5efed2d8030"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b7c1fe4d-2404-4344-8c06-f9a1d5d23f96"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2e048776-3088-45c3-9b9a-e4fc1028dae5"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8901824d-d468-4eb7-b2ba-c403b7498b95"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8de40222-fcb0-4a93-8015-6b0f7c5fc8b4"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"26cc6bb8-299d-4402-b326-c4f7e41e64e9"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"366a4f79-1ee5-4846-b146-a3e39170a4af"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"351804b6-d7b8-4e82-8b3d-2dd3ff3576b1"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d85997e9-13ca-4cf6-ba8a-541c489d2831"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bfe7d134-4ba6-46e1-b0e3-ee92cdbd79c9"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4fec0c09-722f-40bb-a92c-cfe08a1991fd"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c894ef66-f096-4f36-a139-b677c0d4a01a"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4bab0c42-c6d4-4df6-add8-1bd2faba9a6e"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"eedfabde-47f0-4fd0-8f40-fd9a4f9da6ed"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"af3ae0b8-fe02-4b2b-8a35-1781c5b6eb15"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"db92edbc-4e74-4838-816d-b902e7f02581"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"544f6fbf-da88-4be2-a98d-a61e7c09e86f"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f2fb9788-4dd3-4916-9d96-560b26a1b027"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6b8cdd28-8405-4847-9bd6-7397ec7d500c"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c28a14d1-1e22-4e44-9b67-142b78bc2563"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cf28dea0-8d9d-49c4-8738-d97073260d37"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9557836f-7c23-4e6b-9375-efec657f97d1"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8c96670a-02c6-4ada-b39f-f803c0f7ba3c"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"29e6376a-b956-47d7-9ed9-0f2d2f2042f4"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"123ce8d5-8bb2-4f23-bcf5-33628575077c"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2dcfb3af-b2d9-4459-a5e5-45f633992f31"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"75772163-3a10-4537-bfe0-3214950320c3"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f54a5317-6eec-455c-92c3-7700e6534c32"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9edb2a3c-77f0-47dc-af41-0c0f7259f212"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cecbcd2d-8261-4080-827b-c8e7fcb902c1"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"542046c4-0b5f-4460-bdbc-1f5945e57edb"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fcf83dba-dab2-4285-b03c-a3ba96ba71b5"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c29920af-720c-4835-b9ef-8e322b996d54"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"79955e4c-9d11-41dc-92d7-311393620057"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"31ba2143-0768-4c90-a0d2-dce65c89d36b"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4e0ddad0-6fcc-485a-adce-7d69147c18c4"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a5fd247c-9074-41cf-8ea1-694c10f7590d"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"79ea56ec-1c63-408c-8909-afb43d90f9b2"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6a056a0c-baef-40ce-befb-8783be0f7f5d"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6dc385b7-57a4-47b5-9bed-96eccdd130c5"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8e02e2c7-9ab0-4168-af40-91850e551114"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f6218b94-59ae-460e-a963-db117ee49768"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e22abd73-6e6c-413a-83e7-b85f54b7dcee"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9e91de19-f342-497e-9a51-70f8d2d0d166"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"808d8703-2ddf-468b-9fad-7d7ae9c23120"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4b1c240d-ef34-4da7-9636-5cf71523c485"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4220a901-1b28-41f7-9aae-023a2e815d61"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"baee7a26-f907-457f-83f6-c5a6eb9dce7f"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a6aa143f-8aa3-4468-923d-1e6771c4cca1"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"23074117-c85e-473c-8fb6-d0865eb2da67"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"633032be-a2f5-46f7-a6f1-e89ed01f25fe"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d7e74e8a-c785-498e-baa8-9474708cfc49"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"eb3ff341-35c3-45e1-bd94-f5794c12f35d"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"288fb7ac-404d-4d01-ab71-fd830b7a6eb9"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"83cd17d1-4afb-488b-af8c-fb0711992825"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"73e73381-74c5-4b34-b89f-a6797a94dea8"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3196a95d-8d6a-4514-b64d-444215e975eb"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2f0b5c5a-01ae-4b6b-91a3-6185bf692cfc"}
+[Nest] 1564851  - 10/11/2026, 1:42:00 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a202d69f-4853-4e80-8866-50f98a7b14e7"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f09538f7-8f09-4e4a-90e7-db0d5854ecd5"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"38e2f3be-34a4-44c3-9dac-378e0b6a5e9b"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d39eff4d-2e0d-4e34-b6d0-84727792937c"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"630cf858-a022-4e9f-83f8-6c490023ea25"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b1fcca60-7573-4805-bfde-ca1724e2dc6b"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2864489c-d5c4-4a9a-bbc9-08841b8fd890"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"29bc1453-6dd2-4cfa-8958-5d6df737cbf0"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1417d72a-3dd3-406b-a20f-d135c9fb5175"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f1a23676-66ac-497a-9287-be19c366f50b"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e3b6483f-a316-44ee-9592-172c16c3c4b0"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"002da1e9-67d1-41b0-9a9b-effa6f710ef4"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5ccc812e-e96c-4fb5-872d-d52714783215"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e4604bec-db99-4eb0-9631-4afca2ee2882"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a5ccb821-f59a-4f36-896d-2701c01e082f"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"933de326-218d-467c-a5cf-4503daf318d4"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"207c660f-79b7-48e9-ad8a-6b93920cfe1c"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7fd8fb76-0b6b-4c01-9b6d-866687b2e398"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"17bdaa2e-ab2c-47eb-acf8-f104643935a2"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"844faf85-029c-41fc-93d5-4d0d7672837c"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"66f0f580-66cf-4614-a8c1-967f05c389a1"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"39b36eea-82b4-4f37-aaeb-a73bf11e095c"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"14197280-0324-43ad-a36a-4dc15fa7e0b3"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"82cc9ab6-94d7-411a-a764-6b712edc86f5"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"38a01b3d-5d3c-40d3-9b92-06698d864e27"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6da92205-fbdc-479a-883a-bd4f5815cfe3"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7cae9381-504e-423b-8525-790701b24d79"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4704c98a-9922-43e6-ad29-d3e488cadb75"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"01b6dcfa-7fcf-4c8b-a5e5-361b768e91ec"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2c45f7ae-ebb3-4e88-a334-f25dbac22cfe"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7e13e43d-06db-4b1a-91c9-7b12698d527b"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"26a683dd-bff5-4238-81c8-b55a8c296fd5"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"859b4ba2-d45f-49ed-95ae-44b2241db625"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f07ae0e0-e60e-4f7c-836d-3a749cba313a"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5f4fd984-7b99-4d06-9759-2a18586aa024"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2393164f-cadf-4466-8066-a15e96e36a67"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fca84284-c168-4d3c-99a4-a6a4d515b019"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"618bfbdc-01c7-49c3-bbe9-ca01d76082fc"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"467e7375-f8b4-4366-ba3a-0b2e63f09194"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"57daf51c-d773-49a0-8889-733f8db36fc7"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c90b7c32-395f-4c49-9556-f7ce3798dcc2"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"25246efc-3c2f-4b8f-8462-63adbc858733"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d76ec678-cd14-47e3-b667-cb4c1afa786e"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0d2ecb69-5c51-4eb3-8961-66d813a2069a"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9881036c-257f-4672-aee0-b37364ac36d1"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cded0e83-f684-4d48-9df1-a4e430ac80dc"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0c37b717-7972-462b-8edb-6f1a10351899"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"22e1f892-a4e7-4e21-ae01-a210798d1d9a"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"06d38dda-d72f-4820-a849-fb9b4612ee77"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f631c712-ff51-4658-84d3-a1cda23df5cd"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"65d2d297-7d58-4d02-a5ff-584350be0a38"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e5106032-a522-41fc-9886-2975a0c44e80"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b6aea613-efa0-49d2-86d5-c17e24b71fd6"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7178bef9-de54-4295-bca4-a63943ff5c7f"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a4d2d78b-246c-40a0-841c-3682a3054ea6"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"aaf68d9d-eeeb-448d-954a-92928f4f8ce3"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"25e44d93-dedf-4b6f-a40b-c49b34c81ca7"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"718355f4-979e-438f-a231-27b18a6ec878"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1f0f83ad-9bda-4d9c-8bd3-c27f56d6325d"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"546953e8-9eb4-47f5-b16e-1eb3a26979cf"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6c873094-e596-45a2-99a1-6ceb8975e529"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ace61603-5f31-46b2-bc11-394741d1adc6"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"345e97e1-f9a1-43e0-959e-63f9b488120c"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8a051e64-20c2-41a6-81d8-4e77b08c2cdd"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ff6f33e7-6fdb-47a8-b0a6-3fb4c95c0559"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fec450d1-6b2b-44e7-903f-4d144e5dc8e3"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8078efa9-597b-4c94-858c-7147a4b8a11f"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e8ced3ca-7a6b-4f86-b808-9c79b796bc2f"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6120b970-7115-423c-b91e-d5c0977bfa38"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"579989f0-ccc9-4dad-8075-06ead1745c5f"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"018f84a2-1016-4dc9-9eff-62fda199df40"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8a1d21fa-a8e2-45cc-b252-aec897f1de5f"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6c1a7b11-1ed4-4fec-8a0a-55020e54e255"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9ad04f7f-f055-4bd2-b0d8-a5376f056e3a"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"744a2fc6-67cd-4299-8870-5522f287e2f7"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"91c3f02b-d797-49c0-95b2-3a6e92e49ea3"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b70d1cee-aee7-43b1-81b9-392975ff5221"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5e190a3d-3ab7-44e2-bb90-d09042022bb5"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4e409111-6eaf-4ddd-a4df-689e33a5375b"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e35bfd8c-a1c3-4a8b-bfc7-156d12ecae48"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"754bee53-4382-4bb0-850a-c03272084f68"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a9780d63-982e-44ef-bbb1-e8575fcd0718"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a238f015-71a2-412f-8acf-58d6af4f7228"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0ecc3bca-43e5-4751-80fd-9c766813a9f3"}
+[Nest] 1564851  - 10/11/2026, 1:42:01 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ef44547f-1f35-4824-913c-baec0eeeec54"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"aa5f744f-c249-4bc3-91e8-b54ae67b79ab"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"47b8148f-5009-47d1-9d08-10e168cba235"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"fed909e1-da06-4c84-be8c-98dda266d86d"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"55c9c469-97f2-4cb6-b685-6f01b56f5776"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c48224d4-587c-4f34-b0f8-3dbd61722fd6"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d8da84f4-5674-4cc0-9ccb-020654bfb6d0"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bdd15248-fe81-4cfe-b280-4837acf630f8"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"136ccf85-3a14-4743-9c95-3953e9e629c1"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ab302702-bc0d-4d7b-882c-478f51932fef"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5134b251-9c25-4b3c-ba86-70444a89f08c"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b0a824e6-dbf1-469b-b6cc-d8f468c2e526"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b1cd1b73-ae96-4758-a84e-d8088a198015"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d2809425-8ec7-4047-bf14-7b43dad7570a"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a815da46-5e17-4171-80a2-06b308177549"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9af33482-b622-4e32-9c0a-444699737aa0"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"83411d26-8855-443d-90d2-8256161140ad"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"28152ffd-81b3-47be-9bdb-9eaadb6a1b24"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3a7b5d84-43a8-4b31-86fd-e2be851f2090"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"40127e50-9427-4b7b-9cbf-b554c33c32ab"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2be70890-7cb4-4f7d-9e71-3d995a8f5308"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b2b432bc-4f05-46ce-b4e2-22cc2b69bd9d"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8f7a8123-c9a4-4fef-a2a5-e23a1e6fa039"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"549b9dff-624a-44d1-ae9b-49f41d55e342"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c3682106-b95d-4e41-af85-60b528bd6f0f"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"df301720-d560-4229-bd68-67ad8f50e5d5"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"79442444-0f11-487a-beb9-6ffe2833d826"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7870cc4b-4408-4263-a6d8-15d51b27587c"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e769030c-3886-4d99-a3da-ebe85f3d60b8"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c3882acf-300b-4b90-b93d-e321e1e2ecd9"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5b050e77-6098-4f4f-ad27-a11f03d84dff"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"693f0e20-b884-4460-aef1-1afae99246f0"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"93385e74-a2c0-4501-82c8-ad83767fad36"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2f70207e-dc4e-470b-8e2c-41d096d8f97e"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cf7e7b05-bb01-4d13-bfce-a934ab7cd70e"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"8394d974-18dc-46c2-baee-fba9c63361ac"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"4d5746e7-b1ad-4290-8df2-11b08f20fec7"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ebc24071-011b-48b0-8816-4b1e5d13f886"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"67cec6f2-e262-4c46-8bd9-a1464ecef0d1"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"ebac1dac-5e34-47c7-a082-76fb57226fb5"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7e6b581c-b22b-4ab6-8591-34c0df98cf29"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2bfe2bec-4122-49e5-a61f-c017a7d5b69f"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b784445e-3a15-4328-a582-723a61a89337"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d214612d-3c7b-4426-9571-be1baffe2b1b"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"17eeeb9b-b56b-42db-aeb5-bf3542e91292"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6c748ee9-2ce4-4d14-b1c3-ee5026701251"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c69c715f-1c32-4d07-b645-7c7bfee7aadd"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"aceb5662-6f97-461d-84ef-4783a384c83a"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"380dc45f-a25f-4e88-91d6-37edf2b59c3b"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5fd34f46-28f4-43d5-ad92-f46663ce42e7"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5982bb7f-81b1-47ce-8cbf-311abacaa9a5"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f51c9e37-b837-4803-b0f1-a200c70d8acd"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"682450c1-4750-469b-a17a-a44361e364b4"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d79128ff-deec-41cd-acdc-1d0ae0efdb85"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"02aeefeb-77cb-4590-a8f1-cb37c3dcc439"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"027d9350-7f54-496e-80eb-4f3b0e882ae0"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"91d0d60d-191e-4ad1-aa2c-58de4adc9030"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"26095080-7e2b-49bd-aab1-00a2a6c9deae"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"50d687f7-417c-4c61-9c92-143744987a80"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"36be6d6d-e742-4c82-8432-9dd4f423a91f"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"11041de4-4afb-45c5-95b5-84fe69c8ab35"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9270c3e7-7322-4cc9-99be-ce46641bb291"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bc1331cd-ec03-4f26-865c-1bd94d0cc3e4"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"62931fba-8ada-4542-b9d4-d1a1f7274ead"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0b710dbb-9ffe-45f9-b184-9f3873fdb028"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"92128f30-09e8-45fa-a799-64e7ac5832e2"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"12a4935c-1d67-40a2-9273-8944ca16f2f7"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c65c9d2e-9929-42db-871a-958013e2343c"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"00560401-c143-436c-8531-fe130e94a29e"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cdc51a6f-03a8-4acf-b7af-972f677b5d63"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6e12559f-1407-47aa-94b9-1a70e8313a41"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"62caff8a-48b3-4167-9367-d064ce1241eb"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d5f72177-191b-4d1e-8074-cecd58a80063"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7729b1ac-1311-49a8-a5fe-4c1200b16284"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"859acd54-3976-4b2e-a4aa-0ca2676dd642"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0c7cd6f9-b421-4a03-8eaf-6babbc0ed44c"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d6222080-c312-49f3-b135-56f418f6875d"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"17d77435-8351-4a86-901b-fa33439f7fa5"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"c27c6f13-584b-413a-8acf-4af61ffbe6dc"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"60f6d91e-5737-40aa-99c1-882043e58d9e"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"82520604-91e3-4a18-851d-7706714ead65"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1c2efa37-8dec-4b2f-9124-6752f93ec79c"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"cdbfd82f-3464-4820-b017-0f9ed1d611e5"}
+[Nest] 1564851  - 10/11/2026, 1:42:02 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"63f18c12-935a-4c65-a5c2-0364923f97c6"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"289ee9ab-2215-457e-81d1-b797580b98d9"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"7e3ea205-2945-4fe0-88ac-364ae63db334"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"f55e5822-eb72-44e9-969b-70a943e6ea7b"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9111fe82-26c8-4114-824d-d7d174a709ef"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"a5997ab6-2682-446e-ba95-d517d3cc25a5"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3eeb5227-ffa4-4f1a-ba64-1c4d20c20dbe"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5da82dbc-c469-4590-ae91-2321962098e3"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2e90881a-b473-4fbc-a1da-7d42903a656a"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e9676cf5-340f-4574-bf88-2dded2cc7e03"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d711512f-7053-4b7a-9db9-ebc5a3bea688"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0c0da9c4-62dd-4cc2-9959-96547e76e1be"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"5742d1b1-e24c-49b0-a995-b0d9357533e4"}
+[Nest] 1564851  - 10/11/2026, 1:42:03 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"6e8448b7-ec08-441b-88bb-4e8924211f86"}
+PASS F2 worker actual PostgreSQL multiple batches, lookahead/reset, added/removed/closed accounts and restart without starvation
+[Nest] 1564851  - 10/11/2026, 1:42:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0aace5bd-1b28-435e-beae-913692e32d89"}
+[Nest] 1564851  - 10/11/2026, 1:42:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"1c5de83d-897f-4147-b7e0-8c070f594982"}
+PASS F2 worker real PostgreSQL slow wallet: other lane progresses, transaction expires and next sweep revisits
+futures F2 db integration ok (83 consolidated financial/evidence/race/rollback checks)

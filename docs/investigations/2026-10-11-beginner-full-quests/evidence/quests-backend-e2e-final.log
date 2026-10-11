@@ -1,0 +1,23 @@
+
+> trading-app@0.0.1 test:e2e
+> jest --config ./test/jest-e2e.json --runInBand
+
+[Nest] 1555901  - 10/11/2026, 1:26:32 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"0b489f0f-d071-419e-ac76-5d1d3ee0fa8b","code":"AD_REWARD_DISABLED","httpStatus":503,"exceptionType":"HttpException","safeCause":{"category":"unexpected_error","errorType":"HttpException"}}
+[Nest] 1555901  - 10/11/2026, 1:26:33 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"55e38659-e5be-4fbb-8141-ebdfb03a5bba","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_connection_failed","errorType":"Error","code":"P1001"}}
+[Nest] 1555901  - 10/11/2026, 1:26:33 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"9e563b5e-f6ef-46b7-a744-44f2e47f3521","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_connection_failed","errorType":"Error","code":"P1001"}}
+[Nest] 1555901  - 10/11/2026, 1:26:33 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"baa8d35d-74ae-4eb6-b82d-bf9377897786","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_connection_failed","errorType":"Error","code":"P1001"}}
+[Nest] 1555901  - 10/11/2026, 1:26:35 PM   ERROR [GlobalHttpExceptionFilter] {"event":"admin_http_request_failed","surface":"authenticated_http","requestId":"p0-admin","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 1555901  - 10/11/2026, 1:26:35 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"p0-operator","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 1555901  - 10/11/2026, 1:26:35 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"p0-user","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"db_transaction_conflict","errorType":"Error","code":"P2034"}}
+[Nest] 1555901  - 10/11/2026, 1:26:40 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"1c1956bd-69bd-4e1a-998c-c62e687f9e59","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"TypeError","safeCause":{"category":"unexpected_error","errorType":"TypeError"}}
+[Nest] 1555901  - 10/11/2026, 1:26:40 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","requestId":"3958309f-db54-48a1-9c9a-9bacb12529e6","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"unexpected_error","errorType":"Error"}}
+[Nest] 1555901  - 10/11/2026, 1:26:40 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"PROFILE_IMAGE_STORAGE_UNAVAILABLE","httpStatus":503,"exceptionType":"ServiceUnavailableException","safeCause":{"category":"unexpected_error","errorType":"ServiceUnavailableException"}}
+[Nest] 1555901  - 10/11/2026, 1:26:40 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"PROFILE_IMAGE_STORAGE_UNAVAILABLE","httpStatus":503,"exceptionType":"ServiceUnavailableException","safeCause":{"category":"unexpected_error","errorType":"ServiceUnavailableException"}}
+[Nest] 1555901  - 10/11/2026, 1:26:40 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"PROFILE_IMAGE_UPLOAD_FAILED","httpStatus":503,"exceptionType":"ServiceUnavailableException","safeCause":{"category":"unexpected_error","errorType":"ServiceUnavailableException"}}
+[Nest] 1555901  - 10/11/2026, 1:26:40 PM   ERROR [GlobalHttpExceptionFilter] {"event":"http_request_failed","surface":"authenticated_http","code":"INTERNAL_SERVER_ERROR","httpStatus":500,"exceptionType":"Error","safeCause":{"category":"unexpected_error","errorType":"Error"}}
+
+Test Suites: 2 passed, 2 total
+Tests:       406 passed, 406 total
+Snapshots:   0 total
+Time:        11.93 s
+Ran all test suites.

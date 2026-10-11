@@ -1,0 +1,226 @@
+{
+  "results": [
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "light",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "dark",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "light",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "dark",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 1,
+      "theme": "light",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 1,
+      "theme": "dark",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 2,
+      "theme": "light",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 360,
+      "fontScale": 2,
+      "theme": "dark",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "light",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "dark",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "light",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "dark",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 1,
+      "theme": "light",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 1,
+      "theme": "dark",
+      "quest": "0",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 2,
+      "theme": "light",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "width": 430,
+      "fontScale": 2,
+      "theme": "dark",
+      "quest": "1",
+      "header": "matches 지갑",
+      "list": "pass"
+    },
+    {
+      "fxSummary": "general",
+      "width": 320,
+      "fontScale": 2,
+      "theme": "light",
+      "switcher": "absent",
+      "rows": 3
+    },
+    {
+      "fxSummary": "season",
+      "width": 360,
+      "fontScale": 1,
+      "theme": "dark",
+      "switcher": "absent",
+      "rows": 3
+    },
+    {
+      "fxSummary": "beginner",
+      "width": 320,
+      "fontScale": 1,
+      "theme": "dark",
+      "switcher": "absent",
+      "rows": 3
+    }
+  ],
+  "flows": [
+    {
+      "context": "shimmer-motion",
+      "direction": "left-to-right",
+      "cycleRestart": true,
+      "fixedIcon": true
+    },
+    {
+      "context": "light-1x-no-preference-390",
+      "exchange": "pass",
+      "transfer": "pass",
+      "posts": 3
+    },
+    {
+      "context": "dark-2x-no-preference-320",
+      "exchange": "pass",
+      "transfer": "pass",
+      "posts": 3
+    },
+    {
+      "context": "dark-1x-reduce-360",
+      "exchange": "pass",
+      "transfer": "pass",
+      "posts": 3
+    },
+    {
+      "context": "replays",
+      "noConfetti": true,
+      "timestampsPreserved": true,
+      "realCommands": 2
+    },
+    {
+      "context": "balance-validation",
+      "accounts": 3,
+      "directions": 2,
+      "reservations": true,
+      "exactBalance": true,
+      "commands": 0
+    },
+    {
+      "context": "reduced-motion",
+      "confetti": 0,
+      "returned": true
+    },
+    {
+      "context": "unconfirmed-then-retry",
+      "pass": true
+    },
+    {
+      "context": "exit-back-switch",
+      "pass": true
+    }
+  ],
+  "compactSteps": [
+    "dark-2x-no-preference-320 entry",
+    "dark-2x-no-preference-320 direction",
+    "dark-2x-no-preference-320 amount",
+    "dark-2x-no-preference-320 quote",
+    "dark-2x-no-preference-320 fee",
+    "dark-2x-no-preference-320 submit",
+    "dark-2x-no-preference-320 transfer entry",
+    "dark-2x-no-preference-320 source",
+    "dark-2x-no-preference-320 destination",
+    "dark-2x-no-preference-320 amount",
+    "dark-2x-no-preference-320 review"
+  ],
+  "accountSwitching": "pass",
+  "delayedFinancialIsolation": "pass",
+  "explicitCreation": "pass",
+  "errors": []
+}

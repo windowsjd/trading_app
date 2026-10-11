@@ -1,3 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
+import { getAssetDetail } from '../../features/asset/api';
+import { QUERY_KEYS } from '../../constants/queryKeys';
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import QuestTarget from '../../features/quest/QuestTarget';
+import { questGuideTarget } from '../../features/quest/questGuideBridge';
+import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { StyleSheet, View } from '../../theme/native';
@@ -26,6 +33,10 @@ export function AssetDetailContent({
   const { selectedAccountId, selectedAccount, isLoading } = useTradingAccount();
   const accountId =
     selectedAccount?.id === selectedAccountId ? selectedAccountId : null;
+  const detail = useQuery({ queryKey: QUERY_KEYS.asset.detail(assetId), queryFn: () => getAssetDetail(assetId) });
+  const learning = useLearningAccess(accountId);
+  const buyGate = learning.gate(detail.data?.asset.assetType === 'crypto' ? 'cryptoMarketBuy' : 'allTrading');
+  useTradingGuideFacts({ screen: 'asset', accountId: accountId ?? '', assetId, assetType: detail.data?.asset.assetType }, focused);
   const openOrder = (side: 'buy' | 'sell') => {
     if (!accountId) return;
     navigation.navigate('Order', { assetId, accountId, side });
@@ -33,6 +44,7 @@ export function AssetDetailContent({
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+      <View ref={questGuideTarget('asset-viewport')} collapsable={false} style={{ flex: 1 }}>
       <View style={styles.content}>
         <AssetMarketChart
           assetId={assetId}
@@ -48,21 +60,23 @@ export function AssetDetailContent({
         />
       </View>
       <View style={styles.footer} testID="asset-order-actions">
-        <CTAButton
+        <QuestTarget id="asset-sell" style={{ flex: 1 }}><CTAButton
           testID={TEST_IDS.assetDetail.openSellOrder}
           label="판매하기"
           state={accountId ? 'enabled' : 'disabled'}
           onPress={() => openOrder('sell')}
           style={{ ...styles.action, backgroundColor: SELL_COLOR }}
-        />
-        <CTAButton
+        /></QuestTarget>
+        <QuestTarget id="asset-buy" style={{ flex: 1 }}><CTAButton
           testID={TEST_IDS.assetDetail.openBuyOrder}
           label="구매하기"
           state={accountId ? 'enabled' : 'disabled'}
-          onPress={() => openOrder('buy')}
+          learningHint={buyGate.locked ? buyGate.message : null}
+          onPress={() => buyGate.guard(() => openOrder('buy'))}
           style={{ ...styles.action, backgroundColor: BUY_COLOR }}
-        />
+        /></QuestTarget>
       </View>
+    </View>
     </SafeAreaView>
   );
 }

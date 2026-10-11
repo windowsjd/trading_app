@@ -17,7 +17,7 @@ const B = 'account-B';
 it('Futures transfer refreshes only request-account cash/ledger and collateral', async () => {
   const { client, keys } = recorder();
   await invalidateAfterWalletTransfer(client, A, { futuresCollateral: true });
-  assert.deepEqual(keys, [QUERY_KEYS.tradingAccount.walletsAll(A), QUERY_KEYS.tradingAccount.futuresCollateral(A)]);
+  assert.deepEqual(keys, [QUERY_KEYS.tradingAccount.quests(A), QUERY_KEYS.tradingAccount.walletsAll(A), QUERY_KEYS.tradingAccount.futuresCollateral(A)]);
   assert.equal(matchesAny(keys, QUERY_KEYS.tradingAccount.futuresCollateral(B)), false);
   assert.equal(matchesAny(keys, QUERY_KEYS.tradingAccount.portfolio(A)), false);
   assert.equal(matchesAny(keys, QUERY_KEYS.tradingAccount.positions(A, {})), false);

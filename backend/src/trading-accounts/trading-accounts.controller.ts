@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   HttpCode,
@@ -78,6 +79,20 @@ export class TradingAccountsController {
     return this.beginnerQuestsService.getQuestProgress(
       this.extractUserId(request),
       accountId,
+    );
+  }
+
+  @Post(':accountId/quests/acknowledgements')
+  @HttpCode(HttpStatus.OK)
+  acknowledgeQuest(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+    @Body() body: { stepId?: unknown; orderId?: unknown },
+  ) {
+    return this.beginnerQuestsService.acknowledge(
+      this.extractUserId(request),
+      accountId,
+      body,
     );
   }
 

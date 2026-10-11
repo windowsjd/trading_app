@@ -1,3 +1,4 @@
+import { questProgress } from '../../../test/questFixtures.ts';
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { FxGuideFacts, QuestGuideCommand, TransferGuideFacts, WalletGuideFacts } from './questGuideBridge.ts';
@@ -21,10 +22,7 @@ import type { BeginnerQuests } from './questProgress.ts';
 const ACCOUNT = 'beginner-1';
 const AT = '2026-10-10T01:00:00.000Z';
 const LATER = '2026-10-10T01:05:00.000Z';
-const progress = (exchange: boolean, transfer = false): BeginnerQuests => ({
-  exchange: { status: exchange ? 'completed' : 'not_started', completed: exchange, completedAt: exchange ? AT : null },
-  transfer: { status: transfer ? 'completed' : 'not_started', completed: transfer, completedAt: transfer ? LATER : null },
-});
+const progress = (exchange: boolean, transfer = false): BeginnerQuests => questProgress(transfer ? 2 : exchange ? 1 : 0);
 const wallet = (overrides: Partial<WalletGuideFacts> = {}): WalletGuideFacts =>
   ({ screen: 'wallet', accountId: ACCOUNT, actions: 'enabled', ...overrides });
 const fx = (overrides: Partial<FxGuideFacts> = {}): FxGuideFacts => ({

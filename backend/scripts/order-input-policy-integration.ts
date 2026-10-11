@@ -1,6 +1,11 @@
+import { tradingSessions } from '../test/support/trading-session-fixture';
+import {
+  prepareLearnedBeginner,
+  cleanupLearningPractice,
+  releaseLearningAssets,
+} from './lib/beginner-quest-practice';
 import { TradingAccountWalletTransferService } from '../src/wallets/trading-account-wallet-transfer.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
-import { tradingSessions } from '../test/support/trading-session-fixture';
 /** Order input policy against an isolated PostgreSQL DB; real services and money writes. */
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -256,10 +261,13 @@ async function fixture(
       idempotencyKey: randomUUID(),
     });
   }
+  if (mode === 'beginner')
+    await prepareLearnedBeginner(prisma, user.id, accountId);
   return s;
 }
 type Scenario = Awaited<ReturnType<typeof fixture>>;
 async function cleanup(s: Scenario) {
+  const learning = await cleanupLearningPractice(prisma, s.accountId);
   const where = { tradingAccountId: s.accountId };
   await prisma.walletTransaction.deleteMany({ where });
   await prisma.walletTransfer.deleteMany({ where });
@@ -282,6 +290,7 @@ async function cleanup(s: Scenario) {
   });
   await prisma.asset.delete({ where: { id: s.asset.id } });
   await prisma.fxRateSnapshot.delete({ where: { id: s.rate.id } });
+  await releaseLearningAssets(prisma, learning);
   await prisma.user.delete({ where: { id: s.userId } });
   resetMarketSessionOverrideStoreForTest();
 }

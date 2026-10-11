@@ -464,6 +464,7 @@ model TradingAccount {
   // Season accounts only — a general account attached here is an integrity
   // violation, never a supported ranking scope (작업 8).
   seasonRankings                SeasonRanking[]
+  beginnerQuestAcknowledgements BeginnerQuestAcknowledgement[]
 
   @@index([userId, mode])
   @@index([mode, status])
@@ -1213,10 +1214,13 @@ model Order {
   attachedProtection ProtectionGroup?
   protectionChild    ProtectionChild?
 
+  beginnerQuestAcknowledgements BeginnerQuestAcknowledgement[]
+
   // Account-scoped create idempotency: the same key may be reused by the
   // SAME user on a different trading account. idempotencyKey stays nullable.
   @@unique([tradingAccountId, idempotencyKey])
   @@index([tradingAccountId, submittedAt])
+  @@unique([id, tradingAccountId])
   @@index([tradingAccountId, status])
   @@index([assetId])
   @@index([quoteId])
@@ -1226,6 +1230,21 @@ model Order {
   @@index([status])
   @@index([limitOrderCandleEvidenceId])
   @@map("orders")
+}
+
+// UI learning only. Financial success remains proven by the referenced Order.
+model BeginnerQuestAcknowledgement {
+  tradingAccountId String @map("trading_account_id")
+  stepId String @map("step_id")
+  orderId String @map("order_id")
+  acknowledgedAt DateTime @map("acknowledged_at")
+
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  order Order @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+
+  @@id([tradingAccountId, stepId])
+  @@index([orderId, tradingAccountId])
+  @@map("beginner_quest_acknowledgements")
 }
 
 model CashWallet {

@@ -1,3 +1,4 @@
+import { questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
@@ -112,6 +113,8 @@ export function OrderTradingScreen({
   const isAdmin = useAdminDiagnostics();
   const headerHeight = useHeaderHeight();
   const inputScroll = useFocusedInputScroll();
+  const { revealView } = inputScroll;
+  useEffect(() => { registerQuestGuideReveal('order', node => revealView(node, 'start')); return () => registerQuestGuideReveal('order', null); }, [revealView]);
   const { width } = useWindowDimensions();
   const { colors } = useAppearance();
   const compact = width < 600;
@@ -218,6 +221,7 @@ export function OrderTradingScreen({
         keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
+      <View ref={questGuideTarget('order-viewport')} collapsable={false} style={{ flex: 1 }}>
         <ScrollView
           ref={inputScroll.scrollRef}
           style={styles.scroll}
@@ -334,7 +338,7 @@ export function OrderTradingScreen({
             />
           ) : null}
           <View style={[styles.tradingRow, compact && styles.compactTradingRow, compact && attachedProtectionVisible && styles.protectionTradingColumn]} testID="asset-trading-columns">
-            <View style={styles.orderColumn} testID="asset-order-column">
+            <View style={[styles.orderColumn, compact && attachedProtectionVisible && styles.stackedColumn]} testID="asset-order-column">
               {account ? (
                 <OrderPanel
                   key={`${assetId}:${accountId}:${side}`}
@@ -357,7 +361,7 @@ export function OrderTradingScreen({
                 />
               )}
             </View>
-            <View style={styles.priceColumn} testID="asset-price-column">
+            <View style={[styles.priceColumn, compact && attachedProtectionVisible && styles.stackedColumn]} testID="asset-price-column">
               {liveOrderBookEnabled ? (
                 <>
                   <AssetOrderLadder
@@ -384,7 +388,8 @@ export function OrderTradingScreen({
             assetId={assetId}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
+    </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -451,6 +456,7 @@ const styles = StyleSheet.create({
   },
   compactTradingRow: { gap: 6 },
   protectionTradingColumn: { flexDirection: 'column' },
+  stackedColumn: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   orderColumn: { flex: 1.15, minWidth: 0 },
   priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
   currentPrice: { paddingVertical: 14, gap: 4, minWidth: 0 },

@@ -1,3 +1,8 @@
+import {
+  prepareLearnedBeginner,
+  cleanupLearningPractice,
+  releaseLearningAssets,
+} from './lib/beginner-quest-practice';
 import { BINANCE_FUTURES_SYMBOLS } from '../src/providers/binance/binance-product-catalog';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
@@ -83,7 +88,11 @@ const now = async () =>
   (
     await db.$queryRaw<Array<{ now: Date }>>`SELECT clock_timestamp() AS "now"`
   )[0].now;
-async function fixture(mode: TradingAccountMode, cash = '10000') {
+async function fixture(
+  mode: TradingAccountMode,
+  cash = '10000',
+  freshLearning = false,
+) {
   const clock = await now();
   const user = await db.user.create({
     data: {
@@ -184,6 +193,8 @@ async function fixture(mode: TradingAccountMode, cash = '10000') {
     instruments,
   };
   await price(s);
+  if (mode === 'beginner' && !freshLearning)
+    await prepareLearnedBeginner(db, user.id, accountId);
   return s;
 }
 const allocatedSymbols = new Map<string, number>();
@@ -505,6 +516,7 @@ async function invariant(s: Scenario) {
   }
 }
 async function cleanup(s: Scenario) {
+  const learning = await cleanupLearningPractice(db, s.accountId);
   const where = { tradingAccountId: s.accountId };
   await db.futuresLimitOrder.deleteMany({ where });
   await db.futuresExecuteRequest.deleteMany({ where });
@@ -543,6 +555,7 @@ async function cleanup(s: Scenario) {
     await db.asset.delete({ where: { id: row.asset.id } });
     allocatedSymbols.delete(row.asset.symbol);
   }
+  await releaseLearningAssets(db, learning);
   await db.user.delete({ where: { id: s.userId } });
 }
 
@@ -553,6 +566,14 @@ async function lifecycle(
   const s = await fixture(mode);
   try {
     await fxEvidence();
+    // Beginner fixtures retain their real foundation orders and zero holding.
+    // Futures commands must leave every pre-existing spot record untouched.
+    const spotPositions = await db.position.count({
+      where: { tradingAccountId: s.accountId },
+    });
+    const spotOrders = await db.order.count({
+      where: { tradingAccountId: s.accountId },
+    });
     const snapshots = await db.equitySnapshot.count({
       where: { tradingAccountId: s.accountId },
     });
@@ -670,11 +691,11 @@ async function lifecycle(
     assert.equal(history.data.pagination.nextOffset, 2);
     assert.equal(
       await db.position.count({ where: { tradingAccountId: s.accountId } }),
-      0,
+      spotPositions,
     );
     assert.equal(
       await db.order.count({ where: { tradingAccountId: s.accountId } }),
-      0,
+      spotOrders,
     );
     assert.equal(
       await db.equitySnapshot.count({

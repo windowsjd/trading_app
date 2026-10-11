@@ -16,8 +16,10 @@ function conditionalHarness(options = {}) {
   }}});
   const native=Object.fromEntries(['View','Text','TextInput'].map(n=>[n,n]));native.StyleSheet={create:s=>s};
   const Screen=load(resolve(__dirname,'../src/features/conditional/ProtectionPanel.tsx'),{
+    'react-native-svg':{default:'Svg',Path:'Path',Defs:'Defs',LinearGradient:'LinearGradient',Rect:'Rect',Stop:'Stop',__esModule:true},
     'react-native':native,'@react-navigation/native':{useIsFocused:()=>true},
     '../../features/conditional/api':api,
+    '../../features/tradingAccount/api':{getBeginnerQuestProgress:async()=>{throw new Error('General account must not request beginner progress');}},
     '../../features/tradingAccount/TradingAccountContext':{useTradingAccount:()=>({selectedAccountId:h.accountId})},
     '../../services/api/sessionOwnership':{getSessionGeneration:()=>h.session,isCurrentSession:s=>s===h.session},
     '../../components/states/AdminDiagnosticPanel':{default:()=>null,__esModule:true},

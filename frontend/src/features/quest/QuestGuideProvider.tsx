@@ -1,3 +1,4 @@
+import { isTradingQuest } from './tradingGuideSteps';
 import React, {
   createContext,
   useCallback,
@@ -14,7 +15,7 @@ import { AppState, Keyboard, StyleSheet, View } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { rootNavigationRef } from '../../app/navigation/navigationRef';
 import { QUERY_KEYS } from '../../constants/queryKeys';
-import { getBeginnerQuestProgress } from '../tradingAccount/api';
+import { acknowledgeBeginnerQuest, getBeginnerQuestProgress } from '../tradingAccount/api';
 import {
   getQuestGuideFacts,
   getQuestGuideVersion,
@@ -32,7 +33,6 @@ import {
   startGuideSession,
   type FocusedGuideScreen,
   type GuideAction,
-  type GuidePhase,
   type GuideSession,
 } from './questGuideModel';
 import type { BeginnerQuestKey, BeginnerQuests } from './questProgress';
@@ -46,7 +46,7 @@ const REPLAY_SUCCESS_MS = 1100;
 const LEAVE_MS = 260;
 const HIGHLIGHT_MS = 8000;
 
-export type QuestGuideStatus = { quest: BeginnerQuestKey; phase: GuidePhase; replay: boolean } | null;
+export type QuestGuideStatus = Pick<GuideSession, 'accountId' | 'quest' | 'phase' | 'replay' | 'step' | 'orderId' | 'assetId' | 'positionId'> | null;
 
 type QuestGuideContextValue = {
   active: QuestGuideStatus;
@@ -74,6 +74,10 @@ function readFocusedScreen(): FocusedGuideScreen {
     case 'WalletFx': return 'fx';
     case 'WalletTransfer': return 'transfer';
     case 'Guide': return 'quests';
+    case 'Market': return 'market';
+    case 'AssetDetail': return 'asset';
+    case 'Order': return 'order';
+    case 'Futures': return 'futures';
     default: return 'other';
   }
 }
@@ -84,9 +88,21 @@ const openQuestList = () => rootNavigationRef.navigate('MainTabs', { screen: 'Qu
 function popWalletStackToRoot() {
   if (!rootNavigationRef.isReady()) return;
   const tabs = rootNavigationRef.getRootState()?.routes.find(route => route.name === 'MainTabs')?.state;
-  const wallet = tabs?.routes.find(route => route.name === 'WalletTab')?.state;
-  if (wallet?.key && typeof wallet.index === 'number' && wallet.index > 0) {
-    rootNavigationRef.dispatch({ ...StackActions.popToTop(), target: wallet.key });
+  for (const tab of ['WalletTab', 'MarketTab']) {
+    const stack = tabs?.routes.find(route => route.name === tab)?.state;
+    if (stack?.key && typeof stack.index === 'number' && stack.index > 0) rootNavigationRef.dispatch({ ...StackActions.popToTop(), target: stack.key });
+  }
+}
+
+function openPractice(session: GuideSession) {
+  if (!isTradingQuest(session.quest)) {
+    rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } });
+  } else if (session.quest === 'futuresLong' || session.quest === 'futuresShort') {
+    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: session.accountId } } });
+  } else if (session.assetId) {
+    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true } });
+  } else {
+    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto' }, pop: true } });
   }
 }
 
@@ -128,8 +144,15 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   const verify = useCallback((sessionId: number) => {
     const settle = (progress: BeginnerQuests | null) =>
       setSession(current => current?.id === sessionId ? settleGuideVerification(current, progress) : current);
-    void fetchProgress().then(settle, () => settle(null));
-  }, [fetchProgress, setSession]);
+    const current = sessionRef.current;
+    const stepId = current?.quest === 'marketBuy' ? 'holdings_reviewed' : current?.quest === 'limitBuy' ? 'limit_result_reviewed' : null;
+    const pending = current?.id === sessionId && current.orderId && stepId
+      ? acknowledgeBeginnerQuest(accountId, stepId, current.orderId).then(progress => {
+          queryClient.setQueryData(QUERY_KEYS.tradingAccount.quests(accountId), progress);
+          return progress;
+        }) : fetchProgress();
+    void pending.then(settle, () => settle(null));
+  }, [accountId, queryClient, fetchProgress, setSession]);
 
   useEffect(() => {
     const update = () => {
@@ -145,6 +168,9 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     const outcome = claimGuideCommand(sessionRef.current, accountId, command);
     if (outcome.session !== sessionRef.current) setSession(outcome.session);
     if (outcome.claimed && outcome.session?.phase === 'verifying') verify(outcome.session.id);
+    if (outcome.claimed && command.kind === 'spot' && outcome.session?.step === 7) {
+      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: command.assetId }, pop: true } });
+    }
     return outcome.claimed;
   }, () => sessionRef.current?.id ?? null), [accountId, setSession, verify]);
 
@@ -204,12 +230,15 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     Keyboard.dismiss();
     setJustCompleted(null);
     setSession(next);
-    // Straight to the Wallet tab's main screen, closing a leftover practice screen.
-    rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } });
+    openPractice(next);
   }, [accountId, setSession]);
 
   const resume = useCallback(() => {
-    if (sessionRef.current) rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab' });
+    const current = sessionRef.current;
+    if (current) {
+      if (isTradingQuest(current.quest)) openPractice(current);
+      else rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab' });
+    }
   }, []);
 
   const exit = useCallback(() => setSession(null), [setSession]);
@@ -220,7 +249,11 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     if (action === 'next') {
       if (step === null) return;
       Keyboard.dismiss();
-      setSession(advanceGuide(current, step));
+      if (current.phase !== 'guiding') return;
+      if (step === 7 && current.orderId && ['marketBuy', 'limitBuy', 'krStock', 'usStock'].includes(current.quest)) {
+        setSession({ ...current, phase: 'verifying' });
+        verify(current.id);
+      } else setSession(advanceGuide(current, step));
     } else if (action === 'retry') {
       setSession({ ...current, phase: 'verifying' });
       verify(current.id);
@@ -231,6 +264,8 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   }, [setSession, verify]);
 
   const view = resolveGuideView(session, foreground ? focused : 'other', {
+    practice: { market: getQuestGuideFacts('market'), asset: getQuestGuideFacts('asset'), order: getQuestGuideFacts('order'), futures: getQuestGuideFacts('futures'),
+      holdings: getQuestGuideFacts('holdings'), protection: getQuestGuideFacts('protection'), limitReview: getQuestGuideFacts('limitReview') },
     wallet: getQuestGuideFacts('wallet'),
     fx: getQuestGuideFacts('fx'),
     transfer: getQuestGuideFacts('transfer'),
@@ -240,14 +275,14 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   const activeReplay = session?.replay;
   const highlightedTarget = foreground && view.kind === 'spotlight' ? view.targets[0] : null;
   const value = useMemo<QuestGuideContextValue>(() => ({
-    active: activeQuest && phase && activeReplay !== undefined ? { quest: activeQuest, phase, replay: activeReplay } : null,
+    active: activeQuest && phase && activeReplay !== undefined && session ? { accountId, quest: activeQuest, phase, replay: activeReplay, step: session.step, orderId: session.orderId, assetId: session.assetId, positionId: session.positionId } : null,
     returnCount,
     justCompleted,
     highlightedTarget,
     start,
     resume,
     exit,
-  }), [activeQuest, activeReplay, exit, highlightedTarget, justCompleted, phase, resume, returnCount, start]);
+  }), [accountId, session, activeQuest, activeReplay, exit, highlightedTarget, justCompleted, phase, resume, returnCount, start]);
 
   return (
     <QuestGuideContext.Provider value={value}>

@@ -1,5 +1,7 @@
 // Fixture transport only. Production providers, navigators and screens are used.
 import { apiClient as existing, transport } from './motionMocks';
+import { questPayload } from '../questFixtures';
+import { tradingQuestTransport } from './tradingQuestMocks';
 export { useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook, getRequestGeneration } from './motionMocks';
 const params = new URLSearchParams(location.search);
 const legacyFlag = params.get('enabled');
@@ -22,21 +24,25 @@ const level = params.get('quest') ?? '0';
 const ledger = {
   fxAt: Number(level) >= 1 ? '2026-10-10T01:00:00.000Z' : null,
   transferAt: Number(level) >= 2 ? '2026-10-10T01:05:00.000Z' : null,
-  wallets: { krw: 10000000, usd: Number(level) >= 1 ? 73.82 : 0, spot: Number(level) >= 2 ? 10 : 0, futures: 0 },
+  wallets: { krw: 10000000, usd: Number(level) >= 1 ? params.has('fullQuests') ? 2000 : 73.82 : 0, spot: Number(level) >= 2 ? params.has('fullQuests') ? 1000 : 10 : 0, futures: 0 },
 };
 transport.ledger = ledger;
 const quest = (questId, stepId, at) => ({
   questId, status: at ? 'completed' : 'not_started', completedStepCount: at ? 1 : 0, totalStepCount: 1,
   steps: [{ stepId, completed: at !== null, completedAt: at, referenceId: at ? `${stepId}-ref` : null }],
 });
+const trading = params.has('fullQuests') ? tradingQuestTransport(response, committedAt, 'beginner-account', Number(level)) : null;
 function questProgress(accountId) {
+  if (trading) return trading.progress();
   if (level === 'error' || transport.questFailures > 0) {
     if (transport.questFailures > 0) transport.questFailures -= 1;
     throw Object.assign(new Error('Request failed with status code 503'), { response: { status: 503, data: { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Request could not be completed.' } } } });
   }
-  return response({ tradingAccountId: accountId, quests: [
+  const base = questPayload(Number(level) || 0, accountId);
+  return response({ ...base, learningAccess: { ...base.learningAccess, transfer: !!ledger.fxAt, cryptoMarketBuy: !!ledger.transferAt }, quests: [
     quest('common-01-exchange', 'fx_krw_to_usd', ledger.fxAt),
     quest('common-02-transfer', 'transfer_securities_usd_to_crypto_spot_usd', ledger.transferAt),
+    ...base.quests.slice(2),
   ] });
 }
 const walletRows = accountId => [
@@ -67,6 +73,8 @@ export const apiClient = {
       transport.responses.push(path);
       return response({ tradingAccountId: 'beginner-account', wallets: walletRows('beginner-account') });
     }
+    const tradingResult = await trading?.get(path, config);
+    if (tradingResult) return tradingResult;
     const result = await existing.get(path, config);
     if (path === '/trading-accounts/beginner-account/portfolio') {
       result.data.data.summary = { ...result.data.data.summary,
@@ -84,6 +92,8 @@ export const apiClient = {
       return response({ created, account: beginner, wallets: [] });
     }
     if (!params.has('practice')) throw Error('Unexpected fixture mutation');
+    const tradingResult = await trading?.post(path, body);
+    if (tradingResult) return tradingResult;
     const accountId = path.split('/')[2];
     if (path.endsWith('/fx/quote')) {
       const rate = 1350;

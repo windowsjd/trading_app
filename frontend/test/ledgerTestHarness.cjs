@@ -13,6 +13,18 @@ function load(file, mocks) {
   }).outputText;
   const localRequire = (name) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
+    if (name === 'react-native-svg') return { __esModule: true, default: 'Svg',
+      ...Object.fromEntries(['Path', 'Circle', 'Rect', 'Defs', 'LinearGradient', 'Stop', 'G', 'Line', 'Polygon'].map(value => [value, value])) };
+    // New guide hooks share the screen's account/transport boundaries. Resolve
+    // those boundaries irrespective of the caller's relative import depth.
+    for (const suffix of ['tradingAccount/TradingAccountContext', 'tradingAccount/api', 'quest/QuestGuideProvider']) {
+      if (name.endsWith('/' + suffix) || (suffix === 'quest/QuestGuideProvider' && name === './QuestGuideProvider')) {
+        const boundary = mocks['../../features/' + suffix];
+        if (boundary) return boundary;
+        if (suffix === 'quest/QuestGuideProvider') return { useQuestGuide: () => null };
+      }
+    }
+    if (name.endsWith('/useLearningAccess') || name.endsWith('/useTradingGuideFacts')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/conditional/api') || (file.includes('/features/conditional/') && name === './api')) {
       return mocks['../../features/conditional/api'] ?? { getProtections: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) };
     }

@@ -1,3 +1,6 @@
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
+import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import React from 'react';
 import { View, Text, StyleSheet, useWindowDimensions } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
@@ -15,12 +18,14 @@ type Props = { position: FuturesPosition; accountId: string; evaluatedAt: string
 export default function FuturesPositionCard({ position: p, accountId, evaluatedAt, now,
   disabled, capabilities, onSelect, onInputFocus, onInputBlur }: Props) {
   const { width, fontScale } = useWindowDimensions();
+  const learning = useLearningAccess(accountId).gate('allTrading');
+  const guide = useQuestGuide();
   const stacked = width / fontScale < 300;
   const display = getFuturesPositionDisplay(futuresHolding(p), evaluatedAt, now);
   const price = (value: string | null | undefined) => value == null ? '-'
     : formatAssetPrice(value, 'USD', p.instrument.underlying.displayPriceDecimals);
   const pnlColor = display.pnlDirection === 'neutral' ? semantic.secondary : financial[display.pnlDirection];
-  return <View style={styles.card} testID={`futures-position-${p.id}`}>
+  return <View ref={guide?.active?.positionId === p.id ? questGuideTarget('futures-position') : undefined} collapsable={false} style={styles.card} testID={`futures-position-${p.id}`}>
     <View style={styles.header}>
       <Text style={styles.name}>{display.name} · USD 무기한</Text>
       <Text style={[styles.direction, { color: p.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>{display.direction}</Text>
@@ -57,8 +62,9 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
     <View style={styles.actions}>
       {(['increase', 'reduce', 'close'] as const).map(op => <CTAButton key={op} variant="secondary"
         testID={`futures-position-${p.id}-${op}`} label={op === 'increase' ? '포지션 증가' : op === 'reduce' ? '포지션 감소' : '전량 종료'}
+        learningHint={op === 'increase' && learning.locked ? learning.message : null}
         style={styles.action} state={disabled || !capabilities[op === 'increase' ? 'canIncrease' : op === 'reduce' ? 'canReduce' : 'canClose']
-          ? 'disabled' : 'enabled'} onPress={() => onSelect(op)} />)}
+          ? 'disabled' : 'enabled'} onPress={() => op === 'increase' ? learning.guard(() => onSelect(op)) : onSelect(op)} />)}
     </View>
   </View>;
 }

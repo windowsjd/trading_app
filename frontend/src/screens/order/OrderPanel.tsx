@@ -1,3 +1,7 @@
+import { captureQuestGuideCommand, questGuideTarget } from '../../features/quest/questGuideBridge';
+import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import QuestTarget from '../../features/quest/QuestTarget';
 import { semantic } from '../../theme/tokens';
 import { getProtections } from '../../features/conditional/api';
 import { ProtectionEditor, draftLegs, emptyProtection, protectionInputError } from '../../features/conditional/ProtectionEditor';
@@ -233,6 +237,7 @@ export function OrderForm({
   // accountId is immutable for this mounted form, supplied by the route or
   // the keyed inline panel. Selection changes never retarget a pending request.
   const rootNavigation = useRootNavigation();
+  const learning = useLearningAccess(accountId);
   const queryClient = useQueryClient();
   const {
     accounts,
@@ -277,6 +282,7 @@ export function OrderForm({
   const successQuoteData = successState.quote;
   const [, setQuoteNow] = useState(() => Date.now());
   type OrderRequest = {
+    reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
     accountId: string;
     epoch: number;
     revision: number;
@@ -318,15 +324,15 @@ export function OrderForm({
   const feeQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.detail(accountId),
     queryFn: () => getTradingAccount(accountId),
-    enabled: accountKnown && side === 'buy',
+    enabled: accountKnown,
   });
   const tickerUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const { latestTicker, runtime: tickerRuntime } = useAssetTicker({
     assetId,
     wsUrl: tickerUrl ?? '',
-    enabled: enabled && side === 'buy' && !!tickerUrl,
+    enabled: enabled && !!tickerUrl,
   });
-  useStaleRecheck(enabled && side === 'buy', () => setQuoteNow(Date.now()));
+  useStaleRecheck(enabled, () => setQuoteNow(Date.now()));
 
   const orderMutation = useMutation({
     mutationFn: (action: QuotedAction<OrderRequest, OrderQuoteDto>) =>
@@ -364,7 +370,11 @@ export function OrderForm({
       if (!data) return;
       if (isActionCurrent(action.request)) {
         if (isOrderSuccess(data.result)) {
-          setSuccessState(captureOrderSuccess(data.result, data.quote));
+          const orderId = data.result.order.orderId ?? data.result.order.id;
+          const claimed = !!orderId && action.request.reportQuestCommand({ kind: 'spot', accountId: action.request.accountId,
+            orderId, assetId, assetType: data.quote.asset.assetType ?? asset?.assetType ?? '', side: action.request.payload.side,
+            orderType: action.request.payload.orderType ?? 'market', summary: '주문 결과가 서버에서 확인됐어요.' });
+          if (!claimed) setSuccessState(captureOrderSuccess(data.result, data.quote));
           setOrderInput('');
           setProtectionDraft(emptyProtection());
           setQuotedPreview(null);
@@ -524,10 +534,11 @@ export function OrderForm({
     ? feeQuery.data?.feePolicy?.tradeFeeRate
     : null;
   const indicativePreview =
-    side === 'buy' && !inputInvalidReason
+    !inputInvalidReason
       ? isAmountBuy
         ? amountBuyPreview(orderInput.trim(), tradeFeeRate)
         : orderPreview({
+            side,
             quantity: orderInput.trim(),
             price:
               orderType === 'limit'
@@ -727,11 +738,14 @@ export function OrderForm({
     walletsQuery.isLoading,
   ]);
 
+  const tradeGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
+  const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
   const canExecute =
     !preOrderBlockedReason &&
     !inputInvalidReason &&
     !successData &&
     !orderActionRef.current?.completed;
+  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType, amountValid: !inputInvalidReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
   const inputErrorMessage =
     fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 
@@ -799,6 +813,7 @@ export function OrderForm({
   };
 
   const submitOrder = () => {
+    if (!tradeGate.allowed && !orderActionRef.current) { tradeGate.guard(() => undefined); return; }
     if (
       accountChangedAway ||
       submitLockRef.current ||
@@ -818,6 +833,7 @@ export function OrderForm({
     orderActionRef.current ??= {
       request: {
         accountId,
+        reportQuestCommand: captureQuestGuideCommand(),
         epoch: scopeRef.current.epoch,
         revision: quoteRevisionRef.current,
         seasonUi: capabilities?.isSeason ?? false,
@@ -881,16 +897,17 @@ export function OrderForm({
   };
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
-      <OrderTypeSelect
+      <QuestTarget id="order-type"><OrderTypeSelect
+        limitLearningHint={limitGate.locked ? limitGate.message : null}
         value={orderType}
         disabled={pending}
         onChange={(next) =>
-          resetInput(() => {
+          (next === 'limit' ? limitGate : learning.gate('riskReduction')).guard(() => resetInput(() => {
             setOrderType(next);
             if (next === 'market') setLimitPrice('');
-          })
+          }))
         }
-      />
+      /></QuestTarget>
       <View style={styles.group}>
         <Text style={styles.label}>가격 ({asset.settlementCurrency})</Text>
         {orderType === 'limit' ? (
@@ -910,7 +927,7 @@ export function OrderForm({
           <Text style={styles.marketPrice}>시장가</Text>
         )}
       </View>
-      <View style={styles.group}>
+      <View ref={questGuideTarget('order-input')} collapsable={false} style={styles.group}>
         <Text style={styles.label}>
           {isAmountBuy ? `매수 금액 (${asset.settlementCurrency})` : '수량'}
         </Text>
@@ -1090,10 +1107,10 @@ export function OrderForm({
           }
         />
       ) : null}
-      {side === 'buy' && !(stockMarketClosed && orderType === 'market') ? (
+      {!(stockMarketClosed && orderType === 'market') ? (
         <>
           {!inputInvalidReason ? (
-            <View style={styles.preview} testID="order-indicative-preview">
+            <View ref={questGuideTarget('order-preview')} collapsable={false} style={styles.preview} testID="order-indicative-preview">
               {preview ? (
                 <>
                   <Amount
@@ -1112,7 +1129,7 @@ export function OrderForm({
                   />
                   <Amount
                     label={
-                      orderType === 'limit' ? '예상 예약금액' : '예상 결제금액'
+                      side === 'sell' ? '예상 수령액' : orderType === 'limit' ? '예상 예약금액' : '예상 결제금액'
                     }
                     value={formatPreviewMoney(
                       preview.totalAmount,
@@ -1165,15 +1182,16 @@ export function OrderForm({
           ) : null}
         </>
       ) : null}
-      <View ref={submitRef} collapsable={false}>
+      <View ref={submitRef} collapsable={false}><QuestTarget id="order-submit">
         <CTAButton
           testID={TEST_IDS.order.executeSubmit}
           label={side === 'buy' ? '매수' : '매도'}
           style={side === 'buy' ? styles.buyActive : styles.sellActive}
           state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
+          learningHint={tradeGate.locked ? tradeGate.message : null}
           onPress={submitOrder}
         />
-      </View>
+      </QuestTarget></View>
       <OrderSuccessBottomSheet
         visible={!!successData}
         payload={successData}

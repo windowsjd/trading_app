@@ -1,3 +1,4 @@
+import { questProgress } from '../../../test/questFixtures.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -12,10 +13,7 @@ const bridge = require('./questGuideBridge.ts');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const ACCOUNT = 'beginner-1';
-const progress = (exchange: boolean, transfer = false): BeginnerQuests => ({
-  exchange: { status: exchange ? 'completed' : 'not_started', completed: exchange, completedAt: exchange ? '2026-10-10T01:00:00.000Z' : null },
-  transfer: { status: transfer ? 'completed' : 'not_started', completed: transfer, completedAt: transfer ? '2026-10-10T01:05:00.000Z' : null },
-});
+const progress = (exchange: boolean, transfer = false): BeginnerQuests => questProgress(transfer ? 2 : exchange ? 1 : 0);
 const fxFacts = { screen: 'fx', accountId: ACCOUNT, blocked: false, fromCurrency: 'KRW', amountValid: true, rate: 'available',
   previewReady: true, canExecute: true, pending: false, failed: false } as const;
 const fxCommand = { kind: 'fx', accountId: ACCOUNT, fromCurrency: 'KRW', toCurrency: 'USD', summary: '받은 금액 USD 73.82' } as const;
@@ -139,7 +137,7 @@ describe('QuestGuideProvider', () => {
 
     await h.act(() => h.guide.start('exchange', progress(false)));
     assert.deepEqual(h.navigations, [['MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet', pop: true } }]]);
-    assert.deepEqual(h.guide.active, { quest: 'exchange', phase: 'guiding', replay: false });
+    assert.deepEqual(h.guide.active, { quest: 'exchange', phase: 'guiding', replay: false, accountId: ACCOUNT, step: 1, assetId: undefined, orderId: undefined, positionId: undefined });
 
     await h.focus('Wallet');
     await h.act(() => bridge.publishQuestGuideFacts('wallet', { screen: 'wallet', accountId: ACCOUNT, actions: 'enabled' }));

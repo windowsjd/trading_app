@@ -27,7 +27,7 @@ function futuresHarness(options = {}) {
       post: async (path, body) => {
         h.requests.push({ path, body }); if (h.gate) await h.gate.promise;
         if (h.failure) throw h.failure;
-        return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'command', execution: { operation: body.operation, feeAmount: '0.1' } } } };
+        return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'command', execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 37), positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.1' } } } };
       },
     } },
   });

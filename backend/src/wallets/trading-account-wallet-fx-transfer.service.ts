@@ -1,3 +1,4 @@
+import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
@@ -191,6 +192,7 @@ export class TradingAccountWalletFxTransferService {
             'TRADING_ACCOUNT_SCOPE_MISMATCH',
             'Account mode changed.',
           );
+        await assertBeginnerLearningAccess(tx, lockedAccount, 'allTrading');
         const durable = await tx.quote.findFirst({
           where: {
             id: quoteId,

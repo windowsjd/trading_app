@@ -1,0 +1,21 @@
+import assert from 'node:assert/strict';import {randomUUID} from 'node:crypto';
+import {PrismaService} from '/home/nayuta/projects/trading-app/backend/src/prisma/prisma.service';
+import {OperatorAuditService} from '/home/nayuta/projects/trading-app/backend/src/operator/operator-audit.service';
+import {OperatorSeasonModerationService} from '/home/nayuta/projects/trading-app/backend/src/operator/operator-season-moderation.service';
+import {SeasonSettlementJobService} from '/home/nayuta/projects/trading-app/backend/src/batch/season-settlement-job.service';
+const db=new PrismaService();async function main(){await db.$connect();
+const user=await db.user.create({data:{email:`audit-${randomUUID()}@example.com`,nickname:'race-'+randomUUID().slice(0,8),passwordHash:'test-only',role:'admin'}});
+const season=await db.season.create({data:{name:'audit-race',status:'ended',startAt:new Date('2026-01-01Z'),endAt:new Date('2026-02-01Z'),initialCapitalKrw:'1000000',tradeFeeRate:'0.001',fxFeeRate:'0.001'}});
+const account=await db.tradingAccount.create({data:{userId:user.id,mode:'season',status:'active',initialCapitalKrw:'1000000',openedAt:new Date('2026-01-01Z')}});
+const p=await db.seasonParticipant.create({data:{userId:user.id,seasonId:season.id,tradingAccountId:account.id,participantStatus:'active',joinedAt:new Date('2026-01-01Z'),initialCapitalKrw:'1000000',totalAssetKrw:'1000000',totalReturnRate:'0',maxDrawdown:'0'}});
+try{let observed!:()=>void,release!:()=>void;const read=new Promise<void>(r=>observed=r),gate=new Promise<void>(r=>release=r);
+const proxy=new Proxy(db,{get(target,key){if(key!=='$transaction')return Reflect.get(target,key);return (work:any)=>target.$transaction(tx=>work(new Proxy(tx,{get(t,k){if(k!=='tradingAccount')return Reflect.get(t,k);return new Proxy(t.tradingAccount,{get(model,op){if(op!=='findUnique')return Reflect.get(model,op);return async(args:any)=>{const result=await model.findUnique(args);observed();await gate;return result;};}});}})),{timeout:15000});}});
+const moderation=new OperatorSeasonModerationService(proxy,new OperatorAuditService(proxy));
+const excluding=moderation.excludeParticipant({userId:user.id,role:'admin'},season.id,p.id,{reason:'audit concurrency'});
+await read;
+const settlement=new SeasonSettlementJobService({} as any,db);
+await (settlement as any).createFinalSettlementAtomically({seasonId:season.id,settlementDate:new Date('2026-02-01Z'),capturedAt:new Date(),finalRows:[{seasonParticipantId:p.id,userId:user.id,totalAssetKrw:'1000000',returnRate:'0',krwCash:'1000000',usdCashKrw:'0',domesticStockValueKrw:'0',usStockValueKrw:'0',cryptoValueKrw:'0',maxDrawdown:'0',totalFillCount:0,reachedReturnAt:new Date('2026-02-01Z'),rank:1,finalTier:'master'}]});
+release();await excluding;
+const result={season:(await db.season.findUniqueOrThrow({where:{id:season.id}})).status,account:(await db.tradingAccount.findUniqueOrThrow({where:{id:account.id}})).status,participant:(await db.seasonParticipant.findUniqueOrThrow({where:{id:p.id}})).participantStatus,finalRanks:await db.seasonRanking.count({where:{seasonId:season.id,rankType:'final'}})};console.log(JSON.stringify(result));assert.deepEqual(result,{season:'settled',account:'suspended',participant:'excluded',finalRanks:1});
+}finally{await db.operatorAuditLog.deleteMany({where:{actorUserId:user.id}});await db.seasonRanking.deleteMany({where:{seasonId:season.id}});await db.equitySnapshot.deleteMany({where:{tradingAccountId:account.id}});await db.seasonParticipant.delete({where:{id:p.id}});await db.tradingAccount.delete({where:{id:account.id}});await db.season.delete({where:{id:season.id}});await db.user.delete({where:{id:user.id}});await db.$disconnect();}}
+main().catch(e=>{console.error(e);process.exitCode=1});

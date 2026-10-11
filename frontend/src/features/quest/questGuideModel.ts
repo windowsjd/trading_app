@@ -1,3 +1,6 @@
+import { TRADING_GUIDE_STEPS, isTradingQuest } from './tradingGuideSteps.ts';
+import { canStartQuest } from './questProgress.ts';
+import type { TradeGuideScreen, TradeGuideFacts } from './questGuideBridge.ts';
 /**
  * The beginner quest spotlight, as pure data (no React, no react-native).
  *
@@ -37,6 +40,9 @@ export interface GuideSession {
   phase: GuidePhase;
   /** Display copy of the adopted command's outcome. */
   summary: string | null;
+  orderId?: string;
+  assetId?: string;
+  positionId?: string;
 }
 
 export type GuideAction = 'next' | 'exit' | 'retry' | 'back';
@@ -72,13 +78,16 @@ export type GuideView =
   | { kind: 'celebration'; key: string; quest: BeginnerQuestKey; title: string; summary: string | null; leaving: boolean; replay: boolean };
 
 export type GuideFacts = {
+  practice?: Partial<Record<TradeGuideScreen, TradeGuideFacts | null>>;
   wallet: WalletGuideFacts | null;
   fx: FxGuideFacts | null;
   transfer: TransferGuideFacts | null;
 };
 
-export const PRACTICE_SCREEN: Record<BeginnerQuestKey, 'fx' | 'transfer'> = { exchange: 'fx', transfer: 'transfer' };
+export const PRACTICE_SCREEN: Record<'exchange' | 'transfer', 'fx' | 'transfer'> = { exchange: 'fx', transfer: 'transfer' };
 export const VIEWPORT_TARGET: Record<QuestGuideScreen, QuestGuideTargetId> = {
+  market: 'market-viewport', asset: 'asset-viewport', order: 'order-viewport', futures: 'futures-viewport',
+  holdings: 'asset-viewport', protection: 'asset-viewport', limitReview: 'asset-viewport',
   wallet: 'wallet-viewport',
   fx: 'fx-viewport',
   transfer: 'transfer-viewport',
@@ -157,6 +166,7 @@ function entryView(session: GuideSession, wallet: WalletGuideFacts | null): Guid
   if (wallet.actions === 'disabled') {
     return message(session, 'wallet', 'disabled', card(copy.wallet.disabled, { tone: 'warning' }));
   }
+  if (isTradingQuest(session.quest)) return NONE;
   const entry = copy[session.quest].entry;
   return spotlight(session, 'wallet', 0, 'entry',
     [session.quest === 'exchange' ? 'wallet-exchange' : 'wallet-transfer'],
@@ -254,6 +264,7 @@ export function resolveGuideView(session: GuideSession | null, focused: FocusedG
       replay: session.replay,
     };
   }
+  if (isTradingQuest(session.quest)) return tradingGuideView(session, focused, facts);
   const practice = PRACTICE_SCREEN[session.quest];
   // Other tabs (and the quest list, which shows its own state) pause the overlay.
   if (focused !== 'wallet' && focused !== practice) return NONE;
@@ -274,24 +285,95 @@ export function resolveGuideView(session: GuideSession | null, focused: FocusedG
 }
 
 /** Starting needs a known baseline; QUEST 02 also needs QUEST 01 proven. */
+function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, facts: GuideFacts): GuideView {
+  if (!isTradingQuest(session.quest) || !['market', 'asset', 'order', 'futures'].includes(focused)) return NONE;
+  const screen = focused as TradeGuideScreen;
+  if (session.phase === 'verifying') return message(session, screen, 'verifying', card(copy.verifying, { busy: true, actions: [] }));
+  if (session.phase === 'unconfirmed') return message(session, screen, 'unconfirmed', card(copy.unconfirmed, { actions: ['retry', 'back'], tone: 'warning' }));
+  if (session.phase === 'completedElsewhere') return message(session, screen, 'elsewhere', card(copy.completedElsewhere, { actions: ['back', 'exit'] }));
+  const steps = TRADING_GUIDE_STEPS[session.quest];
+  let index = session.step;
+  const protection = facts.practice?.protection;
+  if (session.quest === 'protection' && index === 0 && protection?.accountId === session.accountId && protection.protectionEditing) index = 1;
+  const step = steps[index];
+  if (!step || step.screen !== focused) return NONE;
+  const form = facts.practice?.[screen];
+  if (!form || form.accountId !== session.accountId) return NONE;
+  const wantedAssetType = session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto';
+  if ((screen === 'asset' || screen === 'order') && form.assetType && form.assetType !== wantedAssetType) {
+    return message(session, screen, 'wrong-market', card({ title: '실습 시장 확인', body: '이번 퀘스트의 시장에 해당하는 종목을 선택해 주세요. 퀘스트 목록으로 돌아가 다시 시작할 수 있어요.' }, { actions: ['back', 'exit'] }));
+  }
+  const holding = facts.practice?.holdings;
+  const review = facts.practice?.limitReview;
+  if (screen === 'asset' && ['protection', 'marketSell'].includes(session.quest)
+    && holding?.accountId === session.accountId && holding.assetId === session.assetId && holding.holdingsVisible === false) {
+    return spotlight(session, screen, index, 'prepare-holding', ['asset-buy'], card({ title: '실습 수량 준비', body: '현재 보유종목과 수익률을 확인해 주세요. 보유수량이 없다면 구매하기에서 시장가로 다시 매수한 뒤 이 화면으로 돌아올 수 있어요.' }));
+  }
+  if (form.blocked) return message(session, screen, 'operationally-unavailable', card({ title: '거래 가능 상태 확인', body: '현재는 화면에 안내된 거래 제한이 적용돼요. 휴장·시세 미준비·운영 중지 상태를 확인해 주세요. 퀘스트 목록으로 돌아가 다른 실습을 선택할 수도 있어요.' }, { actions: ['back', 'exit'] }));
+  let ready = !!step.next;
+  let hint: string | null = null;
+  if (screen === 'order') {
+    const wantedSide = session.quest === 'marketSell' ? 'sell' : 'buy';
+    const wantedType = session.quest === 'limitBuy' ? 'limit' : 'market';
+    if (form.side !== wantedSide || form.orderType !== wantedType) {
+      return spotlight(session, screen, index, 'choose-order', ['order-type'], card({ title: '주문 방식 확인', body: `${wantedSide === 'buy' ? '매수' : '매도'} · ${wantedType === 'limit' ? '지정가' : '시장가'}를 선택해 주세요.` }));
+    }
+    if (step.target === 'order-input') ready = ready && form.amountValid === true;
+  }
+  if (step.target === 'asset-holdings' && session.orderId) ready = ready && holding?.accountId === session.accountId && holding.assetId === session.assetId && holding.holdingsVisible === true;
+  if (step.target === 'limit-review') ready = ready && review?.accountId === session.accountId && review.orderResolved === true;
+  if (step.target === 'protection-editor') ready = ready && protection?.tpSlReady === true;
+  if (step.target === 'futures-direction') ready = ready && form.direction === (session.quest === 'futuresShort' ? 'short' : 'long');
+  if (step.target === 'futures-margin') ready = ready && (form.leverage ?? 0) > 1;
+  if (screen === 'futures' && session.step < 5 && form.positionId) {
+    hint = '이 종목에는 포지션이 이미 있어요. 기존 포지션을 전량 종료하거나 다른 종목을 선택한 뒤 새 포지션으로 실습해 주세요. One-way 정책은 그대로 적용돼요.';
+  }
+  const view = spotlight(session, screen, index, ready ? 'ready' : 'practice', [step.target], card(step, { next: step.next ? ready ? 'enabled' : 'disabled' : null, hint }));
+  if (view.kind === 'spotlight') view.card.stepLabel = `${index + 1}/${steps.length}`;
+  return view;
+}
+
 export function startGuideSession(id: number, accountId: string, quest: BeginnerQuestKey, progress: BeginnerQuests | null): GuideSession | null {
   if (!accountId || !progress) return null;
-  if (quest === 'transfer' && !progress.exchange.completed) return null;
+  if (!canStartQuest(quest, progress)) return null;
+  if (isTradingQuest(quest)) {
+    const replay = progress[quest].completed;
+    const saved = !replay ? progress[quest].steps[0].referenceId : null;
+    const assetId = quest === 'limitBuy' ? progress.practice.limitAssetId : progress.practice.spotAssetId;
+    const review = !!saved && ['marketBuy', 'limitBuy'].includes(quest);
+    const positionId = quest === 'futuresLong' ? progress.practice.longPositionId : quest === 'futuresShort' ? progress.practice.shortPositionId : null;
+    return { id, accountId, quest, replay, step: review ? 7 : positionId && !replay ? 5 : 0, phase: 'guiding', summary: null,
+      ...(review ? { orderId: saved, assetId: assetId ?? undefined } : {}),
+      ...(['protection', 'marketSell'].includes(quest) ? { assetId: progress.practice.spotAssetId ?? undefined } : {}),
+      ...(positionId && !replay ? { positionId } : {}) };
+  }
   return { id, accountId, quest, replay: progress[quest].completed, step: 1, phase: 'guiding', summary: null };
 }
 
 /** Returning to the Wallet root means the practice screen was closed: start it over. */
 export function followGuideFocus(session: GuideSession, focused: FocusedGuideScreen): GuideSession {
+  if (isTradingQuest(session.quest)) {
+    if (session.phase !== 'guiding') return session;
+    if (focused === 'order' && session.step < (session.quest === 'marketSell' ? 2 : 3)) return { ...session, step: session.quest === 'marketSell' ? 2 : 3 };
+    if (focused === 'asset' && session.step === 0 && !['protection', 'marketSell'].includes(session.quest)) return { ...session, step: 1 };
+    return session;
+  }
   return session.phase === 'guiding' && focused === 'wallet' && session.step !== 1 ? { ...session, step: 1 } : session;
 }
 
 export function advanceGuide(session: GuideSession, fromStep: number): GuideSession {
   if (session.phase !== 'guiding') return session;
-  return { ...session, step: Math.min(clampStep(fromStep) + 1, PRACTICE_STEPS) };
+  return { ...session, step: isTradingQuest(session.quest) ? Math.min(fromStep + 1, TRADING_GUIDE_STEPS[session.quest].length - 1) : Math.min(clampStep(fromStep) + 1, PRACTICE_STEPS) };
 }
 
 /** The only commands that can complete each quest on the server. */
 export function commandMatchesQuest(quest: BeginnerQuestKey, command: QuestGuideCommand): boolean {
+  if (isTradingQuest(quest)) {
+    if (quest === 'protection') return command.kind === 'protection' && command.bothLegs;
+    if (quest === 'futuresLong' || quest === 'futuresShort') return command.kind === 'futures' && command.direction === (quest === 'futuresLong' ? 'long' : 'short') && command.leverage > 1;
+    return command.kind === 'spot' && command.assetType === (quest === 'krStock' ? 'domestic_stock' : quest === 'usStock' ? 'us_stock' : 'crypto')
+      && command.side === (quest === 'marketSell' ? 'sell' : 'buy') && command.orderType === (quest === 'limitBuy' ? 'limit' : 'market');
+  }
   return quest === 'exchange'
     ? command.kind === 'fx' && command.fromCurrency === 'KRW' && command.toCurrency === 'USD'
     : command.kind === 'transfer' && command.currency === 'USD'
@@ -311,18 +393,26 @@ export function claimGuideCommand(session: GuideSession | null, accountId: strin
     || !commandMatchesQuest(session.quest, command)) {
     return { session, claimed: false };
   }
+  if (command.kind === 'spot' && ['marketBuy', 'limitBuy', 'krStock', 'usStock'].includes(session.quest)) {
+    return { session: { ...session, step: 7, assetId: command.assetId, orderId: command.orderId, summary: command.summary }, claimed: true };
+  }
+  if (command.kind === 'protection' && session.assetId && command.assetId !== session.assetId) return { session, claimed: false };
+  if (command.kind === 'futures') {
+    if (command.operation === 'open') return { session: { ...session, step: 5, positionId: command.positionId, summary: command.summary }, claimed: true };
+    if (!['close', 'reduce'].includes(command.operation) || command.quantityAfter !== '0.00000000' && Number(command.quantityAfter) !== 0 || command.positionId !== session.positionId) return { session, claimed: false };
+  }
   return { session: { ...session, phase: session.replay ? 'replaySucceeded' : 'verifying', summary: command.summary }, claimed: true };
 }
 
 /** A fresh server read decides: celebrate only what the ledger proves. */
 export function settleGuideVerification(session: GuideSession, progress: BeginnerQuests | null): GuideSession {
   if (session.phase !== 'verifying') return session;
-  return { ...session, phase: progress?.[session.quest].completed ? 'celebrating' : 'unconfirmed' };
+  return { ...session, phase: progress?.[session.quest].completed ? session.replay ? 'replaySucceeded' : 'celebrating' : 'unconfirmed' };
 }
 
 /** Proven without this session's command (e.g. another device): no celebration. */
 export function observeGuideProgress(session: GuideSession, progress: BeginnerQuests, commandPending: boolean): GuideSession {
-  if (session.phase !== 'guiding' || session.replay || commandPending || !progress[session.quest].completed) return session;
+  if (session.phase !== 'guiding' || session.orderId || session.positionId || session.replay || commandPending || !progress[session.quest].completed) return session;
   return { ...session, phase: 'completedElsewhere' };
 }
 

@@ -1,3 +1,4 @@
+import { questPayload, questProgress } from '../../../test/questFixtures.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -29,10 +30,11 @@ const quest = (questId: string, stepId: string, at: string | null, overrides: Re
   ...overrides,
 });
 const payload = (fxAt: string | null, transferAt: string | null, fx: Record<string, unknown> = {}, transfer: Record<string, unknown> = {}) => ({
-  tradingAccountId: 'beginner-1',
+  ...questPayload(transferAt ? 2 : fxAt ? 1 : 0),
   quests: [
     quest(QUEST_EXCHANGE_ID, QUEST_FX_STEP, fxAt, fx),
     quest(QUEST_TRANSFER_ID, QUEST_TRANSFER_STEP, transferAt, transfer),
+    ...questPayload().quests.slice(2),
   ],
 });
 const rejects = (value: unknown, accountId = 'beginner-1') =>
@@ -40,12 +42,9 @@ const rejects = (value: unknown, accountId = 'beginner-1') =>
 
 describe('QUEST 01/02 progress contract', () => {
   it('maps each quest independently and strictly from its server-proven step', () => {
-    assert.deepEqual(parseBeginnerQuests(payload(null, null), 'beginner-1'), {
-      exchange: { status: 'not_started', completed: false, completedAt: null },
-      transfer: { status: 'not_started', completed: false, completedAt: null },
-    });
+    assert.deepEqual(parseBeginnerQuests(payload(null, null), 'beginner-1'), questProgress());
     const exchanged = parseBeginnerQuests(payload(FX_AT, null), 'beginner-1');
-    assert.deepEqual(exchanged.exchange, { status: 'completed', completed: true, completedAt: FX_AT });
+    assert.deepEqual(exchanged.exchange, { status: 'completed', completed: true, completedAt: FX_AT, steps: payload(FX_AT, null).quests[0].steps });
     assert.equal(exchanged.transfer.completed, false);
     const both = parseBeginnerQuests(payload(FX_AT, TRANSFER_AT), 'beginner-1');
     assert.equal(both.transfer.completedAt, TRANSFER_AT);

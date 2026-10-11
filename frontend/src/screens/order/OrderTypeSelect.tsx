@@ -1,3 +1,4 @@
+import LearningLock from '../../features/quest/LearningLock';
 import React, { useEffect, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
@@ -40,7 +41,8 @@ export function placeOrderTypeMenu(anchor: Rect, frame: Rect, menuHeight: number
 }
 
 /** One full-width button opens 시장가/지정가; the caller owns the order type. */
-export default function OrderTypeSelect({ value, disabled, onChange }: {
+export default function OrderTypeSelect({ value, disabled, onChange, limitLearningHint }: {
+  limitLearningHint?: string | null;
   value: OrderType;
   disabled: boolean;
   onChange: (value: OrderType) => void;
@@ -150,21 +152,23 @@ export default function OrderTypeSelect({ value, disabled, onChange }: {
             >
               {OPTIONS.map((option) => {
                 const selected = option.value === value;
+                const learningRestricted = option.value === 'limit' && !!limitLearningHint;
                 return (
                   <ActionPressable
                     key={option.value}
                     testID={option.testID}
                     accessibilityRole="menuitem"
-                    accessibilityLabel={option.label}
-                    accessibilityState={{ selected, disabled }}
+                    accessibilityLabel={option.value === 'limit' && limitLearningHint ? `${option.label}, 학습 제한. ${limitLearningHint}` : option.label}
+                    accessibilityState={{ selected, disabled: disabled || learningRestricted }}
                     aria-selected={selected}
                     disabled={disabled}
                     style={[styles.option, selected && styles.optionSelected]}
                     onPress={() => select(option.value)}
                   >
-                    <Text style={[styles.optionText, selected && styles.optionTextSelected]}>
+                    <Text style={[styles.optionText, selected && styles.optionTextSelected, learningRestricted && { color: semantic.muted }]}>
                       {option.label}
                     </Text>
+                    {option.value === 'limit' && limitLearningHint ? <LearningLock /> : null}
                     {selected ? <Text style={styles.check} accessible={false}>✓</Text> : null}
                   </ActionPressable>
                 );

@@ -1,3 +1,4 @@
+import { questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
@@ -75,6 +76,8 @@ export function AssetMarketChart({
   footerContent,
 }: AssetMarketChartProps) {
   const inputScroll = useFocusedInputScroll();
+  const { revealView } = inputScroll;
+  React.useEffect(() => { registerQuestGuideReveal('asset', node => revealView(node, 'start')); return () => registerQuestGuideReveal('asset', null); }, [revealView]);
   const isFocused = useIsFocused();
   const isAdmin = useAdminDiagnostics();
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
@@ -174,7 +177,7 @@ export function AssetMarketChart({
               {asset.settlementCurrency}
             </Text> : null}
           </View>
-          <View style={styles.detailPriceRow}>
+          <View ref={questGuideTarget('asset-price')} collapsable={false} style={styles.detailPriceRow}>
             <View style={styles.detailPriceStack}>
               <Text testID="asset-detail-primary-price" style={styles.detailPrice} selectable>
                 {displayPrice.priceLocal === null && asset

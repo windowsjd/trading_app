@@ -1,0 +1,21 @@
+{
+  "baseline": "f87c9666c5dd1ea35c6f9e67433cd19a797895da",
+  "originMain": "f87c9666c5dd1ea35c6f9e67433cd19a797895da",
+  "remoteMain": "f87c9666c5dd1ea35c6f9e67433cd19a797895da",
+  "workBaseline": "3985aa1fbdfb1be8fe7d778445a6580984f2d026",
+  "implementationManifest": "../../2026-10-11-beginner-full-quests/evidence/implementation-manifest.json",
+  "sourceChangedDuringAudit": [],
+  "dbHost": "127.0.0.1",
+  "dbPort": 55441,
+  "databases": [
+    "trading_quests_test",
+    "trading_audit_test",
+    "trading_audit_f2_test",
+    "trading_audit_f3_test"
+  ],
+  "postgresVersion": "16",
+  "testTimezone": "UTC",
+  "operations": "No production services, migrations, providers, deployments or external load tests invoked.",
+  "reportFinalReviewDate": "2026-10-12",
+  "finalReview": "../../2026-10-11-beginner-full-quests/evidence/final-review.json"
+}

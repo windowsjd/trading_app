@@ -412,6 +412,7 @@ export const ModelName = {
   ProtectionCommand: 'ProtectionCommand',
   Position: 'Position',
   Order: 'Order',
+  BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   AdRewardClaim: 'AdRewardClaim',
@@ -451,7 +452,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2524,6 +2525,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrderCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    BeginnerQuestAcknowledgement: {
+      payload: Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>
+      fields: Prisma.BeginnerQuestAcknowledgementFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.BeginnerQuestAcknowledgementFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.BeginnerQuestAcknowledgementFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>
+        }
+        findFirst: {
+          args: Prisma.BeginnerQuestAcknowledgementFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.BeginnerQuestAcknowledgementFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>
+        }
+        findMany: {
+          args: Prisma.BeginnerQuestAcknowledgementFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>[]
+        }
+        create: {
+          args: Prisma.BeginnerQuestAcknowledgementCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>
+        }
+        createMany: {
+          args: Prisma.BeginnerQuestAcknowledgementCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.BeginnerQuestAcknowledgementCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>[]
+        }
+        delete: {
+          args: Prisma.BeginnerQuestAcknowledgementDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>
+        }
+        update: {
+          args: Prisma.BeginnerQuestAcknowledgementUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>
+        }
+        deleteMany: {
+          args: Prisma.BeginnerQuestAcknowledgementDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.BeginnerQuestAcknowledgementUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.BeginnerQuestAcknowledgementUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>[]
+        }
+        upsert: {
+          args: Prisma.BeginnerQuestAcknowledgementUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$BeginnerQuestAcknowledgementPayload>
+        }
+        aggregate: {
+          args: Prisma.BeginnerQuestAcknowledgementAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateBeginnerQuestAcknowledgement>
+        }
+        groupBy: {
+          args: Prisma.BeginnerQuestAcknowledgementGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BeginnerQuestAcknowledgementGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.BeginnerQuestAcknowledgementCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.BeginnerQuestAcknowledgementCountAggregateOutputType> | number
         }
       }
     }
@@ -4907,6 +4982,16 @@ export const OrderScalarFieldEnum = {
 export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
 
 
+export const BeginnerQuestAcknowledgementScalarFieldEnum = {
+  tradingAccountId: 'tradingAccountId',
+  stepId: 'stepId',
+  orderId: 'orderId',
+  acknowledgedAt: 'acknowledgedAt'
+} as const
+
+export type BeginnerQuestAcknowledgementScalarFieldEnum = (typeof BeginnerQuestAcknowledgementScalarFieldEnum)[keyof typeof BeginnerQuestAcknowledgementScalarFieldEnum]
+
+
 export const CashWalletScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -6327,6 +6412,7 @@ export type GlobalOmitConfig = {
   protectionCommand?: Prisma.ProtectionCommandOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
+  beginnerQuestAcknowledgement?: Prisma.BeginnerQuestAcknowledgementOmit
   cashWallet?: Prisma.CashWalletOmit
   walletTransaction?: Prisma.WalletTransactionOmit
   adRewardClaim?: Prisma.AdRewardClaimOmit

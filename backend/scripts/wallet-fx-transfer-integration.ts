@@ -1,3 +1,8 @@
+import {
+  prepareLearnedBeginner,
+  cleanupLearningPractice,
+  releaseLearningAssets,
+} from './lib/beginner-quest-practice';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -216,6 +221,8 @@ async function fixture(mode: TradingAccountMode) {
       effectiveAt: now,
     },
   });
+  if (mode === 'beginner')
+    await prepareLearnedBeginner(prisma, user.id, accountId);
   return { mode, userId: user.id, accountId, season, asset };
 }
 type Scenario = Awaited<ReturnType<typeof fixture>>;
@@ -282,6 +289,7 @@ async function reject(promise: Promise<unknown>, code: string) {
   });
 }
 async function cleanup(s: Scenario) {
+  const learning = await cleanupLearningPractice(prisma, s.accountId);
   const where = { tradingAccountId: s.accountId };
   await prisma.walletTransferExecuteRequest.deleteMany({ where });
   await prisma.walletTransferQuote.deleteMany({ where: { quote: where } });
@@ -302,6 +310,7 @@ async function cleanup(s: Scenario) {
     where: { assetId: s.asset.id },
   });
   await prisma.asset.delete({ where: { id: s.asset.id } });
+  await releaseLearningAssets(prisma, learning);
   await prisma.user.delete({ where: { id: s.userId } });
 }
 
@@ -311,6 +320,10 @@ async function parity(
   reverse: boolean,
 ) {
   const [a, b] = await Promise.all([fixture(mode), fixture(mode)]);
+  const priorSnapshots = await prisma.equitySnapshot.findMany({
+    where: { tradingAccountId: { in: [a.accountId, b.accountId] } },
+    select: { id: true },
+  });
   try {
     await evidence();
     const q = await quote(b, crypto, reverse);
@@ -397,6 +410,7 @@ async function parity(
         where: {
           tradingAccountId: s.accountId,
           snapshotReason: 'exchange_executed',
+          id: { notIn: priorSnapshots.map((row) => row.id) },
         },
       });
     const [sa, sb] = await Promise.all([snapshot(a), snapshot(b)]);
@@ -473,9 +487,9 @@ async function parity(
     );
     const after = await state(b);
     assert.equal(after.ledger - before.ledger, 4);
-    assert.equal(after.command, 1);
-    assert.equal(after.fxCommand, 1);
-    assert.equal(after.transfer, 1);
+    assert.equal(after.command - before.command, 1);
+    assert.equal(after.fxCommand - before.fxCommand, 1);
+    assert.equal(after.transfer - before.transfer, 1);
     const another = await quote(b, crypto, reverse, reverse ? '1' : '1400');
     await reject(
       app.composite.execute(b.userId, b.accountId, {
@@ -795,6 +809,7 @@ async function concurrency(mode: TradingAccountMode) {
     const s = await fixture(mode);
     try {
       await evidence();
+      const initial = await state(s);
       const reverse = ['same-currency', 'limit', 'market'].includes(race);
       const q = await quote(
         s,
@@ -885,9 +900,9 @@ async function concurrency(mode: TradingAccountMode) {
           (outcomes[0] as PromiseFulfilledResult<unknown>).value,
           (outcomes[1] as PromiseFulfilledResult<unknown>).value,
         );
-        assert.equal((await state(s)).command, 1);
-        assert.equal((await state(s)).fxCommand, 1);
-        assert.equal((await state(s)).transfer, 1);
+        assert.equal((await state(s)).command - initial.command, 1);
+        assert.equal((await state(s)).fxCommand - initial.fxCommand, 1);
+        assert.equal((await state(s)).transfer - initial.transfer, 1);
       }
       for (const w of await prisma.cashWallet.findMany({
         where: { tradingAccountId: s.accountId },
@@ -1179,6 +1194,9 @@ async function main() {
     await committedReplayAcrossDeadline();
     await providerPolicies();
     console.log('wallet FX transfer db integration ok');
+  } catch (error) {
+    console.error('Financial scenario failed before cleanup:', error);
+    throw error;
   } finally {
     for (const row of originalRates)
       await prisma.fxRateSnapshot.update({

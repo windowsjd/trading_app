@@ -1,3 +1,4 @@
+import { questProgress } from '../../../test/questFixtures.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -12,10 +13,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const FX_AT = '2026-10-10T01:00:00.000Z';
 const TRANSFER_AT = '2026-10-10T01:05:00.000Z';
-const progressOf = (count: 0 | 1 | 2): BeginnerQuests => ({
-  exchange: { status: count > 0 ? 'completed' : 'not_started', completed: count > 0, completedAt: count > 0 ? FX_AT : null },
-  transfer: { status: count > 1 ? 'completed' : 'not_started', completed: count > 1, completedAt: count > 1 ? TRANSFER_AT : null },
-});
+const progressOf = (count: 0 | 1 | 2): BeginnerQuests => questProgress(count);
 
 type Guide = {
   active: { quest: BeginnerQuestKey; phase: string; replay: boolean } | null;
@@ -75,7 +73,7 @@ it('shows QUEST 01 환전하기 and QUEST 02 이체하기 as separate cards with
     t.after(async () => { await Renderer.act(async () => h.renderer.unmount()); });
     const copy = h.text();
     assert.match(copy, /공통 기초 — 암호화폐 현물/);
-    assert.equal(h.all('quest-summary-progress')[0].props.children.join(''), `퀘스트 ${count}/2 완료`);
+    assert.equal(h.all('quest-summary-progress')[0].props.children.join(''), `퀘스트 ${count}/10 완료`);
     assert.match(h.cardText('exchange'), /QUEST 01/);
     assert.match(h.cardText('exchange'), /환전하기/);
     assert.match(h.cardText('transfer'), /QUEST 02/);

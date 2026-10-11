@@ -1,3 +1,4 @@
+import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
@@ -225,6 +226,13 @@ export class FuturesService {
             HttpStatus.INTERNAL_SERVER_ERROR,
           );
         await this.assertTradable(lockedAccount, executeNow, tx);
+        await assertBeginnerLearningAccess(
+          tx,
+          lockedAccount,
+          ['open', 'increase'].includes(request.operation)
+            ? 'allTrading'
+            : 'riskReduction',
+        );
         const lockedInstrument = await this.instrument(
           tx,
           request.instrumentId,

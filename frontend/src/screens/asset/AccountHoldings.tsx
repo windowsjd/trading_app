@@ -1,3 +1,9 @@
+import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
+import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
+import QuestTarget from '../../features/quest/QuestTarget';
+import QuestLimitReview from '../../features/quest/QuestLimitReview';
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import LearningLock from '../../features/quest/LearningLock';
 import ProtectionPanel from '../../features/conditional/ProtectionPanel';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
@@ -36,6 +42,8 @@ export default function AccountHoldings({
   onInputBlur,
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('current');
+  const guide = useQuestGuide();
+  const reviewOrderId = guide?.active?.quest === 'limitBuy' && guide.active.accountId === accountId && guide.active.assetId === assetId ? guide.active.orderId : undefined;
   const query = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId ?? ''),
     queryFn: () =>
@@ -56,8 +64,12 @@ export default function AccountHoldings({
       ? positions.filter((position) => position.assetId === assetId)
       : positions;
 
+  const ownPosition = visible.find(p => p.assetId === assetId);
+  useTradingGuideFacts({ screen: 'holdings', accountId: accountId ?? '', assetId, holdingsVisible: isFocused && filter !== 'pending' && !query.isError && !!ownPosition && ownPosition.valuation.state !== 'unavailable' }, isFocused);
+
   return (
     <View style={styles.section} testID="account-holdings">
+      {reviewOrderId && accountId ? <QuestLimitReview key={`${accountId}:${reviewOrderId}`} accountId={accountId} orderId={reviewOrderId} focused={isFocused} /> : null}
       <View style={styles.header}>
         <Text style={styles.title} testID="holdings-count">
           {filter === 'pending' ? '대기 주문' : `보유 종목${data && !query.isError ? ` ${positions.length}` : ''}`}
@@ -129,7 +141,7 @@ export default function AccountHoldings({
         />
       ) : (
         visible.map((position) => (
-          <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position}
+          <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position} guideTarget={isFocused && position.assetId === assetId}
             onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
         ))
       )}
@@ -137,17 +149,19 @@ export default function AccountHoldings({
   );
 }
 
-function HoldingRow({ position, accountId, onInputFocus, onInputBlur }: {
+function HoldingRow({ position, accountId, guideTarget, onInputFocus, onInputBlur }: {
+  guideTarget: boolean;
   position: PositionItemDto; accountId: string;
   onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
 }) {
   const [protection, setProtection] = useState(false);
+  const gate = useLearningAccess(accountId).gate(position.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
   return (
     <View style={styles.row} testID={`holding-${position.assetId}`}>
-      <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} />
-      <ActionPressable accessibilityRole="button" testID={`holding-protection-${position.assetId}`} onPress={() => setProtection(!protection)} style={styles.retry}>
-        <Text style={styles.value}>TP/SL 설정·관리</Text>
-      </ActionPressable>
+      {guideTarget ? <QuestTarget id="asset-holdings"><PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} /></QuestTarget> : <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} />}
+      <QuestTarget id="asset-protection" enabled={guideTarget}><ActionPressable accessibilityRole="button" accessibilityLabel={gate.locked ? `TP/SL 설정·관리, 신규 설정 학습 제한. ${gate.message}` : 'TP/SL 설정·관리'} testID={`holding-protection-${position.assetId}`} onPress={() => setProtection(!protection)} style={styles.retry}>
+        <Text style={styles.value}>TP/SL 설정·관리</Text>{gate.locked ? <LearningLock /> : null}
+      </ActionPressable></QuestTarget>
       {protection ? <ProtectionPanel accountId={accountId} assetId={position.assetId} positionId={position.positionId}
         domain="spot" currency={position.currencyCode} onInputFocus={onInputFocus} onInputBlur={onInputBlur} /> : null}
     </View>

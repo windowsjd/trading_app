@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {PrismaService} from '/home/nayuta/projects/trading-app/backend/src/prisma/prisma.service';
+import {OperatorAuditService} from '/home/nayuta/projects/trading-app/backend/src/operator/operator-audit.service';
+import {OperatorAccountManagementService} from '/home/nayuta/projects/trading-app/backend/src/operator/operator-account-management.service';
+import {OperatorUserStatusService} from '/home/nayuta/projects/trading-app/backend/src/operator/operator-user-status.service';
+const db=new PrismaService();
+async function main(){
+ await db.$connect();assert.equal(await db.user.count(),0,'empty isolated DB required');
+ const users=await Promise.all([0,1].map(i=>db.user.create({data:{email:`audit-${randomUUID()}@example.com`,nickname:`admin-${i}`,passwordHash:'test-only',role:'admin',status:'active'}})));
+ try{
+ for(const mode of ['role','status','mixed']){
+  await db.user.updateMany({where:{id:{in:users.map(u=>u.id)}},data:{role:'admin',status:'active'}});
+  let waiting=0;let release!:()=>void;const barrier=new Promise<void>(r=>release=r);
+  const proxy=new Proxy(db,{get(target,key){if(key!=='$transaction')return Reflect.get(target,key);return (work:any)=>target.$transaction(async tx=>work(new Proxy(tx,{get(t,k){if(k!=='user')return Reflect.get(t,k);return new Proxy(t.user,{get(model,op){if(op!=='count')return Reflect.get(model,op);return async(args:any)=>{const count=await model.count(args);assert.equal(count,2);if(++waiting===2)release();await barrier;return count;};}});}})),{timeout:10000});}});
+  const audit=new OperatorAuditService(proxy),roles=new OperatorAccountManagementService(proxy,audit),status=new OperatorUserStatusService(proxy,audit);
+  const result=await Promise.allSettled(users.map((actor,i)=> mode==='role'||(mode==='mixed'&&i===0)?roles.updateUserRole({userId:actor.id,role:'admin'},users[1-i].id,{role:'user',reason:'audit race'}):status.updateUserStatus({userId:actor.id,role:'admin'},users[1-i].id,{status:'suspended',reason:'audit race'})));
+  const activeAdmins=await db.user.count({where:{role:'admin',status:'active'}});
+  console.log(JSON.stringify({case:mode,results:result.map(r=>r.status),activeAdmins}));assert.equal(activeAdmins,0,'candidate reproduced');
+ }
+ }finally{await db.operatorAuditLog.deleteMany({where:{actorUserId:{in:users.map(u=>u.id)}}});await db.user.deleteMany({where:{id:{in:users.map(u=>u.id)}}});await db.$disconnect();}
+}
+main().catch(e=>{console.error(e);process.exitCode=1});

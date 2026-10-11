@@ -79,6 +79,7 @@ export const ModelName = {
   ProtectionCommand: 'ProtectionCommand',
   Position: 'Position',
   Order: 'Order',
+  BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   AdRewardClaim: 'AdRewardClaim',
@@ -684,6 +685,16 @@ export const OrderScalarFieldEnum = {
 } as const
 
 export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
+
+
+export const BeginnerQuestAcknowledgementScalarFieldEnum = {
+  tradingAccountId: 'tradingAccountId',
+  stepId: 'stepId',
+  orderId: 'orderId',
+  acknowledgedAt: 'acknowledgedAt'
+} as const
+
+export type BeginnerQuestAcknowledgementScalarFieldEnum = (typeof BeginnerQuestAcknowledgementScalarFieldEnum)[keyof typeof BeginnerQuestAcknowledgementScalarFieldEnum]
 
 
 export const CashWalletScalarFieldEnum = {

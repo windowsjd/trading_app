@@ -108,9 +108,10 @@ async function progress(userId: string, accountId: string) {
   const response = await quests.getQuestProgress(userId, accountId);
   assert.equal(response.data.tradingAccountId, accountId);
   assert.deepEqual(
-    response.data.quests.map((quest) => quest.questId),
+    response.data.quests.slice(0, 2).map((quest) => quest.questId),
     ['common-01-exchange', 'common-02-transfer'],
   );
+  assert.equal(response.data.quests.length, 10);
   const [exchange, transfer] = response.data.quests;
   for (const quest of [exchange, transfer]) {
     assert.equal(quest.totalStepCount, 1);
@@ -124,10 +125,10 @@ async function progress(userId: string, accountId: string) {
     transfer.steps[0].completed && !exchange.steps[0].completed,
     false,
   );
-  const count =
-    exchange.completedStepCount + transfer.completedStepCount;
+  const count = exchange.completedStepCount + transfer.completedStepCount;
   return {
-    status: count === 0 ? 'not_started' : count === 2 ? 'completed' : 'in_progress',
+    status:
+      count === 0 ? 'not_started' : count === 2 ? 'completed' : 'in_progress',
     count,
     exchange: exchange.status,
     transfer: transfer.status,
@@ -348,7 +349,21 @@ async function run() {
   // a transfer committed before the first standalone FX does not count.
   const second = await user();
   const other = (await opens.openBeginnerAccount(second)).data.account;
+  await rejectsCode(
+    compositeKrwToSpot(second, other.id),
+    'BEGINNER_FEATURE_LOCKED',
+  );
+  // Historical pre-lock records: execute through unchanged General services,
+  // then restore the original beginner mode before checking legacy evidence.
+  await db.tradingAccount.update({
+    where: { id: other.id },
+    data: { mode: 'general' },
+  });
   await compositeKrwToSpot(second, other.id);
+  await db.tradingAccount.update({
+    where: { id: other.id },
+    data: { mode: 'beginner' },
+  });
   assert.equal(
     await db.exchangeTransaction.count({
       where: { tradingAccountId: other.id },
@@ -360,8 +375,20 @@ async function run() {
     1,
   );
   assert.equal((await progress(second, other.id)).status, 'not_started');
+  await rejectsCode(
+    usdTransfer(second, other.id, 'crypto_spot', 'securities', '20'),
+    'BEGINNER_FEATURE_LOCKED',
+  );
+  await db.tradingAccount.update({
+    where: { id: other.id },
+    data: { mode: 'general' },
+  });
   await usdTransfer(second, other.id, 'crypto_spot', 'securities', '20');
   await usdTransfer(second, other.id, 'securities', 'crypto_spot', '10');
+  await db.tradingAccount.update({
+    where: { id: other.id },
+    data: { mode: 'beginner' },
+  });
   assert.equal((await progress(second, other.id)).status, 'not_started');
   const otherFx = await fxKrwToUsd(second, other.id, '150000');
   assert.deepEqual(await progress(second, other.id), {
@@ -372,7 +399,21 @@ async function run() {
     fxId: otherFx.result.data.exchangeId,
     transferId: null,
   });
+  await rejectsCode(
+    compositeKrwToSpot(second, other.id),
+    'BEGINNER_FEATURE_LOCKED',
+  );
+  // Historical pre-lock records: execute through unchanged General services,
+  // then restore the original beginner mode before checking legacy evidence.
+  await db.tradingAccount.update({
+    where: { id: other.id },
+    data: { mode: 'general' },
+  });
   await compositeKrwToSpot(second, other.id);
+  await db.tradingAccount.update({
+    where: { id: other.id },
+    data: { mode: 'beginner' },
+  });
   assert.equal((await progress(second, other.id)).status, 'in_progress');
   const otherMove = await usdTransfer(
     second,

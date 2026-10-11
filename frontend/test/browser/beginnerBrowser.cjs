@@ -241,6 +241,10 @@ async function run() {
       assert.ok(frames.filter(frame => frame.celebration).length >= 20, 'the completion is visible long enough to notice');
     }
 
+    if (process.env.FULL_QUEST_BROWSER === '1') {
+      await require('./tradingQuestFlows.cjs')({page,open,id,tab,out,errors});
+      return;
+    }
     // A: quest list, header and tab icon at small widths, both themes, large fonts.
     const headerOf = label => heading(label).evaluate(el => {
       const row = el.parentElement, icon = row.querySelector('svg'), s = getComputedStyle(el);
@@ -272,7 +276,7 @@ async function run() {
       assert.doesNotMatch(list, /실제 거래 기능을 직접 사용해 보며 단계별로 배워요/);
       assert.doesNotMatch(list, /\d+%|경험치|레벨|해금|잠금|보상|배우는 내용:|완료 ·|다시 둘러보기/);
       if (level === '1') { assert.equal(await id('quest-card-exchange-start').getAttribute('aria-label'), '다시하기'); assert.equal(await id('quest-card-exchange-start').getByTestId('quest-replay-icon').count(), 1); }
-      assert.equal(await text('quest-summary-progress'), `퀘스트 ${level}/2 완료`);
+      assert.equal(await text('quest-summary-progress'), `퀘스트 ${level}/10 완료`);
       assert.equal(await text('quest-card-exchange-status'), level === '1' ? '완료' : '미시작');
       assert.equal(await text('quest-card-transfer-status'), level === '1' ? '미시작' : '대기');
       assert.equal(await id('quest-card-transfer-start').getAttribute('aria-disabled'), level === '1' ? null : 'true');
@@ -363,7 +367,7 @@ async function run() {
       await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
       await page.waitForTimeout(400);
       assertSmoothReturn(await stopFrames(), 'transfer');
-      assert.equal(await text('quest-summary-progress'), '퀘스트 2/2 완료');
+      assert.equal(await text('quest-summary-progress'), '퀘스트 2/10 완료');
       await page.screenshot({ path: path.join(out, `tr-8-returned-${context}.png`) });
     }
     for (const [width, height, fontScale, theme, motion] of [
@@ -408,7 +412,7 @@ async function run() {
       await page.screenshot({ path: path.join(out, `replay-${quest}-success.png`) });
       await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-celebration"]'));
       await id('beginner-quest-list').waitFor(); await contentFits('beginner-quest-list');
-      assert.equal(await text('quest-summary-progress'), '퀘스트 2/2 완료');
+      assert.equal(await text('quest-summary-progress'), '퀘스트 2/10 완료');
     }
     assert.deepEqual(await page.evaluate(() => ({ fxAt: window.beginnerFixture.ledger.fxAt, transferAt: window.beginnerFixture.ledger.transferAt })), original);
     assert.equal((await page.evaluate(() => window.beginnerFixture.posts)).length, 3);
@@ -493,12 +497,13 @@ async function run() {
       await id('quest-guide-next').click();
       await page.waitForFunction(step => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === step, step);
     }
-    await page.evaluate(() => { window.beginnerFixture.questFailures = 2; });
+    await page.evaluate(() => { window.beginnerFixture.questFailures = Infinity; });
     await id('wallet-fx-execute-submit').click();
     await id('quest-guide-retry').waitFor({ timeout: 8000 });
     assert.equal(await page.getByTestId('quest-guide-celebration').count(), 0, 'no celebration without proof');
     await contentFits('quest-guide-card');
     await page.screenshot({ path: path.join(out, 'unconfirmed.png') });
+    await page.evaluate(() => { window.beginnerFixture.questFailures = 0; });
     await id('quest-guide-retry').click();
     await id('quest-guide-celebration').waitFor();
     await waitForQuestCompletion('exchange');
@@ -634,7 +639,7 @@ async function run() {
     await switchTo('beginner');
     await tab('퀘스트').click();
     await id('quest-summary-progress').waitFor();
-    assert.equal(await text('quest-summary-progress'), '퀘스트 2/2 완료');
+    assert.equal(await text('quest-summary-progress'), '퀘스트 2/10 완료');
     // Unknown progress is shown as unknown at the narrowest, largest layout.
     await page.setViewportSize({ width: 320, height: 844 });
     await open('quest=error&fontScale=2&theme=dark');
@@ -661,6 +666,10 @@ async function run() {
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ results, flows, compactSteps, accountSwitching: 'pass', delayedFinancialIsolation: 'pass', explicitCreation: 'pass', errors }, null, 2));
     console.log(`beginner browser checks passed: ${results.length} layouts, ${flows.length} guided flows (spotlight geometry, real presses, celebration, smooth return, Reduced Motion, unconfirmed retry, exit/back/switch), FX summary for three modes, account isolation and explicit creation`);
   } finally {
+    if (process.env.FULL_QUEST_BROWSER === '1' && page) {
+      const debug = await page.evaluate(() => ({ posts: window.beginnerFixture?.posts, requests: window.beginnerFixture?.requests?.slice(-30), text: document.body.innerText.slice(-5000) })).catch(() => null);
+      fs.writeFileSync(path.join(out, 'full-quest-debug.json'), JSON.stringify({ debug, errors }, null, 2));
+    }
     await page?.screenshot({ path: path.join(out, 'last-screen.png') }).catch(() => {});
     await browser?.close(); server.close();
   }

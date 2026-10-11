@@ -348,6 +348,10 @@ function inlineTradingHarness() {
               ],
             },
           };
+        if (resource === 'quests') {
+          if (options.enabled !== false && !h.questProgress) throw new Error('Missing beginner quest fixture');
+          return { ...base, data: h.questProgress };
+        }
         throw new Error('Unexpected query ' + options.queryKey);
       },
     },

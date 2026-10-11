@@ -1,0 +1,101 @@
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"0bc76198-54a1-4750-a97c-5b963d1d1c77"}
+(node:1556776) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS Conditional same underlying: Spot SL fires on Spot only, Futures SL on Futures Last only; DB keeps evidence in its domain
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"985d6297-5229-487d-ae23-8169e03511f9"}
+PASS Conditional general/spot/long/stop_loss/market: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e7e7e532-aafb-4ac8-9fc4-c23561db62ef"}
+PASS Conditional general/spot/long/stop_loss/limit: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"866a5ed0-1b82-434a-8302-a90e4a4067e5"}
+PASS Conditional general/spot/long/take_profit/market: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"42cd666c-28b9-4950-b52c-b0530755adfe"}
+PASS Conditional general/spot/long/take_profit/limit: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"36cd9509-9ede-4735-a510-b38a359017a5"}
+PASS Conditional general/futures/long/stop_loss/market: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"b5e0acbb-0140-4ca1-b66b-f0b697c86fde"}
+PASS Conditional general/futures/long/stop_loss/limit: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"d09f1122-896d-44ba-86a3-f29f69f36ee1"}
+PASS Conditional general/futures/long/take_profit/market: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:08 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"976532aa-1d85-42bf-a6da-288de5ffa338"}
+PASS Conditional general/futures/long/take_profit/limit: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"2cac05d9-cbd5-4d70-86bd-4f7cd8a304c7"}
+PASS Conditional general/futures/short/stop_loss/market: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"e47d0e70-7cfb-4293-adbe-9e3182985ebe"}
+PASS Conditional general/futures/short/stop_loss/limit: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"763e26f2-7bc2-4bf7-9d6e-81ae5c580ddb"}
+PASS Conditional general/futures/short/take_profit/market: one fill, full exit, terminal replay
+[Nest] 1556776  - 10/11/2026, 1:28:07 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"33751bde-5b19-4349-8701-7ef6a482e687"}
+PASS Conditional general/futures/short/take_profit/limit: one fill, full exit, terminal replay
+PASS Conditional season/spot/long/stop_loss/market: one fill, full exit, terminal replay
+PASS Conditional season/spot/long/stop_loss/limit: one fill, full exit, terminal replay
+PASS Conditional season/spot/long/take_profit/market: one fill, full exit, terminal replay
+PASS Conditional season/spot/long/take_profit/limit: one fill, full exit, terminal replay
+PASS Conditional season/futures/long/stop_loss/market: one fill, full exit, terminal replay
+PASS Conditional season/futures/long/stop_loss/limit: one fill, full exit, terminal replay
+PASS Conditional season/futures/long/take_profit/market: one fill, full exit, terminal replay
+PASS Conditional season/futures/long/take_profit/limit: one fill, full exit, terminal replay
+PASS Conditional season/futures/short/stop_loss/market: one fill, full exit, terminal replay
+PASS Conditional season/futures/short/stop_loss/limit: one fill, full exit, terminal replay
+PASS Conditional season/futures/short/take_profit/market: one fill, full exit, terminal replay
+PASS Conditional season/futures/short/take_profit/limit: one fill, full exit, terminal replay
+PASS Conditional spot: OCO opposite replacement both ways, old leg re-arm, one reservation, no trigger fill count
+PASS Conditional spot: manual partial reduce re-arms remainder and manual close completes
+PASS Conditional futures: OCO opposite replacement both ways, old leg re-arm, one reservation, no trigger fill count
+PASS Conditional futures: manual partial reduce re-arms remainder and manual close completes
+PASS Conditional Futures Last-only trigger source (Spot/Mark ignored); stale/missing defer; disabled pauses; reduce-only exits; command replay
+PASS Conditional attached BINANCE parent fill: holding, replay, lifecycle, reservation, fill count
+PASS Conditional attached BINANCE parent cancel: holding, replay, lifecycle, reservation, fill count
+[Nest] 1556776  - 10/11/2026, 1:28:11 PM     LOG [LimitOrderCancelService] {"event":"limit_order_season_end_cleanup","canceledOrderCount":1}
+PASS Conditional attached BINANCE parent end: holding, replay, lifecycle, reservation, fill count
+PASS Conditional attached KRX parent fill: holding, replay, lifecycle, reservation, fill count
+PASS Conditional attached KRX parent cancel: holding, replay, lifecycle, reservation, fill count
+[Nest] 1556776  - 10/11/2026, 1:28:12 PM     LOG [LimitOrderCancelService] {"event":"limit_order_season_end_cleanup","canceledOrderCount":1}
+PASS Conditional attached KRX parent end: holding, replay, lifecycle, reservation, fill count
+PASS Conditional attached NAS parent fill: holding, replay, lifecycle, reservation, fill count
+PASS Conditional attached NAS parent cancel: holding, replay, lifecycle, reservation, fill count
+[Nest] 1556776  - 10/11/2026, 1:28:12 PM     LOG [LimitOrderCancelService] {"event":"limit_order_season_end_cleanup","canceledOrderCount":1}
+PASS Conditional attached NAS parent end: holding, replay, lifecycle, reservation, fill count
+PASS Conditional KRX stop_loss/market: canonical stock source and closed-session defer
+PASS Conditional KRX stop_loss/limit: canonical stock source and closed-session defer
+PASS Conditional KRX take_profit/market: canonical stock source and closed-session defer
+PASS Conditional KRX take_profit/limit: canonical stock source and closed-session defer
+PASS Conditional NAS stop_loss/market: canonical stock source and closed-session defer
+PASS Conditional NAS stop_loss/limit: canonical stock source and closed-session defer
+PASS Conditional NAS take_profit/market: canonical stock source and closed-session defer
+PASS Conditional NAS take_profit/limit: canonical stock source and closed-session defer
+PASS Conditional real PG conditional vs manual_close: single quantity settlement, fee/ledger uniqueness, no deadlock
+PASS Conditional real PG conditional vs manual_reduce: single quantity settlement, fee/ledger uniqueness, no deadlock
+PASS Conditional real PG conditional vs liquidation: single quantity settlement, fee/ledger uniqueness, no deadlock
+PASS Conditional real PG conditional vs season_end: single quantity settlement, fee/ledger uniqueness, no deadlock
+PASS Conditional real PG conditional vs duplicate: single quantity settlement, fee/ledger uniqueness, no deadlock
+PASS Conditional protectionChild.create: atomic rollback then one retry fill
+PASS Conditional futuresPosition.update: atomic rollback then one retry fill
+PASS Conditional futuresExecution.create: atomic rollback then one retry fill
+PASS Conditional walletTransaction.createMany: atomic rollback then one retry fill
+PASS Conditional protectionChild.update: atomic rollback then one retry fill
+PASS Conditional futuresExecuteRequest.create: atomic rollback then one retry fill
+PASS Conditional Spot child fill vs manual_close: one reservation owner and no oversell
+PASS Conditional Spot child fill vs manual_reduce: one reservation owner and no oversell
+PASS Conditional Spot child fill vs opposite: one reservation owner and no oversell
+PASS Conditional Spot child fill vs duplicate: one reservation owner and no oversell
+[Nest] 1556776  - 10/11/2026, 1:28:15 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"3e668790-f59f-4559-b935-3dfff3968c74"}
+[Nest] 1556776  - 10/11/2026, 1:28:15 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"96601325-a3b4-4959-a10b-e9fd8976b1af"}
+PASS Conditional create/cancel rollback, replay across disable, ownership and one-group conflicts
+PASS Conditional Cross long: bound Limit exit and conflicting increase blocked
+PASS Conditional Cross short: bound Limit exit and conflicting increase blocked
+[Nest] 1556776  - 10/11/2026, 1:28:16 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"9489e08b-718b-47b2-9dee-9439e39bf0cf"}
+PASS Conditional general: future receipt, other instrument, Spot and Mark never trigger Futures
+PASS Conditional season: future receipt, other instrument, Spot and Mark never trigger Futures
+PASS Conditional ERS partial Market exits retain OCO until actual remainder reaches flat
+PASS Conditional KRX manual fractional reduce -> whole remaining protected Limit; normal Limit still integer-only
+PASS Conditional NAS manual fractional reduce -> whole remaining protected Limit; normal Limit still integer-only
+PASS Conditional spot stop_loss Market fill completes OCO; armed increase extends whole-position protection
+PASS Conditional spot take_profit Market fill completes OCO; armed increase extends whole-position protection
+PASS Conditional futures stop_loss Market fill completes OCO; armed increase extends whole-position protection
+PASS Conditional futures take_profit Market fill completes OCO; armed increase extends whole-position protection
+PASS Conditional Spot Market cash/position/ledger/count rollback and same-command retry
+PASS Conditional Spot attached parent reservation rollback and same-command retry
+[Nest] 1556776  - 10/11/2026, 1:28:20 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"bbbea702-5076-4c28-822f-eedb6743ff5f"}
+PASS Conditional general inactive lifecycle cancels child once, releases reservation and preserves accurate reason without fill
+PASS Conditional season inactive lifecycle cancels child once, releases reservation and preserves accurate reason without fill
+Conditional PostgreSQL PASS 82 checks

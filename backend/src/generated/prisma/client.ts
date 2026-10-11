@@ -180,6 +180,11 @@ export type Position = Prisma.PositionModel
  */
 export type Order = Prisma.OrderModel
 /**
+ * Model BeginnerQuestAcknowledgement
+ * 
+ */
+export type BeginnerQuestAcknowledgement = Prisma.BeginnerQuestAcknowledgementModel
+/**
  * Model CashWallet
  * 
  */

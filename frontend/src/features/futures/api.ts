@@ -109,6 +109,9 @@ export type FuturesInstruments = {
   instruments: FuturesInstrument[];
 };
 export type FuturesExecution = {
+  positionId: string;
+  leverage: number;
+  positionAfter: { quantity: string; averageEntryPrice: string; isolatedMargin: string };
   id: string;
   operation: Operation;
   direction: Direction;

@@ -1,3 +1,4 @@
+import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'node:crypto';
@@ -140,6 +141,8 @@ export class TradingAccountWalletTransferService {
           );
         if (isStandaloneAccountMode(lockedAccount.mode))
           await this.performance.assertGeneralAccountReady(lockedAccount, tx);
+
+        await assertBeginnerLearningAccess(tx, lockedAccount, 'transfer');
 
         // ID order prevents opposite-direction transfers from forming a wallet lock cycle.
         // The account predicate excludes foreign rows before any lock or mutation.

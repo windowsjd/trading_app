@@ -1,3 +1,4 @@
+import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { buildPagination } from '../common/pagination';
 import { Injectable } from '@nestjs/common';
@@ -165,6 +166,7 @@ export class FuturesLimitService {
       assertFuturesOperation('open');
       const now = await this.futures.dbNow(tx);
       await this.futures.assertTradable(locked, now, tx);
+      await assertBeginnerLearningAccess(tx, locked, 'allTrading');
       const instrument = await this.futures.instrument(
         tx,
         request.instrumentId,

@@ -1,0 +1,10 @@
+import {EventEmitter} from 'node:events';
+import {AssetTickerGateway} from '/home/nayuta/projects/trading-app/backend/src/realtime/asset-ticker.gateway';
+let reads=0;const flood=process.argv[2]==='flood';
+const assets={getAssetPriceForTicker:async()=>{reads++;if(!flood)throw new Error('AUDIT_DB_UNAVAILABLE');return new Promise(()=>{});}};
+const gateway=new AssetTickerGateway({user:{findUnique:async()=>({status:'active'})}} as any,{verifyAsync:async()=>({sub:'audit-user'})} as any,{get:()=> 'test-secret'} as any,assets as any,{} as any,{} as any);
+const socket=Object.assign(new EventEmitter(),{readyState:1,bufferedAmount:0,send(){},close(){}});
+(async()=>{await gateway.handleConnection(socket as any,{url:'/',headers:{authorization:'Bearer test'}} as any);
+ for(let i=0;i<(flood?100:1);i++)socket.emit('message',Buffer.from(JSON.stringify({type:'subscribe',channel:'asset_ticker',assetId:'same-asset'})));
+ if(flood)console.log(JSON.stringify({requests:100,concurrentSnapshotSelections:reads,sameAsset:true}));else setTimeout(()=>console.log('unexpected process survival'),100);
+})();

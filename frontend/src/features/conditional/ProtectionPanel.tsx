@@ -1,3 +1,8 @@
+import { useLearningAccess } from '../quest/useLearningAccess';
+import { useQuestGuide } from '../quest/QuestGuideProvider';
+import { useTradingGuideFacts } from '../quest/useTradingGuideFacts';
+import { captureQuestGuideCommand } from '../quest/questGuideBridge';
+import QuestTarget from '../quest/QuestTarget';
 import AdminDiagnosticPanel from "../../components/states/AdminDiagnosticPanel";
 import React, { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "../../theme/native";
@@ -60,6 +65,8 @@ export function BoundProtectionPanel({
   collapsible = false,
 }: Props) {
   const { selectedAccountId } = useTradingAccount();
+  const learning = useLearningAccess(accountId).gate(domain === 'spot' ? 'spotProtection' : 'allTrading');
+  const guide = useQuestGuide();
   const focused = useIsFocused(),
     client = useQueryClient();
   const bound = selectedAccountId === accountId;
@@ -80,6 +87,7 @@ export function BoundProtectionPanel({
     };
   }, []);
   const action = useRef<{
+    reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
     epoch: number;
     session: number;
     key: string;
@@ -123,6 +131,7 @@ export function BoundProtectionPanel({
   const submit = async (groupId?: string) => {
     if (!bound || lock.current) return;
     const canceling = uncertain ? Boolean(action.current?.groupId) : Boolean(groupId);
+    if (!canceling && !uncertain && !learning.allowed) { learning.guard(() => undefined); return; }
     if (!(canceling ? permissions.current.cancel : permissions.current.create)) return;
     if (!uncertain) {
       if (
@@ -136,6 +145,7 @@ export function BoundProtectionPanel({
       }
       const idempotencyKey = createIdempotencyKey("protection");
       action.current = {
+        reportQuestCommand: captureQuestGuideCommand(),
         epoch: scope.current.epoch,
         session: getSessionGeneration(),
         key: idempotencyKey,
@@ -170,6 +180,7 @@ export function BoundProtectionPanel({
         });
       }
       if (validScope(request)) {
+        if (request.body && domain === 'spot') request.reportQuestCommand({ kind: 'protection', accountId, assetId, bothLegs: request.body.legs.length === 2, summary: 'TP와 SL 보호 주문이 등록됐어요.' });
         setDraft(emptyProtection());
         setUncertain(false);
         action.current = null;
@@ -197,6 +208,7 @@ export function BoundProtectionPanel({
       if (validScope(request)) setBusy(false);
     }
   };
+  useTradingGuideFacts({ screen: 'protection', accountId, assetId, protectionEditing: expanded, tpSlReady: draftLegs(draft).length === 2 && !protectionInputError(draft), pending: busy, blocked: !canCreate }, focused && guide?.active?.quest === 'protection' && guide.active.assetId === assetId);
   if (!bound) return null;
   if (query.isPending)
     return <Text style={styles.hint}>익절·손절 상태 확인 중…</Text>;
@@ -210,7 +222,7 @@ export function BoundProtectionPanel({
     );
   if (!data) return null;
   return (
-    <View style={styles.card} testID="protection-panel">
+    <QuestTarget id="protection-editor"><View style={styles.card} testID="protection-panel">
       <Text style={styles.heading}>
         익절·손절 보호
         {(active?.currencyCode ?? currency)
@@ -291,11 +303,12 @@ export function BoundProtectionPanel({
             onInputFocus={onInputFocus}
             onInputBlur={onInputBlur}
           />
-          <CTAButton
+          <QuestTarget id="protection-submit"><CTAButton
+            learningHint={learning.locked ? learning.message : null}
             label="보호 조건 등록"
             state={busy || uncertain ? "disabled" : "enabled"}
             onPress={() => void submit()}
-          />
+          /></QuestTarget>
         </>
       ) : (
         <Text style={styles.hint}>
@@ -359,7 +372,7 @@ export function BoundProtectionPanel({
           ))
         : null}
       </> : null}
-    </View>
+    </View></QuestTarget>
   );
 }
 const styles = StyleSheet.create({

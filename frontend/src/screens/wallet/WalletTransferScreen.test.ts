@@ -64,7 +64,7 @@ for (const account of ['A', 'B']) test(`${account}: compact USD form executes di
   assert.equal(h.requests[0].body.sourceWalletId, `${account}:securities`);
   assert.equal(h.requests[0].body.destinationWalletId, `${account}:crypto_spot`);
   assert.equal(h.requests[0].body.amount, '500.00000000');
-  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.walletsAll(account)]);
+  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.quests(account), QUERY_KEYS.tradingAccount.walletsAll(account)]);
   assert.match(text(h), /보낸 금액|보내는 지갑 잔액|받는 지갑 잔액|다른 이체하기/);
   assert.doesNotMatch(text(h), /crypto_spot|crypto_futures|securities/);
 });
@@ -91,7 +91,7 @@ for (const source of wallets) for (const destination of wallets.filter(value => 
   if (destination !== defaultDestination) await h.choose('destination', destination);
   await h.amount('20'); await h.press('wallet-transfer-submit'); assert.ok(h.node('wallet-transfer-success'));
   assert.equal(h.requests[0].body.sourceWalletId, 'A:' + source); assert.equal(h.requests[0].body.destinationWalletId, 'A:' + destination);
-  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.walletsAll('A'), ...(source === 'crypto_futures' || destination === 'crypto_futures' ? [QUERY_KEYS.tradingAccount.futuresCollateral('A')] : [])]);
+  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.quests('A'), QUERY_KEYS.tradingAccount.walletsAll('A'), ...(source === 'crypto_futures' || destination === 'crypto_futures' ? [QUERY_KEYS.tradingAccount.futuresCollateral('A')] : [])]);
 });
 
 for (const switches of [['B'], ['B', 'A']]) for (const failure of [false, true]) test(`late A ${failure ? 'failure' : 'success'} after ${switches.join('→')} cannot affect current form`, async t => {
@@ -100,7 +100,7 @@ for (const switches of [['B'], ['B', 'A']]) for (const failure of [false, true])
   for (const account of switches) await h.switchAccount(account);
   if (failure) h.gate.reject(new Error('network')); else h.gate.resolve(); await h.flush();
   assert.equal(h.node('wallet-transfer-success') === undefined, true); assert.equal(h.node('wallet-transfer-error') === undefined, true);
-  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.walletsAll('A')]);
+  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.quests('A'), QUERY_KEYS.tradingAccount.walletsAll('A')]);
   assert.equal(h.requests.length, 1); assert.equal(h.requests[0].path, '/trading-accounts/A/wallet-transfers');
   assert.equal(h.node('wallet-transfer-amount').props.value, '');
 });
@@ -259,7 +259,7 @@ test('late wallet A read cannot populate B while B is loading', async t => {
   await h.start(); t.after(h.close); await h.switchAccount('B');
   h.walletGate.A.resolve(); await h.flush(); assert.equal(h.node('wallet-transfer-submit') === undefined, true);
   h.walletGate.B.resolve(); await h.flush(); await h.amount('1'); await h.press('wallet-transfer-submit');
-  assert.equal(h.requests[0].body.sourceWalletId, 'B:securities'); assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.walletsAll('B')]);
+  assert.equal(h.requests[0].body.sourceWalletId, 'B:securities'); assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.quests('B'), QUERY_KEYS.tradingAccount.walletsAll('B')]);
 });
 
 test('unverifiable response retries with the original key and never shows a false receipt', async t => {

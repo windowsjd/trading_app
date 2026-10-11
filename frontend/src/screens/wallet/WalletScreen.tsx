@@ -1,3 +1,5 @@
+import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import LearningLock from '../../features/quest/LearningLock';
 import { portfolioReadPolicy } from '../../features/tradingAccount/portfolioReadPolicy';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { revealInScrollView } from '../../hooks/useFocusedInputScroll';
@@ -63,6 +65,7 @@ type AccountWalletProps = {
 function AccountWallet({ account, capabilities, navigation }: AccountWalletProps) {
   const accountId = account.id;
   const guide = useQuestGuide();
+  const transferGate = useLearningAccess(accountId).gate('transfer');
   const rootNavigation = useRootNavigation();
   const [trendExpanded, setTrendExpanded] = useState(false);
   const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
@@ -110,7 +113,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-transfer'),
-      onPress: () => navigation.navigate('WalletTransfer'),
+      onPress: () => transferGate.guard(() => navigation.navigate('WalletTransfer')),
     },
     {
       testID: 'wallet-exchange',
@@ -198,8 +201,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             <ActionPressable
               testID={action.testID}
               accessibilityRole="button"
-              accessibilityLabel={action.label}
-              accessibilityState={{ disabled: action.disabled }}
+              accessibilityLabel={action.testID === 'wallet-transfer' && transferGate.locked ? `${action.label}, 학습 제한. ${transferGate.message}` : action.label}
+              accessibilityState={{ disabled: action.disabled || action.testID === 'wallet-transfer' && transferGate.locked }}
               disabled={action.disabled}
               style={styles.quickActionTarget}
               feedbackStyle={[styles.quickAction, styles.quickActionFeedback]}
@@ -208,14 +211,14 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
               <View ref={action.questTarget} collapsable={false} testID={`${action.testID}-guide-target`} style={styles.quickActionGroup}>
                 <View
                   testID={`${action.testID}-surface`}
-                  style={[styles.quickAction, action.disabled && styles.quickActionDisabled]}
+                  style={[styles.quickAction, (action.disabled || action.testID === 'wallet-transfer' && transferGate.locked) && styles.quickActionDisabled]}
                   accessible={false}
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                   aria-hidden
                   pointerEvents="none"
                 >
-                  <PrimaryButtonBackground shape={{ borderRadius: styles.quickAction.borderRadius }} />
+                  {!(action.testID === 'wallet-transfer' && transferGate.locked) ? <PrimaryButtonBackground shape={{ borderRadius: styles.quickAction.borderRadius }} /> : null}
                   <QuestTargetHighlight active={!action.disabled && guide?.highlightedTarget === action.testID} radius={styles.quickAction.borderRadius} />
                   <Svg
                     style={styles.quickActionIcon}
@@ -223,7 +226,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                     height={24}
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke={primaryGradient.foreground}
+                    stroke={action.testID === 'wallet-transfer' && transferGate.locked ? semantic.secondary : primaryGradient.foreground}
                     strokeWidth={2}
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -232,6 +235,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                   >
                     <Path d={action.iconPath} />
                   </Svg>
+                  {action.testID === 'wallet-transfer' && transferGate.locked ? <View style={{ position: 'absolute', right: 3, bottom: 3 }}><LearningLock /></View> : null}
                 </View>
                 <Text
                   testID={`${action.testID}-label`}
@@ -239,7 +243,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                   accessibilityElementsHidden
                   importantForAccessibility="no-hide-descendants"
                   aria-hidden
-                  style={[styles.quickActionLabel, action.disabled && styles.quickActionDisabled]}
+                  style={[styles.quickActionLabel, (action.disabled || action.testID === 'wallet-transfer' && transferGate.locked) && styles.quickActionDisabled]}
                 >
                   {action.label}
                 </Text>

@@ -1,3 +1,4 @@
+import { questProgress } from '../../../test/questFixtures.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -11,8 +12,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 test('completed cards preserve status and description, expose a centered static replay icon and hide chips/timestamps', async t => {
   const at = '2026-10-10T01:00:00.000Z';
-  const progress = { exchange: { completed: true, completedAt: at, status: 'completed' },
-    transfer: { completed: true, completedAt: '2026-10-10T01:05:00.000Z', status: 'completed' } };
+  const progress = questProgress(2);
   const starts: string[] = [];
   const List = load(resolve('src/screens/quest/BeginnerQuestList.tsx'), {
     'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (x: unknown) => x } },

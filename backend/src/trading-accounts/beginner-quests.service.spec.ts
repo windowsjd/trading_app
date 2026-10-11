@@ -60,7 +60,9 @@ function setup(input: {
   legs?: Leg[];
   integrityError?: Error;
 }) {
-  const prisma = {
+  const rows = {
+    beginnerQuestAcknowledgement: { findMany: jest.fn().mockResolvedValue([]) },
+    order: { findFirst: jest.fn().mockResolvedValue(null) },
     exchangeTransaction: {
       findMany: jest.fn().mockResolvedValue(input.exchanges ?? []),
     },
@@ -78,6 +80,12 @@ function setup(input: {
         ),
       ),
     },
+  };
+  const prisma = {
+    ...rows,
+    $transaction: jest.fn(async (fn: (tx: typeof rows) => Promise<unknown>) =>
+      fn(rows),
+    ),
   };
   const account = {
     id: ACCOUNT,
@@ -123,9 +131,25 @@ describe('BeginnerQuestsService', () => {
     expect(access.getOwnedAccountOrThrow).toHaveBeenCalledWith(
       'user-1',
       ACCOUNT,
+      expect.any(Object),
     );
     expect(performance.assertGeneralAccountReady).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({
+    expect(result.data.quests.length).toBe(10);
+    expect(result.data.learningAccess).toEqual({
+      exchange: true,
+      transfer: false,
+      cryptoMarketBuy: false,
+      spotProtection: false,
+      cryptoLimitBuy: false,
+      allTrading: false,
+    });
+    expect({
+      ...result,
+      data: {
+        tradingAccountId: result.data.tradingAccountId,
+        quests: result.data.quests.slice(0, 2),
+      },
+    }).toEqual({
       success: true,
       data: {
         tradingAccountId: ACCOUNT,
@@ -285,10 +309,9 @@ describe('BeginnerQuestsService', () => {
     const quests = (await service.getQuestProgress('user-1', ACCOUNT)).data
       .quests;
 
-    expect(quests.map((quest) => quest.status)).toEqual([
-      'not_started',
-      'not_started',
-    ]);
+    expect(quests.map((quest) => quest.status)).toEqual(
+      Array(10).fill('not_started'),
+    );
     expect(prisma.walletTransfer.findMany).not.toHaveBeenCalled();
   });
 
@@ -317,10 +340,9 @@ describe('BeginnerQuestsService', () => {
     });
     const quests = (await service.getQuestProgress('user-1', ACCOUNT)).data
       .quests;
-    expect(quests.map((quest) => quest.status)).toEqual([
-      'not_started',
-      'not_started',
-    ]);
+    expect(quests.map((quest) => quest.status)).toEqual(
+      Array(10).fill('not_started'),
+    );
     expect(
       quests.every((quest) => quest.steps.every((step) => !step.completed)),
     ).toBe(true);

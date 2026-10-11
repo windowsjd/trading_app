@@ -18,9 +18,16 @@
  * function-call screen harnesses can load it unchanged.
  */
 
-export type QuestGuideScreen = 'wallet' | 'fx' | 'transfer';
+export type TradeGuideScreen = 'market' | 'asset' | 'order' | 'futures' | 'holdings' | 'protection' | 'limitReview';
+export type QuestGuideScreen = 'wallet' | 'fx' | 'transfer' | TradeGuideScreen;
 
 export type QuestGuideTargetId =
+  | 'market-viewport' | 'market-tabs' | 'market-assets'
+  | 'asset-viewport' | 'asset-price' | 'asset-buy' | 'asset-sell' | 'asset-holdings' | 'asset-protection'
+  | 'protection-editor' | 'protection-submit' | 'limit-review'
+  | 'order-viewport' | 'order-type' | 'order-input' | 'order-preview' | 'order-submit'
+  | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
+  | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
   | 'wallet-viewport'
   | 'wallet-exchange'
   | 'wallet-transfer'
@@ -89,13 +96,24 @@ export type TransferGuideFacts = {
   succeeded: boolean;
 };
 
-export type QuestGuideFacts = WalletGuideFacts | FxGuideFacts | TransferGuideFacts;
+export type TradeGuideFacts = { [S in TradeGuideScreen]: {
+  screen: S; accountId: string; assetId?: string; assetType?: string;
+  side?: string; orderType?: string; amountValid?: boolean; canExecute?: boolean;
+  pending?: boolean; blocked?: boolean; holdingsVisible?: boolean;
+  protectionEditing?: boolean; tpSlReady?: boolean; orderResolved?: boolean;
+  direction?: string; leverage?: number; marginMode?: string; positionId?: string;
+  positionDirection?: string;
+} }[TradeGuideScreen];
+export type QuestGuideFacts = WalletGuideFacts | FxGuideFacts | TransferGuideFacts | TradeGuideFacts;
 type FactsFor<S extends QuestGuideScreen> = Extract<QuestGuideFacts, { screen: S }>;
 
 /** A command the screen already committed; `summary` is display copy only. */
 export type QuestGuideCommand =
   | { kind: 'fx'; accountId: string; fromCurrency: string; toCurrency: string; summary: string }
-  | { kind: 'transfer'; accountId: string; source: string; destination: string; currency: string; summary: string };
+  | { kind: 'transfer'; accountId: string; source: string; destination: string; currency: string; summary: string }
+  | { kind: 'spot'; accountId: string; orderId: string; assetId: string; assetType: string; side: string; orderType: string; summary: string }
+  | { kind: 'protection'; accountId: string; assetId: string; bothLegs: boolean; summary: string }
+  | { kind: 'futures'; accountId: string; positionId: string; direction: string; operation: string; leverage: number; quantityAfter: string; summary: string };
 
 type Listener = () => void;
 

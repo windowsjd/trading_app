@@ -233,3 +233,12 @@ test('FX respects server display validity, unknown validity, unavailable data an
     );
   }
 });
+
+test('sell preview subtracts the same decimal fee from proceeds without changing buy estimates', () => {
+  const input = {quantity:'1.234567',price:'100.12',feeRate:'0.001'};
+  const buy=orderPreview(input)!,sell=orderPreview({...input,side:'sell'})!;
+  assert.equal(sell.grossAmount,buy.grossAmount);
+  assert.equal(sell.feeAmount,buy.feeAmount);
+  assert.equal(sell.totalAmount,'123.48124319');
+  assert.equal(buy.totalAmount,'123.72845289');
+});

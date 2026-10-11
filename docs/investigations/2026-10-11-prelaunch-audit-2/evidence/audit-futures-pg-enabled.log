@@ -1,0 +1,109 @@
+
+> trading-app@0.0.1 test
+> jest --runInBand futures-risk.integration.spec futures-f3.integration.spec futures-price-safety.integration.spec
+
+FAIL src/futures/futures-risk.integration.spec.ts
+  ● Futures F2 actual PostgreSQL financial integration › proves risk, atomic liquidation, bankruptcy, transfers, lifecycle, races and rollback
+
+    [Nest] 1563691  - 10/11/2026, 1:39:51 PM     LOG [GeneralAccountsService] {"event":"general_account_opened","tradingAccountId":"872532d6-8c9c-4b8d-a949-3eb3f51c8144"}
+    PrismaClientKnownRequestError: 
+    Invalid `db.asset.create()` invocation in
+    /home/nayuta/projects/trading-app/backend/scripts/futures-integration.ts:226:32
+
+      223   });
+      224   return { asset, instrument };
+      225 }
+    → 226 const asset = await db.asset.create(
+    Unique constraint failed on the fields: (`market`, `symbol`)
+
+      224 |     return { asset, instrument };
+      225 |   }
+    > 226 |   const asset = await db.asset.create({
+          |                 ^
+      227 |     data: {
+      228 |       symbol,
+      229 |       name: 'F1 fixture',
+
+      at Gr.handleRequestError (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+      at Gr.handleAndLogRequestError (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+      at Gr.request (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+      at async a (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+      at async newInstrument (../scripts/futures-integration.ts:226:17)
+      at async fixture (../scripts/futures-integration.ts:184:48)
+      at async setup (../scripts/futures-risk-integration.ts:88:13)
+      at async diagnosticSafety (../scripts/futures-risk-integration.ts:1363:13)
+      at async main (../scripts/futures-risk-integration.ts:1420:3) {
+        code: 'P2002',
+        meta: {
+          modelName: 'Asset',
+          driverAdapterError: DriverAdapterError: UniqueConstraintViolation
+      at PrismaPgAdapter.onError (../node_modules/.pnpm/@prisma+adapter-pg@7.6.0/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+      at PrismaPgAdapter.performIO (../node_modules/.pnpm/@prisma+adapter-pg@7.6.0/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+      at async PrismaPgAdapter.queryRaw (../node_modules/.pnpm/@prisma+adapter-pg@7.6.0/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+      at async e.interpretNode (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+      at async e.interpretNode (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:213:41)
+      at async e.interpretNode (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+      at async e.run (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+      at async e.execute (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+      at async jt.request (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:498:22) {
+            cause: [Object]
+          }
+        },
+        clientVersion: '7.6.0'
+      }
+      at Object.<anonymous> (futures/futures-risk.integration.spec.ts:17:38)
+
+FAIL src/futures/futures-f3.integration.spec.ts
+  ● Futures F3 actual PostgreSQL integration › proves valuation, performance, final settlement, retries, collateral boundaries and races
+
+    PrismaClientKnownRequestError: 
+    Invalid `db.asset.create()` invocation in
+    /home/nayuta/projects/trading-app/backend/scripts/futures-integration.ts:226:32
+
+      223   });
+      224   return { asset, instrument };
+      225 }
+    → 226 const asset = await db.asset.create(
+    Unique constraint failed on the fields: (`market`, `symbol`)
+
+      224 |     return { asset, instrument };
+      225 |   }
+    > 226 |   const asset = await db.asset.create({
+          |                 ^
+      227 |     data: {
+      228 |       symbol,
+      229 |       name: 'F1 fixture',
+
+      at Gr.handleRequestError (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+      at Gr.handleAndLogRequestError (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+      at Gr.request (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+      at async a (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+      at async newInstrument (../scripts/futures-integration.ts:226:17)
+      at async fixture (../scripts/futures-integration.ts:184:48)
+      at async legacySpotPinRetry (../scripts/futures-f3-integration.ts:1080:13)
+      at async main (../scripts/futures-f3-integration.ts:1157:3) {
+        code: 'P2002',
+        meta: {
+          modelName: 'Asset',
+          driverAdapterError: DriverAdapterError: UniqueConstraintViolation
+      at PrismaPgAdapter.onError (../node_modules/.pnpm/@prisma+adapter-pg@7.6.0/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+      at PrismaPgAdapter.performIO (../node_modules/.pnpm/@prisma+adapter-pg@7.6.0/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+      at async PrismaPgAdapter.queryRaw (../node_modules/.pnpm/@prisma+adapter-pg@7.6.0/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+      at async e.interpretNode (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+      at async e.interpretNode (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:213:41)
+      at async e.interpretNode (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+      at async e.run (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+      at async e.execute (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+      at async jt.request (../node_modules/.pnpm/@prisma+client@7.6.0_prisma@7.6.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__r_889fd3be5ec8852f6f4d66c586359f50/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:498:22) {
+            cause: [Object]
+          }
+        },
+        clientVersion: '7.6.0'
+      }
+      at Object.<anonymous> (futures/futures-f3.integration.spec.ts:17:38)
+
+Test Suites: 2 failed, 1 passed, 3 total
+Tests:       2 failed, 1 passed, 3 total
+Snapshots:   0 total
+Time:        17.405 s, estimated 53 s
+Ran all test suites matching futures-risk.integration.spec|futures-f3.integration.spec|futures-price-safety.integration.spec.

@@ -1,108 +1,100 @@
-/**
- * Beginner quest progress contract (GET /trading-accounts/:accountId/quests).
- *
- * QUEST 01 (환전하기) and QUEST 02 (이체하기) are separate quests with one
- * practice step each. The server derives both from the account's committed FX
- * and wallet-transfer rows; this client never marks a quest done by itself.
- * A payload that does not prove itself — other account, unknown shape, counts
- * or status that disagree with the step, a transfer without an earlier FX — is
- * rejected, so nothing is ever shown as complete without server evidence.
- */
-
+/** Backend financial evidence and separate learning acknowledgements. */
 export const QUEST_EXCHANGE_ID = 'common-01-exchange';
 export const QUEST_TRANSFER_ID = 'common-02-transfer';
 export const QUEST_FX_STEP = 'fx_krw_to_usd';
 export const QUEST_TRANSFER_STEP = 'transfer_securities_usd_to_crypto_spot_usd';
 
-export type BeginnerQuestKey = 'exchange' | 'transfer';
-export type BeginnerQuestStatus = 'not_started' | 'completed';
-
-export interface BeginnerQuestStepDto {
-  stepId: string;
-  completed: boolean;
-  completedAt: string | null;
-  referenceId: string | null;
-}
-
+export const QUEST_DEFINITIONS = {
+  exchange: { questId: QUEST_EXCHANGE_ID, steps: [QUEST_FX_STEP] },
+  transfer: { questId: QUEST_TRANSFER_ID, steps: [QUEST_TRANSFER_STEP] },
+  marketBuy: { questId: 'common-03-market-buy', steps: ['market_buy_filled', 'holdings_reviewed'] },
+  protection: { questId: 'common-04-protection', steps: ['tp_sl_registered'] },
+  marketSell: { questId: 'common-05-market-sell', steps: ['market_sell_filled'] },
+  limitBuy: { questId: 'common-06-limit-buy', steps: ['limit_buy_registered', 'limit_result_reviewed'] },
+  krStock: { questId: 'market-kr-stock', steps: ['kr_stock_buy_filled'] },
+  usStock: { questId: 'market-us-stock', steps: ['us_stock_buy_filled'] },
+  futuresLong: { questId: 'market-futures-long', steps: ['long_opened', 'long_closed'] },
+  futuresShort: { questId: 'market-futures-short', steps: ['short_opened', 'short_closed'] },
+} as const;
+export type BeginnerQuestKey = keyof typeof QUEST_DEFINITIONS;
+export type BeginnerQuestStatus = 'not_started' | 'in_progress' | 'completed';
+export const BEGINNER_QUEST_KEYS = Object.keys(QUEST_DEFINITIONS) as BeginnerQuestKey[];
+export const FOUNDATION_KEYS = BEGINNER_QUEST_KEYS.slice(0, 6);
+export type LearningAction = 'exchange' | 'transfer' | 'cryptoMarketBuy' | 'spotProtection' | 'cryptoLimitBuy' | 'allTrading';
+export type LearningAccess = Record<LearningAction, boolean>;
+export interface BeginnerQuestStepDto { stepId: string; completed: boolean; completedAt: string | null; referenceId: string | null }
 export interface BeginnerQuestProgressDto {
-  questId: string;
-  status: BeginnerQuestStatus;
-  completedStepCount: number;
-  totalStepCount: number;
-  steps: BeginnerQuestStepDto[];
+  questId: string; status: BeginnerQuestStatus; completedStepCount: number; totalStepCount: number; steps: BeginnerQuestStepDto[];
 }
-
 export interface BeginnerQuestsDto {
-  tradingAccountId: string;
-  quests: BeginnerQuestProgressDto[];
+  practice: { spotAssetId: string | null; limitAssetId: string | null; longPositionId: string | null; shortPositionId: string | null };
+  tradingAccountId: string; quests: BeginnerQuestProgressDto[];
+  learningAccess: LearningAccess;
+  operations: { limitOrdersEnabled: boolean; conditionalOrdersEnabled: boolean; futuresTradingMode: 'ENABLED' | 'REDUCE_ONLY' | 'DISABLED' };
 }
-
-/** One quest as the screens consume it: only server-proven facts. */
 export interface BeginnerQuestProgress {
-  status: BeginnerQuestStatus;
-  completed: boolean;
-  completedAt: string | null;
+  status: BeginnerQuestStatus; completed: boolean; completedAt: string | null; steps: BeginnerQuestStepDto[];
 }
-
-export interface BeginnerQuests {
-  exchange: BeginnerQuestProgress;
-  transfer: BeginnerQuestProgress;
-}
-
-export const BEGINNER_QUEST_KEYS: readonly BeginnerQuestKey[] = ['exchange', 'transfer'];
-
-const DEFINITIONS: Record<BeginnerQuestKey, { questId: string; stepId: string }> = {
-  exchange: { questId: QUEST_EXCHANGE_ID, stepId: QUEST_FX_STEP },
-  transfer: { questId: QUEST_TRANSFER_ID, stepId: QUEST_TRANSFER_STEP },
+export type BeginnerQuests = Record<BeginnerQuestKey, BeginnerQuestProgress> & {
+  practice: BeginnerQuestsDto['practice'];
+  learningAccess: LearningAccess; operations: BeginnerQuestsDto['operations'];
 };
-
 export class BeginnerQuestContractError extends Error {
-  constructor() {
-    super('퀘스트 진행 상황을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.');
-    this.name = 'BeginnerQuestContractError';
-  }
+  constructor() { super('퀘스트 진행 상황을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.'); this.name = 'BeginnerQuestContractError'; }
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-const isInstant = (value: unknown): value is string =>
-  typeof value === 'string' && value.endsWith('Z') && Number.isFinite(Date.parse(value));
-
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+const isInstant = (value: unknown): value is string => typeof value === 'string' && value.endsWith('Z') && Number.isFinite(Date.parse(value));
 function parseQuest(quests: unknown[], key: BeginnerQuestKey): BeginnerQuestProgress {
-  const { questId, stepId } = DEFINITIONS[key];
-  // Exactly one entry per known quest; a duplicate is ambiguous, not a choice.
-  const matches = quests.filter(item => isRecord(item) && item.questId === questId);
+  const definition = QUEST_DEFINITIONS[key];
+  const matches = quests.filter(item => isRecord(item) && item.questId === definition.questId);
   const quest = matches.length === 1 ? matches[0] : null;
-  if (!isRecord(quest) || !Array.isArray(quest.steps) || quest.steps.length !== 1 || quest.totalStepCount !== 1) {
-    throw new BeginnerQuestContractError();
-  }
-  const step: unknown = quest.steps[0];
-  if (!isRecord(step) || step.stepId !== stepId || typeof step.completed !== 'boolean') {
-    throw new BeginnerQuestContractError();
-  }
-  const proven = step.completed
-    ? isInstant(step.completedAt) && typeof step.referenceId === 'string' && step.referenceId.length > 0
-    : step.completedAt === null && step.referenceId === null;
-  const status: BeginnerQuestStatus = step.completed ? 'completed' : 'not_started';
-  if (!proven || quest.completedStepCount !== Number(step.completed) || quest.status !== status) {
-    throw new BeginnerQuestContractError();
-  }
-  return { status, completed: step.completed, completedAt: step.completed ? step.completedAt as string : null };
+  if (!isRecord(quest) || !Array.isArray(quest.steps) || quest.steps.length !== definition.steps.length || quest.totalStepCount !== definition.steps.length) throw new BeginnerQuestContractError();
+  let previousAt: string | null = null;
+  let missing = false;
+  const steps = quest.steps.map((step: unknown, index): BeginnerQuestStepDto => {
+    if (!isRecord(step) || step.stepId !== definition.steps[index] || typeof step.completed !== 'boolean') throw new BeginnerQuestContractError();
+    if (step.completed) {
+      if (missing || !isInstant(step.completedAt) || typeof step.referenceId !== 'string' || !step.referenceId
+        || (previousAt && Date.parse(step.completedAt) <= Date.parse(previousAt))) throw new BeginnerQuestContractError();
+      previousAt = step.completedAt;
+    } else {
+      if (step.completedAt !== null || step.referenceId !== null) throw new BeginnerQuestContractError();
+      missing = true;
+    }
+    return step as unknown as BeginnerQuestStepDto;
+  });
+  const count = steps.filter(step => step.completed).length;
+  const status = count === steps.length ? 'completed' : count ? 'in_progress' : 'not_started';
+  if (quest.status !== status || quest.completedStepCount !== count) throw new BeginnerQuestContractError();
+  if ((key === 'marketBuy' || key === 'limitBuy') && count === 2 && steps[0].referenceId !== steps[1].referenceId) throw new BeginnerQuestContractError();
+  return { status, completed: status === 'completed', completedAt: status === 'completed' ? previousAt : null, steps };
 }
 
-/** Throws unless the payload is both quests' progress for exactly `accountId`. */
+export function canStartQuest(key: BeginnerQuestKey, progress: BeginnerQuests): boolean {
+  if (progress[key].completed || key === 'exchange') return true;
+  const index = FOUNDATION_KEYS.indexOf(key);
+  return progress[index < 0 ? 'limitBuy' : FOUNDATION_KEYS[index - 1]].completed;
+}
+
 export function parseBeginnerQuests(payload: unknown, accountId: string): BeginnerQuests {
-  if (!accountId || !isRecord(payload) || payload.tradingAccountId !== accountId || !Array.isArray(payload.quests)) {
-    throw new BeginnerQuestContractError();
+  if (!accountId || !isRecord(payload) || payload.tradingAccountId !== accountId || !Array.isArray(payload.quests)) throw new BeginnerQuestContractError();
+  const parsed = Object.fromEntries(BEGINNER_QUEST_KEYS.map(key => [key, parseQuest(payload.quests as unknown[], key)])) as Record<BeginnerQuestKey, BeginnerQuestProgress>;
+  for (const key of BEGINNER_QUEST_KEYS.slice(1)) {
+    const index = FOUNDATION_KEYS.indexOf(key);
+    const prior = parsed[index < 0 ? 'limitBuy' : FOUNDATION_KEYS[index - 1]];
+    const first = parsed[key].steps[0];
+    if (first.completed && (!prior.completed || Date.parse(first.completedAt) <= Date.parse(prior.completedAt))) throw new BeginnerQuestContractError();
   }
-  // Quests this client does not know yet are ignored, never guessed at.
-  const exchange = parseQuest(payload.quests, 'exchange');
-  const transfer = parseQuest(payload.quests, 'transfer');
-  // The transfer only counts after a proven FX, so it can never stand alone.
-  const ordered = !transfer.completed
-    || (exchange.completed && Date.parse(transfer.completedAt ?? '') > Date.parse(exchange.completedAt ?? ''));
-  if (!ordered) throw new BeginnerQuestContractError();
-  return { exchange, transfer };
+  const expected: LearningAccess = { exchange: true, transfer: parsed.exchange.completed,
+    cryptoMarketBuy: parsed.transfer.completed, spotProtection: parsed.marketBuy.completed,
+    cryptoLimitBuy: parsed.marketSell.completed, allTrading: parsed.limitBuy.completed };
+  const access = payload.learningAccess, operations = payload.operations;
+  if (!isRecord(access) || Object.entries(expected).some(([key, allowed]) => access[key] !== allowed)
+    || !isRecord(operations) || typeof operations.limitOrdersEnabled !== 'boolean' || typeof operations.conditionalOrdersEnabled !== 'boolean'
+    || typeof operations.futuresTradingMode !== 'string' || !['ENABLED', 'REDUCE_ONLY', 'DISABLED'].includes(operations.futuresTradingMode)) throw new BeginnerQuestContractError();
+  const practice = payload.practice;
+  if (!isRecord(practice) || ['spotAssetId', 'limitAssetId', 'longPositionId', 'shortPositionId'].some(key => practice[key] !== null && (typeof practice[key] !== 'string' || !practice[key]))) throw new BeginnerQuestContractError();
+  return { ...parsed, learningAccess: expected, operations: operations as unknown as BeginnerQuestsDto['operations'], practice: practice as unknown as BeginnerQuestsDto['practice'] };
 }
 
 export type QuestCardState = 'loading' | 'error' | 'waiting' | 'available' | 'active' | 'completed';
@@ -131,7 +123,7 @@ export function describeQuestCard(
     return { state: 'active', statusLabel: quest.completed ? '완료' : '진행 중', actionLabel: '이어하기', canStart: true };
   }
   if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시하기', canStart: true };
-  if (key === 'transfer' && !progress.exchange.completed) {
+  if (!canStartQuest(key, progress)) {
     return { state: 'waiting', statusLabel: '대기', actionLabel: '퀘스트 시작하기', canStart: false };
   }
   return { state: 'available', statusLabel: '미시작', actionLabel: '퀘스트 시작하기', canStart: true };

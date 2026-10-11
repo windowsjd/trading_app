@@ -2,8 +2,47 @@
 
 `beginner`는 사용자당 평생 하나인 독립 TradingAccount다. 일반·시즌계정과
 금융 행을 공유하거나 이전하지 않는다. 시즌 참가·랭킹·티어·정산·보상과
-광고 보상에서 제외한다. QUEST 01(환전하기)·QUEST 02(이체하기) 진행 판정만
-구현하며 기능 해금·보상 정책은 미정이므로 구현하지 않는다.
+광고 보상에서 제외한다. 공통 기초 6개는 순차 진행하며, QUEST 06 완료 후
+한국주식·미국주식·선물 롱·숏 실습은 서로 독립적으로 진행한다. 보상은 없다.
+
+## 전체 퀘스트와 학습 접근 계약 (2026-10-11)
+
+이번 사용자 승인 정책은 아래의 기존 QUEST 01·02 계약을 확장한다.
+기존 두 퀘스트의 ID·판정·완료 기록은 유지한다. 모든 API는 `/api/v1`이다.
+
+| ID | 금융 증거 | 추가 학습 확인 |
+| --- | --- | --- |
+| common-01-exchange | 기존 독립 KRW→USD 환전과 원장 | 없음 |
+| common-02-transfer | 기존 환전 이후 증권→현물 USD 이체와 원장 | 없음 |
+| common-03-market-buy | Q02 이후 실제 수량이 체결된 현물 crypto 시장가 BUY | 해당 주문 종목의 보유종목·수익률 확인 |
+| common-04-protection | Q03 확인 이후 같은 crypto 종목의 활성화된 TP+SL 등록 | 없음; 발동·취소 후에도 등록 증거 보존 |
+| common-05-market-sell | Q04 이후 사용자 crypto 시장가 SELL 체결 | 보호주문 자동 체결 제외 |
+| common-06-limit-buy | Q05 이후 crypto 지정가 BUY 접수·예약 | 해당 주문의 사용자 취소/예약 해제 또는 실제 체결 결과 확인 |
+| market-kr-stock | Q06 이후 국내 주식 시장가 BUY 체결 | 없음 |
+| market-us-stock | Q06 이후 미국 주식 시장가 BUY 체결 | 없음 |
+| market-futures-long | Q06 이후 leverage > 1 롱 진입과 동일 lifetime 사용자 전량 종료 | 강제청산·시즌정산·보호주문 종료 제외 |
+| market-futures-short | Q06 이후 leverage > 1 숏 진입과 동일 lifetime 사용자 전량 종료 | 롱과 독립 |
+
+GET quests는 읽기 전용이며 일관된 DB snapshot에서 증거를 조회한다.
+응답은 기존 `quests`와 별도의 `learningAccess`, `operations`를 반환한다.
+학습 권한은 진행 가능한 단계부터 허용한다: 환전 항상, 이체 Q01 완료,
+crypto 시장가 BUY Q02 완료, 현물 TP/SL Q03 완료, crypto 지정가 BUY Q05 완료,
+그 밖의 신규 거래 Q06 완료. Q06 이후 추가 잠금은 없다.
+일반·시즌계정은 학습 검사에서 즉시 제외한다. 기존 소유권·상태·운영 플래그·
+시장시간·시세·금융 위험 검증은 그대로 적용한다. 취소·현물 SELL·선물 reduce/close는
+학습 제한에서 제외한다. 커밋된 명령 재생은 새로운 명령 제한보다 먼저 처리한다.
+
+금융 원장에 존재하지 않는 UI 확인 두 가지만 `BeginnerQuestAcknowledgement`에
+계정/step별 최초 한 행으로 저장한다. 주문과 계정을 복합 FK로 연결하고 확인 시각은
+계정 잠금 후 DB 시각이다. `POST :accountId/quests/acknowledgements`의 본문은
+`{stepId: "holdings_reviewed" | "limit_result_reviewed", orderId: string}`이다.
+서버는 선행 완료·해당 주문의 소유권·적격 금융 증거·최종 상태를 재검증한 후 기록한다.
+UI 확인은 금융 체결 증거를 대신하지 않으며 GET으로 생성되지 않는다.
+재시도는 최초 확인을 유지한다. 금융 상태/계산/보상/seed는 변경하지 않는다.
+
+`LIMIT_ORDER_ENABLED`, `CONDITIONAL_ORDERS_ENABLED`, `FUTURES_TRADING_MODE`와
+각 매칭·위험 엔진 플래그는 이 작업에서 변경하지 않는다. 비활성 기능은 운영 제한으로
+안내하며 학습 미완료와 구별한다. 운영 비활성이 Q04/Q06 실습을 막을 수 있다.
 
 ## 기본 제공 정책 (2026-10-10)
 
@@ -31,7 +70,7 @@
   광고 및 추가 지급은 제공하지 않는다.
 - 계정 간 이체 API는 없다. 내부 지갑 이체는 같은 accountId에서만 처리한다.
 
-## QUEST 01·02 진행 상태 (읽기 전용)
+## QUEST 01·02 금융 증거 계약 (전체 응답 중 기존 두 항목)
 
 `GET /api/v1/trading-accounts/:accountId/quests`: 소유자 전용, beginner 계정만
 (그 외 모드는 409 `BEGINNER_QUEST_ACCOUNT_ONLY`, 남의/없는 계정은 404
@@ -58,7 +97,7 @@
 환전과 이체는 각각 독립된 퀘스트이며 단계는 하나씩이다(2026-10-10 분리, 이전
 `common-01-trading-funds` 2단계 퀘스트를 대체). `status`·`completedStepCount`는 각
 퀘스트의 단계와 일치해야 하며 클라이언트는 불일치 응답을 거부한다. 알 수 없는
-questId는 무시한다. 퀘스트 테이블·상태 저장·보상·해금은 없다. 진행은 매 요청마다
+questId는 무시한다. QUEST 01·02 자체의 상태 테이블·보상은 없다. 진행은 매 요청마다
 커밋된 금융 행에서 도출하며 GET은 아무것도 쓰지 않는다.
 
 - QUEST 01 환전 단계: 같은 계정의 `ExchangeTransaction` KRW→USD 중 복합 명령

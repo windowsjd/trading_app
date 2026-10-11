@@ -1,0 +1,77 @@
+
+> trading-app@0.0.1 test
+> jest --runInBand auth.service.spec access-token.guard.spec operator-account-management.service.spec operator-user-status.service.spec operator-season-moderation.service.spec asset-ticker.gateway.spec asset-candle.gateway.spec asset-order-book.gateway.spec season-settlement-job.service.spec ranking-refresh.service.spec futures-risk-worker.spec futures-last-price-retention.service.spec
+
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [SeasonSettlementJobService] {"event":"season_settlement_blocked_open_limit_reservations","seasonId":"season-1","openLimitOrderCount":2,"reservedWalletCount":0,"reservedPositionCount":0,"activeProtectionCount":0,"openFuturesEntryCount":0,"recovery":"run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement"}
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [SeasonSettlementJobService] {"event":"season_settlement_blocked_open_limit_reservations","seasonId":"season-1","openLimitOrderCount":0,"reservedWalletCount":1,"reservedPositionCount":0,"activeProtectionCount":0,"openFuturesEntryCount":0,"recovery":"run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement"}
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [SeasonSettlementJobService] {"event":"season_settlement_blocked_open_limit_reservations","seasonId":"season-1","openLimitOrderCount":0,"reservedWalletCount":0,"reservedPositionCount":0,"activeProtectionCount":0,"openFuturesEntryCount":1,"recovery":"run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement"}
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [SeasonSettlementJobService] {"event":"season_settlement_blocked_open_limit_reservations","seasonId":"season-1","openLimitOrderCount":0,"reservedWalletCount":0,"reservedPositionCount":0,"activeProtectionCount":0,"openFuturesEntryCount":1,"recovery":"run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement"}
+[Nest] 20  - 10/11/2026, 1:39:00 PM     LOG [RankingRefreshService] Current ranking refreshed for season season-1: 0 participants.
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [RankingRefreshService] Current ranking refresh failed for season season-1.
+HttpException: Http Exception
+    at throwSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:54:9)
+    at assertSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:300:5)
+    at assertSeasonRankingScopes (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:392:5)
+    at outcome.prisma.$transaction.isolationLevel (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:507:34)
+    at RankingRefreshService.replaceCurrentRankings (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:461:21)
+    at RankingRefreshService.calculateAndReplace (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:307:14)
+    at RankingRefreshService.drainRefreshes (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:165:20)
+    at expectRefreshAborted (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:237:7)
+    at Object.<anonymous> (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:258:7)
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [RankingRefreshService] Current ranking refresh failed for season season-1.
+HttpException: Http Exception
+    at throwSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:54:9)
+    at assertSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:324:5)
+    at assertSeasonRankingScopes (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:392:5)
+    at outcome.prisma.$transaction.isolationLevel (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:507:34)
+    at RankingRefreshService.replaceCurrentRankings (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:461:21)
+    at RankingRefreshService.calculateAndReplace (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:307:14)
+    at RankingRefreshService.drainRefreshes (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:165:20)
+    at expectRefreshAborted (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:237:7)
+    at Object.<anonymous> (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:272:7)
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [RankingRefreshService] Current ranking refresh failed for season season-1.
+HttpException: Http Exception
+    at throwSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:54:9)
+    at assertSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:330:5)
+    at assertSeasonRankingScopes (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:392:5)
+    at outcome.prisma.$transaction.isolationLevel (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:507:34)
+    at RankingRefreshService.replaceCurrentRankings (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:461:21)
+    at RankingRefreshService.calculateAndReplace (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:307:14)
+    at RankingRefreshService.drainRefreshes (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:165:20)
+    at expectRefreshAborted (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:237:7)
+    at Object.<anonymous> (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:284:7)
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [RankingRefreshService] Current ranking refresh failed for season season-1.
+HttpException: Http Exception
+    at throwSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:54:9)
+    at assertSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:318:5)
+    at assertSeasonRankingScopes (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:392:5)
+    at outcome.prisma.$transaction.isolationLevel (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:507:34)
+    at RankingRefreshService.replaceCurrentRankings (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:461:21)
+    at RankingRefreshService.calculateAndReplace (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:307:14)
+    at RankingRefreshService.drainRefreshes (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:165:20)
+    at expectRefreshAborted (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:237:7)
+    at Object.<anonymous> (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:297:7)
+[Nest] 20  - 10/11/2026, 1:39:00 PM     LOG [RankingRefreshService] Current ranking refreshed for season season-1: 1 participants.
+[Nest] 20  - 10/11/2026, 1:39:00 PM     LOG [RankingRefreshService] Current ranking refreshed for season season-1: 1 participants.
+[Nest] 20  - 10/11/2026, 1:39:00 PM    WARN [RankingRefreshService] Current ranking refresh for season season-1 was skipped: stale_generation.
+[Nest] 20  - 10/11/2026, 1:39:00 PM    WARN [RankingRefreshService] Current ranking refresh for season season-1 was skipped: stale_generation.
+[Nest] 20  - 10/11/2026, 1:39:00 PM    WARN [RankingRefreshService] Current ranking refresh for season season-1 was skipped: stale_generation.
+[Nest] 20  - 06/10/2026, 9:11:00 AM     LOG [RankingRefreshService] Current ranking refreshed for season season-1: 1 participants.
+[Nest] 20  - 06/10/2026, 9:11:00 AM     LOG [RankingRefreshService] Current ranking refreshed for season season-1: 1 participants.
+[Nest] 20  - 10/11/2026, 1:39:00 PM   ERROR [RankingRefreshService] Current ranking refresh failed for season season-1.
+HttpException: Http Exception
+    at throwSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:54:9)
+    at assertSeasonRankingScope (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:324:5)
+    at assertSeasonRankingScopes (/home/nayuta/projects/trading-app/backend/src/ranking/season-ranking-scope.ts:392:5)
+    at outcome.prisma.$transaction.isolationLevel (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:507:34)
+    at RankingRefreshService.replaceCurrentRankings (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:461:21)
+    at RankingRefreshService.calculateAndReplace (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:307:14)
+    at RankingRefreshService.drainRefreshes (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.ts:165:20)
+    at expectRefreshAborted (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:237:7)
+    at Object.<anonymous> (/home/nayuta/projects/trading-app/backend/src/ranking/ranking-refresh.service.spec.ts:438:7)
+
+Test Suites: 11 passed, 11 total
+Tests:       210 passed, 210 total
+Snapshots:   0 total
+Time:        0.961 s, estimated 1 s
+Ran all test suites matching auth.service.spec|access-token.guard.spec|operator-account-management.service.spec|operator-user-status.service.spec|operator-season-moderation.service.spec|asset-ticker.gateway.spec|asset-candle.gateway.spec|asset-order-book.gateway.spec|season-settlement-job.service.spec|ranking-refresh.service.spec|futures-risk-worker.spec|futures-last-price-retention.service.spec.

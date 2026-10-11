@@ -1,0 +1,2 @@
+f87c9666 선물종목반영
+3433701c feat: add isolated reproducible load-test harness [skip render]

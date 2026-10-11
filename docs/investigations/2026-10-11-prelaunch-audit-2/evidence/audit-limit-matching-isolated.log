@@ -1,0 +1,18 @@
+ok R04 PostgreSQL FIFO across both sides and account modes
+(node:1560599) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ok R04 N+1 season BUY reaches locked execution
+ok R04 N+1 Path B touch survives prefix orders
+ok R04 cancellation after candidate scan is skipped
+ok R04 prior fill after candidate scan is not duplicated
+ok path A fills at the snapshot price with improvement
+ok path A does not fill above the limit
+ok path B fills at the limit price off a candle touch
+ok path B never uses the partial submit candle
+ok fill uses the pinned reservation fee rate, not the season rate
+ok a canceled order is skipped by the matcher
+ok an ended season is not filled
+ok candle evidence never becomes a price snapshot
+[Nest] 1560599  - 10/11/2026, 1:35:11 PM   ERROR [LimitOrderMatchingService] {"event":"limit_order_fill_failed","orderId":"ed839e02-d4dd-4c33-871d-e39c8af1c846","assetId":"188485a8-24a5-49e9-9ea8-d3aa49f716b2","phase":"execution_error","path":"snapshot","reason":"ORDER_RESERVATION_INCONSISTENT","category":"reservation_inconsistent","code":"ORDER_RESERVATION_INCONSISTENT","stage":"wallet_settlement"}
+ok matcher preserves reservation error stage and rollback
+limit order matching integration ok

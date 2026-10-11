@@ -1,0 +1,79 @@
+
+> LeagueOfTrading@1.0.0 export:web
+> expo export --platform web --output-dir dist
+
+env: load .env
+env: export EXPO_PUBLIC_API_ORIGIN
+Using src/app as the root directory for Expo Router.
+Starting Metro Bundler
+
+Web node_modules/expo/AppEntry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+| (node:85) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+Web Bundled 1390ms node_modules/expo/AppEntry.js (1097 modules)
+
+› Assets (29):
+node_modules/@react-navigation/elements/lib/module/assets/back-icon-mask.0a328cd9c1afd0afe8e3b1ec5165b1b4.png (653B)
+node_modules/@react-navigation/elements/lib/module/assets/back-icon.35ba0eaec5a4f5ed12ca16fabeae451d.png (207B)
+node_modules/@react-navigation/elements/lib/module/assets/clear-icon.c94f6478e7ae0cdd9f15de1fcb9e5e55.png (4 variations | 425B)
+node_modules/@react-navigation/elements/lib/module/assets/close-icon.808e1b1b9b53114ec2838071a7e6daa7.png (4 variations | 235B)
+node_modules/@react-navigation/elements/lib/module/assets/search-icon.286d67d3f74808a60a78d3ebf1a5fb57.png (928B)
+src/assets/home-tier-backgrounds/01_Bronze_Dark.ef572b3ad06921716e77c0a70f3da132.png (175KB)
+src/assets/home-tier-backgrounds/01_Bronze_Light.59a6795ab63a91abffe49aa37274d4bf.png (168KB)
+src/assets/home-tier-backgrounds/02_Silver_Dark.31e49bb66c5d2032f34c40bfd27877cb.png (202KB)
+src/assets/home-tier-backgrounds/02_Silver_Light.7ccc74e8a7e7ead8338fcdec3b042610.png (171KB)
+src/assets/home-tier-backgrounds/03_Gold_Dark.bf442338b8b50a8918821167023d368a.png (182KB)
+src/assets/home-tier-backgrounds/03_Gold_Light.738ae4cbe7ee83797c55ec8b4cd139a8.png (162KB)
+src/assets/home-tier-backgrounds/04_Platinum_Dark.29a26ecfc45a7d6e8996539253699177.png (187KB)
+src/assets/home-tier-backgrounds/04_Platinum_Light.1c6c1f7989c2b6ee7d7695ffbfc07596.png (181KB)
+src/assets/home-tier-backgrounds/05_Diamond_Dark.00ad3dba33c62b786ca01e5f555f4f52.png (133KB)
+src/assets/home-tier-backgrounds/05_Diamond_Light.cbfd7fab853e88b4ce3ec57a74f4945b.png (137KB)
+src/assets/home-tier-backgrounds/06_Whale_Dark.22dfd31ea535e1c7f4c368d6cc2c70e5.png (348KB)
+src/assets/home-tier-backgrounds/06_Whale_Light.560c955b5f454df88756aa2215dd8eaf.png (365KB)
+src/assets/home-tiers/bronze.6db3517d195a3d28f8345c4e6db8db98.png (1.3MB)
+src/assets/home-tiers/diamond.cf6bc60f039311cae09a7b40b3845221.png (1.8MB)
+src/assets/home-tiers/gold.56ed12b64bd24566091c00d1748d1243.png (1.3MB)
+src/assets/home-tiers/platinum.49335666fcb71154049916b8a7d769d6.png (1.7MB)
+src/assets/home-tiers/silver.edc0dda641d727926a6b7c611f117545.png (1.2MB)
+src/assets/home-tiers/whale.1acd37c1362004757e780ff5177fb4eb.png (503KB)
+
+› web bundles (1):
+_expo/static/js/web/AppEntry-ea1d9426e1654e15a7f7a2e9ddf45d54.js (2.3MB)
+
+› Files (2):
+index.html (1.2KB)
+metadata.json (49B)
+
+Exported: dist

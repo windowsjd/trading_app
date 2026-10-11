@@ -1,3 +1,7 @@
+import {
+  assertBeginnerLearningAccess,
+  beginnerOrderAction,
+} from '../trading-accounts/beginner-learning-policy';
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
@@ -935,6 +939,11 @@ export class OrdersService {
     }
 
     const asset = await this.findUsableAsset(inputRequest.assetId);
+    await assertBeginnerLearningAccess(
+      this.prisma,
+      context,
+      beginnerOrderAction(inputRequest, asset.assetType),
+    );
     assertOrderInputPolicy(
       { ...inputRequest, assetType: asset.assetType },
       { positionBoundExit: !!inputRequest.protectionChildId },
@@ -1108,6 +1117,11 @@ export class OrdersService {
       );
     }
     const asset = await this.findUsableAsset(inputRequest.assetId);
+    await assertBeginnerLearningAccess(
+      this.prisma,
+      context,
+      beginnerOrderAction(inputRequest, asset.assetType),
+    );
     assertOrderInputPolicy(
       { ...inputRequest, assetType: asset.assetType },
       { positionBoundExit: !!inputRequest.protectionChildId },
@@ -1468,6 +1482,11 @@ export class OrdersService {
           request,
           now: transactionNow,
         });
+        await assertBeginnerLearningAccess(
+          tx,
+          input.context,
+          beginnerOrderAction(request, quote.asset.assetType),
+        );
         this.assertOrderAssetTradable(quote.asset, transactionNow);
 
         const tradeFeeRate = this.resolveMarketOrderFeeRate({
@@ -1813,6 +1832,11 @@ export class OrdersService {
           request,
           now: transactionNow,
         });
+        await assertBeginnerLearningAccess(
+          tx,
+          input.context,
+          beginnerOrderAction(request, quote.asset.assetType),
+        );
         this.assertOrderAssetTradable(
           quote.asset,
           transactionNow,
@@ -2789,6 +2813,12 @@ export class OrdersService {
     order: OrderExecutionRecord,
     executedAt: Date,
   ): Promise<OrderExecutionPlan> {
+    if (order.tradingAccount)
+      await assertBeginnerLearningAccess(
+        tx,
+        order.tradingAccount,
+        beginnerOrderAction(order, order.asset.assetType),
+      );
     const quote = await this.assertActiveOrderQuoteForExecution(
       tx,
       order,
@@ -5182,6 +5212,11 @@ export class OrdersService {
       sourceWorkflow,
     } = input;
     const asset = await this.findUsableAsset(inputRequest.assetId);
+    await assertBeginnerLearningAccess(
+      this.prisma,
+      input,
+      beginnerOrderAction(inputRequest, asset.assetType),
+    );
     assertOrderInputPolicy(
       { ...inputRequest, assetType: asset.assetType },
       { positionBoundExit: !!inputRequest.protectionChildId },

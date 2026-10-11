@@ -27,6 +27,38 @@ export const QUEST_CARDS = {
     completed: '이체하기 퀘스트 완료!',
     result: '이체',
   },
+  marketBuy: {
+    number: 'QUEST 03', title: '암호화폐 시장가 매수', summary: '거래 가능한 현물 종목을 골라 매수하고 보유종목과 수익률을 확인해요.',
+    topics: ['현재가', '시장가', '매수 금액·수수료', '보유종목·수익률'], condition: '실제 매수 체결 후 보유종목과 수익률을 확인하면 완료돼요.', completed: '시장가 매수 퀘스트 완료!', result: '매수',
+  },
+  protection: {
+    number: 'QUEST 04', title: 'TP/SL 설정', summary: '매수한 현물에 익절(TP)과 손절(SL)을 함께 설정해요.',
+    topics: ['목표가격', '손절가격', '보호 주문', 'OCO'], condition: '앞서 매수한 종목에 TP와 SL 등록이 확정되면 완료돼요.', completed: 'TP/SL 설정 퀘스트 완료!', result: '보호 주문',
+  },
+  marketSell: {
+    number: 'QUEST 05', title: '암호화폐 시장가 매도', summary: '보유수량을 매도하며 실현손익과 거래 수수료를 배워요.',
+    topics: ['매도 가능수량', '실현손익', '수수료', '자산 변화'], condition: '사용자의 시장가 매도가 실제 체결되면 완료돼요. 손실이어도 괜찮아요.', completed: '시장가 매도 퀘스트 완료!', result: '매도',
+  },
+  limitBuy: {
+    number: 'QUEST 06', title: '암호화폐 지정가 매수', summary: '원하는 가격으로 주문하고 예약금과 미체결 주문 관리를 배워요.',
+    topics: ['지정가격', '예약금', '미체결', '주문 취소'], condition: '등록한 주문을 취소하거나 체결 결과를 확인하면 모든 학습용 기능 제한이 해제돼요.', completed: '공통 기초 완료! 모든 거래 기능을 배울 준비가 됐어요.', result: '지정가 주문',
+  },
+  krStock: {
+    number: 'QUEST 07', title: '한국주식 매수', summary: 'KRW로 국내 주식을 매수해요. 휴장 중에는 다른 심화 퀘스트를 선택할 수 있어요.',
+    topics: ['한국 시장 운영시간', 'KRW 거래', '시장가 매수', '보유종목'], condition: '국내 주식 시장가 매수가 실제 체결되면 완료돼요.', completed: '한국주식 매수 퀘스트 완료!', result: '국내 주식 매수',
+  },
+  usStock: {
+    number: 'QUEST 08', title: '미국주식 매수', summary: '증권 USD 지갑으로 미국 주식을 매수하고 환율과 원화 평가의 관계를 배워요.',
+    topics: ['미국 시장 운영시간', '증권 USD', '환율과 원화 평가', '보유종목'], condition: '미국 주식 시장가 매수가 실제 체결되면 완료돼요.', completed: '미국주식 매수 퀘스트 완료!', result: '미국 주식 매수',
+  },
+  futuresLong: {
+    number: 'QUEST 09', title: '암호화폐 선물 롱', summary: '선물 USD 지갑을 준비하고 롱 포지션 진입부터 전량 종료까지 연습해요.',
+    topics: ['Long', '낮은 레버리지', '격리마진', '청산가격', '미실현손익'], condition: '1배보다 높은 레버리지로 진입한 같은 롱 포지션을 직접 전량 종료하면 완료돼요.', completed: '선물 롱 퀘스트 완료!', result: '롱 포지션 종료',
+  },
+  futuresShort: {
+    number: 'QUEST 10', title: '암호화폐 선물 숏', summary: '하락 방향의 손익 구조를 배우고 숏 포지션을 직접 종료해요. 롱 실습과 독립적이에요.',
+    topics: ['Short', '하락과 손익', '증거금', '청산 위험', 'One-way'], condition: '1배보다 높은 레버리지로 진입한 같은 숏 포지션을 직접 전량 종료하면 완료돼요.', completed: '선물 숏 퀘스트 완료!', result: '숏 포지션 종료',
+  },
 } as const;
 
 /** One spotlight step: what the highlighted control is, in a sentence or two. */

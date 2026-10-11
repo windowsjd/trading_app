@@ -1,107 +1,21 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { createApiError } from '../common/api-error';
-import type {
-  CurrencyCode,
-  WalletScope,
-  WalletTransactionDirection,
-  WalletTransactionReferenceType,
-  WalletTransactionType,
-} from '../generated/prisma/client';
+import { conditionalEnabled } from '../conditional/conditional.config';
+import { futuresTradingMode } from '../futures/futures.config';
+import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from './trading-account-access.service';
-
-/**
- * Beginner quest progress, DERIVED read-only from committed financial rows.
- *
- * There is no quest table and nothing here writes: a quest is complete
- * exactly when the account's own ledger proves the practice happened. That is
- * why app restarts, other devices, account switches and lost responses all
- * converge on the same answer, and why a retried command (one committed row)
- * can never count twice. The catalogue and the teaching copy live in the
- * client; the server only answers "which practices are proven".
- *
- * Two quests, one practice step each, in teaching order:
- *  - QUEST 01 환전하기: a standalone KRW → USD FX (Securities KRW debit,
- *    Securities USD credit);
- *  - QUEST 02 이체하기: a standalone USD transfer Securities USD → Crypto Spot
- *    USD executed strictly after QUEST 01's first proven FX.
- * A composite FX+transfer command records both legs at one instant; it is
- * excluded from both quests because each asks for its practice on its own.
- * Quotes, failed or rolled-back commands leave no rows, so they cannot count.
- * Balances are never used as evidence. Accounts that practised before the
- * split are recognised by the same rules, so no progress is lost.
- */
-
-export const BEGINNER_QUEST_01_ID = 'common-01-exchange';
-export const BEGINNER_QUEST_02_ID = 'common-02-transfer';
-export const BEGINNER_QUEST_01_FX_STEP = 'fx_krw_to_usd';
-export const BEGINNER_QUEST_02_TRANSFER_STEP =
-  'transfer_securities_usd_to_crypto_spot_usd';
-
-type QuestStatus = 'not_started' | 'in_progress' | 'completed';
-
-type QuestStepView = {
-  stepId: string;
-  completed: boolean;
-  completedAt: string | null;
-  /** ExchangeTransaction.id or WalletTransfer.id that proves the step. */
-  referenceId: string | null;
-};
-
-type QuestProgressView = {
-  questId: string;
-  status: QuestStatus;
-  completedStepCount: number;
-  totalStepCount: number;
-  steps: QuestStepView[];
-};
-
-type BeginnerQuestsResponse = {
-  success: true;
-  data: { tradingAccountId: string; quests: QuestProgressView[] };
-};
-
-type Evidence = { id: string; executedAt: Date };
-
-type LedgerLegRule = {
-  txType: WalletTransactionType;
-  direction: WalletTransactionDirection;
-  currencyCode: CurrencyCode;
-  walletScope: WalletScope;
-};
-
-const FX_LEGS: LedgerLegRule[] = [
-  {
-    txType: 'exchange_source',
-    direction: 'debit',
-    currencyCode: 'KRW',
-    walletScope: 'securities',
-  },
-  {
-    txType: 'exchange_target',
-    direction: 'credit',
-    currencyCode: 'USD',
-    walletScope: 'securities',
-  },
-];
-
-const TRANSFER_LEGS: LedgerLegRule[] = [
-  {
-    txType: 'wallet_transfer',
-    direction: 'debit',
-    currencyCode: 'USD',
-    walletScope: 'securities',
-  },
-  {
-    txType: 'wallet_transfer',
-    direction: 'credit',
-    currencyCode: 'USD',
-    walletScope: 'crypto_spot',
-  },
-];
-
-const EVIDENCE_ORDER = [{ executedAt: 'asc' as const }, { id: 'asc' as const }];
+import {
+  BeginnerQuestEvidence,
+  type QuestClient,
+} from './beginner-quest-evidence';
+export {
+  BEGINNER_QUEST_01_ID,
+  BEGINNER_QUEST_02_ID,
+  BEGINNER_QUEST_01_FX_STEP,
+  BEGINNER_QUEST_02_TRANSFER_STEP,
+} from './beginner-quest-evidence';
 
 @Injectable()
 export class BeginnerQuestsService {
@@ -111,187 +25,146 @@ export class BeginnerQuestsService {
     private readonly performance: GeneralAccountPerformanceService,
   ) {}
 
-  async getQuestProgress(
+  private async account(
     userId: string | undefined,
     accountId: string,
-  ): Promise<BeginnerQuestsResponse> {
-    if (!userId) {
-      this.fail(HttpStatus.UNAUTHORIZED, 'UNAUTHORIZED', 'Unauthorized');
-    }
-    // Ownership first: a foreign or unknown account is 404 like every read.
+    client: QuestClient = this.prisma,
+  ) {
+    if (!userId)
+      throw createApiError(
+        'UNAUTHORIZED',
+        'Unauthorized',
+        HttpStatus.UNAUTHORIZED,
+      );
     const account = await this.access.getOwnedAccountOrThrow(
       userId,
-      typeof accountId === 'string' ? accountId.trim() : accountId,
+      accountId.trim(),
+      client,
     );
-    if (account.mode !== 'beginner') {
-      this.fail(
-        HttpStatus.CONFLICT,
+    if (account.mode !== 'beginner')
+      throw createApiError(
         'BEGINNER_QUEST_ACCOUNT_ONLY',
         'Quests are available only for beginner accounts.',
+        409,
+      );
+    await this.performance.assertGeneralAccountReady(account, client);
+    return account;
+  }
+
+  private async response(accountId: string, client: QuestClient) {
+    return {
+      success: true as const,
+      data: {
+        ...(await new BeginnerQuestEvidence(client).read(accountId)),
+        operations: {
+          limitOrdersEnabled: isLimitOrderEnabled(),
+          conditionalOrdersEnabled: conditionalEnabled(),
+          futuresTradingMode: futuresTradingMode(),
+        },
+      },
+    };
+  }
+
+  /** A consistent read; never creates accounts, financial rows, or learning state. */
+  async getQuestProgress(userId: string | undefined, accountId: string) {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const account = await this.account(userId, accountId, tx);
+        return this.response(account.id, tx);
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
+  }
+
+  /** UI acknowledgement is separate from financial evidence, immutable and idempotent. */
+  async acknowledge(
+    userId: string | undefined,
+    accountId: string,
+    body: { stepId?: unknown; orderId?: unknown },
+  ) {
+    const account = await this.account(userId, accountId);
+    if (
+      !body ||
+      typeof body.stepId !== 'string' ||
+      !['holdings_reviewed', 'limit_result_reviewed'].includes(body.stepId) ||
+      typeof body.orderId !== 'string' ||
+      !body.orderId ||
+      body.orderId.length > 128
+    ) {
+      throw createApiError(
+        'INVALID_QUEST_ACKNOWLEDGEMENT',
+        'Specify a learning step and its order.',
+        400,
       );
     }
-    // Same integrity gate as the account's FX/wallet reads: damaged financial
-    // rows fail closed instead of being read as progress.
-    await this.performance.assertGeneralAccountReady(account);
-
-    const fx = await this.firstProvenFx(account.id);
-    // QUEST 02 is only reachable after QUEST 01: no FX, no transfer lookup.
-    const transfer = fx ? await this.firstProvenTransfer(account.id, fx) : null;
-
-    return {
-      success: true,
-      data: {
-        tradingAccountId: account.id,
-        quests: [
-          this.quest(BEGINNER_QUEST_01_ID, [
-            this.step(BEGINNER_QUEST_01_FX_STEP, fx),
-          ]),
-          this.quest(BEGINNER_QUEST_02_ID, [
-            this.step(BEGINNER_QUEST_02_TRANSFER_STEP, transfer),
-          ]),
-        ],
-      },
-    };
-  }
-
-  private quest(questId: string, steps: QuestStepView[]): QuestProgressView {
-    const completedStepCount = steps.filter((step) => step.completed).length;
-    return {
-      questId,
-      status:
-        completedStepCount === 0
-          ? 'not_started'
-          : completedStepCount === steps.length
-            ? 'completed'
-            : 'in_progress',
-      completedStepCount,
-      totalStepCount: steps.length,
-      steps,
-    };
-  }
-
-  private async firstProvenFx(accountId: string): Promise<Evidence | null> {
-    const candidates = await this.prisma.exchangeTransaction.findMany({
-      where: {
-        tradingAccountId: accountId,
-        fromCurrency: 'KRW',
-        toCurrency: 'USD',
-        // Composite FX+transfer legs are not a standalone FX practice.
-        walletTransferExecuteRequest: { is: null },
-        fxExecuteRequests: {
-          some: {
-            tradingAccountId: accountId,
-            status: 'succeeded',
-          },
-        },
-      },
-      orderBy: EVIDENCE_ORDER,
-      select: { id: true, executedAt: true },
-    });
-    return this.firstWithLedgerLegs(
-      accountId,
-      'exchange_transaction',
-      candidates,
-      FX_LEGS,
-    );
-  }
-
-  private async firstProvenTransfer(
-    accountId: string,
-    fx: Evidence,
-  ): Promise<Evidence | null> {
-    const candidates = await this.prisma.walletTransfer.findMany({
-      where: {
-        tradingAccountId: accountId,
-        currencyCode: 'USD',
-        compositeCommand: { is: null },
-        executedAt: { gt: fx.executedAt },
-        sourceWallet: {
-          is: {
-            tradingAccountId: accountId,
-            walletScope: 'securities',
-            currencyCode: 'USD',
-          },
-        },
-        destinationWallet: {
-          is: {
-            tradingAccountId: accountId,
-            walletScope: 'crypto_spot',
-            currencyCode: 'USD',
-          },
-        },
-      },
-      orderBy: EVIDENCE_ORDER,
-      select: { id: true, executedAt: true },
-    });
-    return this.firstWithLedgerLegs(
-      accountId,
-      'wallet_transfer',
-      candidates,
-      TRANSFER_LEGS,
-    );
-  }
-
-  /** A row counts only with exactly its committed ledger legs on this account. */
-  private async firstWithLedgerLegs(
-    accountId: string,
-    referenceType: WalletTransactionReferenceType,
-    candidates: Evidence[],
-    rules: LedgerLegRule[],
-  ): Promise<Evidence | null> {
-    if (candidates.length === 0) return null;
-    const legs = await this.prisma.walletTransaction.findMany({
-      where: {
-        tradingAccountId: accountId,
-        referenceType,
-        referenceId: { in: candidates.map((row) => row.id) },
-      },
-      select: {
-        referenceId: true,
-        txType: true,
-        direction: true,
-        currencyCode: true,
-        wallet: {
-          select: {
-            tradingAccountId: true,
-            walletScope: true,
-            currencyCode: true,
-          },
-        },
-      },
-    });
-    return (
-      candidates.find((candidate) => {
-        const own = legs.filter((leg) => leg.referenceId === candidate.id);
-        return (
-          own.length === rules.length &&
-          rules.every(
-            (rule) =>
-              own.filter(
-                (leg) =>
-                  leg.txType === rule.txType &&
-                  leg.direction === rule.direction &&
-                  leg.currencyCode === rule.currencyCode &&
-                  leg.wallet.tradingAccountId === accountId &&
-                  leg.wallet.walletScope === rule.walletScope &&
-                  leg.wallet.currencyCode === rule.currencyCode,
-              ).length === 1,
-          )
+    const stepId = body.stepId,
+      orderId = body.orderId;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM trading_accounts WHERE id = ${account.id} AND user_id = ${account.userId} FOR UPDATE`;
+      await this.account(userId, account.id, tx);
+      const reader = new BeginnerQuestEvidence(tx);
+      const progress = await reader.read(account.id);
+      const previous = progress.quests[stepId === 'holdings_reviewed' ? 1 : 4];
+      const at = previous.steps[previous.steps.length - 1];
+      if (
+        previous.status !== 'completed' ||
+        !at.completedAt ||
+        !at.referenceId
+      ) {
+        throw createApiError(
+          'BEGINNER_QUEST_PREREQUISITE',
+          'Complete the preceding quest first.',
+          409,
         );
-      }) ?? null
-    );
-  }
-
-  private step(stepId: string, evidence: Evidence | null): QuestStepView {
-    return {
-      stepId,
-      completed: evidence !== null,
-      completedAt: evidence?.executedAt.toISOString() ?? null,
-      referenceId: evidence?.id ?? null,
-    };
-  }
-
-  private fail(status: HttpStatus, code: string, message: string): never {
-    throw createApiError(code, message, status);
+      }
+      const after = {
+        id: at.referenceId,
+        executedAt: new Date(at.completedAt),
+      };
+      const order =
+        stepId === 'holdings_reviewed'
+          ? await reader.filledOrder(
+              account.id,
+              after,
+              'crypto',
+              'buy',
+              orderId,
+            )
+          : await reader.limitOrder(account.id, after, orderId);
+      const evidenceAt =
+        order &&
+        ('submittedAt' in order
+          ? reader.limitResolvedAt(order)
+          : order.executedAt);
+      if (!order || !evidenceAt) {
+        throw createApiError(
+          'BEGINNER_QUEST_EVIDENCE_REQUIRED',
+          'A qualifying committed order result is required.',
+          409,
+        );
+      }
+      const [clock] = await tx.$queryRaw<
+        Array<{ now: Date }>
+      >`SELECT clock_timestamp() AS now`;
+      if (clock.now <= evidenceAt)
+        throw createApiError(
+          'BEGINNER_QUEST_EVIDENCE_REQUIRED',
+          'Retry after the committed result is available.',
+          409,
+        );
+      await tx.beginnerQuestAcknowledgement.upsert({
+        where: {
+          tradingAccountId_stepId: { tradingAccountId: account.id, stepId },
+        },
+        create: {
+          tradingAccountId: account.id,
+          stepId,
+          orderId,
+          acknowledgedAt: clock.now,
+        },
+        update: {},
+      });
+      return this.response(account.id, tx);
+    });
   }
 }

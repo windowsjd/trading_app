@@ -108,6 +108,7 @@ function createTradingUiHarness(screenName) {
           result.refetch = async () => h.walletRefetch ? h.walletRefetch() : result;
           return result;
         }
+        if (resource === 'quests' && options.enabled === false) return base;
         throw new Error(`Unexpected query: ${options.queryKey}`);
       },
       useMutation: config => ({ isPending: false, reset: () => {}, mutate: variables => {

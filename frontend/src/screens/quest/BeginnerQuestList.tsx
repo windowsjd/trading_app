@@ -8,6 +8,7 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { QUEST_CARDS, QUEST_CATEGORY, QUEST_GUIDE_COPY } from '../../features/quest/questContent';
 import {
   BEGINNER_QUEST_KEYS,
+  FOUNDATION_KEYS,
   completedQuestCount,
   describeQuestCard,
   type BeginnerQuestKey,
@@ -58,12 +59,15 @@ export default function BeginnerQuestList() {
           {quest.isRefreshError ? (
             <Text style={styles.muted} testID="quest-card-stale">최신 진행 상황을 다시 확인하지 못했어요. 아래로 당겨 새로고침해 주세요.</Text>
           ) : null}
-          {BEGINNER_QUEST_KEYS.map(key => (
+          {BEGINNER_QUEST_KEYS.map((key, index) => (
+            <React.Fragment key={key}>
+            {index === 6 ? <Text accessibilityRole="header" style={styles.category}>시장별 심화 — 자유 진행</Text> : null}
             <QuestCard key={key} questKey={key} progress={progress} isError={quest.isError}
               active={guide?.active?.quest === key} highlighted={guide?.justCompleted === key}
               onStart={guide && progress ? () => guide.start(key, progress) : null}
               onResume={guide ? guide.resume : null}
               onExit={guide ? guide.exit : null} />
+            </React.Fragment>
           ))}
         </>
       )}
@@ -103,8 +107,16 @@ function QuestCard({ questKey, progress, isError, active, highlighted, onStart, 
       {!done ? (
         <Text style={styles.muted}>{content.condition}</Text>
       ) : null}
-      {display.state === 'waiting' && questKey === 'transfer' ? (
-        <Text style={styles.muted} testID="quest-card-transfer-waiting">{QUEST_CARDS.transfer.waiting}</Text>
+      {display.state === 'waiting' ? (
+        <Text style={styles.muted} testID={`quest-card-${questKey}-waiting`}>
+          {questKey === 'transfer' ? QUEST_CARDS.transfer.waiting : FOUNDATION_KEYS.includes(questKey)
+            ? '앞선 공통 기초 퀘스트를 완료하면 시작할 수 있어요.' : 'QUEST 06을 완료하면 네 심화 퀘스트를 원하는 순서로 진행할 수 있어요.'}
+        </Text>
+      ) : null}
+      {progress && (questKey === 'protection' && !progress.operations.conditionalOrdersEnabled
+        || questKey === 'limitBuy' && !progress.operations.limitOrdersEnabled
+        || (questKey === 'futuresLong' || questKey === 'futuresShort') && progress.operations.futuresTradingMode !== 'ENABLED') ? (
+        <Text style={styles.muted} testID={`quest-card-${questKey}-operations`}>현재 서버 운영 정책으로 이 실습의 신규 거래가 제공되지 않습니다.</Text>
       ) : null}
       <CTAButton
         label={display.actionLabel ?? '퀘스트 시작하기'}
