@@ -1239,8 +1239,8 @@ model BeginnerQuestAcknowledgement {
   orderId String @map("order_id")
   acknowledgedAt DateTime @map("acknowledged_at")
 
-  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  order Order @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict, map: "beginner_quest_acknowledgements_account_fkey")
+  order Order @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict, map: "beginner_quest_acknowledgements_order_fkey")
 
   @@id([tradingAccountId, stepId])
   @@index([orderId, tradingAccountId])

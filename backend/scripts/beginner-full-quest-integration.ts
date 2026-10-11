@@ -22,11 +22,14 @@ import { assertBeginnerLearningAccess } from '../src/trading-accounts/beginner-l
 import { FuturesLimitService } from '../src/futures/futures-limit.service';
 
 const target = new URL(process.env.DATABASE_URL ?? 'http://invalid');
+const disposableDatabase =
+  target.pathname.endsWith('_test') ||
+  (process.env.GITHUB_ACTIONS === 'true' && target.pathname === '/trading_app');
 if (
   process.env.NODE_ENV !== 'test' ||
   process.env.BEGINNER_ACCOUNT_DB_INTEGRATION !== '1' ||
   !['localhost', '127.0.0.1'].includes(target.hostname) ||
-  !target.pathname.endsWith('_test')
+  !disposableDatabase
 )
   throw new Error('Disposable local test database opt-in required');
 // Isolated subprocess fixtures only; application/default configuration is untouched.
