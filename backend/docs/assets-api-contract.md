@@ -1,5 +1,16 @@
 # Assets API Contract
 
+## Product availability
+
+The Binance Spot fixed universe stays at 25. Active Futures-only HYPEUSDT,
+PUMPUSDT, BCHUSDT, FILUSDT and AAVEUSDT are excluded from Spot list/search,
+including `includeInactive=true`, and return `ASSET_NOT_FOUND` from generic
+Spot detail/price/candles. Ticker/candle/order-book subscriptions reject them
+using the existing WS error contracts. Spot quote/create/execute, Limit matching
+and Spot protection registration also reject them on the server. They remain
+valid operational Assets for their separate Futures Last/Mark/financial paths.
+Historical holdings and financial reads retain their IDs and existing evidence.
+
 ## Status
 
 - `GET /api/v1/assets` read-only MVP is implemented.

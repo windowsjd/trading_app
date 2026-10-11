@@ -1,3 +1,4 @@
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import {
   resolveAssetProviderEligibility,
@@ -556,9 +557,15 @@ export class AssetTickerGateway
       }
       const asset = await this.prisma.asset.findUnique({
         where: { id: assetId },
-        select: { id: true, isActive: true },
+        select: {
+          id: true,
+          isActive: true,
+          symbol: true,
+          market: true,
+          assetType: true,
+        },
       });
-      if (!asset?.isActive) {
+      if (!asset?.isActive || isFuturesOnlyAsset(asset)) {
         this.sendCandleSubscriptionError(
           client,
           assetId,

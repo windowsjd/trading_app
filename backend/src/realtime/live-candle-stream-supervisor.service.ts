@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
 import { KoscomConfigService } from '../providers/koscom/koscom.config';
 import { MarketCandleIngestionService } from '../assets/market-candle-ingestion.service';
@@ -950,7 +951,7 @@ export class LiveCandleStreamSupervisorService
 
   private loadAssets(assetType: AssetType): Promise<LiveCandleAsset[]> {
     return this.prisma.asset.findMany({
-      where: { isActive: true, assetType },
+      where: { isActive: true, assetType, ...SPOT_ASSET_WHERE },
       select: {
         id: true,
         symbol: true,

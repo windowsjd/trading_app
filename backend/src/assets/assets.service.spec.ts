@@ -1394,6 +1394,34 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
 
+  it.each(['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'])(
+    'hides active Futures-only %s from Spot detail and ticker',
+    async (symbol) => {
+      const { prisma, service } = createService();
+      const only = asset({
+        id: `futures-${symbol}`,
+        symbol,
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        isActive: true,
+      });
+      prisma.asset.findUnique.mockResolvedValue(only);
+      prisma.asset.findFirst.mockResolvedValue(only);
+      await expectApiError(
+        service.getAsset('user-1', only.id),
+        404,
+        'ASSET_NOT_FOUND',
+      );
+      await expectApiError(
+        service.getAssetPrice('user-1', only.id),
+        404,
+        'ASSET_NOT_FOUND',
+      );
+      expect(await service.getAssetPriceForTicker(only.id)).toBeNull();
+      expectNoAssetWrites(prisma);
+    },
+  );
+
   it('returns NOT_FOUND when detail asset does not exist', async () => {
     const { prisma, service } = createService();
     prisma.asset.findUnique.mockResolvedValueOnce(null);

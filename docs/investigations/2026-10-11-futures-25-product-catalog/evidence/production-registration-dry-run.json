@@ -1,0 +1,102 @@
+{
+  "mode": "dry-run",
+  "database": "dpg-da7ac0e1egvs73e2sv20-a.singapore-postgres.render.com:5432/trading_app_fbbk",
+  "evaluatedAt": "2026-10-10T23:46:53.737Z",
+  "readOnlyTransaction": true,
+  "spotBefore": 25,
+  "spotAfter": 25,
+  "assetRowsBefore": 25,
+  "assetRowsAfter": 30,
+  "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "ZECUSDT",
+    "XRPUSDT",
+    "HYPEUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "NEARUSDT",
+    "ADAUSDT",
+    "WLDUSDT",
+    "TAOUSDT",
+    "ENAUSDT",
+    "LINKUSDT",
+    "AVAXUSDT",
+    "UNIUSDT",
+    "PUMPUSDT",
+    "BCHUSDT",
+    "TRUMPUSDT",
+    "FILUSDT",
+    "AAVEUSDT",
+    "LTCUSDT",
+    "ASTERUSDT",
+    "XLMUSDT"
+  ],
+  "blockers": [],
+  "createAssets": [
+    {
+      "symbol": "HYPEUSDT",
+      "name": "Hyperliquid"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "name": "Pump.Fun"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "name": "Bitcoin Cash"
+    },
+    {
+      "symbol": "FILUSDT",
+      "name": "Filecoin"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "name": "Aave"
+    }
+  ],
+  "createInstruments": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "SOLUSDT",
+    "ZECUSDT",
+    "XRPUSDT",
+    "HYPEUSDT",
+    "DOGEUSDT",
+    "BNBUSDT",
+    "SUIUSDT",
+    "NEARUSDT",
+    "ADAUSDT",
+    "WLDUSDT",
+    "TAOUSDT",
+    "ENAUSDT",
+    "LINKUSDT",
+    "AVAXUSDT",
+    "UNIUSDT",
+    "PUMPUSDT",
+    "BCHUSDT",
+    "TRUMPUSDT",
+    "FILUSDT",
+    "AAVEUSDT",
+    "LTCUSDT",
+    "ASTERUSDT",
+    "XLMUSDT"
+  ],
+  "updateInstruments": [],
+  "keepInstruments": [],
+  "counts": {
+    "assets": {
+      "create": 5,
+      "maintain": 20,
+      "change": 0
+    },
+    "instruments": {
+      "create": 25,
+      "maintain": 0,
+      "change": 0
+    }
+  },
+  "outsideCatalog": []
+}

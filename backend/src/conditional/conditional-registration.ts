@@ -12,6 +12,7 @@ import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { conditionalPrice } from './conditional-price';
 import { liveProtection } from './conditional-state';
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 
 /** Caller owns the existing account/lifecycle fence. Registration never reserves. */
 export async function createProtectionInTransaction(
@@ -43,6 +44,12 @@ export async function createProtectionInTransaction(
   const asset = await tx.asset.findUniqueOrThrow({
     where: { id: input.assetId },
   });
+  if (input.domain === 'spot' && isFuturesOnlyAsset(asset))
+    throw createApiError(
+      'ASSET_NOT_TRADABLE',
+      'Asset is not a Spot product.',
+      400,
+    );
   const existing = await tx.protectionGroup.findFirst({
     where: {
       tradingAccountId: input.accountId,

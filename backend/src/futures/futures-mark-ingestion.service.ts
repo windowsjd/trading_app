@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { Prisma } from '../generated/prisma/client';
 import {
   FUTURES_EXCHANGE_INFO_URL,
@@ -182,7 +183,13 @@ export class FuturesMarkIngestion implements OnModuleInit, OnModuleDestroy {
         const instruments = await this.prisma.futuresInstrument.findMany({
           where: {
             OR: [
-              { isActive: true },
+              {
+                isActive: true,
+                underlyingAsset: {
+                  isActive: true,
+                  symbol: { in: [...BINANCE_FUTURES_SYMBOLS] },
+                },
+              },
               { positions: { some: { status: 'open' } } },
             ],
           },

@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 jest.mock('../generated/prisma/client', () => ({
   Prisma: {
     Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
@@ -31,6 +32,7 @@ describe('Mark transport failure and independent REST recovery', () => {
   let service: FuturesMarkIngestion;
   const createMany = jest.fn().mockResolvedValue({ count: 1 });
   const groupBy = jest.fn().mockResolvedValue([]);
+  const targets = jest.fn();
   const sockets = () =>
     (
       WebSocket as unknown as {
@@ -44,14 +46,13 @@ describe('Mark transport failure and independent REST recovery', () => {
     sockets().length = 0;
     createMany.mockClear();
     groupBy.mockClear();
+    targets
+      .mockReset()
+      .mockResolvedValue([{ id: 'i', underlyingAsset: { symbol: 'BTCUSDT' } }]);
     service = new FuturesMarkIngestion(
       {
         futuresInstrument: {
-          findMany: jest
-            .fn()
-            .mockResolvedValue([
-              { id: 'i', underlyingAsset: { symbol: 'BTCUSDT' } },
-            ]),
+          findMany: targets,
         },
         futuresMarkSnapshot: { createMany, groupBy },
       } as unknown as PrismaService,
@@ -99,6 +100,24 @@ describe('Mark transport failure and independent REST recovery', () => {
     await service.cycle();
     expect(sockets()).toHaveLength(2);
   });
+  it('subscribes all 25 selected exact Mark streams, including Futures-only underlyings', async () => {
+    targets.mockResolvedValue(
+      BINANCE_FUTURES_SYMBOLS.map((symbol) => ({
+        id: symbol,
+        underlyingAsset: { symbol },
+      })),
+    );
+    await service.cycle();
+    const socket = sockets()[0];
+    socket.emit('open');
+    expect(JSON.parse(socket.send.mock.calls[0][0]).params).toEqual(
+      BINANCE_FUTURES_SYMBOLS.map((s) => `${s.toLowerCase()}@markPrice@1s`),
+    );
+    expect(targets.mock.calls[0][0].where.OR[1]).toEqual({
+      positions: { some: { status: 'open' } },
+    });
+  });
+
   it('coalesces duplicate/out-of-order frames and only writes valid provider evidence', async () => {
     await service.cycle();
     createMany.mockClear();

@@ -1,0 +1,21 @@
+{
+  "verdict": "PASS",
+  "spotSymbols": 25,
+  "futuresSymbols": 25,
+  "futuresOnly": [
+    "HYPEUSDT",
+    "PUMPUSDT",
+    "BCHUSDT",
+    "FILUSDT",
+    "AAVEUSDT"
+  ],
+  "spotQuoteRejections": 20,
+  "spotWsRejections": 15,
+  "lastMarkWs": 5,
+  "marketLifecycleFills": 20,
+  "limitCreateCancel": 5,
+  "idempotencyReplay": 5,
+  "exactLedgerChains": "PASS (focused account)",
+  "externalProviderAttempts": 0,
+  "fullFixtureAudit": "See separate harness audit; never replaced by this focused check"
+}

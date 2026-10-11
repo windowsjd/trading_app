@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
 import { presentFuturesPerformance } from './futures-position-display';
@@ -660,7 +661,13 @@ export class FuturesService {
     const account = await this.access.getOwnedAccountOrThrow(userId, accountId);
     const now = await this.dbNow(this.prisma);
     const rows = await this.prisma.futuresInstrument.findMany({
-      where: { isActive: true, underlyingAsset: { isActive: true } },
+      where: {
+        isActive: true,
+        underlyingAsset: {
+          isActive: true,
+          symbol: { in: [...BINANCE_FUTURES_SYMBOLS] },
+        },
+      },
       include: futuresInstrumentInclude,
       orderBy: { id: 'asc' },
     });

@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import {
   Injectable,
   Logger,
@@ -125,7 +126,10 @@ export class FuturesLastPriceIngestion
           {
             isActive: true,
             markVerifiedAt: { not: null },
-            underlyingAsset: { isActive: true },
+            underlyingAsset: {
+              isActive: true,
+              symbol: { in: [...BINANCE_FUTURES_SYMBOLS] },
+            },
           },
           { positions: { some: { status: 'open' } } },
         ],

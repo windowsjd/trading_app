@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../../src/providers/binance/binance-product-catalog';
 import { EventEmitter } from 'node:events';
 import { performance } from 'node:perf_hooks';
 import { BINANCE_FIXED_ASSET_UNIVERSE } from '../../src/providers/binance/binance-fixed-asset-universe';
@@ -247,7 +248,11 @@ export class Replay {
       for (const socket of this.sockets)
         for (const stream of socket.streams) {
           const symbol = stream.split('@')[0].toUpperCase();
-          if (!CRYPTO.some((a) => a.symbol === symbol)) {
+          if (
+            socket.kind === 'spot'
+              ? !CRYPTO.some((a) => a.symbol === symbol)
+              : !BINANCE_FUTURES_SYMBOLS.includes(symbol)
+          ) {
             this.metrics.failure('REPLAY_UNKNOWN_SYMBOL');
             continue;
           }
@@ -304,9 +309,14 @@ export class Replay {
     for (const s of [...this.sockets]) s.close();
   }
   fingerprint() {
-    return hash(
-      CRYPTO.map((a) => providerFrames(a.symbol, 20, 1700000000000, this.m)),
-    );
+    return hash({
+      spot: CRYPTO.map((a) =>
+        providerFrames(a.symbol, 20, 1700000000000, this.m),
+      ),
+      futures: BINANCE_FUTURES_SYMBOLS.map((symbol) =>
+        providerFrames(symbol, 20, 1700000000000, this.m),
+      ),
+    });
   }
   fetch = async (
     raw: string | URL | Request,
@@ -320,26 +330,24 @@ export class Replay {
       u.hostname === 'fapi.binance.com' &&
       u.pathname === '/fapi/v1/exchangeInfo'
     )
-      value = { symbols: CRYPTO.map((a) => contract(a.symbol)) };
+      value = { symbols: BINANCE_FUTURES_SYMBOLS.map(contract) };
     else if (
       u.hostname === 'fapi.binance.com' &&
       u.pathname === '/fapi/v2/ticker/price'
     )
-      value = CRYPTO.map((a) => ({
-        symbol: a.symbol,
-        price: replayPrice(a.symbol, this.priceTick, this.m.seed),
+      value = BINANCE_FUTURES_SYMBOLS.map((symbol) => ({
+        symbol,
+        price: replayPrice(symbol, this.priceTick, this.m.seed),
         time: now,
       }));
     else if (
       u.hostname === 'fapi.binance.com' &&
       u.pathname === '/fapi/v1/premiumIndex'
     )
-      value = CRYPTO.map((a) => ({
-        symbol: a.symbol,
-        markPrice: markPrice(
-          replayPrice(a.symbol, this.priceTick, this.m.seed),
-        ),
-        indexPrice: replayPrice(a.symbol, this.priceTick, this.m.seed),
+      value = BINANCE_FUTURES_SYMBOLS.map((symbol) => ({
+        symbol,
+        markPrice: markPrice(replayPrice(symbol, this.priceTick, this.m.seed)),
+        indexPrice: replayPrice(symbol, this.priceTick, this.m.seed),
         lastFundingRate: '0',
         nextFundingTime: now + 3600000,
         time: now,

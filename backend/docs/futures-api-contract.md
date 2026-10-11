@@ -13,7 +13,11 @@ does not change the default DISABLED mode.
 
 ## Identity and API
 
-`Asset` remains the Binance Spot underlying/reference asset. `FuturesInstrument`
+`Asset` is the reusable operational underlying/reference asset. Spot availability
+is separate from `isActive`: the unchanged fixed Spot 25 are retained, and
+HYPEUSDT/PUMPUSDT/BCHUSDT/FILUSDT/AAVEUSDT are active Futures-only underlyings.
+The exact Futures offering is the approved 25 in `binance-product-catalog.ts`;
+new entry and catalog reads reject contracts outside it. `FuturesInstrument`
 has its own durable ID and an explicit `synthetic_perpetual` product type and USD
 settlement currency, unique per underlying/product/currency. Only active Binance
 crypto assets priced/settled in USD qualify. Open/increase and the instrument
@@ -152,15 +156,30 @@ nonnegative margin, USD synthetic product, direction enum, and one-way uniquenes
 Immutable instrument identity and position lifetime identity/leverage prevent
 historical reinterpretation; service transactions own financial formulas.
 
-Provision instruments explicitly with `pnpm futures:provision-instruments`
-(dry-run) then `pnpm futures:provision-instruments --apply`. This only creates
-missing instrument rows for eligible existing assets and is safe to rerun; it
-does not change assets, wallets or the trading flag. The JSON report also names
-the target database (no credentials), per-symbol exclusion reasons, existing
-instruments with coverage state and ineligible Binance assets. New instruments
-join Mark and Futures Last ingestion targets within 30 seconds. Deployment order is additive
-`prisma migrate deploy` → new server/generated client → explicit provisioning;
-keep the mutation flag OFF. Financial API reads never provision or repair rows.
+Provision with `pnpm futures:provision-instruments --dry-run`. A dry-run requires
+`FUTURES_PROVISION_DRY_RUN_REDIS_URL` pointing to local Redis for the existing
+Binance REST coordinator, so production Valkey is never touched. It uses a
+PostgreSQL READ ONLY transaction and current exact exchangeInfo contracts.
+The plan reports all 25 symbols, five new operational underlyings, instrument
+create/maintain/reverify counts, conflicts and the unchanged Spot count. Missing
+shared Spot assets, inactive/conflicting identities or missing contracts block
+all writes. GET never provisions or repairs financial state.
+
+After the catalog code is deployed and separate registration approval is given,
+`--apply` additionally requires `FUTURES_PROVISION_EXPECTED_TARGET=host:port/database`.
+Apply is one Serializable transaction: create only the five Futures-only assets,
+create selected missing instruments and refresh expired/changed contract metadata.
+Existing Spot IDs/flags, wallets, positions, orders, ledger and the trading flag
+are untouched. Repeat apply is idempotent. This catalog change needs no migration.
+**Do not register active Futures-only assets against the old deployed server:**
+it does not have the Spot exclusion guards. Keep `FUTURES_TRADING_MODE=DISABLED`.
+
+Selected active instruments join Last/Mark targets within the existing 30-second
+refresh. An unoffered instrument with an open lifetime remains a target so risk,
+reduce/close, protection exits and Season settlement stay priced. Existing exact
+contract validation and 24-hour verification remain unchanged. Futures display
+precision comes from FAPI PRICE_FILTER metadata, with the approved Futures tick
+fallback, and never from the Spot tick table.
 
 ## F2 risk reads and durable system history
 

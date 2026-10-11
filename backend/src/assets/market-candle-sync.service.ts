@@ -1,3 +1,7 @@
+import {
+  SPOT_ASSET_WHERE,
+  isFuturesOnlyAsset,
+} from '../providers/binance/binance-product-catalog';
 import { KoscomCandleAdapter } from '../providers/koscom/koscom-candle.adapter';
 import {
   KOSCOM_MINUTE_SOURCE,
@@ -207,7 +211,7 @@ export class MarketCandleSyncService {
         isActive: true,
       },
     });
-    if (!asset) {
+    if (!asset || isFuturesOnlyAsset(asset)) {
       throw new MarketCandleSyncInputError(
         `Asset ${input.assetId} does not exist.`,
       );
@@ -253,6 +257,7 @@ export class MarketCandleSyncService {
         ...(input.assetTypes !== undefined
           ? { assetType: { in: [...input.assetTypes] } }
           : {}),
+        ...SPOT_ASSET_WHERE,
         ...(input.activeOnly !== false ? { isActive: true } : {}),
       },
       orderBy: [{ symbol: 'asc' }, { id: 'asc' }],

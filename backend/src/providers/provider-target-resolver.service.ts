@@ -1,3 +1,8 @@
+import {
+  SPOT_ASSET_WHERE,
+  isFuturesOnlyAsset,
+  isFuturesOnlySymbol,
+} from './binance/binance-product-catalog';
 import { Injectable } from '@nestjs/common';
 import { AssetType, CurrencyCode } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -108,6 +113,7 @@ export class ProviderTargetResolverService {
   ): Promise<ProviderTargets> {
     const assets = await this.prisma.asset.findMany({
       where: {
+        ...SPOT_ASSET_WHERE,
         isActive: true,
       },
       orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
@@ -155,6 +161,7 @@ export function resolveActiveAssetTargetsFromRecords(
   const unsupportedAssets: UnsupportedProviderTargetAsset[] = [];
 
   for (const asset of assets) {
+    if (isFuturesOnlyAsset(asset)) continue;
     const market = asset.market.trim().toUpperCase();
     const symbol = asset.symbol.trim().toUpperCase();
 
@@ -207,7 +214,8 @@ export function resolveActiveAssetTargetsFromRecords(
 
   return {
     targetSource,
-    activeAssetCount: assets.length,
+    activeAssetCount: assets.filter((asset) => !isFuturesOnlyAsset(asset))
+      .length,
     binanceSymbols: uniqueStrings(binanceSymbols),
     kisDomesticSymbols: uniqueStrings(kisDomesticSymbols),
     kisUsSymbols: uniqueStrings(kisUsSymbols),
@@ -225,8 +233,10 @@ export function resolveEnvProviderTargets(
   return {
     targetSource: 'env',
     activeAssetCount: 0,
-    binanceSymbols:
-      binanceSymbols.length > 0 ? binanceSymbols : DEFAULT_BINANCE_SYMBOLS,
+    binanceSymbols: (binanceSymbols.length > 0
+      ? binanceSymbols
+      : DEFAULT_BINANCE_SYMBOLS
+    ).filter((symbol) => !isFuturesOnlySymbol(symbol)),
     kisDomesticSymbols: resolveWithDefault(
       readCsvEnv(env, 'KIS_DOMESTIC_SYMBOLS'),
       KIS_FIXED_DOMESTIC_SYMBOLS,

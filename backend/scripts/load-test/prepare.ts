@@ -1,3 +1,8 @@
+import {
+  BINANCE_FUTURES_SYMBOLS,
+  BINANCE_FUTURES_ONLY_ASSETS,
+  isFuturesOnlyAsset,
+} from '../../src/providers/binance/binance-product-catalog';
 import { resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -34,7 +39,16 @@ export async function prepare(
     if ((await db.user.count()) !== 0)
       throw new Error('LOAD_TEST_PREPARE_REQUIRES_EMPTY_USER_DATA');
     const at = new Date();
-    for (const a of [...CRYPTO, ...STOCKS])
+    for (const a of [
+      ...CRYPTO,
+      ...STOCKS,
+      ...BINANCE_FUTURES_ONLY_ASSETS.map((a) => ({
+        ...a,
+        market: 'BINANCE' as const,
+        assetType: 'crypto' as const,
+        currencyCode: 'USD' as const,
+      })),
+    ])
       await db.asset.create({
         data: {
           symbol: a.symbol,
@@ -50,7 +64,7 @@ export async function prepare(
       orderBy: [{ assetType: 'asc' }, { symbol: 'asc' }],
     });
     const eligible = parseFuturesContracts({
-      symbols: CRYPTO.map((a) => contract(a.symbol)),
+      symbols: BINANCE_FUTURES_SYMBOLS.map(contract),
     });
     // The CURRENT coverage parser rejects non-ASCII contracts. Keep all Spot
     // assets, but never invent an alias or register an unverified Futures row.
@@ -69,7 +83,7 @@ export async function prepare(
     });
     const candles = new MarketCandlesRepository(db);
     const lastClosed = Math.floor(+at / 300000) * 300000;
-    for (const asset of assets) {
+    for (const asset of assets.filter((a) => !isFuturesOnlyAsset(a))) {
       const rows: MarketCandleUpsertInput[] = [];
       for (
         let t = lastClosed - m.fixture.candleDays * 86400000;
@@ -159,17 +173,21 @@ export async function prepare(
       await delay(500);
     }
     const actors: FixtureActor[] = [];
-    const crypto = assets.filter((a) => a.assetType === 'crypto');
+    const crypto = assets.filter(
+      (a) => a.assetType === 'crypto' && !isFuturesOnlyAsset(a),
+    );
     const data: Fixture = {
       version: 1,
       runId: m.runId,
       manifestHash,
       actors,
-      assets: assets.map((a) => ({
-        id: a.id,
-        symbol: a.symbol,
-        assetType: a.assetType,
-      })),
+      assets: assets
+        .filter((a) => !isFuturesOnlyAsset(a))
+        .map((a) => ({
+          id: a.id,
+          symbol: a.symbol,
+          assetType: a.assetType,
+        })),
       instruments: instruments.map((i) => ({
         id: i.id,
         underlyingAssetId: i.underlyingAssetId,

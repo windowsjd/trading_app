@@ -1,0 +1,70 @@
+{
+  "backendTypecheck": {
+    "result": "PASS",
+    "log": "/tmp/futures25-impl/typecheck-last.log"
+  },
+  "backendBuild": {
+    "result": "PASS",
+    "log": "/tmp/futures25-impl/build-final-complete.log"
+  },
+  "accountsLint": {
+    "result": "PASS",
+    "log": "/tmp/futures25-impl/lint-accounts-final.log"
+  },
+  "candlesLint": {
+    "result": "PASS",
+    "log": "/tmp/futures25-impl/lint-candles-verified.log"
+  },
+  "newFilesLint": {
+    "result": "PASS",
+    "command": "eslint scripts/futures-product-catalog-smoke.ts scripts/provision-futures-instruments.ts scripts/lib/futures-provision-plan{,.spec}.ts src/providers/binance/binance-product-catalog{,.spec}.ts"
+  },
+  "latestCandleSync": {
+    "suitesPassed": 1,
+    "testsPassed": 88,
+    "failed": 0,
+    "skipped": 0,
+    "newFuturesOnlyBackfillRejections": 5
+  },
+  "frontendTypecheck": "PASS",
+  "frontendRelatedTestFiles": {
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+  },
+  "harnessUnitTests": {
+    "passed": 38,
+    "failed": 0
+  },
+  "isolatedApiSummary": {
+    "failures": [],
+    "externalProviderAttempts": 0
+  },
+  "review": {
+    "gitDiffCheck": "PASS",
+    "newTestSkipOrAssertionWeakening": false,
+    "secretsInEvidence": false,
+    "frontendProductChanges": false,
+    "schemaMigrationChanges": false,
+    "financialArithmeticAndFreshnessChanges": false
+  },
+  "cleanup": {
+    "isolatedApi3301": "stopped",
+    "ownRedis56388": "stopped",
+    "ownPostgres55431": "stopped",
+    "testDataFiles": "retained"
+  },
+  "git": {
+    "branch": "main",
+    "head": "3433701c9c9815da813ed21049d6126d3b6aefb2",
+    "committed": false,
+    "pushed": false
+  },
+  "cloud": {
+    "productionRegistrationExecuted": false,
+    "productionMigrationExecuted": false,
+    "renderConfigurationChanged": false,
+    "deploymentExecuted": false,
+    "1000UserLoadTestExecuted": false
+  }
+}

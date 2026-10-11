@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 jest.mock('../generated/prisma/client', () => {
   const runtime = jest.requireActual<{ Decimal: unknown }>(
     '@prisma/client/runtime/client',
@@ -1336,7 +1337,9 @@ describe('MarketCandleSyncService', () => {
     const result = await harness.service.syncAssets({ now: NOW });
     expect(result.processedAssets).toBe(2);
     expect(harness.prisma.asset.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { isActive: true } }),
+      expect.objectContaining({
+        where: { isActive: true, ...SPOT_ASSET_WHERE },
+      }),
     );
     expect(harness.binanceCandles.fetchKlinesPage).toHaveBeenCalledWith(
       expect.objectContaining({ symbol: 'NEWUSDT', interval: '1d' }),
@@ -1354,7 +1357,7 @@ describe('MarketCandleSyncService', () => {
     });
     expect(harness.prisma.asset.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: { in: assetIds }, isActive: true },
+        where: { id: { in: assetIds }, isActive: true, ...SPOT_ASSET_WHERE },
       }),
     );
     expect(result.processedAssets).toBe(1);
@@ -1524,6 +1527,19 @@ describe('MarketCandleSyncService', () => {
       harness.service.syncAsset({ assetId: 'missing', now: NOW }),
     ).rejects.toBeInstanceOf(MarketCandleSyncInputError);
   });
+
+  it.each(['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'])(
+    'rejects explicit Spot candle backfill of active Futures-only %s before provider I/O',
+    async (symbol) => {
+      const asset = { ...CRYPTO_ASSET, id: symbol, symbol };
+      const harness = createHarness({ assets: [asset] });
+      await expect(
+        harness.service.syncAsset({ assetId: asset.id, now: NOW }),
+      ).rejects.toBeInstanceOf(MarketCandleSyncInputError);
+      expect(harness.binanceCandles.fetchKlinesPage).not.toHaveBeenCalled();
+      expect(harness.repository.upsertMany).not.toHaveBeenCalled();
+    },
+  );
 
   it('releases the lock even when the run fails', async () => {
     const harness = createHarness();

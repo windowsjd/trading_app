@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 import { Injectable } from '@nestjs/common';
 import {
   AssetType,
@@ -103,7 +104,7 @@ export class LimitOrderCandidateRepository {
       status: OrderStatus.submitted,
       orderType: OrderType.limit,
       reservationFeeRate: { not: null },
-      asset: { isActive: true },
+      asset: { isActive: true, ...SPOT_ASSET_WHERE },
       AND: [
         {
           OR: [

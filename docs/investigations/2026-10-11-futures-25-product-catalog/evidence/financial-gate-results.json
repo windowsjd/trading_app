@@ -1,0 +1,493 @@
+{
+  "method": "Original 22 PostgreSQL financial gate suites, sequential fresh migrated databases; original assertions and freshness unchanged. Initial failures and opt-in omissions retained below; final results include explicit F1/F3/F3.1 execution.",
+  "initial": {
+    "result": [
+      {
+        "suite": "src/orders/order-input-policy.integration.spec.ts",
+        "database": "futures25_suite_0_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-0"
+      },
+      {
+        "suite": "src/orders/limit-order-reservation.integration.spec.ts",
+        "database": "futures25_suite_1_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-1"
+      },
+      {
+        "suite": "src/wallets/spot-wallet-transfer.integration.spec.ts",
+        "database": "futures25_suite_2_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-2"
+      },
+      {
+        "suite": "src/wallets/wallet-fx-transfer.integration.spec.ts",
+        "database": "futures25_suite_3_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-3"
+      },
+      {
+        "suite": "src/futures/futures.integration.spec.ts",
+        "database": "futures25_suite_4_test",
+        "exitCode": 1,
+        "passed": 0,
+        "failed": 1,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-4"
+      },
+      {
+        "suite": "src/futures/futures-risk.integration.spec.ts",
+        "database": "futures25_suite_5_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-5"
+      },
+      {
+        "suite": "src/futures/futures-f3.integration.spec.ts",
+        "database": "futures25_suite_6_test",
+        "exitCode": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1,
+        "files": "/tmp/futures25-impl/isolated-6"
+      },
+      {
+        "suite": "src/futures/futures-f31.integration.spec.ts",
+        "database": "futures25_suite_7_test",
+        "exitCode": 0,
+        "passed": 0,
+        "failed": 0,
+        "skipped": 1,
+        "files": "/tmp/futures25-impl/isolated-7"
+      },
+      {
+        "suite": "src/conditional/conditional.integration.spec.ts",
+        "database": "futures25_suite_8_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-8"
+      },
+      {
+        "suite": "src/futures/futures-limit.integration.spec.ts",
+        "database": "futures25_suite_9_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-9"
+      },
+      {
+        "suite": "src/futures/futures-isolated-boundary.integration.spec.ts",
+        "database": "futures25_suite_10_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-10"
+      },
+      {
+        "suite": "src/orders/limit-order-create-race.integration.spec.ts",
+        "database": "futures25_suite_11_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-11"
+      },
+      {
+        "suite": "src/orders/limit-order-transaction-time.integration.spec.ts",
+        "database": "futures25_suite_12_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-12"
+      },
+      {
+        "suite": "src/orders/trading-transaction-time.integration.spec.ts",
+        "database": "futures25_suite_13_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-13"
+      },
+      {
+        "suite": "src/orders/trading-fee-pinning.integration.spec.ts",
+        "database": "futures25_suite_14_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-14"
+      },
+      {
+        "suite": "src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "database": "futures25_suite_15_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-15"
+      },
+      {
+        "suite": "src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "database": "futures25_suite_16_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-16"
+      },
+      {
+        "suite": "src/orders/limit-order-matching.integration.spec.ts",
+        "database": "futures25_suite_17_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-17"
+      },
+      {
+        "suite": "src/orders/orders.execute.integration.spec.ts",
+        "database": "futures25_suite_18_test",
+        "exitCode": 0,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-18"
+      },
+      {
+        "suite": "src/orders/market-execution.integration.spec.ts",
+        "database": "futures25_suite_19_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-19"
+      },
+      {
+        "suite": "src/fx/fx.execute.integration.spec.ts",
+        "database": "futures25_suite_20_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-20"
+      },
+      {
+        "suite": "src/mvp-flow.integration.spec.ts",
+        "database": "futures25_suite_21_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-21"
+      }
+    ],
+    "events": [
+      {
+        "suite": "src/wallets/wallet-fx-transfer.integration.spec.ts",
+        "at": "2026-10-10T23:48:33.577Z",
+        "stepMs": -1140.2606460000006
+      },
+      {
+        "suite": "src/futures/futures.integration.spec.ts",
+        "at": "2026-10-10T23:49:05.012Z",
+        "stepMs": -1086.3902910000033
+      },
+      {
+        "suite": "src/futures/futures-risk.integration.spec.ts",
+        "at": "2026-10-10T23:49:36.450Z",
+        "stepMs": -1025.215784
+      },
+      {
+        "suite": "src/futures/futures-limit.integration.spec.ts",
+        "at": "2026-10-10T23:50:07.916Z",
+        "stepMs": -1072.8224180000107
+      },
+      {
+        "suite": "src/orders/trading-transaction-time.integration.spec.ts",
+        "at": "2026-10-10T23:50:39.343Z",
+        "stepMs": -1064.7731040000217
+      },
+      {
+        "suite": "src/orders/trading-transaction-time.integration.spec.ts",
+        "at": "2026-10-10T23:51:10.752Z",
+        "stepMs": -1070.157275000005
+      }
+    ],
+    "complete": true
+  },
+  "explicitRechecks": {
+    "result": [
+      {
+        "suite": "src/futures/futures.integration.spec.ts",
+        "database": "futures25_recheck_0_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/recheck-0"
+      },
+      {
+        "suite": "src/futures/futures-f3.integration.spec.ts",
+        "database": "futures25_recheck_1_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/recheck-1"
+      },
+      {
+        "suite": "src/futures/futures-f31.integration.spec.ts",
+        "database": "futures25_recheck_2_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/recheck-2"
+      }
+    ],
+    "events": [
+      {
+        "suite": "src/futures/futures.integration.spec.ts",
+        "at": "2026-10-10T23:52:13.660Z",
+        "stepMs": -1072.8003289999979
+      },
+      {
+        "suite": "src/futures/futures-f3.integration.spec.ts",
+        "at": "2026-10-10T23:52:45.085Z",
+        "stepMs": -1078.4813520000025
+      },
+      {
+        "suite": "src/futures/futures-f31.integration.spec.ts",
+        "at": "2026-10-10T23:53:16.488Z",
+        "stepMs": -1059.7961380000052
+      }
+    ],
+    "complete": true
+  },
+  "final": {
+    "suites": 22,
+    "passed": 23,
+    "failed": 0,
+    "skipped": 0,
+    "suiteResults": [
+      {
+        "suite": "src/orders/order-input-policy.integration.spec.ts",
+        "database": "futures25_suite_0_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-0"
+      },
+      {
+        "suite": "src/orders/limit-order-reservation.integration.spec.ts",
+        "database": "futures25_suite_1_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-1"
+      },
+      {
+        "suite": "src/wallets/spot-wallet-transfer.integration.spec.ts",
+        "database": "futures25_suite_2_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-2"
+      },
+      {
+        "suite": "src/wallets/wallet-fx-transfer.integration.spec.ts",
+        "database": "futures25_suite_3_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-3"
+      },
+      {
+        "suite": "src/futures/futures.integration.spec.ts",
+        "database": "futures25_recheck_0_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/recheck-0"
+      },
+      {
+        "suite": "src/futures/futures-risk.integration.spec.ts",
+        "database": "futures25_suite_5_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-5"
+      },
+      {
+        "suite": "src/futures/futures-f3.integration.spec.ts",
+        "database": "futures25_recheck_1_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/recheck-1"
+      },
+      {
+        "suite": "src/futures/futures-f31.integration.spec.ts",
+        "database": "futures25_recheck_2_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/recheck-2"
+      },
+      {
+        "suite": "src/conditional/conditional.integration.spec.ts",
+        "database": "futures25_suite_8_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-8"
+      },
+      {
+        "suite": "src/futures/futures-limit.integration.spec.ts",
+        "database": "futures25_suite_9_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-9"
+      },
+      {
+        "suite": "src/futures/futures-isolated-boundary.integration.spec.ts",
+        "database": "futures25_suite_10_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-10"
+      },
+      {
+        "suite": "src/orders/limit-order-create-race.integration.spec.ts",
+        "database": "futures25_suite_11_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-11"
+      },
+      {
+        "suite": "src/orders/limit-order-transaction-time.integration.spec.ts",
+        "database": "futures25_suite_12_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-12"
+      },
+      {
+        "suite": "src/orders/trading-transaction-time.integration.spec.ts",
+        "database": "futures25_suite_13_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-13"
+      },
+      {
+        "suite": "src/orders/trading-fee-pinning.integration.spec.ts",
+        "database": "futures25_suite_14_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-14"
+      },
+      {
+        "suite": "src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "database": "futures25_suite_15_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-15"
+      },
+      {
+        "suite": "src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "database": "futures25_suite_16_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-16"
+      },
+      {
+        "suite": "src/orders/limit-order-matching.integration.spec.ts",
+        "database": "futures25_suite_17_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-17"
+      },
+      {
+        "suite": "src/orders/orders.execute.integration.spec.ts",
+        "database": "futures25_suite_18_test",
+        "exitCode": 0,
+        "passed": 2,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-18"
+      },
+      {
+        "suite": "src/orders/market-execution.integration.spec.ts",
+        "database": "futures25_suite_19_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-19"
+      },
+      {
+        "suite": "src/fx/fx.execute.integration.spec.ts",
+        "database": "futures25_suite_20_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-20"
+      },
+      {
+        "suite": "src/mvp-flow.integration.spec.ts",
+        "database": "futures25_suite_21_test",
+        "exitCode": 0,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0,
+        "files": "/tmp/futures25-impl/isolated-21"
+      }
+    ]
+  }
+}

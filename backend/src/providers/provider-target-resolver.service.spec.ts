@@ -23,6 +23,30 @@ import {
 } from './binance/binance-fixed-asset-universe';
 
 describe('ProviderTargetResolverService', () => {
+  it('never adds Futures-only assets to Spot provider targets, including explicit env/base symbols', () => {
+    const symbols = ['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'];
+    const records = symbols.map((symbol) =>
+      asset({
+        symbol,
+        market: 'BINANCE',
+        assetType: AssetType.crypto,
+        currencyCode: CurrencyCode.USD,
+      }),
+    );
+    expect(
+      resolveActiveAssetTargetsFromRecords(records).binanceSymbols,
+    ).toEqual([]);
+    expect(
+      resolveActiveAssetTargetsFromRecords(records).unsupportedAssets,
+    ).toEqual([]);
+    expect(
+      resolveEnvProviderTargets({
+        BINANCE_CRYPTO_SYMBOLS:
+          'BTCUSDT,HYPEUSDT,PUMP,BCHUSDT,FILUSDT,AAVEUSDT',
+      }).binanceSymbols,
+    ).toEqual(['BTCUSDT']);
+  });
+
   it('includes all fixed assets in active and merged targets using either base or USDT symbols', async () => {
     const records = BINANCE_FIXED_ASSET_UNIVERSE.flatMap((entry) =>
       [entry.baseAsset, entry.symbol].map((symbol) =>

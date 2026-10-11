@@ -1,3 +1,4 @@
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import {
@@ -132,6 +133,7 @@ const EXEC_ORDER_SELECT = {
   asset: {
     select: {
       id: true,
+      symbol: true,
       isActive: true,
       assetType: true,
       market: true,
@@ -348,7 +350,7 @@ export class LimitOrderExecutionService {
           'General order carries a season participant link.',
         );
       }
-      if (!order.asset.isActive) {
+      if (!order.asset.isActive || isFuturesOnlyAsset(order.asset)) {
         return { state: 'skipped', orderId, reason: 'asset_inactive' };
       }
 

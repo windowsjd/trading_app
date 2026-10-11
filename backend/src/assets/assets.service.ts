@@ -1,3 +1,7 @@
+import {
+  SPOT_ASSET_WHERE,
+  isFuturesOnlyAsset,
+} from '../providers/binance/binance-product-catalog';
 import { fxExecuteSnapshotFreshnessThresholdMs } from '../fx/fx-execute-snapshot-policy';
 import {
   buildSelectionFailureEvidence,
@@ -711,7 +715,7 @@ export class AssetsService {
       select: this.assetSelect(),
     });
 
-    if (!asset) {
+    if (!asset || isFuturesOnlyAsset(asset)) {
       this.throwApiError(
         HttpStatus.NOT_FOUND,
         'ASSET_NOT_FOUND',
@@ -764,7 +768,7 @@ export class AssetsService {
       select: this.assetSelect(),
     });
 
-    if (!asset) {
+    if (!asset || isFuturesOnlyAsset(asset)) {
       this.throwApiError(
         HttpStatus.NOT_FOUND,
         'ASSET_NOT_FOUND',
@@ -850,12 +854,13 @@ export class AssetsService {
     const asset = await this.prisma.asset.findFirst({
       where: {
         id: parsedAssetId,
+        ...SPOT_ASSET_WHERE,
         isActive: true,
       },
       select: this.assetSelect(),
     });
 
-    if (!asset) {
+    if (!asset || isFuturesOnlyAsset(asset)) {
       return null;
     }
 
@@ -1474,6 +1479,7 @@ export class AssetsService {
 
   private buildAssetWhere(query: ParsedAssetsQuery): Prisma.AssetWhereInput {
     return {
+      ...SPOT_ASSET_WHERE,
       ...(query.includeInactive ? {} : { isActive: true }),
       ...(query.assetType ? { assetType: query.assetType } : {}),
       ...(query.currencyCode ? { currencyCode: query.currencyCode } : {}),

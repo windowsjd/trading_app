@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 jest.mock('../generated/prisma/client', () => ({
   PrismaClient: class PrismaClient {},
   AssetType: {
@@ -54,7 +55,7 @@ describe('RealtimeAssetMetadataCacheService', () => {
     expect(findFirst).toHaveBeenCalledTimes(1);
     expect(findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'asset-doge', isActive: true },
+        where: { id: 'asset-doge', isActive: true, ...SPOT_ASSET_WHERE },
       }),
     );
     expect(first).toMatchObject({

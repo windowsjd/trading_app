@@ -1,5 +1,10 @@
+import { isOfferedFuturesSymbol } from '../providers/binance/binance-product-catalog';
 import type { Prisma } from '../generated/prisma/client';
 import type { InstrumentWithAsset } from './futures.presenter';
+import {
+  parseTickSizeDisplayDecimals,
+  readPriceFilterTickSize,
+} from '../providers/binance/binance-tick-size';
 
 export const FUTURES_EXCHANGE_INFO_URL =
   'https://fapi.binance.com/fapi/v1/exchangeInfo';
@@ -34,6 +39,8 @@ export function parseFuturesContracts(
       p.underlyingType !== 'COIN'
     )
       continue;
+    const tickSize = readPriceFilterTickSize(p) ?? p.priceTickSize;
+    const decimals = parseTickSizeDisplayDecimals(tickSize);
     contracts.set(p.symbol, {
       symbol: p.symbol,
       pair: p.symbol,
@@ -43,6 +50,9 @@ export function parseFuturesContracts(
       quoteAsset: 'USDT',
       marginAsset: 'USDT',
       underlyingType: 'COIN',
+      ...(typeof tickSize === 'string' && decimals !== null && decimals <= 8
+        ? { priceTickSize: tickSize }
+        : {}),
     });
   }
   return contracts;
@@ -53,6 +63,7 @@ export function verifiedFuturesInstrument(
 ) {
   const asset = instrument.underlyingAsset;
   if (
+    !isOfferedFuturesSymbol(asset.symbol) ||
     !instrument.isActive ||
     !asset.isActive ||
     instrument.productType !== 'synthetic_perpetual' ||

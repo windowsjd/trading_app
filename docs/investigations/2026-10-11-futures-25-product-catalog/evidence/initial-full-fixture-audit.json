@@ -1,0 +1,52 @@
+{
+  "at": "2026-10-10T23:31:51.057Z",
+  "verdict": "CORRECTNESS FAIL",
+  "accounts": 10,
+  "examinedOrders": 52,
+  "examinedExecutions": 20,
+  "examinedLedgers": 160,
+  "liquidationAccounts": 0,
+  "findings": [
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "8695f075-cfae-45b8-bc61-0f931547d821",
+      "rowId": "ec3ea25a-6341-415f-be53-9b92b20a10b8"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "8695f075-cfae-45b8-bc61-0f931547d821",
+      "rowId": "d1282697-922a-4dda-9172-ead8deb18f2f"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "1cd3e2d0-136c-4d3a-83d0-1ef15a2e3f03",
+      "rowId": "0bbfddd5-54e2-40e8-b433-6317fa958552"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "1cd3e2d0-136c-4d3a-83d0-1ef15a2e3f03",
+      "rowId": "c7df18fb-2323-4d66-aaec-85390b42a350"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "89206249-fdef-4611-8954-3f683a679cf2",
+      "rowId": "e45c83f5-b3b6-4ded-89d3-bf9d4e9f2e7d"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "89206249-fdef-4611-8954-3f683a679cf2",
+      "rowId": "970eb392-0fe1-4070-8bf6-ae552a98362d"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "abf84cb9-5a8e-4f85-8b36-50890f837af1",
+      "rowId": "858c47b3-39cb-4dda-914a-06fb210c7f62"
+    },
+    {
+      "code": "WALLET_LEDGER_BALANCE_CHAIN",
+      "accountId": "abf84cb9-5a8e-4f85-8b36-50890f837af1",
+      "rowId": "8896cab8-f8ed-4970-84d3-f20f982df3a0"
+    }
+  ],
+  "arithmetic": "Existing Prisma Decimal and Futures calculation policy; exact equality, no floating point tolerance"
+}

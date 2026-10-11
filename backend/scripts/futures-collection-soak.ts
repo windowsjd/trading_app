@@ -1,3 +1,7 @@
+import {
+  BINANCE_FUTURES_SYMBOLS,
+  BINANCE_FUTURES_ONLY_ASSETS,
+} from '../src/providers/binance/binance-product-catalog';
 /** Real Last + Mark + Spot collection, finance probes, workers and recovery.
  * Disposable loopback DB/Redis only; public Binance market APIs only.
  * SOAK_SECONDS=86400 SOAK_REPORT=/absolute/path.json (also .samples.jsonl).
@@ -219,11 +223,33 @@ async function main() {
   });
   const contracts = parseFuturesContracts(json);
   const selected = process.env.SOAK_SYMBOLS?.split(',');
-  const universe = BINANCE_FIXED_ASSET_UNIVERSE.filter(
-    (a) => !selected || selected.includes(a.symbol),
-  );
+  if (selected)
+    assert.ok(
+      selected.every((symbol) => BINANCE_FUTURES_SYMBOLS.includes(symbol)),
+      'SOAK_SYMBOLS must use approved exact Futures identities',
+    );
+  const universe = [
+    ...BINANCE_FIXED_ASSET_UNIVERSE.filter((a) =>
+      BINANCE_FUTURES_SYMBOLS.includes(a.symbol),
+    ),
+    ...BINANCE_FUTURES_ONLY_ASSETS.map((a) => ({
+      ...a,
+      baseAsset: a.symbol.slice(0, -4),
+      priceTickSize: null,
+      displayPriceDecimals: 8,
+      market: 'BINANCE' as const,
+      assetType: 'crypto' as const,
+      currencyCode: 'USD' as const,
+      priceCurrency: 'USD' as const,
+      settlementCurrency: 'USD' as const,
+    })),
+  ].filter((a) => !selected || selected.includes(a.symbol));
   assert.ok(universe.length > 0);
-  process.env.BINANCE_SYMBOLS = universe.map((a) => a.symbol).join(',');
+  process.env.BINANCE_SYMBOLS = BINANCE_FIXED_ASSET_UNIVERSE.filter((a) =>
+    universe.some((u) => u.symbol === a.symbol),
+  )
+    .map((a) => a.symbol)
+    .join(',');
   for (const item of universe) {
     const {
       baseAsset: _base,
@@ -331,7 +357,9 @@ async function main() {
           startedAt,
           database: urlIdentity(),
           instruments: instruments.length,
-          spotSymbols: universe.length,
+          spotSymbols: BINANCE_FIXED_ASSET_UNIVERSE.filter((a) =>
+            universe.some((u) => u.symbol === a.symbol),
+          ).length,
           samples,
           evaluatedFreshSamples,
           badFreshSamples,

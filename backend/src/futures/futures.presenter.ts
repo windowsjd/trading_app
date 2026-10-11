@@ -1,4 +1,5 @@
-import { BINANCE_FIXED_ASSET_UNIVERSE } from '../providers/binance/binance-fixed-asset-universe';
+import { FUTURES_DISPLAY_DECIMALS } from '../providers/binance/binance-product-catalog';
+import { parseTickSizeDisplayDecimals } from '../providers/binance/binance-tick-size';
 import type {
   FuturesExecution,
   FuturesInstrument,
@@ -11,6 +12,11 @@ export type InstrumentWithAsset = FuturesInstrument & {
   underlyingAsset: Asset;
 };
 export function presentFuturesInstrument(row: InstrumentWithAsset) {
+  const contract = row.markContractJson;
+  const tickDecimals =
+    contract && typeof contract === 'object' && !Array.isArray(contract)
+      ? parseTickSizeDisplayDecimals(contract.priceTickSize)
+      : null;
   return {
     id: row.id,
     productType: row.productType,
@@ -21,12 +27,11 @@ export function presentFuturesInstrument(row: InstrumentWithAsset) {
       symbol: row.underlyingAsset.symbol,
       name: row.underlyingAsset.name,
       market: row.underlyingAsset.market,
-      // Reuse underlying tick display metadata; unknown crypto keeps precision
-      // instead of falling through to the generic USD two-decimal formatter.
+      // Display only; execution arithmetic and eight-decimal evidence stay intact.
       displayPriceDecimals:
-        BINANCE_FIXED_ASSET_UNIVERSE.find(
-          (entry) => entry.symbol === row.underlyingAsset.symbol,
-        )?.displayPriceDecimals ?? 8,
+        tickDecimals !== null && tickDecimals <= 8
+          ? tickDecimals
+          : (FUTURES_DISPLAY_DECIMALS[row.underlyingAsset.symbol] ?? 8),
     },
   };
 }

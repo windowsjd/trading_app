@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../src/providers/binance/binance-product-catalog';
 import 'dotenv/config';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -185,10 +186,35 @@ async function fixture(mode: TradingAccountMode, cash = '10000') {
   await price(s);
   return s;
 }
+const allocatedSymbols = new Map<string, number>();
 async function newInstrument() {
+  const symbol =
+    BINANCE_FUTURES_SYMBOLS.find((value) => !allocatedSymbols.has(value)) ??
+    [...allocatedSymbols].sort((a, b) => a[1] - b[1])[0]?.[0];
+  assert.ok(symbol, 'Futures fixture exhausted approved contract identities');
+  const references = (allocatedSymbols.get(symbol) ?? 0) + 1;
+  allocatedSymbols.set(symbol, references);
+  // The cursor gate intentionally has more accounts than offered contracts.
+  // Share the same-price canonical instrument after all 25 identities are used;
+  // retain every account/position and the original multi-batch assertions.
+  if (references > 1) {
+    const asset = await db.asset.findUniqueOrThrow({
+      where: { market_symbol: { market: 'BINANCE', symbol } },
+    });
+    const instrument = await db.futuresInstrument.findUniqueOrThrow({
+      where: {
+        underlyingAssetId_productType_settlementCurrency: {
+          underlyingAssetId: asset.id,
+          productType: 'synthetic_perpetual',
+          settlementCurrency: 'USD',
+        },
+      },
+    });
+    return { asset, instrument };
+  }
   const asset = await db.asset.create({
     data: {
-      symbol: `F1${randomUUID().replaceAll('-', '').slice(0, 12).toUpperCase()}USDT`,
+      symbol,
       name: 'F1 fixture',
       market: 'BINANCE',
       assetType: 'crypto',
@@ -499,6 +525,11 @@ async function cleanup(s: Scenario) {
   await db.tradingAccount.delete({ where: { id: s.accountId } });
   if (s.season) await db.season.delete({ where: { id: s.season.id } });
   for (const row of s.instruments) {
+    const references = (allocatedSymbols.get(row.asset.symbol) ?? 1) - 1;
+    if (references > 0) {
+      allocatedSymbols.set(row.asset.symbol, references);
+      continue;
+    }
     await db.futuresMarkSnapshot.deleteMany({
       where: { instrumentId: row.instrument.id },
     });
@@ -510,6 +541,7 @@ async function cleanup(s: Scenario) {
       where: { assetId: row.asset.id },
     });
     await db.asset.delete({ where: { id: row.asset.id } });
+    allocatedSymbols.delete(row.asset.symbol);
   }
   await db.user.delete({ where: { id: s.userId } });
 }

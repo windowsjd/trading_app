@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from './binance/binance-product-catalog';
 import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from './asset-price-snapshot-query';
 import { Injectable } from '@nestjs/common';
 import {
@@ -201,6 +202,7 @@ export class MarketSnapshotHealthService {
     return this.prisma.asset.findMany({
       where: {
         isActive: true,
+        ...SPOT_ASSET_WHERE,
       },
       orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
       select: {

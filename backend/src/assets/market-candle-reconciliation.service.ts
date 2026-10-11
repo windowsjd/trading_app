@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   AssetType,
@@ -91,6 +92,7 @@ export class MarketCandleReconciliationService {
     );
     const assets = await this.prisma.asset.findMany({
       where: {
+        ...SPOT_ASSET_WHERE,
         isActive: true,
         ...(input.assetIds?.length ? { id: { in: input.assetIds } } : {}),
         ...(input.assetTypes?.length
@@ -195,7 +197,7 @@ export class MarketCandleReconciliationService {
           ? AssetType.us_stock
           : AssetType.crypto;
     const assets = await this.prisma.asset.findMany({
-      where: { isActive: true, assetType },
+      where: { isActive: true, assetType, ...SPOT_ASSET_WHERE },
       select: { id: true, assetType: true, market: true },
     });
     if (assets.length === 0) return true;

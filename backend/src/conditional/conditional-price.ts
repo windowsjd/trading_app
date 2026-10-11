@@ -1,3 +1,4 @@
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { type Asset, Prisma } from '../generated/prisma/client';
 import { readFuturesLastPrice } from '../futures/futures-last-price';
 import { futuresInstrumentInclude } from '../futures/futures.presenter';
@@ -63,6 +64,7 @@ export async function conditionalPrice(
         }
       : null;
   }
+  if (isFuturesOnlyAsset(asset)) return null;
   try {
     assertOrderSessionAllowed(asset, now, 'market');
   } catch {

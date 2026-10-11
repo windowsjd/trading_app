@@ -1,3 +1,4 @@
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { PortfolioValuationService } from '../portfolio/portfolio-valuation.service';
@@ -2750,7 +2751,7 @@ export class OrdersService {
       this.assertSeasonTradable(participant.season, executedAt);
       this.assertParticipantTradable(participant.participantStatus);
     }
-    if (!order.asset.isActive)
+    if (!order.asset.isActive || isFuturesOnlyAsset(order.asset))
       this.throwApiError(
         HttpStatus.CONFLICT,
         'ASSET_NOT_TRADABLE',
@@ -5663,7 +5664,8 @@ export class OrdersService {
       quote.currencyCode !== this.getAssetSettlementCurrency(quote.asset) ||
       quote.requestHash !== expectedRequestHash ||
       !quote.quotedPrice ||
-      !quote.asset.isActive
+      !quote.asset.isActive ||
+      isFuturesOnlyAsset(quote.asset)
     ) {
       setAdminDiagnosticContext({
         evidence: {
@@ -6246,7 +6248,7 @@ export class OrdersService {
       );
     }
 
-    if (!asset.isActive) {
+    if (!asset.isActive || isFuturesOnlyAsset(asset)) {
       this.throwApiError(
         HttpStatus.BAD_REQUEST,
         'ASSET_NOT_TRADABLE',

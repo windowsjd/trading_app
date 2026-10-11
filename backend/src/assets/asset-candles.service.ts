@@ -1,3 +1,4 @@
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { KoscomCandleReaderService } from './koscom-candle-reader.service';
 import { KoscomError } from '../providers/koscom/koscom.config';
 import { Optional } from '@nestjs/common';
@@ -371,7 +372,7 @@ export class AssetCandlesService {
       select: this.assetSelect(),
     });
 
-    if (!asset) {
+    if (!asset || isFuturesOnlyAsset(asset)) {
       this.throwApiError(
         HttpStatus.NOT_FOUND,
         'ASSET_NOT_FOUND',

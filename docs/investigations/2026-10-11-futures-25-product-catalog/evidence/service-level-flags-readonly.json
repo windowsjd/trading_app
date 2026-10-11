@@ -1,0 +1,9 @@
+{
+  "pages": [
+    37
+  ],
+  "flags": {
+    "BINANCE_WEBSOCKET_STREAMING_ENABLED": "true",
+    "BINANCE_PUBLIC_MARKET_DATA_ENABLED": "true"
+  }
+}

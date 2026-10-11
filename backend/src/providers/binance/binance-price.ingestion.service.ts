@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from './binance-product-catalog';
 import { Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -308,6 +309,7 @@ export class BinancePriceIngestionService {
         : [input.providerSymbol, input.baseSymbol];
     const assets = await this.prisma.asset.findMany({
       where: {
+        ...SPOT_ASSET_WHERE,
         market: BINANCE_MARKET,
         symbol: {
           in: candidateSymbols,

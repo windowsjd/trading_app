@@ -1,3 +1,4 @@
+import { isFuturesOnlySymbol } from './binance/binance-product-catalog';
 import { Injectable } from '@nestjs/common';
 import {
   normalizeUppercaseCsv,
@@ -223,8 +224,10 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
     // truth), NOT a separate BTC/ETH pair. The ticker WebSocket streaming
     // service subscribes from this list, so an unset BINANCE_CRYPTO_SYMBOLS
     // must still stream all 25 registered coins.
-    symbols:
-      binanceSymbols.length > 0 ? binanceSymbols : [...BINANCE_FIXED_SYMBOLS],
+    symbols: (binanceSymbols.length > 0
+      ? binanceSymbols
+      : [...BINANCE_FIXED_SYMBOLS]
+    ).filter((symbol) => !isFuturesOnlySymbol(symbol)),
     usdtAsUsdEquivalent: readBooleanEnv(
       env,
       'BINANCE_CRYPTO_USDT_AS_USD_EQUIVALENT',

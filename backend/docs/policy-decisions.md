@@ -1,5 +1,12 @@
 # Policy Decisions
 
+## Spot / Futures 상품 제공 범위 (2026-10-11, current)
+
+- Spot 고정 25종목은 유지하며 Futures는 Binance YTD 조사에서 선정한 정확한 USDT 무기한 25계약만 신규 진입·목록에 제공한다. 제공 카탈로그는 `binance-product-catalog.ts`를 따른다.
+- `Asset.isActive`는 자산의 운영 유효성이다. Futures 전용 HYPE/PUMP/BCH/FIL/AAVE 기초자산은 활성 상태로 등록하되 일반 Spot 조회·구독·주문·provider target에서 서버가 제외한다. 기존 Asset ID와 금융 이력은 유지하고 schema migration은 도입하지 않는다.
+- 제공 범위에서 제외된 기존 Futures lifetime의 exit·위험관리·시즌 정산에 필요한 Last/Mark 수집은 계속한다. 신규 등록은 선정 25계약만 허용하며 정확한 계약·24시간 재검증과 Last/Mark 가격 역할을 유지한다.
+- Futures 화면 가격 정밀도는 Futures PRICE_FILTER를 사용하며 Spot tick을 재사용하지 않는다. 금융 계산·저장 정밀도는 변경하지 않는다. `FUTURES_TRADING_MODE=DISABLED` 기본값과 운영 설정은 유지한다.
+
 각 항목은 "결정 사항 + 한 줄 근거"만 기록한다. 조사/검토 과정, 후보 비교표, STOP/GO 이력 서술은 담지 않는다. 세부 구현(에러 코드, 필드명 등)은 코드와 `*-api-contract.md`를 기준으로 확인한다.
 
 > 2026-09-11 현재 account-owned 금융·거래·snapshot 행의 소유권은 required

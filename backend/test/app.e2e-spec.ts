@@ -1,3 +1,4 @@
+import { SPOT_ASSET_WHERE } from '../src/providers/binance/binance-product-catalog';
 jest.mock('../src/generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -5208,6 +5209,7 @@ describe('AppController (e2e)', () => {
       expect(prisma.asset.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: {
+            ...SPOT_ASSET_WHERE,
             assetType: 'crypto',
             currencyCode: 'USD',
             market: 'BINANCE',

@@ -1,3 +1,4 @@
+import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 jest.mock('../generated/prisma/client', () => ({
   Prisma: {
     Decimal: jest.requireActual('@prisma/client/runtime/client').Decimal,
@@ -125,11 +126,29 @@ describe('Futures Last Price ingestion', () => {
         {
           isActive: true,
           markVerifiedAt: { not: null },
-          underlyingAsset: { isActive: true },
+          underlyingAsset: {
+            isActive: true,
+            symbol: { in: [...BINANCE_FUTURES_SYMBOLS] },
+          },
         },
         { positions: { some: { status: 'open' } } },
       ],
     });
+  });
+
+  it('subscribes every selected exact contract, including all five Futures-only underlyings', async () => {
+    findMany.mockResolvedValue(
+      BINANCE_FUTURES_SYMBOLS.map((symbol) => ({
+        id: symbol,
+        underlyingAsset: { symbol },
+      })),
+    );
+    await service.cycle();
+    const socket = sockets()[0];
+    socket.emit('open');
+    expect(JSON.parse(socket.send.mock.calls[0][0]).params).toEqual(
+      BINANCE_FUTURES_SYMBOLS.map((s) => `${s.toLowerCase()}@aggTrade`),
+    );
   });
 
   it('keeps the newest aggregate trade per symbol and drops duplicates, reordering and foreign frames', async () => {

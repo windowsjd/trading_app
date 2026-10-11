@@ -345,6 +345,27 @@ describe('OrdersService', () => {
     return { prisma, service, primary, secondary };
   };
 
+  it.each(['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'])(
+    'rejects active Futures-only %s before Spot quote/entry',
+    async (symbol) => {
+      const { prisma, service } = createService();
+      prisma.asset.findUnique.mockResolvedValue({
+        id: symbol,
+        symbol,
+        market: 'BINANCE',
+        assetType: 'crypto',
+        isActive: true,
+        currencyCode: 'USD',
+        priceCurrency: 'USD',
+        settlementCurrency: 'USD',
+      });
+      await expect(service['findUsableAsset'](symbol)).rejects.toMatchObject({
+        response: { error: { code: 'ASSET_NOT_TRADABLE' } },
+      });
+      expect(prisma.order.create).not.toHaveBeenCalled();
+    },
+  );
+
   beforeEach(() => {
     jest.useFakeTimers().setSystemTime(usMarketOpenAt);
   });

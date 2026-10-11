@@ -1,3 +1,7 @@
+import {
+  SPOT_ASSET_WHERE,
+  isFuturesOnlyAsset,
+} from '../providers/binance/binance-product-catalog';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { AssetType, CurrencyCode } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -86,7 +90,7 @@ export class RealtimeAssetMetadataCacheService {
   ): Promise<CacheSlot['entry']> {
     try {
       const asset = await this.prisma.asset.findFirst({
-        where: { id: assetId, isActive: true },
+        where: { id: assetId, isActive: true, ...SPOT_ASSET_WHERE },
         select: {
           id: true,
           symbol: true,
@@ -97,16 +101,17 @@ export class RealtimeAssetMetadataCacheService {
           priceCurrency: true,
         },
       });
-      const entry = asset
-        ? {
-            assetId: asset.id,
-            symbol: asset.symbol,
-            name: asset.name,
-            assetType: asset.assetType,
-            market: asset.market,
-            priceCurrency: asset.priceCurrency ?? asset.currencyCode,
-          }
-        : null;
+      const entry =
+        asset && !isFuturesOnlyAsset(asset)
+          ? {
+              assetId: asset.id,
+              symbol: asset.symbol,
+              name: asset.name,
+              assetType: asset.assetType,
+              market: asset.market,
+              priceCurrency: asset.priceCurrency ?? asset.currencyCode,
+            }
+          : null;
       this.cache.set(assetId, {
         entry,
         expiresAt: Date.now() + (entry ? POSITIVE_TTL_MS : NEGATIVE_TTL_MS),

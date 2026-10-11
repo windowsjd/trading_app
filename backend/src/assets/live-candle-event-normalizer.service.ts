@@ -1,3 +1,4 @@
+import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
 import { AssetType, Prisma } from '../generated/prisma/client';
@@ -222,7 +223,12 @@ export class LiveCandleEventNormalizerService {
   }
 
   private assertAsset(asset: LiveCandleAsset, expected: AssetType): void {
-    if (!asset.isActive || asset.assetType !== expected || !asset.id.trim()) {
+    if (
+      !asset.isActive ||
+      isFuturesOnlyAsset(asset) ||
+      asset.assetType !== expected ||
+      !asset.id.trim()
+    ) {
       throw new LiveCandleEventValidationError(
         'INVALID_ASSET_MAPPING',
         'Provider event does not map to an active compatible asset.',

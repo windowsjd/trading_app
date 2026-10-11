@@ -1,0 +1,25 @@
+{
+  "verdict": "PASS",
+  "target": "loopback isolated futures25_provision_test",
+  "counts": {
+    "assets": 30,
+    "spot": 25,
+    "instruments": 25,
+    "orders": 0,
+    "executions": 0,
+    "ledgers": 0
+  },
+  "readOnlyWriteSqlState": "25006",
+  "apply": {
+    "assetsCreated": 5,
+    "instrumentsCreated": 25,
+    "spotAssetsModified": 0,
+    "financialRowsModified": 0
+  },
+  "repeatApply": {
+    "assetsCreated": 0,
+    "instrumentsCreated": 0,
+    "instrumentsChanged": 0
+  },
+  "productionApplyExecuted": false
+}

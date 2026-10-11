@@ -1,0 +1,993 @@
+{
+  "unit-verified": {
+    "numPassedTestSuites": 144,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 40,
+    "numPassedTests": 2361,
+    "numFailedTests": 0,
+    "numPendingTests": 63,
+    "startTime": 1791675833804,
+    "suites": [
+      {
+        "file": "backend/src/futures/futures-risk.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/futures/futures-price-safety.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/market-candle-sync.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/candle-pipeline-foundation.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/market-candles.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/candle-live-pipeline.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/realtime/asset-order-book-redis.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/live-candle-store.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/kis/coordination/kis-coordination.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-period-candle-live.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/asset-candles-cache.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-candle-live.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/market-candle-retention.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-order-book-live.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/asset-sort-snapshot-redis.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-live-candle.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-candle-live.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-live-candle.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/candle-release-fixture.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/trading-transaction-time.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/futures/futures.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/conditional/conditional.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/futures/futures-isolated-boundary.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/futures/futures-limit.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/futures/futures-f3.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/order-input-policy.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/general-account-trading.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/limit-order-transaction-time.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/trading-fee-pinning.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/market-candle-sync.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/orders.execute.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/market-execution.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/order-replay-and-cancel-scope.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/futures/futures-f31.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/assets-tradability.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/realtime/ticker-poll-process.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-matching.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/koscom/koscom.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/trading-session-fixture.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create-race.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-rest-coordinator.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/market-candle-aggregation.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-reservation.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/assets.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "status": "skipped"
+      },
+      {
+        "file": "backend/src/assets/candle-chart-window.fixture.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-websocket-streaming.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/orders.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-diagnostics.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-candles.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/daily-change-rate.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/order-reservation.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/koscom/koscom-ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candles.repository.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/asset-ticker.gateway.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-auth.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-last-price-ingestion.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-websocket-streaming.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-candles-single-flight.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/live-candle-stream-supervisor.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/asset-candle-fanout.performance.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-matching-diagnostics.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-serving.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/usd-krw-refresh.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/koscom/koscom-candle.adapter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-order-book.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-cancel.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-final-diagnostics.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/provider-http.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/asset-order-book.gateway.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/source-selection-diagnostics.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/live-candle-finalizer.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-krx-startup-catch-up.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-sync-state.repository.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-period-candle-normalizer.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-candle.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/order-input-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-matching.liveness.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/koscom/koscom-normalizer.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/asset-candle.gateway.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/provider-config.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-risk.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-domestic-minute.adapter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-websocket.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/korea-exim/korea-exim-exchange.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-quote.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-rest-coordinator.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-valuation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/exchange-rate/exchange-rate.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/coordination/kis-rate-limiter.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-candles-cache.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-rest-hoga.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-krx-session-close.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/realtime-asset-metadata-cache.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-domestic-five-minute.builder.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-websocket.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-execution.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-calendar.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-mark.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-rest-current-price.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/position-failure-diagnosis.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/live-candle-overlay.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-us-minute.adapter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-hours.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-risk-worker.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-mark-ingestion.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/live-candle-pipeline.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-reconciliation.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-candle-normalizer.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-krx-session-close.parser.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-symbol-metadata.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-last-price.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-instrument-coverage.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-database.loader.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-websocket.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/execution-realism.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/conditional/conditional-worker.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/conditional/conditional-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-price.ingestion.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/live-candle-event-normalizer.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-overseas-period.adapter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-calendar/market-session-override.loader.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-candle-evidence.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/coordination/kis-request-coordinator.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/candles/kis-domestic-period.adapter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/market-snapshot-health.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-position-display.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/asset-price-snapshot-query.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/conditional/conditional-diagnostics.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-reference-prices.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-backfill-lock.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/live-candle-store.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-response.builder.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/korea-exim/korea-exim-exchange.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-public.client.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/provider-target-resolver.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/source-eligibility.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/order-book-pubsub.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-retention.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-admin-input.validation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-calendar/market-calendar.registry.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/realtime/provider-price-pubsub.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-read-plan.builder.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/scripts/lib/futures-provision-plan.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-order-book.parser.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/market-price-event.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/market-order-book-subscription.service.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-tick-size.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-fixed-asset-universe.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/general-trading.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-sync.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/live-candle.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-list-turnover.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/coordination/kis-rate-limit.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-matching.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-candles-cache.keys.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-websocket.trade-parser.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-product-catalog.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/realtime-execution-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-execution-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-mark-retention.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/fx-rate-snapshot-query.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-candles-cache.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-watchlist.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-websocket.parser.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-kline.parser.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-calendar/market-session-override.store.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/market-candle-retention.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-serving.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-operational-error.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/candle-expected-slots.policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-exchange-info.validation.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/general-fx-quote-hash-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/kis/kis-websocket.subscription.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-candle-policy.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/assets/asset-candles-single-flight.config.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/source-metadata.presenter.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/provider-secret-redaction.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/provider-raw-payload.spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "unit-new-final": {
+    "numPassedTestSuites": 4,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0,
+    "numPassedTests": 25,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "startTime": 1791675496681,
+    "suites": [
+      {
+        "file": "backend/src/futures/futures-last-price-ingestion.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-mark-ingestion.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/scripts/lib/futures-provision-plan.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/providers/binance/binance-product-catalog.spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "e2e-final": {
+    "numPassedTestSuites": 2,
+    "numFailedTestSuites": 0,
+    "numPendingTestSuites": 0,
+    "numPassedTests": 404,
+    "numFailedTests": 0,
+    "numPendingTests": 0,
+    "startTime": 1791675238602,
+    "suites": [
+      {
+        "file": "backend/test/app.e2e-spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/test/profile-image.e2e-spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "financial-gate-clean": {
+    "numPassedTestSuites": 21,
+    "numFailedTestSuites": 1,
+    "numPendingTestSuites": 0,
+    "numPassedTests": 22,
+    "numFailedTests": 1,
+    "numPendingTests": 0,
+    "startTime": 1791675433760,
+    "suites": [
+      {
+        "file": "backend/src/orders/trading-transaction-time.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-risk.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/orders/orders.execute.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-execution.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/fx/fx.execute.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/mvp-flow.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/wallets/wallet-fx-transfer.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/conditional/conditional.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-isolated-boundary.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-limit.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-f3.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/wallets/spot-wallet-transfer.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/order-input-policy.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-transaction-time.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/trading-fee-pinning.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-f31.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-matching.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create-race.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-reservation.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "status": "passed"
+      }
+    ]
+  },
+  "financial-gate-verified": {
+    "numPassedTestSuites": 15,
+    "numFailedTestSuites": 7,
+    "numPendingTestSuites": 0,
+    "numPassedTests": 16,
+    "numFailedTests": 7,
+    "numPendingTests": 0,
+    "startTime": 1791675918104,
+    "suites": [
+      {
+        "file": "backend/src/orders/trading-transaction-time.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/futures/futures-risk.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/wallets/wallet-fx-transfer.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/conditional/conditional.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-isolated-boundary.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/futures/futures-limit.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/futures/futures-f3.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/orders/order-input-policy.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/wallets/spot-wallet-transfer.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-transaction-time.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/trading-fee-pinning.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/orders.execute.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/market-execution.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/fx/fx.execute.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/futures/futures-f31.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-matching.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/mvp-flow.integration.spec.ts",
+        "status": "failed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create-race.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-idempotent-replay.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-reservation.integration.spec.ts",
+        "status": "passed"
+      },
+      {
+        "file": "backend/src/orders/limit-order-create-no-redis.integration.spec.ts",
+        "status": "passed"
+      }
+    ]
+  }
+}
