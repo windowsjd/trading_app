@@ -1,0 +1,8 @@
+{
+  "action": "apply",
+  "target": "dpg-da7ac0e1egvs73e2sv20-a.singapore-postgres.render.com:5432/trading_app_fbbk",
+  "envGroups": 0,
+  "exitCode": 1,
+  "stdout": "\u001b[33m[Nest] 2322928  - \u001b[39m10/12/2026, 7:18:34 PM \u001b[33m   WARN\u001b[39m \u001b[38;5;3m[RedisService] \u001b[39m\u001b[33mRedis unavailable; dependent operations will degrade safely (Error).\u001b[39m\n",
+  "stderr": "{\"error\":\"FUTURES_PROVISION_FAILED\",\"category\":\"provider\",\"code\":\"BINANCE_REST_COORDINATION_UNAVAILABLE\"}\n"
+}

@@ -1,0 +1,43 @@
+[
+  {
+    "job_name": "conditional_orders",
+    "status": "succeeded",
+    "started_at": "2026-10-12T10:40:59.251",
+    "finished_at": "2026-10-12T10:40:59.254",
+    "error_code": null,
+    "result_json": {
+      "states": {
+        "armed": 1
+      }
+    }
+  },
+  {
+    "job_name": "futures_limit_matching",
+    "status": "succeeded",
+    "started_at": "2026-10-12T10:40:39.144",
+    "finished_at": "2026-10-12T10:40:39.147",
+    "error_code": null,
+    "result_json": {
+      "states": {
+        "FUTURES_ENTRY_LIMIT_NOT_REACHED": 1
+      }
+    }
+  },
+  {
+    "job_name": "futures_liquidation",
+    "status": "succeeded",
+    "started_at": "2026-10-12T10:40:16.196",
+    "finished_at": "2026-10-12T10:40:16.239",
+    "error_code": null,
+    "result_json": {
+      "results": [
+        {
+          "scope": "24c0c7ef-e040-46b9-8d3c-73123a6a2c32",
+          "state": "healthy",
+          "accountId": "dd014ad9-fc0a-4668-abff-cbb448a54ec1"
+        }
+      ],
+      "nextAccountCursor": ""
+    }
+  }
+]

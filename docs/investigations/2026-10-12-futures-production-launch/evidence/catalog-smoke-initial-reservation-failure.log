@@ -1,0 +1,15 @@
+AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
++ actual - expected
+
++ '10.00994867'
+- '0.00000000'
+
+    at main (/home/runner/work/trading_app/trading_app/backend/scripts/futures-product-catalog-smoke.ts:308:14)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5) {
+  generatedMessage: true,
+  code: 'ERR_ASSERTION',
+  actual: '10.00994867',
+  expected: '0.00000000',
+  operator: 'strictEqual',
+  diff: 'simple'
+}

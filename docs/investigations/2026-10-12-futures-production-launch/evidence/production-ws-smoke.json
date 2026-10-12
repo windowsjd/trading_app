@@ -1,0 +1,81 @@
+{
+  "spotRejections": [
+    {
+      "symbol": "HYPEUSDT",
+      "channel": "asset_ticker",
+      "code": "INVALID_SUBSCRIPTION"
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "channel": "asset_candle",
+      "code": "ASSET_NOT_AVAILABLE"
+    },
+    {
+      "symbol": "HYPEUSDT",
+      "channel": "asset_order_book",
+      "code": "UNSUPPORTED_ASSET"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "channel": "asset_ticker",
+      "code": "INVALID_SUBSCRIPTION"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "channel": "asset_candle",
+      "code": "ASSET_NOT_AVAILABLE"
+    },
+    {
+      "symbol": "PUMPUSDT",
+      "channel": "asset_order_book",
+      "code": "UNSUPPORTED_ASSET"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "channel": "asset_ticker",
+      "code": "INVALID_SUBSCRIPTION"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "channel": "asset_candle",
+      "code": "ASSET_NOT_AVAILABLE"
+    },
+    {
+      "symbol": "BCHUSDT",
+      "channel": "asset_order_book",
+      "code": "UNSUPPORTED_ASSET"
+    },
+    {
+      "symbol": "FILUSDT",
+      "channel": "asset_ticker",
+      "code": "INVALID_SUBSCRIPTION"
+    },
+    {
+      "symbol": "FILUSDT",
+      "channel": "asset_candle",
+      "code": "ASSET_NOT_AVAILABLE"
+    },
+    {
+      "symbol": "FILUSDT",
+      "channel": "asset_order_book",
+      "code": "UNSUPPORTED_ASSET"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "channel": "asset_ticker",
+      "code": "INVALID_SUBSCRIPTION"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "channel": "asset_candle",
+      "code": "ASSET_NOT_AVAILABLE"
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "channel": "asset_order_book",
+      "code": "UNSUPPORTED_ASSET"
+    }
+  ],
+  "reconnect": true,
+  "verdict": "PASS"
+}

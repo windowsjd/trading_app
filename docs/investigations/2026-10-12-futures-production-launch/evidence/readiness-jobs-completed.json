@@ -1,0 +1,32 @@
+[
+  {
+    "createdAt": "2026-10-12T10:30:06.629203Z",
+    "finishedAt": "2026-10-12T10:30:39Z",
+    "id": "job-db6bdblckfvc73crn2f0",
+    "planId": "plan-srv-032",
+    "serviceId": "srv-da84cg8u01pc73cjasa0",
+    "startCommand": "timeout 60s pnpm futures:price-readiness --require-ready",
+    "startedAt": "2026-10-12T10:30:12Z",
+    "status": "succeeded"
+  },
+  {
+    "createdAt": "2026-10-12T10:38:28.91426Z",
+    "finishedAt": "2026-10-12T10:38:56Z",
+    "id": "job-db6bh97avr4c73as5bg0",
+    "planId": "plan-srv-032",
+    "serviceId": "srv-da84cg8u01pc73cjasa0",
+    "startCommand": "timeout 60s pnpm futures:price-readiness --require-ready",
+    "startedAt": "2026-10-12T10:38:29Z",
+    "status": "succeeded"
+  },
+  {
+    "createdAt": "2026-10-12T10:42:32.43595Z",
+    "finishedAt": "2026-10-12T10:43:01Z",
+    "id": "job-db6bj63rjlhs73fkk2ug",
+    "planId": "plan-srv-032",
+    "serviceId": "srv-da84cg8u01pc73cjasa0",
+    "startCommand": "timeout 60s pnpm futures:price-readiness --require-ready",
+    "startedAt": "2026-10-12T10:42:32Z",
+    "status": "succeeded"
+  }
+]

@@ -1,0 +1,86 @@
+{
+  "codeSha": "8b76878281ad07983aa17eb87b0a60a013c8c43a",
+  "deploy": {
+    "commit": {
+      "createdAt": "2026-10-12T10:03:01Z",
+      "id": "8b76878281ad07983aa17eb87b0a60a013c8c43a",
+      "message": "test: select an unreserved account for catalog lifecycle smoke"
+    },
+    "createdAt": "2026-10-12T10:34:57.785082Z",
+    "finishedAt": "2026-10-12T10:36:25.538164Z",
+    "id": "dep-db6bfk8473hc73dsofbg",
+    "startedAt": "2026-10-12T10:34:57.751644Z",
+    "status": "live",
+    "trigger": "api",
+    "updatedAt": "2026-10-12T10:37:01.360186Z"
+  },
+  "postActivationWarnErrorLogQuery": {
+    "hasMore": false,
+    "logs": [],
+    "nextEndTime": "2026-10-12T10:53:00.768129266Z",
+    "nextStartTime": "2026-10-12T10:36:25.000000001Z"
+  },
+  "ciJobs": [
+    {
+      "id": 114759581786,
+      "name": "Limit order PostgreSQL integration",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/38233852910/job/114759581786"
+    },
+    {
+      "id": 114759581875,
+      "name": "Core account PostgreSQL integration",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/38233852910/job/114759581875"
+    },
+    {
+      "id": 114759581880,
+      "name": "Frontend quality",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/38233852910/job/114759581880"
+    },
+    {
+      "id": 114759581902,
+      "name": "Release-critical E2E",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/38233852910/job/114759581902"
+    },
+    {
+      "id": 114759581910,
+      "name": "Candle fixture integration",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/38233852910/job/114759581910"
+    },
+    {
+      "id": 114759581920,
+      "name": "Backend quality",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/windowsjd/trading_app/actions/runs/38233852910/job/114759581920"
+    }
+  ],
+  "testProofs": [
+    "2026-10-12T10:05:26.0362791Z PASS src/portfolio/valuation-snapshot-consistency.integration.spec.ts (14.895 s)",
+    "2026-10-12T10:08:28.5567301Z Test Suites: 23 passed, 23 total",
+    "2026-10-12T10:08:28.5567860Z Tests:       24 passed, 24 total",
+    "2026-10-12T10:08:52.9981827Z Test Suites: 1 passed, 1 total",
+    "2026-10-12T10:08:52.9982289Z Tests:       1 passed, 1 total",
+    "2026-10-12T10:04:55.1184557Z PASS src/batch/season-settlement-exclusion-race.integration.spec.ts",
+    "2026-10-12T10:05:03.1518905Z Test Suites: 24 passed, 24 total",
+    "2026-10-12T10:05:03.1519154Z Tests:       34 passed, 34 total",
+    "2026-10-12T10:05:06.3216359Z PASS src/operator/active-admin-race.integration.spec.ts",
+    "2026-10-12T10:05:06.3234177Z Test Suites: 1 passed, 1 total",
+    "2026-10-12T10:05:06.3234431Z Tests:       1 passed, 1 total",
+    "2026-10-12T10:03:41.3971602Z Test Suites: 2 passed, 2 total",
+    "2026-10-12T10:03:41.3979096Z Tests:       103 passed, 103 total",
+    "2026-10-12T10:05:09.8356192Z PASS src/realtime/websocket-message-boundary-process.spec.ts",
+    "2026-10-12T10:05:13.4447406Z PASS src/realtime/websocket-message-process.spec.ts",
+    "2026-10-12T10:05:14.4070541Z Test Suites: 65 skipped, 268 passed, 268 of 333 total",
+    "2026-10-12T10:05:14.4071321Z Tests:       90 skipped, 4348 passed, 4438 total"
+  ]
+}

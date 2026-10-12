@@ -1,0 +1,17 @@
+{
+  "evaluatedAt": "2026-10-12T10:48:29.910Z",
+  "scope": "Read-only rejection by unchanged production validators of genuine archived production observations; no API fault injected",
+  "last": {
+    "id": "15643dba-213b-43bc-a7f0-d025ef7eff0b",
+    "source": "binance_usdm_agg_trade_ws",
+    "receiptAgeMs": 1489637,
+    "valid": false
+  },
+  "mark": {
+    "id": "d7c8a47e-6f6c-4d77-b6c5-7ffb1edc27c9",
+    "source": "binance_usdm_mark_rest",
+    "receiptAgeMs": 1490132,
+    "valid": false
+  },
+  "verdict": "PASS"
+}

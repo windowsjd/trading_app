@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-12T10:05:04.962Z",
+  "verdict": "CORRECTNESS PASS",
+  "accounts": 10,
+  "examinedOrders": 58,
+  "examinedExecutions": 20,
+  "examinedLedgers": 172,
+  "liquidationAccounts": 0,
+  "findings": [],
+  "arithmetic": "Existing Prisma Decimal and Futures calculation policy; exact equality, no floating point tolerance"
+}

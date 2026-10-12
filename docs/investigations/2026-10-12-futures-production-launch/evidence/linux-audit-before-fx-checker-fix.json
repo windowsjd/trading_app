@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-12T09:42:57.124Z",
+  "verdict": "CORRECTNESS FAIL",
+  "accounts": 10,
+  "examinedOrders": 58,
+  "examinedExecutions": 20,
+  "examinedLedgers": 172,
+  "liquidationAccounts": 0,
+  "findings": [
+    {
+      "code": "FX_NET",
+      "accountId": "749fa23b-83f9-428b-ad62-545dc6c85486",
+      "rowId": "b1575391-0694-4122-8626-d2c92810f524"
+    },
+    {
+      "code": "FX_NET",
+      "accountId": "94255c91-68a9-4a2a-8458-924d303054b1",
+      "rowId": "35adbdcf-eb70-483d-bbef-ebd9327223af"
+    }
+  ],
+  "arithmetic": "Existing Prisma Decimal and Futures calculation policy; exact equality, no floating point tolerance"
+}

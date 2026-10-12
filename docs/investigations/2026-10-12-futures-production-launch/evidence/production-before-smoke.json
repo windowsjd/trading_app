@@ -1,0 +1,22 @@
+[
+  {
+    "phase": "before_smoke",
+    "measured_at": "2026-10-12T10:38:32.323859+00:00",
+    "users": 3,
+    "accounts": 6,
+    "seasons": 1,
+    "ledgers": 46,
+    "wallets": 24,
+    "spot_positions": 8,
+    "binance_assets": 30,
+    "futures_instruments": 25,
+    "last_rows": 14738,
+    "mark_rows": 22375,
+    "open_futures": 0,
+    "pending_entries": 0,
+    "live_protections": 0,
+    "user_ids": "acccd58e93fb8446752b1039a7e3ea89",
+    "account_ids": "e160a07a37ab5a2d7fbf6258d9dc02e9",
+    "ledger_ids": "48c0a4f0505a111f671dd3600423a95f"
+  }
+]
