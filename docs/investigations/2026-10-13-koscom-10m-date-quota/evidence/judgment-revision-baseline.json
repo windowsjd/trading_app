@@ -1,0 +1,30 @@
+{
+  "evidenceType": "LOCAL_JUDGMENT_REVISION_BASELINE",
+  "checkedAtKstDate": "2026-10-13",
+  "reviewCommit": "352c4e34f2d6bb929563171977037420491334ab",
+  "localHead": "4c830060c37d6c752efca352729fa5d9ddc7a222",
+  "localOriginMain": "4c830060c37d6c752efca352729fa5d9ddc7a222",
+  "githubMainReadOnlyCheck": "4c830060c37d6c752efca352729fa5d9ddc7a222",
+  "initialWorkingTreeClean": true,
+  "branch": "main",
+  "commitsAfterReview": 2,
+  "targetDirectoryAndCandlePoliciesChangedAfterReview": false,
+  "parallelWorktrees": {
+    "/tmp/trading-binance-rest-weight": "dirty Binance/provider-http work; untouched",
+    "/tmp/trading-ci-baseline": "clean detached HEAD",
+    "/tmp/trading-ci-stabilization": "clean",
+    "prunableWorktrees": "fee-pinning, home-market-work, transaction-time; untouched"
+  },
+  "processVisibility": "sandbox-local process list only",
+  "subAgentsSpawned": 0,
+  "planSourceUnchanged": true,
+  "urlBuilderSourceUnchanged": true,
+  "conditionalRepeatPolicyUnchanged": true,
+  "executionPreflightAndOnceGuardUnchanged": true,
+  "round1SourceSha256": "4655ed526307e8eff82b9742eb43a509dbc5b727f2ec8d038157a92ca226f12b",
+  "nodeLocal": "v24.14.1",
+  "koscomApiRequests": 0,
+  "renderActions": 0,
+  "productionDataAccesses": 0,
+  "pushesPullRequestsDeployments": 0
+}

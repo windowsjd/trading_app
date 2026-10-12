@@ -1,31 +1,274 @@
-✔ plan: 17 fixed calls, KRX session offsets, adjacent day and holiday from the repository calendar (2.196772ms)
-✔ URLs: full-session 10m, single dated daily, ≤20-symbol multiquote; off-plan requests and hosts rejected (0.815534ms)
-✔ full regular session: END labels 09:10–15:30, both 4h buckets complete, 15:30 closing auction single price (2.224866ms)
-✔ missing slots are listed, never interpolated; an absent 15:30 auction row alone does not break the 13:00 bucket (5.682503ms)
-✔ label semantics: START grid and a pre-open 09:00 row are reported, not silently merged (1.450268ms)
-✔ abnormal responses: >100 rows, exactly 100, duplicates, off-grid, bad OHLC and wrong shape fail closed (5.770789ms)
-✔ dated daily: exact OHLC with after-hours volume is strong attribution; cumulative total can equal daily (1.994645ms)
-✔ dated daily contradictions and range-only matches never become positive attribution (1.546863ms)
-✔ holiday returning the previous session is flagged, never storable, and does not taint the real 10-08 date (16.440903ms)
-✔ identical data on two different trading days contradicts both dates even when daily bars look consistent (6.229815ms)
-✔ normal run: distinct dated sessions attribute exactly; repeat of 10-12 is reproducible (7.568423ms)
-✔ multiquote: all symbols, 10-level fields, fresh clocks while open; partial return and closed market stay distinct (6.546195ms)
-✔ permission denial on multiquote (HTTP 403 or JSON 권한 error) stops all later calls; service-hours error continues (15.164366ms)
-✔ HTTP 401/429, redirect, invalid JSON and zero remaining quota each stop after one call without retry (1.197911ms)
-✔ no automatic retry through the reused round-1 transport: one socket per call even on timeout (22.344505ms)
-✔ 17-call cap: sequential, ≥1 s spacing; quota repeats sent only when the original carried a daily quota header (11.321059ms)
-✔ quota: shared counter, per-API budgets and multi-node counters are distinguished only as far as data allows (22.235154ms)
-✔ output gate blocks the key and any URL in diagnostic lines (0.212121ms)
-✔ main: diagnostic-only once marker (distinct from round 1); second invocation sends zero calls (5.363318ms)
-✔ main: unset KOSCOM_BASE_URL uses the app default production origin (2.1755ms)
-✔ main: wrong service, missing key, foreign base, debug output, stale date and 09:00 quota reset block before any call (9.371981ms)
-✔ independent of the app: only node built-ins and the pinned round-1 module are required (0.293196ms)
-✔ no test reached the real network (0.03962ms)
-ℹ tests 23
-ℹ suites 0
-ℹ pass 23
-ℹ fail 0
-ℹ cancelled 0
-ℹ skipped 0
-ℹ todo 0
-ℹ duration_ms 156.45941
+TAP version 13
+# Subtest: plan: 17 fixed calls, KRX session offsets, adjacent day and holiday from the repository calendar
+ok 1 - plan: 17 fixed calls, KRX session offsets, adjacent day and holiday from the repository calendar
+  ---
+  duration_ms: 2.295602
+  type: 'test'
+  ...
+# Subtest: URLs: full-session 10m, single dated daily, ≤20-symbol multiquote; off-plan requests and hosts rejected
+ok 2 - URLs: full-session 10m, single dated daily, ≤20-symbol multiquote; off-plan requests and hosts rejected
+  ---
+  duration_ms: 0.809433
+  type: 'test'
+  ...
+# Subtest: full regular session: END labels 09:10–15:30, both 4h buckets complete, 15:30 closing auction single price
+ok 3 - full regular session: END labels 09:10–15:30, both 4h buckets complete, 15:30 closing auction single price
+  ---
+  duration_ms: 3.233176
+  type: 'test'
+  ...
+# Subtest: missing slots are listed, never interpolated; an absent 15:30 auction row alone does not break the 13:00 bucket
+ok 4 - missing slots are listed, never interpolated; an absent 15:30 auction row alone does not break the 13:00 bucket
+  ---
+  duration_ms: 6.275102
+  type: 'test'
+  ...
+# Subtest: label semantics: START grid and a pre-open 09:00 row are reported, not silently merged
+ok 5 - label semantics: START grid and a pre-open 09:00 row are reported, not silently merged
+  ---
+  duration_ms: 2.680116
+  type: 'test'
+  ...
+# Subtest: abnormal responses: >100 rows, exactly 100, duplicates, off-grid, bad OHLC and wrong shape fail closed
+ok 6 - abnormal responses: >100 rows, exactly 100, duplicates, off-grid, bad OHLC and wrong shape fail closed
+  ---
+  duration_ms: 6.374485
+  type: 'test'
+  ...
+# Subtest: dated daily: exact OHLC with after-hours volume is strong attribution; cumulative total can equal daily
+ok 7 - dated daily: exact OHLC with after-hours volume is strong attribution; cumulative total can equal daily
+  ---
+  duration_ms: 2.619087
+  type: 'test'
+  ...
+# Subtest: dated daily contradictions and range-only matches never become positive attribution
+ok 8 - dated daily contradictions and range-only matches never become positive attribution
+  ---
+  duration_ms: 1.70057
+  type: 'test'
+  ...
+# Subtest: holiday returning the previous session is flagged, never storable, and does not taint the real 10-08 date
+ok 9 - holiday returning the previous session is flagged, never storable, and does not taint the real 10-08 date
+  ---
+  duration_ms: 18.725272
+  type: 'test'
+  ...
+# Subtest: identical data on two different trading days contradicts both dates even when daily bars look consistent
+ok 10 - identical data on two different trading days contradicts both dates even when daily bars look consistent
+  ---
+  duration_ms: 8.450064
+  type: 'test'
+  ...
+# Subtest: normal run: distinct dated sessions attribute exactly; repeat of 10-12 is reproducible
+ok 11 - normal run: distinct dated sessions attribute exactly; repeat of 10-12 is reproducible
+  ---
+  duration_ms: 9.176966
+  type: 'test'
+  ...
+# Subtest: multiquote: all symbols, 10-level fields, fresh clocks while open; partial return and closed market stay distinct
+ok 12 - multiquote: all symbols, 10-level fields, fresh clocks while open; partial return and closed market stay distinct
+  ---
+  duration_ms: 7.84609
+  type: 'test'
+  ...
+# Subtest: permission denial on multiquote (HTTP 403 or JSON 권한 error) stops all later calls; service-hours error continues
+ok 13 - permission denial on multiquote (HTTP 403 or JSON 권한 error) stops all later calls; service-hours error continues
+  ---
+  duration_ms: 18.542997
+  type: 'test'
+  ...
+# Subtest: HTTP 401/429, redirect, invalid JSON and zero remaining quota each stop after one call without retry
+ok 14 - HTTP 401/429, redirect, invalid JSON and zero remaining quota each stop after one call without retry
+  ---
+  duration_ms: 1.78289
+  type: 'test'
+  ...
+# Subtest: no automatic retry through the reused round-1 transport: one socket per call even on timeout
+ok 15 - no automatic retry through the reused round-1 transport: one socket per call even on timeout
+  ---
+  duration_ms: 22.249921
+  type: 'test'
+  ...
+# Subtest: 17-call cap: sequential, ≥1 s spacing; quota repeats sent only when the original carried a daily quota header
+ok 16 - 17-call cap: sequential, ≥1 s spacing; quota repeats sent only when the original carried a daily quota header
+  ---
+  duration_ms: 13.19085
+  type: 'test'
+  ...
+# Subtest: quota: shared counter, per-API budgets and multi-node counters are distinguished only as far as data allows
+ok 17 - quota: shared counter, per-API budgets and multi-node counters are distinguished only as far as data allows
+  ---
+  duration_ms: 26.987331
+  type: 'test'
+  ...
+# Subtest: output gate blocks the key and any URL in diagnostic lines
+ok 18 - output gate blocks the key and any URL in diagnostic lines
+  ---
+  duration_ms: 0.221414
+  type: 'test'
+  ...
+# Subtest: main: diagnostic-only once marker (distinct from round 1); second invocation sends zero calls
+ok 19 - main: diagnostic-only once marker (distinct from round 1); second invocation sends zero calls
+  ---
+  duration_ms: 6.101199
+  type: 'test'
+  ...
+# Subtest: main: unset KOSCOM_BASE_URL uses the app default production origin
+ok 20 - main: unset KOSCOM_BASE_URL uses the app default production origin
+  ---
+  duration_ms: 2.240865
+  type: 'test'
+  ...
+# Subtest: main: wrong service, missing key, foreign base, debug output, stale date and 09:00 quota reset block before any call
+ok 21 - main: wrong service, missing key, foreign base, debug output, stale date and 09:00 quota reset block before any call
+  ---
+  duration_ms: 9.029339
+  type: 'test'
+  ...
+# Subtest: independent of the app: only node built-ins and the pinned round-1 module are required
+ok 22 - independent of the app: only node built-ins and the pinned round-1 module are required
+  ---
+  duration_ms: 0.309536
+  type: 'test'
+  ...
+# Subtest: response policy: valid, empty and partial intraday data keep distinct eligibility and continuation
+ok 23 - response policy: valid, empty and partial intraday data keep distinct eligibility and continuation
+  ---
+  duration_ms: 21.387863
+  type: 'test'
+  ...
+# Subtest: fatal candle matrix: malformed shape, wrong code, >100, duplicate/conflicting rows, OHLC and time stop the next call
+ok 24 - fatal candle matrix: malformed shape, wrong code, >100, duplicate/conflicting rows, OHLC and time stop the next call
+  ---
+  duration_ms: 7.855907
+  type: 'test'
+  ...
+# Subtest: daily anomalies: valid foreign date and empty data continue; malformed candle/date and extra rows stop
+ok 25 - daily anomalies: valid foreign date and empty data continue; malformed candle/date and extra rows stop
+  ---
+  duration_ms: 13.715661
+  type: 'test'
+  ...
+# Subtest: daily OHLC contradiction is an observation and never stops the remaining fixed plan
+ok 26 - daily OHLC contradiction is an observation and never stops the remaining fixed plan
+  ---
+  duration_ms: 5.60842
+  type: 'test'
+  ...
+# Subtest: HTTP 5xx with service-hours JSON remains fatal; timeout/transport/body-limit errors never continue
+ok 27 - HTTP 5xx with service-hours JSON remains fatal; timeout/transport/body-limit errors never continue
+  ---
+  duration_ms: 1.385803
+  type: 'test'
+  ...
+# Subtest: 4h completeness: optional 15:30 absence keeps both required buckets complete without asserting END semantics
+ok 28 - 4h completeness: optional 15:30 absence keeps both required buckets complete without asserting END semantics
+  ---
+  duration_ms: 1.502593
+  type: 'test'
+  ...
+# Subtest: 4h required missing rows cannot be replaced by the optional auction row
+ok 29 - 4h required missing rows cannot be replaced by the optional auction row
+  ---
+  duration_ms: 1.144885
+  type: 'test'
+  ...
+# Subtest: 4h START, ambiguous and pre-open patterns remain inconclusive; holiday rows are never eligible
+ok 30 - 4h START, ambiguous and pre-open patterns remain inconclusive; holiday rows are never eligible
+  ---
+  duration_ms: 8.142002
+  type: 'test'
+  ...
+# Subtest: multiquote coverage: HTTP/JSON success does not promote partial or empty symbols to full success
+ok 31 - multiquote coverage: HTTP/JSON success does not promote partial or empty symbols to full success
+  ---
+  duration_ms: 11.475447
+  type: 'test'
+  ...
+# Subtest: multiquote identity and required numeric/time errors preserve observations and stop the next request
+ok 32 - multiquote identity and required numeric/time errors preserve observations and stop the next request
+  ---
+  duration_ms: 30.305429
+  type: 'test'
+  ...
+# Subtest: multiquote depth: full levels, missing levels, numeric errors and book conflicts stay distinct
+ok 33 - multiquote depth: full levels, missing levels, numeric errors and book conflicts stay distinct
+  ---
+  duration_ms: 43.555857
+  type: 'test'
+  ...
+# Subtest: multiquote freshness: open fresh/stale/future/missing clocks and closed zero depth never become identical success
+ok 34 - multiquote freshness: open fresh/stale/future/missing clocks and closed zero depth never become identical success
+  ---
+  duration_ms: 30.148982
+  type: 'test'
+  ...
+# Subtest: quota reset: request spanning 09:00 excludes its incoming/outgoing deltas but preserves later valid evidence
+ok 35 - quota reset: request spanning 09:00 excludes its incoming/outgoing deltas but preserves later valid evidence
+  ---
+  duration_ms: 1.905829
+  type: 'test'
+  ...
+# Subtest: quota reset: all comparisons across reset produce INCONCLUSIVE rather than a counter contradiction
+ok 36 - quota reset: all comparisons across reset produce INCONCLUSIVE rather than a counter contradiction
+  ---
+  duration_ms: 1.285964
+  type: 'test'
+  ...
+# Subtest: quota reset between calls preserves pre/post-reset comparisons and includes the response time in runStudy
+ok 37 - quota reset between calls preserves pre/post-reset comparisons and includes the response time in runStudy
+  ---
+  duration_ms: 8.68348
+  type: 'test'
+  ...
+# Subtest: quota absence, unknown timing, changed limits and backwards wall clock do not create evidence
+ok 38 - quota absence, unknown timing, changed limits and backwards wall clock do not create evidence
+  ---
+  duration_ms: 4.961274
+  type: 'test'
+  ...
+# Subtest: quota patterns remain hypotheses and operating-request deductions cannot prove a contract or a gateway
+ok 39 - quota patterns remain hypotheses and operating-request deductions cannot prove a contract or a gateway
+  ---
+  duration_ms: 20.149586
+  type: 'test'
+  ...
+# Subtest: reused transport keeps GET/no-agent, 512KB body limit, no redirect and no second socket
+ok 40 - reused transport keeps GET/no-agent, 512KB body limit, no redirect and no second socket
+  ---
+  duration_ms: 0.713499
+  type: 'test'
+  ...
+# Subtest: packaging: both commands decode byte-for-byte to current sources and detect a changed source
+ok 41 - packaging: both commands decode byte-for-byte to current sources and detect a changed source
+  ---
+  duration_ms: 2.49881
+  type: 'test'
+  ...
+# Subtest: packaging: SHA-256 rejects changed payload and digest before any request in both command formats
+ok 42 - packaging: SHA-256 rejects changed payload and digest before any request in both command formats
+  ---
+  duration_ms: 7.570252
+  type: 'test'
+  ...
+# Subtest: packaging: no credentials blocks execution; fake key with disabled sockets is redacted and rerun is blocked
+ok 43 - packaging: no credentials blocks execution; fake key with disabled sockets is redacted and rerun is blocked
+  ---
+  duration_ms: 15.387367
+  type: 'test'
+  ...
+# Subtest: no test reached the real network
+ok 44 - no test reached the real network
+  ---
+  duration_ms: 0.157215
+  type: 'test'
+  ...
+1..44
+# tests 44
+# suites 0
+# pass 44
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 426.022677

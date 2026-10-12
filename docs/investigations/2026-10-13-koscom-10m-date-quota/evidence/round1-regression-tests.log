@@ -1,0 +1,142 @@
+TAP version 13
+# Subtest: frozen KRX calendar selects actual session offsets including June 3 and July 17 closures
+ok 1 - frozen KRX calendar selects actual session offsets including June 3 and July 17 closures
+  ---
+  duration_ms: 0.688584
+  type: 'test'
+  ...
+# Subtest: lossless numbers and exact decimal addition retain money beyond Number precision
+ok 2 - lossless numbers and exact decimal addition retain money beyond Number precision
+  ---
+  duration_ms: 0.234438
+  type: 'test'
+  ...
+# Subtest: only documented origins and the exact twelve request parameters are accepted
+ok 3 - only documented origins and the exact twelve request parameters are accepted
+  ---
+  duration_ms: 1.50795
+  type: 'test'
+  ...
+# Subtest: valid rows without trading dates remain unconfirmed even with different prices
+ok 4 - valid rows without trading dates remain unconfirmed even with different prices
+  ---
+  duration_ms: 3.279839
+  type: 'test'
+  ...
+# Subtest: successful empty result is distinct from malformed/missing candle fields
+ok 5 - successful empty result is distinct from malformed/missing candle fields
+  ---
+  duration_ms: 1.032793
+  type: 'test'
+  ...
+# Subtest: duplicates, conflicting candles, nonmonotonic order, invalid OHLC/time and >100 rows fail validation
+ok 6 - duplicates, conflicting candles, nonmonotonic order, invalid OHLC/time and >100 rows fail validation
+  ---
+  duration_ms: 4.076446
+  type: 'test'
+  ...
+# Subtest: matching END/END and START/START hypotheses compare all six fields but do not confirm boundaries
+ok 7 - matching END/END and START/START hypotheses compare all six fields but do not confirm boundaries
+  ---
+  duration_ms: 1.869243
+  type: 'test'
+  ...
+# Subtest: missing minute is never interpolated; all price, volume and amount mismatches are counted
+ok 8 - missing minute is never interpolated; all price, volume and amount mismatches are counted
+  ---
+  duration_ms: 1.059479
+  type: 'test'
+  ...
+# Subtest: date filters: repeated responses and holiday data suppress positive attribution
+ok 9 - date filters: repeated responses and holiday data suppress positive attribution
+  ---
+  duration_ms: 2.456371
+  type: 'test'
+  ...
+# Subtest: matching top-level date alone is insufficient; explicit row dates require successful controls
+ok 10 - matching top-level date alone is insufficient; explicit row dates require successful controls
+  ---
+  duration_ms: 1.660711
+  type: 'test'
+  ...
+# Subtest: dated independent daily comparison detects contradictions, does not prove undated minute attribution
+ok 11 - dated independent daily comparison detects contradictions, does not prove undated minute attribution
+  ---
+  duration_ms: 1.07554
+  type: 'test'
+  ...
+# Subtest: extract only rate-related headers, suppress arbitrary values, expose deltas without attributing concurrent calls
+ok 12 - extract only rate-related headers, suppress arbitrary values, expose deltas without attributing concurrent calls
+  ---
+  duration_ms: 3.958005
+  type: 'test'
+  ...
+# Subtest: all twelve calls are sequential, spaced, and never retried; absent quota remains unconfirmed
+ok 13 - all twelve calls are sequential, spaced, and never retried; absent quota remains unconfirmed
+  ---
+  duration_ms: 3.005295
+  type: 'test'
+  ...
+# Subtest: HTTP 401 stops immediately and prints no body, URL or secret
+ok 14 - HTTP 401 stops immediately and prints no body, URL or secret
+  ---
+  duration_ms: 0.847538
+  type: 'test'
+  ...
+# Subtest: HTTP 403 stops immediately and prints no body, URL or secret
+ok 15 - HTTP 403 stops immediately and prints no body, URL or secret
+  ---
+  duration_ms: 0.983974
+  type: 'test'
+  ...
+# Subtest: HTTP 429 stops immediately and prints no body, URL or secret
+ok 16 - HTTP 429 stops immediately and prints no body, URL or secret
+  ---
+  duration_ms: 0.915068
+  type: 'test'
+  ...
+# Subtest: unexpected JSON auth/rate errors, malformed JSON, transport failure, and zero quota stop without retries
+ok 17 - unexpected JSON auth/rate errors, malformed JSON, transport failure, and zero quota stop without retries
+  ---
+  duration_ms: 3.328846
+  type: 'test'
+  ...
+# Subtest: output gate also rejects a key reflected in otherwise syntactically valid diagnostic fields
+ok 18 - output gate also rejects a key reflected in otherwise syntactically valid diagnostic fields
+  ---
+  duration_ms: 0.168183
+  type: 'test'
+  ...
+# Subtest: native transport handles JSON, timeout, socket errors, redirect/auth rejection and bounded body without retries
+ok 19 - native transport handles JSON, timeout, socket errors, redirect/auth rejection and bounded body without retries
+  ---
+  duration_ms: 23.066538
+  type: 'test'
+  ...
+# Subtest: cancellation before request sends zero calls; cancellation in-flight destroys it and starts no replacement
+ok 20 - cancellation before request sends zero calls; cancellation in-flight destroys it and starts no replacement
+  ---
+  duration_ms: 0.652811
+  type: 'test'
+  ...
+# Subtest: actual main acquires a diagnostic-only once marker; a second invocation sends zero additional calls
+ok 21 - actual main acquires a diagnostic-only once marker; a second invocation sends zero additional calls
+  ---
+  duration_ms: 4.791848
+  type: 'test'
+  ...
+# Subtest: actual main blocks wrong service, missing credentials, undocumented base, and native debug output before requests
+ok 22 - actual main blocks wrong service, missing credentials, undocumented base, and native debug output before requests
+  ---
+  duration_ms: 3.226554
+  type: 'test'
+  ...
+1..22
+# tests 22
+# suites 0
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 70.172279

@@ -1,41 +1,76 @@
 {
-  "evidenceType": "LOCAL_PACKAGING_ONLY",
+  "evidenceType": "LOCAL_PACKAGING_ONLY_JUDGMENT_REVISION",
+  "checkedAtKstDate": "2026-10-13",
   "round1Sha256": "4655ed526307e8eff82b9742eb43a509dbc5b727f2ec8d038157a92ca226f12b",
-  "round2Sha256": "3056f399fc87de124d7bc8dba94b35fb835d37823a6182e5006f3059cf2b1f23",
-  "heredocSha256": "328de26acef16fd95c5494b598abb0ffdcb9a7b92e7faebb35cef3575c1d21e7",
-  "oneLineSha256": "a4940c0f4c9456a7a08713432b8e95eaf5e42d7fa75a79de2d33263ed1c2ef54",
+  "round2Sha256": "e95d7e8318c0855683794cad33d1065b6a7a10008d427488420292de14f74f21",
+  "heredocSha256": "68eb399fa7eba183348433e4360a3d265a102542beceff36ce91705f2d84ebc5",
+  "oneLineSha256": "02709b6cfda8e32353743f43a16555346b4e35d44a5380ad97226e261ed4eb6c",
   "decodeMatchesCanonicalSources": {
     "heredoc": true,
     "oneLine": true
   },
+  "formats": {
+    "heredoc": {
+      "file": "render-shell-command.sh",
+      "bytes": 32798,
+      "lines": 256,
+      "sha256": "68eb399fa7eba183348433e4360a3d265a102542beceff36ce91705f2d84ebc5",
+      "decodeMatchesCanonicalSources": true,
+      "shellArgumentOrStdinMatchesCheckedJavaScript": true
+    },
+    "oneLine": {
+      "file": "render-shell-one-line.sh",
+      "bytes": 34791,
+      "lines": 1,
+      "sha256": "02709b6cfda8e32353743f43a16555346b4e35d44a5380ad97226e261ed4eb6c",
+      "decodeMatchesCanonicalSources": true,
+      "shellArgumentOrStdinMatchesCheckedJavaScript": true
+    }
+  },
+  "isolation": "VM: fake process.env, fixed date, private in-memory once markers, sockets disabled before request; all real network entry points blocked by test suite",
   "checks": [
     {
-      "env": "no RENDER_SERVICE_ID",
+      "env": "no credentials",
       "result": "RENDER_SERVICE_MISMATCH",
-      "calls": 0
+      "requests": 0,
+      "bothFormats": true
     },
     {
-      "env": "service id, no key",
+      "env": "fake service id, no key",
       "result": "KEY_MISSING",
-      "calls": 0
+      "requests": 0,
+      "bothFormats": true
     },
     {
-      "env": "tampered payload",
+      "env": "changed compressed source payload, unchanged expected hash",
       "result": "PACKAGED_SCRIPT_INVALID",
-      "calls": 0
+      "requests": 0,
+      "bothFormats": true
     },
     {
-      "env": "fake key, network namespace without network, private tmpfs /tmp",
+      "env": "changed expected digest",
+      "result": "PACKAGED_SCRIPT_INVALID",
+      "requests": 0,
+      "bothFormats": true
+    },
+    {
+      "env": "source bytes changed in memory",
+      "result": "canonical/payload SHA-256 mismatch detected",
+      "bothFormats": true
+    },
+    {
+      "env": "fake key, sockets disabled, in-memory /tmp",
       "result": "start + request(TRANSPORT_ERROR) + summary; second run ONCE_GUARD_BLOCKED",
+      "blockedRequestAttempts": 1,
       "externalRequests": 0,
-      "stderrBytes": 0,
       "keyInOutput": false,
-      "urlInOutput": false
+      "urlOrAuthParamInOutput": false,
+      "bothFormats": true
     }
   ],
-  "formats": [
-    "heredoc",
-    "one-line"
-  ],
-  "koscomApiRequests": 0
+  "testEvidence": "evidence/mock-tests.log: packaging tests 41-43; test.after asserts realNetworkAttempts=0",
+  "newExternalDownloads": 0,
+  "koscomApiRequests": 0,
+  "renderShellExecuted": false,
+  "shellParsingCheck": "Local bash with a fake node executable that only captures argv/stdin; diagnostic source is not evaluated by this shell check; no inherited credentials"
 }

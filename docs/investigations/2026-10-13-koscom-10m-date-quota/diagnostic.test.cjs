@@ -296,8 +296,10 @@ test('HTTP 401/429, redirect, invalid JSON and zero remaining quota each stop af
     [{ status: 429, headers: {}, code: null, body: null }, 'HTTP_RATE_LIMIT'],
     [{ status: 302, headers: { location: 'https://evil.invalid' }, code: null, body: null }, 'REDIRECT_REJECTED'],
     [{ status: 200, headers: {}, code: null, body: `${KEY} not json` }, 'INVALID_JSON'],
+    [{ status: 200, headers: {}, code: null, body: '' }, 'INVALID_JSON'],
     [{ status: 500, headers: {}, code: null, body: '{}' }, 'HTTP_ERROR_STOP'],
     [{ ...intradayPacket([]), headers: { 'x-ratelimit-remaining-day': '0' } }, 'DAILY_QUOTA_EXHAUSTED'],
+    [{ ...intradayPacket([]), headers: { 'x-ratelimit-remaining-day': '000' } }, 'DAILY_QUOTA_EXHAUSTED'],
   ];
   for (const [packet, reason] of cases) {
     const r = await study(() => packet);
@@ -454,6 +456,450 @@ test('independent of the app: only node built-ins and the pinned round-1 module 
   assert.equal(/backend|prisma|redis|ioredis|@nestjs/i.test(required.join(' ')), false);
 });
 
-test('no test reached the real network', () => {
-  assert.equal(realNetworkAttempts, 0);
+test('response policy: valid, empty and partial intraday data keep distinct eligibility and continuation', async () => {
+  for (const [rows, status, usable] of [
+    [session(56000n), 'COMPLETE_SOURCE_GRID', true],
+    [[], 'EMPTY', false],
+    [session(56000n).filter(r => r.inddTm !== '11000000'), 'PARTIAL_SOURCE_GRID', true],
+  ]) {
+    const r = await study(provider({ 1: () => intradayPacket(rows) }));
+    const o = line(r, 1);
+    assert.equal(o.dataStatus, status);
+    assert.equal(o.usable, usable);
+    assert.equal(o.investigationAction, 'CONTINUE');
+    assert.equal(r.ids.includes(2), true);
+    assert.equal(r.summary.stopped, false);
+  }
 });
+
+test('fatal candle matrix: malformed shape, wrong code, >100, duplicate/conflicting rows, OHLC and time stop the next call', async () => {
+  const rows = session(56000n);
+  const changed = (i, fields) => rows.map((r, k) => k === i ? { ...r, ...fields } : r);
+  for (const [packet, reason] of [
+    [ok({ isuSrtCd: '005930', hisLists: {} }), 'RESPONSE_SHAPE_ERROR'],
+    [ok({ isuSrtCd: '000660', hisLists: rows }), 'RESPONSE_SHAPE_ERROR'],
+    [intradayPacket(Array.from({ length: 101 }, () => rows[0])), 'ROW_LIMIT_EXCEEDED'],
+    [intradayPacket([rows[0], ...rows]), 'DUPLICATE_CANDLES'],
+    [intradayPacket([{ ...rows[0], inddTrdvol: '999' }, ...rows]), 'CONFLICTING_CANDLES'],
+    [intradayPacket(changed(1, { inddHgprc: '1' })), 'INVALID_CANDLE'],
+    [intradayPacket(changed(1, { inddTm: '99600000' })), 'INVALID_TIME'],
+    [intradayPacket(changed(1, { inddTm: '09210000' })), 'OFF_GRID_TIME'],
+    [intradayPacket(session(56000n, { labels: [530, ...END] })), 'OUTSIDE_REQUEST_TIME'],
+    [intradayPacket([rows[1], rows[0], ...rows.slice(2)]), 'NON_MONOTONIC_CANDLES'],
+  ]) {
+    const r = await study(() => packet);
+    assert.equal(r.ids.length, 1, reason);
+    assert.equal(r.summary.stopReason, reason);
+    assert.equal(line(r, 1).usable, false);
+    assert.equal(line(r, 1).responseClass, 'FATAL_ERROR');
+    assert.equal(line(r, 1).investigationAction, 'STOP');
+  }
+  const bad = probe.analyze(calls[0], intradayPacket([rows[0], ...rows]));
+  assert.equal(bad.output.fourHourBucketsEndLabels['09:00-13:00'].complete === null, true);
+  const s = probe.finalSummary([bad, probe.analyze(calls[2], intradayPacket([rows[0], ...rows]))], 2, bad.stop);
+  assert.equal(s.repeatedAcrossDates.length, 0); // rejected partial data is not date evidence
+});
+
+test('daily anomalies: valid foreign date and empty data continue; malformed candle/date and extra rows stop', async () => {
+  const rows = session(56000n);
+  for (const [packet, reason, status] of [
+    [historyPacket([]), null, 'EMPTY'],
+    [historyPacket([daily(rows, '2026-05-18')]), null, 'DATE_MISMATCH'],
+    [historyPacket([daily(rows, '2026-05-19', { override: { hgprc: '1' } })]), 'INVALID_DAILY_CANDLE_OR_DATE', 'INVALID'],
+    [historyPacket([daily(rows, '2026-05-19', { override: { trdDd: '20260230' } })]), 'INVALID_DAILY_CANDLE_OR_DATE', 'INVALID'],
+    [historyPacket([daily(rows, '2026-05-19'), daily(rows, '2026-05-19')]), 'DAILY_ROW_COUNT_EXCEEDED', 'INVALID'],
+  ]) {
+    const r = await study(provider({ 2: () => packet }));
+    assert.equal(r.summary.stopReason, reason);
+    assert.equal(line(r, 2).dataStatus, status);
+    assert.equal(r.ids.includes(3), reason === null);
+    assert.equal(line(r, 2).investigationAction, reason ? 'STOP' : 'CONTINUE');
+    assert.equal(r.summary.dates[0].attribution, 'UNCONFIRMED_NO_COMPARISON');
+  }
+});
+
+test('daily OHLC contradiction is an observation and never stops the remaining fixed plan', async () => {
+  const r = await study(provider({ 2: () => historyPacket([daily(session(56000n), '2026-05-19', { override: { lwprc: '55999' } })]) }));
+  assert.equal(r.summary.dates[0].attribution, 'CONTRADICTED_BY_DATED_DAILY');
+  assert.equal(r.summary.dates[0].fourHourStatus, 'CONTRADICTED_DATE');
+  assert.equal(r.ids.includes(3), true);
+  assert.equal(r.summary.stopped, false);
+});
+
+test('HTTP 5xx with service-hours JSON remains fatal; timeout/transport/body-limit errors never continue', async () => {
+  for (const status of [500, 502, 503]) {
+    const r = await study(() => ({ status, headers: {}, body: JSON.stringify({ error: { message: '제공 시간이 아닙니다' } }) }));
+    assert.equal(r.ids.length, 1);
+    assert.equal(r.summary.stopReason, 'HTTP_ERROR_STOP');
+  }
+  for (const code of ['TIMEOUT', 'TRANSPORT_ERROR', 'BODY_ERROR', 'BODY_TOO_LARGE', 'CANCELED']) {
+    const r = await study(() => ({ status: null, headers: {}, body: null, code }));
+    assert.equal(r.ids.length, 1);
+    assert.equal(r.summary.stopReason, code);
+    assert.equal(line(r, 1).investigationAction, 'STOP');
+  }
+});
+
+test('4h completeness: optional 15:30 absence keeps both required buckets complete without asserting END semantics', () => {
+  const rows = session(56000n);
+  const all = probe.analyze(calls[0], intradayPacket(rows)).output;
+  const noAuction = probe.analyze(calls[0], intradayPacket(rows.slice(0, -1))).output;
+  for (const o of [all, noAuction]) {
+    assert.equal(o.requiredEndComplete, true);
+    assert.equal(o.fourHourBucketsEndLabels['09:00-13:00'].complete, true);
+    assert.equal(o.fourHourBucketsEndLabels['13:00-15:30'].complete, true);
+    assert.equal(o.labelSemantics.confirmed, false);
+  }
+  assert.equal(all.sourceGrid.endComplete, true);
+  assert.equal(all.labelSemantics.inferred, 'END');
+  assert.equal(all.labelSemantics.confidence, 'BOUNDARY_PATTERN_ONLY');
+  assert.equal(all.fourHourStatus, 'COMPLETE_UNDER_END_ASSUMPTION_DATE_UNCONFIRMED');
+  assert.equal(noAuction.sourceGrid.endComplete, false);
+  assert.equal(noAuction.auctionRow.present, false);
+  assert.equal(noAuction.labelSemantics.confidence, 'AMBIGUOUS');
+  assert.equal(noAuction.fourHourStatus, 'INCONCLUSIVE_LABEL_SEMANTICS');
+  assert.equal(noAuction.verdict.includes('필수 4시간봉 구간 충족'), true);
+  const endBucket = all.fourHourBucketsEndLabels['13:00-15:30'].aggregate;
+  assert.equal(endBucket.close, rows.at(-1).inddClsprc);
+  assert.equal(endBucket.volume, String(rows.slice(24).reduce((n, r) => n + BigInt(r.inddTrdvol), 0n)));
+  assert.equal(noAuction.fourHourBucketsEndLabels['13:00-15:30'].aggregate.close, rows.at(-2).inddClsprc);
+});
+
+test('4h required missing rows cannot be replaced by the optional auction row', () => {
+  for (const [missing, bucket, count] of [['11000000', '09:00-13:00', 23], ['14000000', '13:00-15:30', 13]]) {
+    const o = probe.analyze(calls[0], intradayPacket(session(56000n).filter(r => r.inddTm !== missing))).output;
+    assert.equal(o.requiredEndComplete, false);
+    assert.equal(o.fourHourBucketsEndLabels[bucket].present, count);
+    assert.equal(o.fourHourBucketsEndLabels[bucket].complete, false);
+    assert.equal(o.auctionRow.present, true);
+    assert.equal(o.fourHourStatus, 'INCOMPLETE_UNDER_END_ASSUMPTION');
+    assert.equal(o.gridComplete, false);
+  }
+});
+
+test('4h START, ambiguous and pre-open patterns remain inconclusive; holiday rows are never eligible', async () => {
+  for (const [labels, pattern] of [[END.map(t => t - 10), 'START_GRID'], [END.slice(0, -1), 'AMBIGUOUS'], [[540, ...END], 'NEITHER']]) {
+    const o = probe.analyze(calls[0], intradayPacket(session(56000n, { labels }))).output;
+    assert.equal(o.boundaryEvidence, pattern);
+    assert.equal(o.fourHourStatus, 'INCONCLUSIVE_LABEL_SEMANTICS');
+    assert.equal(o.labelSemantics.confirmed, false);
+    assert.equal(o.fourHourBucketsEndLabels['09:00-13:00'].aggregate.open,
+      session(56000n, { labels }).find(r => r.inddTm === '09100000').inddOpnprc);
+  }
+  const r = await study(provider({ 9: () => intradayPacket(session(BASES['2026-10-08'])) }));
+  assert.equal(line(r, 9).requiredEndComplete, true);
+  assert.equal(line(r, 9).fourHourStatus, 'NOT_APPLICABLE_HOLIDAY');
+  assert.equal(r.summary.holiday.storeAsHolidayCandles, false);
+  assert.equal(r.ids.includes(10), true);
+  assert.equal(r.summary.dates.every(d => d.providerDateIndependentlyProven === false), true);
+  assert.equal(r.summary.dates[0].dateConfidence, 'SUPPLIER_DAILY_CORROBORATION_ONLY');
+});
+
+test('multiquote coverage: HTTP/JSON success does not promote partial or empty symbols to full success', async () => {
+  for (const rows of [[priceRow('005930')], []]) {
+    const r = await study(provider({ 12: () => ok({ isulist: rows }) }));
+    const o = line(r, 12);
+    assert.equal(o.httpSuccess, true);
+    assert.equal(o.jsonValid, true);
+    assert.equal(o.api, 'SUCCESS');
+    assert.equal(o.coverageStatus, rows.length ? 'PARTIAL' : 'NONE');
+    assert.equal(o.allRequestedReturned, false);
+    assert.equal(o.fullSuccess, false);
+    assert.equal(o.usable, false);
+    assert.equal(o.responseClass, 'OBSERVATION');
+    assert.equal(r.ids.includes(13), true);
+    assert.equal(r.summary.multiquote[0].fullSuccess, false);
+  }
+});
+
+test('multiquote identity and required numeric/time errors preserve observations and stop the next request', async () => {
+  for (const [rows, reason, coverage] of [
+    [[priceRow('005930'), priceRow('000660'), priceRow('035420')], 'UNEXPECTED_SYMBOL', 'UNEXPECTED_SYMBOLS'],
+    [[priceRow('005930'), priceRow('005930'), priceRow('000660')], 'DUPLICATE_SYMBOL', 'DUPLICATE_SYMBOLS'],
+    [[{ trdPrc: '70000' }], 'INVALID_SYMBOL_IDENTIFIER', 'INVALID_IDENTIFIERS'],
+    [[{ ...priceRow('005930'), trdPrc: '0' }, priceRow('000660')], 'INVALID_CURRENT_PRICE', 'COMPLETE'],
+    [[{ ...priceRow('005930'), trdPrc: '-1' }, priceRow('000660')], 'INVALID_CURRENT_PRICE', 'COMPLETE'],
+    [[priceRow('005930', '24600000'), priceRow('000660')], 'INVALID_TIME', 'COMPLETE'],
+  ]) {
+    const r = await study(provider({ 12: () => ok({ isulist: rows }) }));
+    const o = line(r, 12);
+    assert.equal(r.ids.length, 12, reason);
+    assert.equal(r.ids.includes(13), false);
+    assert.equal(r.summary.stopReason, reason);
+    assert.equal(o.coverageStatus, coverage);
+    assert.equal(o.fullSuccess, false);
+    assert.equal(o.usable, false);
+    assert.equal(r.summary.multiquote[0].responseClass, 'FATAL_ERROR');
+  }
+});
+
+test('multiquote depth: full levels, missing levels, numeric errors and book conflicts stay distinct', async () => {
+  for (const [row, reason, fields] of [
+    [bookRow('005930'), null, true],
+    [bookRow('005930', { levels: 5 }), null, false],
+    [{ ...bookRow('005930'), askStep2BstordRqty: '-1' }, 'INVALID_ORDERBOOK_VALUE', true],
+    [{ ...bookRow('005930'), bidStep4BstordPrc: 'NaN' }, 'INVALID_ORDERBOOK_VALUE', true],
+    [{ ...bookRow('005930', { levels: 5 }), askStep6BstordPrc: '-1' }, 'INVALID_ORDERBOOK_VALUE', false],
+    [{ ...bookRow('005930'), bidStep1BstordPrc: '70200' }, 'CONFLICTING_ORDERBOOK', true],
+    [{ ...bookRow('005930'), askStep2BstordPrc: '70100' }, 'CONFLICTING_ORDERBOOK', true],
+  ]) {
+    const r = await study(provider({ 13: () => ok({ isulist: [row, bookRow('000660')] }) }));
+    const o = line(r, 13);
+    assert.equal(r.summary.stopReason, reason);
+    assert.equal(r.ids.includes(14), reason === null);
+    assert.equal(o.tenLevelFields, fields);
+    assert.equal(o.fullSuccess, reason === null && fields);
+    assert.equal(o.perSymbol[0].levelValuesValid, reason !== 'INVALID_ORDERBOOK_VALUE');
+  }
+});
+
+test('multiquote freshness: open fresh/stale/future/missing clocks and closed zero depth never become identical success', async () => {
+  for (const [clock, freshness, success] of [
+    ['10595900', 'FRESH_CLOCK', true], ['10000000', 'STALE_CLOCK', false], ['11010000', 'CLOCK_AHEAD', false],
+    [undefined, 'UNKNOWN', false],
+  ]) {
+    const first = priceRow('005930');
+    if (clock === undefined) delete first.trdTm; else first.trdTm = clock;
+    const r = await study(provider({ 12: () => ok({ isulist: [first, priceRow('000660')] }) }));
+    assert.equal(line(r, 12).perSymbol[0].freshness, freshness);
+    assert.equal(line(r, 12).fullSuccess, success);
+    assert.equal(r.ids.includes(13), true);
+    assert.equal(line(r, 12).perSymbol[0].dateIndependentlyProven, false);
+  }
+  const closed = await study(provider({ 13: () => ok({ isulist: ['005930', '000660'].map(s => bookRow(s, { zero: true })) }) }),
+    { wall: () => Date.parse('2026-10-13T08:00:00Z') });
+  assert.equal(line(closed, 12).perSymbol[0].freshness, 'NOT_EVALUATED_MARKET_CLOSED');
+  assert.equal(line(closed, 12).fullSuccess, true);
+  assert.equal(line(closed, 13).fullSuccess, true);
+  assert.equal(line(closed, 13).perSymbol[0].askPositiveLevels, 0);
+  assert.equal(line(closed, 13).perSymbol[0].levelValuesValid, true);
+  assert.equal(closed.ids.includes(14), true);
+});
+
+function quotaSample(index, remaining, start, end = start, headers = {}) {
+  return probe.analyze(calls[index], { ...provider()(calls[index]),
+    headers: { 'x-ratelimit-remaining-day': String(remaining), ...headers } }, start, end);
+}
+const RESET = Date.parse('2026-10-13T00:00:00Z'); // 09:00 KST
+
+test('quota reset: request spanning 09:00 excludes its incoming/outgoing deltas but preserves later valid evidence', () => {
+  const analyses = [quotaSample(0, 100, RESET - 2000), quotaSample(1, 50000, RESET - 1000, RESET + 1000),
+    quotaSample(2, 49999, RESET + 2000), quotaSample(3, 49998, RESET + 3000)];
+  const s = probe.finalSummary(analyses, 4, null);
+  assert.equal(s.quotaResetCrossed, true);
+  assert.equal(s.quota.observations[1].remainingDay, '50000');
+  assert.equal(s.quota.consecutive[0].observedDecrease, '-49900');
+  assert.equal(s.quota.consecutive[0].eligible, false);
+  assert.equal(s.quota.consecutive[1].eligible, false);
+  assert.equal(s.quota.consecutive[2].eligible, true);
+  assert.equal(s.quota.singleStrictSharedCounter, 'NOT_CONTRADICTED');
+  assert.equal(s.quota.increasesBetweenConsecutiveCalls, 0);
+  assert.equal(s.quota.withinCategoryMonotonic, 'INCONCLUSIVE');
+  assert.equal(s.quota.perCategoryExact === null, true);
+  assert.equal(s.quota.status, 'PARTIAL_COMPARISONS_EXCLUDED');
+  assert.equal(s.quota.eligibleConsecutiveComparisons, 1);
+});
+
+test('quota reset: all comparisons across reset produce INCONCLUSIVE rather than a counter contradiction', () => {
+  const q = probe.quotaAnalysis([quotaSample(0, 1, RESET - 1000), quotaSample(2, 50000, RESET + 1000)]);
+  assert.equal(q.quotaResetCrossed, true);
+  assert.equal(q.status, 'INCONCLUSIVE');
+  assert.equal(q.singleStrictSharedCounter, 'INCONCLUSIVE');
+  assert.equal(q.perCategoryCounter, 'INCONCLUSIVE');
+  assert.equal(q.withinCategoryMonotonic, 'INCONCLUSIVE');
+  assert.equal(q.perCategoryExact === null, true);
+  assert.equal(q.sameCategory[0].excludedReason, 'QUOTA_RESET_BOUNDARY');
+  assert.equal(q.counterPattern, 'INCONCLUSIVE');
+});
+
+test('quota reset between calls preserves pre/post-reset comparisons and includes the response time in runStudy', async () => {
+  let n = 0;
+  const times = [RESET - 4000, RESET - 3000, RESET - 2000, RESET + 1000];
+  const r = await study(undefined, { wall: () => times[n++] ?? RESET + n * 1000,
+    headers: (call, i) => ({ 'x-ratelimit-remaining-day': String(i === 1 ? 1 : 50002 - i) }) });
+  assert.equal(line(r, 2).quotaTiming.resetCrossedDuringRequest, true);
+  assert.equal(r.summary.quotaResetCrossed, true);
+  assert.equal(r.summary.quota.consecutive[0].eligible, false);
+  assert.equal(r.summary.quota.consecutive[1].eligible, false);
+  assert.equal(r.summary.quota.singleStrictSharedCounter, 'NOT_CONTRADICTED');
+  assert.equal(r.summary.quota.perCategoryCounter, 'NOT_CONTRADICTED');
+  assert.equal(r.summary.quota.withinCategoryMonotonic, 'YES');
+  const q = probe.quotaAnalysis([quotaSample(0, 4, RESET - 4000), quotaSample(1, 3, RESET - 2000),
+    quotaSample(2, 100, RESET + 1000), quotaSample(3, 99, RESET + 3000)]);
+  assert.equal(JSON.stringify(q.consecutive.map(p => p.eligible)), '[true,false,true]');
+  assert.equal(q.singleStrictSharedCounter, 'NOT_CONTRADICTED');
+});
+
+test('quota absence, unknown timing, changed limits and backwards wall clock do not create evidence', () => {
+  const noHeaders = probe.analyze(calls[0], provider()(calls[0]), OPEN_WALL);
+  assert.equal(probe.quotaAnalysis([noHeaders]).status, 'NO_DATA');
+  assert.equal(probe.quotaAnalysis([noHeaders]).singleStrictSharedCounter, 'NO_DATA');
+  const a = quotaSample(0, 100, OPEN_WALL), b = quotaSample(2, 99, OPEN_WALL + 2000);
+  delete a.output.quotaTiming;
+  const unknown = probe.quotaAnalysis([a, b], true);
+  assert.equal(unknown.singleStrictSharedCounter, 'INCONCLUSIVE');
+  assert.equal(unknown.consecutive[0].excludedReason, 'QUOTA_TIMING_UNAVAILABLE');
+  const changed = probe.quotaAnalysis([quotaSample(0, 100, OPEN_WALL, OPEN_WALL, { 'x-ratelimit-limit-day': '1000' }),
+    quotaSample(2, 200, OPEN_WALL + 2000, OPEN_WALL + 2000, { 'x-ratelimit-limit-day': '2000' })]);
+  assert.equal(changed.singleStrictSharedCounter, 'INCONCLUSIVE');
+  assert.equal(changed.sameCategory[0].excludedReason, 'LIMIT_CHANGED');
+  const intermediateLimit = probe.quotaAnalysis([
+    quotaSample(0, 100, OPEN_WALL, OPEN_WALL, { 'x-ratelimit-limit-day': '1000' }),
+    quotaSample(1, 200, OPEN_WALL + 1000, OPEN_WALL + 1000, { 'x-ratelimit-limit-day': '2000' }),
+    quotaSample(2, 99, OPEN_WALL + 2000, OPEN_WALL + 2000, { 'x-ratelimit-limit-day': '1000' }),
+  ]);
+  assert.equal(intermediateLimit.sameCategory[0].excludedReason, 'LIMIT_CHANGED');
+  const backwards = probe.quotaAnalysis([quotaSample(0, 100, OPEN_WALL, OPEN_WALL - 1), b]);
+  assert.equal(backwards.singleStrictSharedCounter, 'INCONCLUSIVE');
+  assert.equal(backwards.consecutive[0].excludedReason, 'WALL_CLOCK_UNRELIABLE');
+});
+
+test('quota patterns remain hypotheses and operating-request deductions cannot prove a contract or a gateway', async () => {
+  const operating = await study(undefined, { headers: (_call, n) => ({ 'x-ratelimit-remaining-day': String(40000 - n * 7) }) });
+  const q = operating.summary.quota;
+  assert.equal(q.singleStrictSharedCounter, 'NOT_CONTRADICTED');
+  assert.equal(q.perCategoryExact, false);
+  assert.equal(q.operatingCallsMayOverlap, true);
+  assert.equal(q.counterPattern, 'SHARED_COMPATIBLE_NOT_PROVEN');
+  assert.equal(q.contractScope, 'UNCONFIRMED');
+  const categories = {};
+  const perType = await study(undefined, { headers: c => {
+    const key = c.kind === 'multiquote' ? c.item : c.kind;
+    categories[key] = (categories[key] ?? 40000) - 1;
+    return { 'x-ratelimit-remaining-day': String(categories[key]) };
+  } });
+  assert.equal(perType.summary.quota.counterPattern, 'CATEGORY_COMPATIBLE_NOT_PROVEN');
+  const distributed = await study(undefined, { headers: (_c, n) => ({ 'x-ratelimit-remaining-day': String((n % 2 ? 40000 : 30000) - n) }) });
+  assert.equal(distributed.summary.quota.counterPattern, 'FINER_SCOPE_OR_DISTRIBUTED_COUNTER_POSSIBLE');
+  assert.equal(distributed.summary.quota.gatewayCounter, 'UNCONFIRMED_NO_GATEWAY_IDENTITY');
+  assert.equal(distributed.summary.quota.contractScope, 'UNCONFIRMED');
+});
+
+test('reused transport keeps GET/no-agent, 512KB body limit, no redirect and no second socket', async () => {
+  for (const mode of ['large', 'redirect']) {
+    let sockets = 0, destroyed = 0;
+    const request = (_url, options, cb) => {
+      sockets++;
+      assert.equal(options.method, 'GET');
+      assert.equal(options.agent, false);
+      const req = new EventEmitter(); req.destroy = () => { destroyed++; };
+      req.end = () => queueMicrotask(() => {
+        const res = new EventEmitter(); res.statusCode = mode === 'redirect' ? 302 : 200;
+        res.headers = { location: 'https://evil.invalid' }; res.destroy = () => { destroyed++; };
+        cb(res);
+        if (mode === 'large') res.emit('data', Buffer.alloc(524289));
+      });
+      return req;
+    };
+    const packet = await v1.requestOnce(probe.buildUrl(BASE, KEY, calls[0]), { request });
+    const a = probe.analyze(calls[0], packet);
+    assert.equal(a.stop, mode === 'large' ? 'BODY_TOO_LARGE' : 'REDIRECT_REJECTED');
+    assert.equal(sockets, 1);
+    assert.equal(destroyed > 0, true);
+  }
+});
+
+// Exercise the generated commands themselves in a VM with a private marker store,
+// fixed time, no real process.env, and a transport that cannot open a socket.
+function packagedCode(format) {
+  const file = path.join(__dirname, format === 'heredoc' ? 'render-shell-command.sh' : 'render-shell-one-line.sh');
+  const shell = fs.readFileSync(file, 'utf8');
+  if (format === 'heredoc') return shell.split('\n').slice(1, -2).join('\n');
+  const prefix = "node --max-old-space-size=128 -e '";
+  assert.equal(shell.startsWith(prefix), true);
+  assert.equal(shell.endsWith("'\n"), true);
+  return shell.slice(prefix.length, -2).replaceAll(`'"'"'`, "'");
+}
+
+function packagedSandbox(code, env = {}) {
+  const lines = [], markers = new Set();
+  let blockedSockets = 0;
+  const fakeProcess = { env, versions: { node: '24.14.1' }, stdout: { write: l => lines.push(l) },
+    on() {}, removeListener() {}, exitCode: 0 };
+  const FixedDate = class extends Date {
+    constructor(...args) { super(...(args.length ? args : [OPEN_WALL])); }
+    static now() { return OPEN_WALL; }
+  };
+  const fakeFs = { openSync(p) { if (markers.has(p)) throw new Error('exists'); markers.add(p); return 1; },
+    writeSync() {}, closeSync() {}, existsSync: p => markers.has(p) };
+  const isolatedRequire = name => {
+    assert.equal(name.startsWith('node:'), true);
+    if (name === 'node:fs') return fakeFs;
+    if (name === 'node:https') return { request() { blockedSockets++; throw new Error('SOCKET_DISABLED'); } };
+    return require(name);
+  };
+  const context = vm.createContext({ require: isolatedRequire, process: fakeProcess, Date: FixedDate,
+    URL, Buffer, AbortController, setTimeout, clearTimeout });
+  const run = async () => {
+    vm.runInContext(code.replace('void round2.main();', 'globalThis.finished = round2.main();'), context, { timeout: 1000 });
+    await context.finished;
+  };
+  return { lines, markers, process: fakeProcess, run, blockedSockets: () => blockedSockets };
+}
+
+test('packaging: both commands decode byte-for-byte to current sources and detect a changed source', () => {
+  const { createHash } = require('node:crypto');
+  const { gunzipSync } = require('node:zlib');
+  const sha = b => createHash('sha256').update(b).digest('hex');
+  for (const format of ['heredoc', 'one-line']) {
+    const matches = [...packagedCode(format).matchAll(/const round[12] = load\(unpack\(\[([\s\S]*?)\], '([a-f0-9]{64})'\)/g)];
+    assert.equal(matches.length, 2);
+    for (const [i, match] of matches.entries()) {
+      const parts = [...match[1].matchAll(/'([A-Za-z0-9+/=]+)'/g)].map(m => m[1]);
+      const decoded = gunzipSync(Buffer.from(parts.join(''), 'base64'));
+      const source = fs.readFileSync(require.resolve(i ? './diagnostic.cjs' : V1_REL));
+      assert.equal(decoded.equals(source), true, `${format} round ${i + 1}`);
+      assert.equal(sha(decoded), match[2]);
+      assert.equal(sha(Buffer.concat([source, Buffer.from('\n// changed source\n')])) === match[2], false);
+    }
+  }
+});
+
+test('packaging: SHA-256 rejects changed payload and digest before any request in both command formats', async () => {
+  const { gzipSync, gunzipSync } = require('node:zlib');
+  for (const format of ['heredoc', 'one-line']) {
+    const code = packagedCode(format);
+    const match = /const round2 = load\(unpack\(\[([\s\S]*?)\], '([a-f0-9]{64})'\)/.exec(code);
+    assert.equal(Boolean(match), true);
+    const parts = [...match[1].matchAll(/'([A-Za-z0-9+/=]+)'/g)].map(m => m[1]);
+    const modified = gzipSync(Buffer.concat([gunzipSync(Buffer.from(parts.join(''), 'base64')), Buffer.from('\n// changed source\n')])).toString('base64');
+    const changedPayload = code.replace(match[1], `'${modified}'`);
+    const changedDigest = code.replace(match[2], '0'.repeat(64));
+    for (const changed of [changedPayload, changedDigest]) {
+      const iso = packagedSandbox(changed);
+      await iso.run();
+      assert.equal(JSON.parse(iso.lines.at(-1)).code, 'PACKAGED_SCRIPT_INVALID');
+      assert.equal(iso.blockedSockets(), 0);
+      assert.equal(iso.markers.size, 0);
+      assert.equal(iso.process.exitCode, 2);
+    }
+  }
+});
+
+test('packaging: no credentials blocks execution; fake key with disabled sockets is redacted and rerun is blocked', async () => {
+  for (const format of ['heredoc', 'one-line']) {
+    for (const [env, expected] of [[{}, 'RENDER_SERVICE_MISMATCH'],
+      [{ RENDER_SERVICE_ID: 'srv-da84cg8u01pc73cjasa0' }, 'KEY_MISSING']]) {
+      const iso = packagedSandbox(packagedCode(format), env);
+      await iso.run();
+      assert.equal(JSON.parse(iso.lines.at(-1)).code, expected);
+      assert.equal(iso.blockedSockets(), 0);
+      assert.equal(iso.markers.size, 0);
+    }
+    const iso = packagedSandbox(packagedCode(format), { RENDER_SERVICE_ID: 'srv-da84cg8u01pc73cjasa0', KOSCOM_API_KEY: KEY });
+    await iso.run();
+    assert.equal(iso.lines.length, 3);
+    assert.equal(JSON.parse(iso.lines[1]).api, 'TRANSPORT_ERROR');
+    assert.equal(JSON.parse(iso.lines[2]).actualCalls, 1);
+    assert.equal(iso.blockedSockets(), 1); // intercepted before opening any socket
+    assert.equal(iso.markers.size, 1);
+    await iso.run();
+    assert.equal(JSON.parse(iso.lines.at(-1)).code, 'ONCE_GUARD_BLOCKED');
+    assert.equal(iso.blockedSockets(), 1);
+    assert.equal(iso.lines.join('').includes(KEY), false);
+    assert.equal(/https?:\/\/|apikey=/.test(iso.lines.join('')), false);
+  }
+});
+
+test.after(() => assert.equal(realNetworkAttempts, 0));
+test('no test reached the real network', () => assert.equal(realNetworkAttempts, 0));

@@ -29,7 +29,7 @@ const ROUND1_MARKER = '/tmp/trading-class-koscom-history-20261012.once';
 const FIELDS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
 const INTRADAY_NAMES = ['inddOpnprc', 'inddHgprc', 'inddLwprc', 'inddClsprc', 'inddTrdvol', 'inddTrdval'];
 const DAILY_NAMES = ['opnprc', 'hgprc', 'lwprc', 'trdPrc', 'accTrdvol', 'accTrdval'];
-// Minutes of the KST day. 10-minute labels are END labels (round-1 evidence):
+// Minutes of the KST day. END is a hypothesis, not independently proven by round 1:
 // 09:10 covers 09:00–09:10; 15:30 covers the 15:20–15:30 closing single-price auction.
 const OPEN = 540, SPLIT = 780, AUCTION_START = 920, CLOSE = 930;
 const range = (from, to) => Array.from({ length: (to - from) / 10 + 1 }, (_, i) => from + i * 10);
@@ -163,6 +163,7 @@ function apiErrorCategory(error) {
 function analyzeIntraday(call, result, output) {
   if (result.isuSrtCd !== SYMBOL || !Array.isArray(result.hisLists)) return 'RESPONSE_SHAPE_ERROR';
   const rows = [];
+  const fatalIssues = [];
   let invalid = 0;
   for (const row of result.hisLists) {
     try {
@@ -170,12 +171,22 @@ function analyzeIntraday(call, result, output) {
       const acc = name => (row[name] === undefined ? null : v1.decimal(row[name]));
       rows.push({ time: clockSeconds(row.inddTm, true) / 60, ...values,
         accVolume: acc('inddAccTrdvol'), accAmount: acc('inddAccTrdval') });
-    } catch { invalid++; }
+    } catch (error) {
+      invalid++;
+      fatalIssues.push(error.message === 'INVALID_TIME' ? 'INVALID_TIME' : 'INVALID_CANDLE');
+    }
   }
   const rowCount = result.hisLists.length;
   const times = rows.map(r => r.time);
   const labels = new Set(times);
   const duplicates = times.length - labels.size;
+  const identities = new Map();
+  let conflicts = 0;
+  for (const r of rows) {
+    const identity = JSON.stringify([...FIELDS.map(f => text(r[f])), text(r.accVolume), text(r.accAmount)]);
+    if (identities.has(r.time) && identities.get(r.time) !== identity) conflicts++;
+    identities.set(r.time, identity);
+  }
   const ascending = times.every((t, i) => i === 0 || t >= times[i - 1]);
   const descending = times.every((t, i) => i === 0 || t <= times[i - 1]);
   const sorted = rows.slice().sort((a, b) => a.time - b.time);
@@ -189,14 +200,21 @@ function analyzeIntraday(call, result, output) {
     : !extraEnd.length && extraStart.length ? 'END_GRID'
       : !extraStart.length && extraEnd.length ? 'START_GRID'
         : !extraEnd.length && !extraStart.length ? 'AMBIGUOUS' : 'NEITHER';
-  const usable = invalid === 0 && duplicates === 0 && rowCount <= 100 && (ascending || descending) &&
-    offGrid === 0 && outsideRequest === 0;
+  if (rowCount > 100) fatalIssues.push('ROW_LIMIT_EXCEEDED');
+  if (duplicates) fatalIssues.push(conflicts ? 'CONFLICTING_CANDLES' : 'DUPLICATE_CANDLES');
+  if (!ascending && !descending) fatalIssues.push('NON_MONOTONIC_CANDLES');
+  if (offGrid) fatalIssues.push('OFF_GRID_TIME');
+  if (outsideRequest) fatalIssues.push('OUTSIDE_REQUEST_TIME');
+  const structurallyValid = fatalIssues.length === 0;
+  const usable = structurallyValid && rows.length > 0;
   // Four-hour buckets under END labels and the app's KRX policy: 15:20/15:25 auction
   // slots are never required; a pre-open row (label ≤ 09:00) is outside the session.
   const bucket = (required, optional) => {
     const present = required.filter(t => labels.has(t)).length;
-    return { expected: required.length, present, complete: present === required.length,
-      optionalAuctionPresent: optional.some(t => labels.has(t)) };
+    return { expected: required.length, present, complete: structurallyValid ? present === required.length : null,
+      missingRequiredLabels: required.filter(t => !labels.has(t)).map(minuteText),
+      optionalAuctionPresent: optional.some(t => labels.has(t)),
+      aggregate: structurallyValid ? aggregateText(aggregate(rows.filter(r => required.includes(r.time) || optional.includes(r.time)))) : null };
   };
   const buckets = {
     '09:00-13:00': bucket(END_GRID.filter(t => t <= SPLIT), []),
@@ -213,14 +231,31 @@ function analyzeIntraday(call, result, output) {
     preFirstAmount = sorted[0].accAmount - sorted[0].amount;
   }
   const window = sorted.filter(r => r.time > 600 && r.time <= 660);
-  const gridComplete = boundaryEvidence === 'END_GRID' ? missingEnd.length === 0
-    : boundaryEvidence === 'START_GRID' ? missingStart.length === 0 : false;
+  const gridComplete = structurallyValid && (boundaryEvidence === 'END_GRID' ? missingEnd.length === 0
+    : boundaryEvidence === 'START_GRID' ? missingStart.length === 0 : false);
+  const requiredEndComplete = structurallyValid ? Object.values(buckets).every(b => b.complete) : null;
+  const observationIssues = [];
+  if (!rows.length && structurallyValid) observationIssues.push('EMPTY_DATA');
+  if (rows.length && !gridComplete) observationIssues.push('SOURCE_GRID_INCOMPLETE_OR_AMBIGUOUS');
+  if (!auction) observationIssues.push('OPTIONAL_AUCTION_ABSENT');
   Object.assign(output, { api: 'SUCCESS', rowCount, validRows: rows.length, invalidRows: invalid,
-    duplicateTimes: duplicates, order: times.length < 2 ? 'NOT_APPLICABLE' : ascending ? 'ASCENDING' : descending ? 'DESCENDING' : 'NON_MONOTONIC',
+    fatalIssues: [...new Set(fatalIssues)], observationIssues,
+    dataStatus: !structurallyValid ? 'INVALID' : !rows.length ? 'EMPTY' : gridComplete ? 'COMPLETE_SOURCE_GRID' : 'PARTIAL_SOURCE_GRID',
+    duplicateTimes: duplicates, conflictingDuplicateTimes: conflicts,
+    order: times.length < 2 ? 'NOT_APPLICABLE' : ascending ? 'ASCENDING' : descending ? 'DESCENDING' : 'NON_MONOTONIC',
     offGrid, outsideRequest, overHundred: rowCount > 100, possiblyTruncatedAtHundred: rowCount === 100,
     first: sorted.length ? minuteText(sorted[0].time) : null, last: sorted.length ? minuteText(sorted.at(-1).time) : null,
     boundaryEvidence, missingEndLabels: missingEnd.map(minuteText), extraEndLabels: extraEnd.map(minuteText),
     missingStartLabelCount: missingStart.length, gridComplete,
+    sourceGrid: { endComplete: structurallyValid && missingEnd.length === 0 && extraEnd.length === 0,
+      startComplete: structurallyValid && missingStart.length === 0 && extraStart.length === 0 },
+    labelSemantics: { inferred: boundaryEvidence === 'END_GRID' ? 'END' : boundaryEvidence === 'START_GRID' ? 'START' : null,
+      confidence: ['END_GRID', 'START_GRID'].includes(boundaryEvidence) ? 'BOUNDARY_PATTERN_ONLY'
+        : boundaryEvidence === 'AMBIGUOUS' ? 'AMBIGUOUS' : 'UNCONFIRMED', confirmed: false },
+    requiredEndComplete,
+    fourHourStatus: !structurallyValid ? 'INVALID_DATA' : !isTradingDay(call.date) ? 'NOT_APPLICABLE_HOLIDAY'
+      : !rows.length ? 'NO_DATA' : boundaryEvidence !== 'END_GRID' ? 'INCONCLUSIVE_LABEL_SEMANTICS'
+        : requiredEndComplete ? 'COMPLETE_UNDER_END_ASSUMPTION_DATE_UNCONFIRMED' : 'INCOMPLETE_UNDER_END_ASSUMPTION',
     fourHourBucketsEndLabels: buckets,
     auctionRow: auction ? { present: true, singlePrice: auction.open === auction.high && auction.high === auction.low && auction.low === auction.close,
       volume: text(auction.volume) } : { present: false },
@@ -232,8 +267,9 @@ function analyzeIntraday(call, result, output) {
     sessionAggregate: aggregateText(aggregate(sorted.filter(r => r.time > OPEN))),
     fingerprint: fingerprint(rows), round1WindowFingerprint: window.length ? fingerprint(window) : null,
     round1WindowRows: window.length, usable });
-  output.verdict = !usable ? '검증 실패' : !rows.length ? '정상적인 데이터 없음'
-    : gridComplete ? '정규장 전체 구간 반환·날짜 미확정' : '일부 구간 누락·날짜 미확정';
+  output.verdict = !structurallyValid ? '검증 실패' : !rows.length ? '정상적인 데이터 없음'
+    : gridComplete ? '정규장 전체 구간 반환·날짜 미확정'
+      : requiredEndComplete ? 'END 가정의 필수 4시간봉 구간 충족·라벨 의미 및 날짜 미확정' : '일부 구간 누락·날짜 미확정';
   return { rows, auction, accPresent, lastAcc: accPresent ? { volume: sorted.at(-1).accVolume, amount: sorted.at(-1).accAmount } : null };
 }
 
@@ -241,20 +277,29 @@ function analyzeHistory(call, result, output) {
   if (result.isuSrtCd !== SYMBOL || !Array.isArray(result.hisLists)) return 'RESPONSE_SHAPE_ERROR';
   const rows = [];
   let invalid = 0;
+  let dateMismatches = 0;
+  const fatalIssues = [];
   const observed = new Set();
   for (const row of result.hisLists) {
     if (isRecord(row) && typeof row.trdDd === 'string' && /^\d{8}$/.test(row.trdDd)) observed.add(row.trdDd);
     try {
       const values = ohlcv(row, DAILY_NAMES);
-      if (row.trdDd !== compact(call.date)) throw new Error('DAILY_DATE_MISMATCH');
+      if (typeof row.trdDd !== 'string' || !/^\d{8}$/.test(row.trdDd) ||
+          new Date(`${row.trdDd.slice(0, 4)}-${row.trdDd.slice(4, 6)}-${row.trdDd.slice(6)}T00:00:00Z`).toISOString().slice(0, 10).replaceAll('-', '') !== row.trdDd)
+        throw new Error('INVALID_DATE');
+      if (row.trdDd !== compact(call.date)) { dateMismatches++; continue; }
       rows.push(values);
-    } catch { invalid++; }
+    } catch { invalid++; fatalIssues.push('INVALID_DAILY_CANDLE_OR_DATE'); }
   }
-  const usable = invalid === 0 && rows.length === 1;
+  if (result.hisLists.length > 1) fatalIssues.push('DAILY_ROW_COUNT_EXCEEDED');
+  const usable = fatalIssues.length === 0 && dateMismatches === 0 && rows.length === 1;
   Object.assign(output, { api: 'SUCCESS', rowCount: result.hisLists.length, validRows: rows.length, invalidRows: invalid,
+    fatalIssues: [...new Set(fatalIssues)], dateMismatches,
+    observationIssues: dateMismatches ? ['DAILY_DATE_MISMATCH'] : !result.hisLists.length ? ['EMPTY_DATA'] : [],
+    dataStatus: fatalIssues.length ? 'INVALID' : dateMismatches ? 'DATE_MISMATCH' : usable ? 'VALID' : 'EMPTY',
     observedTrdDd: [...observed].sort(), trdDdMatches: observed.size === 1 && observed.has(compact(call.date)),
     daily: rows.length === 1 ? aggregateText(rows[0]) : null, usable });
-  output.verdict = usable ? '날짜 명시 일봉 확인' : !result.hisLists.length ? '정상적인 데이터 없음'
+  output.verdict = fatalIssues.length ? '검증 실패' : usable ? '날짜 명시 일봉 확인' : !result.hisLists.length ? '정상적인 데이터 없음'
     : output.trdDdMatches ? '검증 실패' : '일봉 날짜 불일치';
   return { daily: usable ? rows[0] : null };
 }
@@ -263,42 +308,58 @@ function analyzeMultiquote(call, result, output, requestedAtMs) {
   if (!Array.isArray(result.isulist)) return 'RESPONSE_SHAPE_ERROR';
   const list = result.isulist;
   const codes = list.map(r => (isRecord(r) && typeof r.isuSrtCd === 'string' ? r.isuSrtCd : null));
+  const fatalIssues = [], observationIssues = [];
+  const invalidIdentifiers = codes.filter(c => !/^\d{6}$/.test(c ?? '')).length;
+  const unexpected = codes.filter(c => c !== null && !call.symbols.includes(c)).length;
+  const duplicateSymbols = codes.length - new Set(codes).size;
+  if (invalidIdentifiers) fatalIssues.push('INVALID_SYMBOL_IDENTIFIER');
+  if (unexpected) fatalIssues.push('UNEXPECTED_SYMBOL');
+  if (duplicateSymbols) fatalIssues.push('DUPLICATE_SYMBOL');
   const state = marketState(requestedAtMs);
   const nowSecond = kst(requestedAtMs).second;
   const perSymbol = call.symbols.map(symbol => {
     const matches = list.filter((_, i) => codes[i] === symbol);
-    if (matches.length !== 1) return { symbol, present: false, duplicate: matches.length > 1 };
+    if (matches.length !== 1) return { symbol, present: false, returnedCount: matches.length, duplicate: matches.length > 1 };
     const row = matches[0];
     if (call.item === 'price') {
-      let priceValid = false, tradeClock = null, ageSeconds = null;
+      let priceValid = false, tradeClock = null, ageSeconds = null, tradeTimeValid = false;
       try { v1.decimal(row.trdPrc, true); priceValid = true; } catch { /* invalid price stays false */ }
+      if (!priceValid) fatalIssues.push('INVALID_CURRENT_PRICE');
       try {
         const s = clockSeconds(row.trdTm, false);
+        tradeTimeValid = true;
         tradeClock = `${minuteText(Math.floor(s / 60))}:${String(s % 60).padStart(2, '0')}`;
         if (state === 'OPEN') ageSeconds = nowSecond - s;
       } catch { /* invalid clock stays null */ }
+      if (!tradeTimeValid) {
+        if (row.trdTm === undefined) observationIssues.push('TRADE_TIME_MISSING');
+        else fatalIssues.push('INVALID_TIME');
+      }
       // No trdDd in the multiquote price contract: a clock alone cannot prove today's trade.
       const freshness = state !== 'OPEN' ? 'NOT_EVALUATED_MARKET_CLOSED' : ageSeconds === null ? 'UNKNOWN'
         : ageSeconds < -5 ? 'CLOCK_AHEAD' : ageSeconds <= 300 ? 'FRESH_CLOCK' : 'STALE_CLOCK';
-      return { symbol, present: true, priceValid, tradeClock, ageSeconds, freshness, hasTrdDd: row.trdDd !== undefined };
+      if (state === 'OPEN' && freshness !== 'FRESH_CLOCK') observationIssues.push('FRESHNESS_NOT_ESTABLISHED');
+      return { symbol, present: true, priceValid, tradeTimeValid, tradeClock, ageSeconds, freshness,
+        dateIndependentlyProven: false, hasTrdDd: row.trdDd !== undefined };
     }
     const side = name => {
-      let fields = 0, positive = 0, monotonic = true, previous = null;
+      let fields = 0, positive = 0, invalidValues = 0, monotonic = true, previous = null;
       for (let i = 1; i <= 10; i++) {
         const p = row[`${name}Step${i}BstordPrc`], q = row[`${name}Step${i}BstordRqty`];
-        if (p === undefined || q === undefined) continue;
-        fields++;
+        if (p !== undefined && q !== undefined) fields++;
         try {
-          const price = v1.decimal(p);
-          v1.decimal(q);
+          // Validate every supplied value even if the other half of the level is missing.
+          const price = p === undefined ? null : v1.decimal(p);
+          if (q !== undefined) v1.decimal(q);
+          if (price === null) continue;
           if (price > 0n) {
             positive++;
             if (previous !== null && (name === 'ask' ? price <= previous : price >= previous)) monotonic = false;
             previous = price;
           }
-        } catch { monotonic = false; }
+        } catch { invalidValues++; }
       }
-      return { fields, positive, monotonic };
+      return { fields, positive, invalidValues, monotonic };
     };
     const ask = side('ask'), bid = side('bid');
     let crossed = null;
@@ -306,36 +367,75 @@ function analyzeMultiquote(call, result, output, requestedAtMs) {
       const a = v1.decimal(row.askStep1BstordPrc), b = v1.decimal(row.bidStep1BstordPrc);
       if (a > 0n && b > 0n) crossed = b > a;
     } catch { /* missing best levels leave crossed unknown */ }
+    if (ask.invalidValues || bid.invalidValues) fatalIssues.push('INVALID_ORDERBOOK_VALUE');
+    if (!ask.monotonic || !bid.monotonic || crossed) fatalIssues.push('CONFLICTING_ORDERBOOK');
+    if (ask.fields !== 10 || bid.fields !== 10) observationIssues.push('MISSING_ORDERBOOK_LEVELS');
+    if (state === 'OPEN' && (!ask.positive || !bid.positive)) observationIssues.push('EMPTY_DEPTH_MARKET_OPEN');
     return { symbol, present: true, askLevelFields: ask.fields, bidLevelFields: bid.fields,
       askPositiveLevels: ask.positive, bidPositiveLevels: bid.positive,
+      askInvalidValues: ask.invalidValues, bidInvalidValues: bid.invalidValues,
+      levelValuesValid: ask.invalidValues === 0 && bid.invalidValues === 0,
+      freshness: 'NOT_PROVIDED_BY_CONTRACT',
       levelsMonotonic: ask.monotonic && bid.monotonic, crossed };
   });
   const matched = perSymbol.filter(s => s.present).length;
-  const unexpected = codes.filter(c => !call.symbols.includes(c)).length;
-  const tenLevelFields = call.item === 'orderbook' && matched > 0 &&
-    perSymbol.every(s => !s.present || (s.askLevelFields === 10 && s.bidLevelFields === 10));
+  const missingSymbols = perSymbol.filter(s => s.returnedCount === 0).map(s => s.symbol);
+  if (missingSymbols.length) observationIssues.push('MISSING_SYMBOLS');
+  const allRequestedReturned = matched === call.symbols.length;
+  const tenLevelFields = call.item === 'orderbook' && allRequestedReturned &&
+    perSymbol.every(s => s.askLevelFields === 10 && s.bidLevelFields === 10);
+  const coverageStatus = invalidIdentifiers ? 'INVALID_IDENTIFIERS' : duplicateSymbols ? 'DUPLICATE_SYMBOLS'
+    : unexpected ? 'UNEXPECTED_SYMBOLS' : allRequestedReturned ? 'COMPLETE' : matched ? 'PARTIAL' : 'NONE';
+  const fullSuccess = fatalIssues.length === 0 && observationIssues.length === 0 && coverageStatus === 'COMPLETE';
   Object.assign(output, { api: 'SUCCESS', marketStateAtRequest: state, requested: call.symbols.length,
-    returned: list.length, matched, unexpected, perSymbol,
-    ...(call.item === 'orderbook' ? { tenLevelFields } : {}), usable: true });
-  output.verdict = matched === call.symbols.length && unexpected === 0 ? '요청 종목 전체 반환'
-    : matched ? '일부 종목만 반환' : '요청 종목 미반환';
+    returned: list.length, matched, unexpected, duplicateSymbols, invalidIdentifiers, missingSymbols,
+    allRequestedReturned, coverageStatus, fullSuccess, perSymbol,
+    fatalIssues: [...new Set(fatalIssues)], observationIssues: [...new Set(observationIssues)],
+    dataStatus: fatalIssues.length ? 'INVALID' : fullSuccess ? 'FULL_SUCCESS' : 'PARTIAL_OR_UNASSESSED',
+    ...(call.item === 'orderbook' ? { tenLevelFields, levelValuesValid: allRequestedReturned && perSymbol.every(s => s.levelValuesValid) } :
+      { currentPricesValid: allRequestedReturned && perSymbol.every(s => s.priceValid) }), usable: fullSuccess });
+  output.verdict = fatalIssues.length ? '검증 실패' : fullSuccess ? '요청 종목 전체 반환'
+    : matched < call.symbols.length ? matched ? '일부 종목만 반환' : '요청 종목 미반환' : '종목 전체 반환·필드 또는 신선도 관측 이상';
   return {};
 }
 
-function analyze(call, packet, requestedAtMs = Date.now()) {
+// 09:00 KST is 00:00 UTC. A request spanning that instant has no attributable quota period.
+function quotaTiming(requestedAtMs, completedAtMs) {
+  const period = ms => new Date(Math.floor(ms / 86400000) * 86400000).toISOString().slice(0, 10);
+  const requestPeriod = period(requestedAtMs), responsePeriod = period(completedAtMs);
+  return { requestPeriod, responsePeriod,
+    requestedAt: new Date(requestedAtMs).toISOString(), completedAt: new Date(completedAtMs).toISOString(),
+    resetCrossedDuringRequest: requestPeriod !== responsePeriod,
+    clockMovedBackwards: completedAtMs < requestedAtMs,
+    valid: requestPeriod === responsePeriod && completedAtMs >= requestedAtMs };
+}
+
+function crossedQuotaPeriods(analyses) {
+  return analyses.some((a, i) => a.output.quotaTiming?.resetCrossedDuringRequest ||
+    (i > 0 && a.output.quotaTiming && analyses[i - 1].output.quotaTiming &&
+      a.output.quotaTiming.requestPeriod !== analyses[i - 1].output.quotaTiming.responsePeriod));
+}
+
+function analyze(call, packet, requestedAtMs = Date.now(), completedAtMs = requestedAtMs) {
   const output = { type: 'request', id: call.id, kind: call.kind, role: call.role,
     ...(call.date ? { date: call.date, tradingDay: isTradingDay(call.date), offsetFromAnchor: sessionOffset(call.date) } : {}),
     ...(call.market ? { market: call.market, item: call.item, symbols: call.symbols } : {}),
     ...(call.repeatOf ? { repeatOf: call.repeatOf } : {}),
-    requestedAtKst: kst(requestedAtMs).clock, http: packet.status, api: 'UNCONFIRMED',
+    requestedAtKst: kst(requestedAtMs).clock, quotaTiming: quotaTiming(requestedAtMs, completedAtMs),
+    http: packet.status, httpSuccess: !packet.code && packet.status === 200, jsonValid: false, api: 'UNCONFIRMED',
     rateHeaders: v1.rateHeaders(packet.headers), verdict: '검증 실패', usable: false };
-  const failure = (code, verdict) => ({ output: { ...output, api: code, ...(verdict ? { verdict } : {}) }, detail: null, stop: code });
+  const failure = (code, verdict) => ({ output: { ...output, api: code, responseClass: 'FATAL_ERROR',
+    investigationAction: 'STOP', fatalIssues: [code], observationIssues: [], dataStatus: 'INVALID',
+    ...(verdict ? { verdict } : {}) }, detail: null, stop: code });
   if (packet.code) return failure(packet.code);
   if ([401, 403].includes(packet.status)) return failure('HTTP_AUTH_ERROR', '권한 부족 또는 인증 실패');
   if (packet.status === 429) return failure('HTTP_RATE_LIMIT', '호출 제한');
   if (packet.status >= 300 && packet.status < 400) return failure('REDIRECT_REJECTED');
   let body;
   try { body = v1.losslessJson(packet.body); } catch { return failure(packet.status === 200 ? 'INVALID_JSON' : 'HTTP_ERROR_STOP'); }
+  output.jsonValid = true;
+  // Every non-200 is fatal, even if its JSON mentions service hours.
+  if (packet.status !== 200) return failure('HTTP_ERROR_STOP');
   if (isRecord(body) && (body.error != null || body.result?.error != null)) {
     const error = body.error ?? body.result.error;
     const category = apiErrorCategory(error);
@@ -345,15 +445,21 @@ function analyze(call, packet, requestedAtMs = Date.now()) {
     const result = failure(category, verdict);
     result.output.apiErrorCode = code;
     // A documented "outside service hours" answer is not a permission/quota signal; keep the plan.
-    if (category === 'API_SERVICE_HOURS') result.stop = null;
+    if (category === 'API_SERVICE_HOURS') {
+      result.stop = null;
+      Object.assign(result.output, { responseClass: 'OBSERVATION', investigationAction: 'CONTINUE',
+        dataStatus: 'UNAVAILABLE_SERVICE_HOURS', fatalIssues: [], observationIssues: [category] });
+    }
     return result;
   }
-  if (packet.status !== 200) return failure('HTTP_ERROR_STOP');
   if (!isRecord(body) || body.jsonrpc !== '2.0' || !isRecord(body.result)) return failure('RESPONSE_SHAPE_ERROR');
   const analyzer = { intraday: analyzeIntraday, history: analyzeHistory, multiquote: analyzeMultiquote }[call.kind];
   const detail = analyzer(call, body.result, output, requestedAtMs);
   if (typeof detail === 'string') return failure(detail);
-  return { output, detail, stop: null };
+  const stop = output.fatalIssues[0] ?? null;
+  output.responseClass = stop ? 'FATAL_ERROR' : output.observationIssues.length ? 'OBSERVATION' : 'VALIDATED_RESPONSE';
+  output.investigationAction = stop ? 'STOP' : 'CONTINUE';
+  return { output, detail, stop };
 }
 
 function compareDaily(intraday, daily) {
@@ -382,23 +488,35 @@ function attribution(cmp, repeated) {
   return 'CONSISTENT_RANGE_ONLY';
 }
 
-function quotaAnalysis(analyses) {
+function quotaAnalysis(analyses, quotaResetCrossed = false) {
+  quotaResetCrossed ||= crossedQuotaPeriods(analyses);
   const category = o => (o.kind === 'multiquote' ? `multiquote-${o.item}` : o.kind);
   const observations = analyses.map(a => ({ id: a.output.id, category: category(a.output),
     limitDay: a.output.rateHeaders['x-ratelimit-limit-day'] ?? null,
     remainingDay: a.output.rateHeaders['x-ratelimit-remaining-day'] ?? null,
+    timing: a.output.quotaTiming ?? null,
     otherRateHeaders: Object.keys(a.output.rateHeaders).filter(k => !k.startsWith('x-ratelimit-') || !k.endsWith('-day')).sort() }));
   const numeric = observations.filter(o => /^\d+$/.test(o.remainingDay ?? ''));
-  const consecutive = numeric.slice(1).map((o, i) => ({ fromId: numeric[i].id, id: o.id,
-    observedDecrease: (BigInt(numeric[i].remainingDay) - BigInt(o.remainingDay)).toString() }));
+  const comparison = (a, b) => {
+    const between = observations.filter(o => o.id > a.id && o.id <= b.id);
+    const span = [a, ...between];
+    let excludedReason = null;
+    if (span.some(o => !o.timing)) excludedReason = 'QUOTA_TIMING_UNAVAILABLE';
+    else if (span.some(o => o.timing.clockMovedBackwards) ||
+      span.some((o, i) => i > 0 && o.timing.requestedAt < span[i - 1].timing.completedAt)) excludedReason = 'WALL_CLOCK_UNRELIABLE';
+    else if (span.some(o => !o.timing.valid) || a.timing.responsePeriod !== b.timing.responsePeriod)
+      excludedReason = 'QUOTA_RESET_BOUNDARY';
+    else if (new Set(span.map(o => o.limitDay).filter(v => v !== null)).size > 1) excludedReason = 'LIMIT_CHANGED';
+    return { fromId: a.id, id: b.id, observedDecrease: (BigInt(a.remainingDay) - BigInt(b.remainingDay)).toString(),
+      diagnosticCallsBetween: between.length, sameCategoryCallsBetween: between.filter(o => o.category === b.category).length,
+      eligible: excludedReason === null, excludedReason };
+  };
+  const consecutive = numeric.slice(1).map((o, i) => comparison(numeric[i], o));
   const sameCategory = [];
   for (let j = 0; j < numeric.length; j++) {
     const i = numeric.findLastIndex((o, k) => k < j && o.category === numeric[j].category);
     if (i < 0) continue;
-    const between = observations.filter(o => o.id > numeric[i].id && o.id <= numeric[j].id);
-    const decrease = BigInt(numeric[i].remainingDay) - BigInt(numeric[j].remainingDay);
-    sameCategory.push({ category: numeric[j].category, fromId: numeric[i].id, id: numeric[j].id, observedDecrease: decrease.toString(),
-      diagnosticCallsBetween: between.length, sameCategoryCallsBetween: between.filter(o => o.category === numeric[j].category).length });
+    sameCategory.push({ category: numeric[j].category, ...comparison(numeric[i], numeric[j]) });
   }
   const ranges = {};
   for (const o of numeric) {
@@ -406,29 +524,46 @@ function quotaAnalysis(analyses) {
     ranges[o.category] = r ? { min: v < r.min ? v : r.min, max: v > r.max ? v : r.max, count: r.count + 1 } : { min: v, max: v, count: 1 };
   }
   const negative = p => p.observedDecrease.startsWith('-');
-  // An increase can only come from another counter (separate budget or gateway node) or a reset.
-  const sharedContradicted = consecutive.some(negative) ||
-    sameCategory.some(p => BigInt(p.observedDecrease) < BigInt(p.diagnosticCallsBetween));
-  const perCategoryContradicted = sameCategory.some(p => BigInt(p.observedDecrease) < BigInt(p.sameCategoryCallsBetween));
+  const validConsecutive = consecutive.filter(p => p.eligible);
+  const validCategory = sameCategory.filter(p => p.eligible);
+  // Operating requests can increase the decrease. They cannot explain a smaller decrease.
+  // Reset/clock/limit-affected raw deltas are never used here.
+  const sharedContradicted = [...validConsecutive, ...validCategory].some(p =>
+    BigInt(p.observedDecrease) < BigInt(p.diagnosticCallsBetween));
+  const perCategoryContradicted = validCategory.some(p => BigInt(p.observedDecrease) < BigInt(p.sameCategoryCallsBetween));
+  const excluded = consecutive.length + sameCategory.length - validConsecutive.length - validCategory.length;
+  const noComparison = numeric.length ? 'INCONCLUSIVE' : 'NO_DATA';
+  const singleStrictSharedCounter = !validConsecutive.length ? noComparison
+    : sharedContradicted ? 'CONTRADICTED_BY_OBSERVATION' : 'NOT_CONTRADICTED';
+  const perCategoryCounter = !validCategory.length ? noComparison
+    : perCategoryContradicted ? 'CONTRADICTED_BY_OBSERVATION' : 'NOT_CONTRADICTED';
+  const perCategoryExact = validCategory.length ? validCategory.every(p => p.observedDecrease === String(p.sameCategoryCallsBetween)) : null;
   return { observations, consecutive, sameCategory,
+    rawObservationsPreserved: true, categoryRangesBasis: 'RAW_OBSERVATIONS_NOT_COUNTER_PROOF',
+    status: !numeric.length ? 'NO_DATA' : !validConsecutive.length ? 'INCONCLUSIVE' : excluded ? 'PARTIAL_COMPARISONS_EXCLUDED' : 'ANALYZED',
+    eligibleConsecutiveComparisons: validConsecutive.length, eligibleSameCategoryComparisons: validCategory.length,
+    excludedComparisons: excluded, quotaResetCrossed,
     categoryRanges: Object.fromEntries(Object.entries(ranges).map(([k, r]) => [k, { min: r.min.toString(), max: r.max.toString(), count: r.count }])),
     limitValues: [...new Set(observations.map(o => o.limitDay).filter(Boolean))],
-    increasesBetweenConsecutiveCalls: consecutive.filter(negative).length,
-    singleStrictSharedCounter: !numeric.length ? 'NO_DATA' : sharedContradicted ? 'CONTRADICTED_BY_OBSERVATION' : 'NOT_CONTRADICTED',
-    withinCategoryMonotonic: !sameCategory.length ? 'NO_DATA' : sameCategory.some(negative) ? 'NO' : 'YES',
-    perCategoryCounter: !sameCategory.length ? 'NO_DATA' : perCategoryContradicted ? 'CONTRADICTED_BY_OBSERVATION' : 'NOT_CONTRADICTED',
-    perCategoryExact: sameCategory.length > 0 && sameCategory.every(p => p.observedDecrease === String(p.sameCategoryCallsBetween)),
-    operatingCallsMayOverlap: true, contractScope: 'UNCONFIRMED' };
+    increasesBetweenConsecutiveCalls: validConsecutive.filter(negative).length,
+    singleStrictSharedCounter,
+    withinCategoryMonotonic: !validCategory.length ? noComparison : validCategory.some(negative) ? 'NO' : 'YES',
+    perCategoryCounter, perCategoryExact,
+    counterPattern: !validConsecutive.length ? 'INCONCLUSIVE' : !sharedContradicted ? 'SHARED_COMPATIBLE_NOT_PROVEN'
+      : perCategoryContradicted ? 'FINER_SCOPE_OR_DISTRIBUTED_COUNTER_POSSIBLE'
+        : perCategoryExact ? 'CATEGORY_COMPATIBLE_NOT_PROVEN' : 'INCONCLUSIVE',
+    gatewayCounter: 'UNCONFIRMED_NO_GATEWAY_IDENTITY', operatingCallsMayOverlap: true, contractScope: 'UNCONFIRMED' };
 }
 
 function finalSummary(analyses, calls, stopReason, skipped = [], quotaResetCrossed = false) {
+  quotaResetCrossed ||= crossedQuotaPeriods(analyses);
   const byId = id => analyses.find(a => a.output.id === id);
   const intraday = analyses.filter(a => a.output.kind === 'intraday' && a.output.role !== 'QUOTA_REPEAT');
   const repeatedPairs = [];
   const identicalRowPairs = [];
   for (let i = 0; i < intraday.length; i++) for (let j = i + 1; j < intraday.length; j++) {
     const a = intraday[i], b = intraday[j];
-    if (!a.detail?.rows.length || !b.detail?.rows.length) continue;
+    if (!a.output.usable || !b.output.usable || !a.detail?.rows.length || !b.detail?.rows.length) continue;
     if (a.output.fingerprint === b.output.fingerprint) repeatedPairs.push([a.output.date, b.output.date]);
     const keys = new Set(a.detail.rows.map(r => JSON.stringify([r.time, ...FIELDS.map(f => text(r[f]))])));
     const same = b.detail.rows.filter(r => keys.has(JSON.stringify([r.time, ...FIELDS.map(f => text(r[f]))]))).length;
@@ -439,8 +574,14 @@ function finalSummary(analyses, calls, stopReason, skipped = [], quotaResetCross
   const dates = [[1, 2], [3, 4], [5, 6], [7, 8], [10, 11]].map(([i, d]) => {
     const cmp = compareDaily(byId(i), byId(d));
     const o = byId(i)?.output;
+    const dateAttribution = o ? attribution(cmp, repeatedDate(o.date)) : 'NOT_REQUESTED';
     return { date: PLAN[i - 1].date, role: PLAN[i - 1].role, comparison: cmp,
-      attribution: o ? attribution(cmp, repeatedDate(o.date)) : 'NOT_REQUESTED' };
+      attribution: dateAttribution, providerDateIndependentlyProven: false,
+      dateConfidence: dateAttribution.startsWith('CONTRADICTED') ? 'CONTRADICTED'
+        : dateAttribution === 'DATED_DAILY_OHLC_EXACT' ? 'SUPPLIER_DAILY_CORROBORATION_ONLY' : 'UNCONFIRMED',
+      requiredEndComplete: o?.requiredEndComplete ?? null, labelSemantics: o?.labelSemantics ?? null,
+      fourHourStatus: dateAttribution.startsWith('CONTRADICTED') ? 'CONTRADICTED_DATE'
+        : o?.fourHourStatus ?? 'NOT_REQUESTED' };
   });
   const holiday = byId(9), before = byId(7), after = byId(10);
   const holidayVsPrevDaily = compareDaily(holiday, byId(8));
@@ -450,22 +591,32 @@ function finalSummary(analyses, calls, stopReason, skipped = [], quotaResetCross
     fingerprintEqualsAfterHoliday: Boolean(holiday.output.fingerprint && holiday.output.fingerprint === after?.output.fingerprint),
     aggregateMatchesBeforeHolidayDailyOhlc: holidayVsPrevDaily.status === 'COMPARED' &&
       holidayVsPrevDaily.openEqual && holidayVsPrevDaily.highEqual && holidayVsPrevDaily.lowEqual && holidayVsPrevDaily.closeEqual,
-    verdict: !holiday.output.usable ? 'UNAVAILABLE' : !holiday.output.validRows ? 'HOLIDAY_EMPTY'
+    verdict: holiday.output.dataStatus === 'EMPTY' ? 'HOLIDAY_EMPTY' : !holiday.output.usable ? 'UNAVAILABLE'
       : holiday.output.fingerprint === before?.output.fingerprint ? 'HOLIDAY_RETURNED_PREVIOUS_SESSION' : 'HOLIDAY_RETURNED_UNMATCHED_ROWS',
     // Rows returned for a closed date are never that date's candles.
     storeAsHolidayCandles: false } : null;
   const repeat = byId(16);
   const multiquote = analyses.filter(a => a.output.kind === 'multiquote').map(a => ({ id: a.output.id, market: a.output.market,
     item: a.output.item, api: a.output.api, http: a.output.http, requested: a.output.requested ?? null,
-    matched: a.output.matched ?? null, tenLevelFields: a.output.tenLevelFields ?? null, verdict: a.output.verdict }));
+    matched: a.output.matched ?? null, httpSuccess: a.output.httpSuccess, jsonValid: a.output.jsonValid,
+    coverageStatus: a.output.coverageStatus ?? null, fullSuccess: a.output.fullSuccess ?? false,
+    usable: a.output.usable, responseClass: a.output.responseClass, investigationAction: a.output.investigationAction,
+    unexpected: a.output.unexpected ?? null, duplicateSymbols: a.output.duplicateSymbols ?? null,
+    dataStatus: a.output.dataStatus, fatalIssues: a.output.fatalIssues, observationIssues: a.output.observationIssues,
+    perSymbol: a.output.perSymbol ?? [], tenLevelFields: a.output.tenLevelFields ?? null, verdict: a.output.verdict }));
   return { type: 'summary', actualCalls: calls, maxCalls: MAX_CALLS, stopped: Boolean(stopReason), stopReason, skipped,
     completePlan: !stopReason && calls + skipped.length === MAX_CALLS,
     sessions: intraday.map(a => ({ id: a.output.id, date: a.output.date, role: a.output.role, rowCount: a.output.rowCount ?? null,
       first: a.output.first ?? null, last: a.output.last ?? null, boundaryEvidence: a.output.boundaryEvidence ?? null,
-      gridComplete: a.output.gridComplete ?? null, verdict: a.output.verdict })),
+      gridComplete: a.output.gridComplete ?? null, sourceGrid: a.output.sourceGrid ?? null,
+      requiredEndComplete: a.output.requiredEndComplete ?? null, fourHourStatus: a.output.fourHourStatus ?? null,
+      fourHourBucketsEndLabels: a.output.fourHourBucketsEndLabels ?? null,
+      labelSemantics: a.output.labelSemantics ?? null, auctionRow: a.output.auctionRow ?? null,
+      usable: a.output.usable, responseClass: a.output.responseClass, investigationAction: a.output.investigationAction,
+      verdict: a.output.verdict })),
     dates, repeatedAcrossDates: repeatedPairs, identicalRowPairs, holiday: holidayBlock,
     reproducibility: repeat?.output.usable ? { id: 16, sameFingerprintAsId10: repeat.output.fingerprint === after?.output.fingerprint } : null,
-    multiquote, quota: quotaAnalysis(analyses), quotaResetCrossed,
+    multiquote, quota: quotaAnalysis(analyses, quotaResetCrossed), quotaResetCrossed,
     // Date attribution and timestamp semantics still need manual review of these lines.
     actualApiValidationComplete: false };
 }
@@ -488,7 +639,7 @@ function repeatSkipReason(call, analyses) {
 
 async function runStudy({ base, apiKey, emit, signal, transport = v1.requestOnce, sleep = pause,
   now = () => performance.now(), wallNow = () => Date.now() }) {
-  const analyses = [], skipped = [], kstSeconds = [];
+  const analyses = [], skipped = [];
   let calls = 0, stopReason = null, previousCompletion = null;
   for (const call of plan()) {
     if (call.repeatOf !== undefined) {
@@ -501,7 +652,6 @@ async function runStudy({ base, apiKey, emit, signal, transport = v1.requestOnce
     const start = now();
     if (previousCompletion !== null && start - previousCompletion < 1000) { stopReason = 'SPACING_GUARD'; break; }
     const requestedAt = wallNow();
-    kstSeconds.push(kst(requestedAt));
     let packet;
     try {
       const url = buildUrl(base, apiKey, call);
@@ -509,16 +659,15 @@ async function runStudy({ base, apiKey, emit, signal, transport = v1.requestOnce
       packet = await transport(url, { signal });
     } catch { stopReason = 'TRANSPORT_ERROR'; break; }
     previousCompletion = now();
-    const analysis = analyze(call, packet, requestedAt);
+    const analysis = analyze(call, packet, requestedAt, wallNow());
     analysis.output.elapsedMs = Math.max(0, Math.round(previousCompletion - start));
     analyses.push(analysis);
     emit(analysis.output);
     if (analysis.stop) { stopReason = analysis.stop; break; }
-    if (analysis.output.rateHeaders['x-ratelimit-remaining-day'] === '0') { stopReason = 'DAILY_QUOTA_EXHAUSTED'; break; }
+    if (/^0+$/.test(analysis.output.rateHeaders['x-ratelimit-remaining-day'] ?? '')) { stopReason = 'DAILY_QUOTA_EXHAUSTED'; break; }
   }
   // Provider quota resets at 09:00 KST; deltas across that instant are meaningless.
-  const crossed = kstSeconds.some((k, i) => i > 0 && (k.date !== kstSeconds[i - 1].date ||
-    (kstSeconds[i - 1].second < OPEN * 60 && k.second >= OPEN * 60)));
+  const crossed = crossedQuotaPeriods(analyses);
   const summary = finalSummary(analyses, calls, stopReason, skipped, crossed);
   emit(summary);
   return summary;
