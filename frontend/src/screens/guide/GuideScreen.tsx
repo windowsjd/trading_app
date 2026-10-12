@@ -15,7 +15,7 @@ const availableGuides = [
   },
   {
     number: '02', title: '캔들', route: 'Candles', id: 'guide-candles-card',
-    description: '시가·고가·저가·종가와 시간 단위에 따라 가격 움직임이 캔들로 표현되는 방식을 이해합니다.',
+    description: '시가·고가·저가·종가가 캔들의 몸통과 꼬리로 표현되는 방식을 이해합니다.',
   },
   {
     number: '03', title: '주문방식', route: 'OrderTypes', id: 'guide-order-types-card',

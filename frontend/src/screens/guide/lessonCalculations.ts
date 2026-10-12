@@ -96,13 +96,6 @@ export function buyFrames(
 }
 
 export type Ohlc = { open: number; high: number; low: number; close: number };
-export const PATH_A = [10000, 10600, 9700, 10400];
-export const PATH_B = [10000, 9700, 10600, 10400];
-export const FIVE_MINUTE: Ohlc[] = [
-  { open: 10000, high: 10300, low: 9900, close: 10200 },
-  { open: 10200, high: 10600, low: 10100, close: 10400 },
-  { open: 10400, high: 10500, low: 9700, close: 10400 },
-];
 export function ohlcFromPrices(prices: number[]): Ohlc {
   return {
     open: prices[0],
@@ -124,13 +117,5 @@ export function candleParts(candle: Ohlc) {
     body: [bottom, top],
     upper: [top, candle.high],
     lower: [candle.low, bottom],
-  };
-}
-export function aggregateCandles(candles: Ohlc[]): Ohlc {
-  return {
-    open: candles[0].open,
-    high: Math.max(...candles.map((c) => c.high)),
-    low: Math.min(...candles.map((c) => c.low)),
-    close: candles[candles.length - 1].close,
   };
 }

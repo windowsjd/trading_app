@@ -1,7 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { Text, View } from '../../theme/native';
-import Svg, { Line, Polyline, Rect } from 'react-native-svg';
+import Svg, { Line, Rect } from 'react-native-svg';
 import { candleParts, won, type Ohlc } from './lessonCalculations';
 import { lessonStyles as s } from './LessonUi';
 import { UP_COLOR } from '../../components/charts/candleColors';
@@ -219,28 +219,6 @@ export function CandleFigure({
           </Text>
         </>
       ) : null}
-    </View>
-  );
-}
-export function PricePath({ prices, id }: { prices: number[]; id: string }) {
-  const { colors } = useAppearance();
-  const points = prices
-    .map((price, i) => `${20 + i * 80},${y(price)}`)
-    .join(' ');
-  return (
-    <View style={s.section} testID={id}>
-      <Svg width="100%" height={160} viewBox="0 0 280 210" accessible={false}>
-        <Polyline
-          testID={`${id}-line`}
-          points={points}
-          fill="none"
-          stroke={colors.info}
-          strokeWidth={3}
-        />
-      </Svg>
-      <Text style={s.body} accessibilityLiveRegion="polite">
-        가격 경로: {prices.map(won).join(' → ')}
-      </Text>
     </View>
   );
 }

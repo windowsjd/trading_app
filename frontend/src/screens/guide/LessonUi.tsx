@@ -53,6 +53,9 @@ export const lessonStyles = StyleSheet.create({
   gradientAction: { borderRadius: 12, borderColor: 'transparent' },
   secondary: { backgroundColor: semantic.raised },
   secondaryText: { color: semantic.secondary },
+  // Black choice tone: a fixed hex, so light and dark modes both stay black.
+  blackEdge: { borderColor: '#000000' },
+  blackSelected: { backgroundColor: '#000000', borderColor: '#000000' },
   disabled: { opacity: 0.6 },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   comparison: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
@@ -255,6 +258,7 @@ export function LessonAction({
   secondary = false,
   selected,
   primary = true,
+  tone = 'default',
 }: {
   label: string;
   onPress: () => void;
@@ -263,7 +267,9 @@ export function LessonAction({
   secondary?: boolean;
   selected?: boolean;
   primary?: boolean;
+  tone?: 'default' | 'black';
 }) {
+  const black = tone === 'black';
   const gradient = primary && !secondary && selected === undefined;
   return (
     <ActionPressable
@@ -274,7 +280,14 @@ export function LessonAction({
       accessibilityState={{ disabled, selected }}
       disabled={disabled}
       onPress={onPress}
-      style={[s.action, gradient && s.gradientAction, secondary && s.secondary, disabled && s.disabled]}
+      style={[
+        s.action,
+        gradient && s.gradientAction,
+        secondary && s.secondary,
+        black && s.blackEdge,
+        black && selected && s.blackSelected,
+        disabled && s.disabled,
+      ]}
     >
       <Text style={[s.actionText, secondary && s.secondaryText]}>{label}</Text>
     </ActionPressable>

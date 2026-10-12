@@ -6,15 +6,11 @@ import { describe, it, type TestContext } from 'node:test';
 import {
   THICK_ASKS,
   THIN_ASKS,
-  FIVE_MINUTE,
-  PATH_A,
-  PATH_B,
   buyFrames,
   summarize,
-  ohlcFromPrices,
   candleParts,
-  aggregateCandles,
 } from './lessonCalculations.ts';
+import { semantic } from '../../theme/tokens.ts';
 
 const require = createRequire(import.meta.url);
 const {
@@ -172,10 +168,8 @@ describe('local guide calculations', () => {
     assert.match(limited.status, /1주 미체결/);
     assert.equal(summarize([]).average, null);
   });
-  it('calculates candle ranges, opposing intrabar paths, and OHLC aggregation', () => {
-    const candle = ohlcFromPrices(PATH_A);
-    assert.deepEqual(candle, { open: 10000, high: 10600, low: 9700, close: 10400 });
-    assert.deepEqual(ohlcFromPrices(PATH_B), candle);
+  it('calculates candle body and wick ranges for bullish, bearish and flat candles', () => {
+    const candle = { open: 10000, high: 10600, low: 9700, close: 10400 };
     assert.deepEqual(candleParts(candle), {
       direction: '양봉',
       body: [10000, 10400],
@@ -189,7 +183,6 @@ describe('local guide calculations', () => {
       lower: [9700, 9800],
     });
     assert.equal(candleParts({ ...candle, close: 10000 }).direction, '시가와 종가 동일');
-    assert.deepEqual(aggregateCandles(FIVE_MINUTE), candle);
   });
   it('computes 12-share market buy from actual fills, not the displayed current price', () => {
     const final = buyFrames(THIN_ASKS, 12).at(-1)!.value;
@@ -294,8 +287,30 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('candle-term-body'), /높으면 양봉.*낮으면 음봉/);
     checkReadable(h);
   });
-  it('updates SVG geometry, replays both paths and aggregates only after results', (t) => {
+  it('updates SVG geometry on every reselection with black choices and no result step', (t) => {
     const h = setup(t, 'CandlesScreen');
+    for (const id of ['candle-builder-confirm', 'candle-builder-result', 'candle-paths', 'candle-aggregation'])
+      assert.equal(h.find(id) === undefined, true, `${id} is removed`);
+    order(h, 'candle-builder', 'candle-builder-figure', 'lesson-takeaways', 'candles-reset');
+    assert.equal(h.find('lesson-takeaways').findAllByType('Text').length, 4, 'heading and three takeaways');
+    assert.match(h.text('lesson-takeaways'), /1\. .*OHLC.*2\. .*몸통.*3\. .*꼬리/s);
+    assert.doesNotMatch(h.text('lesson-takeaways'), /4\.|시간봉|이동 순서/);
+    const surface = (id: string) => flatten(h.find(id).props.style);
+    const label = (id: string) => flatten(h.find(id).findAllByType('Text')[0].props.style).color;
+    const checkChoice = (id: string, selected: boolean) => {
+      const style = surface(id);
+      assert.equal(h.find(id).props.accessibilityState.selected, selected, `${id} selected`);
+      assert.equal(h.find(id).props.disabled === true, false, `${id} stays selectable`);
+      assert.equal(style.borderColor, '#000000', `${id} border`);
+      assert.equal(style.backgroundColor, selected ? '#000000' : semantic.raised, `${id} background`);
+      assert.equal(label(id), selected ? semantic.onAccent : semantic.secondary, `${id} label`);
+      assert.equal(style.opacity === undefined, true, `${id} is not dimmed`);
+    };
+    checkChoice('candle-close-10400', true);
+    checkChoice('candle-close-9800', false);
+    const resetStyle = flatten(h.find('candles-reset').props.style);
+    assert.equal(resetStyle.borderColor, semantic.infoAction, 'reset keeps the default edge');
+    assert.equal(resetStyle.backgroundColor, semantic.raised);
     const initialBody = { ...h.find('candle-builder-figure-body').props };
     const initialUpper = h.find('candle-builder-figure-upper').props.y1;
     h.press('candle-high-10800');
@@ -305,38 +320,37 @@ describe('continuous guide interactions', () => {
     assert.match(h.text('candle-builder-figure'), /음봉/);
     assert.notEqual(h.find('candle-builder-figure-body').props.y, initialBody.y);
     assert.match(h.text('candle-builder-figure'), /몸통: 9,800원 ~ 10,000원/);
-    assert.equal(h.find('candle-path-a-run') === undefined, true);
-    h.press('candle-builder-confirm');
-    order(h, 'candle-builder-result', 'candle-paths', 'candle-path-a-run');
-    h.press('candle-path-a-run');
-    h.tick(1000);
-    assert.match(h.text('candle-path-a'), /10,000원 → 10,600원/);
-    assert.equal(h.find('candle-path-b-run') === undefined, true);
-    h.finish();
-    order(h, 'candle-path-a-result', 'candle-path-b-run');
-    h.press('candle-path-b-run');
-    h.finish();
-    assert.notEqual(
-      h.find('candle-path-a-line').props.points,
-      h.find('candle-path-b-line').props.points,
-    );
-    for (const prop of ['y', 'height', 'fill'])
-      assert.equal(
-        h.find('candle-compare-a-body').props[prop],
-        h.find('candle-compare-b-body').props[prop],
-      );
-    order(h, 'candle-paths-result', 'candle-aggregation', 'candle-aggregate-run');
-    h.press('candle-aggregate-run');
-    assert.match(
-      h.text('candle-fifteen'),
-      /시가 10,000원.*고가 10,600원.*저가 9,700원.*종가 10,400원/s,
-    );
-    order(h, 'candle-aggregate-result', 'lesson-takeaways');
+    checkChoice('candle-close-9800', true);
+    checkChoice('candle-close-10400', false);
+    checkChoice('candle-high-10800', true);
+    checkChoice('candle-high-10600', false);
+    h.press('candle-close-10000');
+    assert.match(h.text('candle-builder-figure'), /시가와 종가 동일/);
+    h.press('candle-close-10400');
+    assert.match(h.text('candle-builder-figure'), /양봉/);
+    assert.match(h.text('candle-builder-figure'), /몸통: 10,000원 ~ 10,400원/);
+    checkChoice('candle-close-10400', true);
+    checkChoice('candle-close-10000', false);
     assert.deepEqual(h.scrolls, []);
     checkReadable(h);
+    h.press('candle-close-9800');
     h.press('candles-reset');
-    assert.equal(h.find('candle-paths') === undefined, true);
     assert.match(h.text('candle-builder-figure'), /양봉/);
+    assert.match(h.text('candle-builder-figure'), /고가 10,600원.*저가 9,700원.*종가 10,400원/s);
+    checkChoice('candle-close-10400', true);
+    checkChoice('candle-high-10600', true);
+    checkChoice('candle-low-9700', true);
+  });
+  it('keeps the default LessonAction look in other lessons', (t) => {
+    const h = setup(t, 'OrderTypesScreen');
+    reachChoices(h);
+    h.press('orders-choice-a-market');
+    const chosen = flatten(h.find('orders-choice-a-market').props.style);
+    const other = flatten(h.find('orders-choice-b-market').props.style);
+    assert.equal(chosen.borderColor, semantic.infoAction);
+    assert.equal(chosen.backgroundColor, semantic.infoAction);
+    assert.equal(other.borderColor, semantic.infoAction);
+    assert.equal(flatten(h.find('orders-quotes-run').props.style).borderColor, semantic.infoAction);
   });
   it('keeps a limit order waiting through quote changes and fills only on eligible selling', (t) => {
     const h = setup(t, 'OrderTypesScreen');
@@ -431,12 +445,10 @@ describe('continuous guide interactions', () => {
   });
   for (const [screen, start, status, reset] of [
     ['LiquidityScreen', 'liquidity-compare-run', 'liquidity-thin-status', 'liquidity-reset'],
-    ['CandlesScreen', 'candle-path-a-run', 'candle-path-a', 'candles-reset'],
     ['OrderTypesScreen', 'orders-market-run', 'orders-market-book-status', 'orders-reset'],
   ]) {
     it(`${screen} guards duplicate starts, pauses on blur, and clears timers on reset/unmount`, (t) => {
       const h = setup(t, screen);
-      if (screen === 'CandlesScreen') h.press('candle-builder-confirm');
       const onPress = h.find(start).props.onPress;
       act(() => {
         onPress();
@@ -454,7 +466,6 @@ describe('continuous guide interactions', () => {
       assert.notEqual(h.text(status), before);
       h.press(reset);
       h.finish();
-      if (screen === 'CandlesScreen') h.press('candle-builder-confirm');
       assert.equal(h.find(start).props.disabled, false);
       h.press(start);
       act(() => h.renderer.unmount());
@@ -468,12 +479,7 @@ describe('continuous guide interactions', () => {
         completeLiquidity(h);
       }
       if (screen === 'CandlesScreen') {
-        h.press('candle-builder-confirm');
-        h.press('candle-path-a-run');
-        h.finish();
-        h.press('candle-path-b-run');
-        h.finish();
-        h.press('candle-aggregate-run');
+        h.press('candle-close-9800');
       }
       if (screen === 'OrderTypesScreen') {
         reachChoices(h);
