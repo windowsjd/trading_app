@@ -6,6 +6,7 @@ import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
 import { stackScreenLayout } from './stackScreenLayout';
+import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
 
 import type { MarketStackParamList } from './types';
 import MarketScreen from '../../screens/market/MarketScreen';
@@ -18,7 +19,7 @@ const Stack = createNativeStackNavigator<MarketStackParamList>();
 export default function MarketStack() {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="MarketStack" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
+    <Stack.Navigator id="MarketStack" UNSTABLE_router={questNavigationRouter} screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
       <Stack.Screen
         name="Market"
         component={MarketScreen}

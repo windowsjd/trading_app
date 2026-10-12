@@ -9,6 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import type { RootStackParamList } from './types';
 import { rootNavigationRef } from './navigationRef';
+import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
 import AssetChartScreen from '../../screens/asset/AssetChartScreen';
 import TradeHistoryScreen from '../../screens/history/TradeHistoryScreen';
 import AuthStack from './AuthStack';
@@ -44,6 +45,9 @@ export default function RootNavigator() {
       <Stack.Navigator
         id="RootStack"
         initialRouteName="Splash"
+        // An active beginner quest holds pushes over the tabs (history, chart);
+        // sign-in and account entry always pass.
+        UNSTABLE_router={questNavigationRouter}
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.screen }, ...rootTransition(reducedMotion, Platform.OS) }}
         // Keep navigation and session/account providers alive during a render
         // failure. Retrying remounts only this root screen (MainTabs opens Home).

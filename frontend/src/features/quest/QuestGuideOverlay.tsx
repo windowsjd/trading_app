@@ -10,6 +10,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type LayoutChangeEvent,
 } from '../../theme/native';
 import { useSafeAreaInsets } from '../../theme/safeArea';
@@ -59,6 +60,8 @@ const CARD_CHROME = 40;
 const TEXT_GAP = 6;
 /** Text the card shows at least before it scrolls: about two lines. */
 const MIN_TEXT_HEIGHT = 48;
+/** The bottom tab bar's height, grown with larger text as MainTabs does. */
+const tabBarHeight = (fontScale: number) => 49 + Math.ceil(14 * Math.max(0, fontScale - 1));
 const DIM_LIGHT = 'rgba(16,24,40,0.5)';
 const DIM_DARK = 'rgba(0,0,0,0.62)';
 
@@ -107,11 +110,15 @@ function dimPath(width: number, height: number, hole: GuideRect) {
  * From then on it stays up and follows the target through scrolling, the
  * keyboard and layout changes; only a target that is gone (another screen,
  * unmounted, scrolled out of sight) takes the highlight down.
+ *
+ * `notice` shows that a move was held for the guide, with 안내 종료 right in it:
+ * it is the way out even while no step card is on screen.
  */
-export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction }: {
+export default function QuestGuideOverlay({ view, quest, reducedMotion, notice = false, onAction }: {
   view: GuideView;
   quest: BeginnerQuestKey | null;
   reducedMotion: boolean;
+  notice?: boolean;
   onAction: (action: GuideAction, step: number | null) => void;
 }) {
   const rootRef = useRef<View>(null);
@@ -224,7 +231,8 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
     };
   }, [viewKey, screen, targetList, headerTarget, keyboardRevision, insets.top, insets.bottom]);
 
-  if (view.kind === 'none') return null;
+  const held = notice ? <HeldNotice onExit={() => onAction('exit', null)} /> : null;
+  if (view.kind === 'none') return held ? <View pointerEvents="box-none" style={styles.root}>{held}</View> : null;
   if (view.kind === 'celebration') {
     return <QuestCelebration key={view.key} title={view.title} summary={view.summary} leaving={view.leaving} replay={view.replay} reducedMotion={reducedMotion} />;
   }
@@ -248,6 +256,28 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
           requestRoom={requestRoom}
         />
       ) : null}
+      {held}
+    </View>
+  );
+}
+
+/** A short notice above the tab bar, never a modal: only 안내 종료 takes touches, the screen below keeps the rest. */
+function HeldNotice({ onExit }: { onExit: () => void }) {
+  const { colors } = useAppearance();
+  const insets = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  // Announced once per appearance; repeated held moves only keep it up.
+  useEffect(() => { AccessibilityInfo.announceForAccessibility(QUEST_GUIDE_COPY.held); }, []);
+  return (
+    <View pointerEvents="box-none" style={[styles.noticeRow, { bottom: insets.bottom + tabBarHeight(fontScale) + 12 }]}>
+      <View testID="quest-guide-notice" accessibilityLiveRegion="polite" pointerEvents="box-none"
+        style={[styles.notice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View pointerEvents="none" style={styles.noticeTextBox}><Text style={styles.noticeText}>{QUEST_GUIDE_COPY.held}</Text></View>
+        <ActionPressable testID="quest-guide-notice-exit" accessibilityRole="button" accessibilityLabel={ACTION_LABEL.exit}
+          onPress={onExit} style={styles.textButton}>
+          <Text style={styles.noticeAction}>{ACTION_LABEL.exit}</Text>
+        </ActionPressable>
+      </View>
     </View>
   );
 }
@@ -487,4 +517,26 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.45 },
   nextLabel: { fontSize: 15, lineHeight: 22, fontWeight: '700', color: primaryGradient.foreground, textAlign: 'center' },
+  noticeRow: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
+  notice: {
+    maxWidth: 420,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    columnGap: 4,
+    paddingLeft: 16,
+    paddingRight: 4,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderRadius: 14,
+    shadowColor: '#000000',
+    shadowOpacity: 0.18,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 8,
+  },
+  noticeTextBox: { flexShrink: 1 },
+  noticeText: { paddingVertical: 8, fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.text },
+  noticeAction: { fontSize: 14, lineHeight: 21, fontWeight: '700', color: semantic.info, textAlign: 'center' },
 });

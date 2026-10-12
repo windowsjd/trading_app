@@ -28,7 +28,7 @@ function harness(reducedMotion = false) {
     StyleSheet: { create: (styles: unknown) => styles, absoluteFill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }, absoluteFillObject: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } },
     Platform: { OS: 'ios' },
     Easing: { out: () => () => 0, in: () => () => 0, quad: () => 0, cubic: () => 0 },
-    AccessibilityInfo: { announceForAccessibility: (text: string) => { h.announced = text; } },
+    AccessibilityInfo: { announceForAccessibility: (text: string) => { h.announced = text; (h.announcements ??= []).push(text); } },
     Keyboard: { addListener: (event: string, listener: (event: unknown) => void) => { (h.keyboard ??= {})[event] = listener; return { remove() {} }; } },
     useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
     Animated: {
@@ -59,7 +59,7 @@ function harness(reducedMotion = false) {
   const createNodeMock = (element: any) => element.props.testID === 'quest-guide-overlay' ? measurable('root') : null;
   h.render = async (view: unknown) => {
     h.currentView = view;
-    const element = React.createElement(Overlay, { view, quest: 'exchange', reducedMotion, onAction: (...args: unknown[]) => h.actions.push(args) });
+    const element = React.createElement(Overlay, { view, quest: 'exchange', reducedMotion, notice: h.notice ?? false, onAction: (...args: unknown[]) => h.actions.push(args) });
     await Renderer.act(async () => {
       if (h.renderer) h.renderer.update(element);
       else h.renderer = Renderer.create(element, { createNodeMock });
@@ -379,5 +379,45 @@ describe('QuestGuideOverlay', () => {
     t.after(h.close);
     assert.equal(h.find('quest-guide-celebration-title').props.children, '실습을 완료했어요.');
     assert.equal(h.renderer.root.findAll((n: any) => n.props.testID === 'quest-confetti-piece').length, 0);
+  });
+});
+
+describe('QuestGuideOverlay: a held move', () => {
+  const HELD = '안내 종료 후 이용할 수 있어요.';
+  const heard = (h: any) => (h.announcements ?? []).filter((text: string) => text === HELD).length;
+  const celebration = { kind: 'celebration', key: '1:celebration', quest: 'exchange', title: '실습을 완료했어요.', summary: null, leaving: false, replay: true };
+
+  it('shows a short notice with 안내 종료 even when no step card is on screen', async t => {
+    const h = harness(); t.after(h.close);
+    h.notice = true;
+    await h.render({ kind: 'none' });
+    const notice = h.find('quest-guide-notice');
+    assert.equal(notice !== undefined, true);
+    assert.deepEqual(notice.findAll((node: any) => node.type === 'Text').map((node: any) => node.props.children), [HELD, '안내 종료']);
+    assert.equal(notice.props.accessibilityLiveRegion, 'polite');
+    assert.equal(notice.parent.props.style[1].bottom, 34 + 49 + 12, 'above the tab bar and the safe area');
+    const exit = h.find('quest-guide-notice-exit');
+    assert.deepEqual([exit.props.accessibilityRole, exit.props.accessibilityLabel], ['button', '안내 종료']);
+    exit.props.onPress();
+    assert.deepEqual(h.actions, [['exit', null]]);
+    assert.equal(h.has('quest-guide-card'), false, 'never a modal or a card of its own');
+  });
+
+  it('is announced once per appearance, sits beside a step, and never covers the celebration', async t => {
+    const h = harness(); t.after(h.close);
+    h.notice = true;
+    await h.render(spotlight());
+    await h.render(spotlight());
+    assert.equal(h.has('quest-guide-notice'), true);
+    assert.equal(heard(h), 1, 'repeated held moves keep one notice and one announcement');
+    h.notice = false;
+    await h.render(spotlight());
+    assert.equal(h.has('quest-guide-notice'), false);
+    h.notice = true;
+    await h.render(spotlight());
+    assert.equal(heard(h), 2, 'a new appearance is announced again');
+    await h.render(celebration);
+    assert.equal(h.has('quest-guide-notice'), false);
+    assert.equal(h.has('quest-guide-celebration'), true);
   });
 });

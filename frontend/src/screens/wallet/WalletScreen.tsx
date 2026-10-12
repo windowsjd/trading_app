@@ -42,6 +42,7 @@ import { useFuturesHoldings } from '../../features/futures/useFuturesHoldings';
 import FuturesPositionsSection from '../../components/tradingAccount/FuturesPositionsSection';
 import { publishQuestGuideFacts, questGuideTarget, registerQuestGuideReveal, type QuestActionState } from '../../features/quest/questGuideBridge';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
+import { questNavigationAllowed } from '../../features/quest/questNavigationGuard';
 import QuestTargetHighlight from '../../features/quest/QuestTargetHighlight';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
@@ -127,7 +128,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-transfer'),
-      onPress: () => transferGate.guard(() => setTransferOpen(true)),
+      // The sheet is not a route: an active quest guide checks it here.
+      onPress: () => { if (questNavigationAllowed('WalletTransfer')) transferGate.guard(() => setTransferOpen(true)); },
     },
     {
       testID: 'wallet-exchange',

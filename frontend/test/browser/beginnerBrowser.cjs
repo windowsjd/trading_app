@@ -111,6 +111,15 @@ async function run() {
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
     }
     const text = async testId => (await id(testId).textContent()) ?? '';
+    // On screen = drawn on top: inactive tabs stay laid out on Web (opacity 0, or covered under Reduced Motion).
+    const drawn = (testId, heading) => page.evaluate(([testId, heading]) => [...document.querySelectorAll(heading ? '[role="heading"]' : `[data-testid="${testId}"]`)]
+      .filter(element => !heading || element.textContent === heading).some(element => {
+        if (!element.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return false;
+        const r = element.getBoundingClientRect();
+        return element.contains(document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2));
+      }), [testId, heading]);
+    const onScreen = testId => drawn(testId);
+    const headingOnScreen = label => drawn(null, label);
     const box = async locator => locator.evaluate(el => { const r = el.getBoundingClientRect(); return { left: r.left, top: r.top, right: r.right, bottom: r.bottom }; });
     const union = boxes => ({ left: Math.min(...boxes.map(b => b.left)), top: Math.min(...boxes.map(b => b.top)), right: Math.max(...boxes.map(b => b.right)), bottom: Math.max(...boxes.map(b => b.bottom)) });
     const intersects = (a, b) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
@@ -543,7 +552,8 @@ async function run() {
     assert.deepEqual((await page.evaluate(() => window.beginnerFixture.posts)).map(p => p.replace(/^\/trading-accounts\/[^/]+/, '')), ['/fx/quote', '/fx/execute'], 'retry re-reads progress, never re-executes');
     flows.push({ context: 'unconfirmed-then-retry', pass: true });
 
-    // E: exit, Back and account switching never carry a guide elsewhere.
+    // E: a guide holds the list, other tabs and unrelated screens with one short notice; Back inside the
+    // practice stays open; 안내 종료 lifts the hold at once, never resumes, and account switching carries nothing.
     await open('practice=1&fxState=available');
     await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
     await page.getByTestId('quest-guide-ring').waitFor();
@@ -557,7 +567,33 @@ async function run() {
     await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
     await id('wallet-screen').waitFor();
     await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === '1/6');
-    // Back to the list ends the guide: no resume, the card starts a new one.
+    const stillOnWallet = async (label) => {
+      assert.equal(await onScreen('wallet-screen'), true, `${label}: the practice screen stays`);
+      for (const other of ['home-account-title', 'beginner-quest-list', 'market-screen', 'wallet-transfer-screen']) {
+        assert.equal(await onScreen(other), false, `${label}: ${other} did not open`);
+      }
+      for (const other of ['지갑 원장', '거래 내역']) assert.equal(await headingOnScreen(other), false, `${label}: ${other} did not open`);
+      assert.equal(await text('quest-guide-step'), '1/6', `${label}: the guide stays`);
+    };
+    for (const label of ['퀘스트', '홈', 'MY', '마켓']) {
+      await tab(label).click();
+      await id('quest-guide-notice').waitFor();
+      await stillOnWallet(label);
+    }
+    for (const control of ['wallet-ledger', 'wallet-orders', 'wallet-transfer']) {
+      await id(control).click();
+      await page.waitForTimeout(150);
+      await stillOnWallet(control);
+    }
+    assert.equal(await page.getByTestId('quest-guide-notice').count(), 1, 'repeated taps keep one notice');
+    assert.equal(await text('quest-guide-notice'), '안내 종료 후 이용할 수 있어요.안내 종료');
+    await contentFits('quest-guide-notice');
+    await page.screenshot({ path: path.join(out, 'held-notice.png') });
+    await page.waitForFunction(() => !document.querySelector('[data-testid="quest-guide-notice"]'), undefined, { timeout: 6000 });
+    // 안내 종료 in the notice lifts the hold at once: no resume, the card starts a new one.
+    await tab('홈').click(); await id('quest-guide-notice-exit').click();
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0);
+    assert.equal(await page.getByTestId('quest-guide-notice').count(), 0);
     await tab('퀘스트').click();
     assert.equal(await text('quest-card-exchange-status'), '미시작');
     assert.equal(await id('quest-card-exchange-start').getAttribute('aria-label'), '퀘스트 시작하기');
@@ -566,13 +602,9 @@ async function run() {
     assert.equal(await page.getByTestId('quest-guide-card').count(), 0);
     await tab('지갑').click(); await id('wallet-screen').waitFor(); await page.waitForTimeout(400);
     assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'the ended guide does not come back on its tab');
-    await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
-    await id('wallet-screen').waitFor();
-    await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === '1/6');
-    // Leaving for an unrelated tab ends it too.
-    await tab('홈').click();
-    await tab('지갑').click(); await id('wallet-screen').waitFor(); await page.waitForTimeout(400);
-    assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'leaving for another tab ended the guide');
+    await id('wallet-ledger').click(); await heading('지갑 원장').waitFor();
+    assert.equal(await page.getByTestId('quest-guide-notice').count(), 0, 'nothing is held after 안내 종료');
+    await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click(); await id('wallet-screen').waitFor();
     await tab('홈').click();
     await id('trading-account-switcher-trigger').click();
     await id('trading-account-switcher-option-general-account').click();
@@ -586,7 +618,7 @@ async function run() {
     await tab('퀘스트').click();
     assert.equal(await text('quest-card-exchange-status'), '미시작', 'the old session did not survive the switch');
     assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
-    flows.push({ context: 'exit-back-list-tab-switch', noResume: true, pass: true });
+    flows.push({ context: 'held-moves-exit-back-switch', held: 7, notices: 1, noResume: true, pass: true });
 
     // F: the FX screen for every mode: no account switcher, three equal rows.
     for (const [account, width, fontScale, theme] of [['general', 320, 2, 'light'], ['season', 360, 1, 'dark'], ['beginner', 320, 1, 'dark']]) {

@@ -273,8 +273,9 @@ export function resolveGuideView(session: GuideSession | null, focused: FocusedG
   // Other tabs (and the quest list, which shows its own state) pause the overlay.
   if (focused !== 'wallet' && focused !== practice) return NONE;
   const screen: QuestGuideScreen = focused;
+  // A slow server read never holds the user: 안내 종료 keeps the trade and its record.
   if (session.phase === 'verifying') {
-    return message(session, screen, 'verifying', card(copy.verifying, { hint: session.summary, busy: true, actions: [] }));
+    return message(session, screen, 'verifying', card(copy.verifying, { hint: session.summary, busy: true }));
   }
   if (session.phase === 'unconfirmed') {
     return message(session, screen, 'unconfirmed', card(copy.unconfirmed, {
@@ -292,7 +293,7 @@ export function resolveGuideView(session: GuideSession | null, focused: FocusedG
 function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, facts: GuideFacts): GuideView {
   if (!isTradingQuest(session.quest) || !['market', 'asset', 'order', 'futures'].includes(focused)) return NONE;
   const screen = focused as TradeGuideScreen;
-  if (session.phase === 'verifying') return message(session, screen, 'verifying', card(copy.verifying, { busy: true, actions: [] }));
+  if (session.phase === 'verifying') return message(session, screen, 'verifying', card(copy.verifying, { busy: true }));
   if (session.phase === 'unconfirmed') return message(session, screen, 'unconfirmed', card(copy.unconfirmed, { actions: ['retry', 'back'], tone: 'warning' }));
   if (session.phase === 'completedElsewhere') return message(session, screen, 'elsewhere', card(copy.completedElsewhere, { actions: ['back', 'exit'] }));
   const steps = TRADING_GUIDE_STEPS[session.quest];
@@ -357,21 +358,44 @@ export function startGuideSession(id: number, accountId: string, quest: Beginner
   return { id, accountId, quest, replay: progress[quest].completed, step: 1, phase: 'guiding', summary: null };
 }
 
+/**
+ * Where an active guide lets its practice go: the bottom tab(s), their screens
+ * and the 이체 sheet ('WalletTransfer', not a route). Everything else waits for
+ * 안내 종료. Spot practice may explore any listed asset (the guide itself flags
+ * a wrong market); futures funding may top up the futures USD wallet, by 이체 or,
+ * with no USD left anywhere, 환전 first.
+ */
+const GUIDE_ROUTES = {
+  exchange: ['WalletTab', 'Wallet', 'WalletFx'],
+  transfer: ['WalletTab', 'Wallet', 'WalletTransfer'],
+  spot: ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'],
+  futures: ['MarketTab', 'Market', 'Futures', 'WalletTab', 'Wallet', 'WalletTransfer', 'WalletFx'],
+} as const;
+
+function guideRoutes(quest: BeginnerQuestKey): readonly string[] {
+  if (quest === 'exchange' || quest === 'transfer') return GUIDE_ROUTES[quest];
+  return quest === 'futuresLong' || quest === 'futuresShort' ? GUIDE_ROUTES.futures : GUIDE_ROUTES.spot;
+}
+
+export function guideAllowsRoute(quest: BeginnerQuestKey, name: string): boolean {
+  return guideRoutes(quest).includes(name);
+}
+
 /** The bottom tabs a quest's practice uses; futures funding is topped up in the Wallet tab. */
 export function guidePracticeTabs(quest: BeginnerQuestKey): readonly string[] {
-  if (!isTradingQuest(quest)) return ['WalletTab'];
-  return quest === 'futuresLong' || quest === 'futuresShort' ? ['MarketTab', 'WalletTab'] : ['MarketTab'];
+  return guideRoutes(quest).filter(name => name.endsWith('Tab'));
 }
 
 /**
- * Switching to another bottom tab — the quest list included — ends the guide;
- * the next start is a new guide from the server's progress. Moves inside the
- * practice tab (Market → detail → order, Wallet → FX or transfer) keep it, and
- * a celebration's own return to the list is not a departure.
+ * The navigation guard holds the user on the practice path, so this only sees
+ * a move it could not hold (a native back gesture, a restored state): focus on
+ * another tab — the quest list included — or an unrelated screen ends the
+ * guide, and the next start is a new guide from the server's progress. A
+ * celebration's own return to the list is not a departure.
  */
-export function leaveGuideTab(session: GuideSession, tab: string | null): GuideSession | null {
+export function leaveGuideTab(session: GuideSession, tab: string | null, route: string | null = null): GuideSession | null {
   if (tab === null || ['celebrating', 'replaySucceeded', 'returning'].includes(session.phase)) return session;
-  return guidePracticeTabs(session.quest).includes(tab) ? session : null;
+  return guideAllowsRoute(session.quest, tab) && (route === null || guideAllowsRoute(session.quest, route)) ? session : null;
 }
 
 /** Returning to the Wallet root means the practice screen was closed: start it over. */

@@ -172,4 +172,27 @@ describe('Wallet entry buttons and the quest guide', () => {
     assert.equal(item('wallet-orders').props.ref === undefined, true);
     assert.equal(item('wallet-exchange').props.collapsable, false, 'measurable on Android');
   });
+
+  it('opens the 이체 sheet during a guide only for the transfer practice and futures funding', (t) => {
+    const guard = require('../../features/quest/questNavigationGuard.ts');
+    const h = createHomeHarness('general');
+    const owner = () => undefined;
+    t.after(() => { guard.setQuestNavigationGuard(owner, null); h.close(); });
+    h.seed(h.account, { points: [] });
+    const node = (id: string) => elements(h.renderWallet().tree).find((item: any) => item.props.testID === id);
+    const open = () => node('wallet-transfer-sheet').props.visible === true;
+    guard.setQuestNavigationGuard(owner, 'exchange');
+    node('wallet-transfer').props.onPress();
+    assert.equal(open(), false, 'held during the exchange practice');
+    for (const quest of ['transfer', 'futuresShort']) {
+      guard.setQuestNavigationGuard(owner, quest);
+      node('wallet-transfer').props.onPress();
+      assert.equal(open(), true, quest);
+      node('wallet-transfer-sheet').props.onClose();
+      assert.equal(open(), false);
+    }
+    guard.setQuestNavigationGuard(owner, null);
+    node('wallet-transfer').props.onPress();
+    assert.equal(open(), true, 'no guide: unchanged');
+  });
 });

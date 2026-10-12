@@ -1,6 +1,11 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
  const done=[];
+ // On screen = drawn on top: inactive tabs stay laid out on Web (opacity 0, or covered under Reduced Motion).
+ const drawn=(testId,heading)=>page.evaluate(([testId,heading])=>[...document.querySelectorAll(heading?'[role="heading"]':`[data-testid="${testId}"]`)]
+  .filter(el=>!heading||el.textContent===heading).some(el=>{if(!el.checkVisibility({opacityProperty:true,visibilityProperty:true}))return false;
+   const r=el.getBoundingClientRect();return el.contains(document.elementFromPoint(r.left+r.width/2,r.top+r.height/2));}),[testId,heading]);
+ const onScreen=testId=>drawn(testId);
  const next=async()=>{await id('quest-guide-next').waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('[data-testid="quest-guide-next"]')].some(el=>el.checkVisibility()&&el.getAttribute('aria-disabled')!=='true'));await id('quest-guide-next').click();};
  const finish=async key=>{
   await id('quest-guide-celebration').waitFor();
@@ -23,6 +28,22 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
    assert.ok(ringTop>=toolbar-8&&ringTop<=row,`the ring frames the rows, not the list header ${JSON.stringify({ringTop,toolbar,row})}`);
    await expectSteady('market list',1500);
    await page.screenshot({path:path.join(out,'market-list-spotlight.png')});
+   // Held with one notice: Home and the futures practice inside the same tab; the guide stays.
+   await tab('홈').click();await id('quest-guide-notice').waitFor();
+   assert.equal(await onScreen('home-account-title'),false);
+   // The step card sits over the list header here: a keyboard user reaches the 선물 rows.
+   const press=async locator=>{await locator.focus();await page.keyboard.press('Enter');};
+   await press(id('crypto-product-futures'));await id('futures-market-list').waitFor();
+   await page.waitForFunction(()=>!document.querySelector('[data-testid="quest-guide-notice"]'),undefined,{timeout:6000});
+   await press(page.locator('[data-testid^="futures-market-"]:not([data-testid="futures-market-list"])').filter({visible:true}).first());
+   await id('quest-guide-notice').waitFor();
+   assert.equal(await onScreen('futures-screen'),false,'futures is another practice');
+   assert.equal(await page.getByTestId('quest-guide-notice').count(),1);
+   await press(id('crypto-product-spot'));await page.waitForFunction(()=>!document.querySelector('[data-testid="futures-market-list"]'));
+   // The list is held too; 안내 종료 lifts it, and the card starts anew.
+   await tab('퀘스트').click();
+   assert.equal(await onScreen('beginner-quest-list'),false);
+   await id('quest-guide-notice-exit').click();
    await tab('퀘스트').click();
    assert.equal(await id('quest-card-marketBuy-start').getAttribute('aria-label'),'퀘스트 시작하기');
    assert.equal(await page.getByTestId('quest-guide-card').count(),0);
@@ -57,7 +78,16 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
  for(const key of ['krStock','usStock','futuresLong','futuresShort'])assert.notEqual(await id(`quest-card-${key}-start`).getAttribute('aria-disabled'),'true');
  await buy('usStock','US');await buy('krStock','KR');
  for(const [key,direction] of [['futuresShort','숏(Short)'],['futuresLong','롱(Long)']]){
-  await start(key);await next();await next();await page.getByRole('button',{name:direction,exact:true}).click();await next();
+  await start(key);
+  if(key==='futuresShort'){
+   // Funding may use the Wallet tab; its unrelated screens and Home stay held; the guide waits on Futures.
+   await id('futures-screen').waitFor();await tab('지갑').click();await id('wallet-screen').waitFor();
+   await id('wallet-ledger').click();await id('quest-guide-notice').waitFor();
+   assert.equal(await drawn(null,'지갑 원장'),false);
+   await tab('홈').click();assert.equal(await onScreen('home-account-title'),false);
+   await tab('마켓').click();await id('futures-screen').waitFor();
+  }
+  await next();await next();await page.getByRole('button',{name:direction,exact:true}).click();await next();
   await id('futures-leverage').fill('2');await next();await id('futures-quantity').fill('1');await id('futures-submit').click();
   await page.getByRole('button',{name:'전량 종료',exact:true}).filter({visible:true}).first().click();
   await id('futures-submit').click();await finish(key);

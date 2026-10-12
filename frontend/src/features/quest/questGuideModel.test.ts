@@ -8,6 +8,7 @@ import {
   clipBelow,
   commandMatchesQuest,
   followGuideFocus,
+  guideAllowsRoute,
   guidePracticeTabs,
   leaveGuideTab,
   observeGuideProgress,
@@ -251,6 +252,41 @@ describe('session movement', () => {
     const futures: GuideSession = { ...session(), quest: 'futuresLong', step: 0 };
     assert.equal(leaveGuideTab(futures, 'WalletTab') === futures, true);
     assert.equal(leaveGuideTab(futures, 'QuestTab') === null, true);
+  });
+
+  it('keeps each practice to its own screens; the guard holds the rest and a move it missed ends the guide', () => {
+    const allowed = (quest: GuideSession['quest']) => ['HomeTab', 'MarketTab', 'QuestTab', 'WalletTab', 'MyTab', 'Market', 'MarketSearch',
+      'AssetDetail', 'Order', 'Futures', 'AssetChart', 'Wallet', 'WalletFx', 'WalletTransfer', 'WalletTransactions', 'TradeHistory', 'Guide', 'Home']
+      .filter(name => guideAllowsRoute(quest, name));
+    assert.deepEqual(allowed('exchange'), ['WalletTab', 'Wallet', 'WalletFx']);
+    assert.deepEqual(allowed('transfer'), ['WalletTab', 'Wallet', 'WalletTransfer']);
+    for (const quest of ['marketBuy', 'protection', 'marketSell', 'limitBuy', 'krStock', 'usStock'] as const) {
+      assert.deepEqual(allowed(quest), ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'], quest);
+    }
+    for (const quest of ['futuresLong', 'futuresShort'] as const) {
+      assert.deepEqual(allowed(quest), ['MarketTab', 'WalletTab', 'Market', 'Futures', 'Wallet', 'WalletFx', 'WalletTransfer'], quest);
+    }
+    const buying: GuideSession = { ...session(), quest: 'marketBuy', step: 3 };
+    assert.equal(leaveGuideTab(buying, 'MarketTab', 'Order') === buying, true);
+    assert.equal(leaveGuideTab(buying, 'MarketTab', 'AssetChart') === buying, true, 'the chart opens over the tabs');
+    assert.equal(leaveGuideTab(buying, 'MarketTab', 'Futures') === null, true, 'another practice inside the same tab');
+    const funding: GuideSession = { ...session(), quest: 'futuresShort', step: 0 };
+    assert.equal(leaveGuideTab(funding, 'WalletTab', 'Wallet') === funding, true);
+    assert.equal(leaveGuideTab(funding, 'MarketTab', 'AssetDetail') === null, true);
+    assert.equal(leaveGuideTab(funding, 'WalletTab', 'WalletTransactions') === null, true);
+    const done = session({ phase: 'returning' });
+    assert.equal(leaveGuideTab(done, 'QuestTab', 'Guide') === done, true);
+  });
+
+  it('offers 안내 종료 while the server confirms, on every practice screen', () => {
+    for (const [quest, screen] of [['exchange', 'fx'], ['transfer', 'transfer'], ['marketBuy', 'order'], ['futuresLong', 'futures']] as const) {
+      const verifying = resolveGuideView({ ...session({ phase: 'verifying' }), quest }, screen, facts());
+      assert.equal(verifying.kind, 'message', quest);
+      if (verifying.kind === 'message') {
+        assert.deepEqual(verifying.card.actions, ['exit'], quest);
+        assert.equal(verifying.card.busy, true);
+      }
+    }
   });
 });
 

@@ -27,6 +27,7 @@ import {
   advanceGuide,
   claimGuideCommand,
   followGuideFocus,
+  guidePracticeTabs,
   leaveGuideTab,
   observeGuideProgress,
   resolveGuideView,
@@ -34,9 +35,11 @@ import {
   startGuideSession,
   type FocusedGuideScreen,
   type GuideAction,
+  type GuidePhase,
   type GuideSession,
 } from './questGuideModel';
 import type { BeginnerQuestKey, BeginnerQuests } from './questProgress';
+import { setQuestNavigationGuard } from './questNavigationGuard';
 import QuestGuideOverlay from './QuestGuideOverlay';
 
 /** Long enough to read "퀘스트 완료!", short enough not to hold the user. */
@@ -46,6 +49,10 @@ const REPLAY_SUCCESS_MS = 1100;
 /** The overlay fades over the tab switch underneath it. */
 const LEAVE_MS = 260;
 const HIGHLIGHT_MS = 8000;
+/** "안내 종료 후 이용할 수 있어요." stays this long after the last held move. */
+const NOTICE_MS = 3200;
+/** The completion's scrim holds the screen and returns on its own: no notice over it. */
+const completing = (phase: GuidePhase | undefined) => phase === 'celebrating' || phase === 'replaySucceeded' || phase === 'returning';
 
 export type QuestGuideStatus = Pick<GuideSession, 'accountId' | 'quest' | 'phase' | 'replay' | 'step' | 'orderId' | 'assetId' | 'positionId'> | null;
 
@@ -90,6 +97,8 @@ function readFocusedScreen(): FocusedGuideScreen {
   }
 }
 
+const readFocusedRoute = () => rootNavigationRef.isReady() ? rootNavigationRef.getCurrentRoute()?.name ?? null : null;
+
 function readFocusedTab(): string | null {
   if (!rootNavigationRef.isReady()) return null;
   const tabs = rootNavigationRef.getRootState()?.routes.find(route => route.name === 'MainTabs')?.state;
@@ -98,11 +107,11 @@ function readFocusedTab(): string | null {
 
 const openQuestList = () => rootNavigationRef.navigate('MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } });
 
-/** After the return, close the finished practice screen out of sight. */
-function popWalletStackToRoot() {
+/** Close practice stacks out of sight: before a start (Back retraces only the practice) and after the return. */
+function popStacksToRoot(names: readonly string[]) {
   if (!rootNavigationRef.isReady()) return;
   const tabs = rootNavigationRef.getRootState()?.routes.find(route => route.name === 'MainTabs')?.state;
-  for (const tab of ['WalletTab', 'MarketTab']) {
+  for (const tab of names) {
     const stack = tabs?.routes.find(route => route.name === tab)?.state;
     if (stack?.key && typeof stack.index === 'number' && stack.index > 0) rootNavigationRef.dispatch({ ...StackActions.popToTop(), target: stack.key });
   }
@@ -133,9 +142,11 @@ function openPractice(session: GuideSession) {
  * screen reports its own successful command — re-reads the server's
  * ledger-derived progress before celebrating anything.
  *
- * A guide lives only while the user stays in its practice tab: leaving for the
- * quest list or another tab ends it, and there is no resuming. Starting again
- * is a new guide placed by the server's progress, never by a remembered step.
+ * While a guide is active, the navigation guard holds every move outside its
+ * practice (other tabs, the quest list, unrelated screens) with a short notice;
+ * 안내 종료 lifts it at once. A move the guard could not hold still ends the
+ * guide, and there is no resuming. Starting again is a new guide placed by the
+ * server's progress, never by a remembered step.
  */
 export function QuestGuideProvider({ accountId, children }: { accountId: string; children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -146,19 +157,32 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   const [focused, setFocused] = useState<FocusedGuideScreen>(readFocusedScreen);
   const [starting, setStarting] = useState<BeginnerQuestKey | null>(null);
   const focusedTab = useRef(readFocusedTab());
+  const focusedRoute = useRef(readFocusedRoute());
+  /** Counts held moves since the notice appeared; 0 hides it. */
+  const [notice, setNotice] = useState(0);
   const [returnCount, setReturnCount] = useState(0);
   const [justCompleted, setJustCompleted] = useState<BeginnerQuestKey | null>(null);
   const [foreground, setForeground] = useState(AppState.currentState == null || AppState.currentState === 'active');
   // Re-render on screen facts/targets; the view below is derived each render.
   useSyncExternalStore(subscribeQuestGuide, getQuestGuideVersion, getQuestGuideVersion);
 
+  const notifyHeld = useCallback(() => {
+    const phase = sessionRef.current?.phase;
+    if (phase && !completing(phase)) setNotice(count => count + 1);
+  }, []);
+
   // The ref is the source of truth so callbacks fired from a screen's
-  // mutation (outside render) always see the current session.
+  // mutation (outside render) always see the current session. The guard
+  // follows it synchronously, so the guide's own return is never held.
   const setSession = useCallback((update: GuideSession | null | ((current: GuideSession | null) => GuideSession | null)) => {
     const next = typeof update === 'function' ? update(sessionRef.current) : update;
     sessionRef.current = next;
+    setQuestNavigationGuard(notifyHeld, next && next.phase !== 'returning' ? next.quest : null);
     setSessionState(next);
-  }, []);
+  }, [notifyHeld]);
+
+  // An account switch, logout or session expiry unmounts this guide and its guard.
+  useEffect(() => () => setQuestNavigationGuard(notifyHeld, null), [notifyHeld]);
 
   const fetchProgress = useCallback(() => queryClient.fetchQuery({
     queryKey: QUERY_KEYS.tradingAccount.quests(accountId),
@@ -184,12 +208,13 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     const update = () => {
       const next = readFocusedScreen();
       const tab = readFocusedTab();
-      // Only a tab switch can be a departure; moves inside one tab never are.
-      const switched = tab !== focusedTab.current;
+      const route = readFocusedRoute();
+      const moved = tab !== focusedTab.current || route !== focusedRoute.current;
       focusedTab.current = tab;
+      focusedRoute.current = route;
       setFocused(next);
       setSession(current => {
-        const kept = current && switched ? leaveGuideTab(current, tab) : current;
+        const kept = current && moved ? leaveGuideTab(current, tab, route) : current;
         return kept ? followGuideFocus(kept, next) : null;
       });
     };
@@ -244,10 +269,18 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     const timer = setTimeout(() => {
       if (sessionRef.current?.id !== sessionId) return;
       setSession(current => current?.id === sessionId ? null : current);
-      popWalletStackToRoot();
+      popStacksToRoot(['WalletTab', 'MarketTab']);
     }, LEAVE_MS);
     return () => clearTimeout(timer);
   }, [foreground, phase, sessionId, setSession]);
+
+  // One notice at a time: a repeated held move only restarts its timer.
+  useEffect(() => {
+    if (notice === 0) return;
+    const timer = setTimeout(() => setNotice(0), NOTICE_MS);
+    return () => clearTimeout(timer);
+  }, [notice]);
+  useEffect(() => setNotice(0), [sessionId]);
 
   useEffect(() => {
     if (!justCompleted) return;
@@ -270,6 +303,8 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
       setStarting(null);
       const next = readFocusedScreen() === 'quests' ? startGuideSession(id, accountId, quest, progress) : null;
       if (!next) return;
+      // Trading practice starts on cleared stacks; Wallet practice opens the Wallet root itself (pop: true).
+      if (isTradingQuest(quest)) popStacksToRoot(guidePracticeTabs(quest));
       setSession(next);
       openPractice(next);
     };
@@ -327,7 +362,8 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     <QuestGuideContext.Provider value={value}>
       <View style={styles.host}>
         {children}
-        <QuestGuideOverlay view={view} quest={session?.quest ?? null} reducedMotion={reducedMotion} onAction={onAction} />
+        <QuestGuideOverlay view={view} quest={session?.quest ?? null} reducedMotion={reducedMotion} notice={notice > 0 && !!phase && !completing(phase)}
+          onAction={onAction} />
       </View>
     </QuestGuideContext.Provider>
   );

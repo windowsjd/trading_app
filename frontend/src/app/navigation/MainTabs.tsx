@@ -14,6 +14,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
+import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
 import type { MainTabParamList } from './types';
 import HomeStack from './HomeStack';
 import MarketStack from './MarketStack';
@@ -45,6 +46,8 @@ export default function MainTabs() {
       key={selectedAccount.id}
       id="MainTabs"
       initialRouteName="HomeTab"
+      // An active beginner quest holds tab switches outside its practice.
+      UNSTABLE_router={questNavigationRouter}
       screenOptions={{
         headerShown: false,
         tabBarButton: (props) => <TabBarButton {...props} reducedMotion={reducedMotion} />,

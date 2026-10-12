@@ -156,5 +156,6 @@ export const QUEST_GUIDE_COPY = {
   },
   completedElsewhere: { title: '이미 완료된 퀘스트예요', body: '이 퀘스트는 이미 완료되었어요. 퀘스트 목록에서 확인해 주세요.' },
   celebrationNote: '퀘스트 목록으로 이동할게요.',
+  held: '안내 종료 후 이용할 수 있어요.',
   actions: { next: '다음', exit: '안내 종료', retry: '다시 확인', back: '퀘스트로 돌아가기' },
 } as const;

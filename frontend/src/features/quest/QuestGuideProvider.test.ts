@@ -441,3 +441,155 @@ describe('QuestGuideProvider: no resume — leaving ends the guide, a start is a
     assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: ACCOUNT } } }]);
   });
 });
+
+describe('QuestGuideProvider: the practice path is held, 안내 종료 lifts it', () => {
+  const guard = require('./questNavigationGuard.ts');
+  /** Asks the guard like a navigator would; true when the move was held. */
+  const held = async (h: any, name: string) => {
+    let refused = false;
+    await h.act(async () => { refused = !guard.questNavigationAllowed(name); await Promise.resolve(); });
+    return refused;
+  };
+  const spotFill = { kind: 'spot', accountId: ACCOUNT, orderId: 'fill-1', assetId: 'crypto-1',
+    assetType: 'crypto', side: 'buy', orderType: 'market', summary: '체결' } as const;
+
+  it('holds moves outside the practice with one short notice until 안내 종료, which keeps every record', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(); await h.render(); t.after(h.close);
+    assert.equal(await held(h, 'HomeTab'), false, 'no guide, no guard');
+    assert.equal(h.overlay.notice, false);
+    await h.start('exchange', progress(false));
+    await h.focus('Wallet');
+    assert.equal(await held(h, 'WalletFx'), false, 'the practice itself is never held');
+    assert.equal(h.overlay.notice, false, 'no notice for an allowed move');
+    for (const name of ['HomeTab', 'MyTab', 'QuestTab', 'WalletTransactions', 'WalletTransfer']) assert.equal(await held(h, name), true, name);
+    assert.equal(h.overlay.notice, true);
+    assert.equal(h.guide.active?.quest, 'exchange', 'the guide and its screen stay');
+    await h.act(() => t.mock.timers.tick(3000));
+    assert.equal(await held(h, 'HomeTab'), true);
+    await h.act(() => t.mock.timers.tick(3000));
+    assert.equal(h.overlay.notice, true, 'a repeated tap restarts the one notice instead of stacking another');
+    await h.act(() => t.mock.timers.tick(200));
+    assert.equal(h.overlay.notice, false, 'it hides by itself');
+    await held(h, 'HomeTab');
+    assert.equal(h.overlay.notice, true);
+    // 안내 종료 from the notice is the same exit as the card's.
+    await h.act(() => h.overlay.onAction('exit', null));
+    assert.equal(h.guide.active === null, true);
+    assert.equal(h.overlay.notice, false);
+    assert.equal(await held(h, 'HomeTab'), false, 'lifted at once');
+    assert.deepEqual([h.fetches.length, h.acks.length, h.dispatched.length], [1, 0, 0], 'exiting sends, cancels and resets nothing');
+    assert.equal(h.navigations.length, 1, 'and moves nowhere by itself');
+  });
+
+  it("never holds the completion's own return, and shows no notice over the celebration", async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.start('exchange', progress(false));
+    await h.focus('WalletFx');
+    await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
+    assert.equal(await held(h, 'QuestTab'), true, 'held while the server confirms');
+    await h.settle(1, progress(true));
+    assert.equal(h.guide.active.phase, 'celebrating');
+    assert.equal(await held(h, 'HomeTab'), true, 'a stray Back during the celebration is held');
+    assert.equal(h.overlay.notice, false, 'silently: the scrim says where it goes');
+    await h.act(() => t.mock.timers.tick(2100));
+    assert.equal(h.guide.active.phase, 'returning');
+    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } }]);
+    assert.equal(await held(h, 'QuestTab'), false, 'the return to the list is never held');
+    await h.focus('Guide');
+    await h.act(() => t.mock.timers.tick(260));
+    assert.equal(h.guide.active === null, true);
+    assert.equal(await held(h, 'HomeTab'), false, 'normal navigation after completion');
+    assert.equal(h.navigations.length, 2, 'exactly one return');
+  });
+
+  it('a replay returns without confetti and without holding its own return', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.start('exchange', progress(true));
+    await h.focus('WalletFx');
+    await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
+    assert.equal(h.view().replay, true);
+    await h.act(() => t.mock.timers.tick(1100));
+    assert.equal(await held(h, 'QuestTab'), false);
+    assert.equal(h.navigations.length, 2);
+  });
+
+  it('an account switch, logout or session expiry unmounts the guide and its guard', async () => {
+    const h = harness(); await h.render();
+    await h.start('marketBuy', questProgress(2));
+    assert.equal(await held(h, 'MyTab'), true);
+    await h.close();
+    assert.equal(guard.questNavigationAllowed('MyTab'), true, 'nothing stays held after the account goes away');
+  });
+
+  it('opens a trading practice on a clean stack, so Back retraces only the practice', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    const stacks: Record<string, { key: string; index: number }> = { MarketTab: { key: 'market-stack', index: 2 }, WalletTab: { key: 'wallet-stack', index: 1 } };
+    h.rootState = { routes: [{ name: 'MainTabs', get state() {
+      return { index: TABS.indexOf(TAB_OF[h.route] ?? 'HomeTab'), routes: TABS.map(name => ({ name, state: stacks[name] })) };
+    } }] };
+    await h.start('marketBuy', questProgress(2));
+    assert.deepEqual(h.dispatched, [{ type: 'POP_TO_TOP', target: 'market-stack' }], 'spot practice: the Market stack');
+    await h.exit();
+    await h.start('futuresLong', questProgress(6));
+    assert.deepEqual(h.dispatched.slice(1), [{ type: 'POP_TO_TOP', target: 'market-stack' }, { type: 'POP_TO_TOP', target: 'wallet-stack' }],
+      'futures: its funding Wallet tab too');
+    await h.exit();
+    await h.start('exchange', progress(false));
+    assert.equal(h.dispatched.length, 3, 'wallet practice opens the Wallet root itself');
+    await h.start('marketBuy', new Error('network'));
+    assert.equal(h.dispatched.length, 3, 'a start that opens nothing closes nothing');
+  });
+
+  it('futures funding keeps the guide in the Wallet tab, and a funding transfer is not a completion', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.start('futuresLong', questProgress(6));
+    await h.focus('Futures');
+    await h.focus('Wallet');
+    assert.equal(await held(h, 'WalletTransfer'), false, '이체 to the futures wallet');
+    let claimed = true;
+    await h.act(() => { claimed = bridge.claimQuestGuideCommand({ kind: 'transfer', accountId: ACCOUNT, source: 'securities',
+      destination: 'crypto_futures', currency: 'USD', summary: '보낸 금액 USD 10' }); });
+    assert.equal(claimed, false);
+    assert.deepEqual([h.guide.active.phase, h.fetches.length], ['guiding', 1], 'no verification, no celebration');
+    assert.equal(await held(h, 'WalletTransactions'), true, 'unrelated wallet screens stay held');
+    await h.focus('Futures');
+    assert.equal(h.guide.active?.quest, 'futuresLong');
+  });
+
+  it('a move the guard could not hold (a native back gesture into another screen) still ends the guide', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.start('futuresShort', questProgress(6));
+    await h.focus('Futures');
+    await h.focus('Order');
+    assert.equal(h.guide.active === null, true, 'a spot order is not the futures practice');
+    assert.equal(await held(h, 'HomeTab'), false, 'and nothing stays held');
+    await h.focus('Guide');
+    await h.start('marketBuy', questProgress(2));
+    await h.focus('Market');
+    await h.focus('Futures');
+    assert.equal(h.guide.active === null, true);
+  });
+
+  it('a command still in flight at 안내 종료 neither revives the guide nor completes the next one', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.start('marketBuy', questProgress(2));
+    await h.focus('Order');
+    const report = bridge.captureQuestGuideCommand(); // the order was submitted here
+    await h.exit();
+    let adopted = true;
+    await h.act(() => { adopted = report(spotFill); });
+    assert.equal(adopted, false, 'the late fill shows its own receipt; the server still records it');
+    assert.equal(h.guide.active === null, true);
+    await h.focus('Guide');
+    await h.start('marketBuy', questProgress(2));
+    await h.act(() => { adopted = report(spotFill); });
+    assert.equal(adopted, false, 'pinned to the guide it was submitted under');
+    await h.act(() => t.mock.timers.tick(5000));
+    assert.deepEqual([h.guide.active.phase, h.guide.active.step, h.fetches.length], ['guiding', 0, 2], 'no celebration, no return');
+    assert.equal(h.navigations.length, 2, 'only the two starts navigated');
+  });
+});
