@@ -1,0 +1,158 @@
+name: Futures release fixture
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: futures-release-fixture-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  financial-fixture:
+    name: Futures 25 full financial fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: load_test_runner
+          POSTGRES_PASSWORD: load-test-local-only
+          POSTGRES_DB: trading_load_test
+          TZ: UTC
+        ports:
+          - 55431:5432
+        options: >-
+          --health-cmd "pg_isready -U load_test_runner -d trading_load_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+      redis:
+        image: redis:7
+        ports:
+          - 56381:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      TZ: UTC
+      NODE_OPTIONS: --max-old-space-size=1536
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma and build existing harness
+        env:
+          DATABASE_URL: postgresql://load_test_runner:load-test-local-only@127.0.0.1:55431/trading_load_test
+        run: |
+          pnpm exec prisma generate
+          git diff --exit-code -- src/generated/prisma
+          pnpm run build
+      - name: Ten-account preparation, catalog smoke and complete audits
+        timeout-minutes: 12
+        run: |
+          set -euo pipefail
+          task_dir="$RUNNER_TEMP/futures-release-fixture"
+          mkdir -p "$task_dir/evidence"
+          export FUTURES_FIXTURE_DIR="$task_dir"
+          echo "FUTURES_FIXTURE_DIR=$task_dir" >> "$GITHUB_ENV"
+          node dist/scripts/load-test/cli.js template --smoke \
+            --manifest "$task_dir/manifest.json" --credentials "$task_dir/credentials.json"
+          node <<'JS'
+          const fs = require('node:fs');
+          const file = `${process.env.FUTURES_FIXTURE_DIR}/manifest.json`;
+          const m = JSON.parse(fs.readFileSync(file, 'utf8'));
+          if (m.expectedGitSha !== process.env.GITHUB_SHA || m.users !== 10) throw new Error('Fixture identity mismatch');
+          m.allowDirtyLocalSmoke = false;
+          fs.writeFileSync(file, JSON.stringify(m, null, 2), { mode: 0o600 });
+          JS
+          cp "$task_dir/manifest.json" "$task_dir/evidence/manifest.json"
+          # Observe wall and monotonic time throughout the financial checks.
+          # An observed backward clock step fails this run; no clock correction.
+          node <<'JS' &
+          const fs = require('node:fs');
+          let previous = Date.now(), startWall = previous, startMono = performance.now();
+          let samples = 0, backwardSteps = 0, minDriftMs = 0, maxDriftMs = 0;
+          const timer = setInterval(() => {
+            const wall = Date.now(), drift = wall - startWall - (performance.now() - startMono);
+            samples++; if (wall < previous) backwardSteps++;
+            minDriftMs = Math.min(minDriftMs, drift); maxDriftMs = Math.max(maxDriftMs, drift); previous = wall;
+          }, 100);
+          process.on('SIGTERM', () => {
+            clearInterval(timer);
+            fs.writeFileSync(`${process.env.FUTURES_FIXTURE_DIR}/evidence/clock.json`, JSON.stringify({samples, backwardSteps, minDriftMs, maxDriftMs}));
+            process.exit(backwardSteps === 0 && samples > 0 ? 0 : 1);
+          });
+          JS
+          clock_pid=$!
+          server_pid=""
+          cleanup() {
+            if [ -n "$server_pid" ]; then
+              kill -- "-$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            kill "$clock_pid" 2>/dev/null || true
+            wait "$clock_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          node dist/scripts/load-test/cli.js migrate \
+            --manifest "$task_dir/manifest.json" --credentials "$task_dir/credentials.json" \
+            --out "$task_dir/evidence/migrate"
+          setsid node dist/scripts/load-test/cli.js serve \
+            --manifest "$task_dir/manifest.json" --credentials "$task_dir/credentials.json" \
+            --out "$task_dir/evidence/server" > "$task_dir/evidence/server.log" 2>&1 &
+          server_pid=$!
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3301/health > /dev/null; then break; fi
+            kill -0 "$server_pid"
+            sleep 1
+          done
+          node dist/scripts/load-test/cli.js guard \
+            --manifest "$task_dir/manifest.json" --credentials "$task_dir/credentials.json" \
+            --out "$task_dir/evidence/guard"
+          # prepare itself runs the exact complete audit over all ten accounts.
+          timeout --kill-after=10s 480s node dist/scripts/load-test/cli.js prepare \
+            --manifest "$task_dir/manifest.json" --credentials "$task_dir/credentials.json" \
+            --out "$task_dir/evidence/prepare"
+          timeout --kill-after=10s 180s pnpm exec tsx scripts/futures-product-catalog-smoke.ts \
+            "$task_dir/manifest.json" "$task_dir/credentials.json" "$task_dir/evidence/prepare/fixture.json" \
+            > "$task_dir/evidence/catalog-smoke.log" 2>&1
+          node dist/scripts/load-test/cli.js audit \
+            --manifest "$task_dir/manifest.json" --credentials "$task_dir/credentials.json" \
+            --fixture "$task_dir/evidence/prepare/fixture.json" --out "$task_dir/evidence/final-audit"
+          kill "$clock_pid"
+          wait "$clock_pid"
+          node <<'JS'
+          const fs = require('node:fs');
+          const dir = `${process.env.FUTURES_FIXTURE_DIR}/evidence`;
+          for (const phase of ['prepare', 'final-audit']) {
+            const r = JSON.parse(fs.readFileSync(`${dir}/${phase}/audit.json`, 'utf8'));
+            if (r.verdict !== 'CORRECTNESS PASS' || r.accounts !== 10 || r.findings.length !== 0) throw new Error(`Full audit failed: ${phase}`);
+          }
+          const clock = JSON.parse(fs.readFileSync(`${dir}/clock.json`, 'utf8'));
+          if (clock.backwardSteps !== 0 || clock.samples === 0) throw new Error('Unstable clock');
+          JS
+      - name: Preserve this run's financial evidence, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: futures-release-fixture
+          path: ${{ runner.temp }}/futures-release-fixture/evidence
+          if-no-files-found: warn
+          retention-days: 14
