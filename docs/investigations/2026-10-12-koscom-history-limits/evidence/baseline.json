@@ -1,0 +1,104 @@
+{
+  "evidenceType": "LOCAL_REPOSITORY_BASELINE",
+  "reviewCommit": "ed5b01817be739d7abb03b62566912e08c40631f",
+  "cachedOriginMain": "ed5b01817be739d7abb03b62566912e08c40631f",
+  "remoteMainObserved": "ed5b01817be739d7abb03b62566912e08c40631f",
+  "initialWorkingTreeClean": true,
+  "worktrees": [
+    {
+      "path": "/home/nayuta/projects/trading-app",
+      "exists": true,
+      "currentChangedFiles": [
+        "?? docs/investigations/2026-10-12-koscom-history-limits/"
+      ]
+    },
+    {
+      "path": "/tmp/trading-binance-rest-weight",
+      "exists": true,
+      "currentChangedFiles": [
+        " M backend/docs/binance-rest-limits.md",
+        " M backend/src/assets/market-candle-sync.service.spec.ts",
+        " M backend/src/batch/batch.service.spec.ts",
+        " M backend/src/futures/futures-instrument-coverage.spec.ts",
+        " M backend/src/futures/futures-last-price-ingestion.spec.ts",
+        " M backend/src/futures/futures-mark-ingestion.spec.ts",
+        " M backend/src/providers/binance/binance-rest-coordinator.integration.spec.ts",
+        " M backend/src/providers/binance/binance-rest-coordinator.spec.ts",
+        " M backend/src/providers/binance/binance-rest-coordinator.ts",
+        " M backend/src/providers/provider-http.client.spec.ts",
+        " M backend/src/providers/provider-http.client.ts"
+      ]
+    },
+    {
+      "path": "/tmp/trading-ci-baseline",
+      "exists": true,
+      "currentChangedFiles": []
+    },
+    {
+      "path": "/tmp/trading-ci-stabilization",
+      "exists": true,
+      "currentChangedFiles": []
+    },
+    {
+      "path": "/tmp/trading-fee-pinning",
+      "exists": false
+    },
+    {
+      "path": "/tmp/trading-home-market-work",
+      "exists": false
+    },
+    {
+      "path": "/tmp/trading-transaction-time",
+      "exists": false
+    }
+  ],
+  "reviewedSources": [
+    {
+      "path": "backend/src/providers/koscom/koscom.client.ts",
+      "matchesReviewCommit": true,
+      "sha256": "a8e62b3635cb54cc24fabe318d97a59dfe637663ad320733d73f06459af1e0d3"
+    },
+    {
+      "path": "backend/src/providers/koscom/koscom.config.ts",
+      "matchesReviewCommit": true,
+      "sha256": "bd4750594c35115416a29f5fd3f687a7f1dd4792167441d12266287eebf02bbc"
+    },
+    {
+      "path": "backend/src/providers/koscom/koscom-market-map.service.ts",
+      "matchesReviewCommit": true,
+      "sha256": "06073a0589e56796ff731ba922445134d8bb3d564cb983f998583c1a87cb2230"
+    },
+    {
+      "path": "backend/src/providers/koscom/koscom-candle.adapter.ts",
+      "matchesReviewCommit": true,
+      "sha256": "997ee8d8ef19b059160fc4e75f7588499eb54cd6c59ebc47d82a5fe86eb8109a"
+    },
+    {
+      "path": "backend/src/providers/koscom/koscom-normalizer.ts",
+      "matchesReviewCommit": true,
+      "sha256": "0f5291a25d410c2bfca750a3b231399441d9ac4cd868a5fb19389a77236094fb"
+    },
+    {
+      "path": "backend/src/providers/kis/candles/kis-domestic-five-minute.builder.ts",
+      "matchesReviewCommit": true,
+      "sha256": "4fc4c6aba7f6141e589c410d3a7493ad4863c230a2c1a22a9cf59b7179ff6ec7"
+    },
+    {
+      "path": "backend/src/assets/market-candle-aggregation.service.ts",
+      "matchesReviewCommit": true,
+      "sha256": "bd38f551496a8f28c7d0ec2d0881e2744b47b59a288ebbe6a91c4b384a1d7e69"
+    },
+    {
+      "path": "backend/src/assets/market-candle-retention.config.ts",
+      "matchesReviewCommit": true,
+      "sha256": "3d5a03badb29abae6472ec50a9bc0e8562d9da59d64634f5591433724045b3c4"
+    },
+    {
+      "path": "backend/src/orders/market-calendar/data/krx-2026.ts",
+      "matchesReviewCommit": true,
+      "sha256": "085c9ad218c0bc40712109e097da0735c2d83cb5d2d1fcffbfc018acca76b21f"
+    }
+  ],
+  "operationsChanged": false,
+  "actualKoscomCalls": 0
+}

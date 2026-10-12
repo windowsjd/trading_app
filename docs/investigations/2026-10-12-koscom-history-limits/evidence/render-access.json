@@ -1,0 +1,30 @@
+{
+  "evidenceType": "RENDER_READ_ONLY_METADATA",
+  "serviceId": "srv-da84cg8u01pc73cjasa0",
+  "serviceName": "trading_app",
+  "repo": "windowsjd/trading_app",
+  "cliVersion": "2.28.0",
+  "exit": 0,
+  "koscomApiRequests": 0,
+  "shellAccess": "UNAVAILABLE_CLI_LOGIN_REQUIRED",
+  "deploys": [
+    {
+      "id": "dep-db6d9urrjlhs73bkm8qg",
+      "status": "live",
+      "createdAt": "2026-10-12T12:39:23.728541Z",
+      "commit": "ed5b01817be739d7abb03b62566912e08c40631f"
+    },
+    {
+      "id": "dep-db6bfk8473hc73dsofbg",
+      "status": "deactivated",
+      "createdAt": "2026-10-12T10:34:57.785082Z",
+      "commit": "8b76878281ad07983aa17eb87b0a60a013c8c43a"
+    },
+    {
+      "id": "dep-db6b9lg473hc73ds27bg",
+      "status": "deactivated",
+      "createdAt": "2026-10-12T10:22:14.460531Z",
+      "commit": "8b76878281ad07983aa17eb87b0a60a013c8c43a"
+    }
+  ]
+}

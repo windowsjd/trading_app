@@ -1,0 +1,19 @@
+{
+  "evidenceType": "LOCAL_PACKAGING_ONLY",
+  "sourceSha256": "4655ed526307e8eff82b9742eb43a509dbc5b727f2ec8d038157a92ca226f12b",
+  "compressedBytes": 10764,
+  "decodeMatchesCanonicalSource": true,
+  "checks": [
+    {
+      "format": "heredoc",
+      "preflightZeroCalls": true,
+      "unexpectedStderr": false
+    },
+    {
+      "format": "one-line",
+      "preflightZeroCalls": true,
+      "unexpectedStderr": false
+    }
+  ],
+  "koscomApiRequests": 0
+}

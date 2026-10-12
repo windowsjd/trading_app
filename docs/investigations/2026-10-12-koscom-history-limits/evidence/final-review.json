@@ -1,0 +1,15 @@
+{
+  "evidenceType": "FINAL_LOCAL_REVIEW",
+  "localLinksChecked": 19,
+  "localLinksValid": true,
+  "jsonArtifactsValid": true,
+  "sourceMatchesVerifiedPackage": true,
+  "testCount": 22,
+  "testsFailed": 0,
+  "testsSkipped": 0,
+  "actualKoscomCalls": 0,
+  "liveValidationStatus": "AWAITING_USER_RENDER_SHELL_OUTPUT",
+  "financialAppFilesChanged": false,
+  "largeObjectAssertionRiskReviewed": true,
+  "safetyScopeReviewed": true
+}

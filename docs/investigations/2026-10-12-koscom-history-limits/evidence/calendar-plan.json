@@ -1,0 +1,118 @@
+{
+  "type": "REPOSITORY_CALENDAR_PLAN",
+  "anchorKst": "2026-10-12T21:43:01+09:00",
+  "calendarPath": "backend/src/orders/market-calendar/data/krx-2026.ts",
+  "calendarSha256": "085c9ad218c0bc40712109e097da0735c2d83cb5d2d1fcffbfc018acca76b21f",
+  "version": "2026.1",
+  "verifiedAtInDataset": "2026-07-13",
+  "fullYearCovered": 2026,
+  "closures": [
+    "2026-01-01",
+    "2026-02-16",
+    "2026-02-17",
+    "2026-02-18",
+    "2026-03-02",
+    "2026-05-01",
+    "2026-05-05",
+    "2026-05-25",
+    "2026-06-03",
+    "2026-07-17",
+    "2026-08-17",
+    "2026-09-24",
+    "2026-09-25",
+    "2026-10-05",
+    "2026-10-09",
+    "2026-12-25",
+    "2026-12-31"
+  ],
+  "normalSession": "09:00-15:30 KST",
+  "queryWindow": "10:00-11:00 KST",
+  "normalSessionCheckPassed": true,
+  "copyCheckPassed": true,
+  "plan": [
+    {
+      "id": 1,
+      "kind": "intraday",
+      "offset": 0,
+      "date": "2026-10-12",
+      "cycle": 60
+    },
+    {
+      "id": 2,
+      "kind": "intraday",
+      "offset": 0,
+      "date": "2026-10-12",
+      "cycle": 600
+    },
+    {
+      "id": 3,
+      "kind": "intraday",
+      "offset": 1,
+      "date": "2026-10-08",
+      "cycle": 60
+    },
+    {
+      "id": 4,
+      "kind": "intraday",
+      "offset": 1,
+      "date": "2026-10-08",
+      "cycle": 600
+    },
+    {
+      "id": 5,
+      "kind": "intraday",
+      "offset": 30,
+      "date": "2026-08-25",
+      "cycle": 60
+    },
+    {
+      "id": 6,
+      "kind": "intraday",
+      "offset": 30,
+      "date": "2026-08-25",
+      "cycle": 600
+    },
+    {
+      "id": 7,
+      "kind": "intraday",
+      "offset": 60,
+      "date": "2026-07-10",
+      "cycle": 60
+    },
+    {
+      "id": 8,
+      "kind": "intraday",
+      "offset": 60,
+      "date": "2026-07-10",
+      "cycle": 600
+    },
+    {
+      "id": 9,
+      "kind": "intraday",
+      "offset": 96,
+      "date": "2026-05-19",
+      "cycle": 60
+    },
+    {
+      "id": 10,
+      "kind": "intraday",
+      "offset": 96,
+      "date": "2026-05-19",
+      "cycle": 600
+    },
+    {
+      "id": 11,
+      "kind": "intraday",
+      "offset": null,
+      "date": "2026-10-09",
+      "cycle": 60
+    },
+    {
+      "id": 12,
+      "kind": "history",
+      "offset": 96,
+      "date": "2026-05-19",
+      "cycle": "D"
+    }
+  ]
+}

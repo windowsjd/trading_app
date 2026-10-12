@@ -1,0 +1,30 @@
+✔ frozen KRX calendar selects actual session offsets including June 3 and July 17 closures (0.871909ms)
+✔ lossless numbers and exact decimal addition retain money beyond Number precision (0.283689ms)
+✔ only documented origins and the exact twelve request parameters are accepted (1.507223ms)
+✔ valid rows without trading dates remain unconfirmed even with different prices (3.362704ms)
+✔ successful empty result is distinct from malformed/missing candle fields (1.216428ms)
+✔ duplicates, conflicting candles, nonmonotonic order, invalid OHLC/time and >100 rows fail validation (4.425567ms)
+✔ matching END/END and START/START hypotheses compare all six fields but do not confirm boundaries (1.806026ms)
+✔ missing minute is never interpolated; all price, volume and amount mismatches are counted (0.9599ms)
+✔ date filters: repeated responses and holiday data suppress positive attribution (2.187898ms)
+✔ matching top-level date alone is insufficient; explicit row dates require successful controls (1.432277ms)
+✔ dated independent daily comparison detects contradictions, does not prove undated minute attribution (0.821208ms)
+✔ extract only rate-related headers, suppress arbitrary values, expose deltas without attributing concurrent calls (3.65208ms)
+✔ all twelve calls are sequential, spaced, and never retried; absent quota remains unconfirmed (2.649193ms)
+✔ HTTP 401 stops immediately and prints no body, URL or secret (0.755914ms)
+✔ HTTP 403 stops immediately and prints no body, URL or secret (0.942934ms)
+✔ HTTP 429 stops immediately and prints no body, URL or secret (0.95159ms)
+✔ unexpected JSON auth/rate errors, malformed JSON, transport failure, and zero quota stop without retries (2.576651ms)
+✔ output gate also rejects a key reflected in otherwise syntactically valid diagnostic fields (0.146416ms)
+✔ native transport handles JSON, timeout, socket errors, redirect/auth rejection and bounded body without retries (23.435114ms)
+✔ cancellation before request sends zero calls; cancellation in-flight destroys it and starts no replacement (0.518789ms)
+✔ actual main acquires a diagnostic-only once marker; a second invocation sends zero additional calls (4.592219ms)
+✔ actual main blocks wrong service, missing credentials, undocumented base, and native debug output before requests (2.817244ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 66.471003
