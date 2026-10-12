@@ -11,6 +11,9 @@ import {
   fxEvidenceIds,
   cleanup,
   code,
+  untilDb,
+  holdRowLock,
+  untilLockWaiting,
   type Scenario,
 } from './futures-integration';
 import { Prisma } from '../src/generated/prisma/client';
@@ -28,7 +31,11 @@ import { GeneralAccountPerformanceService } from '../src/portfolio/general-accou
 import { GeneralExternalFundingService } from '../src/portfolio/general-external-funding.service';
 import { ConditionalBuyService } from '../src/conditional/conditional-buy.service';
 import { ConditionalBuyWorker } from '../src/conditional/conditional-buy-worker.service';
-import type { ConditionalBuyBody } from '../src/conditional/conditional-buy-policy';
+import {
+  CONDITIONAL_BUY_EXECUTION_WINDOW_MS,
+  isRetryableConditionalBuyFailure,
+  type ConditionalBuyBody,
+} from '../src/conditional/conditional-buy-policy';
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { lockSeasonTradingContext } from '../src/seasons/season-trading-lock';
@@ -985,6 +992,286 @@ async function workerLease() {
   });
 }
 
+// ── The 30 s execution window holds at the create transaction's DB clock ────
+
+const WINDOW_MS = CONDITIONAL_BUY_EXECUTION_WINDOW_MS;
+type ExecutionType = 'market' | 'limit';
+const watchBody = (executionType: ExecutionType): ConditionalBuyBody => ({
+  triggerCondition: 'at_or_above',
+  triggerPrice: '110',
+  executionType,
+  ...(executionType === 'limit' ? { limitPrice: '100' } : {}),
+  ...size('KRX'),
+});
+/** The create request the worker adapter builds for this watch. */
+const watchRequest = (s: Scenario, executionType: ExecutionType) => ({
+  assetId: s.instruments[0].asset.id,
+  side: 'buy' as const,
+  orderType: executionType,
+  quantity: '3.000000',
+  ...(executionType === 'limit' ? { limitPrice: '100.00000000' } : {}),
+});
+/** The worker's trigger write, back-dated `ageMs` on the DB clock, with a
+ * fresh price for the order core. */
+async function triggerAged(s: Scenario, id: string, ageMs: number) {
+  const trigger = await quote(s, 'KRX', '100');
+  const triggeredAt = new Date((await now()).getTime() - ageMs);
+  await db.conditionalBuyOrder.update({
+    where: { id },
+    data: {
+      status: 'triggered',
+      triggeredAt,
+      triggerSnapshotId: trigger.id,
+      triggerEvidenceJson: { snapshotId: trigger.id },
+    },
+  });
+  return triggeredAt;
+}
+/** A refused create leaves nothing: no Order, reservation, ledger or link. */
+async function assertNoOrder(
+  s: Scenario,
+  id: string,
+  before: { balance: string; reserved: string },
+) {
+  assert.equal(await orderCount(s), 0);
+  assert.deepEqual(await wallet(s, 'KRX'), before);
+  assert.equal(await ledgerCount(s), 0);
+  assert.equal((await watch(id)).orderId, null);
+}
+async function assertWindowExpired(s: Scenario, id: string) {
+  const row = await watch(id);
+  assert.equal(row.status, 'failed');
+  assert.equal(row.terminalReason, 'execution_window_expired');
+  assert.equal(row.failureCode, 'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED');
+  assert.equal(await orderCount(s), 0);
+}
+async function windowScenario(
+  work: (
+    s: Scenario,
+    before: { balance: string; reserved: string },
+  ) => Promise<void>,
+) {
+  await scenario('general', async (s) => {
+    await market(s, 'KRX');
+    await quote(s, 'KRX', '100');
+    await work(s, await wallet(s, 'KRX'));
+  });
+}
+
+async function executionWindow(executionType: ExecutionType) {
+  // 25 s after the trigger: the worker still orders it.
+  await windowScenario(async (s) => {
+    const id = await register(s, watchBody(executionType));
+    await triggerAged(s, id, 25_000);
+    assert.equal((await conditionalBuy.evaluate(id)).state, 'ordered');
+    assert.equal(
+      (await watch(id)).order?.status,
+      executionType === 'market' ? 'executed' : 'submitted',
+    );
+    assert.equal(await orderCount(s), 1);
+  });
+  // Exactly 30 s (the DB instant observed just before the create; the clock
+  // only moves on) and past it: the create refuses although the worker's own
+  // check already passed.
+  for (const ageMs of [WINDOW_MS, WINDOW_MS + 3000])
+    await windowScenario(async (s, before) => {
+      const id = await register(s, watchBody(executionType));
+      await triggerAged(s, id, ageMs);
+      await rejects(
+        orders.executeConditionalBuy(s.userId, s.accountId, id),
+        'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED',
+      );
+      await assertNoOrder(s, id, before);
+      assert.equal((await watch(id)).status, 'triggered');
+      assert.equal((await conditionalBuy.evaluate(id)).state, 'failed');
+      await assertWindowExpired(s, id);
+    });
+  // Quoted inside the window, created after it.
+  await windowScenario(async (s, before) => {
+    const id = await register(s, watchBody(executionType));
+    const triggeredAt = await triggerAged(s, id, 29_000);
+    const request = watchRequest(s, executionType);
+    const quoted = await orders.quoteOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      request,
+      undefined,
+      id,
+    );
+    await untilDb(triggeredAt.getTime() + WINDOW_MS + 2000);
+    await rejects(
+      orders.createOrderForTradingAccount(
+        s.userId,
+        s.accountId,
+        {
+          ...request,
+          quoteId: quoted.data.quoteId,
+          idempotencyKey: `conditional-buy:${id}`,
+        },
+        undefined,
+        id,
+      ),
+      'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED',
+    );
+    await assertNoOrder(s, id, before);
+    assert.equal(
+      (
+        await db.quote.findUniqueOrThrow({
+          where: { id: quoted.data.quoteId! },
+        })
+      ).status,
+      'active',
+    );
+  });
+  // Lock waits past the window: on the account fence (before the watch check,
+  // after the worker's check passed) and on the cash wallet (after the watch
+  // check, during the writes; through the real worker path).
+  for (const lock of ['account', 'wallet'] as const)
+    await windowScenario(async (s, before) => {
+      const id = await register(s, watchBody(executionType));
+      const walletId = (
+        await db.cashWallet.findFirstOrThrow({
+          where: {
+            tradingAccountId: s.accountId,
+            walletScope: 'securities',
+            currencyCode: 'KRW',
+          },
+        })
+      ).id;
+      // Close to the window, so the waiting create stays inside Prisma's 5 s
+      // interactive-transaction timeout even across a backward clock step.
+      const triggeredAt = await triggerAged(s, id, 29_500);
+      const holder = await holdRowLock((tx) =>
+        lock === 'account'
+          ? tx.$queryRaw`SELECT "id" FROM "trading_accounts" WHERE "id" = ${s.accountId} FOR UPDATE`
+          : tx.$queryRaw`SELECT "id" FROM "cash_wallets" WHERE "id" = ${walletId} FOR UPDATE`,
+      );
+      const pending =
+        lock === 'account'
+          ? orders.executeConditionalBuy(s.userId, s.accountId, id)
+          : conditionalBuy.evaluate(id);
+      await untilLockWaiting();
+      assert.ok(
+        (await now()).getTime() - triggeredAt.getTime() < WINDOW_MS,
+        'the create waits inside the window',
+      );
+      // Past the window by more than this host's backward clock steps; the
+      // execution price stays fresh, only the window ends.
+      await untilDb(triggeredAt.getTime() + WINDOW_MS + 2000);
+      await quote(s, 'KRX', '100');
+      await holder.release();
+      if (lock === 'account')
+        await rejects(pending, 'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED');
+      else
+        assert.equal(
+          ((await pending) as { state: string }).state,
+          'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED',
+        );
+      await assertNoOrder(s, id, before);
+      if (lock === 'account')
+        assert.equal((await conditionalBuy.evaluate(id)).state, 'failed');
+      await assertWindowExpired(s, id);
+    });
+  // An order committed inside the window replays after it, never a second one.
+  await windowScenario(async (s) => {
+    const id = await register(s, watchBody(executionType));
+    await triggerAged(s, id, 0);
+    assert.equal((await conditionalBuy.evaluate(id)).state, 'ordered');
+    const ordered = await watch(id);
+    const walletAfter = await wallet(s, 'KRX');
+    const ledgerAfter = await ledgerCount(s);
+    await db.conditionalBuyOrder.update({
+      where: { id },
+      data: { triggeredAt: new Date((await now()).getTime() - 120_000) },
+    });
+    const replay = await orders.createOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      {
+        ...watchRequest(s, executionType),
+        quoteId: ordered.order!.quoteId!,
+        idempotencyKey: `conditional-buy:${id}`,
+      },
+      undefined,
+      id,
+    );
+    assert.equal(replay.data.order.orderId, ordered.orderId);
+    assert.equal(await orderCount(s), 1);
+    assert.deepEqual(await wallet(s, 'KRX'), walletAfter);
+    assert.equal(await ledgerCount(s), ledgerAfter);
+    assert.equal((await watch(id)).status, 'ordered');
+  });
+  pass(
+    `${executionType}: window <30 s orders; at/after 30 s, quote-then-late create and lock waits refuse with no partial state; replay kept`,
+  );
+}
+
+/** Concurrent creates, the worker and a user cancel: at most one Order. */
+async function windowRaces() {
+  for (let round = 0; round < 3; round++)
+    await windowScenario(async (s, before) => {
+      const id = await register(s, watchBody('market'));
+      await triggerAged(s, id, 0);
+      await Promise.allSettled([
+        orders.executeConditionalBuy(s.userId, s.accountId, id),
+        orders.executeConditionalBuy(s.userId, s.accountId, id),
+        conditionalBuy.evaluate(id),
+        conditionalBuy.cancel(s.userId, s.accountId, id),
+      ]);
+      const row = await watch(id);
+      if (row.status === 'ordered') {
+        assert.equal(await orderCount(s), 1);
+        assert.equal(await ledgerCount(s), 1);
+      } else {
+        assert.ok(['canceled', 'failed'].includes(row.status), row.status);
+        await assertNoOrder(s, id, before);
+      }
+    });
+  pass('concurrent creates, worker and cancel → at most one Order (3 rounds)');
+}
+
+/** Transient failures still retry inside the window, at most 3 attempts. */
+async function retryAttempts() {
+  await scenario('general', async (s) => {
+    await quote(s, 'BINANCE', '100');
+    const id = await register(s, {
+      triggerCondition: 'at_or_above',
+      triggerPrice: '110',
+      executionType: 'market',
+      amount: '50',
+    });
+    const trigger = await quote(s, 'BINANCE', '110');
+    await db.conditionalBuyOrder.update({
+      where: { id },
+      data: {
+        status: 'triggered',
+        triggeredAt: await now(),
+        triggerSnapshotId: trigger.id,
+        triggerEvidenceJson: { snapshotId: trigger.id },
+      },
+    });
+    // Every execution price is stale: a transient evidence failure.
+    const old = new Date((await now()).getTime() - 600_000);
+    await db.assetPriceSnapshot.updateMany({
+      where: { assetId: s.instruments[0].asset.id },
+      data: { effectiveAt: old, capturedAt: old },
+    });
+    for (const attempt of [1, 2, 3]) {
+      await conditionalBuy.evaluate(id);
+      const row = await watch(id);
+      assert.equal(row.attemptCount, attempt);
+      assert.ok(
+        isRetryableConditionalBuyFailure(row.failureCode ?? ''),
+        row.failureCode ?? '',
+      );
+      assert.equal(row.status, attempt < 3 ? 'triggered' : 'failed');
+    }
+    assert.equal((await watch(id)).terminalReason, 'execution_failed');
+    assert.equal(await orderCount(s), 0);
+    pass('transient failures retry inside the window, at most 3 attempts');
+  });
+}
+
 async function main() {
   await db.$connect();
   try {
@@ -1015,6 +1302,10 @@ async function run() {
   await usStockScope();
   await beginner();
   await workerLease();
+  await executionWindow('market');
+  await executionWindow('limit');
+  await windowRaces();
+  await retryAttempts();
   console.log(`Conditional BUY PostgreSQL PASS (${checks} scenarios)`);
 }
 

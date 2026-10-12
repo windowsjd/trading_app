@@ -73,8 +73,12 @@ conflicts fail immediately. Transient evidence/quote races
 (`ASSET_PRICE_UNAVAILABLE`, `PRICE_STALE`, FX unavailable/stale,
 `RATE_CHANGED_REQUOTE_REQUIRED`, quote expiry/conflict, execution conflicts)
 retry on the next 1 s cycle, at most 3 attempts within 30 s of the trigger. A
-trigger older than 30 s never becomes an order (restart/outage safety:
-`CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED`).
+trigger 30 s old or older never becomes an order (restart/outage safety:
+`CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED`, `failed` /
+`execution_window_expired`). The order create transaction checks the window at
+its DB clock after the watch lock and again as its last statement, so a slow
+quote or a lock wait cannot carry a trigger past it (the create rolls back);
+a committed create still replays.
 
 ### Concurrency and lifecycle
 
@@ -192,7 +196,9 @@ even when the flag is off) processes pending LOCs whose session has closed:
 | Final evidence but the fill stays refused until the deadline (Season ended, account/participant/asset gate, calendar outage, valuation price missing) | `canceled`, released | `expired` / `loc_fill_not_permitted` |
 | User cancel / Season end / exclusion | `canceled` (existing reasons) | `canceled` |
 
-The fill re-validates under its locks: pending LOC row, final evidence of the
+The fill re-validates under its locks: pending LOC row, DB clock before
+`evidenceDeadlineAt` (again as the fill's last statement, so a lock wait during
+its writes rolls it back), final evidence of the
 same asset/market/date/policy version, finalized no later than the DB clock,
 first observed after the current-calendar close, submission inside that
 session, DB clock after the close, close ≤ limit and the existing Season

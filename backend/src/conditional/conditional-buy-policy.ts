@@ -25,6 +25,13 @@ export const CONDITIONAL_BUY_MAX_LIVE_PER_ACCOUNT = 20;
 export const CONDITIONAL_BUY_EXECUTION_WINDOW_MS = 30_000;
 export const CONDITIONAL_BUY_MAX_ATTEMPTS = 3;
 
+/** From 30 s after the trigger (inclusive) no new order may be created. */
+export function conditionalBuyWindowExpired(triggeredAt: Date, now: Date) {
+  return (
+    now.getTime() - triggeredAt.getTime() >= CONDITIONAL_BUY_EXECUTION_WINDOW_MS
+  );
+}
+
 /**
  * Transient execution outcomes that may succeed on the next worker cycle
  * inside the execution window. Every other code (insufficient cash, closed

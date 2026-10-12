@@ -19,11 +19,11 @@ import { conditionalTradable } from './conditional-policy';
 import { conditionalPrice } from './conditional-price';
 import {
   assertConditionalBuyEnabled,
-  CONDITIONAL_BUY_EXECUTION_WINDOW_MS,
   CONDITIONAL_BUY_MAX_ATTEMPTS,
   CONDITIONAL_BUY_MAX_LIVE_PER_ACCOUNT,
   conditionalBuyEnabled,
   conditionalBuyHash,
+  conditionalBuyWindowExpired,
   isConditionalBuyMet,
   isRetryableConditionalBuyFailure,
   parseConditionalBuyBody,
@@ -411,8 +411,7 @@ export class ConditionalBuyService {
       if (row.status === 'triggered') {
         if (
           !row.triggeredAt ||
-          now.getTime() - row.triggeredAt.getTime() >
-            CONDITIONAL_BUY_EXECUTION_WINDOW_MS ||
+          conditionalBuyWindowExpired(row.triggeredAt, now) ||
           row.attemptCount >= CONDITIONAL_BUY_MAX_ATTEMPTS
         ) {
           await this.terminate(
@@ -498,18 +497,22 @@ export class ConditionalBuyService {
       const terminal =
         !isRetryableConditionalBuyFailure(code) ||
         attempts >= CONDITIONAL_BUY_MAX_ATTEMPTS ||
-        now.getTime() - row.triggeredAt.getTime() >=
-          CONDITIONAL_BUY_EXECUTION_WINDOW_MS;
+        conditionalBuyWindowExpired(row.triggeredAt, now);
+      // The create refused a trigger past its window: the same end as the
+      // evaluation pre-check, keeping an earlier attempt's root cause.
+      const windowExpired = code === 'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED';
       await tx.conditionalBuyOrder.update({
         where: { id },
         data: {
           attemptCount: attempts,
           lastAttemptAt: now,
-          failureCode: code,
+          failureCode: windowExpired ? (row.failureCode ?? code) : code,
           ...(terminal
             ? {
                 status: 'failed',
-                terminalReason: 'execution_failed',
+                terminalReason: windowExpired
+                  ? 'execution_window_expired'
+                  : 'execution_failed',
                 endedAt: now,
               }
             : {}),

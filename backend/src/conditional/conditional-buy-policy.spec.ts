@@ -9,6 +9,7 @@ import { HttpException } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import {
   conditionalBuyHash,
+  conditionalBuyWindowExpired,
   isConditionalBuyMet,
   isRetryableConditionalBuyFailure,
   parseConditionalBuyBody,
@@ -137,7 +138,16 @@ describe('conditional BUY execution failure policy', () => {
       'PROTECTION_CHILD_PENDING',
       'LIMIT_ORDER_DISABLED',
       'CONDITIONAL_BUY_CHANGED',
+      'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED',
     ])
       expect(isRetryableConditionalBuyFailure(terminal)).toBe(false);
+  });
+
+  it('closes the execution window exactly 30 s after the trigger', () => {
+    const triggeredAt = new Date('2026-10-12T05:00:00.000Z');
+    const at = (ms: number) => new Date(triggeredAt.getTime() + ms);
+    expect(conditionalBuyWindowExpired(triggeredAt, at(29_999))).toBe(false);
+    expect(conditionalBuyWindowExpired(triggeredAt, at(30_000))).toBe(true);
+    expect(conditionalBuyWindowExpired(triggeredAt, at(30_001))).toBe(true);
   });
 });

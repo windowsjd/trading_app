@@ -61,6 +61,7 @@ const PUBLIC_MESSAGES = new Set<string>([
   'Attached protection is not available on Limit-on-Close orders.',
   'Limit-on-Close orders are currently disabled.',
   'The conditional order changed before execution.',
+  'The conditional order trigger is too old to execute.',
   'Conditional buy orders are currently disabled.',
   'Specify an asset.',
   'Choose at or above, or at or below.',

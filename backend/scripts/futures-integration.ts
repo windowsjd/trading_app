@@ -320,6 +320,43 @@ async function untilDb(at: number) {
     await delay(25);
   }
 }
+/** A slow concurrent writer: `lock` runs in its own transaction, which keeps
+ * its row locks until `release()`. */
+async function holdRowLock(
+  lock: (tx: Prisma.TransactionClient) => Promise<unknown>,
+) {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => (release = resolve));
+  let acquired!: () => void;
+  const ready = new Promise<void>((resolve) => (acquired = resolve));
+  const done = db.$transaction(
+    async (tx) => {
+      await lock(tx);
+      acquired();
+      await released;
+    },
+    { timeout: 20_000 },
+  );
+  await Promise.race([ready, done]);
+  return {
+    release: async () => {
+      release();
+      await done;
+    },
+  };
+}
+/** Resolves once some backend of this database waits for a row lock. */
+async function untilLockWaiting() {
+  const started = Date.now();
+  for (;;) {
+    const [row] = await db.$queryRaw<Array<{ waiting: number }>>`
+      SELECT count(*)::int AS "waiting" FROM pg_stat_activity
+      WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+    if (row.waiting > 0) return;
+    assert.ok(Date.now() - started < 5000, 'no transaction waited for a lock');
+    await delay(10);
+  }
+}
 async function fxEvidence() {
   const clock = await now();
   const snapshot = await db.fxRateSnapshot.create({
@@ -1832,6 +1869,8 @@ export {
   spotPrice,
   latestLast,
   untilDb,
+  holdRowLock,
+  untilLockWaiting,
   fxEvidence,
   openBody,
   positionBody,

@@ -46,6 +46,18 @@ export function decideLimitOnClose(
     : 'not_reached';
 }
 
+/**
+ * The evidence deadline also bounds the fill itself: at or after it no LOC
+ * fill may commit, even with final close evidence (the order then expires as
+ * `loc_fill_not_permitted`). Judged at the fill transaction's DB clock.
+ */
+export function limitOnCloseDeadlinePassed(
+  now: Date,
+  evidenceDeadlineAt: Date,
+): boolean {
+  return now.getTime() >= evidenceDeadlineAt.getTime();
+}
+
 export type LimitOnCloseRegistration = {
   market: 'KRX' | 'US';
   session: MarketSessionWindow;

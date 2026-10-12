@@ -18,6 +18,7 @@ import {
 } from '../conditional/conditional-policy';
 import { createProtectionInTransaction } from '../conditional/conditional-registration';
 import {
+  assertConditionalBuyExecutionWindow,
   linkConditionalBuyOrder,
   lockTriggeredConditionalBuy,
 } from '../conditional/conditional-buy-state';
@@ -1536,13 +1537,14 @@ export class OrdersService {
           transactionNow,
           input.conditionalChildId,
         );
-        if (request.conditionalBuyOrderId)
-          await lockTriggeredConditionalBuy(
-            tx,
-            request.conditionalBuyOrderId,
-            tradingAccountId,
-            request,
-          );
+        const triggeredWatch = request.conditionalBuyOrderId
+          ? await lockTriggeredConditionalBuy(
+              tx,
+              request.conditionalBuyOrderId,
+              tradingAccountId,
+              request,
+            )
+          : null;
         transactionNow = await this.readTransactionWallClock(tx);
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
@@ -1676,6 +1678,13 @@ export class OrdersService {
             id: true,
           },
         });
+        // Last statement: no lock wait during the writes above carries a
+        // conditional BUY past its execution window (the create rolls back).
+        if (triggeredWatch)
+          await assertConditionalBuyExecutionWindow(
+            tx,
+            triggeredWatch.triggeredAt,
+          );
 
         didExecute = true;
         return responsePayloadJson;
@@ -1896,13 +1905,14 @@ export class OrdersService {
           transactionNow,
           input.conditionalChildId,
         );
-        if (request.conditionalBuyOrderId)
-          await lockTriggeredConditionalBuy(
-            tx,
-            request.conditionalBuyOrderId,
-            tradingAccountId,
-            request,
-          );
+        const triggeredWatch = request.conditionalBuyOrderId
+          ? await lockTriggeredConditionalBuy(
+              tx,
+              request.conditionalBuyOrderId,
+              tradingAccountId,
+              request,
+            )
+          : null;
         transactionNow = await this.readTransactionWallClock(tx);
         if (lockedContext) {
           limitOrderCreate.assertLockedTradableContext(
@@ -2008,6 +2018,13 @@ export class OrdersService {
             legs: request.attachedProtection,
             now: transactionNow,
           });
+        // Last statement: no lock wait during the reservation above carries a
+        // conditional BUY past its execution window (the create rolls back).
+        if (triggeredWatch)
+          await assertConditionalBuyExecutionWindow(
+            tx,
+            triggeredWatch.triggeredAt,
+          );
         return response;
       });
     } catch (error) {

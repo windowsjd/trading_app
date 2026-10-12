@@ -10,6 +10,7 @@ import {
 import {
   decideLimitOnClose,
   LOC_DECISION_REASONS,
+  limitOnCloseDeadlinePassed,
   resolveBoundLimitOnCloseSession,
   sessionDateText,
 } from './limit-on-close.policy';
@@ -255,6 +256,19 @@ export class LimitOnCloseSettlementService {
         row,
         'unfilled',
         LOC_DECISION_REASONS.closeNotReached,
+        evidence,
+        summary,
+      );
+      return;
+    }
+    // Cheap pre-check; the fill re-checks the deadline at its post-lock DB clock.
+    if (
+      limitOnCloseDeadlinePassed(await this.dbNow(), row.evidenceDeadlineAt)
+    ) {
+      await this.release(
+        row,
+        'expired',
+        LOC_DECISION_REASONS.fillNotPermitted,
         evidence,
         summary,
       );

@@ -6,6 +6,8 @@ import {
   fixture,
   now,
   untilDb,
+  holdRowLock,
+  untilLockWaiting,
   fxEvidence,
   fxEvidenceIds,
   cleanup,
@@ -1065,6 +1067,268 @@ async function databaseConstraints() {
   });
 }
 
+// ── The evidence deadline bounds the fill itself ─────────────────────────────
+
+const locPlan = (final: { id: string; closePrice: Prisma.Decimal }) => ({
+  path: 'session_close' as const,
+  executedPrice: final.closePrice,
+  closeEvidenceId: final.id,
+});
+const outcomeOf = (outcome: Awaited<ReturnType<typeof fill.fillLimitOrder>>) =>
+  outcome.state === 'skipped' ? outcome.reason : outcome.state;
+async function setDeadline(orderId: string, at: Date) {
+  await db.limitOnCloseOrder.update({
+    where: { orderId },
+    data: { evidenceDeadlineAt: at },
+  });
+  return at;
+}
+/** A deadline already passed by more than this host's backward clock steps
+ * (and, as the schema requires, after the session close). */
+async function passDeadline(s: Loc, orderId: string) {
+  await untilDb(s.closeAt.getTime() + 3000);
+  return setDeadline(orderId, new Date((await now()).getTime() - 2000));
+}
+const krwWalletId = async (s: Scenario) =>
+  (
+    await db.cashWallet.findFirstOrThrow({
+      where: {
+        tradingAccountId: s.accountId,
+        walletScope: 'securities',
+        currencyCode: 'KRW',
+      },
+    })
+  ).id;
+/** Nothing of a refused fill remains: submitted, pending, reservation held. */
+async function assertNotFilled(
+  s: Loc,
+  orderId: string,
+  before: { balance: string; reserved: string },
+) {
+  const row = await order(orderId);
+  assert.equal(row.status, 'submitted');
+  assert.equal(row.executedAt, null);
+  assert.equal(row.sessionCloseEvidenceId, null);
+  assert.equal(row.limitOnClose?.status, 'pending');
+  const wallet = await krwWallet(s);
+  assert.equal(wallet.balance, before.balance);
+  assert.equal(wallet.reserved, row.reservedAmount!.toFixed(8));
+  assert.equal(await ledger(s), 0);
+  assert.equal(
+    await db.position.count({ where: { tradingAccountId: s.accountId } }),
+    0,
+  );
+}
+/** Concurrent cycles after the deadline expire it once and release exactly
+ * the reservation; nothing moves afterwards. */
+async function assertExpiredOnce(
+  s: Loc,
+  orderId: string,
+  before: { balance: string; reserved: string },
+) {
+  const summaries = await Promise.all([cycle(), cycle()]);
+  const total = (pick: (x: (typeof summaries)[number]) => number) =>
+    summaries.reduce((sum, x) => sum + pick(x), 0);
+  assert.equal(
+    total((x) => x.expired.loc_fill_not_permitted ?? 0),
+    1,
+    JSON.stringify(summaries),
+  );
+  assert.equal(
+    total((x) => x.filled),
+    0,
+  );
+  const row = await order(orderId);
+  assert.equal(row.status, 'canceled');
+  assert.equal(row.cancelReason, 'loc_fill_not_permitted');
+  assert.equal(row.executedPrice, null);
+  assert.equal(row.limitOnClose?.status, 'expired');
+  assert.ok(row.limitOnClose?.closeEvidenceId);
+  assert.deepEqual(await krwWallet(s), before);
+  assert.equal(await ledger(s), 0);
+  assert.equal((await cycle()).candidates, 0);
+}
+
+/** At the deadline (the DB instant observed just before the fill; the clock
+ * only moves on) and after it, valid final close evidence never fills. */
+async function fillAtOrAfterDeadline() {
+  for (const late of ['at', 'after'] as const)
+    await locScenario('general', async (s) => {
+      const before = await krwWallet(s);
+      const { orderId } = await place(s);
+      await untilDb(s.closeAt.getTime());
+      const { final } = await finalEvidence(s, '95');
+      await fxEvidence();
+      if (late === 'at') await setDeadline(orderId, await now());
+      else await passDeadline(s, orderId);
+      const outcome = await fill.fillLimitOrder({
+        orderId,
+        plan: locPlan(final!),
+      });
+      assert.equal(outcomeOf(outcome), 'limit_on_close_deadline_passed');
+      await assertNotFilled(s, orderId, before);
+      await assertExpiredOnce(s, orderId, before);
+      pass(
+        `fill ${late} the deadline refused despite final close evidence; expiry releases once`,
+      );
+    });
+}
+
+/** A fill that failed before the deadline is never retried into a fill after
+ * it, even once its cause has cleared. */
+async function retryAfterDeadline() {
+  await locScenario('general', async (s) => {
+    const before = await krwWallet(s);
+    await db.assetPriceSnapshot.deleteMany({ where: { assetId: s.assetId } });
+    const { orderId } = await place(s);
+    await untilDb(s.closeAt.getTime());
+    const { final } = await finalEvidence(s, '95');
+    const summary = await cycle(); // no valuation price: the fill rolls back
+    assert.equal(summary.errors.LOC_FILL_FAILED, 1, JSON.stringify(summary));
+    await assertNotFilled(s, orderId, before);
+    await realtime(s, '95', new Date(s.closeAt.getTime() - 1000));
+    await passDeadline(s, orderId);
+    await fxEvidence();
+    const retried = await fill.fillLimitOrder({
+      orderId,
+      plan: locPlan(final!),
+    });
+    assert.equal(outcomeOf(retried), 'limit_on_close_deadline_passed');
+    await assertNotFilled(s, orderId, before);
+    await assertExpiredOnce(s, orderId, before);
+    pass(
+      'a fill failing before the deadline is never retried into a fill after it',
+    );
+  });
+}
+
+/** Started before the deadline, then waiting for a lock past it: refused at
+ * the post-lock DB clock — on the Order row before any write, and on the
+ * wallet row during the writes (the whole fill rolls back). */
+async function lockWaitPastDeadline() {
+  for (const lock of ['order', 'wallet'] as const)
+    await locScenario('general', async (s) => {
+      const before = await krwWallet(s);
+      const { orderId } = await place(s);
+      await untilDb(s.closeAt.getTime());
+      const { final } = await finalEvidence(s, '95');
+      const walletId = await krwWalletId(s);
+      await fxEvidence();
+      // Short lead and lag keep the waiting fill inside Prisma's 5 s
+      // interactive-transaction timeout even across a backward clock step.
+      const deadline = await setDeadline(
+        orderId,
+        new Date((await now()).getTime() + 300),
+      );
+      const holder = await holdRowLock((tx) =>
+        lock === 'order'
+          ? tx.$queryRaw`SELECT "id" FROM "orders" WHERE "id" = ${orderId} FOR UPDATE`
+          : tx.$queryRaw`SELECT "id" FROM "cash_wallets" WHERE "id" = ${walletId} FOR UPDATE`,
+      );
+      const pending = fill.fillLimitOrder({ orderId, plan: locPlan(final!) });
+      await untilLockWaiting();
+      assert.ok((await now()) < deadline, 'the fill waits before the deadline');
+      // Past the deadline by more than this host's backward clock steps.
+      await untilDb(deadline.getTime() + 2000);
+      await fxEvidence();
+      await holder.release();
+      assert.equal(outcomeOf(await pending), 'limit_on_close_deadline_passed');
+      await assertNotFilled(s, orderId, before);
+      await assertExpiredOnce(s, orderId, before);
+      pass(`fill waiting on the ${lock} row lock past the deadline is refused`);
+    });
+}
+
+/** Fill, deadline expiry and user cancel race: one terminal outcome, the
+ * reservation settled or released once, never a fill at or after the deadline. */
+async function deadlineRaces() {
+  for (const offsetMs of [150, 300, -2000])
+    await locScenario('general', async (s) => {
+      const before = await krwWallet(s);
+      const { orderId } = await place(s);
+      await untilDb(s.closeAt.getTime());
+      const { final } = await finalEvidence(s, '97');
+      await fxEvidence();
+      const deadline =
+        offsetMs < 0
+          ? await passDeadline(s, orderId)
+          : await setDeadline(
+              orderId,
+              new Date((await now()).getTime() + offsetMs),
+            );
+      await Promise.allSettled([
+        fill.fillLimitOrder({ orderId, plan: locPlan(final!) }),
+        untilDb(deadline.getTime()).then(() => settlement.runCycle({ config })),
+        orders.cancelOrderForTradingAccount(s.userId, s.accountId, orderId),
+      ]);
+      const row = await order(orderId);
+      const after = await krwWallet(s);
+      assert.equal(after.reserved, '0.00000000');
+      if (row.status === 'executed') {
+        assert.ok(offsetMs > 0, 'no fill once the deadline has passed');
+        assert.ok(row.executedAt! < row.limitOnClose!.evidenceDeadlineAt);
+        assert.equal(row.limitOnClose?.status, 'filled');
+        assert.equal(await ledger(s), 1);
+      } else {
+        assert.equal(row.status, 'canceled');
+        assert.ok(['canceled', 'expired'].includes(row.limitOnClose!.status));
+        assert.deepEqual(after, before);
+        assert.equal(await ledger(s), 0);
+      }
+      await cycle();
+      const settled = await order(orderId);
+      assert.equal(settled.status, row.status);
+      assert.equal(settled.limitOnClose?.status, row.limitOnClose?.status);
+      assert.deepEqual(await krwWallet(s), after);
+    });
+  pass(
+    'fill vs deadline expiry vs user cancel → one terminal outcome (3 rounds)',
+  );
+}
+
+/** A fill completed before the deadline stays: after it, re-reads, settlement,
+ * the fill itself and the create replay change nothing. */
+async function filledThenDeadline() {
+  await locScenario('general', async (s) => {
+    const key = randomUUID();
+    const { quote, orderId } = await place(s, {}, key);
+    await untilDb(s.closeAt.getTime());
+    const { final } = await finalEvidence(s, '96');
+    assert.equal((await cycle()).filled, 1);
+    const filled = await order(orderId);
+    const wallet = await krwWallet(s);
+    await passDeadline(s, orderId);
+    assert.equal((await cycle()).candidates, 0);
+    const again = await fill.fillLimitOrder({ orderId, plan: locPlan(final!) });
+    assert.equal(outcomeOf(again), 'not_submitted_limit');
+    const replay = await orders.createOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      { ...locBody(s), quoteId: quote.data.quoteId, idempotencyKey: key },
+    );
+    assert.equal(replay.data.order.orderId, orderId);
+    const detail = await orders.getOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      orderId,
+    );
+    assert.equal(detail.data.order.status, 'executed');
+    assert.equal(detail.data.order.limitOnClose?.status, 'filled');
+    const row = await order(orderId);
+    assert.equal(row.executedAt?.getTime(), filled.executedAt?.getTime());
+    assert.equal(row.executedPrice?.toFixed(8), '96.00000000');
+    assert.deepEqual(await krwWallet(s), wallet);
+    assert.equal(await ledger(s), 1);
+    assert.equal(
+      await db.order.count({ where: { tradingAccountId: s.accountId } }),
+      1,
+    );
+    pass(
+      'a fill before the deadline is kept: re-read, settlement, fill and create replay after it change nothing',
+    );
+  });
+}
+
 async function main() {
   await db.$connect();
   try {
@@ -1083,6 +1347,11 @@ async function main() {
     await registrationRules();
     await ordinaryLimitUnaffected();
     await databaseConstraints();
+    await fillAtOrAfterDeadline();
+    await retryAfterDeadline();
+    await lockWaitPastDeadline();
+    await deadlineRaces();
+    await filledThenDeadline();
     console.log(`Limit-on-Close PostgreSQL PASS (${checks} scenarios)`);
   } finally {
     await db.fxRateSnapshot.deleteMany({

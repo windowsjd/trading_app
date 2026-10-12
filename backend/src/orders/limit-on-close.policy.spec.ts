@@ -22,6 +22,7 @@ import {
 } from './market-calendar/market-session-override.store';
 import {
   decideLimitOnClose,
+  limitOnCloseDeadlinePassed,
   nextCloseEvidenceTransition,
   resolveBoundLimitOnCloseSession,
   resolveLimitOnCloseRegistration,
@@ -100,6 +101,16 @@ describe('LOC price decision (shared buy/sell rule)', () => {
     expect(decideLimitOnClose(OrderSide.buy, d('100'), d('NaN'))).toBe(
       'not_reached',
     );
+  });
+});
+
+describe('LOC evidence deadline bounds the fill', () => {
+  it('permits a fill strictly before the deadline only', () => {
+    const deadline = new Date('2026-07-10T09:30:00.000Z');
+    const at = (ms: number) => new Date(deadline.getTime() + ms);
+    expect(limitOnCloseDeadlinePassed(at(-1), deadline)).toBe(false);
+    expect(limitOnCloseDeadlinePassed(at(0), deadline)).toBe(true);
+    expect(limitOnCloseDeadlinePassed(at(1), deadline)).toBe(true);
   });
 });
 

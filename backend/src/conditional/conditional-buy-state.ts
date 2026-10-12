@@ -1,5 +1,6 @@
 import { createApiError } from '../common/api-error';
 import { Prisma } from '../generated/prisma/client';
+import { conditionalBuyWindowExpired } from './conditional-buy-policy';
 
 /** Watching or triggered-but-not-yet-ordered. Nothing else can act. */
 export const liveConditionalBuy = {
@@ -38,8 +39,9 @@ export type ConditionalBuyOrderIntent = {
 
 /**
  * Internal worker capability inside the ordinary order create transaction,
- * after the account/lifecycle fence: the watch must still be triggered and
- * the request must be exactly the registered intent. A concurrent user cancel
+ * after the account/lifecycle fence: the watch must still be triggered, the
+ * request must be exactly the registered intent, and the 30 s window must
+ * still be open at the DB clock after this lock. A concurrent user cancel
  * either committed first (this create fails) or waits behind this lock.
  */
 export async function lockTriggeredConditionalBuy(
@@ -68,7 +70,29 @@ export async function lockTriggeredConditionalBuy(
       'The conditional order changed before execution.',
       409,
     );
+  await assertConditionalBuyExecutionWindow(tx, row.triggeredAt);
   return row;
+}
+
+/**
+ * The execution window at the create transaction's DB clock. Checked after
+ * the watch lock and again as the transaction's last statement, so neither a
+ * slow quote nor a lock wait during the writes turns a trigger 30 s old or
+ * older into an order. A committed create replays before either check.
+ */
+export async function assertConditionalBuyExecutionWindow(
+  tx: Prisma.TransactionClient,
+  triggeredAt: Date | null,
+) {
+  const [{ now }] = await tx.$queryRaw<
+    Array<{ now: Date }>
+  >`SELECT clock_timestamp() AS "now"`;
+  if (!triggeredAt || conditionalBuyWindowExpired(triggeredAt, now))
+    throw createApiError(
+      'CONDITIONAL_BUY_EXECUTION_WINDOW_EXPIRED',
+      'The conditional order trigger is too old to execute.',
+      409,
+    );
 }
 
 /** Same transaction as the Order insert; the Order is the settlement record. */

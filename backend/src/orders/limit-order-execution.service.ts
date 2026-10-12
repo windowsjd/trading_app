@@ -71,6 +71,7 @@ import {
   decideLimitOnClose,
   LOC_DECISION_REASONS,
   LOC_EVIDENCE_POLICY_VERSION,
+  limitOnCloseDeadlinePassed,
   resolveBoundLimitOnCloseSession,
 } from './limit-on-close.policy';
 import { getAssetTradingStatus } from './market-hours.policy';
@@ -81,6 +82,11 @@ import {
 } from './limit-order-matching-diagnostics';
 
 const ZERO_MONEY = '0.00000000';
+/** Skip reason of a LOC fill at or after its evidence deadline. */
+const LOC_DEADLINE_PASSED = 'limit_on_close_deadline_passed';
+/** Rolls back a LOC fill whose deadline passed while it waited during its own
+ * writes; reported as the same skip as the check before them. */
+class LimitOnCloseDeadlinePassed extends Error {}
 
 /**
  * The price basis a fill commits against, chosen by the matching service:
@@ -521,6 +527,16 @@ export class LimitOrderExecutionService {
         // LOC: only final, immutable dated close evidence of the exact bound
         // session, observed after that session's CURRENT calendar close.
         stage = 'session_close_validation';
+        // The evidence deadline bounds the fill itself; the settlement worker
+        // then releases the reservation (`loc_fill_not_permitted`).
+        if (
+          limitOnClose &&
+          limitOnCloseDeadlinePassed(
+            transactionNow,
+            limitOnClose.evidenceDeadlineAt,
+          )
+        )
+          return { state: 'skipped', orderId, reason: LOC_DEADLINE_PASSED };
         const evidence = await tx.sessionClosePriceEvidence.findUnique({
           where: { id: plan.closeEvidenceId },
         });
@@ -868,6 +884,16 @@ export class LimitOrderExecutionService {
         // Persist the snapshot under the fill's verified account owner.
         tradingAccountId,
       );
+      // Last statement before COMMIT: a lock wait during the writes above
+      // cannot carry a LOC fill past its deadline (the whole fill rolls back).
+      if (
+        limitOnClose &&
+        limitOnCloseDeadlinePassed(
+          await this.readTransactionWallClock(tx),
+          limitOnClose.evidenceDeadlineAt,
+        )
+      )
+        throw new LimitOnCloseDeadlinePassed();
 
       return {
         state: 'filled',
@@ -887,7 +913,9 @@ export class LimitOrderExecutionService {
           throw error;
         }),
       )
-      .catch((error: unknown) => {
+      .catch((error: unknown): LimitFillOutcome => {
+        if (error instanceof LimitOnCloseDeadlinePassed)
+          return { state: 'skipped', orderId, reason: LOC_DEADLINE_PASSED };
         // Begin/commit failures occur outside the callback. Keep callback stages
         // when present, without wrapping or changing the thrown exception.
         if (error !== callbackFailure)
