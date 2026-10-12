@@ -41,6 +41,40 @@ import { resolve } from 'node:path';
 type Finding = { code: string; accountId: string; rowId?: string };
 const d = (v: any) => new Prisma.Decimal(v ?? '0');
 const round = (v: Prisma.Decimal) => roundDecimalHalfUp(v, 8);
+type FxAuditInput = {
+  fromCurrency: 'KRW' | 'USD';
+  toCurrency: 'KRW' | 'USD';
+  sourceAmount: string | Prisma.Decimal;
+  appliedRate: string | Prisma.Decimal;
+  feeRate: string | Prisma.Decimal;
+};
+
+/** Reconstruct from immutable source/rate/fee evidence, with exact round8.
+ * Provider FX rounds its raw gross, fee and net only at persistence
+ * (FxService.buildProviderFxExecutePlan). Standalone and FX+Transfer both use
+ * that core. Never feed a persisted rounded field back into the calculation
+ * or allow a tolerance.
+ */
+export function fxAuditAmounts(input: FxAuditInput) {
+  const grossTargetAmount = calculateGrossTargetAmount(input);
+  const gross =
+    input.fromCurrency === 'KRW'
+      ? d(input.sourceAmount).div(input.appliedRate)
+      : d(input.sourceAmount).mul(input.appliedRate);
+  const fee = gross.mul(input.feeRate);
+  return {
+    grossTargetAmount,
+    feeAmount: calculateFeeAmount({
+      grossTargetAmount: gross,
+      feeRate: input.feeRate,
+    }),
+    netTargetAmount: calculateNetTargetAmount({
+      grossTargetAmount: gross,
+      feeAmount: fee,
+    }),
+  };
+}
+
 /** Reconstructs the exact ledger balance chain, including multiple legs with
  * the SAME timestamp. UUID order is not an economic/transaction order. */
 export function ledgerChain(
@@ -887,34 +921,18 @@ export async function audit(
             where: { tradingAccountId: id },
           });
           for (const x of exchanges) {
+            const expected = fxAuditAmounts(x);
             equal(
               x.grossTargetAmount,
-              calculateGrossTargetAmount({
-                fromCurrency: x.fromCurrency,
-                toCurrency: x.toCurrency,
-                sourceAmount: x.sourceAmount,
-                appliedRate: x.appliedRate,
-              }),
+              expected.grossTargetAmount,
               'FX_GROSS',
               id,
               x.id,
             );
-            equal(
-              x.feeAmount,
-              calculateFeeAmount({
-                grossTargetAmount: x.grossTargetAmount,
-                feeRate: x.feeRate,
-              }),
-              'FX_FEE',
-              id,
-              x.id,
-            );
+            equal(x.feeAmount, expected.feeAmount, 'FX_FEE', id, x.id);
             equal(
               x.netTargetAmount,
-              calculateNetTargetAmount({
-                grossTargetAmount: x.grossTargetAmount,
-                feeAmount: x.feeAmount,
-              }),
+              expected.netTargetAmount,
               'FX_NET',
               id,
               x.id,

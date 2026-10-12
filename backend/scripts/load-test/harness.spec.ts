@@ -8,7 +8,9 @@ import {
   type Credentials,
 } from './manifest';
 import { Histogram, Metrics } from './metrics';
-import { ledgerChain } from './audit';
+import { ledgerChain, fxAuditAmounts } from './audit';
+import { FxService } from '../../src/fx/fx.service';
+import { Prisma } from '../../src/generated/prisma/client';
 import { providerFrames, Replay } from './replay';
 import { parseBinanceAggTrade } from '../../src/futures/futures-last-price';
 import { parseBinanceMark } from '../../src/futures/futures-mark';
@@ -266,6 +268,72 @@ describe('workload, histogram and exact financial checks', () => {
     expect(ledgerChain(rows, '8')).toBe(true);
     expect(ledgerChain(rows, '8.00000001')).toBe(false);
     expect(ledgerChain([...rows, rows[0]], '6')).toBe(false);
+  });
+  it('audits standalone provider FX at its existing persistence rounding boundary', () => {
+    const input = {
+      fromCurrency: 'KRW' as const,
+      toCurrency: 'USD' as const,
+      sourceAmount: '1400000',
+      appliedRate: '1400.5',
+      feeRate: '0.001000',
+    };
+    // Execute the actual unchanged financial calculation, rather than the
+    // historical helper that the provider execute path no longer calls.
+    const service = new FxService({} as never) as unknown as {
+      buildProviderFxExecutePlan(input: unknown): {
+        grossTargetAmount: string;
+        feeAmount: string;
+        netTargetAmount: string;
+      };
+    };
+    const plan = service.buildProviderFxExecutePlan({
+      normalizedRequest: { ...input, userId: 'user', idempotencyKey: 'key' },
+      quote: {
+        quotedRate: new Prisma.Decimal(input.appliedRate),
+        maxChangeBps: 30,
+      },
+      sourceWallet: {
+        id: 'source',
+        currencyCode: 'KRW',
+        balanceAmount: '2000000',
+      },
+      targetWallet: { id: 'target', currencyCode: 'USD', balanceAmount: '0' },
+      fxFeeRate: input.feeRate,
+      providerSnapshot: {
+        id: 'rate',
+        sourceType: 'provider_api',
+        rate: new Prisma.Decimal(input.appliedRate),
+        capturedAt: new Date(),
+        effectiveAt: new Date(),
+        sourceDecision: {
+          sourceType: 'provider_api',
+          sourceName: 'exchange_rate_api_usd_krw',
+        },
+      },
+      executeNow: new Date(),
+    });
+    const expected = fxAuditAmounts(input);
+    expect(expected.grossTargetAmount).toBe('999.64298465');
+    expect(expected.feeAmount).toBe('0.99964298');
+    expect(expected.netTargetAmount).toBe('998.64334166');
+    for (const key of [
+      'grossTargetAmount',
+      'feeAmount',
+      'netTargetAmount',
+    ] as const) {
+      expect(plan[key]).toBe(expected[key]);
+      // A single storage unit of damage must still fail exact equality.
+      expect(
+        new Prisma.Decimal(plan[key]).add('0.00000001').eq(expected[key]),
+      ).toBe(false);
+    }
+    expect(
+      new Prisma.Decimal(expected.grossTargetAmount)
+        .sub(expected.feeAmount)
+        .toFixed(8),
+    ).toBe('998.64334167');
+    expect(() => fxAuditAmounts({ ...input, feeRate: '-0.001' })).toThrow();
+    expect(() => fxAuditAmounts({ ...input, feeRate: '2' })).toThrow();
   });
   it('separates correctness / performance / capacity and invalidates missing workload', () => {
     const metrics = new Metrics();
