@@ -27,7 +27,11 @@ export function QuestStack() {
 export default function GuideStack({ beginner = false }: { beginner?: boolean } = {}) {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="GuideStack" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
+    // Lesson titles (시장기초, 호가창과 체결…) use the tab headers' 700-weight
+    // theme font instead of the platform's lighter default stack title.
+    <Stack.Navigator id="GuideStack" screenOptions={({ theme }) => ({
+      ...stackTransition(reducedMotion, Platform.OS), headerTitleStyle: theme.fonts.heavy,
+    })} screenLayout={stackScreenLayout}>
       <Stack.Screen
         name="Guide"
         component={beginner ? BeginnerLearningScreen : GuideScreen}

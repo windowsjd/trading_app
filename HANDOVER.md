@@ -10,6 +10,21 @@
 
 ---
 
+## 2026-10-12 가이드 화면 정리·체결괴리 방지시스템 공지
+
+- **기능 구현 의도:** 가이드를 간결하게(중복 문구 삭제, 학습 시작 CTA 명확화), 체험이 모의투자임을 분명히 하고 공지와 연결하며,
+  가이드의 매수 버튼을 앱의 그라데이션 CTA로 통일한다. 거래·체결·호가·서버 API는 변경하지 않는다.
+- 시작 `main`=`origin/main`=원격 `9570c499`, clean. frontend만, 커밋·push 없음.
+- 카드: `LessonUi.GuideCard` 하나로 메인/상세 통일(큰 번호 26/800, '학습 시작' 보조 표면 버튼, **카드 전체가 하나의 터치 대상**).
+  '기초 가이드'·소개 문구·'이용 가능' 삭제. `GuideStack` 헤더 제목은 테마 `fonts.heavy`(700).
+- **공지:** API·데이터가 없어 정적 `features/notice/notices.ts`(id는 `constants/noticeIds.ts`). 전체 > 공지사항은 제자리 펼침 목록이고
+  `Notices { noticeId }`가 그 공지를 펼치고 스크롤한다. 호가창과 체결의 안내 줄(전체가 `link`)이 `MyTab > Notices`(initial:false)로
+  이동, 뒤로가기는 전체, 가이드 탭 상태는 유지. 공지 문구는 실제 정책(최신 실제 시세 재확인·오래된 시세 미체결·현물 변동 허용 범위)만 쓴다.
+- **정책 변경:** 가이드 매수 실습 버튼 6개는 이제 Primary 그라데이션(2026-10-04의 '금융 연습 제외'를 이 범위에서 변경,
+  `frontend/docs/pressed-feedback.md` 2026-10-12 절). 시장 사건 버튼과 실제 주문 화면 버튼은 그대로.
+- 검증: lint 2종(새 notice 모듈 gate 추가)·typecheck PASS, `npm test` 2323/0/0, Web 렌더 18조합 + 링크 왕복. Android/iOS 실기기 NOT_RUN.
+  상세: [가이드·공지 정리](frontend/docs/guide-notice-ui-2026-10-12.md)
+
 ## 2026-10-12 Trading Class UI/UX 보충 9개 (15–23)
 
 - **기능 구현 의도:** 14개 개선 위에서 홈·랭킹·주문의 정보 구조를 정리한다. 서버 금융 값·정책·API는 그대로 두고 표시만 바꾼다.

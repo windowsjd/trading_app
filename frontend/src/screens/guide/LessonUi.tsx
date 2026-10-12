@@ -49,6 +49,8 @@ export const lessonStyles = StyleSheet.create({
     color: semantic.onAccent,
     flexShrink: 1,
   },
+  // The app's gradient CTA shape (CTAButton): its radius and no edge line.
+  gradientAction: { borderRadius: 12, borderColor: 'transparent' },
   secondary: { backgroundColor: semantic.raised },
   secondaryText: { color: semantic.secondary },
   disabled: { opacity: 0.6 },
@@ -82,6 +84,44 @@ export const lessonStyles = StyleSheet.create({
     fontWeight: '700',
     color: semantic.text,
     fontVariant: ['tabular-nums'],
+  },
+  guideCard: {
+    padding: 16,
+    borderWidth: 1,
+    borderColor: semantic.border,
+    borderRadius: 14,
+    gap: 10,
+    backgroundColor: semantic.surface,
+    minWidth: 0,
+  },
+  // The number leads the title on one baseline; large text wraps the title below.
+  guideHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 10, minWidth: 0 },
+  guideNumber: {
+    fontSize: 26,
+    lineHeight: 37,
+    fontWeight: '800',
+    color: semantic.secondaryActionForeground,
+    fontVariant: ['tabular-nums'],
+  },
+  guideTitle: { flexShrink: 1, minWidth: 0, fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
+  // The app's secondary action surface (Home 자세히 보기): a visible button
+  // that does not compete with the screen's primary actions.
+  start: {
+    minHeight: 44,
+    marginTop: 2,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: semantic.secondaryActionSurface,
+  },
+  startText: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontWeight: '700',
+    textAlign: 'center',
+    color: semantic.secondaryActionForeground,
   },
 });
 const s = lessonStyles;
@@ -164,6 +204,46 @@ export function Result({
     </View>
   );
 }
+/**
+ * A guide or chapter card: number, title, description and a 학습 시작
+ * button. The whole card stays the one touch target (no nested buttons); the
+ * button is its visible action.
+ */
+export function GuideCard({
+  number,
+  title,
+  description,
+  testID,
+  accessibilityHint,
+  onPress,
+}: {
+  number: string;
+  title: string;
+  description: string;
+  testID: string;
+  accessibilityHint: string;
+  onPress: () => void;
+}) {
+  return (
+    <ActionPressable
+      testID={testID}
+      style={s.guideCard}
+      accessibilityRole="button"
+      accessibilityLabel={`${number} ${title}. ${description}. 학습 시작`}
+      accessibilityHint={accessibilityHint}
+      onPress={onPress}
+    >
+      <View style={s.guideHeading}>
+        <Text style={s.guideNumber}>{number}</Text>
+        <Text style={s.guideTitle}>{title}</Text>
+      </View>
+      <Text style={s.body}>{description}</Text>
+      <View testID={`${testID}-start`} style={s.start}>
+        <Text style={s.startText}>학습 시작</Text>
+      </View>
+    </ActionPressable>
+  );
+}
 export function Body({ children }: React.PropsWithChildren) {
   return <Text style={s.body}>{children}</Text>;
 }
@@ -184,16 +264,17 @@ export function LessonAction({
   selected?: boolean;
   primary?: boolean;
 }) {
+  const gradient = primary && !secondary && selected === undefined;
   return (
     <ActionPressable
-      primary={primary && !secondary && selected === undefined}
+      primary={gradient}
       testID={id}
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled, selected }}
       disabled={disabled}
       onPress={onPress}
-      style={[s.action, secondary && s.secondary, disabled && s.disabled]}
+      style={[s.action, gradient && s.gradientAction, secondary && s.secondary, disabled && s.disabled]}
     >
       <Text style={[s.actionText, secondary && s.secondaryText]}>{label}</Text>
     </ActionPressable>

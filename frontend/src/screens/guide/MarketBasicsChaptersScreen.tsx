@@ -1,9 +1,7 @@
 import React from 'react';
-import { Text } from '../../theme/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { GuideStackParamList } from '../../app/navigation/types';
-import ActionPressable from '../../components/common/ActionPressable';
-import { Body, LessonPage, lessonStyles as s } from './LessonUi';
+import { Body, GuideCard, LessonPage } from './LessonUi';
 
 const chapters = [
   {
@@ -25,19 +23,15 @@ export default function MarketBasicsChaptersScreen({
     <LessonPage id="guide-market-chapters">
       <Body>실제 주문과 체결 과정을 통해 시장 가격이 형성되는 구조를 학습합니다.</Body>
       {chapters.map((chapter, i) => (
-        <ActionPressable
+        <GuideCard
           key={chapter.route}
           testID={`guide-chapter-${chapter.route}`}
-          accessibilityRole="button"
-          accessibilityLabel={`${i + 1}. ${chapter.title}. ${chapter.description}`}
+          number={`0${i + 1}`}
+          title={chapter.title}
+          description={chapter.description}
+          accessibilityHint={`${chapter.title} 학습을 시작합니다.`}
           onPress={() => navigation.navigate(chapter.route)}
-          style={s.card}
-        >
-          <Text style={s.helper}>0{i + 1}</Text>
-          <Text style={s.heading}>{chapter.title}</Text>
-          <Text style={s.body}>{chapter.description}</Text>
-          <Text style={[s.helper, s.bold]}>학습 시작 →</Text>
-        </ActionPressable>
+        />
       ))}
     </LessonPage>
   );

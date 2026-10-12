@@ -206,6 +206,31 @@ describe('local guide calculations', () => {
   });
 });
 
+describe('guide buy executions on the app gradient', () => {
+  const gradient = (h: any, id: string) =>
+    h.find(id).findAll((node: any) => node.type === 'LinearGradient').length === 1;
+  it('liquidity: both buys use the gradient, the cancellation event stays plain', (t) => {
+    const h = setup(t, 'LiquidityScreen');
+    assert.equal(gradient(h, 'liquidity-compare-run'), true);
+    h.press('liquidity-compare-run');
+    h.finish();
+    assert.equal(gradient(h, 'liquidity-cancel-run'), false);
+    h.press('liquidity-cancel-run');
+    assert.equal(gradient(h, 'liquidity-trade-run'), true);
+  });
+  it('order types: market and limit buys use the gradient, simulated sellers stay plain', (t) => {
+    const h = setup(t, 'OrderTypesScreen');
+    assert.equal(gradient(h, 'orders-market-run'), true);
+    h.press('orders-market-run');
+    h.finish();
+    assert.equal(gradient(h, 'orders-limit-register'), true);
+    h.press('orders-limit-register');
+    assert.equal(gradient(h, 'orders-quotes-run'), false);
+    h.press('orders-quotes-run');
+    assert.equal(gradient(h, 'orders-limit-run'), false);
+  });
+});
+
 describe('continuous guide interactions', () => {
   it('opens the two market chapters through existing ActionPressable cards', (t) => {
     const h = setup(t, 'MarketBasicsChaptersScreen');

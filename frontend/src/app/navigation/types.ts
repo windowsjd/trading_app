@@ -75,7 +75,8 @@ export type MyStackParamList = {
   Overall: undefined;
   Record: NavigatorScreenParams<RecordStackParamList> | undefined;
   Friends: undefined;
-  Notices: undefined;
+  /** `noticeId` opens and scrolls to that notice (links from guides). */
+  Notices: { noticeId?: string } | undefined;
   Inquiry: undefined;
   UserSeasonSummary: { userId: string };
   My: undefined;

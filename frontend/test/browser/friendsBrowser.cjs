@@ -97,7 +97,7 @@ async function main() {
                 : screen === 'friends'
                   ? '친구 목록'
                   : screen === 'notices'
-                    ? '등록된 공지사항이 없습니다.'
+                    ? '체결괴리 방지시스템 안내'
                     : screen === 'settings'
                       ? '닉네임 변경'
                       : '최근 30일 자산 / 수익률 추이',

@@ -1,10 +1,10 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, Platform } from '../../theme/native';
+import { SafeAreaView, ScrollView, StyleSheet, Platform } from '../../theme/native';
 import { getScreenContentStyle } from '../../theme/screenLayout';
 
 import type { GuideScreenProps } from '../../app/navigation/types';
-import ActionPressable from '../../components/common/ActionPressable';
+import { GuideCard } from './LessonUi';
 import { guideTopics, type GuideTopic } from './guideTopics';
 import { TEST_IDS } from '../../constants/testIds';
 
@@ -26,30 +26,21 @@ const availableGuides = [
   })),
 ] as const;
 
+// The header already says 가이드: the list starts with the cards.
 export default function GuideScreen({ navigation }: GuideScreenProps) {
   return (
     <SafeAreaView style={styles.container} testID={TEST_IDS.guide.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.introduction}>
-          시장 구조와 투자에 필요한 핵심 개념을 직접 체험하며 학습합니다.
-        </Text>
-        <Text accessibilityRole="header" style={styles.sectionTitle}>기초 가이드</Text>
-
         {availableGuides.map((guide) => (
-          <ActionPressable
+          <GuideCard
             key={guide.route}
             testID={guide.id}
-            style={styles.card}
-            accessibilityRole="button"
-            accessibilityLabel={`${guide.number} ${guide.title}. 이용 가능. ${guide.description}`}
+            number={guide.number}
+            title={guide.title}
+            description={guide.description}
             accessibilityHint={`${guide.title} 가이드를 엽니다.`}
             onPress={() => navigation.navigate(guide.route)}
-          >
-            <Text style={styles.number}>{guide.number}</Text>
-            <Text style={styles.title}>{guide.title}</Text>
-            <Text style={styles.description}>{guide.description}</Text>
-            <Text style={styles.available}>이용 가능 · 학습 시작 →</Text>
-          </ActionPressable>
+          />
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -59,18 +50,4 @@ export default function GuideScreen({ navigation }: GuideScreenProps) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 32, gap: 12 },
-  introduction: { fontSize: 16, lineHeight: 26, color: semantic.secondary, marginBottom: 12 },
-  sectionTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
-  card: {
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 14,
-    padding: 16,
-    backgroundColor: semantic.surface,
-    gap: 8,
-  },
-  number: { fontSize: 14, lineHeight: 22, fontWeight: '600', color: semantic.secondary },
-  title: { fontSize: 20, lineHeight: 28, fontWeight: '700', color: semantic.text },
-  description: { fontSize: 16, lineHeight: 26, color: semantic.secondary },
-  available: { fontSize: 14, lineHeight: 23, color: semantic.secondary, fontWeight: '700', marginTop: 4 },
 });

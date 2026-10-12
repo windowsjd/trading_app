@@ -27,7 +27,11 @@ for (const [stack, root, label, icon] of [
         .map(match => [match[2], { default: match[1], __esModule: true }])),
     };
     const tree = load(file, mocks).default();
-    assert.deepEqual(tree.props.screenOptions, { animation: 'none' });
+    // Guide lesson titles take the tab headers' heavy theme font; transitions stay native.
+    const options = typeof tree.props.screenOptions === 'function'
+      ? tree.props.screenOptions({ theme: navigationTheme.useTheme() }) : tree.props.screenOptions;
+    assert.deepEqual(options, stack === 'Guide'
+      ? { animation: 'none', headerTitleStyle: { fontFamily: 'System', fontWeight: '700' } } : { animation: 'none' });
     const screens = elements(tree, 'Screen');
     const first = screens.find(screen => screen.props.name === root);
     assert.equal(first.props.options.title, label);

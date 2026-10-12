@@ -21,9 +21,11 @@ function setup(t: TestContext, home = false) {
       useFocusEffect: (effect: () => void) => React.useEffect(() => h.focused ? effect() : undefined, [effect, h.focused]),
     },
   });
+  h.rootRoutes = [];
   h.Screen = h.load(`src/screens/guide/${home ? 'GuideScreen' : 'MarketBasicsScreen'}.tsx`, {
     './useOrderBookLesson': lessonModule,
     '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
+    '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate: (...args: any[]) => h.rootRoutes.push(args) }) },
   }).default;
   h.routes = [];
   h.props = { navigation: { navigate: (route: string) => h.routes.push(route) } };
@@ -31,7 +33,16 @@ function setup(t: TestContext, home = false) {
   h.find = (id: string) => h.renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID === id)[0];
   h.tick = (milliseconds: number) => act(() => t.mock.timers.tick(milliseconds));
   h.press = (id: string) => act(() => h.find(id).props.onPress());
-  h.text = () => JSON.stringify(h.renderer.toJSON());
+  // Gradient buttons carry Animated style nodes (cyclic): keep each object once.
+  h.text = () => {
+    const seen = new WeakSet();
+    return JSON.stringify(h.renderer.toJSON(), (_key, value) => {
+      if (typeof value !== 'object' || value === null) return value;
+      if (seen.has(value)) return undefined;
+      seen.add(value);
+      return value;
+    });
+  };
   h.update = () => act(() => h.renderer.update(React.createElement(h.Screen, h.props)));
   h.layout = (id: string, layout: { y?: number; height?: number }) => act(() =>
     h.find(id).props.onLayout({ nativeEvent: { layout } }),
@@ -446,13 +457,61 @@ describe('guide home and market basics lesson', () => {
     assert.equal(h.scrolls.length, 0, 'a fill alone does not force a scroll');
   });
 
+  it('states the simulation, links its protection notice and runs both buys on the app gradient', (t) => {
+    const h = setup(t);
+    const texts = h.renderer.root.findAllByType('Text').map(textContent);
+    assert.equal(texts.includes('호가창은 현재 거래소에 제출되어 대기 중인 주문을 보여줍니다.'), false);
+    const link = h.find(ids.executionGapLink);
+    assert.equal(link.props.accessibilityRole, 'link');
+    assert.equal(link.props.accessibilityLabel, '모의투자에서 발생하는 거래는 실제 호가창에 적용되지 않습니다. 대신 체결괴리 방지시스템이 적용됩니다.');
+    assert.equal(textContent(link), '모의투자에서 발생하는 거래는 실제 호가창에 적용되지 않습니다. 대신 체결괴리 방지시스템이 적용됩니다.');
+    const term = link.findAll((node: any) => node.type === 'Text' && node.props.children === '체결괴리 방지시스템')[0];
+    const style = flatten(term.props.style);
+    assert.equal(style.textDecorationLine, 'underline', 'the link reads as a link, not body text');
+    assert.equal(style.fontWeight, '700');
+    assert.equal(flatten(link.props.style).minHeight >= 44, true);
+    h.press(ids.executionGapLink);
+    assert.deepEqual(h.rootRoutes, [['MainTabs', { screen: 'MyTab', params: {
+      screen: 'Notices', initial: false, params: { noticeId: 'execution-gap-protection' },
+    } }]]);
+    const gradient = (id: string) => h.find(id).findAll((node: any) => node.type === 'LinearGradient').length === 1;
+    assert.equal(gradient(ids.buyThree), true);
+    h.press(ids.buyThree);
+    h.tick(1000);
+    h.tick(1300);
+    assert.equal(gradient(ids.buyEight), true);
+  });
+
   it('enlarges home typography without restricting card text or button labels', (t) => {
     const h = setup(t, true);
     assertReadableText(h);
     assert.equal(h.renderer.root.findAllByType('ScrollView').length, 1);
-    for (const label of ['기초 가이드', '시장기초', '캔들', '주문방식', '주식특성']) {
-      const text = h.renderer.root.findAllByType('Text').find((node: any) => node.props.children === label);
+    const texts = h.renderer.root.findAllByType('Text');
+    // The header already says 가이드: no repeated introduction or section title.
+    for (const removed of ['기초 가이드', '시장 구조와 투자에 필요한 핵심 개념을 직접 체험하며 학습합니다.']) {
+      assert.equal(texts.some((node: any) => textContent(node) === removed), false, removed);
+    }
+    assert.equal(texts.some((node: any) => textContent(node).includes('이용 가능')), false);
+    for (const label of ['시장기초', '캔들', '주문방식', '주식특성']) {
+      const text = texts.find((node: any) => node.props.children === label);
       assert.ok(flatten(text.props.style).fontSize >= 19);
+    }
+    // Each card: a larger number than before (14) that stays below a heavy title
+    // in weight balance, and a visible 학습 시작 button inside the one touch target.
+    const numbers = texts.filter((node: any) => /^0\d$/.test(textContent(node)));
+    assert.equal(numbers.length, 6);
+    for (const number of numbers) {
+      const style = flatten(number.props.style);
+      assert.equal(style.fontSize > 20 && style.fontSize <= 28, true);
+      assert.equal(style.fontWeight, '800');
+    }
+    const cards = h.renderer.root.findAllByType('Pressable');
+    for (const card of cards) {
+      const start = card.findAll((node: any) => typeof node.type === 'string' && node.props.testID === `${card.props.testID}-start`)[0];
+      assert.equal(start !== undefined && textContent(start) === '학습 시작', true, card.props.testID);
+      assert.equal(flatten(start.props.style).minHeight >= 44, true);
+      assert.match(card.props.accessibilityLabel, /학습 시작$/);
+      assert.doesNotMatch(card.props.accessibilityLabel, /이용 가능/);
     }
     for (const text of h.renderer.root.findAllByType('Text')) {
       if (textContent(text).endsWith('합니다.') || textContent(text).endsWith('살펴봅니다.')) {

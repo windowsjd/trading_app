@@ -11,7 +11,9 @@ import {
 } from '../../theme/native';
 
 import ActionPressable from '../../components/common/ActionPressable';
+import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { TEST_IDS } from '../../constants/testIds';
+import { NOTICE_IDS } from '../../constants/noticeIds';
 import { LESSON_BIDS, useOrderBookLesson, type Quote } from './useOrderBookLesson';
 
 const terms = [
@@ -30,6 +32,8 @@ const takeaways = [
   '매수 주문이 더 높은 가격대의 매도호가까지 순차적으로 체결되면 현재가가 상승할 수 있습니다.',
   '평균 매입단가는 체결가격과 수량을 함께 반영합니다. 이번 주문의 평균 체결가와 전체 보유 평단가는 계산에 포함하는 범위가 다릅니다.',
 ];
+
+const SIMULATION_NOTICE = '모의투자에서 발생하는 거래는 실제 호가창에 적용되지 않습니다. 대신 체결괴리 방지시스템이 적용됩니다.';
 
 const won = (price: number) => `${price.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원`;
 
@@ -222,6 +226,7 @@ function PurchaseSummary({ values: { frame, order, holding }, snapshot = false }
 }
 
 export default function MarketBasicsScreen() {
+  const rootNavigation = useRootNavigation();
   const lesson = useOrderBookLesson();
   const { frame, running, firstComplete, complete, order, holding } = lesson;
   // A display-only snapshot taken at the second button press. The hook remains
@@ -293,9 +298,23 @@ export default function MarketBasicsScreen() {
             {'\n\n'}이때 각 가격대에 대기 중인 주문의 분포와 실제 체결 흐름을 확인할 수 있는 화면이{' '}
             <Text style={styles.bold}>호가창(Order Book)</Text>입니다.
           </Text>
-          <Text style={styles.helper}>
-            호가창은 현재 거래소에 제출되어 대기 중인 주문을 보여줍니다.
-          </Text>
+          {/* The whole line is the link's touch target; the term is styled as the link. */}
+          <ActionPressable
+            testID={TEST_IDS.guide.executionGapLink}
+            style={styles.simulationNotice}
+            accessibilityRole="link"
+            accessibilityLabel={SIMULATION_NOTICE}
+            accessibilityHint="공지사항의 체결괴리 방지시스템 안내로 이동합니다."
+            onPress={() => rootNavigation.navigate('MainTabs', {
+              screen: 'MyTab',
+              params: { screen: 'Notices', initial: false, params: { noticeId: NOTICE_IDS.executionGapProtection } },
+            })}
+          >
+            <Text style={styles.helper}>
+              모의투자에서 발생하는 거래는 실제 호가창에 적용되지 않습니다. 대신{' '}
+              <Text style={styles.link}>체결괴리 방지시스템</Text>이 적용됩니다.
+            </Text>
+          </ActionPressable>
         </View>
 
         <View
@@ -313,6 +332,7 @@ export default function MarketBasicsScreen() {
           {renderBook(1, firstValues, firstComplete)}
           {!firstComplete ? (
             <ActionPressable
+              primary
               testID={TEST_IDS.guide.buyThree}
               style={[styles.button, running && styles.disabledButton]}
               accessibilityRole="button"
@@ -356,6 +376,7 @@ export default function MarketBasicsScreen() {
             {renderBook(2, lesson)}
             {!complete ? (
               <ActionPressable
+                primary
                 testID={TEST_IDS.guide.buyEight}
                 style={[styles.button, running && styles.disabledButton]}
                 accessibilityRole="button"
@@ -446,6 +467,8 @@ const styles = StyleSheet.create({
   summaryValue: { fontSize: 19, lineHeight: 28, fontWeight: '700', color: semantic.text, fontVariant: ['tabular-nums'] },
   body: { fontSize: 16, lineHeight: 27, color: semantic.secondary },
   helper: { fontSize: 14, lineHeight: 23, color: semantic.secondary },
+  simulationNotice: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: semantic.raised },
+  link: { color: semantic.secondaryActionForeground, fontWeight: '700', textDecorationLine: 'underline' },
   bold: { fontWeight: '700' },
   book: { backgroundColor: semantic.surface, borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 12, gap: 4 },
   bookHeading: { gap: 4, marginBottom: 8 },

@@ -127,7 +127,6 @@ function OrderTypesLesson() {
           확인하세요.
         </Body>
         <LessonAction
-          primary={false}
           id="orders-market-run"
           label="12주 시장가 매수 실행"
           onPress={market.start}
@@ -163,7 +162,6 @@ function OrderTypesLesson() {
             이하에서만 10주를 매수하도록 가격 조건을 둡니다.
           </Body>
           <LessonAction
-            primary={false}
             id="orders-limit-register"
             label="9,990원에 10주 지정가 매수 등록"
             disabled={registered}
