@@ -856,7 +856,8 @@ export class SeasonSettlementJobService {
    * everything below commits or none of it does (작업 8 §14):
    *
    *   season row FOR UPDATE → status re-check → reservation re-check →
-   *   participant/account link verification → settlement EquitySnapshot →
+   *   participant/account link verification → eligible-set re-check of the
+   *   pre-computed rows (TC-D01) → settlement EquitySnapshot →
    *   final SeasonRanking (participant target + measured account) →
    *   participant final results →
    *   participant status transitions → season account closure →
@@ -973,6 +974,13 @@ export class SeasonSettlementJobService {
           'Final rankings disappeared before settlement status update.',
         );
       }
+
+      // TC-D01: the fresh rows were valued and ranked BEFORE this lock.
+      this.assertFinalRowsMatchEligibleParticipants(
+        input.seasonId,
+        input.finalRows,
+        eligibleAccountParticipants,
+      );
 
       // Resolved for ALL ranked participants up front; a broken link aborts the
       // settlement rather than producing a partial final ranking.
@@ -1496,6 +1504,62 @@ export class SeasonSettlementJobService {
         `${extra.length} final ranking row(s) belong to a participant that is not eligible for settlement (first: ${extra[0].seasonParticipantId})`,
       );
     }
+  }
+
+  /**
+   * TC-D01: freshly computed final rows must cover EXACTLY the participants
+   * that are eligible under the season lock.
+   *
+   * Valuation runs before the lock so it does not block trading for its whole
+   * duration. An exclusion that commits in between shrinks the competing set,
+   * and with it every rank below the excluded participant and every tier
+   * cutoff. Publishing the rows would rank an excluded participant (or leave
+   * an eligible one unranked). Nothing has been written yet, so the settlement
+   * stops with a retryable conflict and the next run values the current set:
+   * a scheduled run retries on its next tick (new key per tick), a manual run
+   * is re-run with a new idempotency key like any failed batch job.
+   */
+  private assertFinalRowsMatchEligibleParticipants(
+    seasonId: string,
+    finalRows: readonly FinalRankingRow[],
+    eligibleParticipants: readonly SettlementAccountParticipant[],
+  ): void {
+    const rankedIds = new Set(finalRows.map((row) => row.seasonParticipantId));
+    const eligibleIds = new Set(
+      eligibleParticipants.map((participant) => participant.id),
+    );
+    const noLongerEligible = finalRows.filter(
+      (row) => !eligibleIds.has(row.seasonParticipantId),
+    );
+    const unranked = eligibleParticipants.filter(
+      (participant) => !rankedIds.has(participant.id),
+    );
+
+    if (
+      rankedIds.size === finalRows.length &&
+      noLongerEligible.length === 0 &&
+      unranked.length === 0
+    ) {
+      return;
+    }
+
+    this.logger.warn(
+      JSON.stringify({
+        event: 'season_settlement_participants_changed',
+        seasonId,
+        rankedCount: finalRows.length,
+        eligibleCount: eligibleParticipants.length,
+        noLongerEligibleCount: noLongerEligible.length,
+        unrankedCount: unranked.length,
+        recovery:
+          're-run settlement; it values the participant set as it stands now',
+      }),
+    );
+    this.throwJobError(
+      HttpStatus.CONFLICT,
+      'SETTLEMENT_PARTICIPANTS_CHANGED',
+      `Season ${seasonId} participants changed after final valuation (${noLongerEligible.length} no longer eligible, ${unranked.length} unranked); nothing was settled. Re-run settlement to value the current participant set.`,
+    );
   }
 
   /**

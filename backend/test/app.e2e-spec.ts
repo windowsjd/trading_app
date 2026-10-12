@@ -31,6 +31,10 @@ jest.mock('../src/generated/prisma/client', () => {
       official_batch: 'official_batch',
       provider_api: 'provider_api',
     },
+    // Read at module load (INQUIRY_CATEGORIES); reuse the generated enum so
+    // the category set cannot drift from schema.prisma.
+    InquiryCategory: jest.requireActual('../src/generated/prisma/enums')
+      .InquiryCategory,
     OrderSide: {
       buy: 'buy',
       sell: 'sell',
@@ -1978,6 +1982,15 @@ describe('AppController (e2e)', () => {
     prisma.seasonParticipant.findFirst.mockResolvedValueOnce(
       moderatedParticipant,
     );
+    // TC-D01: exclusion locks Season → Account → Participant before reading;
+    // the lock-target lookup returns the participant's account link.
+    prisma.$queryRaw.mockImplementation((strings: TemplateStringsArray) =>
+      Promise.resolve(
+        strings.join('?').includes('AS "tradingAccountId"')
+          ? [{ tradingAccountId: 'trading-account-1' }]
+          : [{ result: 1 }],
+      ),
+    );
     // Linked season trading account is suspended in the same transaction.
     prisma.tradingAccount.findUnique.mockResolvedValueOnce({
       id: 'trading-account-1',
@@ -2039,6 +2052,17 @@ describe('AppController (e2e)', () => {
           where: { tradingAccountId: 'trading-account-1', status: 'submitted' },
           orderBy: { id: 'asc' },
         });
+        const lockStatements = prisma.$queryRaw.mock.calls
+          .map(([strings]) => (strings as string[]).join('?'))
+          .filter((sql) => /FOR (SHARE|NO KEY UPDATE)/.test(sql));
+        expect(lockStatements.length).toBe(3);
+        expect(lockStatements[0].includes('FROM "seasons"')).toBe(true);
+        expect(lockStatements[1].includes('FROM "trading_accounts"')).toBe(
+          true,
+        );
+        expect(lockStatements[2].includes('FROM "season_participants"')).toBe(
+          true,
+        );
         expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
           expect.objectContaining({
             data: expect.objectContaining({

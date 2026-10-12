@@ -223,6 +223,7 @@ Success:
 Policy:
 
 - Only `active` and `ended` seasons can use general exclusion. `settled` seasons must use final result correction instead.
+- Exclusion locks the season row (`FOR SHARE`), the linked account and the participant before reading their state, so it serializes with final settlement: a request that waited for settlement to commit sees `settled` and returns `PARTICIPANT_EXCLUDE_NOT_ALLOWED`; a settlement that valued participants before an exclusion committed fails with `SETTLEMENT_PARTICIPANTS_CHANGED` and is re-run.
 - Exclusion sets `participantStatus=excluded`, stores the operator/reason/timestamp, and clears `currentRank`.
 - Existing orders, FX transactions, wallets, positions, and ledger rows remain intact.
 - Excluded participants are blocked from new order quote/create/execute and FX quote/execute.

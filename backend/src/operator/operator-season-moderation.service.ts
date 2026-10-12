@@ -90,6 +90,7 @@ type ModerationTransactionClient = Pick<
   | 'seasonRanking'
   | 'tradingAccount'
   | '$executeRaw'
+  | '$queryRaw'
 >;
 
 type ExcludedAccountSync = {
@@ -129,6 +130,12 @@ export class OperatorSeasonModerationService {
 
     try {
       return await this.prisma.$transaction(async (tx) => {
+        // Lock first, then read: the season status and account state that
+        // decide this exclusion must be the ones settlement sees (TC-D01).
+        const lockedTradingAccountId = await this.lockExclusionTarget(
+          tx,
+          target,
+        );
         const participant = await this.findParticipantOrThrow(tx, target);
         this.assertExcludeAllowed(participant);
 
@@ -138,6 +145,7 @@ export class OperatorSeasonModerationService {
         const accountSync = await this.syncExcludedParticipantTradingAccount(
           tx,
           participant,
+          lockedTradingAccountId,
         );
 
         const now = new Date();
@@ -478,12 +486,27 @@ export class OperatorSeasonModerationService {
    * account is never reverted. Any account/participant mismatch fails closed
    * instead of being overwritten. Pre-migration null links are handled only
    * by the explicit repair-links CLI.
+   *
+   * The account row is already locked by `lockExclusionTarget`, so the status
+   * read here cannot be overtaken by settlement closing the account.
    */
   private async syncExcludedParticipantTradingAccount(
     tx: ModerationTransactionClient,
     participant: ModeratedParticipant,
+    lockedTradingAccountId: string | null,
   ): Promise<ExcludedAccountSync> {
     const tradingAccountId = participant.tradingAccountId;
+
+    if (tradingAccountId !== lockedTradingAccountId) {
+      throw new SeasonTradingAccountLinkIntegrityError(
+        'Participant trading account link changed while acquiring exclusion locks.',
+        {
+          seasonParticipantId: participant.id,
+          tradingAccountId,
+          lockedTradingAccountId,
+        },
+      );
+    }
 
     const account = await tx.tradingAccount.findUnique({
       where: { id: tradingAccountId },
@@ -532,6 +555,54 @@ export class OperatorSeasonModerationService {
       afterTradingAccountStatus,
       tradingAccountLinkRepaired: false,
     };
+  }
+
+  /**
+   * TC-D01: exclusion joins the season serialization used by settlement.
+   *
+   * Settlement fixes the final ranking, closes every season account and marks
+   * the season settled while holding the season row FOR UPDATE. An exclusion
+   * that read `ended`/`active` without that lock could commit afterwards,
+   * turning a closed account back into `suspended` and leaving an excluded
+   * participant in the final ranking. Season FOR SHARE conflicts with
+   * settlement, ranking publication and join (FOR UPDATE), not with season
+   * trades (FOR SHARE).
+   *
+   * Order is Season → Account → Participant, before Orders/Wallets
+   * (season-trading-lock.ts), each at the strength of its later UPDATE so no
+   * lock is upgraded. Returns the locked account id, or null when the
+   * participant does not exist (findParticipantOrThrow then reports it).
+   */
+  private async lockExclusionTarget(
+    tx: ModerationTransactionClient,
+    target: { seasonId: string; seasonParticipantId: string },
+  ): Promise<string | null> {
+    // Locates the lock targets only; the decision reads the rows after this.
+    const targets = await tx.$queryRaw<Array<{ tradingAccountId: string }>>`
+      SELECT "trading_account_id" AS "tradingAccountId"
+      FROM "season_participants"
+      WHERE "id" = ${target.seasonParticipantId}
+        AND "season_id" = ${target.seasonId}
+    `;
+    const tradingAccountId = targets[0]?.tradingAccountId ?? null;
+    if (!tradingAccountId) {
+      return null;
+    }
+
+    await tx.$queryRaw`
+      SELECT "id" FROM "seasons" WHERE "id" = ${target.seasonId} FOR SHARE
+    `;
+    await tx.$queryRaw`
+      SELECT "id" FROM "trading_accounts" WHERE "id" = ${tradingAccountId}
+      FOR NO KEY UPDATE
+    `;
+    await tx.$queryRaw`
+      SELECT "id" FROM "season_participants"
+      WHERE "id" = ${target.seasonParticipantId}
+      FOR NO KEY UPDATE
+    `;
+
+    return tradingAccountId;
   }
 
   private async findParticipantOrThrow(

@@ -303,6 +303,9 @@ jobs:
       # Complete general KRW/USD FX lifecycle and its account/TWR integrity.
       GENERAL_FX_DB_INTEGRATION: "1"
       SEASON_JOIN_DB_INTEGRATION: "1"
+      # TC-D01: final settlement and participant exclusion serialize on the
+      # season row; a stale pre-lock participant set is never published.
+      SEASON_SETTLEMENT_RACE_DB_INTEGRATION: "1"
       # Feature flags the account-scoped suites assert THROUGH; they gate
       # product behaviour, not the tests.
       LIMIT_ORDER_ENABLED: "true"
@@ -363,6 +366,7 @@ jobs:
           src/trading-accounts/general-trading-audit.integration.spec.ts
           src/ranking/season-ranking-scope.integration.spec.ts
           src/ranking/ranking-consistency.integration.spec.ts
+          src/batch/season-settlement-exclusion-race.integration.spec.ts
           src/friends/friends.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts

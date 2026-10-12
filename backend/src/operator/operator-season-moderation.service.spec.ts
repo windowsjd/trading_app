@@ -144,6 +144,15 @@ describe('OperatorSeasonModerationService', () => {
         update: jest.fn(),
       },
       $executeRaw: jest.fn().mockResolvedValue(1),
+      // Exclusion lock statements (TC-D01): the target lookup returns the
+      // participant's account link, each lock returns its locked row.
+      $queryRaw: jest.fn((strings: TemplateStringsArray) =>
+        Promise.resolve(
+          strings.join('?').includes('AS "tradingAccountId"')
+            ? [{ tradingAccountId: 'ta-1' }]
+            : [{ id: 'locked' }],
+        ),
+      ),
     };
     prisma.$transaction.mockImplementation((callback) => callback(prisma));
     // Default: the participant's linked season account exists and is active.
@@ -482,6 +491,72 @@ describe('OperatorSeasonModerationService', () => {
         }),
       }),
     );
+  });
+
+  // TC-D01: the exclusion is decided on rows locked in the settlement order.
+  it('locks season (share), account, then participant before reading exclusion state', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant();
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt: now,
+      currentRank: null,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+
+    const statements = prisma.$queryRaw.mock.calls.map(([strings]) =>
+      strings.join('?').replace(/\s+/g, ' ').trim(),
+    );
+    expect(statements).toHaveLength(4);
+    expect(statements[0]).toMatch(/FROM "season_participants"/);
+    expect(statements[0]).not.toMatch(/FOR /);
+    expect(statements[1]).toMatch(/FROM "seasons" .* FOR SHARE$/);
+    expect(statements[2]).toMatch(
+      /FROM "trading_accounts" .* FOR NO KEY UPDATE$/,
+    );
+    expect(statements[3]).toMatch(
+      /FROM "season_participants" .* FOR NO KEY UPDATE$/,
+    );
+    const lastLock = Math.max(...prisma.$queryRaw.mock.invocationCallOrder);
+    expect(
+      prisma.seasonParticipant.findFirst.mock.invocationCallOrder[0] > lastLock,
+    ).toBe(true);
+    expect(
+      prisma.tradingAccount.findUnique.mock.invocationCallOrder[0] > lastLock,
+    ).toBe(true);
+  });
+
+  it('takes no lock and reports not found for a participant outside the season', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([]);
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(null);
+
+    await expectErrorCode(
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      'SEASON_PARTICIPANT_NOT_FOUND',
+    );
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when the participant account link differs from the locked account', async () => {
+    const { prisma, service } = createService();
+    prisma.$queryRaw.mockResolvedValueOnce([{ tradingAccountId: 'ta-other' }]);
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(
+      createParticipant(),
+    );
+
+    await expectErrorCode(
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      'TRADING_ACCOUNT_LINK_INTEGRITY',
+    );
+    expect(prisma.tradingAccount.findUnique).not.toHaveBeenCalled();
+    expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
+    expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
   });
 
   it('hides and unhides ranking without deleting ranking rows', async () => {

@@ -385,6 +385,17 @@ and prices, never gets a new settlement snapshot, and never gets a new final
 ranking row. The check runs both before and under the season row lock. Recovery
 is investigation plus restoring the final ranking, not a re-run.
 
+**Participant set changed (TC-D01).** A fresh settlement values and ranks the
+eligible participants BEFORE taking the season row lock. Under the lock it
+re-reads every participant and requires the computed rows to cover exactly the
+participants that are still eligible. An operator exclusion that committed in
+between (exclusion takes the season row `FOR SHARE`, so it can only commit
+before the lock or wait until settlement ends) fails the run with
+`SETTLEMENT_PARTICIPANTS_CHANGED` (409) before any snapshot, ranking,
+participant, account or status write. This is retryable: a scheduled run
+retries on its next tick, and a manual run is re-run with a new
+`idempotencyKey`; the retry values the current participant set.
+
 ### `final-tier-assignment`
 
 **Every season account (§A-6).** The job checked only the accounts that appear

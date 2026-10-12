@@ -10,7 +10,8 @@ import {
 /**
  * Authorization locks only; season trades do not take the general TWR fence.
  * Current writers determine this order: ranking/settlement lock Season first;
- * exclusion updates Account before Participant and then cleans up Orders.
+ * exclusion locks Season (SHARE), then Account before Participant, and then
+ * cleans up Orders.
  * Take these locks before Order/Wallet/Position, never upgrade them.
  * Executions update participant valuation, so they acquire NO KEY UPDATE
  * up front; registration only needs SHARE. Account/Season always use SHARE.

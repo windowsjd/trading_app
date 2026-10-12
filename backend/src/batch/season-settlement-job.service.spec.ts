@@ -1061,6 +1061,89 @@ describe('SeasonSettlementJobService', () => {
 
   // §A-5: a settled season never gets a NEW final ranking.
 
+  // TC-D01: rows are valued before the season lock; the eligible set is
+  // re-read under it, and a difference publishes nothing.
+  describe('TC-D01 eligible set re-check under the season lock', () => {
+    const expectNothingWritten = (prisma: PrismaMock) => {
+      expect(prisma.__tx.equitySnapshot.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.equitySnapshot.update).not.toHaveBeenCalled();
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.seasonParticipant.update).not.toHaveBeenCalled();
+      expect(prisma.__tx.seasonParticipant.updateMany).not.toHaveBeenCalled();
+      expect(prisma.__tx.tradingAccount.updateMany).not.toHaveBeenCalled();
+      expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+    };
+
+    const arrangeTwoValuedParticipants = () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [
+        { id: 'sp-1', userId: 'user-1' },
+        { id: 'sp-2', userId: 'user-2' },
+      ]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [
+        snapshot('sp-1', 'user-1', '1000.00000000', '0.00000000'),
+        snapshot('sp-2', 'user-2', '2000.00000000', '10.00000000'),
+      ]);
+      return { service, prisma };
+    };
+
+    it('refuses to publish a row for a participant excluded after valuation', async () => {
+      const { service, prisma } = arrangeTwoValuedParticipants();
+      // Committed between valuation and the lock.
+      accountParticipants = [
+        accountParticipant('sp-1', 'user-1'),
+        accountParticipant('sp-2', 'user-2', ParticipantStatus.excluded),
+      ];
+
+      const response = await captureHttpExceptionResponse(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      );
+
+      expect(response.error.code).toBe('SETTLEMENT_PARTICIPANTS_CHANGED');
+      expectNothingWritten(prisma);
+    });
+
+    it('refuses when an eligible participant under the lock was never valued', async () => {
+      const { service, prisma } = arrangeTwoValuedParticipants();
+      accountParticipants = [
+        ...accountParticipants,
+        accountParticipant('sp-3', 'user-3'),
+      ];
+
+      await expect(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      ).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { error: { code: 'SETTLEMENT_PARTICIPANTS_CHANGED' } },
+      });
+      expectNothingWritten(prisma);
+    });
+
+    it('still settles when an already-excluded participant was never valued', async () => {
+      const { service, prisma } = arrangeTwoValuedParticipants();
+      // Excluded before valuation: not in the rows, not eligible, account
+      // still closed with the season.
+      accountParticipants = [
+        ...accountParticipants,
+        accountParticipant('sp-3', 'user-3', ParticipantStatus.excluded),
+      ];
+      prisma.__tx.seasonRanking.create
+        .mockResolvedValueOnce({ id: 'final-ranking-1' })
+        .mockResolvedValueOnce({ id: 'final-ranking-2' });
+
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+
+      expect(result.season.updated).toBe(true);
+      expect(prisma.__tx.seasonRanking.create).toHaveBeenCalledTimes(2);
+      expect(result.closedTradingAccountIds).toContain('account-of-sp-3');
+    });
+  });
+
   describe('§A-5 settled season without a final ranking', () => {
     it('refuses to compute a new final ranking for a settled season with no final rows', async () => {
       const { service, prisma } = createService();
