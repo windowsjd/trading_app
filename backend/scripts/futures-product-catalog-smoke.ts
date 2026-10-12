@@ -48,8 +48,10 @@ async function main() {
   const db = new PrismaService();
   const metrics = new Metrics();
   try {
-    // All test users remain in the full audit. Select one initially sound account
-    // for this focused regression; do not relabel other smoke audit findings.
+    // All test users remain in the full audit. The mixed fixture deliberately
+    // leaves pending orders on some accounts. Select a sound account without
+    // initial reservations so the unchanged final zero-reservation assertion
+    // checks this regression's own create/cancel lifecycle.
     let actor: Fixture['actors'][number] | undefined;
     for (const candidate of fixture.actors.filter(
       (a) => a.mode === 'general',
@@ -62,7 +64,8 @@ async function main() {
         const rows = await db.walletTransaction.findMany({
           where: { walletId: w.id },
         });
-        if (!ledgerChain(rows, w.balanceAmount)) sound = false;
+        if (!ledgerChain(rows, w.balanceAmount) || !w.reservedAmount.eq(0))
+          sound = false;
       }
       if (sound) {
         actor = candidate;
