@@ -164,6 +164,21 @@ export type Position = Prisma.PositionModel
  */
 export type Order = Prisma.OrderModel
 /**
+ * Model ConditionalBuyOrder
+ * 
+ */
+export type ConditionalBuyOrder = Prisma.ConditionalBuyOrderModel
+/**
+ * Model LimitOnCloseOrder
+ * 
+ */
+export type LimitOnCloseOrder = Prisma.LimitOnCloseOrderModel
+/**
+ * Model SessionClosePriceEvidence
+ * 
+ */
+export type SessionClosePriceEvidence = Prisma.SessionClosePriceEvidenceModel
+/**
  * Model BeginnerQuestAcknowledgement
  * 
  */

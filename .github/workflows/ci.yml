@@ -181,6 +181,10 @@ jobs:
       FUTURES_F31_DB_INTEGRATION: "1"
       CONDITIONAL_DB_INTEGRATION: "1"
       FUTURES_LIMIT_DB_INTEGRATION: "1"
+      # Conditional BUY watches and KRX Limit-on-Close: trigger/fill through
+      # the existing order cores, final close evidence, races and lifecycle.
+      CONDITIONAL_BUY_DB_INTEGRATION: "1"
+      LIMIT_ON_CLOSE_DB_INTEGRATION: "1"
       # TC-D05: one committed account state per valuation while real Spot,
       # FX, transfer and Futures commands commit between its SELECTs.
       VALUATION_CONSISTENCY_DB_INTEGRATION: "1"
@@ -234,6 +238,8 @@ jobs:
           src/futures/futures-f3.integration.spec.ts
           src/futures/futures-f31.integration.spec.ts
           src/conditional/conditional.integration.spec.ts
+          src/conditional/conditional-buy.integration.spec.ts
+          src/orders/limit-on-close.integration.spec.ts
           src/futures/futures-limit.integration.spec.ts
           src/futures/futures-isolated-boundary.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts

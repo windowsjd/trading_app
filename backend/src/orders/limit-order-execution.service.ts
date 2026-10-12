@@ -67,6 +67,12 @@ import { OrdersService } from './orders.service';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 
 import { resolveRegularSessionForEvent } from './market-calendar.policy';
+import {
+  decideLimitOnClose,
+  LOC_DECISION_REASONS,
+  LOC_EVIDENCE_POLICY_VERSION,
+  resolveBoundLimitOnCloseSession,
+} from './limit-on-close.policy';
 import { getAssetTradingStatus } from './market-hours.policy';
 
 import {
@@ -81,6 +87,9 @@ const ZERO_MONEY = '0.00000000';
  * - `snapshot` (path A): fill at the fresh provider snapshot price.
  * - `candle` (path B): fill at the ORDER's limitPrice, with the closed 5m
  *   candle as touch evidence.
+ * - `session_close` (Limit-on-Close only): fill at the FINAL regular-session
+ *   close of the order's bound session. Paths A/B never fill a LOC order and
+ *   this path never fills an ordinary limit order.
  */
 export type LimitFillPlan =
   | {
@@ -92,7 +101,18 @@ export type LimitFillPlan =
       path: 'candle';
       executedPrice: Prisma.Decimal;
       candle: EligibleClosedCandle;
+    }
+  | {
+      path: 'session_close';
+      executedPrice: Prisma.Decimal;
+      closeEvidenceId: string;
     };
+
+/** Plans the continuous matcher (paths A/B) may produce. */
+export type ContinuousLimitFillPlan = Exclude<
+  LimitFillPlan,
+  { path: 'session_close' }
+>;
 
 export type LimitFillOutcome =
   | {
@@ -100,7 +120,7 @@ export type LimitFillOutcome =
       orderId: string;
       seasonId: string | null;
       seasonParticipantId: string | null;
-      path: 'snapshot' | 'candle';
+      path: LimitFillPlan['path'];
       executedPrice: string;
       netAmount: string;
     }
@@ -275,6 +295,20 @@ export class LimitOrderExecutionService {
           limitOrderErrorCodes.ORDER_RESERVATION_INCONSISTENT,
           'Submitted limit order is missing its reservation basis.',
         );
+      }
+      // Session-bound LOC orders and continuous limit orders never share a path.
+      const limitOnClose = await tx.limitOnCloseOrder.findUnique({
+        where: { orderId },
+      });
+      if (
+        (limitOnClose !== null) !== (plan.path === 'session_close') ||
+        (limitOnClose && limitOnClose.status !== 'pending')
+      ) {
+        return {
+          state: 'skipped',
+          orderId,
+          reason: limitOnClose ? 'limit_on_close_order' : 'not_limit_on_close',
+        };
       }
 
       stage = 'transaction_clock';
@@ -453,7 +487,7 @@ export class LimitOrderExecutionService {
             orderId,
             reason: 'price_evidence_unavailable',
           };
-      } else {
+      } else if (plan.path === 'candle') {
         // Path B is historical touch evidence. Its close is evidenceAt, not
         // the execution time: no current 10-second price freshness/session gate.
         stage = 'candle_validation';
@@ -481,6 +515,49 @@ export class LimitOrderExecutionService {
             state: 'skipped',
             orderId,
             reason: 'candle_evidence_invalid',
+          };
+        }
+      } else {
+        // LOC: only final, immutable dated close evidence of the exact bound
+        // session, observed after that session's CURRENT calendar close.
+        stage = 'session_close_validation';
+        const evidence = await tx.sessionClosePriceEvidence.findUnique({
+          where: { id: plan.closeEvidenceId },
+        });
+        const session = limitOnClose
+          ? resolveBoundLimitOnCloseSession(
+              order.asset,
+              order.submittedAt,
+              limitOnClose.sessionDate,
+            )
+          : null;
+        if (
+          !limitOnClose ||
+          !evidence ||
+          !session ||
+          evidence.status !== 'final' ||
+          !evidence.finalizedAt ||
+          evidence.finalizedAt > transactionNow ||
+          evidence.policyVersion !== LOC_EVIDENCE_POLICY_VERSION ||
+          evidence.assetId !== order.assetId ||
+          evidence.market !== limitOnClose.market ||
+          evidence.sessionDate.getTime() !==
+            limitOnClose.sessionDate.getTime() ||
+          evidence.currencyCode !== order.currencyCode ||
+          !evidence.closePrice.eq(plan.executedPrice) ||
+          evidence.firstObservedAt < session.closeTime ||
+          order.submittedAt >= session.closeTime ||
+          transactionNow < session.closeTime ||
+          decideLimitOnClose(
+            order.side,
+            order.limitPrice,
+            evidence.closePrice,
+          ) !== 'fill'
+        ) {
+          return {
+            state: 'skipped',
+            orderId,
+            reason: 'session_close_evidence_invalid',
           };
         }
       }
@@ -631,12 +708,13 @@ export class LimitOrderExecutionService {
       }
 
       stage = 'candle_evidence_persistence';
-      // 8) Evidence link. Path A → snapshot; path B → shared candle evidence.
+      // 8) Evidence link. Path A → snapshot; path B → shared candle evidence;
+      // LOC → sessionCloseEvidenceId (written with the status flip below).
       let assetPriceSnapshotId: string | null = null;
       let limitOrderCandleEvidenceId: string | null = null;
       if (plan.path === 'snapshot') {
         assetPriceSnapshotId = plan.assetPriceSnapshotId;
-      } else {
+      } else if (plan.path === 'candle') {
         limitOrderCandleEvidenceId =
           await this.candleEvidence.findOrCreateEvidenceInTransaction(
             tx,
@@ -742,6 +820,8 @@ export class LimitOrderExecutionService {
           assetPriceSnapshotId,
           fxRateSnapshotId,
           limitOrderCandleEvidenceId,
+          sessionCloseEvidenceId:
+            plan.path === 'session_close' ? plan.closeEvidenceId : null,
           executedAt: transactionNow,
           reservationReleasedAt: transactionNow,
         },
@@ -751,6 +831,24 @@ export class LimitOrderExecutionService {
           limitOrderErrorCodes.LIMIT_ORDER_EXECUTION_CONFLICT,
           'Order state changed while filling.',
         );
+      }
+      if (plan.path === 'session_close') {
+        const decided = await tx.limitOnCloseOrder.updateMany({
+          where: { orderId: order.id, status: 'pending' },
+          data: {
+            status: 'filled',
+            decisionReason: LOC_DECISION_REASONS.closeReached,
+            decidedAt: transactionNow,
+            closeEvidenceId: plan.closeEvidenceId,
+            closePrice: executedPriceText,
+          },
+        });
+        if (decided.count !== 1) {
+          this.throwLimitOrderError(
+            limitOrderErrorCodes.LIMIT_ORDER_EXECUTION_CONFLICT,
+            'Order state changed while filling.',
+          );
+        }
       }
 
       stage = 'portfolio_snapshot';

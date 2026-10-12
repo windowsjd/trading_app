@@ -919,6 +919,74 @@ export type EnumWalletScopeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumWalletScopeFilter<$PrismaModel>
 }
 
+export type EnumConditionalBuyTriggerFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyTrigger | Prisma.EnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyTriggerFilter<$PrismaModel> | $Enums.ConditionalBuyTrigger
+}
+
+export type EnumConditionalBuyStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyStatus | Prisma.EnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel> | $Enums.ConditionalBuyStatus
+}
+
+export type EnumConditionalBuyTriggerWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyTrigger | Prisma.EnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyTriggerWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalBuyTrigger
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalBuyTriggerFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalBuyTriggerFilter<$PrismaModel>
+}
+
+export type EnumConditionalBuyStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyStatus | Prisma.EnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyStatusWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalBuyStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
+}
+
+export type EnumLimitOnCloseStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.LimitOnCloseStatus | Prisma.EnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLimitOnCloseStatusFilter<$PrismaModel> | $Enums.LimitOnCloseStatus
+}
+
+export type EnumLimitOnCloseStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LimitOnCloseStatus | Prisma.EnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLimitOnCloseStatusWithAggregatesFilter<$PrismaModel> | $Enums.LimitOnCloseStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLimitOnCloseStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLimitOnCloseStatusFilter<$PrismaModel>
+}
+
+export type EnumSessionCloseEvidenceStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.SessionCloseEvidenceStatus | Prisma.EnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel> | $Enums.SessionCloseEvidenceStatus
+}
+
+export type EnumSessionCloseEvidenceStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SessionCloseEvidenceStatus | Prisma.EnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSessionCloseEvidenceStatusWithAggregatesFilter<$PrismaModel> | $Enums.SessionCloseEvidenceStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel>
+}
+
 export type EnumWalletTransactionDirectionFilter<$PrismaModel = never> = {
   equals?: $Enums.WalletTransactionDirection | Prisma.EnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
   in?: $Enums.WalletTransactionDirection[] | Prisma.ListEnumWalletTransactionDirectionFieldRefInput<$PrismaModel>
@@ -2138,6 +2206,74 @@ export type NestedEnumWalletScopeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumWalletScopeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumWalletScopeFilter<$PrismaModel>
+}
+
+export type NestedEnumConditionalBuyTriggerFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyTrigger | Prisma.EnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyTriggerFilter<$PrismaModel> | $Enums.ConditionalBuyTrigger
+}
+
+export type NestedEnumConditionalBuyStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyStatus | Prisma.EnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel> | $Enums.ConditionalBuyStatus
+}
+
+export type NestedEnumConditionalBuyTriggerWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyTrigger | Prisma.EnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyTrigger[] | Prisma.ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyTriggerWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalBuyTrigger
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalBuyTriggerFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalBuyTriggerFilter<$PrismaModel>
+}
+
+export type NestedEnumConditionalBuyStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalBuyStatus | Prisma.EnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalBuyStatus[] | Prisma.ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalBuyStatusWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalBuyStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumLimitOnCloseStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.LimitOnCloseStatus | Prisma.EnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLimitOnCloseStatusFilter<$PrismaModel> | $Enums.LimitOnCloseStatus
+}
+
+export type NestedEnumLimitOnCloseStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LimitOnCloseStatus | Prisma.EnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLimitOnCloseStatusWithAggregatesFilter<$PrismaModel> | $Enums.LimitOnCloseStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLimitOnCloseStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLimitOnCloseStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.SessionCloseEvidenceStatus | Prisma.EnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel> | $Enums.SessionCloseEvidenceStatus
+}
+
+export type NestedEnumSessionCloseEvidenceStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.SessionCloseEvidenceStatus | Prisma.EnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.SessionCloseEvidenceStatus[] | Prisma.ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumSessionCloseEvidenceStatusWithAggregatesFilter<$PrismaModel> | $Enums.SessionCloseEvidenceStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumSessionCloseEvidenceStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumWalletTransactionDirectionFilter<$PrismaModel = never> = {

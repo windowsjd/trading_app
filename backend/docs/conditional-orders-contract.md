@@ -2,6 +2,10 @@
 
 Current contract: server capability defaults OFF; production activation is a separate operation. API remains `/api/v1`.
 
+Conditional BUY watches and Limit-on-Close are a separate contract and flag
+([Conditional BUY / LOC](conditional-buy-and-loc-contract.md));
+`CONDITIONAL_ORDERS_ENABLED` never enables them.
+
 ## Intent and boundaries
 
 One account-scoped protection group protects the entire remaining Spot position or one Futures position lifetime. It contains Stop Loss, Take Profit, or both. Each leg has a trigger and a Market or Limit exit intent. [Futures Limit Entry v1](futures-limit-entry-contract.md) supplies a parent entry without adding a second Conditional engine. There is no trailing stop, quantity ladder, or general condition framework.

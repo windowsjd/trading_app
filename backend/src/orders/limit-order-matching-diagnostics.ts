@@ -114,6 +114,7 @@ export type LimitExecutionStage =
   | 'market_validation'
   | 'snapshot_validation'
   | 'candle_validation'
+  | 'session_close_validation'
   | 'amounts_validation'
   | 'fx_evidence'
   | 'wallet_settlement'

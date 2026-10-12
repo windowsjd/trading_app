@@ -270,6 +270,8 @@ enum OpsJobName {
   conditional_orders
   futures_limit_matching
   futures_last_price_retention
+  conditional_buy_orders
+  limit_on_close_settlement
 }
 
 enum MarketCandleSyncMode {
@@ -484,6 +486,8 @@ model TradingAccount {
   futuresSeasonSettlement       FuturesSeasonSettlement?
   protectionGroups              ProtectionGroup[]
   protectionCommands            ProtectionCommand[]
+  conditionalBuyOrders          ConditionalBuyOrder[]
+  limitOnCloseOrders            LimitOnCloseOrder[]
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
   equitySnapshots               EquitySnapshot[]
@@ -698,6 +702,9 @@ model Asset {
   limitOrderCandleEvidence LimitOrderCandleEvidence[]
   futuresInstruments       FuturesInstrument[]
   protectionGroups         ProtectionGroup[]
+  conditionalBuyOrders     ConditionalBuyOrder[]
+  limitOnCloseOrders       LimitOnCloseOrder[]
+  sessionCloseEvidences    SessionClosePriceEvidence[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -720,12 +727,14 @@ model AssetPriceSnapshot {
   rawPayloadJson  Json?                @map("raw_payload_json")
   note            String?
 
-  asset               Asset                @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  orders              Order[]
-  quotes              Quote[]
-  futuresExecutions   FuturesExecution[]
-  futuresSeasonPrices FuturesSeasonPrice[]
-  protectionChildren  ProtectionChild[]
+  asset                       Asset                 @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  orders                      Order[]
+  quotes                      Quote[]
+  futuresExecutions           FuturesExecution[]
+  futuresSeasonPrices         FuturesSeasonPrice[]
+  protectionChildren          ProtectionChild[]
+  conditionalBuyRegistrations ConditionalBuyOrder[] @relation("ConditionalBuyRegistrationSnapshot")
+  conditionalBuyTriggers      ConditionalBuyOrder[] @relation("ConditionalBuyTriggerSnapshot")
 
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
@@ -1224,6 +1233,9 @@ model Order {
   cancelReason               String?      @map("cancel_reason")
   // Closed-candle evidence link written by scheduler path-B matching.
   limitOrderCandleEvidenceId String?      @map("limit_order_candle_evidence_id")
+  // Final session-close evidence of a filled Limit-on-Close order (SQL CHECK:
+  // exclusive with the snapshot/candle links, limit BUY only).
+  sessionCloseEvidenceId     String?      @map("session_close_evidence_id")
   submittedAt                DateTime     @map("submitted_at")
   executedAt                 DateTime?    @map("executed_at")
   canceledAt                 DateTime?    @map("canceled_at")
@@ -1238,8 +1250,11 @@ model Order {
   assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   fxRateSnapshot     FxRateSnapshot?           @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   candleEvidence     LimitOrderCandleEvidence? @relation(fields: [limitOrderCandleEvidenceId], references: [id], onDelete: Restrict)
+  sessionCloseEvidence SessionClosePriceEvidence? @relation(fields: [sessionCloseEvidenceId], references: [id], onDelete: Restrict)
   attachedProtection ProtectionGroup?
   protectionChild    ProtectionChild?
+  conditionalBuy     ConditionalBuyOrder?
+  limitOnClose       LimitOnCloseOrder?
 
   beginnerQuestAcknowledgements BeginnerQuestAcknowledgement[]
 
@@ -1256,7 +1271,158 @@ model Order {
   @@index([submittedAt])
   @@index([status])
   @@index([limitOrderCandleEvidenceId])
+  @@index([sessionCloseEvidenceId])
   @@map("orders")
+}
+
+enum ConditionalBuyTrigger {
+  at_or_above
+  at_or_below
+}
+
+enum ConditionalBuyStatus {
+  watching
+  triggered
+  ordered
+  canceled
+  failed
+}
+
+// Watch-only BUY intent. Watching reserves nothing. A trigger creates at most
+// ONE ordinary market or limit Order through the user quote/create core; that
+// Order (never this row) is the financial and settlement evidence. SQL CHECKs
+// (migration only) bind execution type/limit, quantity XOR amount and
+// status/order/trigger consistency.
+model ConditionalBuyOrder {
+  id                     String                @id @default(uuid())
+  tradingAccountId       String                @map("trading_account_id")
+  assetId                String                @map("asset_id")
+  triggerCondition       ConditionalBuyTrigger @map("trigger_condition")
+  triggerPrice           Decimal               @map("trigger_price") @db.Decimal(24, 8)
+  executionType          OrderType             @map("execution_type")
+  limitPrice             Decimal?              @map("limit_price") @db.Decimal(24, 8)
+  // Stocks: share quantity. Crypto: fee-exclusive principal amount.
+  quantity               Decimal?              @db.Decimal(24, 8)
+  amount                 Decimal?              @db.Decimal(24, 8)
+  currencyCode           CurrencyCode          @map("currency_code")
+  status                 ConditionalBuyStatus  @default(watching)
+  orderId                String?               @unique @map("order_id")
+  registrationSnapshotId String?               @map("registration_snapshot_id")
+  triggerSnapshotId      String?               @map("trigger_snapshot_id")
+  triggerEvidenceJson    Json?                 @map("trigger_evidence_json")
+  triggeredAt            DateTime?             @map("triggered_at")
+  attemptCount           Int                   @default(0) @map("attempt_count")
+  lastAttemptAt          DateTime?             @map("last_attempt_at")
+  failureCode            String?               @map("failure_code")
+  terminalReason         String?               @map("terminal_reason")
+  idempotencyKey         String                @map("idempotency_key")
+  requestHash            String                @map("request_hash")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  endedAt                DateTime?             @map("ended_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+
+  tradingAccount       TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset                Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  order                Order?              @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  registrationSnapshot AssetPriceSnapshot? @relation("ConditionalBuyRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
+  triggerSnapshot      AssetPriceSnapshot? @relation("ConditionalBuyTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, tradingAccountId])
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([status, id])
+  @@index([tradingAccountId, createdAt, id])
+  @@index([assetId])
+  @@index([registrationSnapshotId])
+  @@index([triggerSnapshotId])
+  @@map("conditional_buy_orders")
+}
+
+enum LimitOnCloseStatus {
+  pending
+  filled
+  unfilled
+  expired
+  canceled
+}
+
+// A LOC BUY is an ordinary submitted limit Order (reservation, cancel and
+// lifecycle cleanup unchanged) plus this row: the one regular session it is
+// bound to and its decision against final close evidence. The continuous
+// matcher (paths A/B) never fills an Order that has this row.
+model LimitOnCloseOrder {
+  orderId            String               @id @map("order_id")
+  tradingAccountId   String               @map("trading_account_id")
+  assetId            String               @map("asset_id")
+  market             MarketCalendarMarket
+  sessionDate        DateTime             @map("session_date") @db.Date
+  sessionOpenAt      DateTime             @map("session_open_at")
+  sessionCloseAt     DateTime             @map("session_close_at")
+  evidenceDeadlineAt DateTime             @map("evidence_deadline_at")
+  status             LimitOnCloseStatus   @default(pending)
+  decisionReason     String?              @map("decision_reason")
+  decidedAt          DateTime?            @map("decided_at")
+  closeEvidenceId    String?              @map("close_evidence_id")
+  closePrice         Decimal?             @map("close_price") @db.Decimal(24, 8)
+  lastCheckCode      String?              @map("last_check_code")
+  lastCheckedAt      DateTime?            @map("last_checked_at")
+  createdAt          DateTime             @default(now()) @map("created_at")
+  updatedAt          DateTime             @updatedAt @map("updated_at")
+
+  order          Order                      @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  tradingAccount TradingAccount             @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset          Asset                      @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  closeEvidence  SessionClosePriceEvidence? @relation(fields: [closeEvidenceId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, tradingAccountId])
+  @@index([status, sessionCloseAt, orderId])
+  @@index([assetId, sessionDate])
+  @@index([tradingAccountId, createdAt])
+  @@index([closeEvidenceId])
+  @@map("limit_on_close_orders")
+}
+
+enum SessionCloseEvidenceStatus {
+  observing
+  final
+}
+
+// Dated regular-session close of one asset/session from one provider. It is
+// final only after identical post-close observations separated by the
+// configured confirmation interval, and never changes afterwards. It is not a
+// realtime price: valuation, tickers and the continuous matcher never read it.
+model SessionClosePriceEvidence {
+  id                  String                     @id @default(uuid())
+  assetId             String                     @map("asset_id")
+  market              MarketCalendarMarket
+  sessionDate         DateTime                   @map("session_date") @db.Date
+  sessionCloseAt      DateTime                   @map("session_close_at")
+  provider            String
+  sourceName          String                     @map("source_name")
+  providerSymbol      String                     @map("provider_symbol")
+  providerTradingDate String                     @map("provider_trading_date")
+  closePrice          Decimal                    @map("close_price") @db.Decimal(24, 8)
+  currencyCode        CurrencyCode               @map("currency_code")
+  status              SessionCloseEvidenceStatus @default(observing)
+  // First receipt of the CURRENT candidate close; reset when a later
+  // observation disagrees.
+  firstObservedAt     DateTime                   @map("first_observed_at")
+  lastObservedAt      DateTime                   @map("last_observed_at")
+  observationCount    Int                        @default(1) @map("observation_count")
+  mismatchCount       Int                        @default(0) @map("mismatch_count")
+  finalizedAt         DateTime?                  @map("finalized_at")
+  firstRawJson        Json                       @map("first_raw_json")
+  confirmRawJson      Json?                      @map("confirm_raw_json")
+  policyVersion       Int                        @map("policy_version")
+  createdAt           DateTime                   @default(now()) @map("created_at")
+  updatedAt           DateTime                   @updatedAt @map("updated_at")
+
+  asset              Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  limitOnCloseOrders LimitOnCloseOrder[]
+  orders             Order[]
+
+  @@unique([assetId, market, sessionDate, provider])
+  @@index([status, sessionDate])
+  @@map("session_close_price_evidences")
 }
 
 // UI learning only. Financial success remains proven by the referenced Order.

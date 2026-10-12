@@ -80,6 +80,9 @@ export const ModelName = {
   ProtectionCommand: 'ProtectionCommand',
   Position: 'Position',
   Order: 'Order',
+  ConditionalBuyOrder: 'ConditionalBuyOrder',
+  LimitOnCloseOrder: 'LimitOnCloseOrder',
+  SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
@@ -689,6 +692,7 @@ export const OrderScalarFieldEnum = {
   reservationReleasedAt: 'reservationReleasedAt',
   cancelReason: 'cancelReason',
   limitOrderCandleEvidenceId: 'limitOrderCandleEvidenceId',
+  sessionCloseEvidenceId: 'sessionCloseEvidenceId',
   submittedAt: 'submittedAt',
   executedAt: 'executedAt',
   canceledAt: 'canceledAt',
@@ -699,6 +703,88 @@ export const OrderScalarFieldEnum = {
 } as const
 
 export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
+
+
+export const ConditionalBuyOrderScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  triggerCondition: 'triggerCondition',
+  triggerPrice: 'triggerPrice',
+  executionType: 'executionType',
+  limitPrice: 'limitPrice',
+  quantity: 'quantity',
+  amount: 'amount',
+  currencyCode: 'currencyCode',
+  status: 'status',
+  orderId: 'orderId',
+  registrationSnapshotId: 'registrationSnapshotId',
+  triggerSnapshotId: 'triggerSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ConditionalBuyOrderScalarFieldEnum = (typeof ConditionalBuyOrderScalarFieldEnum)[keyof typeof ConditionalBuyOrderScalarFieldEnum]
+
+
+export const LimitOnCloseOrderScalarFieldEnum = {
+  orderId: 'orderId',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  market: 'market',
+  sessionDate: 'sessionDate',
+  sessionOpenAt: 'sessionOpenAt',
+  sessionCloseAt: 'sessionCloseAt',
+  evidenceDeadlineAt: 'evidenceDeadlineAt',
+  status: 'status',
+  decisionReason: 'decisionReason',
+  decidedAt: 'decidedAt',
+  closeEvidenceId: 'closeEvidenceId',
+  closePrice: 'closePrice',
+  lastCheckCode: 'lastCheckCode',
+  lastCheckedAt: 'lastCheckedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LimitOnCloseOrderScalarFieldEnum = (typeof LimitOnCloseOrderScalarFieldEnum)[keyof typeof LimitOnCloseOrderScalarFieldEnum]
+
+
+export const SessionClosePriceEvidenceScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  market: 'market',
+  sessionDate: 'sessionDate',
+  sessionCloseAt: 'sessionCloseAt',
+  provider: 'provider',
+  sourceName: 'sourceName',
+  providerSymbol: 'providerSymbol',
+  providerTradingDate: 'providerTradingDate',
+  closePrice: 'closePrice',
+  currencyCode: 'currencyCode',
+  status: 'status',
+  firstObservedAt: 'firstObservedAt',
+  lastObservedAt: 'lastObservedAt',
+  observationCount: 'observationCount',
+  mismatchCount: 'mismatchCount',
+  finalizedAt: 'finalizedAt',
+  firstRawJson: 'firstRawJson',
+  confirmRawJson: 'confirmRawJson',
+  policyVersion: 'policyVersion',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SessionClosePriceEvidenceScalarFieldEnum = (typeof SessionClosePriceEvidenceScalarFieldEnum)[keyof typeof SessionClosePriceEvidenceScalarFieldEnum]
 
 
 export const BeginnerQuestAcknowledgementScalarFieldEnum = {

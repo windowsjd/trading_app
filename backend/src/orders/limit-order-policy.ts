@@ -17,6 +17,11 @@ export const LIMIT_ORDER_CANCEL_REASONS = {
   accountNotTradable: 'account_not_tradable',
   conditionalReplaced: 'conditional_replaced',
   conditionalManualReduce: 'conditional_manual_reduce',
+  // Limit-on-Close session decisions (see limit-on-close.policy.ts).
+  locCloseNotReached: 'loc_close_not_reached',
+  locCloseEvidenceUnavailable: 'loc_close_evidence_unavailable',
+  locSessionInvalid: 'loc_session_invalid',
+  locFillNotPermitted: 'loc_fill_not_permitted',
 } as const;
 
 export type LimitOrderCancelReason =

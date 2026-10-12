@@ -16,6 +16,14 @@ import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.s
 import { LimitOrderExecutionService } from './limit-order-execution.service';
 import { LimitOrderMatchingService } from './limit-order-matching.service';
 import { TradingAccountOrdersController } from './trading-account-orders.controller';
+import { OpsJobLockService } from '../ops/ops-job-lock.service';
+import { OpsJobRunService } from '../ops/ops-job-run.service';
+import {
+  KoscomSessionCloseSource,
+  LimitOnCloseEvidenceService,
+} from './limit-on-close-evidence.service';
+import { LimitOnCloseSettlementService } from './limit-on-close-settlement.service';
+import { LimitOnCloseWorker } from './limit-on-close-worker.service';
 
 @Module({
   imports: [
@@ -37,6 +45,12 @@ import { TradingAccountOrdersController } from './trading-account-orders.control
     LimitOrderCandleEvidenceService,
     LimitOrderExecutionService,
     LimitOrderMatchingService,
+    KoscomSessionCloseSource,
+    LimitOnCloseEvidenceService,
+    LimitOnCloseSettlementService,
+    LimitOnCloseWorker,
+    OpsJobLockService,
+    OpsJobRunService,
   ],
   exports: [OrdersService, LimitOrderCancelService, LimitOrderMatchingService],
 })

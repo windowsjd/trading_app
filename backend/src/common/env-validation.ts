@@ -9,6 +9,8 @@ import { validateFuturesConfig } from '../futures/futures.config';
 import { futuresMarkRetentionConfig } from '../futures/futures-mark-retention.config';
 import { futuresLastPriceRetentionConfig } from '../futures/futures-last-price-retention.config';
 import { conditionalEnabled } from '../conditional/conditional.config';
+import { conditionalBuyEnabled } from '../conditional/conditional-buy.config';
+import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -50,6 +52,8 @@ export function validateEnv(
   collect(errors, () => futuresMarkRetentionConfig(env));
   collect(errors, () => futuresLastPriceRetentionConfig(env));
   collect(errors, () => conditionalEnabled(env));
+  collect(errors, () => conditionalBuyEnabled(env));
+  collect(errors, () => readLimitOnCloseConfig(env));
   collect(errors, () => readGeneralFxFeeRate(env));
   collect(errors, () => readProfileImageStorageConfig(config));
 

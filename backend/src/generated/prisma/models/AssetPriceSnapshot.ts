@@ -286,6 +286,8 @@ export type AssetPriceSnapshotWhereInput = {
   futuresExecutions?: Prisma.FuturesExecutionListRelationFilter
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceListRelationFilter
   protectionChildren?: Prisma.ProtectionChildListRelationFilter
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderListRelationFilter
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderListRelationFilter
 }
 
 export type AssetPriceSnapshotOrderByWithRelationInput = {
@@ -308,6 +310,8 @@ export type AssetPriceSnapshotOrderByWithRelationInput = {
   futuresExecutions?: Prisma.FuturesExecutionOrderByRelationAggregateInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceOrderByRelationAggregateInput
   protectionChildren?: Prisma.ProtectionChildOrderByRelationAggregateInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderOrderByRelationAggregateInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderOrderByRelationAggregateInput
 }
 
 export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
@@ -333,6 +337,8 @@ export type AssetPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
   futuresExecutions?: Prisma.FuturesExecutionListRelationFilter
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceListRelationFilter
   protectionChildren?: Prisma.ProtectionChildListRelationFilter
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderListRelationFilter
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderListRelationFilter
 }, "id">
 
 export type AssetPriceSnapshotOrderByWithAggregationInput = {
@@ -394,6 +400,8 @@ export type AssetPriceSnapshotCreateInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateInput = {
@@ -415,6 +423,8 @@ export type AssetPriceSnapshotUncheckedCreateInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUpdateInput = {
@@ -436,6 +446,8 @@ export type AssetPriceSnapshotUpdateInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateInput = {
@@ -457,6 +469,8 @@ export type AssetPriceSnapshotUncheckedUpdateInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateManyInput = {
@@ -679,6 +693,38 @@ export type AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutOrdersInput, Prisma.AssetPriceSnapshotUpdateWithoutOrdersInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput>
 }
 
+export type AssetPriceSnapshotCreateNestedOneWithoutConditionalBuyRegistrationsInput = {
+  create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyRegistrationsInput>
+  connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutConditionalBuyRegistrationsInput
+  connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
+}
+
+export type AssetPriceSnapshotCreateNestedOneWithoutConditionalBuyTriggersInput = {
+  create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyTriggersInput>
+  connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutConditionalBuyTriggersInput
+  connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
+}
+
+export type AssetPriceSnapshotUpdateOneWithoutConditionalBuyRegistrationsNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyRegistrationsInput>
+  connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutConditionalBuyRegistrationsInput
+  upsert?: Prisma.AssetPriceSnapshotUpsertWithoutConditionalBuyRegistrationsInput
+  disconnect?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  delete?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUpdateWithoutConditionalBuyRegistrationsInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyRegistrationsInput>
+}
+
+export type AssetPriceSnapshotUpdateOneWithoutConditionalBuyTriggersNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyTriggersInput>
+  connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutConditionalBuyTriggersInput
+  upsert?: Prisma.AssetPriceSnapshotUpsertWithoutConditionalBuyTriggersInput
+  disconnect?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  delete?: Prisma.AssetPriceSnapshotWhereInput | boolean
+  connect?: Prisma.AssetPriceSnapshotWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetPriceSnapshotUpdateToOneWithWhereWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUpdateWithoutConditionalBuyTriggersInput>, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyTriggersInput>
+}
+
 export type AssetPriceSnapshotCreateNestedOneWithoutQuotesInput = {
   create?: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutQuotesInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutQuotesInput>
   connectOrCreate?: Prisma.AssetPriceSnapshotCreateOrConnectWithoutQuotesInput
@@ -729,6 +775,8 @@ export type AssetPriceSnapshotCreateWithoutAssetInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutAssetInput = {
@@ -749,6 +797,8 @@ export type AssetPriceSnapshotUncheckedCreateWithoutAssetInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutAssetInput = {
@@ -814,6 +864,8 @@ export type AssetPriceSnapshotCreateWithoutFuturesExecutionsInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutFuturesExecutionsInput = {
@@ -834,6 +886,8 @@ export type AssetPriceSnapshotUncheckedCreateWithoutFuturesExecutionsInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutFuturesExecutionsInput = {
@@ -870,6 +924,8 @@ export type AssetPriceSnapshotUpdateWithoutFuturesExecutionsInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutFuturesExecutionsInput = {
@@ -890,6 +946,8 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutFuturesExecutionsInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateWithoutProtectionChildrenInput = {
@@ -910,6 +968,8 @@ export type AssetPriceSnapshotCreateWithoutProtectionChildrenInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutProtectionChildrenInput = {
@@ -930,6 +990,8 @@ export type AssetPriceSnapshotUncheckedCreateWithoutProtectionChildrenInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutProtectionChildrenInput = {
@@ -966,6 +1028,8 @@ export type AssetPriceSnapshotUpdateWithoutProtectionChildrenInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutProtectionChildrenInput = {
@@ -986,6 +1050,8 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutProtectionChildrenInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateWithoutOrdersInput = {
@@ -1006,6 +1072,8 @@ export type AssetPriceSnapshotCreateWithoutOrdersInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutOrdersInput = {
@@ -1026,6 +1094,8 @@ export type AssetPriceSnapshotUncheckedCreateWithoutOrdersInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutOrdersInput = {
@@ -1062,6 +1132,8 @@ export type AssetPriceSnapshotUpdateWithoutOrdersInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
@@ -1082,6 +1154,216 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutOrdersInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+}
+
+export type AssetPriceSnapshotCreateWithoutConditionalBuyRegistrationsInput = {
+  id?: string
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  sourceType: $Enums.AssetPriceSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: string | null
+  asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
+  protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
+}
+
+export type AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyRegistrationsInput = {
+  id?: string
+  assetId: string
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  sourceType: $Enums.AssetPriceSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: string | null
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
+  protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+}
+
+export type AssetPriceSnapshotCreateOrConnectWithoutConditionalBuyRegistrationsInput = {
+  where: Prisma.AssetPriceSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyRegistrationsInput>
+}
+
+export type AssetPriceSnapshotCreateWithoutConditionalBuyTriggersInput = {
+  id?: string
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  sourceType: $Enums.AssetPriceSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: string | null
+  asset: Prisma.AssetCreateNestedOneWithoutPriceSnapshotsInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
+  protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+}
+
+export type AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyTriggersInput = {
+  id?: string
+  assetId: string
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  sourceType: $Enums.AssetPriceSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: string | null
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
+  protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+}
+
+export type AssetPriceSnapshotCreateOrConnectWithoutConditionalBuyTriggersInput = {
+  where: Prisma.AssetPriceSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyTriggersInput>
+}
+
+export type AssetPriceSnapshotUpsertWithoutConditionalBuyRegistrationsInput = {
+  update: Prisma.XOR<Prisma.AssetPriceSnapshotUpdateWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyRegistrationsInput>
+  create: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyRegistrationsInput>
+  where?: Prisma.AssetPriceSnapshotWhereInput
+}
+
+export type AssetPriceSnapshotUpdateToOneWithWhereWithoutConditionalBuyRegistrationsInput = {
+  where?: Prisma.AssetPriceSnapshotWhereInput
+  data: Prisma.XOR<Prisma.AssetPriceSnapshotUpdateWithoutConditionalBuyRegistrationsInput, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyRegistrationsInput>
+}
+
+export type AssetPriceSnapshotUpdateWithoutConditionalBuyRegistrationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
+  protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
+}
+
+export type AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyRegistrationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
+  protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+}
+
+export type AssetPriceSnapshotUpsertWithoutConditionalBuyTriggersInput = {
+  update: Prisma.XOR<Prisma.AssetPriceSnapshotUpdateWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyTriggersInput>
+  create: Prisma.XOR<Prisma.AssetPriceSnapshotCreateWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUncheckedCreateWithoutConditionalBuyTriggersInput>
+  where?: Prisma.AssetPriceSnapshotWhereInput
+}
+
+export type AssetPriceSnapshotUpdateToOneWithWhereWithoutConditionalBuyTriggersInput = {
+  where?: Prisma.AssetPriceSnapshotWhereInput
+  data: Prisma.XOR<Prisma.AssetPriceSnapshotUpdateWithoutConditionalBuyTriggersInput, Prisma.AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyTriggersInput>
+}
+
+export type AssetPriceSnapshotUpdateWithoutConditionalBuyTriggersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  asset?: Prisma.AssetUpdateOneRequiredWithoutPriceSnapshotsNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
+  protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+}
+
+export type AssetPriceSnapshotUncheckedUpdateWithoutConditionalBuyTriggersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  priceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  sourceType?: Prisma.EnumAssetPriceSourceTypeFieldUpdateOperationsInput | $Enums.AssetPriceSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
+  protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateWithoutQuotesInput = {
@@ -1102,6 +1384,8 @@ export type AssetPriceSnapshotCreateWithoutQuotesInput = {
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutQuotesInput = {
@@ -1122,6 +1406,8 @@ export type AssetPriceSnapshotUncheckedCreateWithoutQuotesInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutSnapshotInput
   protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutQuotesInput = {
@@ -1158,6 +1444,8 @@ export type AssetPriceSnapshotUpdateWithoutQuotesInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput = {
@@ -1178,6 +1466,8 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutQuotesInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateWithoutFuturesSeasonPricesInput = {
@@ -1198,6 +1488,8 @@ export type AssetPriceSnapshotCreateWithoutFuturesSeasonPricesInput = {
   quotes?: Prisma.QuoteCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutAssetPriceSnapshotInput
   protectionChildren?: Prisma.ProtectionChildCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotUncheckedCreateWithoutFuturesSeasonPricesInput = {
@@ -1218,6 +1510,8 @@ export type AssetPriceSnapshotUncheckedCreateWithoutFuturesSeasonPricesInput = {
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
   protectionChildren?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutAssetPriceSnapshotInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type AssetPriceSnapshotCreateOrConnectWithoutFuturesSeasonPricesInput = {
@@ -1254,6 +1548,8 @@ export type AssetPriceSnapshotUpdateWithoutFuturesSeasonPricesInput = {
   quotes?: Prisma.QuoteUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutFuturesSeasonPricesInput = {
@@ -1274,6 +1570,8 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutFuturesSeasonPricesInput = {
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotCreateManyAssetInput = {
@@ -1309,6 +1607,8 @@ export type AssetPriceSnapshotUpdateWithoutAssetInput = {
   futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
@@ -1329,6 +1629,8 @@ export type AssetPriceSnapshotUncheckedUpdateWithoutAssetInput = {
   futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
   futuresSeasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutSnapshotNestedInput
   protectionChildren?: Prisma.ProtectionChildUncheckedUpdateManyWithoutAssetPriceSnapshotNestedInput
+  conditionalBuyRegistrations?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalBuyTriggers?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type AssetPriceSnapshotUncheckedUpdateManyWithoutAssetInput = {
@@ -1357,6 +1659,8 @@ export type AssetPriceSnapshotCountOutputType = {
   futuresExecutions: number
   futuresSeasonPrices: number
   protectionChildren: number
+  conditionalBuyRegistrations: number
+  conditionalBuyTriggers: number
 }
 
 export type AssetPriceSnapshotCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1365,6 +1669,8 @@ export type AssetPriceSnapshotCountOutputTypeSelect<ExtArgs extends runtime.Type
   futuresExecutions?: boolean | AssetPriceSnapshotCountOutputTypeCountFuturesExecutionsArgs
   futuresSeasonPrices?: boolean | AssetPriceSnapshotCountOutputTypeCountFuturesSeasonPricesArgs
   protectionChildren?: boolean | AssetPriceSnapshotCountOutputTypeCountProtectionChildrenArgs
+  conditionalBuyRegistrations?: boolean | AssetPriceSnapshotCountOutputTypeCountConditionalBuyRegistrationsArgs
+  conditionalBuyTriggers?: boolean | AssetPriceSnapshotCountOutputTypeCountConditionalBuyTriggersArgs
 }
 
 /**
@@ -1412,6 +1718,20 @@ export type AssetPriceSnapshotCountOutputTypeCountProtectionChildrenArgs<ExtArgs
   where?: Prisma.ProtectionChildWhereInput
 }
 
+/**
+ * AssetPriceSnapshotCountOutputType without action
+ */
+export type AssetPriceSnapshotCountOutputTypeCountConditionalBuyRegistrationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ConditionalBuyOrderWhereInput
+}
+
+/**
+ * AssetPriceSnapshotCountOutputType without action
+ */
+export type AssetPriceSnapshotCountOutputTypeCountConditionalBuyTriggersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ConditionalBuyOrderWhereInput
+}
+
 
 export type AssetPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1433,6 +1753,8 @@ export type AssetPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.In
   futuresExecutions?: boolean | Prisma.AssetPriceSnapshot$futuresExecutionsArgs<ExtArgs>
   futuresSeasonPrices?: boolean | Prisma.AssetPriceSnapshot$futuresSeasonPricesArgs<ExtArgs>
   protectionChildren?: boolean | Prisma.AssetPriceSnapshot$protectionChildrenArgs<ExtArgs>
+  conditionalBuyRegistrations?: boolean | Prisma.AssetPriceSnapshot$conditionalBuyRegistrationsArgs<ExtArgs>
+  conditionalBuyTriggers?: boolean | Prisma.AssetPriceSnapshot$conditionalBuyTriggersArgs<ExtArgs>
   _count?: boolean | Prisma.AssetPriceSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["assetPriceSnapshot"]>
 
@@ -1494,6 +1816,8 @@ export type AssetPriceSnapshotInclude<ExtArgs extends runtime.Types.Extensions.I
   futuresExecutions?: boolean | Prisma.AssetPriceSnapshot$futuresExecutionsArgs<ExtArgs>
   futuresSeasonPrices?: boolean | Prisma.AssetPriceSnapshot$futuresSeasonPricesArgs<ExtArgs>
   protectionChildren?: boolean | Prisma.AssetPriceSnapshot$protectionChildrenArgs<ExtArgs>
+  conditionalBuyRegistrations?: boolean | Prisma.AssetPriceSnapshot$conditionalBuyRegistrationsArgs<ExtArgs>
+  conditionalBuyTriggers?: boolean | Prisma.AssetPriceSnapshot$conditionalBuyTriggersArgs<ExtArgs>
   _count?: boolean | Prisma.AssetPriceSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AssetPriceSnapshotIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1512,6 +1836,8 @@ export type $AssetPriceSnapshotPayload<ExtArgs extends runtime.Types.Extensions.
     futuresExecutions: Prisma.$FuturesExecutionPayload<ExtArgs>[]
     futuresSeasonPrices: Prisma.$FuturesSeasonPricePayload<ExtArgs>[]
     protectionChildren: Prisma.$ProtectionChildPayload<ExtArgs>[]
+    conditionalBuyRegistrations: Prisma.$ConditionalBuyOrderPayload<ExtArgs>[]
+    conditionalBuyTriggers: Prisma.$ConditionalBuyOrderPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1927,6 +2253,8 @@ export interface Prisma__AssetPriceSnapshotClient<T, Null = never, ExtArgs exten
   futuresExecutions<T extends Prisma.AssetPriceSnapshot$futuresExecutionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$futuresExecutionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   futuresSeasonPrices<T extends Prisma.AssetPriceSnapshot$futuresSeasonPricesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$futuresSeasonPricesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonPricePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   protectionChildren<T extends Prisma.AssetPriceSnapshot$protectionChildrenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$protectionChildrenArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionChildPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  conditionalBuyRegistrations<T extends Prisma.AssetPriceSnapshot$conditionalBuyRegistrationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$conditionalBuyRegistrationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConditionalBuyOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  conditionalBuyTriggers<T extends Prisma.AssetPriceSnapshot$conditionalBuyTriggersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetPriceSnapshot$conditionalBuyTriggersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConditionalBuyOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2487,6 +2815,54 @@ export type AssetPriceSnapshot$protectionChildrenArgs<ExtArgs extends runtime.Ty
   take?: number
   skip?: number
   distinct?: Prisma.ProtectionChildScalarFieldEnum | Prisma.ProtectionChildScalarFieldEnum[]
+}
+
+/**
+ * AssetPriceSnapshot.conditionalBuyRegistrations
+ */
+export type AssetPriceSnapshot$conditionalBuyRegistrationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ConditionalBuyOrder
+   */
+  select?: Prisma.ConditionalBuyOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ConditionalBuyOrder
+   */
+  omit?: Prisma.ConditionalBuyOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConditionalBuyOrderInclude<ExtArgs> | null
+  where?: Prisma.ConditionalBuyOrderWhereInput
+  orderBy?: Prisma.ConditionalBuyOrderOrderByWithRelationInput | Prisma.ConditionalBuyOrderOrderByWithRelationInput[]
+  cursor?: Prisma.ConditionalBuyOrderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ConditionalBuyOrderScalarFieldEnum | Prisma.ConditionalBuyOrderScalarFieldEnum[]
+}
+
+/**
+ * AssetPriceSnapshot.conditionalBuyTriggers
+ */
+export type AssetPriceSnapshot$conditionalBuyTriggersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ConditionalBuyOrder
+   */
+  select?: Prisma.ConditionalBuyOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ConditionalBuyOrder
+   */
+  omit?: Prisma.ConditionalBuyOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConditionalBuyOrderInclude<ExtArgs> | null
+  where?: Prisma.ConditionalBuyOrderWhereInput
+  orderBy?: Prisma.ConditionalBuyOrderOrderByWithRelationInput | Prisma.ConditionalBuyOrderOrderByWithRelationInput[]
+  cursor?: Prisma.ConditionalBuyOrderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ConditionalBuyOrderScalarFieldEnum | Prisma.ConditionalBuyOrderScalarFieldEnum[]
 }
 
 /**

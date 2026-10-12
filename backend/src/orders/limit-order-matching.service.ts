@@ -26,7 +26,7 @@ import {
 } from './limit-order-candle-evidence.service';
 import {
   LimitOrderExecutionService,
-  type LimitFillPlan,
+  type ContinuousLimitFillPlan,
 } from './limit-order-execution.service';
 import {
   addLimitMatchingSample,
@@ -66,7 +66,7 @@ type PathASnapshotEvaluation = {
   reason: SnapshotSelectionReason;
 };
 type FillPlanDecision = {
-  plan: LimitFillPlan | null;
+  plan: ContinuousLimitFillPlan | null;
   pathA: PathAReason;
   pathB: PathBReason;
   candleOrderExclusions: Partial<Record<CandleOrderExclusionReason, number>>;

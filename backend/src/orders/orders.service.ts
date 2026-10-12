@@ -18,6 +18,16 @@ import {
 } from '../conditional/conditional-policy';
 import { createProtectionInTransaction } from '../conditional/conditional-registration';
 import {
+  linkConditionalBuyOrder,
+  lockTriggeredConditionalBuy,
+} from '../conditional/conditional-buy-state';
+import { readLimitOnCloseConfig } from './limit-on-close.config';
+import {
+  resolveLimitOnCloseRegistration,
+  sessionDateText,
+} from './limit-on-close.policy';
+import { LIMIT_ON_CLOSE_SELECT } from './limit-on-close-state';
+import {
   buildSelectionFailureEvidence,
   describeManualFallback,
 } from '../providers/source-selection-diagnostics';
@@ -174,6 +184,8 @@ export type OrdersQuery = {
 
 export type OrderRequestBody = {
   attachedProtection?: unknown;
+  /** Additive LOC flag: `true` on a KRX stock BUY limit (server-gated). */
+  limitOnClose?: unknown;
   assetId?: unknown;
   side?: unknown;
   orderType?: unknown;
@@ -233,7 +245,10 @@ type OrderAsset = {
 type ParsedOrderRequest = {
   /** Internal worker capability, never parsed from HTTP. */
   protectionChildId?: string;
+  /** Internal worker capability, never parsed from HTTP. */
+  conditionalBuyOrderId?: string;
   attachedProtection?: ProtectionLegInput[];
+  limitOnClose?: true;
   assetId: string;
   side: OrderSide;
   orderType: OrderType;
@@ -799,6 +814,7 @@ export class OrdersService {
     const request = this.parseOrderRequest(body);
 
     if (request.orderType === OrderType.limit) {
+      this.assertLimitOnCloseFeatureEnabled(request);
       return this.quoteLimitBuyOrder(userId, request, quoteAt);
     }
 
@@ -826,6 +842,7 @@ export class OrdersService {
     tradingAccountId: string,
     body: OrderRequestBody = {},
     conditionalChildId?: string,
+    conditionalBuyOrderId?: string,
   ): Promise<OrderQuoteResponse> {
     if (!userId) {
       this.throwApiError(
@@ -837,6 +854,25 @@ export class OrdersService {
 
     const quoteAt = new Date();
     const request = this.parseOrderRequest(body);
+    if (conditionalBuyOrderId) {
+      // Courtesy pre-check; create re-locks and re-validates the watch.
+      const watch = await this.prisma.conditionalBuyOrder.findFirst({
+        where: {
+          id: conditionalBuyOrderId,
+          tradingAccountId,
+          status: 'triggered',
+          orderId: null,
+        },
+        select: { id: true },
+      });
+      if (!watch)
+        throw createApiError(
+          'CONDITIONAL_BUY_CHANGED',
+          'The conditional order changed before execution.',
+          409,
+        );
+      request.conditionalBuyOrderId = conditionalBuyOrderId;
+    }
     if (conditionalChildId) {
       await assertPendingChild(
         this.prisma,
@@ -854,6 +890,7 @@ export class OrdersService {
 
     if (request.orderType === OrderType.limit) {
       this.assertLimitOrderFeatureEnabled();
+      this.assertLimitOnCloseFeatureEnabled(request);
       return this.quoteLimitBuyOrderForContext(
         userId,
         request,
@@ -976,6 +1013,15 @@ export class OrdersService {
     }
     // Confirmed CLOSED permits registration; an unknown calendar fails closed.
     this.assertOrderAssetTradable(asset, quoteAt, OrderType.limit);
+    // LOC courtesy check only; create re-validates at its post-lock DB clock.
+    const limitOnClose = request.limitOnClose
+      ? resolveLimitOnCloseRegistration({
+          asset,
+          now: quoteAt,
+          seasonEndAt: context.season?.endAt ?? null,
+          config: readLimitOnCloseConfig(),
+        })
+      : null;
 
     const settlementCurrency = this.getAssetSettlementCurrency(asset);
     const preview = await limitOrderCreate.buildLimitBuyQuotePreview({
@@ -1098,7 +1144,22 @@ export class OrdersService {
           preview.estimatedAvailableAfter,
           monetaryScale,
         ),
-        executionPolicy: this.limitOrderExecutionPolicy(),
+        executionPolicy: limitOnClose
+          ? buildLimitOrderExecutionPolicy({ autoExecutionEnabled: false })
+          : this.limitOrderExecutionPolicy(),
+        ...(limitOnClose
+          ? {
+              limitOnClose: {
+                market: limitOnClose.market,
+                sessionDate: sessionDateText(limitOnClose.sessionDate),
+                sessionOpenAt: limitOnClose.session.openTime.toISOString(),
+                sessionCloseAt: limitOnClose.session.closeTime.toISOString(),
+                evidenceDeadlineAt:
+                  limitOnClose.evidenceDeadlineAt.toISOString(),
+                executionPricePolicy: 'final_regular_session_close' as const,
+              },
+            }
+          : {}),
       },
     };
   }
@@ -1337,6 +1398,7 @@ export class OrdersService {
     tradingAccountId: string,
     body: OrderRequestBody = {},
     conditionalChildId?: string,
+    conditionalBuyOrderId?: string,
   ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     if (!userId) {
       this.throwApiError(
@@ -1348,6 +1410,7 @@ export class OrdersService {
 
     const request = this.parseOrderRequest(body);
     request.protectionChildId = conditionalChildId;
+    request.conditionalBuyOrderId = conditionalBuyOrderId;
     const submittedAt = new Date();
 
     if (request.orderType === OrderType.limit) {
@@ -1473,6 +1536,13 @@ export class OrdersService {
           transactionNow,
           input.conditionalChildId,
         );
+        if (request.conditionalBuyOrderId)
+          await lockTriggeredConditionalBuy(
+            tx,
+            request.conditionalBuyOrderId,
+            tradingAccountId,
+            request,
+          );
         transactionNow = await this.readTransactionWallClock(tx);
         const quote = await this.findActiveOrderQuoteForCreateOrThrow(tx, {
           quoteId,
@@ -1563,6 +1633,14 @@ export class OrdersService {
             where: { id: input.conditionalChildId },
             data: { orderId },
           });
+        if (request.conditionalBuyOrderId)
+          await linkConditionalBuyOrder(
+            tx,
+            request.conditionalBuyOrderId,
+            tradingAccountId,
+            orderId,
+            transactionNow,
+          );
         const executionOrder = order as OrderExecutionRecord;
         this.assertExecutableSeasonAndAsset(executionOrder, transactionNow);
         const plan = await this.buildOrderExecutionPlan(
@@ -1675,6 +1753,7 @@ export class OrdersService {
       return this.replayIdempotentCreateOrder(replayedOrder, idempotency);
     }
     this.assertLimitOrderFeatureEnabled();
+    this.assertLimitOnCloseFeatureEnabled(request);
     const submittedAt = new Date();
     // Pre-transaction checks are a fast-fail courtesy only: they give the user
     // a clean error without opening a transaction. They are NOT the basis of
@@ -1746,6 +1825,7 @@ export class OrdersService {
     }
 
     this.assertLimitOrderFeatureEnabled();
+    this.assertLimitOnCloseFeatureEnabled(request);
     const submittedAt = new Date();
     const context = await this.resolveAccountTradingContextForAccount(
       account,
@@ -1816,6 +1896,13 @@ export class OrdersService {
           transactionNow,
           input.conditionalChildId,
         );
+        if (request.conditionalBuyOrderId)
+          await lockTriggeredConditionalBuy(
+            tx,
+            request.conditionalBuyOrderId,
+            tradingAccountId,
+            request,
+          );
         transactionNow = await this.readTransactionWallClock(tx);
         if (lockedContext) {
           limitOrderCreate.assertLockedTradableContext(
@@ -1842,6 +1929,15 @@ export class OrdersService {
           transactionNow,
           OrderType.limit,
         );
+        // LOC binds to the session OPEN at this post-lock DB clock.
+        const limitOnClose = request.limitOnClose
+          ? resolveLimitOnCloseRegistration({
+              asset: quote.asset,
+              now: transactionNow,
+              seasonEndAt: lockedContext?.seasonEndAt ?? null,
+              config: readLimitOnCloseConfig(),
+            })
+          : undefined;
 
         if (!quote.limitPrice) {
           this.throwApiError(
@@ -1890,9 +1986,17 @@ export class OrdersService {
           return response;
         }
         const response =
-          await limitOrderCreate.createSubmittedLimitBuyInTransaction(
+          await limitOrderCreate.createSubmittedLimitBuyInTransaction(tx, {
+            ...createInput,
+            limitOnClose,
+          });
+        if (request.conditionalBuyOrderId)
+          await linkConditionalBuyOrder(
             tx,
-            createInput,
+            request.conditionalBuyOrderId,
+            tradingAccountId,
+            response.data.order.orderId,
+            transactionNow,
           );
         if (request.attachedProtection)
           await createProtectionInTransaction(tx, {
@@ -2411,6 +2515,7 @@ export class OrdersService {
           id: true,
           quoteId: true,
           protectionChild: { select: { id: true } },
+          limitOnClose: { select: LIMIT_ON_CLOSE_SELECT },
           side: true,
           orderType: true,
           status: true,
@@ -2509,6 +2614,7 @@ export class OrdersService {
             sourceType: true,
           },
         },
+        limitOnClose: { select: LIMIT_ON_CLOSE_SELECT },
       },
     });
 
@@ -2992,6 +3098,57 @@ export class OrdersService {
         idempotencyKey: `protection:${childId}`,
       },
       childId,
+    );
+  }
+
+  /**
+   * Worker-only adapter for a triggered conditional BUY. The ordinary user
+   * quote/create core prices, reserves or executes, and settles; the watch is
+   * re-locked and linked inside that create transaction. The deterministic
+   * idempotency key keeps at most one Order per watch.
+   */
+  async executeConditionalBuy(
+    userId: string,
+    accountId: string,
+    conditionalBuyOrderId: string,
+  ) {
+    const watch = await this.prisma.conditionalBuyOrder.findFirst({
+      where: {
+        id: conditionalBuyOrderId,
+        tradingAccountId: accountId,
+        status: 'triggered',
+        orderId: null,
+      },
+    });
+    if (!watch) return null;
+    const request: OrderRequestBody = {
+      assetId: watch.assetId,
+      side: OrderSide.buy,
+      orderType: watch.executionType,
+      ...(watch.amount
+        ? { amount: watch.amount.toFixed(monetaryScale) }
+        : { quantity: watch.quantity!.toFixed(quantityScale) }),
+      ...(watch.limitPrice
+        ? { limitPrice: watch.limitPrice.toFixed(monetaryScale) }
+        : {}),
+    };
+    const quote = await this.quoteOrderForTradingAccount(
+      userId,
+      accountId,
+      request,
+      undefined,
+      conditionalBuyOrderId,
+    );
+    return this.createOrderForTradingAccount(
+      userId,
+      accountId,
+      {
+        ...request,
+        quoteId: quote.data.quoteId,
+        idempotencyKey: `conditional-buy:${conditionalBuyOrderId}`,
+      },
+      undefined,
+      conditionalBuyOrderId,
     );
   }
 
@@ -5801,6 +5958,8 @@ export class OrdersService {
       ...(request.attachedProtection
         ? { attachedProtection: request.attachedProtection }
         : {}),
+      // Legacy requests keep their exact hash bytes.
+      ...(request.limitOnClose ? { limitOnClose: true } : {}),
     };
     const canonicalJson = JSON.stringify(canonicalPayload);
     const requestHash = createHash('sha256')
@@ -5834,6 +5993,11 @@ export class OrdersService {
         'Attached protection is supported only on Spot BUY Limit entries.',
         400,
       );
+    const limitOnClose = this.parseLimitOnClose(body.limitOnClose, {
+      side,
+      orderType,
+      attachedProtection: !!attachedProtection,
+    });
     if (
       this.hasProvidedValue(body.amount) &&
       this.hasProvidedValue(body.quantity)
@@ -5888,6 +6052,7 @@ export class OrdersService {
       quantity,
       amount,
       attachedProtection,
+      ...(limitOnClose ? { limitOnClose } : {}),
       limitPrice: this.parsePositiveDecimalField(
         body.limitPrice,
         'limitPrice',
@@ -5895,6 +6060,53 @@ export class OrdersService {
       ),
       currencyCode: this.parseOptionalCurrencyCode(body.currencyCode),
     };
+  }
+
+  /** Strict additive flag. Absent/false keeps every existing request shape. */
+  private parseLimitOnClose(
+    value: unknown,
+    request: {
+      side: OrderSide;
+      orderType: OrderType;
+      attachedProtection: boolean;
+    },
+  ): true | undefined {
+    if (value === undefined || value === null || value === false)
+      return undefined;
+    if (value !== true)
+      throw createApiError(
+        'INVALID_LIMIT_ON_CLOSE',
+        'limitOnClose must be a boolean.',
+        400,
+      );
+    if (request.orderType !== OrderType.limit)
+      throw createApiError(
+        'INVALID_LIMIT_ON_CLOSE',
+        'Limit-on-Close requires a limit order.',
+        400,
+      );
+    if (request.side !== OrderSide.buy)
+      throw createApiError(
+        'LOC_SIDE_NOT_SUPPORTED',
+        'Limit-on-Close currently supports BUY orders only.',
+        400,
+      );
+    if (request.attachedProtection)
+      throw createApiError(
+        'LOC_ATTACHED_PROTECTION_NOT_SUPPORTED',
+        'Attached protection is not available on Limit-on-Close orders.',
+        400,
+      );
+    return true;
+  }
+
+  private assertLimitOnCloseFeatureEnabled(request: ParsedOrderRequest) {
+    if (request.limitOnClose && !readLimitOnCloseConfig().enabled)
+      throw createApiError(
+        'LOC_ORDERS_DISABLED',
+        'Limit-on-Close orders are currently disabled.',
+        409,
+      );
   }
 
   private parseOrderId(orderId: string | undefined): string {

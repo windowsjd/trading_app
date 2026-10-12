@@ -354,7 +354,9 @@ export const OpsJobName = {
   futures_mark_retention: 'futures_mark_retention',
   conditional_orders: 'conditional_orders',
   futures_limit_matching: 'futures_limit_matching',
-  futures_last_price_retention: 'futures_last_price_retention'
+  futures_last_price_retention: 'futures_last_price_retention',
+  conditional_buy_orders: 'conditional_buy_orders',
+  limit_on_close_settlement: 'limit_on_close_settlement'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -472,6 +474,44 @@ export const ProtectionChildStatus = {
 } as const
 
 export type ProtectionChildStatus = (typeof ProtectionChildStatus)[keyof typeof ProtectionChildStatus]
+
+
+export const ConditionalBuyTrigger = {
+  at_or_above: 'at_or_above',
+  at_or_below: 'at_or_below'
+} as const
+
+export type ConditionalBuyTrigger = (typeof ConditionalBuyTrigger)[keyof typeof ConditionalBuyTrigger]
+
+
+export const ConditionalBuyStatus = {
+  watching: 'watching',
+  triggered: 'triggered',
+  ordered: 'ordered',
+  canceled: 'canceled',
+  failed: 'failed'
+} as const
+
+export type ConditionalBuyStatus = (typeof ConditionalBuyStatus)[keyof typeof ConditionalBuyStatus]
+
+
+export const LimitOnCloseStatus = {
+  pending: 'pending',
+  filled: 'filled',
+  unfilled: 'unfilled',
+  expired: 'expired',
+  canceled: 'canceled'
+} as const
+
+export type LimitOnCloseStatus = (typeof LimitOnCloseStatus)[keyof typeof LimitOnCloseStatus]
+
+
+export const SessionCloseEvidenceStatus = {
+  observing: 'observing',
+  final: 'final'
+} as const
+
+export type SessionCloseEvidenceStatus = (typeof SessionCloseEvidenceStatus)[keyof typeof SessionCloseEvidenceStatus]
 
 
 export const FuturesMarkSource = {

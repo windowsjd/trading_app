@@ -527,6 +527,7 @@ export class SeasonSettlementJobService {
       reservedPositionCount,
       activeProtectionCount,
       openFuturesEntryCount,
+      liveConditionalBuyCount,
     ] = await Promise.all([
       client.order.count({
         where: {
@@ -559,6 +560,13 @@ export class SeasonSettlementJobService {
           tradingAccount: { seasonParticipant: { seasonId } },
         },
       }),
+      // Reservation-free watches still must not outlive the final result.
+      client.conditionalBuyOrder.count({
+        where: {
+          status: { in: ['watching', 'triggered'] },
+          tradingAccount: { seasonParticipant: { seasonId } },
+        },
+      }),
     ]);
 
     if (
@@ -566,7 +574,8 @@ export class SeasonSettlementJobService {
       reservedWalletCount > 0 ||
       reservedPositionCount > 0 ||
       activeProtectionCount > 0 ||
-      openFuturesEntryCount > 0
+      openFuturesEntryCount > 0 ||
+      liveConditionalBuyCount > 0
     ) {
       this.logger.error(
         JSON.stringify({
@@ -577,6 +586,7 @@ export class SeasonSettlementJobService {
           reservedPositionCount,
           activeProtectionCount,
           openFuturesEntryCount,
+          liveConditionalBuyCount,
           recovery:
             'run season lifecycle transition cleanup to cancel open limit orders and release reservations, then retry settlement',
         }),

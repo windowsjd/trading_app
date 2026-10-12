@@ -413,6 +413,9 @@ export const ModelName = {
   ProtectionCommand: 'ProtectionCommand',
   Position: 'Position',
   Order: 'Order',
+  ConditionalBuyOrder: 'ConditionalBuyOrder',
+  LimitOnCloseOrder: 'LimitOnCloseOrder',
+  SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
@@ -453,7 +456,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2600,6 +2603,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.OrderCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.OrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    ConditionalBuyOrder: {
+      payload: Prisma.$ConditionalBuyOrderPayload<ExtArgs>
+      fields: Prisma.ConditionalBuyOrderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ConditionalBuyOrderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ConditionalBuyOrderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>
+        }
+        findFirst: {
+          args: Prisma.ConditionalBuyOrderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ConditionalBuyOrderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>
+        }
+        findMany: {
+          args: Prisma.ConditionalBuyOrderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>[]
+        }
+        create: {
+          args: Prisma.ConditionalBuyOrderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>
+        }
+        createMany: {
+          args: Prisma.ConditionalBuyOrderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ConditionalBuyOrderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>[]
+        }
+        delete: {
+          args: Prisma.ConditionalBuyOrderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>
+        }
+        update: {
+          args: Prisma.ConditionalBuyOrderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>
+        }
+        deleteMany: {
+          args: Prisma.ConditionalBuyOrderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ConditionalBuyOrderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ConditionalBuyOrderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>[]
+        }
+        upsert: {
+          args: Prisma.ConditionalBuyOrderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ConditionalBuyOrderPayload>
+        }
+        aggregate: {
+          args: Prisma.ConditionalBuyOrderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateConditionalBuyOrder>
+        }
+        groupBy: {
+          args: Prisma.ConditionalBuyOrderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ConditionalBuyOrderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ConditionalBuyOrderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ConditionalBuyOrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    LimitOnCloseOrder: {
+      payload: Prisma.$LimitOnCloseOrderPayload<ExtArgs>
+      fields: Prisma.LimitOnCloseOrderFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LimitOnCloseOrderFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LimitOnCloseOrderFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>
+        }
+        findFirst: {
+          args: Prisma.LimitOnCloseOrderFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LimitOnCloseOrderFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>
+        }
+        findMany: {
+          args: Prisma.LimitOnCloseOrderFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>[]
+        }
+        create: {
+          args: Prisma.LimitOnCloseOrderCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>
+        }
+        createMany: {
+          args: Prisma.LimitOnCloseOrderCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LimitOnCloseOrderCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>[]
+        }
+        delete: {
+          args: Prisma.LimitOnCloseOrderDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>
+        }
+        update: {
+          args: Prisma.LimitOnCloseOrderUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>
+        }
+        deleteMany: {
+          args: Prisma.LimitOnCloseOrderDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LimitOnCloseOrderUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LimitOnCloseOrderUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>[]
+        }
+        upsert: {
+          args: Prisma.LimitOnCloseOrderUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LimitOnCloseOrderPayload>
+        }
+        aggregate: {
+          args: Prisma.LimitOnCloseOrderAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLimitOnCloseOrder>
+        }
+        groupBy: {
+          args: Prisma.LimitOnCloseOrderGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOnCloseOrderGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LimitOnCloseOrderCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LimitOnCloseOrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    SessionClosePriceEvidence: {
+      payload: Prisma.$SessionClosePriceEvidencePayload<ExtArgs>
+      fields: Prisma.SessionClosePriceEvidenceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.SessionClosePriceEvidenceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.SessionClosePriceEvidenceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>
+        }
+        findFirst: {
+          args: Prisma.SessionClosePriceEvidenceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.SessionClosePriceEvidenceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>
+        }
+        findMany: {
+          args: Prisma.SessionClosePriceEvidenceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>[]
+        }
+        create: {
+          args: Prisma.SessionClosePriceEvidenceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>
+        }
+        createMany: {
+          args: Prisma.SessionClosePriceEvidenceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.SessionClosePriceEvidenceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>[]
+        }
+        delete: {
+          args: Prisma.SessionClosePriceEvidenceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>
+        }
+        update: {
+          args: Prisma.SessionClosePriceEvidenceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>
+        }
+        deleteMany: {
+          args: Prisma.SessionClosePriceEvidenceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.SessionClosePriceEvidenceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.SessionClosePriceEvidenceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>[]
+        }
+        upsert: {
+          args: Prisma.SessionClosePriceEvidenceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SessionClosePriceEvidencePayload>
+        }
+        aggregate: {
+          args: Prisma.SessionClosePriceEvidenceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSessionClosePriceEvidence>
+        }
+        groupBy: {
+          args: Prisma.SessionClosePriceEvidenceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SessionClosePriceEvidenceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.SessionClosePriceEvidenceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SessionClosePriceEvidenceCountAggregateOutputType> | number
         }
       }
     }
@@ -5058,6 +5283,7 @@ export const OrderScalarFieldEnum = {
   reservationReleasedAt: 'reservationReleasedAt',
   cancelReason: 'cancelReason',
   limitOrderCandleEvidenceId: 'limitOrderCandleEvidenceId',
+  sessionCloseEvidenceId: 'sessionCloseEvidenceId',
   submittedAt: 'submittedAt',
   executedAt: 'executedAt',
   canceledAt: 'canceledAt',
@@ -5068,6 +5294,88 @@ export const OrderScalarFieldEnum = {
 } as const
 
 export type OrderScalarFieldEnum = (typeof OrderScalarFieldEnum)[keyof typeof OrderScalarFieldEnum]
+
+
+export const ConditionalBuyOrderScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  triggerCondition: 'triggerCondition',
+  triggerPrice: 'triggerPrice',
+  executionType: 'executionType',
+  limitPrice: 'limitPrice',
+  quantity: 'quantity',
+  amount: 'amount',
+  currencyCode: 'currencyCode',
+  status: 'status',
+  orderId: 'orderId',
+  registrationSnapshotId: 'registrationSnapshotId',
+  triggerSnapshotId: 'triggerSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ConditionalBuyOrderScalarFieldEnum = (typeof ConditionalBuyOrderScalarFieldEnum)[keyof typeof ConditionalBuyOrderScalarFieldEnum]
+
+
+export const LimitOnCloseOrderScalarFieldEnum = {
+  orderId: 'orderId',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  market: 'market',
+  sessionDate: 'sessionDate',
+  sessionOpenAt: 'sessionOpenAt',
+  sessionCloseAt: 'sessionCloseAt',
+  evidenceDeadlineAt: 'evidenceDeadlineAt',
+  status: 'status',
+  decisionReason: 'decisionReason',
+  decidedAt: 'decidedAt',
+  closeEvidenceId: 'closeEvidenceId',
+  closePrice: 'closePrice',
+  lastCheckCode: 'lastCheckCode',
+  lastCheckedAt: 'lastCheckedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LimitOnCloseOrderScalarFieldEnum = (typeof LimitOnCloseOrderScalarFieldEnum)[keyof typeof LimitOnCloseOrderScalarFieldEnum]
+
+
+export const SessionClosePriceEvidenceScalarFieldEnum = {
+  id: 'id',
+  assetId: 'assetId',
+  market: 'market',
+  sessionDate: 'sessionDate',
+  sessionCloseAt: 'sessionCloseAt',
+  provider: 'provider',
+  sourceName: 'sourceName',
+  providerSymbol: 'providerSymbol',
+  providerTradingDate: 'providerTradingDate',
+  closePrice: 'closePrice',
+  currencyCode: 'currencyCode',
+  status: 'status',
+  firstObservedAt: 'firstObservedAt',
+  lastObservedAt: 'lastObservedAt',
+  observationCount: 'observationCount',
+  mismatchCount: 'mismatchCount',
+  finalizedAt: 'finalizedAt',
+  firstRawJson: 'firstRawJson',
+  confirmRawJson: 'confirmRawJson',
+  policyVersion: 'policyVersion',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type SessionClosePriceEvidenceScalarFieldEnum = (typeof SessionClosePriceEvidenceScalarFieldEnum)[keyof typeof SessionClosePriceEvidenceScalarFieldEnum]
 
 
 export const BeginnerQuestAcknowledgementScalarFieldEnum = {
@@ -6155,6 +6463,62 @@ export type ListEnumWalletScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$
 
 
 /**
+ * Reference to a field of type 'ConditionalBuyTrigger'
+ */
+export type EnumConditionalBuyTriggerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConditionalBuyTrigger'>
+    
+
+
+/**
+ * Reference to a field of type 'ConditionalBuyTrigger[]'
+ */
+export type ListEnumConditionalBuyTriggerFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConditionalBuyTrigger[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ConditionalBuyStatus'
+ */
+export type EnumConditionalBuyStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConditionalBuyStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ConditionalBuyStatus[]'
+ */
+export type ListEnumConditionalBuyStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ConditionalBuyStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'LimitOnCloseStatus'
+ */
+export type EnumLimitOnCloseStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LimitOnCloseStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'LimitOnCloseStatus[]'
+ */
+export type ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LimitOnCloseStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'SessionCloseEvidenceStatus'
+ */
+export type EnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SessionCloseEvidenceStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'SessionCloseEvidenceStatus[]'
+ */
+export type ListEnumSessionCloseEvidenceStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SessionCloseEvidenceStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'WalletTransactionDirection'
  */
 export type EnumWalletTransactionDirectionFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletTransactionDirection'>
@@ -6515,6 +6879,9 @@ export type GlobalOmitConfig = {
   protectionCommand?: Prisma.ProtectionCommandOmit
   position?: Prisma.PositionOmit
   order?: Prisma.OrderOmit
+  conditionalBuyOrder?: Prisma.ConditionalBuyOrderOmit
+  limitOnCloseOrder?: Prisma.LimitOnCloseOrderOmit
+  sessionClosePriceEvidence?: Prisma.SessionClosePriceEvidenceOmit
   beginnerQuestAcknowledgement?: Prisma.BeginnerQuestAcknowledgementOmit
   cashWallet?: Prisma.CashWalletOmit
   walletTransaction?: Prisma.WalletTransactionOmit

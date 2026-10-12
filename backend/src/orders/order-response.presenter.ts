@@ -7,6 +7,10 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
+import {
+  presentLimitOnClose,
+  type LimitOnCloseRecord,
+} from './limit-on-close-state';
 
 export const orderQuantityScale = 6;
 
@@ -39,6 +43,8 @@ export type OrderResponseRecord = {
   reservedQuantity?: Prisma.Decimal | null;
   reservationReleasedAt?: Date | null;
   cancelReason?: string | null;
+  /** Present (non-null) only on Limit-on-Close orders. */
+  limitOnClose?: LimitOnCloseRecord | null;
   submittedAt: Date;
   executedAt: Date | null;
   canceledAt: Date | null;
@@ -88,6 +94,9 @@ export function formatOrderResponse(order: OrderResponseRecord) {
     rejectReason: order.rejectReason,
     createdAt: order.createdAt.toISOString(),
     updatedAt: order.updatedAt.toISOString(),
+    ...(order.limitOnClose
+      ? { limitOnClose: presentLimitOnClose(order.limitOnClose) }
+      : {}),
   };
 }
 

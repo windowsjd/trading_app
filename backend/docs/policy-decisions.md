@@ -559,6 +559,15 @@ preserves financial atomicity without exchange-style fill event infrastructure.
   DISABLED에서는 user condition도 대기한다. Read/cancel/lifecycle cleanup과 risk는 분리한다.
   Production enable은 코드 완료와 별도다.
 
+## Conditional BUY · KRX LOC (2026-10-12, current)
+
+- [계약](conditional-buy-and-loc-contract.md): 매수 조건주문은 예약 없는 감시이며 발동 시 기존 quote→create로 시장가/지정가 주문 하나만 만든다. 근거: 금융 계산·예약·체결 코어를 복제하지 않고 실제 Order를 유일한 체결 증거로 둔다.
+- 별도 플래그 `CONDITIONAL_BUY_ORDERS_ENABLED`·`LOC_ORDERS_ENABLED`(기본 false)를 쓴다. 근거: 이미 켜질 수 있는 보호주문 플래그가 신규 기능을 공개하면 안 된다.
+- 발동은 등록 이후의 기존 Spot 적격 증거만 사용하고, 주식은 정규장 중에만 평가한다. 발동 후 30초·3회를 넘긴 일시 실패나 자금 부족 등 확정 실패는 `failed`로 끝낸다. 근거: 오래된 발동이 다른 가격으로 체결되거나 무한 재시도되면 안 된다.
+- LOC는 지정가 매수 예약을 그대로 쓰고 정규장 하나에 묶인다. 체결 가격은 확정 정규장 종가이며 종가 ≤ 지정가일 때만 체결한다. 매도 판정(종가 ≥ 지정가)은 공통 규칙으로만 둔다. 근거: 가상 LOC는 거래소 경매가 아니라 확정 종가 기준 판정이다.
+- 종가 증거는 KOSCOM 날짜 지정 일별 history(정확한 종목·거래일·마감 후 수신)를 마감 20분 후부터 수집하고, 5분 이상 간격으로 같은 값이 다시 관측되어야 final이다. 실시간 가격·분봉·일봉 캔들·전일 종가로 대체하지 않으며, 기한(마감 3시간) 안에 확정하지 못하면 예약을 해제하고 만료한다. 근거: 단일 응답만으로는 최종성을 증명할 수 없고, 미검증 가격으로 체결하거나 예약을 무기한 묶어 두면 안 된다.
+- 미국주식 조건주문·LOC는 데이터 제공처 확정 전까지 서버가 거부한다. 공통 market 컬럼과 세션·판정·최종성 구조만 둔다. 근거: 제공사 응답 형식을 가정한 구현은 하지 않는다.
+
 ## Futures Limit Entry·Crypto Market 통합 (2026-10-08, current)
 
 - Entry는 flat 신규 전량 진입이고 account/instrument당 pending 하나다. Cross/Isolated,

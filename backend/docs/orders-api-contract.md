@@ -734,6 +734,17 @@ reservationFeeRate, duplicate }` plus additive `executionPolicy`. On the order p
 nothing was executed. No provider price fields, no walletTransactionId, no
 positionId.
 
+### Limit-on-Close flag (2026-10-12, current)
+
+Additive `limitOnClose: true` on a KRX stock BUY limit quote/create
+(`LOC_ORDERS_ENABLED`, default false). It reuses this limit quote/create,
+reservation, cancel and cleanup contract, binds the order to the session open
+at the post-lock DB clock and settles only on final dated close evidence; the
+continuous matcher never fills it. Absent/false keeps existing request and hash
+bytes. Responses add `order.limitOnClose` for LOC orders only, and an executed
+LOC links `orders.session_close_evidence_id`. Full contract:
+[Conditional BUY / LOC](conditional-buy-and-loc-contract.md).
+
 ## POST /api/v1/orders/:orderId/cancel
 
 Cancels the caller's own SUBMITTED limit order and releases its cash or

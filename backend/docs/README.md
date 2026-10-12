@@ -21,6 +21,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/futures-risk-contract.md` — F2 Mark, Cross collateral, maintenance and full liquidation policy
    - `docs/futures-f3-contract.md` — Mark valuation, final Season exit (Futures Last since 2026-10-10), UI and release procedure
    - `docs/conditional-orders-contract.md` — SL/TP Market/Limit exits, OCO and attached Spot/Futures Limit entry; default OFF
+   - `docs/conditional-buy-and-loc-contract.md` — Conditional BUY watches (KRX/crypto Spot) and KRX Limit-on-Close with final close evidence; US extension contract; default OFF
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`

@@ -43,6 +43,11 @@ import {
   orderQuantityScale,
   type OrderResponsePayload,
 } from './order-response.presenter';
+import type { LimitOnCloseRegistration } from './limit-on-close.policy';
+import {
+  createLimitOnCloseInTransaction,
+  LIMIT_ON_CLOSE_SELECT,
+} from './limit-on-close-state';
 
 const LIMIT_ORDER_PAYLOAD_SELECT = {
   id: true,
@@ -79,6 +84,7 @@ const LIMIT_ORDER_PAYLOAD_SELECT = {
       currencyCode: true,
     },
   },
+  limitOnClose: { select: LIMIT_ON_CLOSE_SELECT },
 } as const;
 
 export type LimitBuyQuotePreview = {
@@ -572,6 +578,8 @@ export class LimitOrderCreateService {
       /** Whether the scheduler matcher will auto-fill this order; drives the
        * additive executionPolicy on the response. Defaults to false. */
       autoExecutionEnabled?: boolean;
+      /** Limit-on-Close session binding, already validated post-lock. */
+      limitOnClose?: LimitOnCloseRegistration;
     },
   ): Promise<LimitOrderCreateResponse> {
     setAdminDiagnosticContext({
@@ -708,6 +716,16 @@ export class LimitOrderCreateService {
       );
     }
 
+    // 3b) Limit-on-Close binds the same reservation to one regular session.
+    if (input.limitOnClose)
+      await createLimitOnCloseInTransaction(tx, {
+        orderId: created.id,
+        tradingAccountId: input.tradingAccountId,
+        assetId: input.quote.asset.id,
+        registration: input.limitOnClose,
+        now: input.submittedAt,
+      });
+
     setAdminDiagnosticContext({
       failureStage: 'order_read_back',
       evidence: {
@@ -753,8 +771,11 @@ export class LimitOrderCreateService {
           reservationFeeRate: reservationFeeRateText,
           duplicate: false,
         },
+        // The continuous matcher never fills a LOC order; its session
+        // settlement is described by order.limitOnClose instead.
         executionPolicy: buildLimitOrderExecutionPolicy({
-          autoExecutionEnabled: input.autoExecutionEnabled === true,
+          autoExecutionEnabled:
+            !input.limitOnClose && input.autoExecutionEnabled === true,
         }),
       },
     };

@@ -10,6 +10,12 @@ import {
 } from '../conditional/conditional-state';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import {
+  cancelLiveConditionalBuysInTransaction,
+  liveConditionalBuy,
+  type ConditionalBuyLifecycleReason,
+} from '../conditional/conditional-buy-state';
+import { limitOnCloseOrderCanceled } from './limit-on-close-state';
+import {
   CurrencyCode,
   WalletScope,
   OrderSide,
@@ -146,6 +152,74 @@ export class LimitOrderCancelService {
       canceledAt: now,
     });
   }
+
+  /**
+   * LOC session decision without a fill (close above limit, evidence missing
+   * by the deadline, invalid session, or a blocked fill at the deadline).
+   * Order lock → LOC decision → the shared release core, exactly like any
+   * other cancel. Returns false when the order already left `submitted`.
+   */
+  async decideLimitOnCloseWithoutFillInTransaction(
+    tx: CancelTransactionClient,
+    input: {
+      orderId: string;
+      status: 'unfilled' | 'expired';
+      reason: LimitOrderCancelReason;
+      now: Date;
+      evidence?: { id: string; closePrice: Prisma.Decimal } | null;
+    },
+  ): Promise<boolean> {
+    await tx.$queryRaw`SELECT id FROM orders WHERE id = ${input.orderId} FOR UPDATE`;
+    const order = await tx.order.findUnique({
+      where: { id: input.orderId },
+      include: {
+        limitOnClose: true,
+        tradingAccount: {
+          select: {
+            id: true,
+            mode: true,
+            seasonParticipant: { select: { id: true, tradingAccountId: true } },
+          },
+        },
+      },
+    });
+    if (
+      !order ||
+      order.status !== 'submitted' ||
+      order.orderType !== 'limit' ||
+      order.limitOnClose?.status !== 'pending'
+    )
+      return false;
+    const decided = await tx.limitOnCloseOrder.updateMany({
+      where: { orderId: input.orderId, status: 'pending' },
+      data: {
+        status: input.status,
+        decisionReason: input.reason,
+        decidedAt: input.now,
+        closeEvidenceId: input.evidence?.id ?? null,
+        closePrice: input.evidence?.closePrice ?? null,
+      },
+    });
+    if (decided.count !== 1)
+      this.throwLimitOrderError(
+        limitOrderErrorCodes.ORDER_CANCEL_CONFLICT,
+        'Order state changed while canceling.',
+      );
+    await this.releaseAndCancelLockedOrder(tx, {
+      orderId: order.id,
+      side: order.side,
+      assetId: order.assetId,
+      tradingAccountId: this.requireOrderTradingScopeForRelease(order),
+      currencyCode: order.currencyCode,
+      cashWalletScope: order.cashWalletScope,
+      reservedAmount: order.reservedAmount,
+      reservedQuantity: order.reservedQuantity,
+      cancelReason: input.reason,
+      canceledAt: input.now,
+    });
+    return true;
+  }
+
   private readonly logger = new Logger(LimitOrderCancelService.name);
 
   constructor(
@@ -413,6 +487,13 @@ export class LimitOrderCancelService {
         input.reason,
         input.canceledAt,
       );
+    // Conditional BUY watches reserve nothing; the same fence terminalizes them.
+    await cancelLiveConditionalBuysInTransaction(
+      tx,
+      input.tradingAccountId,
+      conditionalBuyLifecycleReason(input.reason),
+      input.canceledAt,
+    );
     return {
       canceledOrderCount,
       releasedReservationCount: canceledOrderCount,
@@ -601,6 +682,44 @@ export class LimitOrderCancelService {
           reason: 'season_ended',
           canceledAt: input.now,
         });
+      });
+    }
+    // Reservation-less conditional BUY watches of ended seasons, same fence.
+    const watches = await this.prisma.conditionalBuyOrder.findMany({
+      where: {
+        ...liveConditionalBuy,
+        tradingAccount: {
+          mode: 'season',
+          seasonParticipant: {
+            season: { status: { in: ['ended', 'settled'] } },
+          },
+        },
+      },
+      distinct: ['tradingAccountId'],
+      select: {
+        tradingAccountId: true,
+        tradingAccount: {
+          select: { seasonParticipant: { select: { id: true } } },
+        },
+      },
+      orderBy: { tradingAccountId: 'asc' },
+      take: batchSize,
+    });
+    for (const watch of watches) {
+      if (input.isLockOwned && !input.isLockOwned())
+        // @diagnosticSurface internal: Existing Ops runner records lease loss and retries lifecycle cleanup.
+        throw new Error('Ops job lock ownership was lost.');
+      await this.prisma.$transaction(async (tx) => {
+        await lockSeasonTradingContext(tx, {
+          seasonParticipantId: watch.tradingAccount.seasonParticipant!.id,
+          participantWrite: true,
+        });
+        await cancelLiveConditionalBuysInTransaction(
+          tx,
+          watch.tradingAccountId,
+          'season_ended',
+          input.now,
+        );
       });
     }
     if (canceledOrderCount > 0) {
@@ -929,6 +1048,12 @@ export class LimitOrderCancelService {
       input.cancelReason,
       input.canceledAt,
     );
+    await limitOnCloseOrderCanceled(
+      tx,
+      input.orderId,
+      input.cancelReason,
+      input.canceledAt,
+    );
     return {
       reservedAmount: releasedAmountText,
       reservedQuantity: releasedQuantityText,
@@ -1098,4 +1223,12 @@ export class LimitOrderCancelService {
       limitOrderErrorHttpStatus[code],
     );
   }
+}
+
+function conditionalBuyLifecycleReason(
+  reason: LimitOrderCancelReason,
+): ConditionalBuyLifecycleReason {
+  return reason === 'season_ended' || reason === 'participant_excluded'
+    ? reason
+    : 'account_not_tradable';
 }

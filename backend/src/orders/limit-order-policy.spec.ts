@@ -101,6 +101,10 @@ describe('limit order policy', () => {
       accountNotTradable: 'account_not_tradable',
       conditionalReplaced: 'conditional_replaced',
       conditionalManualReduce: 'conditional_manual_reduce',
+      locCloseNotReached: 'loc_close_not_reached',
+      locCloseEvidenceUnavailable: 'loc_close_evidence_unavailable',
+      locSessionInvalid: 'loc_session_invalid',
+      locFillNotPermitted: 'loc_fill_not_permitted',
     });
   });
 });

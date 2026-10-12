@@ -103,6 +103,8 @@ export class LimitOrderCandidateRepository {
     return {
       status: OrderStatus.submitted,
       orderType: OrderType.limit,
+      // Limit-on-Close orders settle only on final session-close evidence.
+      limitOnClose: null,
       reservationFeeRate: { not: null },
       asset: { isActive: true, ...SPOT_ASSET_WHERE },
       AND: [
