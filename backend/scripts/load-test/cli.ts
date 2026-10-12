@@ -57,7 +57,11 @@ async function main() {
     console.log('Template files created with mode 0600; no resources created.');
     return;
   }
-  const inputs = readInputs(manifestFile, credentialFile);
+  const inputs = readInputs(
+    manifestFile,
+    credentialFile,
+    command === 'serve' ? process.env : undefined,
+  );
   const { m, git, manifestHash } = inputs;
   validateCommandApproval(m, command);
   const c = command === 'serve' ? inputs.c : observerCredentials(inputs.c);

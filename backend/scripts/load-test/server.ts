@@ -2,6 +2,7 @@ import { Global, Module } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { WsAdapter } from '@nestjs/platform-ws';
 import IORedis from 'ioredis';
+import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -86,6 +87,59 @@ export function applyTestEnvironment(m: Manifest, c: Credentials) {
   // from an empty directory so the repository's .env files cannot be loaded.
   process.chdir(mkdtempSync(resolve(tmpdir(), 'trading-load-empty-env-')));
 }
+
+export const SERVER_LEASE_KEY = 'load-test:server-lease';
+const SERVER_LEASE_MS = 30_000;
+const RENEW_LEASE =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('pexpire', KEYS[1], ARGV[2]) end return 0";
+const RELEASE_LEASE =
+  "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) end return 0";
+
+/** One test server per Valkey. Render overlaps old/new instances on redeploy
+ * and can scale out; a second replay / FX loop would invalidate the run. */
+export async function acquireServerLease(c: Credentials, metrics: Metrics) {
+  const control = new IORedis(c.valkeyUrl, {
+    commandTimeout: 5000,
+    maxRetriesPerRequest: 0,
+  });
+  control.on('error', () => metrics.failure('CONTROL_VALKEY_ERROR'));
+  const owner = randomBytes(16).toString('hex');
+  let acquired: 'OK' | null = null;
+  try {
+    acquired = await control.set(
+      SERVER_LEASE_KEY,
+      owner,
+      'PX',
+      SERVER_LEASE_MS,
+      'NX',
+    );
+  } finally {
+    if (acquired !== 'OK') control.disconnect();
+  }
+  if (acquired !== 'OK') throw new Error('LOAD_TEST_SERVER_ALREADY_ACTIVE');
+  let lost = false;
+  const renew = setInterval(() => {
+    control
+      .eval(RENEW_LEASE, 1, SERVER_LEASE_KEY, owner, SERVER_LEASE_MS)
+      .then((held) => {
+        if (held !== 1) lost = true;
+      })
+      .catch(() => metrics.failure('CONTROL_VALKEY_ERROR'));
+  }, SERVER_LEASE_MS / 3);
+  renew.unref();
+  return {
+    control,
+    lost: () => lost,
+    release: async () => {
+      clearInterval(renew);
+      await control
+        .eval(RELEASE_LEASE, 1, SERVER_LEASE_KEY, owner)
+        .catch(() => undefined);
+      control.disconnect();
+    },
+  };
+}
+
 export async function serve(
   m: Manifest,
   c: Credentials,
@@ -96,6 +150,32 @@ export async function serve(
   validateServerEnvironment(m, c);
   mkdirSync(out, { recursive: true });
   const environment = await preflight(m, c, true);
+  const lease = await acquireServerLease(c, metrics);
+  try {
+    await serveExclusively(
+      m,
+      c,
+      manifestHash,
+      out,
+      metrics,
+      environment,
+      lease,
+    );
+  } finally {
+    await lease.release();
+  }
+}
+
+async function serveExclusively(
+  m: Manifest,
+  c: Credentials,
+  manifestHash: string,
+  out: string,
+  metrics: Metrics,
+  environment: Awaited<ReturnType<typeof preflight>>,
+  lease: Awaited<ReturnType<typeof acquireServerLease>>,
+) {
+  const { control } = lease;
   applyTestEnvironment(m, c);
   const replay = new Replay(m, metrics);
   const savedFetch = globalThis.fetch;
@@ -232,11 +312,6 @@ export async function serve(
     restoreSends();
     throw error;
   }
-  const control = new IORedis(c.valkeyUrl, {
-    commandTimeout: 5000,
-    maxRetriesPerRequest: 0,
-  });
-  control.on('error', () => metrics.failure('CONTROL_VALKEY_ERROR'));
   const { PrismaService } = require('../../src/prisma/prisma.service');
   const db = app.get<PrismaServiceType>(PrismaService);
   const {
@@ -326,6 +401,10 @@ export async function serve(
         await control.set(controlKey(m, 'abort'), 'EXTERNAL_PROVIDER_ATTEMPT');
         stopped = true;
       }
+      if (lease.lost()) {
+        metrics.failure('SERVER_LEASE_LOST');
+        stopped = true;
+      }
       await delay(1000);
     }
   } finally {
@@ -339,7 +418,6 @@ export async function serve(
         JSON.stringify(metrics.serializable()),
       )
       .catch(() => undefined);
-    control.disconnect();
     globalThis.fetch = savedFetch;
     dbMetrics.close();
     restoreSends();

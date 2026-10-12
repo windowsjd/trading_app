@@ -31,7 +31,13 @@ import {
 import { prepare } from './prepare';
 import { run } from './run';
 import { Metrics } from './metrics';
-import { serve, applyTestEnvironment } from './server';
+import {
+  serve,
+  applyTestEnvironment,
+  acquireServerLease,
+  SERVER_LEASE_KEY,
+} from './server';
+import { Test } from '@nestjs/testing';
 import { mergeRuntimeEnv } from '../lib/load-runtime-env';
 
 function fixture() {
@@ -321,6 +327,79 @@ describe('reviewed Render reuse transition', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+  it('uses the Render deploy SHA only for the approved server when the runtime has no Git checkout', () => {
+    const { m, c } = fixture();
+    const dir = mkdtempSync(join(tmpdir(), 'render-reuse-runtime-'));
+    const manifest = join(dir, 'manifest.json'),
+      credentials = join(dir, 'credentials.json');
+    const write = (value: Manifest) => {
+      writeFileSync(manifest, JSON.stringify(value), { mode: 0o600 });
+      writeFileSync(credentials, JSON.stringify(c), { mode: 0o600 });
+    };
+    const git = jest
+      .spyOn(childProcess, 'execFileSync')
+      .mockImplementation(() => {
+        throw new Error('fatal: not a git repository');
+      });
+    try {
+      write(m);
+      const accepted = readInputs(manifest, credentials, runtime(m, c));
+      expect(accepted.git.sha).toBe(m.expectedGitSha);
+      expect(accepted.git.dirty).toBe(false);
+      // Generator, migrate and other commands never pass the server environment.
+      expect(() => readInputs(manifest, credentials)).toThrow(
+        'not a git repository',
+      );
+      for (const [key, value] of [
+        ['LOAD_TEST_MODE', undefined],
+        ['RENDER_SERVICE_ID', 'srv-other'],
+        ['RENDER_GIT_COMMIT', undefined],
+        ['RENDER_GIT_COMMIT', 'short'],
+      ] as const)
+        expect(() =>
+          readInputs(manifest, credentials, {
+            ...runtime(m, c),
+            [key]: value,
+          }),
+        ).toThrow('not a git repository');
+      expect(() =>
+        readInputs(manifest, credentials, {
+          ...runtime(m, c),
+          RENDER_GIT_COMMIT: 'b'.repeat(40),
+        }),
+      ).toThrow('Git SHA / dirty tree');
+      // A dedicated / local manifest can never substitute an ambient SHA.
+      const local = defaultManifest(m.expectedGitSha, false);
+      writeFileSync(manifest, JSON.stringify(local), { mode: 0o600 });
+      writeFileSync(
+        credentials,
+        JSON.stringify({
+          ...c,
+          databaseUrl: `postgresql://${local.target.databaseUser}:load-test-local-only@127.0.0.1:${local.target.databasePort}/${local.target.databaseName}`,
+          databaseObserverUrl: undefined,
+          valkeyUrl: `redis://127.0.0.1:${local.target.valkeyPort}/0`,
+          valkeyObserverUrl: undefined,
+        }),
+        { mode: 0o600 },
+      );
+      expect(() =>
+        readInputs(manifest, credentials, {
+          LOAD_TEST_MODE: 'render-reuse',
+          RENDER_SERVICE_ID: local.target.apiResourceId,
+          RENDER_GIT_COMMIT: local.expectedGitSha,
+        }),
+      ).toThrow('not a git repository');
+      // A present checkout is never replaced by the ambient SHA.
+      write(m);
+      git.mockImplementation(((_file: string, args: string[]) =>
+        args[0] === 'rev-parse' ? 'b'.repeat(40) : '') as any);
+      expect(() => readInputs(manifest, credentials, runtime(m, c))).toThrow(
+        'Git SHA / dirty tree',
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('normal build/start protection', () => {
@@ -599,6 +678,67 @@ describe('database privilege and migration preflight (all transports mocked)', (
       migrate(m, observerCredentials(c), 'hash', '/manifest', '/credentials'),
     ).rejects.toThrow('EMPTY_USERS');
     expect(child.mock.calls.length).toBe(0);
+  });
+  it('refuses a second concurrent test server before booting or swapping the environment', async () => {
+    const env = process.env,
+      cwd = process.cwd();
+    const out = mkdtempSync(join(tmpdir(), 'render-reuse-lease-'));
+    const boot = jest.spyOn(Test, 'createTestingModule');
+    const set = jest
+      .mocked(IORedis.prototype.set)
+      .mockImplementation((async (key: string) =>
+        key === SERVER_LEASE_KEY ? null : 'OK') as any);
+    const evaluate = jest.spyOn(IORedis.prototype, 'eval');
+    try {
+      process.env = { ...runtime(m, c) };
+      await expect(serve(m, c, 'hash', out)).rejects.toThrow(
+        'LOAD_TEST_SERVER_ALREADY_ACTIVE',
+      );
+      const leaseCall = set.mock.calls.find(
+        (call) => call[0] === SERVER_LEASE_KEY,
+      );
+      expect(leaseCall?.slice(2).join(' ')).toBe('PX 30000 NX');
+      expect(boot.mock.calls.length).toBe(0);
+      expect(evaluate.mock.calls.length).toBe(0);
+      expect(process.env.LOAD_TEST_MODE).toBe('render-reuse');
+      expect(process.cwd()).toBe(cwd);
+    } finally {
+      process.env = env;
+      rmSync(out, { recursive: true, force: true });
+    }
+  });
+  it('renews only its own lease, stops on loss and releases by owner', async () => {
+    jest.useFakeTimers();
+    const evaluate = jest
+      .spyOn(IORedis.prototype, 'eval')
+      .mockResolvedValueOnce(1)
+      .mockResolvedValueOnce(0)
+      .mockResolvedValue(1);
+    try {
+      const lease = await acquireServerLease(c, new Metrics());
+      const owner = jest
+        .mocked(IORedis.prototype.set)
+        .mock.calls.find((call) => call[0] === SERVER_LEASE_KEY)?.[1];
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(lease.lost()).toBe(false);
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(lease.lost()).toBe(true);
+      await lease.release();
+      const calls = evaluate.mock.calls;
+      expect(calls.length).toBe(3);
+      expect(
+        calls.every(
+          (call) =>
+            call[1] === 1 && call[2] === SERVER_LEASE_KEY && call[3] === owner,
+        ),
+      ).toBe(true);
+      expect(String(calls[0][0]).includes('pexpire')).toBe(true);
+      expect(String(calls[2][0]).includes("redis.call('del'")).toBe(true);
+      await jest.advanceTimersByTimeAsync(30_000);
+      expect(evaluate.mock.calls.length).toBe(3);
+    } finally {
+      jest.useRealTimers();
+    }
   });
   it('accepts already claimed identities without mutating them', async () => {
     marker = `load-test-only:${hash({ resourceId: m.target.databaseResourceId, db: name, role: user })}`;

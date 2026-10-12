@@ -188,17 +188,44 @@ export function workloadHash(m: Manifest) {
   } = m;
   return hash(workload);
 }
-export function gitIdentity() {
+/** Render native runtimes may omit `.git`. Only the approved reuse server may
+ * then use Render's own deploy SHA, which readInputs still pins to the manifest. */
+function renderDeploySha(
+  m: Manifest,
+  environment: Record<string, string | undefined>,
+) {
+  return m.renderReuse &&
+    environment.LOAD_TEST_MODE === 'render-reuse' &&
+    environment.RENDER_SERVICE_ID === m.target.apiResourceId &&
+    /^[a-f0-9]{40}$/.test(environment.RENDER_GIT_COMMIT ?? '')
+    ? environment.RENDER_GIT_COMMIT
+    : undefined;
+}
+export function gitIdentity(renderDeploy?: {
+  m: Manifest;
+  environment: Record<string, string | undefined>;
+}) {
   const run = (...args: string[]) =>
     execFileSync('git', args, { cwd: ROOT, encoding: 'utf8' }).trim();
-  return {
-    sha: run('rev-parse', 'HEAD'),
-    dirty: run('status', '--porcelain').length > 0,
+  const files = {
     lockHash: hash(readFileSync(resolve(ROOT, 'pnpm-lock.yaml'), 'utf8')),
     schemaHash: hash(
       readFileSync(resolve(ROOT, 'prisma/schema.prisma'), 'utf8'),
     ),
   };
+  try {
+    return {
+      sha: run('rev-parse', 'HEAD'),
+      dirty: run('status', '--porcelain').length > 0,
+      ...files,
+    };
+  } catch (error) {
+    // A present-but-dirty checkout never reaches here; it still fails closed.
+    const sha =
+      renderDeploy && renderDeploySha(renderDeploy.m, renderDeploy.environment);
+    if (!sha) throw error;
+    return { sha, dirty: false, source: 'RENDER_GIT_COMMIT', ...files };
+  }
 }
 export function validateManifest(m: Manifest): void {
   if (m.generator.shardCount !== 1 || m.generator.shardIndex !== 0)
@@ -510,7 +537,12 @@ export function assertNormalEnvironment(
   if (environment.LOAD_TEST_MODE || testTarget)
     fail('normal entry refused; use the approved load-test CLI');
 }
-export function readInputs(manifestFile: string, credentialFile: string) {
+/** `serverEnvironment` is passed only by `serve` (Render deploy SHA fallback). */
+export function readInputs(
+  manifestFile: string,
+  credentialFile: string,
+  serverEnvironment?: Record<string, string | undefined>,
+) {
   if (statSync(credentialFile).mode & 0o077)
     fail('credential file must have mode 0600');
   const m = JSON.parse(readFileSync(manifestFile, 'utf8')) as Manifest;
@@ -534,7 +566,9 @@ export function readInputs(manifestFile: string, credentialFile: string) {
         valkeyUrl: c.valkeyObserverUrl ?? c.valkeyUrl,
       },
     );
-  const git = gitIdentity();
+  const git = gitIdentity(
+    serverEnvironment && { m, environment: serverEnvironment },
+  );
   if (
     git.sha !== m.expectedGitSha ||
     (git.dirty &&

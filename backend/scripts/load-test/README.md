@@ -24,7 +24,7 @@ node dist/scripts/load-test/cli.js migrate --manifest /secure/smoke.json --crede
 node dist/scripts/load-test/cli.js serve --manifest /secure/smoke.json --credentials /secure/smoke.credentials.json --out /evidence/server
 ```
 
-Run `serve` as a long-lived process on the isolated API host. Keep its evidence directory durable or export it before stopping a Render instance. This process discards inherited credentials, bootstraps from an empty working directory so repository dotenv files cannot load, injects synthetic provider transports and uses the existing guards, middleware, scheduler, locks and financial services. It never exposes test authentication or financial bypass routes. Only the test process enables the mixed launch trading profile. The production Futures flag remains unchanged.
+Run `serve` as a long-lived process on the isolated API host. Keep its evidence directory durable or export it before stopping a Render instance. This process discards inherited credentials, bootstraps from an empty working directory so repository dotenv files cannot load, injects synthetic provider transports and uses the existing guards, middleware, scheduler, locks and financial services. It never exposes test authentication or financial bypass routes. Only the test process enables the mixed launch trading profile. The production Futures flag remains unchanged. Only one `serve` may run per test Valkey: it holds a 30-second renewed `load-test:server-lease` before booting, a second instance (redeploy overlap or scale-out) exits with `LOAD_TEST_SERVER_ALREADY_ACTIVE`, and a server that loses its lease stops.
 
 After `/health` is ready, run preparation and smoke on the generator:
 
