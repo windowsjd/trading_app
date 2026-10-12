@@ -1,14 +1,14 @@
 import React from 'react';
 import AdminDiagnosticPanel from '../states/AdminDiagnosticPanel';
-import { View, Text, StyleSheet, useWindowDimensions } from '../../theme/native';
+import { View, Text, StyleSheet, useWindowDimensions, type StyleProp, type ViewStyle } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
 import { getPositionAssetDisplay, type SpotHoldingDisplay } from '../../features/position/assetDisplay';
 
-type Props = { position: SpotHoldingDisplay; onPress?: () => void; testID?: string };
+type Props = { position: SpotHoldingDisplay; onPress?: () => void; testID?: string; style?: StyleProp<ViewStyle>; accessibilityHint?: string };
 
-export default function PositionAssetRow({ position, onPress, testID }: Props) {
+export default function PositionAssetRow({ position, onPress, testID, style, accessibilityHint }: Props) {
   const display = getPositionAssetDisplay(position);
   const { width, fontScale } = useWindowDimensions();
   const stacked = width / fontScale < 300;
@@ -29,8 +29,8 @@ export default function PositionAssetRow({ position, onPress, testID }: Props) {
   </>;
   return (
     <>
-      {onPress ? <ActionPressable testID={testID} style={styles.row} onPress={onPress} accessibilityRole="button">{content}</ActionPressable>
-        : <View testID={testID} style={styles.row}>{content}</View>}
+      {onPress ? <ActionPressable testID={testID} style={[styles.row, style]} onPress={onPress} accessibilityRole="button" accessibilityHint={accessibilityHint}>{content}</ActionPressable>
+        : <View testID={testID} style={[styles.row, style]}>{content}</View>}
       {position.valuation.state === 'stale_cache' && position.valuation.diagnostic ? <AdminDiagnosticPanel diagnostic={position.valuation.diagnostic} /> : null}
     </>
   );

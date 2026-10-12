@@ -15,8 +15,6 @@ import ErrorNotice from '../../components/states/ErrorNotice';
 import { useAppearance } from '../../theme/appearance';
 import { getHomeTier } from './tierPresentation';
 import TierEmblem from './TierEmblem';
-import TierCardBackground from './TierCardBackground';
-import { TIER_BACKGROUNDS } from './tierBackgrounds';
 
 export function useHomeAccountContext(account: TradingAccountDto | null) {
   const season = account?.mode === 'season' ? account.season : null;
@@ -37,53 +35,38 @@ export function useHomeAccountContext(account: TradingAccountDto | null) {
 
 export type HomeAccountContextData = ReturnType<typeof useHomeAccountContext>;
 
-export default function HomeAccountContext({ context }: { context: HomeAccountContextData }) {
-  const { meQuery, rankingQuery, rankType, hasSeason, seasonId } = context;
-  const { width } = useWindowDimensions();
-  const { mode } = useAppearance();
+/** The season ranking row behind Home's rank and tier (never for general/beginner). */
+function readSeasonStanding(context: HomeAccountContextData, mode: 'light' | 'dark') {
+  const { rankingQuery, rankType, hasSeason, seasonId } = context;
   const loading = !!seasonId && rankingQuery.isLoading;
   const myRanking = !rankingQuery.isError && !loading && seasonId &&
     rankingQuery.data?.state === 'available' && rankingQuery.data.myRanking.state === 'available'
     ? rankingQuery.data.myRanking : null;
   const tier = hasSeason ? getHomeTier(getRankingTier(myRanking, rankType), mode) : null;
-  const background = tier ? TIER_BACKGROUNDS[tier.id][mode] : null;
-  // Light foregrounds can cross bright facets when names/fonts wrap. A small
-  // halo keeps the original artwork visible without reserving empty image rows.
-  const foreground = tier ? { color: tier.palette.color, ...(mode === 'dark' || tier.id === 'whale' ? {
-    textShadowColor: '#001124', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 3,
-  } : {}) } : undefined;
-  const emblemSize = width < 360 ? 132 : 160;
   const rank = myRanking && Number.isFinite(myRanking.rank) && myRanking.rank > 0 ? `#${myRanking.rank}` : '-';
   const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패' : '티어 미정');
   const notice = rankingQuery.isError ? '랭킹 정보를 불러오지 못했습니다.' :
     !loading && !!seasonId && !myRanking ? '아직 표시할 랭킹 정보가 없습니다.' : null;
+  return { loading, tier, rank, tierLabel, notice };
+}
+
+/**
+ * One account box for general, beginner and season accounts: the mode or
+ * season title and the change action on top, the profile right below. The
+ * season tier is shown next to the total assets (HomeTierBadge).
+ */
+export default function HomeAccountContext({ context }: { context: HomeAccountContextData }) {
+  const { meQuery, rankingQuery, rankType, hasSeason } = context;
+  const { mode } = useAppearance();
+  const { loading, rank, notice } = readSeasonStanding(context, mode);
   return (
-    <AccountSwitcher home homeCardStyle={tier ? { backgroundColor: tier.palette.backgroundColor,
-      ...(tier.id === 'whale' ? { paddingTop: 8 } : {}) } : undefined}
-      homeBackground={tier ? <TierCardBackground key={`${tier.id}-${mode}`} tier={tier.id} mode={mode} /> : undefined}
-      homeBackgroundAspectRatio={background ? background.width / background.height : undefined}
-      homeBackgroundCornerRatio={tier?.id === 'whale' ? 0.05 : 0.04}
-      homeHeadingTopRatio={tier?.id === 'whale' ? 0.06 : 0}
-      homeForegroundStyle={foreground}
-      homeVisual={hasSeason ? <View style={styles.tier}>
-        {tier ? <TierEmblem tier={tier.id} size={emblemSize} /> :
-          <View testID="home-tier-neutral" style={[styles.neutral, { width: emblemSize, height: emblemSize }]}
-            accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-            <View style={styles.neutralRing}><Text style={styles.neutralMark}>—</Text></View>
-          </View>}
-      </View> : undefined}
-      homeVisualCaption={hasSeason ? <Text testID={TEST_IDS.home.tier}
-        style={[styles.tierName, foreground]}
-        accessibilityLiveRegion="polite">{tierLabel}</Text> : undefined}>
-      <View style={styles.userDetails}>
-        <View style={styles.identity}>
-          {meQuery.isLoading ? <SectionSkeleton lines={1} /> : meQuery.data ? <>
-            <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={36} testID="home-profile-avatar" />
-            <Text testID={TEST_IDS.home.nickname} style={[styles.nickname, hasSeason && styles.seasonNickname,
-              foreground]}>{meQuery.data.nickname}</Text>
-          </> : <InlineEmptyState message="사용자 정보를 불러오지 못했습니다." />}
-        </View>
-        {hasSeason ? <Text testID={TEST_IDS.home.rank} style={[styles.rank, foreground]}
+    <AccountSwitcher home>
+      <View style={styles.identity}>
+        {meQuery.isLoading ? <View style={styles.flex}><SectionSkeleton lines={1} /></View> : meQuery.data ? <>
+          <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={32} testID="home-profile-avatar" />
+          <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
+        </> : <View style={styles.flex}><InlineEmptyState message="사용자 정보를 불러오지 못했습니다." /></View>}
+        {hasSeason ? <Text testID={TEST_IDS.home.rank} style={styles.rank}
           accessibilityLabel={`${rankType === 'final' ? '최종' : '현재'} 순위 ${rank === '-' ? '확인 중 또는 정보 없음' : rank}`}>
           {loading ? '—' : rank}
         </Text> : null}
@@ -95,16 +78,39 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
   );
 }
 
+/**
+ * The season tier emblem beside the total assets. The emblem keeps its
+ * original proportions; the numbers stay the larger, primary information.
+ */
+export function HomeTierBadge({ context }: { context: HomeAccountContextData }) {
+  const { mode } = useAppearance();
+  const { width, fontScale } = useWindowDimensions();
+  const { tier, tierLabel } = readSeasonStanding(context, mode);
+  if (!context.hasSeason) return null;
+  const size = width < 360 || fontScale > 1.3 ? 68 : 84;
+  return (
+    <View testID="home-tier-badge" style={styles.tier}>
+      {tier ? <TierEmblem tier={tier.id} size={size} /> :
+        <View testID="home-tier-neutral" style={[styles.neutral, { width: size, height: size }]}
+          accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+          <View style={styles.neutralRing}><Text style={styles.neutralMark}>—</Text></View>
+        </View>}
+      <Text testID={TEST_IDS.home.tier} style={styles.tierName} accessibilityLabel={`시즌 티어 ${tierLabel}`}
+        accessibilityLiveRegion="polite">{tierLabel}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  userDetails: { minWidth: 0, gap: 10 },
-  identity: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
-  nickname: { flex: 1, minWidth: 0, fontSize: 15, fontWeight: '600', lineHeight: 23 },
-  seasonNickname: { fontSize: 19, lineHeight: 28, fontWeight: '700' },
-  rank: { fontSize: 20, lineHeight: 30, fontWeight: '700', color: semantic.secondary, flexShrink: 1 },
-  tier: { alignItems: 'center', flexShrink: 0, maxWidth: '100%' },
-  tierName: { fontSize: 20, lineHeight: 29, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
+  flex: { flex: 1, minWidth: 0 },
+  // The rank sits beside the name and wraps below it when large text needs the room.
+  identity: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 4, minWidth: 0 },
+  nickname: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minWidth: 0, fontSize: 16, fontWeight: '600', lineHeight: 24 },
+  rank: { marginLeft: 'auto', maxWidth: '100%', fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.secondary, fontVariant: ['tabular-nums'] },
+  tier: { alignItems: 'center', gap: 2, flexShrink: 0, maxWidth: 120 },
+  tierName: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
   neutral: { alignItems: 'center', justifyContent: 'center' },
   neutralRing: { width: '65%', height: '65%', borderRadius: 999, borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },
-  neutralMark: { fontSize: 28, color: semantic.muted },
+  neutralMark: { fontSize: 22, color: semantic.muted },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
 });

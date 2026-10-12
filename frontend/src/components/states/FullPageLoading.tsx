@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { SafeAreaView, View, Text, ActivityIndicator, StyleSheet } from '../../theme/native';
+import { SafeAreaView, View, Text, StyleSheet } from '../../theme/native';
+import WhaleLoader from './WhaleLoader';
 
 interface FullPageLoadingProps {
   message?: string;
@@ -12,7 +13,7 @@ export default function FullPageLoading({
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.center}>
-        <ActivityIndicator />
+        <WhaleLoader size={56} testID="full-page-loading-indicator" />
         <Text style={styles.message}>{message}</Text>
       </View>
     </SafeAreaView>
@@ -28,7 +29,7 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   message: {
-    marginTop: 12,
+    marginTop: 14,
     fontSize: 14,
     color: semantic.secondary,
   },

@@ -15,6 +15,8 @@ type Props = {
   compactBottom?: boolean;
   compactTop?: boolean;
   unavailableMessage?: string;
+  /** Season tier emblem, to the right of the numbers. */
+  aside?: React.ReactNode;
 };
 
 // Color only: values and return-rate meaning still come from the portfolio API.
@@ -24,10 +26,11 @@ function performanceStyle(value: string | null | undefined) {
   return amount > 0 ? styles.up : styles.down;
 }
 
-export default function HomeAssetHero({ summary, finalResult, settled = false, compactBottom = false, compactTop = false, unavailableMessage }: Props) {
+export default function HomeAssetHero({ summary, finalResult, settled = false, compactBottom = false, compactTop = false, unavailableMessage, aside }: Props) {
   const result = settled ? (finalResult?.state === 'available' ? finalResult : null) : summary;
   return (
-    <View testID={TEST_IDS.home.summaryCard} style={[styles.hero, compactBottom && styles.compactBottom, compactTop && styles.compactTop]}>
+    <View testID={TEST_IDS.home.summaryCard} style={[styles.heroRow, compactBottom && styles.compactBottom, compactTop && styles.compactTop]}>
+    <View style={styles.hero}>
       <Text style={styles.label}>{settled ? '최종 자산' : '총 자산'}</Text>
       {result ? (
         <>
@@ -64,11 +67,16 @@ export default function HomeAssetHero({ summary, finalResult, settled = false, c
         />
       )}
     </View>
+    {/* Wraps below the numbers when long amounts or large fonts need the width. */}
+    {aside ? <View style={styles.aside}>{aside}</View> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { paddingVertical: 12, gap: 8, minWidth: 0 },
+  heroRow: { paddingVertical: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 8, minWidth: 0 },
+  hero: { gap: 8, minWidth: 0, flexGrow: 1, flexShrink: 1, flexBasis: 190 },
+  aside: { flexShrink: 0, marginLeft: 'auto' },
   compactBottom: { paddingBottom: 0 },
   compactTop: { paddingTop: 0 },
   label: { fontSize: 18, fontWeight: '700', lineHeight: 27, color: semantic.secondary },

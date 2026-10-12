@@ -300,7 +300,8 @@ for (const platform of ['web', 'android', 'ios']) test(`${platform}: focus hook 
   const h = walletTransferHarness({ platform }); await h.start(); t.after(h.close);
   const scroll = h.node('wallet-transfer-screen');
   assert.equal(scroll.props.keyboardShouldPersistTaps, 'handled'); assert.equal(scroll.props.keyboardDismissMode, 'none'); assert.equal(scroll.props.scrollEventThrottle, 16);
-  const avoiding = h.renderer.root.findByType('KeyboardAvoidingView'); assert.equal(avoiding.props.keyboardVerticalOffset, platform === 'ios' ? 64 : 0);
+  // The bottom sheet (InlineBottomSheet) owns keyboard room; a nested avoiding view would double it.
+  assert.equal(h.renderer.root.findAllByType('KeyboardAvoidingView').length, 0);
   await h.focus(); h.keyboard('keyboardDidShow', 400); assert.deepEqual(h.scrolls.at(-1), { y: 214, animated: false });
   scroll.props.onScroll({ nativeEvent: { contentOffset: { y: 20 } } });
   scroll.props.onLayout(); h.flushFrames(); assert.deepEqual(h.scrolls.at(-1), { y: 234, animated: false });
@@ -319,4 +320,23 @@ test('short keyboard viewport prioritizes input while CTA remains scrollable', a
 test('validated success remains visible if the subsequent wallet refresh fails', async t => {
   const h = walletTransferHarness(); await h.start(); t.after(h.close); await h.amount('1'); await h.press('wallet-transfer-submit');
   h.walletState = { isError: true, error: new Error('refresh failed') }; await h.update(); assert.ok(h.node('wallet-transfer-success'));
+});
+
+test('the receipt offers 확인 and 마켓으로 가기; busy is reported while the command is in flight', async t => {
+  const h = walletTransferHarness();
+  const events: string[] = [];
+  h.props = { onDone: () => events.push('done'), onGoMarket: () => events.push('market'), onBusyChange: (busy: boolean) => events.push(`busy:${busy}`) };
+  h.gate = deferred();
+  await h.start(); t.after(h.close);
+  await h.amount('20'); await h.press('wallet-transfer-submit');
+  assert.equal(events.includes('busy:true'), true, 'the sheet cannot be dismissed mid-command');
+  assert.equal(h.node('wallet-transfer-success') === undefined, true, 'no receipt before the server answers');
+  h.gate.resolve(); await h.flush();
+  assert.equal(events.at(-1), 'busy:false');
+  assert.ok(h.node('wallet-transfer-success'));
+  const labels = h.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => n.props.label);
+  assert.deepEqual(labels, ['확인', '마켓으로 가기']);
+  await h.press('wallet-transfer-done'); await h.press('wallet-transfer-go-market');
+  assert.deepEqual(events.slice(-2), ['done', 'market']);
+  assert.equal(h.requests.length, 1, 'closing or leaving never re-executes');
 });

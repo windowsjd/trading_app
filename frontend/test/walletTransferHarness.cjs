@@ -88,7 +88,7 @@ function walletTransferHarness({ platform = 'web', diagnostics = false, role = '
     mocks['../../features/me/api'] = { getMe: async () => ({ id: 'user-1', role: h.role }) };
     client.setQueryData(['me'], { id: 'user-1', role: h.role });
   }
-  const Screen = load(resolve(__dirname, '../src/screens/wallet/WalletTransferScreen.tsx'), mocks).default;
+  const Screen = load(resolve(__dirname, '../src/screens/wallet/WalletTransferSheet.tsx'), mocks).default;
   h.bounds = { viewport: [0, 0, 320, 600], input: [0, 420, 288, 52], submit: [0, 550, 288, 52] };
   const measure = key => ({ measureInWindow: callback => callback(...h.bounds[key]) });
   const createNodeMock = element => {
@@ -97,7 +97,9 @@ function walletTransferHarness({ platform = 'web', diagnostics = false, role = '
     if (element.type === 'View' && element.props.collapsable === false) return measure(element.props.children?.props.testID === 'wallet-transfer-amount' ? 'input' : 'submit');
     return null;
   };
-  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(Screen));
+  // The sheet's actions (확인 / 마켓으로 가기 / busy) are optional panel props.
+  h.props = {};
+  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(Screen, h.props));
   h.flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 20)); }); };
   h.start = async () => { await act(async () => { h.renderer = create(tree(), { createNodeMock }); }); await h.flush(); };
   h.update = async () => { await act(async () => { h.renderer.update(tree()); }); await h.flush(); };

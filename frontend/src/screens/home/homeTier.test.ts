@@ -8,20 +8,24 @@ const { interactionHarness, React, act, flatten } = require('../../../test/inter
 function setup() {
   const h = interactionHarness();
   const rankingApi = h.load('src/features/ranking/api.ts', { '../../services/api/client': { apiClient: {} } });
-  const Card = h.load('src/screens/home/HomeAccountContext.tsx', {
+  const module = h.load('src/screens/home/HomeAccountContext.tsx', {
     '../../features/ranking/api': rankingApi,
     '../../features/me/api': { getMe() {} },
-    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, props.homeBackground, children, props.homeVisual, props.homeVisualCaption) },
+    '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children, ...props }) => React.createElement('AccountSwitcher', props, children) },
     '../../components/states/SectionSkeleton': { __esModule: true, default: 'Skeleton' },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'Empty' },
     './AdminDiagnosticPanel': { __esModule: true, default: () => null },
-  }).default;
+  });
+  // The account box and the tier badge beside the total assets share one context.
+  const Card = module.default;
+  const Badge = module.HomeTierBadge;
   const context = {
     hasSeason: true, seasonId: 'selected-season', rankType: 'daily',
     meQuery: { data: { nickname: 'mycroft', profileImageUrl: null } },
     rankingQuery: { isLoading: false, isError: false, data: { state: 'available', myRanking: { state: 'available', rank: 12, provisionalTier: 'gold', finalTier: 'diamond' } } },
   };
-  const tree = () => React.createElement(Card, { context });
+  const tree = () => React.createElement(React.Fragment, null,
+    React.createElement(Card, { context }), React.createElement('Hero', null, React.createElement(Badge, { context })));
   const renderer = h.render(tree());
   const node = id => renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === id)[0];
   return { h, context, renderer, node, update: () => act(() => renderer.update(tree())), close: () => act(() => renderer.unmount()) };
@@ -41,9 +45,11 @@ for (const [canonical, name, id] of [
   assert.equal(h.node('home-rank').props.children, '#12');
   assert.equal(h.node('home-whale-subject') === undefined, true);
   assert.equal(h.node('home-whale-wave') === undefined, true);
-  assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle.backgroundColor, getHomeTier(canonical, 'light')?.palette.backgroundColor);
-  assert.ok(h.node(`home-tier-background-${id}-light`) !== undefined);
-  assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle.borderColor, undefined);
+  // The emblem sits beside the total assets; Home's account box carries no tier art.
+  assert.ok(h.renderer.root.findByType('Hero').findAll((n: any) => n.props.testID === `home-emblem-${id}`).length === 1);
+  assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.testID === `home-emblem-${id}`).length, 0);
+  assert.equal(h.node(`home-tier-background-${id}-light`) === undefined, true);
+  assert.deepEqual(Object.keys(h.renderer.root.findByType('AccountSwitcher').props).sort(), ['children', 'home']);
 });
 
 it('daily/final selection preserves the existing getRankingTier policy', t => {
@@ -76,8 +82,7 @@ for (const state of ['loading', 'error', 'null', 'unknown', 'response-unavailabl
     h.update();
     assert.ok(h.node('home-tier-neutral'));
     assert.equal(h.node('home-tier-image') === undefined, true);
-    assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle, undefined);
-    assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeBackground, undefined);
+    assert.equal(h.renderer.root.findAll((n: any) => typeof n.type === 'string' && String(n.props?.testID ?? '').startsWith('home-tier-background-')).length, 0);
     if (state === 'loading') assert.equal(h.node('home-tier').props.children, '티어 확인 중');
     if (state === 'error') assert.equal(h.node('home-tier').props.children, '티어 확인 실패');
     assert.equal(h.node('home-rank').props.children, ['null', 'unknown'].includes(state) ? '#12' : state === 'loading' ? '—' : '-');
@@ -94,14 +99,13 @@ it('general account has no tier, frame, background or rank; missing me does not 
   h.context.meQuery.data = undefined; h.update();
   assert.ok(h.node('home-emblem-gold'));
   h.context.hasSeason = false; h.context.seasonId = null; h.update();
-  for (const id of ['home-tier', 'home-tier-image', 'home-tier-neutral', 'home-rank']) assert.equal(h.node(id) === undefined, true);
-  assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeCardStyle, undefined);
-  assert.equal(h.renderer.root.findByType('AccountSwitcher').props.homeBackground, undefined);
+  for (const id of ['home-tier', 'home-tier-image', 'home-tier-neutral', 'home-rank', 'home-tier-badge']) assert.equal(h.node(id) === undefined, true);
 });
 
-it('supplies the emblem beside the account information and leaves all text untruncated', t => {
+it('keeps the emblem out of the account box and leaves all text untruncated', t => {
   const h = setup(); t.after(h.close);
-  assert.ok(h.renderer.root.findByType('AccountSwitcher').props.homeVisual);
+  assert.ok(h.node('home-tier-badge'));
+  assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.testID === 'home-tier-badge').length, 0);
   assert.equal(h.node('home-nickname').props.numberOfLines, undefined);
   assert.ok(flatten(h.node('home-nickname').props.style).fontSize > 15);
 });

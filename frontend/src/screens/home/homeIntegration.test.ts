@@ -51,12 +51,12 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
         assert.equal(texts(nickname), '김재민');
         const avatar = elements(tree, 'ProfileAvatar')[0];
         assert.equal(avatar.props.profileImageUrl, 'https://example.test/me.png');
-        assert.equal(avatar.props.size, 36);
+        assert.equal(avatar.props.size, 32, 'compact account box');
         assert.equal(texts(rank), '#2');
         assert.equal(texts(tier), 'Silver');
         assert.ok(textNodes.indexOf(nickname) < textNodes.indexOf(total));
         assert.ok(textNodes.indexOf(tier) < textNodes.indexOf(detail));
-        assert.ok(total.props.style.fontSize > Object.assign({}, ...rank.props.style.filter(Boolean)).fontSize);
+        assert.ok(total.props.style.fontSize > Object.assign({}, ...[rank.props.style].flat().filter(Boolean)).fontSize);
         assert.ok(h.queries.some((query) => query.queryKey === QUERY_KEYS.me));
       } else {
         assert.equal(texts(nickname), '김재민');

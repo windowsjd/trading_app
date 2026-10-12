@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
+import { stackScreenLayout } from './stackScreenLayout';
 
 import type { GuideStackParamList } from './types';
 import GuideScreen from '../../screens/guide/GuideScreen';
@@ -26,7 +27,7 @@ export function QuestStack() {
 export default function GuideStack({ beginner = false }: { beginner?: boolean } = {}) {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="GuideStack" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
+    <Stack.Navigator id="GuideStack" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
       <Stack.Screen
         name="Guide"
         component={beginner ? BeginnerLearningScreen : GuideScreen}

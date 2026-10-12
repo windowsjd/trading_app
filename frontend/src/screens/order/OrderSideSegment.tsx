@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Platform, StyleSheet, Text, View } from '../../theme/native';
+import { Animated, Platform, StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from '../../components/common/ActionPressable';
+import { selectionEasing, selectionMotion } from '../../components/common/SegmentedControl';
 import { TEST_IDS } from '../../constants/testIds';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 
@@ -12,7 +13,8 @@ const SIDES = ['buy', 'sell'] as const;
 const LABEL = { buy: '매수', sell: '매도' } as const;
 const COLOR = { buy: BUY_COLOR, sell: SELL_COLOR } as const;
 const INSET = 3;
-export const SIDE_SEGMENT_DURATION = 200;
+/** The same selection motion as every segmented control (reference video 2). */
+export const SIDE_SEGMENT_DURATION = selectionMotion.duration;
 
 /**
  * One track for 매수/매도. The selected side is owned by the caller and changes
@@ -42,7 +44,7 @@ export default function OrderSideSegment({ side, onChange }: {
     const animation = Animated.timing(progress, {
       toValue: target,
       duration: SIDE_SEGMENT_DURATION,
-      easing: Easing.out(Easing.quad),
+      easing: selectionEasing,
       useNativeDriver: Platform.OS !== 'web',
       isInteraction: false,
     });

@@ -15,15 +15,16 @@ const contrast = (a: string, b: string) => (Math.max(luminance(a), luminance(b))
 test('new, invalid and missing preferences use Red/Blue; Green/Red is explicit', () => {
   for (const value of [null, '', 'unknown', 'red_blue']) assert.equal(parseFinancialColorPreference(value), 'red_blue');
   assert.equal(parseFinancialColorPreference('green_red'), 'green_red');
-  assert.equal(resolveFinancialColor(financial.buy, 'light'), '#a13e3b');
+  assert.equal(resolveFinancialColor(financial.buy, 'light'), '#c8241e');
 });
 
 for (const mode of ['light', 'dark'] as const) for (const preference of ['red_blue', 'green_red'] as const) {
   test(`${mode} ${preference}: text/surfaces retain their theme policy; actions/candles have separate roles`, () => {
     const colors = getFinancialColors(mode, preference);
+    // 2026-10-12: more saturated direction text, same >= 4.5:1 contrast checks below.
     const expected = mode === 'light'
-      ? preference === 'red_blue' ? ['#a13e3b', '#315f9b'] : ['#16803a', '#a13e3b']
-      : preference === 'red_blue' ? ['#ff8b86', '#8cbaff'] : ['#79d68b', '#ff8b86'];
+      ? preference === 'red_blue' ? ['#c8241e', '#1b5ec9'] : ['#118038', '#c8241e']
+      : preference === 'red_blue' ? ['#ff6b64', '#64a2ff'] : ['#4ed472', '#ff6b64'];
     const actions = preference === 'red_blue' ? ['#d1110b', '#0a5ac2'] : ['#16803a', '#d1110b'];
     const candles = preference === 'red_blue' ? ['#d1110b', '#0a5ac2'] : [expected[0], '#d1110b'];
     const surfaces = mode === 'light'

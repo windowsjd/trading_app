@@ -199,6 +199,16 @@ function validateLimitPrice(limitPrice: string) {
   return null;
 }
 
+/** Decimal comparison of a preview total with the available cash; unknown is never "over". */
+function exceedsAvailable(total: string | null | undefined, available: string | null) {
+  if (!total || available === null) return false;
+  try {
+    return new Decimal(total).gt(new Decimal(available));
+  } catch {
+    return false;
+  }
+}
+
 function parsePositiveDecimal(value?: string | number | null) {
   if (value === null || value === undefined || value === '') return null;
   const parsed = typeof value === 'number' ? value : Number(value);
@@ -738,14 +748,26 @@ export function OrderForm({
     walletsQuery.isLoading,
   ]);
 
+  // Live pre-check while typing (the server's quote and order still decide):
+  // a known total, fee included, above the AVAILABLE cash (balance - reserved)
+  // is insufficient. An unknown price, fee or balance never claims the order
+  // fits, and a retained (uncertain) attempt keeps its same-key retry because
+  // its own debit may already be reflected in the balance.
+  const buyInsufficientReason =
+    side === 'buy' && !inputInvalidReason && !orderActionRef.current &&
+    !walletsQuery.isError && !!walletsQuery.data && exceedsAvailable(preview?.totalAmount, buyAvailable)
+      ? '잔액이 부족합니다.'
+      : null;
+
   const tradeGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
   const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
   const canExecute =
     !preOrderBlockedReason &&
     !inputInvalidReason &&
+    !buyInsufficientReason &&
     !successData &&
     !orderActionRef.current?.completed;
-  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType, amountValid: !inputInvalidReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
+  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
   const inputErrorMessage =
     fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 
@@ -755,7 +777,8 @@ export function OrderForm({
     side === 'sell'
       ? (positionQuantityValue ?? 0) * ratio
       : ((buyAvailableValue ?? 0) * ratio) /
-        ((ratioPriceValue ?? 0) * (1 + BUY_FEE_BUFFER));
+        // Never below the real fee, so 100% stays within the live balance check.
+        ((ratioPriceValue ?? 0) * (1 + Math.max(BUY_FEE_BUFFER, Number(tradeFeeRate) || 0)));
   const inputAtRatio = (ratio: number) => {
     if (isAmountBuy) return buyAmountAtRatio(buyAvailable, tradeFeeRate, ratio);
     const value = quantityAtRatio(ratio);
@@ -1022,6 +1045,11 @@ export function OrderForm({
           ? `주문 가능 ${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`
           : `보유 ${formatDisplayDecimal(positionQuantity)}`}
       </Text>
+      {buyInsufficientReason ? (
+        <Text testID="order-balance-insufficient" accessibilityLiveRegion="polite" style={styles.errorText}>
+          {buyInsufficientReason}
+        </Text>
+      ) : null}
       {integrityMessage ? (
         <Text
           testID={TEST_IDS.tradingAccount.integrityError}

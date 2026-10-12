@@ -3,6 +3,7 @@ import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { chartTransition, rootTransition, stackTransition } from './transitionPolicy';
+import { stackScreenLayout } from './stackScreenLayout';
 import { Platform } from '../../theme/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
@@ -18,6 +19,11 @@ import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
 import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+// Root pushes keep the error boundary and gain the web push cue.
+const pushedRootLayout = (props: Parameters<typeof stackScreenLayout>[0]) => (
+  <ScreenErrorBoundary>{stackScreenLayout(props)}</ScreenErrorBoundary>
+);
 
 export default function RootNavigator() {
   const { mode, colors } = useAppearance();
@@ -49,14 +55,14 @@ export default function RootNavigator() {
         <Stack.Screen name="AuthStack" component={AuthStack} />
         <Stack.Screen name="ModeSelection" component={ModeSelectionScreen} />
         <Stack.Screen name="MainTabs" component={MainTabs} />
-        <Stack.Screen name="TradeHistory" component={TradeHistoryScreen} options={{
+        <Stack.Screen name="TradeHistory" component={TradeHistoryScreen} layout={pushedRootLayout} options={{
           ...stackTransition(reducedMotion, Platform.OS),
           headerShown: true,
           title: '거래 내역',
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
         }} />
-        <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} options={stackTransition(reducedMotion, Platform.OS)} />
+        <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} layout={pushedRootLayout} options={stackTransition(reducedMotion, Platform.OS)} />
         <Stack.Screen name="AssetChart" component={AssetChartScreen} options={chartTransition(reducedMotion, Platform.OS)} />
       </Stack.Navigator>
     </NavigationContainer>

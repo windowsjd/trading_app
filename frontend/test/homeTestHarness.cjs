@@ -171,10 +171,11 @@ function createHomeHarness(mode = 'general') {
     const branch = elements(outer).find((node) => typeof node.type === 'function');
     return { tree: expandDisplay(branch.type(branch.props)), branch };
   };
-  const homeComponents = ['HomeAccountContext', 'HomeHoldings', 'HomeHotMarket'].map(name => {
+  const homeComponents = ['HomeAccountContext', 'HomeHoldings', 'HomeHotMarket'].flatMap(name => {
     const module = load(resolve(__dirname, `../src/screens/home/${name}.tsx`), mocks);
     mocks[`./${name}`] = { ...module, __esModule: true };
-    return module.default;
+    // The season tier badge is rendered beside the total assets (hero aside).
+    return module.HomeTierBadge ? [module.default, module.HomeTierBadge] : [module.default];
   });
   mocks['./HomeAssetHero'] = { default: hero, __esModule: true };
   const charts = load(

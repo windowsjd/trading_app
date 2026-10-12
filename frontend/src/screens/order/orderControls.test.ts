@@ -61,7 +61,8 @@ describe('buy/sell segmented control', () => {
     s.setSide('buy');
     const [first, second] = s.h.animations;
     assert.deepEqual([first.options.toValue, second.options.toValue], [1, 0]);
-    assert.equal(first.options.duration, 200);
+    // The shared selection motion (reference video 2), same as every segmented control.
+    assert.equal(first.options.duration, 140);
     assert.equal(first.options.useNativeDriver, true);
     assert.equal(first.value.animation === first, false, 'the first run was stopped');
     s.h.finish();
@@ -88,7 +89,7 @@ describe('order panel side change', () => {
     assert.equal(h.animations.length, 0);
     await h.press(sell);
     // The form fade starts in the press handler; the thumb follows the committed side.
-    assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.duration]), [[1, 180], [1, 200]]);
+    assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.duration]), [[1, 180], [1, 140]]);
     assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.label, '매도');
     h.reduced = true;
@@ -99,36 +100,27 @@ describe('order panel side change', () => {
   });
 });
 
-describe('market/limit dropdown', () => {
-  it('is one full-width button, about 2/3 of the former 44px tabs, keeping a 44px target', async (t) => {
+describe('market/limit segmented selector', () => {
+  it('is one track of two tab segments keeping a 44dp target', async (t) => {
     const h = inlineTradingHarness();
     await h.mount(); t.after(h.close);
-    const trigger = h.node(TEST_IDS.order.typeSelect);
     assert.equal(h.orderType(), '시장가');
-    assert.equal(h.node(TEST_IDS.order.typeToggleMarket) === undefined, true, 'no tab pair remains');
-    const style = flatten(trigger.props.style);
-    assert.equal(style.alignSelf, 'stretch');
-    const surface = trigger.findAll((n: any) => n.type === 'View' && flatten(n.props.style).minHeight !== undefined)[0];
-    const visual = flatten(surface.props.style).minHeight;
-    assert.equal(visual, 30);
-    assert.ok(Math.abs(visual / 44 - 2 / 3) < 0.03);
-    assert.equal(visual + style.paddingVertical * 2, 44);
-    assert.equal(style.marginVertical, -style.paddingVertical, 'the touch band does not add layout height');
-    assert.equal(h.node('order-type-select-triangle') !== undefined, true);
-    assert.equal(trigger.props.accessibilityRole, 'button');
-    assert.equal(trigger.props.accessibilityState.expanded, false);
+    assert.equal(h.node(TEST_IDS.order.typeSelect).props.accessibilityRole, 'tablist');
+    const market = h.node(TEST_IDS.order.typeToggleMarket);
+    const limit = h.node(TEST_IDS.order.typeToggleLimit);
+    for (const segment of [market, limit]) {
+      assert.equal(segment.props.accessibilityRole, 'tab');
+      const style = flatten(segment.props.style);
+      assert.ok(style.minHeight + segment.props.hitSlop.top + segment.props.hitSlop.bottom >= 44);
+    }
+    assert.deepEqual([market.props.accessibilityState.selected, limit.props.accessibilityState.selected], [true, false]);
+    assert.equal(h.node('order-type-menu') === undefined, true, 'no dropdown menu remains');
   });
 
-  it('opens from anywhere on the button, marks the current type and switches the form', async (t) => {
+  it('switches the form on press and clears the limit price when leaving 지정가', async (t) => {
     const h = inlineTradingHarness();
     await h.mount(); t.after(h.close);
-    await h.press(TEST_IDS.order.typeSelect);
-    assert.equal(h.node(TEST_IDS.order.typeSelect).props.accessibilityState.expanded, true);
-    assert.equal(h.node(TEST_IDS.order.typeToggleMarket).props.accessibilityState.selected, true);
-    assert.equal(h.node(TEST_IDS.order.typeToggleLimit).props.accessibilityState.selected, false);
-    assert.equal(h.node(TEST_IDS.order.typeToggleLimit).props.accessibilityRole, 'menuitem');
-    await h.press(TEST_IDS.order.typeToggleLimit);
-    assert.equal(h.node('order-type-menu') === undefined, true);
+    await h.selectOrderType('limit');
     assert.equal(h.orderType(), '지정가');
     assert.equal(h.node(TEST_IDS.order.limitPriceInput) !== undefined, true);
     await h.input(TEST_IDS.order.limitPriceInput, '700');
@@ -138,38 +130,18 @@ describe('market/limit dropdown', () => {
     assert.equal(h.node(TEST_IDS.order.limitPriceInput).props.value, '', 'market cleared the limit price');
   });
 
-  it('closes on the backdrop and Android back without changing the type or inputs', async (t) => {
+  it('re-selecting the current type keeps inputs; Reduced Motion moves without animation', async (t) => {
     const h = inlineTradingHarness();
     await h.mount(); t.after(h.close);
     await h.input(TEST_IDS.order.quantityInput, '3');
-    await h.press(TEST_IDS.order.typeSelect);
-    await h.press('order-type-menu-backdrop');
-    assert.equal(h.node('order-type-menu') === undefined, true);
-    await h.press(TEST_IDS.order.typeSelect);
-    const modal = h.renderer.root.findAll((n: any) => n.type === 'Modal')[0];
-    assert.equal(modal.props.transparent, true);
-    assert.equal(modal.props.animationType, 'fade');
-    await act(async () => modal.props.onRequestClose());
-    assert.equal(h.node('order-type-menu') === undefined, true);
-    await h.press(TEST_IDS.order.typeSelect);
-    await h.press(TEST_IDS.order.typeToggleMarket);
+    await h.selectOrderType('market');
     assert.equal(h.orderType(), '시장가');
     assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '3', 're-selecting the current type keeps inputs');
     h.reduced = true;
     await h.update();
-    await h.press(TEST_IDS.order.typeSelect);
-    assert.equal(h.renderer.root.findAll((n: any) => n.type === 'Modal')[0].props.animationType, 'none');
-  });
-
-  it('places the menu under the button, flips near the bottom and stays inside narrow screens', () => {
-    const h = interactionHarness('android');
-    const { placeOrderTypeMenu } = h.load('src/screens/order/OrderTypeSelect.tsx');
-    const frame = { x: 0, y: 0, width: 320, height: 640 };
-    // Same window coordinates for the trigger and the modal root.
-    assert.deepEqual(placeOrderTypeMenu({ x: 12, y: 200, width: 150, height: 30 }, frame, 96), { left: 12, top: 234, width: 150 });
-    assert.deepEqual(placeOrderTypeMenu({ x: 12, y: 580, width: 150, height: 30 }, frame, 96), { left: 12, top: 480, width: 150 });
-    assert.deepEqual(placeOrderTypeMenu({ x: 250, y: 200, width: 60, height: 30 }, frame, 96), { left: 172, top: 234, width: 140 });
-    // A modal window that starts below the status bar shifts both rects alike.
-    assert.deepEqual(placeOrderTypeMenu({ x: 12, y: 200, width: 150, height: 30 }, { ...frame, y: 24 }, 96), { left: 12, top: 210, width: 150 });
+    const before = h.animations.length;
+    await h.selectOrderType('limit');
+    assert.equal(h.orderType(), '지정가');
+    assert.equal(h.animations.filter((a: any) => a.duration === 140).length, h.animations.slice(0, before).filter((a: any) => a.duration === 140).length);
   });
 });

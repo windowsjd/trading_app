@@ -385,6 +385,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 
 export const ModelName = {
   User: 'User',
+  Inquiry: 'Inquiry',
   Friendship: 'Friendship',
   OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
@@ -452,7 +453,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -527,6 +528,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    Inquiry: {
+      payload: Prisma.$InquiryPayload<ExtArgs>
+      fields: Prisma.InquiryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.InquiryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.InquiryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>
+        }
+        findFirst: {
+          args: Prisma.InquiryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.InquiryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>
+        }
+        findMany: {
+          args: Prisma.InquiryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>[]
+        }
+        create: {
+          args: Prisma.InquiryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>
+        }
+        createMany: {
+          args: Prisma.InquiryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.InquiryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>[]
+        }
+        delete: {
+          args: Prisma.InquiryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>
+        }
+        update: {
+          args: Prisma.InquiryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>
+        }
+        deleteMany: {
+          args: Prisma.InquiryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.InquiryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.InquiryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>[]
+        }
+        upsert: {
+          args: Prisma.InquiryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryPayload>
+        }
+        aggregate: {
+          args: Prisma.InquiryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateInquiry>
+        }
+        groupBy: {
+          args: Prisma.InquiryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.InquiryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.InquiryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.InquiryCountAggregateOutputType> | number
         }
       }
     }
@@ -4433,6 +4508,19 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const InquiryScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  clientRequestId: 'clientRequestId',
+  category: 'category',
+  title: 'title',
+  content: 'content',
+  createdAt: 'createdAt'
+} as const
+
+export type InquiryScalarFieldEnum = (typeof InquiryScalarFieldEnum)[keyof typeof InquiryScalarFieldEnum]
+
+
 export const FriendshipScalarFieldEnum = {
   id: 'id',
   lowUserId: 'lowUserId',
@@ -5591,6 +5679,20 @@ export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaM
 
 
 /**
+ * Reference to a field of type 'InquiryCategory'
+ */
+export type EnumInquiryCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InquiryCategory'>
+    
+
+
+/**
+ * Reference to a field of type 'InquiryCategory[]'
+ */
+export type ListEnumInquiryCategoryFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'InquiryCategory[]'>
+    
+
+
+/**
  * Reference to a field of type 'FriendshipStatus'
  */
 export type EnumFriendshipStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FriendshipStatus'>
@@ -6385,6 +6487,7 @@ export type PrismaClientOptions = ({
 }
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
+  inquiry?: Prisma.InquiryOmit
   friendship?: Prisma.FriendshipOmit
   operatorAuditLog?: Prisma.OperatorAuditLogOmit
   refreshTokenSession?: Prisma.RefreshTokenSessionOmit

@@ -8,7 +8,6 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
-  ActivityIndicator,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
@@ -62,6 +61,7 @@ import {
   formatKstDateTime,
   formatPercent,
 } from '../../utils/format';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = PortfolioScreenProps;
 
@@ -527,7 +527,7 @@ export default function PortfolioScreen({ navigation }: Props) {
           <View style={styles.footerActions}>
             {positionsQuery.isFetchingNextPage ? (
               <View style={styles.footerLoader}>
-                <ActivityIndicator />
+                <WhaleLoader size={28} />
               </View>
             ) : null}
             <View style={styles.card}>

@@ -340,8 +340,35 @@ model User {
   rewardFulfillmentsRequested RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestedBy")
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
   rewardFulfillmentsCanceled  RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
+  inquiries                   Inquiry[]
 
   @@map("users")
+}
+
+enum InquiryCategory {
+  account
+  trading
+  wallet
+  season_ranking
+  bug
+  other
+}
+
+/// A user's support inquiry. Not financial: no account, order or ledger link.
+/// (userId, clientRequestId) makes a resubmitted form return the same row.
+model Inquiry {
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  clientRequestId String          @map("client_request_id")
+  category        InquiryCategory
+  title           String          @db.VarChar(100)
+  content         String          @db.VarChar(2000)
+  createdAt       DateTime        @default(now()) @map("created_at")
+  user            User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([userId, clientRequestId])
+  @@index([userId, createdAt, id])
+  @@map("inquiries")
 }
 
 enum FriendshipStatus {

@@ -16,7 +16,6 @@ import { TEST_IDS } from '../../constants/testIds';
 import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import { AssetMarketChart } from './AssetChartScreen';
-import AccountHoldings from './AccountHoldings';
 import { useIsFocused } from '@react-navigation/native';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
@@ -52,11 +51,10 @@ export function AssetDetailContent({
           onChangePair={() =>
             navigation.navigate('MarketSearch', { returnToAsset: true })
           }
-          footerContent={(inputScroll) => !isLoading && !accountId ? (
+          // Holdings, TP/SL and limit review live under the order screen (one place).
+          footerContent={!isLoading && !accountId ? (
             <InlineEmptyState title="계정이 없습니다." message="계정을 개설하면 주문할 수 있습니다." />
-          ) : accountId ? <AccountHoldings key={`${accountId}:${assetId}`} accountId={accountId}
-            account={selectedAccount} assetId={assetId} isFocused={focused}
-            onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : null}
+          ) : null}
         />
       </View>
       <View style={styles.footer} testID="asset-order-actions">

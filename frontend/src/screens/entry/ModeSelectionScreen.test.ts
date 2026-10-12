@@ -27,6 +27,8 @@ function harness() {
     '../../components/states/ErrorState': { default: 'ErrorState', __esModule: true },
     '../../components/states/FullPageLoading': { default: 'FullPageLoading', __esModule: true },
     '../states/ErrorNotice': { default: 'ErrorNotice', __esModule: true },
+    // A loading CTA's spinner is a native animation boundary for this shallow expansion.
+    '../states/WhaleLoader': { default: 'WhaleLoader', __esModule: true },
   }).default;
   function expand(node) {
     if (Array.isArray(node)) return node.map(expand);

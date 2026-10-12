@@ -3,7 +3,8 @@ import LearningLock from '../../features/quest/LearningLock';
 import { portfolioReadPolicy } from '../../features/tradingAccount/portfolioReadPolicy';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { revealInScrollView } from '../../hooks/useFocusedInputScroll';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { useQuery } from '@tanstack/react-query';
 import Svg, { Path } from 'react-native-svg';
 import { ScrollView, View, Text, StyleSheet, Platform } from '../../theme/native';
@@ -42,6 +43,9 @@ import FuturesPositionsSection from '../../components/tradingAccount/FuturesPosi
 import { publishQuestGuideFacts, questGuideTarget, registerQuestGuideReveal, type QuestActionState } from '../../features/quest/questGuideBridge';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import QuestTargetHighlight from '../../features/quest/QuestTargetHighlight';
+import InlineBottomSheet from '../../components/common/InlineBottomSheet';
+import { SheetPortal } from '../../components/common/ScreenSheetHost';
+import WalletTransferPanel from './WalletTransferSheet';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
@@ -68,6 +72,16 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const transferGate = useLearningAccess(accountId).gate('transfer');
   const rootNavigation = useRootNavigation();
   const [trendExpanded, setTrendExpanded] = useState(false);
+  // 이체 opens over the wallet instead of a new page; leaving the wallet closes it.
+  const focused = useIsFocused();
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferBusy, setTransferBusy] = useState(false);
+  useEffect(() => { if (!focused) setTransferOpen(false); }, [focused]);
+  const closeTransfer = useCallback(() => setTransferOpen(false), []);
+  const transferToMarket = useCallback(() => {
+    setTransferOpen(false);
+    rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } });
+  }, [rootNavigation]);
   const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
   const portfolioQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.portfolio(accountId),
@@ -113,7 +127,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-transfer'),
-      onPress: () => transferGate.guard(() => navigation.navigate('WalletTransfer')),
+      onPress: () => transferGate.guard(() => setTransferOpen(true)),
     },
     {
       testID: 'wallet-exchange',
@@ -299,6 +313,12 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
         </View>
       ) : null}
     </ScrollView>
+    <SheetPortal>
+      <InlineBottomSheet testID="wallet-transfer-sheet" title="이체하기" visible={transferOpen && focused}
+        dismissible={!transferBusy} onClose={closeTransfer}>
+        <WalletTransferPanel onDone={closeTransfer} onGoMarket={transferToMarket} onBusyChange={setTransferBusy} />
+      </InlineBottomSheet>
+    </SheetPortal>
     </View>
   );
 }

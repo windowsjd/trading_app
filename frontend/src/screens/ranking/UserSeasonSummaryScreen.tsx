@@ -18,6 +18,10 @@ import {
   getUserSeasonSummary,
 } from '../../features/ranking/api';
 import { formatKrw, formatPercent } from '../../utils/format';
+import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
+import { useAppearance } from '../../theme/appearance';
+import { getHomeTier } from '../home/tierPresentation';
+import TierEmblem from '../home/TierEmblem';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -31,6 +35,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   const { userId } = route.params;
   const focused = useIsFocused();
   const client = useQueryClient();
+  const { mode } = useAppearance();
   const [, setClock] = useState(Date.now());
   useEffect(() => {
     if (!focused) return;
@@ -86,6 +91,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
       />
     );
   const { user, season, portfolioAccess, reason } = query.data;
+  const tier = getHomeTier(getRankingTier(season), mode);
   // Never paint cached sensitive sections while a fresh permission check runs.
   const portfolio =
     focused && !query.isFetching && !query.isError && portfolioAccess === 'available'
@@ -113,24 +119,29 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
       contentContainerStyle={styles.content}
     >
       <View style={styles.card}>
-        <ProfileAvatar profileImageUrl={user.profileImageUrl} size={56} />
-        <Text style={styles.title}>{user.nickname}</Text>
+        {/* Same profile order as the ranking list: photo left, name right. */}
+        <View style={styles.profile}>
+          <ProfileAvatar profileImageUrl={user.profileImageUrl} size={56} />
+          <Text style={[styles.title, styles.profileName]}>{user.nickname}</Text>
+        </View>
         <Text style={styles.helper}>
           {season?.name ?? '현재 시즌 정보가 없습니다.'}
         </Text>
         <Text style={styles.helper}>
           현재 순위 {season?.rank ? `#${season.rank}` : '-'}
         </Text>
-        <Text style={styles.helper}>등급 {getRankingTier(season)}</Text>
+        {tier ? (
+          <View style={styles.tierRow} accessible accessibilityLabel={`${tier.name} 티어`}>
+            <TierEmblem tier={tier.id} size={36} />
+            <Text style={styles.tierName}>{tier.name}</Text>
+          </View>
+        ) : null}
       </View>
       {season ? (
         <View style={styles.card}>
           <Text style={styles.label}>현재 시즌 요약</Text>
           <Text style={styles.helper}>
-            수익률 {formatPercent(season.returnRate)}%
-          </Text>
-          <Text style={styles.helper}>
-            퍼센타일 {formatPercent(season.percentile)}%
+            수익률 <Text style={{ color: getRecordFinancialDisplay(season.returnRate, 'rate').color }}>{getRecordFinancialDisplay(season.returnRate, 'rate').text}</Text>
           </Text>
           <Text style={styles.helper}>
             총 자산 {formatKrw(season.totalAssetKrw)}원
@@ -228,6 +239,10 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   );
 }
 const styles = StyleSheet.create({
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 12, minWidth: 0 },
+  profileName: { flex: 1, minWidth: 0 },
+  tierRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  tierName: { fontSize: 15, lineHeight: 22, fontWeight: '700' },
   screen: { flex: 1, backgroundColor: semantic.screen },
   content: { padding: 16, paddingBottom: 32, gap: 12 },
   card: {

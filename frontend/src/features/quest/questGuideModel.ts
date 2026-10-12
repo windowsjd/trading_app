@@ -87,7 +87,7 @@ export type GuideFacts = {
 export const PRACTICE_SCREEN: Record<'exchange' | 'transfer', 'fx' | 'transfer'> = { exchange: 'fx', transfer: 'transfer' };
 export const VIEWPORT_TARGET: Record<QuestGuideScreen, QuestGuideTargetId> = {
   market: 'market-viewport', asset: 'asset-viewport', order: 'order-viewport', futures: 'futures-viewport',
-  holdings: 'asset-viewport', protection: 'asset-viewport', limitReview: 'asset-viewport',
+  holdings: 'order-viewport', protection: 'order-viewport', limitReview: 'order-viewport',
   wallet: 'wallet-viewport',
   fx: 'fx-viewport',
   transfer: 'transfer-viewport',
@@ -305,14 +305,17 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   }
   const holding = facts.practice?.holdings;
   const review = facts.practice?.limitReview;
-  if (screen === 'asset' && ['protection', 'marketSell'].includes(session.quest)
+  // Holdings are listed under the order form; without a visible holding the
+  // practice quantity is prepared here with a normal market buy.
+  if (screen === 'order' && ['protection', 'marketSell'].includes(session.quest) && ['asset-holdings', 'asset-protection'].includes(step.target)
     && holding?.accountId === session.accountId && holding.assetId === session.assetId && holding.holdingsVisible === false) {
-    return spotlight(session, screen, index, 'prepare-holding', ['asset-buy'], card({ title: '실습 수량 준비', body: '현재 보유종목과 수익률을 확인해 주세요. 보유수량이 없다면 구매하기에서 시장가로 다시 매수한 뒤 이 화면으로 돌아올 수 있어요.' }));
+    return message(session, screen, 'prepare-holding', card({ title: '실습 수량 준비', body: '아래 보유종목에서 현재 종목의 보유수량과 수익률을 확인해 주세요. 보유수량이 없다면 매수를 선택해 시장가로 다시 매수한 뒤 이어서 진행할 수 있어요.' }));
   }
   if (form.blocked) return message(session, screen, 'operationally-unavailable', card({ title: '거래 가능 상태 확인', body: '현재는 화면에 안내된 거래 제한이 적용돼요. 휴장·시세 미준비·운영 중지 상태를 확인해 주세요. 퀘스트 목록으로 돌아가 다른 실습을 선택할 수도 있어요.' }, { actions: ['back', 'exit'] }));
   let ready = !!step.next;
   let hint: string | null = null;
-  if (screen === 'order') {
+  // Only the order form's own steps depend on the chosen side and type.
+  if (screen === 'order' && step.target.startsWith('order-')) {
     const wantedSide = session.quest === 'marketSell' ? 'sell' : 'buy';
     const wantedType = session.quest === 'limitBuy' ? 'limit' : 'market';
     if (form.side !== wantedSide || form.orderType !== wantedType) {
@@ -354,7 +357,9 @@ export function startGuideSession(id: number, accountId: string, quest: Beginner
 export function followGuideFocus(session: GuideSession, focused: FocusedGuideScreen): GuideSession {
   if (isTradingQuest(session.quest)) {
     if (session.phase !== 'guiding') return session;
-    if (focused === 'order' && session.step < (session.quest === 'marketSell' ? 2 : 3)) return { ...session, step: session.quest === 'marketSell' ? 2 : 3 };
+    // The first step that lives on the order screen (marketSell: holdings; protection: all of it).
+    const firstOrderStep = session.quest === 'marketSell' ? 1 : session.quest === 'protection' ? 0 : 3;
+    if (focused === 'order' && session.step < firstOrderStep) return { ...session, step: firstOrderStep };
     if (focused === 'asset' && session.step === 0 && !['protection', 'marketSell'].includes(session.quest)) return { ...session, step: 1 };
     return session;
   }

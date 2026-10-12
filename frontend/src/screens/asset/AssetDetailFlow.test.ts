@@ -16,7 +16,7 @@ const openDetail = async (h: any) => {
   await h.mount();
 };
 
-test('market asset opens chart-first detail with price, change and a shared holding section', async (t) => {
+test('market asset opens chart-first detail with price and change; holdings live under the order screen only', async (t) => {
   const h = inlineTradingHarness();
   await openDetail(h);
   t.after(h.close);
@@ -27,7 +27,8 @@ test('market asset opens chart-first detail with price, change and a shared hold
   assert.ok(h.node(TEST_IDS.assetDetail.screen));
   assert.equal(h.node('inline-order-panel') === undefined, true);
   assert.equal(h.node('asset-trading-columns') === undefined, true);
-  assert.equal(h.node('account-holdings') !== undefined, true);
+  // 2026-10-12: no duplicate holdings on the detail (they are under the order form).
+  assert.equal(h.node('account-holdings') === undefined, true);
   assert.ok(chart(h).candles.length > 0);
   assert.ok(screen.indexOf('전일대비') < screen.indexOf('CandlestickChart'));
   assert.ok(screen.indexOf('CandlestickChart') < screen.indexOf('ChartTimeframeSelector'));

@@ -19,6 +19,7 @@ import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import type { PositionItemDto } from '../../features/position/api';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import ActionPressable from '../../components/common/ActionPressable';
+import SegmentedControl from '../../components/common/SegmentedControl';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -31,6 +32,8 @@ type Props = {
   isFocused: boolean;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
+  /** Order screen: a holding of another asset switches the order to it. */
+  onSelectAsset?: (assetId: string) => void;
 };
 
 export default function AccountHoldings({
@@ -40,6 +43,7 @@ export default function AccountHoldings({
   isFocused,
   onInputFocus,
   onInputBlur,
+  onSelectAsset,
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('current');
   const guide = useQuestGuide();
@@ -74,29 +78,13 @@ export default function AccountHoldings({
         <Text style={styles.title} testID="holdings-count">
           {filter === 'pending' ? '대기 주문' : `보유 종목${data && !query.isError ? ` ${positions.length}` : ''}`}
         </Text>
-        <View style={styles.filters}>
-          {(['current', 'all', 'pending'] as const).map((value) => (
-            <ActionPressable
-              key={value}
-              testID={`holdings-filter-${value}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: filter === value }}
-              aria-pressed={filter === value}
-              onPress={() => setFilter(value)}
-              style={[styles.filter, filter === value && styles.selectedFilter]}
-            >
-              <Text
-                style={[
-                  styles.filterText,
-                  filter === value && styles.selectedText,
-                ]}
-              >
-                {value === 'all' ? '전체 보유' : value === 'current' ? '현재 종목' : '대기 목록'}
-              </Text>
-            </ActionPressable>
-          ))}
-        </View>
       </View>
+      <SegmentedControl testID="holdings-filters" accessibilityLabel="보유 목록 보기" compact value={filter} onChange={setFilter}
+        options={(['current', 'all', 'pending'] as const).map(value => ({
+          key: value,
+          label: value === 'all' ? '전체 보유' : value === 'current' ? '현재 종목' : '대기 목록',
+          testID: `holdings-filter-${value}`,
+        }))} />
       {!accountId ? (
         <InlineEmptyState
           title="계정이 없습니다."
@@ -142,6 +130,7 @@ export default function AccountHoldings({
       ) : (
         visible.map((position) => (
           <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position} guideTarget={isFocused && position.assetId === assetId}
+            onSelect={onSelectAsset && position.assetId !== assetId ? () => onSelectAsset(position.assetId) : undefined}
             onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
         ))
       )}
@@ -149,16 +138,22 @@ export default function AccountHoldings({
   );
 }
 
-function HoldingRow({ position, accountId, guideTarget, onInputFocus, onInputBlur }: {
+function HoldingRow({ position, accountId, guideTarget, onSelect, onInputFocus, onInputBlur }: {
   guideTarget: boolean;
   position: PositionItemDto; accountId: string;
+  onSelect?: () => void;
   onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
 }) {
   const [protection, setProtection] = useState(false);
   const gate = useLearningAccess(accountId).gate(position.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
+  // The summary is the item's touch surface (to the card's top edges); the
+  // TP/SL button and its inline editor stay separate controls below it.
+  const summary = <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} onPress={onSelect}
+    style={onSelect ? styles.pressableSummary : undefined}
+    accessibilityHint={onSelect ? '이 종목의 주문 화면으로 전환합니다' : undefined} />;
   return (
     <View style={styles.row} testID={`holding-${position.assetId}`}>
-      {guideTarget ? <QuestTarget id="asset-holdings"><PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} /></QuestTarget> : <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} />}
+      {guideTarget ? <QuestTarget id="asset-holdings">{summary}</QuestTarget> : summary}
       <QuestTarget id="asset-protection" enabled={guideTarget}><ActionPressable accessibilityRole="button" accessibilityLabel={gate.locked ? `TP/SL 설정·관리, 신규 설정 학습 제한. ${gate.message}` : 'TP/SL 설정·관리'} testID={`holding-protection-${position.assetId}`} onPress={() => setProtection(!protection)} style={styles.retry}>
         <Text style={styles.value}>TP/SL 설정·관리</Text>{gate.locked ? <LearningLock /> : null}
       </ActionPressable></QuestTarget>
@@ -183,20 +178,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  filters: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, minWidth: 0, maxWidth: '100%' },
-  filter: {
-    minWidth: 0,
-    minHeight: 32,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    backgroundColor: semantic.raised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  selectedFilter: { backgroundColor: semantic.selected },
-  filterText: { fontSize: 12, color: semantic.secondary, textAlign: 'center' },
-  selectedText: { color: semantic.onAccent, fontWeight: '600' },
   row: {
     backgroundColor: semantic.surface,
     borderWidth: 1,
@@ -205,6 +186,15 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 12,
     minWidth: 0,
+  },
+  pressableSummary: {
+    marginHorizontal: -14,
+    marginTop: -14,
+    paddingHorizontal: 14,
+    paddingTop: 20,
+    paddingBottom: 6,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   value: {
     fontSize: 14,

@@ -16,10 +16,10 @@ import {
   Text,
   StyleSheet,
   FlatList,
-  ActivityIndicator,
   Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+import SegmentedControl from '../../components/common/SegmentedControl';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { MarketScreenProps } from '../../app/navigation/types';
@@ -38,6 +38,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = MarketScreenProps;
 
@@ -176,40 +177,19 @@ export default function MarketScreen({ navigation, route }: Props) {
         refreshControl={refresh.refreshControl}
         ListHeaderComponent={
           <View style={styles.headerSection}>
-            <View ref={questGuideTarget('market-tabs')} collapsable={false} style={styles.tabRow}>
-              {TABS.map((tab) => {
-                const active = tab.key === selectedTab;
-                const testID =
-                  tab.key === 'domestic_stock'
-                    ? TEST_IDS.market.tabDomestic
-                    : tab.key === 'us_stock'
-                      ? TEST_IDS.market.tabUs
-                      : TEST_IDS.market.tabCrypto;
-
-                return (
-                  <ActionPressable
-                    key={tab.key}
-                    testID={testID}
-                    accessibilityRole="tab"
-                    accessibilityLabel={tab.label}
-                    accessibilityState={{ selected: active }}
-                    aria-selected={active}
-                    style={[styles.tabButton, active && styles.tabButtonActive]}
-                    onPress={() => setSelectedTab(tab.key)}
-                  >
-                    <Text
-                      style={active ? styles.tabTextActive : styles.tabText}
-                    >
-                      {tab.label}
-                    </Text>
-                  </ActionPressable>
-                );
-              })}
+            <View ref={questGuideTarget('market-tabs')} collapsable={false}>
+              <SegmentedControl testID="market-tabs" accessibilityLabel="시장 선택" value={selectedTab} onChange={setSelectedTab}
+                options={TABS.map(tab => ({ key: tab.key, label: tab.label, testID: tab.key === 'domestic_stock'
+                  ? TEST_IDS.market.tabDomestic : tab.key === 'us_stock' ? TEST_IDS.market.tabUs : TEST_IDS.market.tabCrypto }))} />
             </View>
 
-            {selectedTab === 'crypto' ? <View style={styles.tabRow}>
-              {(['spot', 'futures'] as const).map(product => <ActionPressable key={product} testID={`crypto-product-${product}`} accessibilityRole="tab" accessibilityState={{ selected: cryptoProduct === product }} aria-selected={cryptoProduct === product} onPress={() => setCryptoProduct(product)} style={[styles.tabButton, cryptoProduct === product && styles.tabButtonActive]}><Text style={cryptoProduct === product ? styles.tabTextActive : styles.tabText}>{product === 'spot' ? '현물' : '선물'}</Text></ActionPressable>)}
-            </View> : null}
+            {selectedTab === 'crypto' ? (
+              <SegmentedControl testID="crypto-product" accessibilityLabel="암호화폐 상품" value={cryptoProduct} onChange={setCryptoProduct}
+                options={[
+                  { key: 'spot', label: '현물', accessibilityLabel: '암호화폐 현물', testID: 'crypto-product-spot' },
+                  { key: 'futures', label: '선물', accessibilityLabel: '암호화폐 선물', testID: 'crypto-product-futures' },
+                ]} />
+            ) : null}
             {futuresMarket ? <FuturesMarketList onSelect={(accountId, instrumentId) => navigation.navigate('Futures', { accountId, instrumentId })} /> : <>
             <ActionPressable
               style={styles.searchEntry}
@@ -266,7 +246,7 @@ export default function MarketScreen({ navigation, route }: Props) {
             </ActionPressable>
           ) : marketQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator />
+              <WhaleLoader size={28} />
             </View>
           ) : null
         }
@@ -284,21 +264,6 @@ const styles = StyleSheet.create({
   headerSection: {
     paddingHorizontal: 12, borderRadius: 14,
     backgroundColor: semantic.surface, gap: SCREEN_SECTION_GAP, marginBottom: SCREEN_SECTION_GAP },
-  tabRow: { flexDirection: 'row', gap: 8 },
-  tabButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    backgroundColor: semantic.raised,
-  },
-  tabButtonActive: { backgroundColor: semantic.secondaryActionSurface, borderColor: semantic.secondaryActionSurface },
-  tabText: { color: semantic.text, fontWeight: '600', fontSize: 14,
-    ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
-  tabTextActive: { color: semantic.secondaryActionForeground, fontWeight: '600',
-    ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
   searchEntry: {
     borderWidth: 1,
     borderColor: semantic.border,

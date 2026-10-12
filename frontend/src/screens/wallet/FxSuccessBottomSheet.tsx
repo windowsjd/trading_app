@@ -51,8 +51,9 @@ export default function FxSuccessBottomSheet({
         ) : null}
 
         <View style={styles.buttonRow}>
-          <CTAButton variant="neutral" label="지갑으로 돌아가기" onPress={onGoWallet} style={styles.flex} />
-          <CTAButton label="마켓으로 가기" onPress={onGoMarket} style={styles.flex} />
+          {/* Same pair as the transfer receipt: 확인 returns to the wallet. */}
+          <CTAButton testID="fx-success-done" variant="neutral" label="확인" onPress={onGoWallet} style={styles.flex} />
+          <CTAButton testID="fx-success-go-market" label="마켓으로 가기" onPress={onGoMarket} style={styles.flex} />
         </View>
       </ScrollView>
     </BottomSheetBackdrop>

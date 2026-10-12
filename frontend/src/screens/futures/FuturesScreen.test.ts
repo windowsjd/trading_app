@@ -243,3 +243,25 @@ test("uncertain open replays the original command after poll shows a position an
   assert.deepEqual(h.requests[1], h.requests[0]);
   assert.equal(h.requests[1].body.operation, "open");
 });
+
+test("opening with no free collateral is flagged while typing; reduce and unknown collateral are not", async (t) => {
+  const h = futuresHarness({ freeCollateral: "0.00000000" });
+  await h.start();
+  t.after(h.close);
+  await h.change("futures-quantity", "1");
+  assert.equal(h.node("futures-collateral-insufficient")?.props.children, "사용 가능한 선물 담보가 부족합니다.");
+  assert.equal(h.node("futures-submit").props.state, "disabled");
+  await h.press("futures-submit");
+  assert.equal(h.requests.length, 0, "the server is never asked for a certain rejection");
+  const unknown = futuresHarness({ freeCollateral: null });
+  await unknown.start();
+  t.after(unknown.close);
+  await unknown.change("futures-quantity", "1");
+  assert.equal(unknown.node("futures-collateral-insufficient") === undefined, true, "unknown never counts as short");
+  const reducing = futuresHarness({ position: true, freeCollateral: "0.00000000" });
+  await reducing.start();
+  t.after(reducing.close);
+  await reducing.press("futures-position-A:position-reduce");
+  await reducing.change("futures-quantity", "0.5");
+  assert.equal(reducing.node("futures-collateral-insufficient") === undefined, true, "risk reduction needs no new collateral");
+});

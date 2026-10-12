@@ -73,8 +73,9 @@ it('HOT uses the Market turnover DESC result and stable order for each category,
       const tab = h.node(`home-hot-tab-${category}`);
       assert.equal(tab.props.accessibilityRole, 'tab');
       assert.equal(tab.props['aria-selected'], category === type);
+      // Before the track is measured the selected segment paints the pill itself.
       assert.equal(Object.assign({}, ...tab.props.style.filter(Boolean)).backgroundColor,
-        category === type ? semantic.secondaryActionSurface : undefined);
+        category === type ? semantic.surface : undefined);
     }
     assert.deepEqual(h.hotRows().map(n => n.props.testID), h.markets[type].map(a => `home-hot-item-${a.id}`));
     await h.press(`home-hot-item-${type}-0`);

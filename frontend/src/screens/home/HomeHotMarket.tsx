@@ -8,6 +8,7 @@ import { marketSortParams } from '../../features/market/marketSort';
 import { getMarketChangeDisplay, getMarketException } from '../../features/market/marketPresentation';
 import { getAssetNameDisplay, getAssetPriceText, getAssetSymbolMarketDisplay } from '../../utils/format';
 import ActionPressable from '../../components/common/ActionPressable';
+import SegmentedControl from '../../components/common/SegmentedControl';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import ErrorState from '../../components/states/ErrorState';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -54,14 +55,8 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
   return (
     <View testID="home-hot" style={styles.card}>
       <Text accessibilityRole="header" style={styles.heading}>HOT 🔥</Text>
-      <View style={styles.tabs}>
-        {CATEGORIES.map(item => <ActionPressable key={item.key} testID={`home-hot-tab-${item.key}`}
-          accessibilityRole="tab" accessibilityLabel={item.label} accessibilityState={{ selected: item.key === assetType }}
-          aria-selected={item.key === assetType}
-          onPress={() => setAssetType(item.key)} style={[styles.tab, item.key === assetType && styles.selectedTab]}>
-          <Text style={[styles.tabText, item.key === assetType && styles.selectedText]}>{item.label}</Text>
-        </ActionPressable>)}
-      </View>
+      <SegmentedControl testID="home-hot-tabs" accessibilityLabel="HOT 시장" value={assetType} onChange={setAssetType}
+        options={CATEGORIES.map(item => ({ key: item.key, label: item.label, testID: `home-hot-tab-${item.key}` }))} />
       <Text style={styles.caption}>거래대금 TOP 5</Text>
       {query.isLoading ? <SectionSkeleton lines={3} /> : null}
       {query.isError ? <ErrorState title="HOT 종목을 불러오지 못했습니다."
@@ -105,11 +100,6 @@ const styles = StyleSheet.create({
   // No outline: the transparent 1px border keeps the content inset unchanged.
   card: { borderWidth: 1, borderColor: 'transparent', borderRadius: 14, padding: 16, gap: 8, backgroundColor: semantic.surface },
   heading: { fontSize: 18, lineHeight: 27, fontWeight: '700' },
-  tabs: { flexDirection: 'row', gap: 4, padding: 3, borderRadius: 10, backgroundColor: semantic.raised },
-  tab: { flex: 1, minWidth: 0, minHeight: 44, paddingVertical: 8, paddingHorizontal: 2, alignItems: 'center', justifyContent: 'center', borderRadius: 8 },
-  selectedTab: { backgroundColor: semantic.secondaryActionSurface },
-  tabText: { fontSize: 13, lineHeight: 20, fontWeight: '600', textAlign: 'center', maxWidth: '100%', color: semantic.secondary },
-  selectedText: { color: semantic.secondaryActionForeground },
   caption: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
   row: { flexDirection: 'row', gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: semantic.border, minHeight: 44 },
   rank: { fontSize: 14, lineHeight: 23, fontWeight: '700', color: semantic.secondary },

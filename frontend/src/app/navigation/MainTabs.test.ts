@@ -26,6 +26,13 @@ const icons = readFileSync(
 type AccountMode = 'general' | 'season' | 'beginner';
 
 function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`) {
+  // Tab screens' bottom sheets render in ScreenSheetHost; the navigator contract is inside it.
+  const unwrap = (node: any) => node?.type === 'ScreenSheetHost' ? node.props.children : node;
+  const tree: any = renderHostedTabs(mode, isLoading, appearance, reduced, accountId);
+  return tree?.type === 'QuestGuideProvider' ? { ...tree, props: { ...tree.props, children: unwrap(tree.props.children) } } : unwrap(tree);
+}
+
+function renderHostedTabs(mode: AccountMode | null, isLoading = false, appearance: 'light' | 'dark' = 'light', reduced = false, accountId = `${mode}-account`) {
   const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
     'react-native': { useWindowDimensions: () => ({ fontScale: 1 }) },
     'react-native-safe-area-context': {
@@ -61,6 +68,7 @@ function renderTabs(mode: AccountMode | null, isLoading = false, appearance: 'li
       }),
     },
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
+    '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
     ...Object.fromEntries(
       ['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
         `./${name}Stack`,
@@ -299,6 +307,9 @@ it('beginner tabs run inside one quest guide keyed by the account, unlike other 
   for (const mode of ['general', 'season'] as const) {
     assert.equal(renderTabs(mode).type, 'Navigator', `${mode} has no quest guide`);
   }
+  // Sheets cover the tabs (headers, tab bar) but the quest overlay stays above them.
+  assert.equal((renderHostedTabs('beginner') as any).props.children.type, 'ScreenSheetHost');
+  for (const mode of ['general', 'season'] as const) assert.equal((renderHostedTabs(mode) as any).type, 'ScreenSheetHost');
 });
 it('even switching two season accounts resets nested navigation by account id', () => {
   assert.notEqual(renderTabs('season', false, 'light', false, 'season-one').key, renderTabs('season', false, 'light', false, 'season-two').key);

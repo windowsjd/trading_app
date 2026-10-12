@@ -10,6 +10,35 @@
 
 ---
 
+## 2026-10-12 Trading Class 전반 UI/UX 개선 (14개 요구사항)
+
+- **기능 구현 의도:** 금융 정책·계산·API 계약은 그대로 두고, 터치·전환·로딩의 즉각적이고 일관된 반응,
+  계정/티어/랭킹 정보 위계, 이체·주문 입력의 안전한 즉시 안내, 중복 UI 제거, 문의 접수를 더한다.
+- 시작 `main`=`origin/main`=`c4fea106`, clean. 커밋·push·배포·운영 Migration 없음. 참고 영상 3개(HEVC)는
+  scratchpad의 static ffmpeg로 프레임 실측했고 저장소에 복사하지 않았다(실측값·차이는 상세 문서).
+- 공통: `ActionPressable` 터치 지점 잉크(`InkRipple`; 버튼은 0.97 축소 유지, 카드는 잉크만, 선택형은 정적 tint,
+  매수/매도 실행은 `ripple="subtle"`), `SegmentedControl`(140ms, 매수/매도와 공유), `WhaleLoader`(미상=회전 호,
+  지정=99% 상한, Reduced Motion 정지), iOS push 350ms·Web 방향 cue(`stackScreenLayout`), busy 버튼은 그라데이션 유지
+  (로그인/CTA가 검게 변하던 원인: disabled 시 그라데이션 제거).
+- 홈: 일반/초보/시즌 공통 컴팩트 계정박스(104px), 시즌 티어 앰블럼은 총자산 오른쪽(`HomeTierBadge`). 랭킹: 홈 티어 카드를
+  `TierCard`로 분리해 '내 순위'로, 퍼센타일 UI 삭제, 앰블럼+색 있는 수익률, 사진 왼쪽 정렬 통일. 금융 텍스트 색 채도 상향(대비 4.5 유지).
+- **이체 바텀시트는 RN Modal이 아니라 MainTabs `ScreenSheetHost`에 그린다**: native 모달은 퀘스트 스포트라이트를 덮어
+  QUEST 02를 깨뜨린다. 퀘스트는 Wallet 라우트+이체 폼 facts를 'transfer'로 본다. 이체 금융 흐름(사전 확인·고정 키·fence·
+  불확실 재시도)은 그대로, 요청 중 닫기 경로 전부 비활성. 환전/이체 완료 버튼은 `확인`/`마켓으로 가기`.
+- 주문: 매수 입력 중 수수료 포함 총액 > 주문 가능(잔액−예약)이면 '잔액이 부족합니다.'+비활성(불확실하면 판단 안 함, 서버 최종).
+  선물은 free collateral ≤ 0인 진입/증가만 즉시 안내. 보유종목 행 → 기존 `selectAsset`으로 같은 계정 종목 전환.
+  종목 상세 보유종목 삭제, 퀘스트 holdings/TP·SL/지정가 결과 단계는 주문 화면으로 연결(10개 퀘스트 증거 규칙 불변).
+- 문의: 최소 백엔드 `inquiries`(추가형 migration `20261012120000_add_user_inquiries`, 금융 테이블 무관), `POST /api/v1/inquiries`,
+  `GET /api/v1/inquiries/me`, 인증·검증·본인 조회·client request id 멱등·409·10분 5건 제한. MY > 문의하기 화면.
+- **검증 PASS:** frontend lint 2종+typecheck, `npm test` **2291/0 fail/0 skip**, Web·Android·iOS export; backend tsc/build,
+  unit **4334 pass**(87 skip=기존 DB-gated), 격리 PG(127.0.0.1:55471)에서 빈 DB migration 체인+drift 없음, 문의 HTTP+DB
+  통합 22 assertions. 실제 Web 렌더로 물결/세그먼트/push 프레임, 홈·랭킹(320×글꼴2·다크), 주문 부족 안내, 이체 시트, 문의,
+  로그인 busy 확인. `beginnerBrowser` 표준·전체 8퀘스트·compact PASS.
+- **NOT_RUN/제한:** Android/iOS 실기기·시뮬레이터. Android push는 플랫폼 고정 곡선. `walletBrowser`/`conditionalBrowser`는
+  HEAD에서도 실패(사본 비교), 이전 디자인을 단언하는 browser 스크립트 8개는 갱신 필요(목록은 상세 문서).
+  `backend/.env.local`은 Render DB — Prisma 명령은 반드시 loopback DATABASE_URL로.
+- [기능별 구현·의도·판단·재사용·검증·제한](frontend/docs/ui-ux-overhaul-2026-10-12.md)
+
 ## 2026-10-10 Binance Futures Last Price 도입·선물 상품 등록 준비
 
 - **기능 구현 의도:** 가상 선물 체결(시장가·지정가·TP/SL·시즌 최종 정산)을 Binance Spot이 아닌

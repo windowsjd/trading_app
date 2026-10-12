@@ -324,10 +324,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setNotice(null);
     action.current = null;
   };
+  // Certain-only live check: opening or increasing needs some free collateral.
+  // The margin a positive amount needs (Mark, leverage, fees) stays the
+  // server's; the uncertain-result retry is a separate path (pendingResult).
+  const collateralShort = (selectedOperation === 'open' || selectedOperation === 'increase') &&
+    !!selectedQuantity.trim() && !inputError && hasNoFreeCollateral(data.collateral.freeCollateral);
   const entryGate = learning.gate(selectedOperation === 'close' || selectedOperation === 'reduce' ? 'riskReduction' : 'allTrading');
   const submit = () => {
     if (!entryGate.allowed) { entryGate.guard(() => undefined); return; }
-    if (!allowed || inputError || submitLock.current || !instrument) return;
+    if (!allowed || inputError || collateralShort || submitLock.current || !instrument) return;
     const signature = JSON.stringify([
       scope.current.epoch,
       instrument.id,
@@ -634,7 +639,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               {selectedQuantity && inputError ? (
                 <Text style={styles.warning}>{inputError}</Text>
               ) : null}
-              {!position && entryType === 'limit' ? <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id} assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage} quantity={quantity} allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !pendingResult} onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : <View ref={inputScroll.submitRef}>
+              {collateralShort ? (
+                <Text testID="futures-collateral-insufficient" accessibilityLiveRegion="polite" style={styles.warning}>
+                  {futuresErrorMessage('FUTURES_INSUFFICIENT_FREE_COLLATERAL')}
+                </Text>
+              ) : null}
+              {!position && entryType === 'limit' ? <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id} assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage} quantity={quantity} allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !collateralShort && !pendingResult} onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : <View ref={inputScroll.submitRef}>
                 <QuestTarget id="futures-submit"><CTAButton
                   learningHint={entryGate.locked ? entryGate.message : null}
                   label={`${operationLabel[selectedOperation]} · ${directionLabel[position?.direction ?? direction]}`}
@@ -643,7 +653,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   state={
                     mutation.isPending
                       ? "loading"
-                      : allowed && !inputError
+                      : allowed && !inputError && !collateralShort
                         ? "enabled"
                         : "disabled"
                   }
@@ -918,6 +928,12 @@ function Choice({
     </ActionPressable>
   );
 }
+/** A known zero/negative free collateral; unknown (null) never counts as short. */
+function hasNoFreeCollateral(value: string | null) {
+  if (value === null || !/^-?\d+(\.\d+)?$/.test(value.trim())) return false;
+  return Number(value) <= 0;
+}
+
 function futuresErrorMessage(code: string | null) {
   if (code === "FUTURES_INSTRUMENT_UNVERIFIED")
     return "현재 이 상품은 신규 진입할 수 없습니다. 보유 포지션의 Reduce/Close는 가능합니다.";

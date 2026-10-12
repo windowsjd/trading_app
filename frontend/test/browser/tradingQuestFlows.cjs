@@ -12,7 +12,7 @@ module.exports=async function({page,open,id,tab,out,errors}){
  const start=async key=>{await tab('퀘스트').click();await id(`quest-card-${key}-start`).click();};
  const buy=async(key,asset)=>{
   await start(key);await id(`market-item-${asset}`).click();await next();await id('asset-detail-open-buy-order').click();
-  if(key==='limitBuy'){await id('order-type-select').click();await id('order-type-toggle-limit').click();await id('order-limit-price-input').fill('90');}
+  if(key==='limitBuy'){await id('order-type-toggle-limit').click();await id('order-limit-price-input').fill('90');}
   await next();await id('order-quantity-input').fill(asset==='BTC'?'100':'1');await next();await next();
   await id('quest-guide-card').waitFor();
   await page.waitForFunction(()=>{const el=document.querySelector('[data-testid="quest-guide-card"]'); return el && Number(getComputedStyle(el).opacity)===1;});
@@ -32,7 +32,8 @@ module.exports=async function({page,open,id,tab,out,errors}){
  await id('protection-take_profit-toggle').click();await page.getByLabel('익절 (Take Profit) 조건 가격',{exact:true}).fill('120');
  await id('protection-stop_loss-toggle').click();await page.getByLabel('손절 (Stop Loss) 조건 가격',{exact:true}).fill('80');
  await next();await page.getByRole('button',{name:'보호 조건 등록',exact:true}).click();await finish('protection');
- await start('marketSell');await next();await id('asset-detail-open-sell-order').click();await next();
+ // 판매하기 on the detail, then holdings below the sell form, then the form steps.
+ await start('marketSell');await id('asset-detail-open-sell-order').click();await next();await next();
  await id('order-quantity-input').fill('1');await next();await next();await id('order-execute-submit').click();await finish('marketSell');
  await buy('limitBuy','BTC');
  for(const key of ['krStock','usStock','futuresLong','futuresShort'])assert.notEqual(await id(`quest-card-${key}-start`).getAttribute('aria-disabled'),'true');

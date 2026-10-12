@@ -1,6 +1,7 @@
 import React from "react";
 import { StyleSheet, Text, TextInput, View } from "../../theme/native";
 import ActionPressable from "../../components/common/ActionPressable";
+import SegmentedControl from "../../components/common/SegmentedControl";
 import { semantic } from "../../theme/tokens";
 import { formatDisplayDecimal } from "../../utils/format";
 import type { ProtectionLeg } from "./api";
@@ -99,29 +100,19 @@ export function ProtectionEditor({
                   onInputBlur={onInputBlur}
                 />
                 <Text style={styles.text}>조건 충족 후 실행 주문</Text>
-                <View style={styles.choices}>
-                  {(["market", "limit"] as const).map((type) => (
-                    <ActionPressable
-                      key={type}
-                      disabled={disabled || (type === "limit" && !canLimit)}
-                      accessibilityRole="radio"
-                      accessibilityState={{
-                        selected: leg.type === type,
-                        disabled: disabled || (type === "limit" && !canLimit),
-                      }}
-                      onPress={() => change({ type })}
-                      style={[
-                        styles.choice,
-                        leg.type === type && styles.selected,
-                      ]}
-                      testID={`protection-${kind}-${type}`}
-                    >
-                      <Text style={styles.text}>
-                        {type === "market" ? "시장가" : "지정가"}
-                      </Text>
-                    </ActionPressable>
-                  ))}
-                </View>
+                <SegmentedControl
+                  testID={`protection-${kind}-type`}
+                  accessibilityLabel={`${protectionLabel[kind]} 실행 주문`}
+                  compact
+                  value={leg.type}
+                  onChange={(type) => change({ type })}
+                  options={(["market", "limit"] as const).map((type) => ({
+                    key: type,
+                    label: type === "market" ? "시장가" : "지정가",
+                    testID: `protection-${kind}-${type}`,
+                    disabled: disabled || (type === "limit" && !canLimit),
+                  }))}
+                />
                 {leg.type === "limit" ? (
                   <>
                     <Text style={styles.text}>실행 지정가 (Limit)</Text>
@@ -186,7 +177,6 @@ function PriceInput({
 const styles = StyleSheet.create({
   editor: { gap: 12, minWidth: 0 },
   leg: { gap: 8, minWidth: 0 },
-  choices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   choice: {
     minHeight: 44,
     padding: 10,
@@ -196,7 +186,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     minWidth: 0,
   },
-  selected: { backgroundColor: semantic.surface },
   label: {
     fontSize: 15,
     fontWeight: "700",

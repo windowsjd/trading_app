@@ -41,7 +41,8 @@ async function run() {
       localStorage.setItem('trading-app:appearance', params.get('theme') ?? 'light');
     });
     const id = value => page.getByTestId(value).filter({ visible: true }).first();
-    const tab = label => page.getByRole('tablist').getByRole('tab', { name: label, exact: true });
+    // Bottom tabs are links; in-screen segmented controls are also tablists.
+    const tab = label => page.locator('a[role="tab"]').filter({ has: page.getByText(label, { exact: true }) });
     const heading = label => page.getByRole('heading', { name: label, exact: true }).filter({ visible: true }).first();
     async function waitForQuestCompletion(quest) {
       await page.waitForFunction(quest => document.querySelector(`[data-testid="quest-card-${quest}-status"]`)?.textContent === '완료', quest, { timeout: 8000 });
@@ -82,6 +83,8 @@ async function run() {
     // Every visible text run stays inside the viewport and its own box; every
     // button keeps a 44px target with its label inside (no truncation/clipping).
     async function contentFits(testId) {
+      // Measure the settled layout, not a screen still easing in (web push cue).
+      await settled(testId);
       const issues = await page.evaluate(testId => {
         const root = [...document.querySelectorAll(`[data-testid="${testId}"]`)].find(element => element.checkVisibility());
         if (!root) return [`missing ${testId}`];
@@ -228,7 +231,8 @@ async function run() {
     function assertSmoothReturn(frames, practice) {
       assert.equal(frames.some(frame => frame.sheet), false, 'no FX success sheet next to the celebration');
       const routes = frames.map(frame => frame.route).filter((route, index, all) => route && route !== all[index - 1]);
-      assert.deepEqual(routes, [practice === 'fx' ? 'WalletFx' : 'WalletTransfer', 'Guide'], `one direct return, no Wallet flash: ${routes}`);
+      // 이체 is a sheet over the Wallet route (2026-10-12), 환전 is its own screen.
+      assert.deepEqual(routes, [practice === 'fx' ? 'WalletFx' : 'Wallet', 'Guide'], `one direct return, no Wallet flash: ${routes}`);
       const firstList = frames.findIndex(frame => frame.route === 'Guide');
       assert.ok(firstList > 0);
       assert.equal(frames[firstList - 1].celebration, true, 'the celebration covers the tab switch');
@@ -271,7 +275,7 @@ async function run() {
       const tabIcon = await tab('퀘스트').evaluate(el => [...el.querySelectorAll('path')].map(p => p.getAttribute('d')).join('|'));
       assert.ok(tabIcon.includes('M4 3h2v18H4z'), 'filled quest flag on the selected tab');
       assert.doesNotMatch(tabIcon, /M3 3h6c1\.3/, 'not the guide book');
-      assert.equal(await page.getByRole('tablist').getByRole('tab').count(), 5);
+      assert.equal(await page.locator('a[role="tab"]').count(), 5, 'five bottom tabs');
       const list = await text('beginner-quest-list');
       assert.doesNotMatch(list, /실제 거래 기능을 직접 사용해 보며 단계별로 배워요/);
       assert.doesNotMatch(list, /\d+%|경험치|레벨|해금|잠금|보상|배우는 내용:|완료 ·|다시 둘러보기/);

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   FlatList,
@@ -34,6 +33,7 @@ import {
 } from '../../features/market/useMarketAssetSearch';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import { buildWsUrl } from '../../constants/env';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 const OPEN_DURATION = 280;
 const CLOSE_DURATION = 220;
@@ -297,7 +297,7 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
             ListEmptyComponent={
               searchQuery.isLoading ? (
                 <View testID="order-asset-sheet-loading" style={styles.state}>
-                  <ActivityIndicator />
+                  <WhaleLoader size={28} />
                   <Text style={styles.stateText}>{loadingCopy}</Text>
                 </View>
               ) : searchQuery.isError ? (
@@ -343,7 +343,7 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
                 </ActionPressable>
               ) : searchQuery.isFetchingNextPage ? (
                 <View style={styles.footerLoader}>
-                  <ActivityIndicator />
+                  <WhaleLoader size={28} />
                 </View>
               ) : null
             }

@@ -4,15 +4,11 @@ import React, { useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { useAppearance } from '../../theme/appearance';
 import {
-  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
   View,
-  type StyleProp,
-  type ViewStyle,
-  type TextStyle,
 } from '../../theme/native';
 import ActionPressable from '../common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
@@ -32,6 +28,7 @@ import {
 import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import type { TradingAccountDto } from '../../features/tradingAccount/api';
+import WhaleLoader from '../states/WhaleLoader';
 
 /**
  * The account switcher (작업 9 §B-3).
@@ -58,25 +55,16 @@ import type { TradingAccountDto } from '../../features/tradingAccount/api';
 type Props = {
   /** Compact trigger for headers; the sheet is identical either way. */
   compact?: boolean;
-  /** Home context with a small change action; selection still uses this sheet. */
+  /**
+   * Home's account box, identical for general, beginner and season accounts:
+   * title and change action on top, the caller's profile row below, sized to
+   * its content. The season tier lives beside Home's total assets instead.
+   */
   home?: boolean;
-  /** Home owns tier presentation; the shared switcher has no ranking dependency. */
-  homeCardStyle?: StyleProp<ViewStyle>;
-  /** Decorative artwork stays inside the same growing card as all its text. */
-  homeBackground?: React.ReactNode;
-  homeBackgroundAspectRatio?: number;
-  homeBackgroundCornerRatio?: number;
-  /** Keep text below a bright top facet without adding padding above the emblem. */
-  homeHeadingTopRatio?: number;
-  homeForegroundStyle?: TextStyle;
-  /** Optional Home illustration shares the title/profile column's vertical space. */
-  homeVisual?: React.ReactNode;
-  homeVisualCaption?: React.ReactNode;
   children?: React.ReactNode;
 };
 
-export default function AccountSwitcher({ compact = false, home = false, homeCardStyle, homeBackground,
-  homeBackgroundAspectRatio, homeBackgroundCornerRatio = 0.04, homeHeadingTopRatio = 0, homeForegroundStyle, homeVisual, homeVisualCaption, children }: Props) {
+export default function AccountSwitcher({ compact = false, home = false, children }: Props) {
   const { colors } = useAppearance();
   const {
     accounts,
@@ -90,10 +78,8 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
     refetchAccounts,
   } = useTradingAccount();
   const [open, setOpen] = useState(false);
-  const [homeWidth, setHomeWidth] = useState(0);
-  const [wrappedHeading, setWrappedHeading] = useState<string | null>(null);
   const rootNavigation = useRootNavigation();
-  const { height, width, fontScale } = useWindowDimensions();
+  const { height } = useWindowDimensions();
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
@@ -122,7 +108,7 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
         style={[styles.trigger, styles.stateBox]}
         testID={TEST_IDS.tradingAccount.switcherLoading}
       >
-        <ActivityIndicator size="small" color={semantic.info} />
+        <WhaleLoader size={20} />
         <Text style={styles.stateText}>계정 정보를 불러오는 중입니다…</Text>
       </View>
     );
@@ -162,74 +148,43 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
   }
 
   const display = getAccountDisplay(selectedAccount);
-  const hasHomeVisual = selectedAccount.mode === 'season' && !!homeVisual;
-  const hasHomeBackground = hasHomeVisual && !!homeBackground;
-  const headingLayoutKey = `${selectedAccount.id}/${display.title}/${width}/${fontScale}`;
-  // Latch a long/wrapped heading for this title/viewport: measuring it in the
-  // wider stacked column must not alternate between the two layouts.
-  const stackHomeVisual = fontScale > 1.3 || (hasHomeVisual && wrappedHeading === headingLayoutKey);
-  const foreground = hasHomeBackground ? homeForegroundStyle : undefined;
 
   return (
     <>
       {home ? (
-        <View style={[styles.homeContext, hasHomeVisual && styles.homeSeasonContext,
-          hasHomeVisual && stackHomeVisual && styles.homeStacked,
-          selectedAccount.mode === 'season' && homeCardStyle,
-          hasHomeBackground && { borderWidth: 0, overflow: 'hidden', borderRadius: homeWidth * homeBackgroundCornerRatio,
-            paddingHorizontal: Math.max(8, homeWidth * 0.02),
-            paddingBottom: Math.max(14, homeWidth * homeBackgroundCornerRatio),
-            minHeight: homeBackgroundAspectRatio ? homeWidth / homeBackgroundAspectRatio : undefined }]}
-          onLayout={({ nativeEvent }) => setHomeWidth(nativeEvent.layout.width)}
-          testID={TEST_IDS.home.accountContext}>
-          {hasHomeBackground ? homeBackground : null}
-          <View style={[styles.homeInfo, hasHomeVisual && !stackHomeVisual && styles.homeSeasonInfo]}>
-            <View style={[styles.homeHeading, hasHomeVisual && styles.homeSeasonHeading,
-              hasHomeBackground && { paddingTop: homeWidth * homeHeadingTopRatio }]}>
-              <View style={[styles.homeContextRow, hasHomeVisual && styles.homeSeasonRow]}>
-                <Text key={`${hasHomeBackground}/${headingLayoutKey}`} testID="home-account-title"
-                  style={[selectedAccount.mode === 'season' ? styles.homeSeasonTitle : styles.homeTitle, foreground]}
-                  onLayout={({ nativeEvent }) => {
-                    if (hasHomeVisual && !stackHomeVisual && nativeEvent.layout.width > 0 &&
-                      nativeEvent.layout.height > 27 * fontScale * 1.5) {
-                      setWrappedHeading(headingLayoutKey);
-                    }
-                  }}>{display.title}</Text>
-                <ActionPressable
-                  style={[styles.homeChange, hasHomeBackground && styles.homeArtworkChange]}
-                  onPress={() => setOpen(true)}
-                  accessibilityRole="button"
-                  accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
-                  testID={TEST_IDS.tradingAccount.switcherTrigger}
-                >
-                  <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
-                    <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={foreground?.color ?? colors.secondary}
-                      strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
-                      {foreground?.textShadowColor ? <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4"
-                        stroke={foreground.textShadowColor} strokeWidth={4} /> : null}
-                      <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
-                    </Svg>
-                  </View>
-                </ActionPressable>
+        <View style={styles.homeContext} testID={TEST_IDS.home.accountContext}>
+          <View style={styles.homeContextRow}>
+            <Text testID="home-account-title" style={styles.homeTitle}>{display.title}</Text>
+            <ActionPressable
+              style={styles.homeChange}
+              // A compact 36dp mark keeps the 44dp touch target.
+              hitSlop={4}
+              onPress={() => setOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`계정 변경. 현재 ${display.title}, ${display.statusLabel}`}
+              testID={TEST_IDS.tradingAccount.switcherTrigger}
+            >
+              <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+                <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.secondary}
+                  strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" focusable={false}>
+                  <Path d="M4 7h16m-4-4 4 4-4 4M20 17H4m4-4-4 4 4 4" />
+                </Svg>
               </View>
-              {selectedAccount.status !== 'active' ? (
-                <Text style={[styles.homeNotice, foreground]}>계정 {display.statusLabel}</Text>
-              ) : null}
-              {selectedAccount.mode === 'season' && (
-                !selectedAccount.season ||
-                selectedAccount.season.seasonStatus !== 'active' ||
-                selectedAccount.season.participantStatus !== 'active'
-              ) ? (
-                <Text style={[styles.homeNotice, foreground]}>
-                  {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
-                </Text>
-              ) : null}
-            </View>
-            {children}
+            </ActionPressable>
           </View>
-          {hasHomeVisual ? <View style={styles.homeIllustration}>
-            {homeVisual}{homeVisualCaption}
-          </View> : null}
+          {selectedAccount.status !== 'active' ? (
+            <Text style={styles.homeNotice}>계정 {display.statusLabel}</Text>
+          ) : null}
+          {selectedAccount.mode === 'season' && (
+            !selectedAccount.season ||
+            selectedAccount.season.seasonStatus !== 'active' ||
+            selectedAccount.season.participantStatus !== 'active'
+          ) ? (
+            <Text style={styles.homeNotice}>
+              {display.subtitle ?? '시즌 정보를 확인할 수 없습니다.'}
+            </Text>
+          ) : null}
+          {children}
         </View>
       ) : (
         <ActionPressable
@@ -325,7 +280,7 @@ export default function AccountSwitcher({ compact = false, home = false, homeCar
                 </View>
                 <View style={styles.rowBadgeColumn}>
                   {startGeneral.isPending ? (
-                    <ActivityIndicator size="small" color={semantic.info} />
+                    <WhaleLoader size={20} />
                   ) : (
                     <Text style={styles.startAction}>시작</Text>
                   )}
@@ -414,44 +369,30 @@ const BADGE_TEXT_TONE = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
+  // Content-sized: the title row sits at the top inset, the profile right below.
   homeContext: {
-    minHeight: 96,
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingTop: 12,
+    paddingBottom: 14,
     borderRadius: 14,
-    // No outline: the transparent 1px border keeps the content inset (and the
-    // season heading's wrap measurement) unchanged.
+    // No outline: the transparent 1px border keeps the content inset unchanged.
     borderWidth: 1,
     borderColor: 'transparent',
     backgroundColor: semantic.surface,
-    gap: 16,
+    gap: 8,
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  homeSeasonContext: { flexDirection: 'row', paddingHorizontal: 8, paddingVertical: 14, gap: 1 },
-  homeStacked: { flexDirection: 'column', justifyContent: 'space-between', gap: 16 },
-  homeIllustration: { alignItems: 'center', gap: 4, flexShrink: 0, maxWidth: '100%' },
-  homeInfo: { minWidth: 0, gap: 16 },
-  homeSeasonInfo: { flex: 1, justifyContent: 'space-between', gap: 12 },
-  homeHeading: { gap: 16 },
-  homeSeasonHeading: { gap: 8 },
-  homeSeasonRow: { gap: 2, flexWrap: 'wrap' },
-  homeTitle: { flex: 1, minWidth: 0, fontSize: 20, fontWeight: '700', lineHeight: 28 },
-  // Do not inherit homeTitle's flex: 1. Native Yoga resolves a positive flex
-  // shorthand + flexBasis: auto to a zero basis even with flexGrow: 0, hiding
-  // the title and measuring a tall line box that then latches stacked layout.
-  homeSeasonTitle: { minWidth: 0, maxWidth: '100%', flexGrow: 0, flexShrink: 1, flexBasis: 'auto', fontSize: 19, lineHeight: 27, fontWeight: '800' },
+  // A long season name wraps beside the fixed change mark; nothing truncates.
+  homeTitle: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: '700', lineHeight: 26 },
   homeChange: {
     flexShrink: 0,
-    minWidth: 44,
-    minHeight: 44,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    width: 36,
+    height: 36,
     borderRadius: 10,
     backgroundColor: semantic.raised,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  homeArtworkChange: { backgroundColor: 'transparent' },
   homeNotice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
   trigger: {
     flexDirection: 'row',

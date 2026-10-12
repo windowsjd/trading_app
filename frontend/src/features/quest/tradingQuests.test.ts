@@ -26,12 +26,42 @@ test('a click/quote/old progress never replaces committed fill plus holdings rev
   assert.equal(settleGuideVerification({...fill,phase:'verifying'},questProgress(2)).phase,'unconfirmed');
   assert.equal(settleGuideVerification({...fill,phase:'verifying'},questProgress(3)).phase,'celebrating');
 });
+// Holdings (with TP/SL and limit review) are listed under the order form only.
+const orderForm=(patch={})=>({screen:'order' as const,accountId:account,assetId:'crypto-1',assetType:'crypto',side:'buy' as const,orderType:'market' as const,...patch});
 test('holdings Next requires the matching account and asset valuation to be visible',()=>{
   const session=claimGuideCommand(startGuideSession(1,account,'marketBuy',questProgress(2)),account,spot).session!;
   for(const visible of [false,true]) {
-    const view=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account,assetId:'crypto-1',assetType:'crypto'},holdings:{screen:'holdings',accountId:account,assetId:'crypto-1',holdingsVisible:visible}}});
-    assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.equal(view.card.next,visible?'enabled':'disabled');
+    const view=resolveGuideView(session,'order',{wallet:null,fx:null,transfer:null,practice:{order:orderForm(),holdings:{screen:'holdings',accountId:account,assetId:'crypto-1',holdingsVisible:visible}}});
+    assert.equal(view.kind,'spotlight');if(view.kind==='spotlight'){assert.equal(view.card.next,visible?'enabled':'disabled');assert.deepEqual(view.targets,['asset-holdings']);}
   }
+  // The detail screen no longer has holdings: nothing is pointed at there.
+  const detail=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account,assetId:'crypto-1',assetType:'crypto'},holdings:{screen:'holdings',accountId:account,assetId:'crypto-1',holdingsVisible:true}}});
+  assert.equal(detail.kind,'none');
+});
+test('review steps below the order form ignore the form side/type check',()=>{
+  const session=claimGuideCommand(startGuideSession(1,account,'marketBuy',questProgress(2)),account,spot).session!;
+  const view=resolveGuideView(session,'order',{wallet:null,fx:null,transfer:null,practice:{order:orderForm({side:'sell',orderType:'limit'}),holdings:{screen:'holdings',accountId:account,assetId:'crypto-1',holdingsVisible:true}}});
+  assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.deepEqual(view.targets,['asset-holdings']);
+});
+test('marketSell: 판매하기 on the detail, then holdings and the sell form on the order screen',()=>{
+  const session=startGuideSession(5,account,'marketSell',questProgress(4))!;
+  assert.equal(session.step,0);
+  const sell=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account,assetId:'crypto-1',assetType:'crypto'}}});
+  assert.equal(sell.kind,'spotlight');if(sell.kind==='spotlight')assert.deepEqual(sell.targets,['asset-sell']);
+  const atOrder=followGuideFocus(session,'order');
+  assert.equal(atOrder.step,1,'arriving at the order screen reviews holdings first');
+  const facts=(visible:boolean)=>({wallet:null,fx:null,transfer:null,practice:{order:orderForm({side:'sell'}),holdings:{screen:'holdings' as const,accountId:account,assetId:session.assetId,holdingsVisible:visible}}});
+  const prepare=resolveGuideView(atOrder,'order',facts(false));
+  assert.equal(prepare.kind,'message');if(prepare.kind==='message')assert.equal(prepare.card.title,'실습 수량 준비');
+  const holdings=resolveGuideView(atOrder,'order',facts(true));
+  assert.equal(holdings.kind,'spotlight');if(holdings.kind==='spotlight')assert.deepEqual(holdings.targets,['asset-holdings']);
+  assert.equal(followGuideFocus({...atOrder,step:3},'order').step,3);
+});
+test('protection runs on the order screen of the practiced asset',()=>{
+  const session=startGuideSession(6,account,'protection',questProgress(3))!;
+  assert.equal(followGuideFocus(session,'order').step,0);
+  const view=resolveGuideView(session,'order',{wallet:null,fx:null,transfer:null,practice:{order:orderForm({assetId:session.assetId}),holdings:{screen:'holdings',accountId:account,assetId:session.assetId,holdingsVisible:true}}});
+  assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.deepEqual(view.targets,['asset-protection']);
 });
 test('navigation updates preserve an already advanced order step',()=>{
   const session=startGuideSession(1,account,'marketBuy',questProgress(2))!;
@@ -43,8 +73,8 @@ test('limit registration waits for terminal result review and survives reconnect
   payload.quests[5].status='in_progress';payload.quests[5].completedStepCount=1;payload.quests[5].steps[1]={stepId:'limit_result_reviewed',completed:false,completedAt:null,referenceId:null};payload.practice.limitAssetId='crypto-1';
   const session=startGuideSession(2,account,'limitBuy',parseBeginnerQuests(payload,account))!;
   assert.equal(session.step,7);assert.equal(session.orderId,'limitBuy-ref');
-  const view=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account},limitReview:{screen:'limitReview',accountId:account,orderResolved:false}}});
-  assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.equal(view.card.next,'disabled');
+  const view=resolveGuideView(session,'order',{wallet:null,fx:null,transfer:null,practice:{order:orderForm(),limitReview:{screen:'limitReview',accountId:account,orderResolved:false}}});
+  assert.equal(view.kind,'spotlight');if(view.kind==='spotlight'){assert.equal(view.card.next,'disabled');assert.deepEqual(view.targets,['limit-review']);}
 });
 test('futures requires leverage, direction and manual full close of the same lifetime',()=>{
   const session=startGuideSession(3,account,'futuresShort',questProgress(6))!;

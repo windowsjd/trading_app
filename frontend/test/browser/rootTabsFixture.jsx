@@ -3,7 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppearanceProvider, useAppearance } from '../../src/theme/appearance';
 import { TradingAccountProvider } from '../../src/features/tradingAccount/TradingAccountContext';
-import WalletTransfer from '../../src/screens/wallet/WalletTransferScreen';
+// The transfer form (hosted by Wallet's bottom sheet in the app).
+import WalletTransfer from '../../src/screens/wallet/WalletTransferSheet';
 import Wallet from '../../src/screens/wallet/WalletScreen';
 import Home from '../../src/screens/home/HomeScreen';
 import Market from '../../src/screens/market/MarketScreen';

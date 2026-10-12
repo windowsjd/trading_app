@@ -219,14 +219,15 @@ describe('Order screen lifecycle with real React and query mutations', () => {
     const h = inlineTradingHarness(); h.quoteGate = deferred();
     await h.mount(); t.after(h.close);
     await h.press(sell); await h.input(qty, '1');
-    await h.press(TEST_IDS.order.typeSelect);
     const staleLimit = h.node(TEST_IDS.order.typeToggleLimit).props.onPress;
-    await h.press('order-type-menu-backdrop');
     await h.press(submit); await h.flush();
     assert.equal(h.node(qty).props.editable, false);
-    assert.equal(h.node(TEST_IDS.order.typeSelect).props.disabled, true);
-    await h.input(qty, '2'); await h.press(TEST_IDS.order.typeSelect);
-    assert.equal(h.node(TEST_IDS.order.typeToggleLimit) === undefined, true);
+    // Both segments refuse input while the command is in flight.
+    for (const id of [TEST_IDS.order.typeToggleMarket, TEST_IDS.order.typeToggleLimit]) {
+      assert.equal(h.node(id).props.disabled, true);
+      assert.equal(h.node(id).props.accessibilityState.disabled, true);
+    }
+    await h.input(qty, '2');
     await act(async () => staleLimit());
     assert.equal(h.orderType(), '시장가');
     assert.equal(h.node(qty).props.value, '1');

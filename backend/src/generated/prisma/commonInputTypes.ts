@@ -157,6 +157,23 @@ export type DateTimeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedDateTimeFilter<$PrismaModel>
 }
 
+export type EnumInquiryCategoryFilter<$PrismaModel = never> = {
+  equals?: $Enums.InquiryCategory | Prisma.EnumInquiryCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInquiryCategoryFilter<$PrismaModel> | $Enums.InquiryCategory
+}
+
+export type EnumInquiryCategoryWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.InquiryCategory | Prisma.EnumInquiryCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInquiryCategoryWithAggregatesFilter<$PrismaModel> | $Enums.InquiryCategory
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumInquiryCategoryFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumInquiryCategoryFilter<$PrismaModel>
+}
+
 export type EnumFriendshipStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.FriendshipStatus | Prisma.EnumFriendshipStatusFieldRefInput<$PrismaModel>
   in?: $Enums.FriendshipStatus[] | Prisma.ListEnumFriendshipStatusFieldRefInput<$PrismaModel>
@@ -1413,6 +1430,23 @@ export type NestedDateTimeWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedDateTimeFilter<$PrismaModel>
   _max?: Prisma.NestedDateTimeFilter<$PrismaModel>
+}
+
+export type NestedEnumInquiryCategoryFilter<$PrismaModel = never> = {
+  equals?: $Enums.InquiryCategory | Prisma.EnumInquiryCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInquiryCategoryFilter<$PrismaModel> | $Enums.InquiryCategory
+}
+
+export type NestedEnumInquiryCategoryWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.InquiryCategory | Prisma.EnumInquiryCategoryFieldRefInput<$PrismaModel>
+  in?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  notIn?: $Enums.InquiryCategory[] | Prisma.ListEnumInquiryCategoryFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumInquiryCategoryWithAggregatesFilter<$PrismaModel> | $Enums.InquiryCategory
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumInquiryCategoryFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumInquiryCategoryFilter<$PrismaModel>
 }
 
 export type NestedEnumFriendshipStatusFilter<$PrismaModel = never> = {

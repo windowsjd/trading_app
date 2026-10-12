@@ -5,6 +5,21 @@ const { resolve, dirname } = require('node:path');
 const ts = require('typescript');
 const React = require('react');
 
+// Animation clocks are a native boundary. A screen mock without Animated (or
+// Platform) gets a still clock: values never advance unless a test drives them.
+class StillValue {
+  constructor(value) { this.value = value; }
+  setValue(value) { this.value = value; }
+  stopAnimation() {}
+  addListener() { return '0'; }
+  removeListener() {}
+  interpolate(config) { return { value: this, ...config }; }
+}
+const stillAnimated = { Value: StillValue, View: 'AnimatedView', timing: () => ({ start() {}, stop() {} }), loop: () => ({ start() {}, stop() {} }) };
+const withNativeDefaults = (native) => native && (!native.Animated || !native.Platform)
+  ? { Platform: { OS: 'android' }, ...native, Animated: native.Animated ?? stillAnimated }
+  : native;
+
 function load(file, mocks) {
   const module = { exports: {} };
   const code = ts.transpileModule(readFileSync(file, 'utf8'), {
@@ -34,7 +49,7 @@ function load(file, mocks) {
     // as TSX components instead of Node's native TypeScript require.
     if (name.endsWith('/tierBackgrounds')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };
-    if (name.endsWith('/theme/native')) return mocks['react-native'];
+    if (name.endsWith('/theme/native')) return withNativeDefaults(mocks['react-native']);
     if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
     if (name.endsWith('/theme/useReducedMotion')) return { useReducedMotion: () => false };
     if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', financialPreference: 'red_blue', financialColors: require('../src/theme/financialColors.ts').getFinancialColors('light'), mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd' }, setPreference() {} }) };

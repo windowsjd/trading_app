@@ -2,12 +2,13 @@ import { logoutGradient, primaryGradient, semantic } from '../../theme/tokens';
 import React from 'react';
 import {
   Text,
-  ActivityIndicator,
   StyleSheet,
   View,
   ViewStyle,
 } from '../../theme/native';
 import ActionPressable from './ActionPressable';
+import WhaleLoader from '../states/WhaleLoader';
+import type { RippleTone } from './pressFeedback';
 import LearningLock from '../../features/quest/LearningLock';
 
 type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';
@@ -23,6 +24,8 @@ interface CTAButtonProps {
   testID?: string;
   /** History entry uses secondary; back and recovery actions keep neutral. */
   variant?: 'primary' | 'secondary' | 'neutral' | 'logout';
+  /** Trade-executing commands pass `subtle`. */
+  ripple?: RippleTone;
 }
 
 export default function CTAButton({
@@ -34,6 +37,7 @@ export default function CTAButton({
   style,
   testID,
   variant = 'primary',
+  ripple,
 }: CTAButtonProps) {
   const disabled = state === 'disabled' || state === 'loading' || state === 'blocked';
 
@@ -42,6 +46,7 @@ export default function CTAButton({
       feedback="button"
       primary={!learningHint && variant === 'primary' && style?.backgroundColor === undefined}
       gradient={variant === 'logout' ? logoutGradient : undefined}
+      ripple={ripple}
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={learningHint ? `${label}, 학습 제한. ${learningHint}` : label}
@@ -59,7 +64,10 @@ export default function CTAButton({
       disabled={disabled}
     >
       {state === 'loading' ? (
-        <ActivityIndicator color={variant === 'secondary' ? semantic.secondaryActionForeground : primaryGradient.foreground} />
+        // Same line height as the label, so the button keeps its size.
+        <View style={styles.loading}>
+          <WhaleLoader size={21} tone={variant === 'secondary' ? 'brand' : 'onAction'} accessibilityLabel={`${label} 처리 중`} />
+        </View>
       ) : leadingIcon || learningHint ? (
         <View style={styles.labelGroup}>
           <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.icon}>{leadingIcon}</View>
@@ -78,6 +86,7 @@ const styles = StyleSheet.create({
   learningText: { color: semantic.secondary },
   labelGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' },
   icon: { flexShrink: 0 },
+  loading: { minHeight: 21, alignItems: 'center', justifyContent: 'center' },
   iconLabel: { flexShrink: 1 },
   button: {
     backgroundColor: semantic.selected,

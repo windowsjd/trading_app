@@ -552,3 +552,27 @@ describe('order panel side colors in the trading screen', () => {
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled');
   });
 });
+
+describe('order screen holdings switch the order in place', () => {
+  it('a holding of another asset opens its order on the same account with fresh inputs; TP/SL stays separate', async (t) => {
+    const h = inlineTradingHarness();
+    h.holdings = { general: [holding('bnb', '2'), holding('btc', '3')] };
+    await h.mount(); t.after(h.close); await h.flush();
+    await h.input(TEST_IDS.order.quantityInput, '5');
+    await h.press('holdings-filter-all');
+    // The current asset's own row is not a navigation target.
+    assert.equal(h.node('spot-card-bnb').props.onPress, undefined);
+    const other = h.node('spot-card-btc');
+    assert.equal(typeof other.props.onPress, 'function');
+    assert.equal(other.props.accessibilityRole, 'button');
+    assert.match(other.props.accessibilityHint, /주문 화면으로 전환/);
+    // The TP/SL control is its own button and never switches the asset.
+    await h.press('holding-protection-btc');
+    assert.equal(h.navigation.some((entry: any) => entry[0] === 'setParams'), false);
+    await act(async () => other.props.onPress());
+    assert.deepEqual(h.navigation.at(-1), ['setParams', { assetId: 'btc', side: 'buy' }]);
+    await h.update(); await h.flush();
+    assert.equal(h.routeAccountId, h.accountId, 'the account is never changed');
+    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '', 'the previous asset input does not carry over');
+  });
+});

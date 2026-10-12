@@ -11,6 +11,7 @@ const menus = [
   { route: 'Friends', title: '친구' },
   { route: 'Record', title: '전적' },
   { route: 'Notices', title: '공지사항' },
+  { route: 'Inquiry', title: '문의하기' },
   { route: 'Settings', title: '설정' },
 ] as const;
 export default function OverallScreen({

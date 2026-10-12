@@ -1,5 +1,5 @@
 import { semantic } from '../../theme/tokens';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   SafeAreaView,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+import WhaleLoader from '../../components/states/WhaleLoader';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { LoginScreenProps } from '../../app/navigation/types';
@@ -61,6 +62,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   const [blockedAuthState, setBlockedAuthState] =
     useState<AuthViewState | null>(null);
 
+  // Fences a second tap before React re-renders the pending state.
+  const inFlight = useRef(false);
   const loginMutation = useMutation({
     mutationFn: (payload: LoginRequestDto) =>
       authenticateSession(queryClient, () => login(payload)),
@@ -109,6 +112,9 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           : getApiErrorDisplayMessage(error),
       );
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const authState: AuthViewState = useMemo(() => {
@@ -120,6 +126,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   }, [loginMutation.isPending, fieldError, blockedAuthState, submitError]);
 
   const onSubmit = () => {
+    if (inFlight.current || loginMutation.isPending) return;
     setFieldError(null);
     setSubmitError(null);
     setBlockedAuthState(null);
@@ -134,6 +141,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       return;
     }
 
+    inFlight.current = true;
     loginMutation.mutate({
       email,
       password,
@@ -183,10 +191,18 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
           style={styles.primaryButton}
           onPress={onSubmit}
           disabled={loginMutation.isPending}
+          // Busy keeps the brand background; the whale replaces the label.
+          accessibilityRole="button"
+          accessibilityLabel={loginMutation.isPending ? '로그인 중' : '로그인'}
+          accessibilityState={{ disabled: loginMutation.isPending, busy: loginMutation.isPending }}
         >
-          <Text style={styles.primaryButtonText}>
-            {loginMutation.isPending ? '로그인 중...' : '로그인'}
-          </Text>
+          <View style={styles.primaryButtonLabel}>
+            {loginMutation.isPending ? (
+              <WhaleLoader size={22} tone="onAction" accessibilityLabel="로그인 중" testID="login-submit-loading" />
+            ) : (
+              <Text style={styles.primaryButtonText}>로그인</Text>
+            )}
+          </View>
         </ActionPressable>
 
         <ActionPressable
@@ -231,6 +247,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  // One height for the label and the loader, so pressing never resizes it.
+  primaryButtonLabel: { minHeight: 22, alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: {
     color: semantic.onAccent,
     fontSize: 16,

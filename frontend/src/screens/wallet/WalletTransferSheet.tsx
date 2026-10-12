@@ -1,13 +1,10 @@
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useHeaderHeight } from '@react-navigation/elements';
 import Svg, { Path } from 'react-native-svg';
-import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from '../../theme/native';
-import { SafeAreaView } from '../../theme/safeArea';
+import { Keyboard, ScrollView, StyleSheet, Text, TextInput, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
-import { getHeaderScreenContentStyle } from '../../theme/screenLayout';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getCapabilityBlockMessage, type TradingAccountCapabilities } from '../../features/tradingAccount/capabilities';
@@ -39,14 +36,28 @@ type UsdWalletIdentity = Extract<TransferWalletIdentity, { currency: 'USD' }>;
 const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWalletIdentity => wallet.currency === 'USD');
 const walletLabel = (wallet: UsdWalletIdentity) => WALLET_SCOPE_LABELS[wallet.scope] + ' USD';
 
-export default function WalletTransferScreen() {
+type SheetActions = {
+  /** 확인: close the receipt and stay on the wallet. */
+  onDone?: () => void;
+  /** 마켓으로 가기: close the receipt and open the market. */
+  onGoMarket?: () => void;
+  /** A command in flight: the sheet must not look closable/cancellable. */
+  onBusyChange?: (busy: boolean) => void;
+};
+
+/**
+ * The USD wallet transfer, presented in the Wallet's bottom sheet. Its
+ * financial flow (preflight, pinned idempotency key, synchronous fence,
+ * uncertain-result retry, scope checks) is the former full screen's.
+ */
+export default function WalletTransferPanel(actions: SheetActions) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   const accountId = selectedAccount?.id ?? '';
   const scopeRef = useRef<TransferScope>({ accountId, scopeEpoch: 0 });
   if (scopeRef.current.accountId !== accountId) scopeRef.current = { accountId, scopeEpoch: scopeRef.current.scopeEpoch + 1 };
   if (isLoading) return <FullPageLoading message="계정 정보를 불러오는 중입니다." />;
   if (isError || !selectedAccount) return <ErrorState error={isError ? error : undefined} title="계정 정보를 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void refetchAccounts()} />;
-  return <TransferForm key={accountId + ':' + scopeRef.current.scopeEpoch} account={selectedAccount} capabilities={capabilities} scope={scopeRef.current} readScope={() => scopeRef.current} />;
+  return <TransferForm key={accountId + ':' + scopeRef.current.scopeEpoch} account={selectedAccount} capabilities={capabilities} scope={scopeRef.current} readScope={() => scopeRef.current} {...actions} />;
 }
 
 type TransferCommand = TransferScope & {
@@ -57,7 +68,7 @@ type TransferCommand = TransferScope & {
   uncertain?: boolean;
   reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
 };
-function TransferForm({ account, capabilities, scope, readScope }: {
+function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMarket, onBusyChange }: SheetActions & {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
   scope: TransferScope;
@@ -65,7 +76,6 @@ function TransferForm({ account, capabilities, scope, readScope }: {
 }) {
   const queryClient = useQueryClient();
   const transferGate = useLearningAccess(account.id).gate('transfer');
-  const headerHeight = useHeaderHeight();
   const inputScroll = useFocusedInputScroll();
   const amountRef = useRef<View>(null);
   const amountInputRef = useRef<TextInput>(null);
@@ -163,6 +173,8 @@ function TransferForm({ account, capabilities, scope, readScope }: {
   const canonicalAmount = parseTransferAmount(amount);
   const block = capabilities?.canExchange ? null : getCapabilityBlockMessage(capabilities, capabilities?.exchangeBlockReason) ?? '현재 계정에서는 이체할 수 없습니다.';
   const locked = mutation.isPending || !!attempt.current?.running;
+  useEffect(() => { onBusyChange?.(locked); }, [locked, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   const sameIntent = (command: TransferCommand | null): command is TransferCommand => !!command &&
     isTransferResponseInScope(command, readScope()) && command.body.sourceWalletId === source?.id &&
     command.body.destinationWalletId === destination?.id && command.body.amount === canonicalAmount;
@@ -237,64 +249,77 @@ function TransferForm({ account, capabilities, scope, readScope }: {
     setOpenDropdown(null); setFailure(null);
   };
 
+  // The sheet supplies keyboard room; the scroll keeps the input and CTA visible.
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
-      <KeyboardAvoidingView style={styles.screen} keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View ref={questGuideTarget('transfer-viewport')} collapsable={false} style={styles.screen}>
-        <ScrollView testID="wallet-transfer-screen" ref={inputScroll.scrollRef} onLayout={inputScroll.revealFocusedInput}
-          onContentSizeChange={inputScroll.revealFocusedInput} onScroll={inputScroll.onScroll} scrollEventThrottle={16}
-          keyboardShouldPersistTaps="handled" keyboardDismissMode="none" contentContainerStyle={styles.content}>
-          {result ? (
-            <View testID="wallet-transfer-success" style={styles.card} accessibilityLiveRegion="polite">
-              <Text style={styles.heading}>이체가 완료되었습니다.</Text>
-              <Text style={styles.body}>{WALLET_SCOPE_LABELS[result.source.walletScope]} USD → {WALLET_SCOPE_LABELS[result.destination.walletScope]} USD</Text>
-              <Text style={styles.money}>보낸 금액: USD {formatDisplayDecimal(result.amount)}</Text>
-              <Text style={styles.body}>보내는 지갑 잔액: USD {formatDisplayDecimal(result.source.balanceAfter)}</Text>
-              <Text style={styles.body}>받는 지갑 잔액: USD {formatDisplayDecimal(result.destination.balanceAfter)}</Text>
-              <CTAButton label="다른 이체하기" onPress={() => { setResult(null); setAmount(''); attempt.current = null; }} />
-            </View>
-          ) : integrity ? <ErrorState error={integrity.error} diagnosticRuntime={integrity.error === failure ? failureRuntime : undefined} title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
-            : wallets.isLoading ? <FullPageLoading message="지갑 잔액을 불러오는 중입니다." />
-              : wallets.isError || !wallets.data ? <ErrorState error={wallets.error} title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
-                : !hasAllWallets || (!sourceIsFutures && available === null) ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
-                  : <>
-                    {block ? <Text testID="wallet-transfer-blocked" style={styles.error}>{block}</Text> : null}
-                    <WalletSelector kind="source" selected={sourceIdentity} excludedKey={destinationKey} expanded={openDropdown === 'source'} disabled={locked} onToggle={() => toggleDropdown('source')} onSelect={wallet => chooseWallet('source', wallet)} />
-                    <WalletSelector kind="destination" selected={destinationIdentity} excludedKey={sourceKey} expanded={openDropdown === 'destination'} disabled={locked} onToggle={() => toggleDropdown('destination')} onSelect={wallet => chooseWallet('destination', wallet)} />
-                    <View style={styles.card}>
-                      <Text style={styles.heading}>이체 금액 (USD)</Text>
-                      <View ref={questGuideTarget('transfer-amount')} collapsable={false} testID="wallet-transfer-amount-field">
-                      <View ref={amountRef} collapsable={false}>
-                        <TextInput ref={amountInputRef} testID="wallet-transfer-amount" accessibilityLabel="이체 금액 USD" value={amount}
-                          onFocus={() => { setOpenDropdown(null); inputScroll.onInputFocus(amountRef.current); }} onBlur={inputScroll.onInputBlur}
-                          onChangeText={value => {
-                            if (locked || attempt.current?.running) return;
-                            if (parseTransferAmount(value) !== canonicalAmount) attempt.current = null;
-                            setAmount(value); setFailure(null);
-                          }}
-                          editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
-                      </View>
-                      </View>
-                      {sourceIsFutures && futures.isError && !futures.isFetching ? <ErrorNotice error={futures.error}
-                        message="현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다." testID="wallet-transfer-available" style={styles.money} /> : <Text ref={questGuideTarget('transfer-available')} testID="wallet-transfer-available" style={styles.money}>
-                        {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
-                          : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
-                      </Text>}
-                      {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
-                      {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
-                        : balanceReady && canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>잔액이 부족합니다.</Text> : null}
-                    </View>
-                    {failure ? <ErrorNotice error={failure} message={failure instanceof WalletBalanceCheckError ? walletBalanceCheckMessage(failure.insufficient) : attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
-                    <View ref={inputScroll.submitRef} collapsable={false}>
-                      <View ref={questGuideTarget('transfer-submit')} collapsable={false}>
-                        <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} learningHint={transferGate.locked ? transferGate.message : null} onPress={() => transferGate.guard(execute)} />
-                      </View>
-                    </View>
-                  </>}
-        </ScrollView>
+    <View ref={questGuideTarget('transfer-viewport')} collapsable={false} style={styles.viewport}>
+    <ScrollView testID="wallet-transfer-screen" ref={inputScroll.scrollRef} onLayout={inputScroll.revealFocusedInput}
+      onContentSizeChange={inputScroll.revealFocusedInput} onScroll={inputScroll.onScroll} scrollEventThrottle={16}
+      keyboardShouldPersistTaps="handled" keyboardDismissMode="none" style={styles.scroll} contentContainerStyle={styles.content}>
+      {result ? (
+        <View testID="wallet-transfer-success" style={styles.receipt} accessibilityLiveRegion="polite">
+          <View style={styles.iconCircle} accessible={false}><Text style={styles.iconText}>✓</Text></View>
+          <Text accessibilityRole="header" style={styles.receiptTitle}>이체가 완료되었습니다</Text>
+          <View style={styles.receiptCard}>
+            <ReceiptRow label="이체 경로" value={`${WALLET_SCOPE_LABELS[result.source.walletScope]} USD → ${WALLET_SCOPE_LABELS[result.destination.walletScope]} USD`} />
+            <ReceiptRow label="보낸 금액" value={`USD ${formatDisplayDecimal(result.amount)}`} />
+            <ReceiptRow label="보내는 지갑 잔액" value={`USD ${formatDisplayDecimal(result.source.balanceAfter)}`} />
+            <ReceiptRow label="받는 지갑 잔액" value={`USD ${formatDisplayDecimal(result.destination.balanceAfter)}`} />
+          </View>
+          <View style={styles.receiptActions}>
+            <CTAButton testID="wallet-transfer-done" variant="neutral" label="확인" style={styles.flex}
+              onPress={() => { if (onDone) onDone(); else { setResult(null); setAmount(''); attempt.current = null; } }} />
+            <CTAButton testID="wallet-transfer-go-market" label="마켓으로 가기" style={styles.flex} onPress={() => onGoMarket?.()} />
+          </View>
         </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+      ) : integrity ? <ErrorState error={integrity.error} diagnosticRuntime={integrity.error === failure ? failureRuntime : undefined} title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
+        : wallets.isLoading ? <FullPageLoading message="지갑 잔액을 불러오는 중입니다." />
+          : wallets.isError || !wallets.data ? <ErrorState error={wallets.error} title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
+            : !hasAllWallets || (!sourceIsFutures && available === null) ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
+              : <>
+                {block ? <Text testID="wallet-transfer-blocked" style={styles.error}>{block}</Text> : null}
+                <WalletSelector kind="source" selected={sourceIdentity} excludedKey={destinationKey} expanded={openDropdown === 'source'} disabled={locked} onToggle={() => toggleDropdown('source')} onSelect={wallet => chooseWallet('source', wallet)} />
+                <WalletSelector kind="destination" selected={destinationIdentity} excludedKey={sourceKey} expanded={openDropdown === 'destination'} disabled={locked} onToggle={() => toggleDropdown('destination')} onSelect={wallet => chooseWallet('destination', wallet)} />
+                <View style={styles.card}>
+                  <Text style={styles.heading}>이체 금액 (USD)</Text>
+                  <View ref={questGuideTarget('transfer-amount')} collapsable={false} testID="wallet-transfer-amount-field">
+                  <View ref={amountRef} collapsable={false}>
+                    <TextInput ref={amountInputRef} testID="wallet-transfer-amount" accessibilityLabel="이체 금액 USD" value={amount}
+                      onFocus={() => { setOpenDropdown(null); inputScroll.onInputFocus(amountRef.current); }} onBlur={inputScroll.onInputBlur}
+                      onChangeText={value => {
+                        if (locked || attempt.current?.running) return;
+                        if (parseTransferAmount(value) !== canonicalAmount) attempt.current = null;
+                        setAmount(value); setFailure(null);
+                      }}
+                      editable={!locked} keyboardType="decimal-pad" placeholder="0" style={styles.input} />
+                  </View>
+                  </View>
+                  {sourceIsFutures && futures.isError && !futures.isFetching ? <ErrorNotice error={futures.error}
+                    message="현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다." testID="wallet-transfer-available" style={styles.money} /> : <Text ref={questGuideTarget('transfer-available')} testID="wallet-transfer-available" style={styles.money}>
+                    {available !== null ? '이체 가능 금액: USD ' + formatDisplayDecimal(available)
+                      : futures.isFetching ? '이체 가능 금액을 확인하고 있습니다.' : '현재 선물 지갑의 이체 가능 금액을 확인할 수 없습니다.'}
+                  </Text>}
+                  {sourceIsFutures && available === null && !futures.isFetching ? <CTAButton label="이체 가능 금액 다시 확인" variant="neutral" state={locked ? 'disabled' : 'enabled'} onPress={() => void futures.refetch()} /> : null}
+                  {amount && !canonicalAmount ? <Text style={styles.error}>0보다 큰 금액을 소수점 8자리까지 입력해주세요.</Text>
+                    : balanceReady && canonicalAmount && available !== null && !transferAmountFits(canonicalAmount, available) && !uncertainRetry ? <Text style={styles.error}>잔액이 부족합니다.</Text> : null}
+                </View>
+                {failure ? <ErrorNotice error={failure} message={failure instanceof WalletBalanceCheckError ? walletBalanceCheckMessage(failure.insufficient) : attempt.current?.uncertain ? '이체 결과를 확인하지 못했습니다. 원장을 확인하거나 같은 요청으로 다시 확인해주세요.' : transferErrorMessage(getApiErrorCode(failure))} runtime={failureRuntime} testID="wallet-transfer-error" style={styles.error} /> : null}
+                <View ref={inputScroll.submitRef} collapsable={false}>
+                  <View ref={questGuideTarget('transfer-submit')} collapsable={false}>
+                    <CTAButton testID="wallet-transfer-submit" label="이체하기" state={locked ? 'loading' : canExecute ? 'enabled' : 'disabled'} learningHint={transferGate.locked ? transferGate.message : null} onPress={() => transferGate.guard(execute)} />
+                  </View>
+                </View>
+              </>}
+    </ScrollView>
+    </View>
+  );
+}
+
+function ReceiptRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.receiptRow}>
+      <Text style={styles.receiptLabel}>{label}</Text>
+      <Text style={styles.receiptValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -331,8 +356,19 @@ function WalletSelector({ kind, selected, excludedKey, expanded, disabled, onTog
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: semantic.screen },
-  content: getHeaderScreenContentStyle(Platform.OS),
+  viewport: { flexShrink: 1, minHeight: 0 },
+  scroll: { flexGrow: 0 },
+  content: { gap: 12, paddingTop: 4, paddingBottom: 4 },
+  receipt: { gap: 12 },
+  iconCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: semantic.successSurface, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
+  iconText: { fontSize: 24, fontWeight: '700', color: semantic.success },
+  receiptTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
+  receiptCard: { borderWidth: 1, borderColor: semantic.border, borderRadius: 14, padding: 16, backgroundColor: semantic.raised, gap: 10 },
+  receiptRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
+  receiptLabel: { fontSize: 14, lineHeight: 21, color: semantic.secondary, flexShrink: 1, maxWidth: '45%' },
+  receiptValue: { fontSize: 14, lineHeight: 21, fontWeight: '600', flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  receiptActions: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  flex: { flex: 1 },
   card: { padding: 16, borderRadius: 14, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface, gap: 12 },
   heading: { fontSize: 16, lineHeight: 25, fontWeight: '600' },
   body: { fontSize: 14, lineHeight: 22, flexShrink: 1 },

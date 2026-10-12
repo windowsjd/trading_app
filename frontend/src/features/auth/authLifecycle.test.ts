@@ -18,6 +18,7 @@ function screenHarness() {
     useCallback: (fn: any) => fn,
     useMemo: (fn: any) => fn(),
     useState: (initial: any) => [initial, () => {}],
+    useRef: (initial: any) => ({ current: initial }),
   });
   h.mocks.set('react-native', {
     View: 'View',
@@ -38,6 +39,11 @@ function screenHarness() {
   });
   h.mocks.set(resolve('src/components/common/ActionPressable.tsx'), {
     default: 'Pressable',
+    __esModule: true,
+  });
+  // The busy label's loader is a native (SVG/animation) boundary here.
+  h.mocks.set(resolve('src/components/states/WhaleLoader.tsx'), {
+    default: 'WhaleLoader',
     __esModule: true,
   });
   return { ...h, routes, mutation: () => mutation };

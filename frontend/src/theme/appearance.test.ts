@@ -162,19 +162,19 @@ test('financial preference defaults to Red/Blue, applies instantly, survives rem
   const h = harness('system'); t.after(h.close);
   await h.mount();
   assert.equal(h.current.financialPreference, 'red_blue');
-  assert.equal(h.current.financialColors.buy, '#ff8b86');
+  assert.equal(h.current.financialColors.buy, '#ff6b64');
   await h.chooseFinancial('green_red');
-  assert.equal(h.current.financialColors.buy, '#79d68b');
+  assert.equal(h.current.financialColors.buy, '#4ed472');
   assert.equal(h.values.get('trading-app:financial-colors'), 'green_red');
   assert.equal(h.values.get('trading-app:appearance'), 'system');
   await h.close(); await h.mount();
   assert.equal(h.current.financialPreference, 'green_red');
   h.setScheme('light'); await h.rerender();
-  assert.equal(h.current.financialColors.buy, '#16803a');
-  assert.equal(h.current.financialColors.sell, '#a13e3b');
+  assert.equal(h.current.financialColors.buy, '#118038');
+  assert.equal(h.current.financialColors.sell, '#c8241e');
   await h.chooseFinancial('red_blue');
-  assert.equal(h.current.financialColors.buy, '#a13e3b');
-  assert.equal(h.current.financialColors.sell, '#315f9b');
+  assert.equal(h.current.financialColors.buy, '#c8241e');
+  assert.equal(h.current.financialColors.sell, '#1b5ec9');
 });
 
 test('financial restore gates children; invalid/read/write failure uses the default', async (t) => {

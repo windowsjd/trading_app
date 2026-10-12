@@ -1,4 +1,4 @@
-import { isTradingQuest } from './tradingGuideSteps';
+import { isTradingQuest, TRADING_GUIDE_STEPS } from './tradingGuideSteps';
 import React, {
   createContext,
   useCallback,
@@ -67,12 +67,14 @@ export function useQuestGuide() {
   return useContext(QuestGuideContext);
 }
 
+/** 이체 is a bottom sheet over Wallet: its mounted form is the practice screen. */
+const walletOrTransfer = (): FocusedGuideScreen => (getQuestGuideFacts('transfer') ? 'transfer' : 'wallet');
+
 function readFocusedScreen(): FocusedGuideScreen {
   if (!rootNavigationRef.isReady()) return 'other';
   switch (rootNavigationRef.getCurrentRoute()?.name) {
-    case 'Wallet': return 'wallet';
+    case 'Wallet': return walletOrTransfer();
     case 'WalletFx': return 'fx';
-    case 'WalletTransfer': return 'transfer';
     case 'Guide': return 'quests';
     case 'Market': return 'market';
     case 'AssetDetail': return 'asset';
@@ -100,7 +102,13 @@ function openPractice(session: GuideSession) {
   } else if (session.quest === 'futuresLong' || session.quest === 'futuresShort') {
     rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Futures', params: { accountId: session.accountId } } });
   } else if (session.assetId) {
-    rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true } });
+    // Holdings, TP/SL and limit review steps live on the order screen of that asset.
+    if (TRADING_GUIDE_STEPS[session.quest][session.step]?.screen === 'order') {
+      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Order', params: {
+        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' ? 'sell' : 'buy' }, pop: true } });
+    } else {
+      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true } });
+    }
   } else {
     rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market', params: { assetType: session.quest === 'krStock' ? 'domestic_stock' : session.quest === 'usStock' ? 'us_stock' : 'crypto' }, pop: true } });
   }
@@ -168,9 +176,7 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     const outcome = claimGuideCommand(sessionRef.current, accountId, command);
     if (outcome.session !== sessionRef.current) setSession(outcome.session);
     if (outcome.claimed && outcome.session?.phase === 'verifying') verify(outcome.session.id);
-    if (outcome.claimed && command.kind === 'spot' && outcome.session?.step === 7) {
-      rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: command.assetId }, pop: true } });
-    }
+    // A claimed fill (step 7) is reviewed right below the order form: no navigation.
     return outcome.claimed;
   }, () => sessionRef.current?.id ?? null), [accountId, setSession, verify]);
 
@@ -243,6 +249,13 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
 
   const exit = useCallback(() => setSession(null), [setSession]);
 
+  // Opening/closing the transfer sheet changes no route; follow it like one
+  // (closing it returns to the Wallet entry step, as leaving the page did).
+  const effectiveFocus: FocusedGuideScreen = focused === 'wallet' || focused === 'transfer' ? walletOrTransfer() : focused;
+  useEffect(() => {
+    setSession(current => current ? followGuideFocus(current, effectiveFocus) : current);
+  }, [effectiveFocus, setSession]);
+
   const onAction = useCallback((action: GuideAction, step: number | null) => {
     const current = sessionRef.current;
     if (!current) return;
@@ -263,7 +276,7 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     }
   }, [setSession, verify]);
 
-  const view = resolveGuideView(session, foreground ? focused : 'other', {
+  const view = resolveGuideView(session, foreground ? effectiveFocus : 'other', {
     practice: { market: getQuestGuideFacts('market'), asset: getQuestGuideFacts('asset'), order: getQuestGuideFacts('order'), futures: getQuestGuideFacts('futures'),
       holdings: getQuestGuideFacts('holdings'), protection: getQuestGuideFacts('protection'), limitReview: getQuestGuideFacts('limitReview') },
     wallet: getQuestGuideFacts('wallet'),

@@ -8,7 +8,6 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
-  ActivityIndicator,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useInfiniteQuery } from '@tanstack/react-query';
@@ -39,6 +38,7 @@ import {
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = WalletTransactionsScreenProps;
 
@@ -280,7 +280,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
         ListFooterComponent={
           transactionsQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator />
+              <WhaleLoader size={28} />
             </View>
           ) : null
         }

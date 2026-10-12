@@ -212,6 +212,8 @@ function inlineTradingHarness() {
       },
       View: 'AnimatedView',
       add: (a, b) => ({ add: [a, b] }),
+      // A loading loop never completes; it is recorded, not run.
+      loop: () => ({ start: () => {}, stop: () => {} }),
       timing: (value, options) => ({
         start: (callback) => {
           value.setValue(options.toValue);
@@ -524,12 +526,11 @@ function inlineTradingHarness() {
   };
   h.input = async (id, value) =>
     act(async () => h.node(id).props.onChangeText(value));
-  // The order type is one dropdown: open it, then pick the menu item.
+  // 시장가/지정가 are the two segments of one sliding selector.
   h.selectOrderType = async (type) => {
-    await h.press('order-type-select');
     await h.press(type === 'limit' ? 'order-type-toggle-limit' : 'order-type-toggle-market');
   };
-  h.orderType = () => h.node('order-type-select').props.accessibilityValue.text;
+  h.orderType = () => (h.node('order-type-toggle-limit').props.accessibilityState.selected ? '지정가' : '시장가');
   h.slide = async (percent) => act(async () =>
     h.node('order-quantity-slider').props.onChange({ currentTarget: { valueAsNumber: percent } }));
   h.success = () => h.renderer.root.findByType('OrderSuccessBottomSheet').props;

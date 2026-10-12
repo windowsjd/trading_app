@@ -35,7 +35,7 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
   }).default;
   const dimensions = { fontScale: 1 };
   const insets = { bottom: 34 };
-  const MainTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
+  const HostedTabs = load(resolve('src/app/navigation/MainTabs.tsx'), {
     'react-native': { useWindowDimensions: () => dimensions },
     'react-native-safe-area-context': { useSafeAreaInsets: () => insets },
     '@react-navigation/native': { getFocusedRouteNameFromRoute: route => route.params?.screen },
@@ -49,10 +49,13 @@ function harness(platform: string, mode: 'general' | 'season' = 'general', reduc
       useTradingAccount: () => ({ selectedAccount: { id: 'account-1', mode }, isLoading: false }),
     },
     '../../features/quest/QuestGuideProvider': { QuestGuideProvider: 'QuestGuideProvider' },
+    '../../components/common/ScreenSheetHost': { ScreenSheetHost: 'ScreenSheetHost' },
     ...Object.fromEntries(['Home', 'Market', 'Guide', 'Ranking', 'Wallet', 'My'].map((name) => [
       `./${name}Stack`, { default: `${name}Stack`, __esModule: true },
     ])),
   }).default;
+  // The navigator renders inside the tab screens' bottom-sheet host.
+  const MainTabs = () => HostedTabs().props.children;
   return { MainTabs, dimensions, insets, animations };
 }
 

@@ -419,6 +419,18 @@ export const OpsJobTrigger = {
 export type OpsJobTrigger = (typeof OpsJobTrigger)[keyof typeof OpsJobTrigger]
 
 
+export const InquiryCategory = {
+  account: 'account',
+  trading: 'trading',
+  wallet: 'wallet',
+  season_ranking: 'season_ranking',
+  bug: 'bug',
+  other: 'other'
+} as const
+
+export type InquiryCategory = (typeof InquiryCategory)[keyof typeof InquiryCategory]
+
+
 export const FriendshipStatus = {
   pending: 'pending',
   accepted: 'accepted'

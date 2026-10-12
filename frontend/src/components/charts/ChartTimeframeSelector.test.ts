@@ -86,9 +86,12 @@ describe('chart timeframe selector', () => {
     t.after(() => act(() => h.renderer.unmount()));
     for (const id of ['asset-timeframe-selector', ...ASSET_CHART_TIMEFRAMES.map((item) => `asset-timeframe-option-${item.interval}`)]) {
       const button = h.button(id);
-      act(() => button.props.onPressIn({ nativeEvent: { pageX: 125, pageY: 220 } }));
-      assert.ok(h.renderer.root.findAllByType('View').some((node: any) =>
-        node.props.pointerEvents === 'none' && flatten(node.props.style).opacity > 0));
+      // The common ink: a hidden layer inside the button, inked from the touch.
+      const layer = button.findAll((node: any) => node.type === 'View' && node.props.accessibilityElementsHidden === true && typeof node.props.onLayout === 'function')[0];
+      act(() => layer.props.onLayout({ nativeEvent: { layout: { width: 120, height: 44 } } }));
+      act(() => button.props.onPressIn({ nativeEvent: { pageX: 125, pageY: 220, locationX: 20, locationY: 10 } }));
+      assert.equal(flatten(h.button(id).findAll((node: any) => node.type === 'View' && typeof node.props.onLayout === 'function')[0]
+        .findAllByType('AnimatedView')[0].props.style).opacity.value.value, 1);
       act(() => button.props.onPressOut({ nativeEvent: {} }));
       h.finish();
     }

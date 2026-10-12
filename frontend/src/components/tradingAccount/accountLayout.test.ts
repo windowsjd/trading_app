@@ -207,9 +207,14 @@ describe('the styles long text depends on are present', () => {
     const hero = read('screens/home/HomeAssetHero.tsx');
     assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
-    // Identity shrinks beside the emblem and stacks with larger text.
-    assert.match(read('screens/home/HomeAccountContext.tsx'), /userDetails:\s*\{[^}]*minWidth:\s*0/s);
-    assert.match(read('components/tradingAccount/AccountSwitcher.tsx'), /homeStacked:\s*\{[^}]*flexDirection:\s*'column'/s);
+    // The nickname shrinks beside the avatar and rank; the emblem lives beside
+    // the total (the hero row wraps it below long amounts or large text).
+    const context = read('screens/home/HomeAccountContext.tsx');
+    assert.equal(/identity:\s*\{[^}]*minWidth:\s*0/s.test(context), true);
+    assert.equal(/nickname:\s*\{[^}]*flexShrink:\s*1[^}]*minWidth:\s*0/s.test(context), true);
+    assert.equal(/identity:\s*\{[^}]*flexWrap:\s*'wrap'/s.test(context), true);
+    assert.equal(/heroRow:\s*\{[^}]*flexWrap:\s*'wrap'/s.test(hero), true);
+    assert.equal(/hero:\s*\{[^}]*flexShrink:\s*1/s.test(hero), true);
     assert.match(read('screens/home/HomeHoldings.tsx'), /<PositionAssetRow/);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /columns:\s*\{[^}]*flexDirection:\s*'row'/s);

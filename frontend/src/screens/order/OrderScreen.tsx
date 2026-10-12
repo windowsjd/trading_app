@@ -86,6 +86,7 @@ export default function OrderScreen(props: OrderScreenProps) {
         onSideChange={(next) => {
           sideRef.current = next;
         }}
+        onSelectAsset={selectAsset}
       />
       <OrderAssetSheet
         visible={assetSheetOpen}
@@ -102,10 +103,13 @@ export function OrderTradingScreen({
   onOpenAssetSheet,
   onSideChange,
   onReturnToAsset,
+  onSelectAsset,
 }: OrderScreenProps & {
   onOpenAssetSheet?: () => void;
   onSideChange?: (side: OrderSide) => void;
   onReturnToAsset?: () => void;
+  /** A holding row switches this order in place (same account, fresh inputs). */
+  onSelectAsset?: (assetId: string) => void;
 }) {
   const { assetId, accountId, side } = route.params;
   const rootNavigation = useRootNavigation();
@@ -386,6 +390,7 @@ export function OrderTradingScreen({
             accountId={accountId}
             account={account}
             assetId={assetId}
+            onSelectAsset={onSelectAsset}
           />
         </ScrollView>
       </View>

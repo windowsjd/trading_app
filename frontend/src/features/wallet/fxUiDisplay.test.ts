@@ -68,7 +68,8 @@ describe('FX screen information display', () => {
     assert.deepEqual(h.navigation, [['MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } }]]);
     assert.equal(success.props.onGoHome, undefined);
     const tree = sheet({ visible: true, onClose() {}, onGoWallet() {}, onGoMarket() {}, payload: null });
-    assert.deepEqual(elements(tree, 'CTAButton').map(node => node.props.label), ['지갑으로 돌아가기', '마켓으로 가기']);
+    // FX and transfer receipts share the pair 확인 / 마켓으로 가기.
+    assert.deepEqual(elements(tree, 'CTAButton').map(node => node.props.label), ['확인', '마켓으로 가기']);
   });
 
   it('keeps the current rate and captured timestamp with empty and filled inputs', () => {

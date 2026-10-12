@@ -12,6 +12,7 @@ import TabBarIcon from '../../components/navigation/TabBarIcon';
 import TabBarButton from '../../components/navigation/TabBarButton';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
+import { ScreenSheetHost } from '../../components/common/ScreenSheetHost';
 import { QuestGuideProvider } from '../../features/quest/QuestGuideProvider';
 import type { MainTabParamList } from './types';
 import HomeStack from './HomeStack';
@@ -139,7 +140,10 @@ export default function MainTabs() {
 
   // The quest guide spans the Quest and Wallet tabs of ONE beginner account;
   // keyed like the navigator, a switch or logout discards it with the tabs.
+  // Bottom sheets of tab screens cover headers and the tab bar but stay below
+  // the quest overlay, which the provider draws after its children.
+  const hosted = <ScreenSheetHost>{tabs}</ScreenSheetHost>;
   return mode === 'beginner' ? (
-    <QuestGuideProvider key={selectedAccount.id} accountId={selectedAccount.id}>{tabs}</QuestGuideProvider>
-  ) : tabs;
+    <QuestGuideProvider key={selectedAccount.id} accountId={selectedAccount.id}>{hosted}</QuestGuideProvider>
+  ) : hosted;
 }

@@ -1,5 +1,5 @@
 import { semantic } from '../../theme/tokens';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   SafeAreaView,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+import WhaleLoader from '../../components/states/WhaleLoader';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { SignupScreenProps } from '../../app/navigation/types';
@@ -64,6 +65,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [blockedAuthState, setBlockedAuthState] =
     useState<AuthViewState | null>(null);
 
+  // Fences a second tap before React re-renders the pending state.
+  const inFlight = useRef(false);
   const signupMutation = useMutation({
     mutationFn: (payload: SignupRequestDto) =>
       authenticateSession(queryClient, () => signup(payload)),
@@ -111,6 +114,9 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           : getApiErrorDisplayMessage(error),
       );
     },
+    onSettled: () => {
+      inFlight.current = false;
+    },
   });
 
   const authState: AuthViewState = useMemo(() => {
@@ -122,6 +128,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   }, [signupMutation.isPending, fieldError, blockedAuthState, submitError]);
 
   const onSubmit = () => {
+    if (inFlight.current || signupMutation.isPending) return;
     setFieldError(null);
     setSubmitError(null);
     setBlockedAuthState(null);
@@ -146,6 +153,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       return;
     }
 
+    inFlight.current = true;
     signupMutation.mutate({
       email,
       nickname: nickname.trim(),
@@ -215,10 +223,18 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           style={styles.primaryButton}
           onPress={onSubmit}
           disabled={signupMutation.isPending}
+          // Busy keeps the brand background; the whale replaces the label.
+          accessibilityRole="button"
+          accessibilityLabel={signupMutation.isPending ? '가입 중' : '회원가입'}
+          accessibilityState={{ disabled: signupMutation.isPending, busy: signupMutation.isPending }}
         >
-          <Text style={styles.primaryButtonText}>
-            {signupMutation.isPending ? '가입 중...' : '회원가입'}
-          </Text>
+          <View style={styles.primaryButtonLabel}>
+            {signupMutation.isPending ? (
+              <WhaleLoader size={22} tone="onAction" accessibilityLabel="가입 중" testID="signup-submit-loading" />
+            ) : (
+              <Text style={styles.primaryButtonText}>회원가입</Text>
+            )}
+          </View>
         </ActionPressable>
 
         <ActionPressable
@@ -263,6 +279,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  // One height for the label and the loader, so pressing never resizes it.
+  primaryButtonLabel: { minHeight: 22, alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: {
     color: semantic.onAccent,
     fontSize: 16,

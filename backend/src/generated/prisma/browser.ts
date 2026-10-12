@@ -23,6 +23,12 @@ export * from './enums.js';
  */
 export type User = Prisma.UserModel
 /**
+ * Model Inquiry
+ * A user's support inquiry. Not financial: no account, order or ledger link.
+ * (userId, clientRequestId) makes a resubmitted form return the same row.
+ */
+export type Inquiry = Prisma.InquiryModel
+/**
  * Model Friendship
  * 
  */

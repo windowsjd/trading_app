@@ -252,3 +252,46 @@ describe('QuestGuideProvider', () => {
     assert.equal(bridge.claimQuestGuideCommand(fxCommand), false);
   });
 });
+
+describe('QuestGuideProvider: transfer sheet and order-screen holdings', () => {
+  const transferFacts = { screen: 'transfer', accountId: ACCOUNT, blocked: false, source: 'securities', destination: 'crypto_spot',
+    amountValid: false, amountFits: false, nothingToSend: false, canExecute: false, pending: false, failed: false, succeeded: false } as const;
+
+  it('the transfer sheet over Wallet is the practice screen; closing it returns to the entry step', async t => {
+    const h = harness(); await h.render();
+    t.after(async () => { bridge.publishQuestGuideFacts('transfer', null); await h.close(); });
+    await h.act(() => h.guide.start('transfer', progress(true)));
+    await h.act(() => bridge.publishQuestGuideFacts('wallet', { screen: 'wallet', accountId: ACCOUNT, actions: 'enabled' }));
+    await h.focus('Wallet');
+    assert.deepEqual(h.view().targets, ['wallet-transfer']);
+    // 이체하기 opens the sheet: the Wallet route stays, the mounted form publishes its facts.
+    await h.act(() => bridge.publishQuestGuideFacts('transfer', transferFacts));
+    assert.equal(h.view().screen, 'transfer');
+    assert.deepEqual(h.view().targets, ['transfer-source']);
+    await h.act(() => h.overlay.onAction('next', 1));
+    assert.equal(h.guide.active.step, 2);
+    await h.act(() => bridge.publishQuestGuideFacts('transfer', null));
+    assert.equal(h.guide.active.step, 1, 'closing the sheet starts the practice over, as leaving the page did');
+    assert.deepEqual(h.view().targets, ['wallet-transfer']);
+  });
+
+  it('protection opens the order screen of the practiced asset (holdings live under the order form)', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.act(() => h.guide.start('protection', questProgress(3)));
+    assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Order',
+      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'buy' }, pop: true } }]);
+  });
+
+  it('a claimed spot fill is reviewed on the order screen without navigating away', async t => {
+    const h = harness(); await h.render(); t.after(h.close);
+    await h.act(() => h.guide.start('marketBuy', questProgress(2)));
+    const before = h.navigations.length;
+    await h.focus('Order');
+    let claimed = false;
+    await h.act(() => { claimed = bridge.claimQuestGuideCommand({ kind: 'spot', accountId: ACCOUNT, orderId: 'fill-1', assetId: 'crypto-1',
+      assetType: 'crypto', side: 'buy', orderType: 'market', summary: '체결' }); });
+    assert.equal(claimed, true);
+    assert.equal(h.guide.active.step, 7);
+    assert.equal(h.navigations.length, before, 'no jump to the asset detail');
+  });
+});

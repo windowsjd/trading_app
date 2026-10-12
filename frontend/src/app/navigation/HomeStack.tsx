@@ -4,6 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
+import { stackScreenLayout } from './stackScreenLayout';
 
 import type { HomeStackParamList } from './types';
 import HomeScreen from '../../screens/home/HomeScreen';
@@ -14,7 +15,7 @@ const Stack = createNativeStackNavigator<HomeStackParamList>();
 export default function HomeStack() {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="HomeStack" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
+    <Stack.Navigator id="HomeStack" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
       <Stack.Screen
         name="Home"
         component={HomeScreen}

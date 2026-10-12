@@ -22,7 +22,7 @@ export type HomeStackParamList = {
 };
 
 export type WalletStackParamList = {
-  WalletTransfer: undefined;
+  // 이체 is a bottom sheet on Wallet (WalletTransferSheet), not a route.
   Wallet: undefined;
   WalletFx: undefined;
   WalletTransactions: { currencyCode?: 'KRW' | 'USD' } | undefined;
@@ -76,6 +76,7 @@ export type MyStackParamList = {
   Record: NavigatorScreenParams<RecordStackParamList> | undefined;
   Friends: undefined;
   Notices: undefined;
+  Inquiry: undefined;
   UserSeasonSummary: { userId: string };
   My: undefined;
   Reward: undefined;

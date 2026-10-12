@@ -30,7 +30,7 @@ import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
 import HomeHotMarket, { type HomeHotMarketData } from './HomeHotMarket';
-import HomeAccountContext, { type HomeAccountContextData } from './HomeAccountContext';
+import HomeAccountContext, { HomeTierBadge, type HomeAccountContextData } from './HomeAccountContext';
 import type { AssetType } from '../../features/market/api';
 
 /**
@@ -219,6 +219,7 @@ export default function SeasonAccountHome({
           finalResult={portfolio.finalResult}
           settled={isSettled || !!portfolio.finalResult}
           unavailableMessage={portfolioNotice?.message}
+          aside={<HomeTierBadge context={accountContext} />}
         />
 
         <HomeAssetTrend

@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { getFeedbackPalette } from './pressFeedback.ts';
+import { getFeedbackPalette, getRipplePalette, rippleOrigin, rippleRadius } from './pressFeedback.ts';
 import ts from 'typescript';
 
 const require = createRequire(import.meta.url);
@@ -18,6 +18,19 @@ it('uses a subtle neutral wash in light/dark without changing financial colors',
   for (const color of [0xfffafafa, 0xffffffff, null]) {
     assert.deepEqual(getFeedbackPalette(color), { washOpacity: 0.065, washColor: '#000' });
   }
+});
+
+it('ripple darkens colored and light surfaces, lifts near-black neutrals, and reaches the farthest corner', () => {
+  // Brand blue, buy red, sell blue and light tonal surfaces deepen their own color.
+  for (const color of [0xff326fe5, 0xffd1110b, 0xff0a5ac2, 0xffeaf4fc, 0xffffffff, null]) {
+    assert.equal(getRipplePalette(color).rippleColor, '#000');
+  }
+  // Dark-mode cards and the neutral CTA (#202a35) are lifted instead.
+  for (const color of [0xff202a35, 0xff1c1d21, 0xff303137]) assert.equal(getRipplePalette(color).rippleColor, '#fff');
+  assert.ok(getRipplePalette(0xffffffff).rippleOpacity < getRipplePalette(0xff326fe5).rippleOpacity, 'white rows stay gentle');
+  assert.deepEqual(rippleOrigin({ width: 100, height: 40 }), { x: 50, y: 20 }, 'no coordinates → center');
+  assert.deepEqual(rippleOrigin({ width: 100, height: 40 }, -5, 99), { x: 0, y: 40 }, 'clamped into the surface');
+  assert.equal(rippleRadius({ width: 100, height: 40 }, { x: 10, y: 10 }), Math.hypot(90, 30));
 });
 
 describe('touch coverage and exclusions', () => {
@@ -41,7 +54,9 @@ describe('touch coverage and exclusions', () => {
             assert.equal(attr('feedback')?.initializer?.getText(source), '"none"');
           }
           if (file === 'components/common/ActionPressable.tsx') return;
-          if (file === 'components/common/BottomSheetBackdrop.tsx' || !attr('onPress')) {
+          // Sheet dims dismiss; they are not action buttons and carry no feedback.
+          if (file === 'components/common/BottomSheetBackdrop.tsx' || !attr('onPress')
+            || (file === 'components/common/InlineBottomSheet.tsx' && node.tagName.getText(source) === 'Pressable')) {
             excluded.push(file);
             assert.ok(style && !ts.isCallExpression(style), `${file}: non-action keeps its static style`);
           } else {
@@ -57,6 +72,7 @@ describe('touch coverage and exclusions', () => {
     }
     assert.deepEqual(excluded.sort(), [
       'components/common/BottomSheetBackdrop.tsx',
+      'components/common/InlineBottomSheet.tsx',
       'screens/history/TradeHistoryScreen.tsx',
     ]);
     for (const file of [

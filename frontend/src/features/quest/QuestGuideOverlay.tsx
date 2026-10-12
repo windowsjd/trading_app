@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   Animated,
   Easing,
   Keyboard,
@@ -34,6 +33,7 @@ import {
 } from './questGuideModel';
 import type { BeginnerQuestKey } from './questProgress';
 import QuestCelebration from './QuestCelebration';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 /** Re-measure often enough to follow scroll/keyboard settling, cheaply. */
 const MEASURE_INTERVAL_MS = 160;
@@ -394,7 +394,7 @@ function GuideCardContent({ card, quest, compact, scrolls, onHeadLayout, onTextL
         </View>
       </ScrollView>
       <View style={styles.actions} onLayout={onActionsLayout} testID="quest-guide-actions">
-        {card.busy ? <ActivityIndicator size="small" color={semantic.info} /> : null}
+        {card.busy ? <WhaleLoader size={20} /> : null}
         {card.actions.map(action => (
           <ActionPressable key={action} testID={`quest-guide-${action}`} accessibilityRole="button"
             accessibilityLabel={ACTION_LABEL[action as Exclude<GuideAction, 'next'>]}

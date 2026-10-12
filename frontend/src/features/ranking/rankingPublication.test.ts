@@ -98,8 +98,9 @@ for (const state of ['active', 'settled']) it(`${state}: secondary tab state pre
       assert.equal(tab.props.accessibilityLabel, label);
       assert.equal(tab.props.accessibilityState.selected, selected);
       assert.equal(tab.props['aria-selected'], selected);
-      assert.equal(flatten(tab.props.style).backgroundColor, selected ? semantic.secondaryActionSurface : semantic.raised);
-      assert.equal(flatten(tab.findByType('Text').props.style).color, selected ? semantic.secondaryActionForeground : semantic.text);
+      // One sliding selector: before measurement the selected segment paints the pill.
+      assert.equal(flatten(tab.props.style).backgroundColor, selected ? semantic.surface : undefined);
+      assert.equal(flatten(tab.findByType('Text').props.style).color, selected ? semantic.text : semantic.secondary);
     }
     assert.deepEqual(podium(), initial);
     const list = h.calls.filter(p => p.scope === scope && p.limit !== 3).at(-1);

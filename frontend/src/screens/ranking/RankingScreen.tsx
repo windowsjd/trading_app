@@ -9,7 +9,6 @@ import {
   SafeAreaView,
   FlatList,
   ScrollView,
-  ActivityIndicator,
   Platform,
   useWindowDimensions,
 } from '../../theme/native';
@@ -32,10 +31,7 @@ import {
 } from '../../features/ranking/api';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
-import {
-  formatKrw,
-  formatPercent,
-} from '../../utils/format';
+import { formatKrw } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -43,7 +39,14 @@ import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import EmptyState from '../../components/states/EmptyState';
 import CTAButton from '../../components/common/CTAButton';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
+import SegmentedControl from '../../components/common/SegmentedControl';
 import { getMe, type MeDto } from '../../features/me/api';
+import WhaleLoader from '../../components/states/WhaleLoader';
+import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
+import { useAppearance } from '../../theme/appearance';
+import { getHomeTier } from '../home/tierPresentation';
+import TierEmblem from '../home/TierEmblem';
+import TierCard, { tierForeground } from '../home/TierCard';
 
 type Props = RankingScreenProps;
 
@@ -290,46 +293,25 @@ export default function RankingScreen({ navigation }: Props) {
                     }
                   >
                     <Text style={styles.topRank}>#{item.rank}</Text>
-                    <ProfileAvatar profileImageUrl={item.profileImageUrl} size={32} testID={`ranking-top-avatar-${item.userId}`} />
-                    <Text style={styles.topName}>{item.nickname}</Text>
-                    <Text style={styles.helper}>{formatPercent(item.returnRate)}%</Text>
+                    {/* Same profile order everywhere: photo left, name right. */}
+                    <View style={styles.profile}>
+                      <ProfileAvatar profileImageUrl={item.profileImageUrl} size={28} testID={`ranking-top-avatar-${item.userId}`} />
+                      <Text style={styles.topName}>{item.nickname}</Text>
+                    </View>
+                    <RankingReturn item={item} rankType={rankType} compact />
                   </ActionPressable>
                 ))}
               </View>
             </View>
 
-            <View style={styles.tabRow}>
-              {TABS.map((tab) => {
-                const active = tab.key === selectedTab;
-                const testID =
-                  tab.key === 'all'
-                    ? TEST_IDS.ranking.tabAll
-                    : tab.key === 'friends'
-                    ? TEST_IDS.ranking.tabFriends
-                    : TEST_IDS.ranking.tabTop10;
-
-                return (
-                  <ActionPressable
-                    key={tab.key}
-                    testID={testID}
-                    accessibilityRole="tab"
-                    accessibilityLabel={tab.label}
-                    accessibilityState={{ selected: active }}
-                    aria-selected={active}
-                    style={[styles.tabButton, active && styles.tabButtonActive]}
-                    onPress={() => setSelectedTab(tab.key)}
-                  >
-                    <Text style={active ? styles.tabTextActive : styles.tabText}>
-                      {tab.label}
-                    </Text>
-                  </ActionPressable>
-                );
-              })}
-            </View>
+            <SegmentedControl testID="ranking-tabs" accessibilityLabel="랭킹 범위" value={selectedTab} onChange={setSelectedTab}
+              style={styles.tabs}
+              options={TABS.map(tab => ({ key: tab.key, label: tab.label, testID: tab.key === 'all' ? TEST_IDS.ranking.tabAll
+                : tab.key === 'friends' ? TEST_IDS.ranking.tabFriends : TEST_IDS.ranking.tabTop10 }))} />
           </>
         }
         ListEmptyComponent={
-          rankingQuery.isLoading ? <ActivityIndicator accessibilityLabel="목록을 불러오는 중입니다." /> :
+          rankingQuery.isLoading ? <WhaleLoader size={28} accessibilityLabel="목록을 불러오는 중입니다." /> :
           rankingQuery.isError ? <ErrorState error={rankingQuery.error} title="목록을 불러오지 못했습니다."
             onRetry={() => {
               void topQuery.refetch().then(() => queryClient.resetQueries({ queryKey: rankingQueryKey, exact: true }));
@@ -361,7 +343,7 @@ export default function RankingScreen({ navigation }: Props) {
         ListFooterComponent={
           rankingQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator />
+              <WhaleLoader size={28} />
             </View>
           ) : null
         }
@@ -406,26 +388,60 @@ function MyRankingCard({
   }
 
   const availableRanking = myRanking?.state === 'available' ? myRanking : null;
+  return <MyStandingCard me={me} ranking={availableRanking} rankType={rankType} />;
+}
 
-  return (
-    <View style={styles.card}>
-      <Text style={styles.label}>내 순위</Text>
+/**
+ * 내 순위 in the season tier card's design (Home's former card), without the
+ * account change action or season name: profile, rank, tier and return rate.
+ * Without a known tier it keeps the same information on a plain card.
+ */
+function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extract<MyRankingDto, { state: 'available' }> | null; rankType?: RankingRankType }) {
+  const { mode } = useAppearance();
+  const { width } = useWindowDimensions();
+  const tier = getHomeTier(getRankingTier(ranking, rankType), mode);
+  const foreground = tier ? tierForeground(tier, mode) : undefined;
+  const rate = getRecordFinancialDisplay(ranking?.returnRate, 'rate');
+  const content = (
+    <>
+      <Text style={[styles.label, foreground && styles.onArtLabel, foreground]}>내 순위</Text>
       {me ? (
-        <View style={styles.myIdentity}>
+        <View style={styles.profile}>
           <ProfileAvatar profileImageUrl={me.profileImageUrl} size={36} testID="ranking-my-avatar" />
-          <Text style={styles.rankIdentity}>{me.nickname}</Text>
+          <Text style={[styles.myName, foreground]}>{me.nickname}</Text>
         </View>
       ) : null}
-      <Text style={styles.big}>
-        {availableRanking ? `#${availableRanking.rank}` : '-'}
-      </Text>
-      <Text style={styles.helper}>
-        등급 {getRankingTier(availableRanking, rankType)} · 수익률 {formatPercent(availableRanking?.returnRate)}%
-      </Text>
-      <Text style={styles.helper}>퍼센타일 {formatPercent(availableRanking?.percentile)}%</Text>
-      {rankType === 'final' ? (
-        <Text style={styles.settledText}>최종 랭킹 확정</Text>
-      ) : null}
+      <Text testID="ranking-my-rank" style={[styles.myRank, foreground]}>{ranking ? `#${ranking.rank}` : '-'}</Text>
+      {/* A light chip keeps the rise/fall color legible on every facet. */}
+      <View style={styles.rateChip}>
+        <Text style={styles.rateLabel}>수익률</Text>
+        <Text testID="ranking-my-return" style={[styles.rateValue, { color: rate.color }]}>{rate.text}</Text>
+      </View>
+      {rankType === 'final' ? <Text style={[styles.settledText, foreground && styles.onArtSettled]}>최종 랭킹 확정</Text> : null}
+    </>
+  );
+  if (!tier) {
+    return <View testID="ranking-my-card" style={styles.card}>{content}</View>;
+  }
+  return (
+    <View style={styles.myCard}>
+      <TierCard testID="ranking-my-card" tier={tier} mode={mode} emblemSize={width < 360 ? 104 : 124}
+        caption={<Text testID="ranking-my-tier" style={[styles.tierCaption, foreground]}>{tier.name}</Text>}>
+        {content}
+      </TierCard>
+    </View>
+  );
+}
+
+/** The emblem leads the return rate; rates carry rise/fall colors (0/unknown neutral). */
+function RankingReturn({ item, rankType, compact = false }: { item: RankingItemDto; rankType?: RankingRankType; compact?: boolean }) {
+  const { mode } = useAppearance();
+  const tier = getHomeTier(getRankingTier(item, rankType), mode);
+  const rate = getRecordFinancialDisplay(item.returnRate, 'rate');
+  return (
+    <View style={[styles.returnLine, compact && styles.returnLineStart]} accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}`}>
+      {tier ? <TierEmblem tier={tier.id} size={compact ? 22 : 26} /> : null}
+      <Text testID={`ranking-return-${item.userId}`} style={[compact ? styles.topReturn : styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
     </View>
   );
 }
@@ -447,17 +463,15 @@ function RankingRow({
     >
       <View style={styles.rankLeft}>
         <Text style={styles.rankNumber}>#{item.rank}</Text>
-        <View style={styles.rankIdentity}>
-          <ProfileAvatar profileImageUrl={item.profileImageUrl} size={28} testID={`ranking-avatar-${item.userId}`} />
+        <View style={styles.profile}>
+          <ProfileAvatar profileImageUrl={item.profileImageUrl} size={32} testID={`ranking-avatar-${item.userId}`} />
           <Text style={styles.name}>{item.nickname}</Text>
-          <Text style={styles.helper}>등급 {getRankingTier(item, rankType)}</Text>
-          <Text style={styles.helper}>퍼센타일 {formatPercent(item.percentile)}%</Text>
         </View>
       </View>
 
       <View style={styles.alignEnd}>
-        <Text style={styles.value}>{formatPercent(item.returnRate)}%</Text>
-        <Text style={styles.helper}>{formatKrw(item.totalAssetKrw)}원</Text>
+        <RankingReturn item={item} rankType={rankType} />
+        <Text style={styles.totalAsset}>{formatKrw(item.totalAssetKrw)}원</Text>
       </View>
     </ActionPressable>
   );
@@ -475,21 +489,23 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  tabRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
-  tabButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: semantic.raised,
-  },
-  tabButtonActive: { backgroundColor: semantic.secondaryActionSurface, borderColor: semantic.secondaryActionSurface },
-  tabText: { color: semantic.text, fontWeight: '600',
-    ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
-  tabTextActive: { color: semantic.secondaryActionForeground, fontWeight: '600',
-    ...(Platform.OS === 'web' ? { maxWidth: '100%', textAlign: 'center' } as const : {}) },
+  tabs: { marginBottom: 12 },
+  myCard: { marginBottom: 12 },
+  onArtLabel: { fontWeight: '700' },
+  onArtSettled: { fontWeight: '800' },
+  myName: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
+  myRank: { fontSize: 32, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  rateChip: { alignSelf: 'flex-start', maxWidth: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: semantic.surface },
+  rateLabel: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
+  rateValue: { fontSize: 17, lineHeight: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
+  profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
+  returnLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6, maxWidth: '100%' },
+  returnLineStart: { justifyContent: 'flex-start' },
+  returnValue: { fontSize: 18, lineHeight: 26, fontWeight: '800', textAlign: 'right', fontVariant: ['tabular-nums'], flexShrink: 1 },
+  topReturn: { fontSize: 15, lineHeight: 22, fontWeight: '800', fontVariant: ['tabular-nums'], flexShrink: 1 },
+  totalAsset: { fontSize: 15, lineHeight: 22, fontWeight: '600', textAlign: 'right', fontVariant: ['tabular-nums'] },
   title: { fontSize: 22, fontWeight: '700' },
   label: { fontSize: 13, color: semantic.secondary },
   big: { fontSize: 24, fontWeight: '700' },
@@ -505,37 +521,35 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     backgroundColor: semantic.raised,
-    gap: 4,
+    gap: 6,
   },
-  topRank: { fontSize: 16, fontWeight: '700' },
-  topName: { fontSize: 14, fontWeight: '600' },
+  topRank: { fontSize: 16, fontWeight: '800' },
+  topName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700' },
   rankRow: {
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 14,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     backgroundColor: semantic.surface,
     flexDirection: 'row',
     flexWrap: 'wrap',
+    alignItems: 'center',
     gap: 12,
     justifyContent: 'space-between',
     marginBottom: 10,
   },
   rankLeft: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
+    gap: 10,
     alignItems: 'center',
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: 160,
+    flexBasis: 150,
     minWidth: 0,
   },
-  myIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  rankIdentity: { flexGrow: 1, flexShrink: 1, flexBasis: 100, minWidth: 0, gap: 4 },
-  rankNumber: { maxWidth: '100%', fontSize: 18, fontWeight: '700' },
-  name: { fontSize: 15, fontWeight: '700' },
-  value: { fontSize: 15, fontWeight: '700' },
-  alignEnd: { alignItems: 'flex-end', flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  rankNumber: { minWidth: 28, fontSize: 20, lineHeight: 28, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
+  name: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 22, fontWeight: '700' },
+  alignEnd: { alignItems: 'flex-end', gap: 2, flexGrow: 1, flexShrink: 1, minWidth: 0 },
   footerLoader: { paddingVertical: 16 },
 });

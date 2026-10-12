@@ -65,7 +65,9 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(elements(collapsed, 'Pressable').filter(row => row.props.testID?.startsWith('home-position-item-')).length, 1);
       find(collapsed, 'home-holdings-toggle').props.onPress();
       const home = h.render().tree, wallet = h.renderWallet().tree;
-      assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')));
+      // The same hero; Home alone adds the season tier badge beside the total.
+      assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')) + (mode === 'season' ? ' Silver' : ''));
+      assert.equal(find(wallet, 'home-tier-badge') === undefined, true);
       assert.equal(text(find(home, 'home-position-item-0')), text(find(wallet, 'wallet-position-0')));
       for (const [index, quantity] of ['10 주', '0.125 주', '0.000805 BTC'].entries()) {
         assert.equal(find(home, `home-position-item-${index}-quantity`) !== undefined, true);
@@ -124,8 +126,13 @@ describe('selected account Wallet and shared Home holdings', () => {
         assert.equal(surface.props.accessible, false);
       }
       assert.ok(nodes.indexOf(find(wallet, 'wallet-orders-label')) < nodes.indexOf(find(wallet, 'wallet-composition')));
+      // 이체 opens a bottom sheet over Wallet instead of navigating to a page.
+      const sheet = find(wallet, 'wallet-transfer-sheet');
+      assert.equal(sheet.props.visible, false);
+      assert.equal(sheet.props.title, '이체하기');
+      const navigations = h.navigation.length;
       find(wallet, 'wallet-transfer').props.onPress();
-      assert.deepEqual(h.navigation.at(-1), ['WalletTransfer']);
+      assert.equal(h.navigation.length, navigations);
       find(wallet, 'wallet-exchange').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
       find(wallet, 'wallet-ledger').props.onPress();

@@ -4,11 +4,13 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import { stackTransition } from './transitionPolicy';
+import { stackScreenLayout } from './stackScreenLayout';
 
 import RecordStack from './RecordStack';
 import type { MyStackParamList } from './types';
 import OverallScreen from '../../screens/my/OverallScreen';
 import NoticesScreen from '../../screens/my/NoticesScreen';
+import InquiryScreen from '../../screens/my/InquiryScreen';
 import FriendsScreen from '../../screens/friends/FriendsScreen';
 import UserSeasonSummaryScreen from '../../screens/ranking/UserSeasonSummaryScreen';
 import MyScreen from '../../screens/my/MyScreen';
@@ -20,7 +22,7 @@ const Stack = createNativeStackNavigator<MyStackParamList>();
 export default function MyStack() {
   const reducedMotion = useReducedMotion();
   return (
-    <Stack.Navigator id="MyStack" initialRouteName="Overall" screenOptions={stackTransition(reducedMotion, Platform.OS)}>
+    <Stack.Navigator id="MyStack" initialRouteName="Overall" screenOptions={stackTransition(reducedMotion, Platform.OS)} screenLayout={stackScreenLayout}>
       <Stack.Screen
         name="Overall"
         component={OverallScreen}
@@ -36,6 +38,11 @@ export default function MyStack() {
         name="Notices"
         component={NoticesScreen}
         options={{ title: '공지사항' }}
+      />
+      <Stack.Screen
+        name="Inquiry"
+        component={InquiryScreen}
+        options={{ title: '문의하기' }}
       />
       <Stack.Screen
         name="UserSeasonSummary"

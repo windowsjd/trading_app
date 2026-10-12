@@ -8,23 +8,25 @@ export function parseFinancialColorPreference(value: string | null): FinancialCo
 
 // Text/surfaces adapt to appearance. Red/Blue actions and candles share strong
 // direction colors in both modes; Green retains its existing role policies.
+// Direction text (2026-10-12) is more saturated than before, never neon, and
+// keeps >= 4.5:1 on every screen/card background and its own surface.
 const red = {
-  text: { light: '#a13e3b', dark: '#ff8b86' },
+  text: { light: '#c8241e', dark: '#ff6b64' },
   surface: { light: '#fef2f2', dark: '#38232a' },
   action: { light: '#d1110b', dark: '#d1110b' },
   candle: { light: '#d1110b', dark: '#d1110b' },
 };
 const blue = {
-  text: { light: '#315f9b', dark: '#8cbaff' },
+  text: { light: '#1b5ec9', dark: '#64a2ff' },
   surface: { light: '#eff6ff', dark: '#1e304b' },
   action: { light: '#0a5ac2', dark: '#0a5ac2' },
   candle: { light: '#0a5ac2', dark: '#0a5ac2' },
 };
 const green = {
-  text: { light: '#16803a', dark: '#79d68b' },
+  text: { light: '#118038', dark: '#4ed472' },
   surface: { light: '#f0fdf4', dark: '#1d392b' },
   action: { light: '#16803a', dark: '#16803a' },
-  candle: { light: '#16803a', dark: '#79d68b' },
+  candle: { light: '#118038', dark: '#4ed472' },
 };
 
 function directionalPalette(positive: typeof red, negative: typeof red) {

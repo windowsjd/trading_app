@@ -165,9 +165,12 @@ describe('guide home and market basics lesson', () => {
     for (const title of ['시장기초', '캔들', '주문방식', '주식특성', '기업행동과 조정주가', 'ETF와 지수']) assert.ok(h.text().includes(title));
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 0);
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '가이드').length, 0);
-    act(() => buttons[0].props.onPressIn({ nativeEvent: { pageX: 120, pageY: 210 } }));
-    assert.ok(h.renderer.root.findAllByType('View').some((node: any) =>
-      node.props.pointerEvents === 'none' && flatten(node.props.style).opacity > 0), 'available card keeps the shared pressed surface');
+    // The shared touch feedback: the card's own ink layer starts at the touch.
+    const layer = buttons[0].findAll((node: any) => node.type === 'View' && node.props.accessibilityElementsHidden === true && typeof node.props.onLayout === 'function')[0];
+    act(() => layer.props.onLayout({ nativeEvent: { layout: { width: 300, height: 90 } } }));
+    act(() => buttons[0].props.onPressIn({ nativeEvent: { pageX: 120, pageY: 210, locationX: 20, locationY: 10 } }));
+    const ink = h.renderer.root.findAllByType('Pressable')[0].findAll((node: any) => node.type === 'View' && typeof node.props.onLayout === 'function')[0].findAllByType('AnimatedView')[0];
+    assert.equal(flatten(ink.props.style).opacity.value.value, 1, 'available card keeps the shared pressed surface');
   });
 
   it('shows the resting book, visibly executes each price level in order, then fully resets', (t) => {

@@ -3,10 +3,10 @@ import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  ActivityIndicator,
   StyleSheet,
   SafeAreaView,
 } from '../../theme/native';
+import WhaleLoader from '../../components/states/WhaleLoader';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { SplashScreenProps } from '../../app/navigation/types';
@@ -132,7 +132,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
     <SafeAreaView style={styles.container}>
       <View style={styles.center}>
         <Text style={styles.logo}>Trading League</Text>
-        <ActivityIndicator style={styles.loader} />
+        <WhaleLoader size={48} style={styles.loader} accessibilityLabel="앱을 준비하는 중" />
         <Text style={styles.caption}>앱을 준비하는 중입니다.</Text>
       </View>
     </SafeAreaView>

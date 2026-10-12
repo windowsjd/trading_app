@@ -19,7 +19,6 @@ import {
   SafeAreaView,
   TextInput,
   FlatList,
-  ActivityIndicator,
   Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -30,6 +29,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = NativeStackScreenProps<MarketStackParamList, 'MarketSearch'>;
 
@@ -183,7 +183,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
             </ActionPressable>
           ) : searchQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator />
+              <WhaleLoader size={28} />
             </View>
           ) : null
         }

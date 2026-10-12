@@ -8,7 +8,6 @@ import {
   SafeAreaView,
   FlatList,
   Pressable,
-  ActivityIndicator,
   Alert,
   AppState,
   type AppStateStatus,
@@ -62,6 +61,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import EmptyState from '../../components/states/EmptyState';
+import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHistory'>;
 type Filter = 'all' | 'buy' | 'sell';
@@ -507,7 +507,7 @@ export default function TradeHistoryScreen({ route }: Props) {
         ListFooterComponent={
           ordersQuery.isFetchingNextPage ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator />
+              <WhaleLoader size={28} />
             </View>
           ) : null
         }

@@ -147,8 +147,10 @@ describe('ranking wire response rendering', () => {
     assert.match(html, /#2/);
     assert.match(html, /10%/);
     assert.match(html, /999,999/);
-    assert.match(html, /master/);
-    assert.match(html, /silver/);
+    // Tiers are emblems beside the return rate (master is shown as Whale), never raw text.
+    assert.match(html, /home-emblem-whale/);
+    assert.match(html, /home-emblem-silver/);
+    assert.doesNotMatch(html, /퍼센타일|등급 |>master<|>silver</);
   });
 
   it('opens the existing summary with userId from both podium and list presses', () => {
@@ -254,8 +256,8 @@ describe('ranking wire response rendering', () => {
     h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: null, finalTier: 'diamond' };
     const html = h.render();
     assert.match(html, /최종 랭킹 확정/);
-    assert.match(html, /diamond/);
-    assert.doesNotMatch(html, /master|silver/);
+    assert.match(html, /home-emblem-diamond/);
+    assert.doesNotMatch(html, /home-emblem-whale|home-emblem-silver/);
   });
 
   it('renders long nicknames and financial text without a line truncation limit', () => {
@@ -377,7 +379,9 @@ describe('existing user season summary', () => {
     h.queries.set('ranking', h.ready(summaryFixture));
     const html = h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
     assert.match(html, /trader-2/);
-    assert.match(html, /silver/);
+    assert.match(html, /home-emblem-silver/);
+    assert.match(html, />Silver</);
+    assert.doesNotMatch(html, /퍼센타일|등급 silver/);
     assert.match(html, /999,998/);
     await h.queryOptions[0].queryFn({});
     assert.equal(h.requests[0], '/users/user-2/season-summary');

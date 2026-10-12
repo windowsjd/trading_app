@@ -8,7 +8,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const flatten = (style) => Array.isArray(style) ? Object.assign({}, ...style.map(flatten)) : style || {};
 
 function interactionHarness(platform = 'android') {
-  const h = { reduced: false, animations: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200] };
+  const h = { reduced: false, animations: [], loops: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200] };
   class Value {
     constructor(value) { this.value = value; this.listeners = new Map(); this.listenerId = 0; }
     setValue(value) {
@@ -39,7 +39,7 @@ function interactionHarness(platform = 'android') {
       return (0xff000000 | parseInt(hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex, 16)) >>> 0;
     },
     useWindowDimensions: () => h.dimensions,
-    Animated: { Value, View: 'AnimatedView', timing: (value, options) => {
+    Animated: { Value, View: 'AnimatedView', loop: (animation) => ({ start: () => { h.loops.push(animation); }, stop: () => {} }), timing: (value, options) => {
       const animation = {
         value, options,
         start: (callback) => { value.stopAnimation(); value.animation = animation; animation.callback = callback; h.animations.push(animation); },
