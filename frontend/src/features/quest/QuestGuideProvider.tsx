@@ -27,6 +27,7 @@ import {
   advanceGuide,
   claimGuideCommand,
   followGuideFocus,
+  leaveGuideTab,
   observeGuideProgress,
   resolveGuideView,
   settleGuideVerification,
@@ -55,9 +56,14 @@ type QuestGuideContextValue = {
   /** A quest whose completion was just celebrated, for a brief list highlight. */
   justCompleted: BeginnerQuestKey | null;
   highlightedTarget: QuestGuideTargetId | null;
-  start: (quest: BeginnerQuestKey, progress: BeginnerQuests) => void;
-  resume: () => void;
-  exit: () => void;
+  /** The quest whose latest server progress is being read before its guide opens. */
+  starting: BeginnerQuestKey | null;
+  /**
+   * Always a new guide. Where it begins comes from a fresh server read, so
+   * steps the ledger already proves (a fill, an open order or position) are
+   * reviewed, never repeated; a failed read starts nothing.
+   */
+  start: (quest: BeginnerQuestKey) => void;
 };
 
 const QuestGuideContext = createContext<QuestGuideContextValue | null>(null);
@@ -82,6 +88,12 @@ function readFocusedScreen(): FocusedGuideScreen {
     case 'Futures': return 'futures';
     default: return 'other';
   }
+}
+
+function readFocusedTab(): string | null {
+  if (!rootNavigationRef.isReady()) return null;
+  const tabs = rootNavigationRef.getRootState()?.routes.find(route => route.name === 'MainTabs')?.state;
+  return tabs && typeof tabs.index === 'number' ? tabs.routes[tabs.index]?.name ?? null : null;
 }
 
 const openQuestList = () => rootNavigationRef.navigate('MainTabs', { screen: 'QuestTab', params: { screen: 'Guide', pop: true } });
@@ -120,6 +132,10 @@ function openPractice(session: GuideSession) {
  * It never sends a financial request: it navigates, points, and — after a
  * screen reports its own successful command — re-reads the server's
  * ledger-derived progress before celebrating anything.
+ *
+ * A guide lives only while the user stays in its practice tab: leaving for the
+ * quest list or another tab ends it, and there is no resuming. Starting again
+ * is a new guide placed by the server's progress, never by a remembered step.
  */
 export function QuestGuideProvider({ accountId, children }: { accountId: string; children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -128,6 +144,8 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   const sessionRef = useRef<GuideSession | null>(null);
   const counter = useRef(0);
   const [focused, setFocused] = useState<FocusedGuideScreen>(readFocusedScreen);
+  const [starting, setStarting] = useState<BeginnerQuestKey | null>(null);
+  const focusedTab = useRef(readFocusedTab());
   const [returnCount, setReturnCount] = useState(0);
   const [justCompleted, setJustCompleted] = useState<BeginnerQuestKey | null>(null);
   const [foreground, setForeground] = useState(AppState.currentState == null || AppState.currentState === 'active');
@@ -165,8 +183,15 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
   useEffect(() => {
     const update = () => {
       const next = readFocusedScreen();
+      const tab = readFocusedTab();
+      // Only a tab switch can be a departure; moves inside one tab never are.
+      const switched = tab !== focusedTab.current;
+      focusedTab.current = tab;
       setFocused(next);
-      setSession(current => current ? followGuideFocus(current, next) : current);
+      setSession(current => {
+        const kept = current && switched ? leaveGuideTab(current, tab) : current;
+        return kept ? followGuideFocus(kept, next) : null;
+      });
     };
     update();
     return rootNavigationRef.addListener('state', update);
@@ -230,24 +255,26 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     return () => clearTimeout(timer);
   }, [justCompleted]);
 
-  const start = useCallback((quest: BeginnerQuestKey, progress: BeginnerQuests) => {
-    const next = startGuideSession(++counter.current, accountId, quest, progress);
-    if (!next) return;
+  // A start still reading progress when the account's guide goes away opens nothing.
+  useEffect(() => () => { counter.current += 1; }, []);
+
+  const start = useCallback((quest: BeginnerQuestKey) => {
+    const id = ++counter.current;
     Keyboard.dismiss();
     setJustCompleted(null);
-    setSession(next);
-    openPractice(next);
-  }, [accountId, setSession]);
-
-  const resume = useCallback(() => {
-    const current = sessionRef.current;
-    if (current) {
-      if (isTradingQuest(current.quest)) openPractice(current);
-      else rootNavigationRef.navigate('MainTabs', { screen: 'WalletTab' });
-    }
-  }, []);
-
-  const exit = useCallback(() => setSession(null), [setSession]);
+    setSession(null);
+    setStarting(quest);
+    const begin = (progress: BeginnerQuests | null) => {
+      // A later start superseded this one, or the user left the list meanwhile.
+      if (counter.current !== id) return;
+      setStarting(null);
+      const next = readFocusedScreen() === 'quests' ? startGuideSession(id, accountId, quest, progress) : null;
+      if (!next) return;
+      setSession(next);
+      openPractice(next);
+    };
+    void fetchProgress().then(begin, () => begin(null));
+  }, [accountId, fetchProgress, setSession]);
 
   // Opening/closing the transfer sheet changes no route; follow it like one
   // (closing it returns to the Wallet entry step, as leaving the page did).
@@ -292,10 +319,9 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     returnCount,
     justCompleted,
     highlightedTarget,
+    starting,
     start,
-    resume,
-    exit,
-  }), [accountId, session, activeQuest, activeReplay, exit, highlightedTarget, justCompleted, phase, resume, returnCount, start]);
+  }), [accountId, session, activeQuest, activeReplay, highlightedTarget, justCompleted, phase, returnCount, starting, start]);
 
   return (
     <QuestGuideContext.Provider value={value}>

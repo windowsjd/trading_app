@@ -2,10 +2,9 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import CTAButton from '../../components/common/CTAButton';
-import ActionPressable from '../../components/common/ActionPressable';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
-import { QUEST_CARDS, QUEST_CATEGORY, QUEST_GUIDE_COPY } from '../../features/quest/questContent';
+import { QUEST_CARDS, QUEST_CATEGORY } from '../../features/quest/questContent';
 import {
   BEGINNER_QUEST_KEYS,
   FOUNDATION_KEYS,
@@ -21,7 +20,8 @@ import { QuestMark, QuestProgressBar, QuestReplayIcon, QuestStatusBadge } from '
 /**
  * QUEST 01 환전하기 and QUEST 02 이체하기, each with its own server-proven
  * state. Starting opens the real Wallet screens under the spotlight guide;
- * nothing is executed or completed from this list.
+ * nothing is executed or completed from this list. Coming back here has
+ * already ended any guide, so a card only ever starts a new one.
  */
 export default function BeginnerQuestList() {
   const quest = useBeginnerQuestProgress();
@@ -63,10 +63,8 @@ export default function BeginnerQuestList() {
             <React.Fragment key={key}>
             {index === 6 ? <Text accessibilityRole="header" style={styles.category}>시장별 심화 — 자유 진행</Text> : null}
             <QuestCard key={key} questKey={key} progress={progress} isError={quest.isError}
-              active={guide?.active?.quest === key} highlighted={guide?.justCompleted === key}
-              onStart={guide && progress ? () => guide.start(key, progress) : null}
-              onResume={guide ? guide.resume : null}
-              onExit={guide ? guide.exit : null} />
+              highlighted={guide?.justCompleted === key} starting={guide?.starting === key}
+              onStart={guide && progress ? () => guide.start(key) : null} />
             </React.Fragment>
           ))}
         </>
@@ -75,23 +73,21 @@ export default function BeginnerQuestList() {
   );
 }
 
-function QuestCard({ questKey, progress, isError, active, highlighted, onStart, onResume, onExit }: {
+function QuestCard({ questKey, progress, isError, highlighted, starting, onStart }: {
   questKey: BeginnerQuestKey;
   progress: BeginnerQuests | null;
   isError: boolean;
-  active: boolean;
   highlighted: boolean;
+  /** Its latest server progress is being read before the guide opens. */
+  starting: boolean;
   onStart: (() => void) | null;
-  onResume: (() => void) | null;
-  onExit: (() => void) | null;
 }) {
   const content = QUEST_CARDS[questKey];
-  const display = describeQuestCard(questKey, { progress, isError, active });
+  const display = describeQuestCard(questKey, { progress, isError });
   const done = progress?.[questKey].completed === true;
-  const press = display.state === 'active' ? onResume : onStart;
   return (
     <View testID={`quest-card-${questKey}`}
-      style={[styles.card, display.state === 'active' && styles.cardActive, highlighted && done && styles.cardHighlighted]}>
+      style={[styles.card, highlighted && done && styles.cardHighlighted]}>
       <View style={styles.cardHeader}>
         <QuestMark done={done} />
         <View style={styles.heading}>
@@ -123,15 +119,9 @@ function QuestCard({ questKey, progress, isError, active, highlighted, onStart, 
         leadingIcon={display.state === 'completed' ? <QuestReplayIcon /> : undefined}
         testID={`quest-card-${questKey}-start`}
         variant={display.state === 'completed' ? 'secondary' : 'primary'}
-        state={display.canStart && press ? 'enabled' : 'disabled'}
-        onPress={press ?? undefined}
+        state={starting ? 'loading' : display.canStart && onStart ? 'enabled' : 'disabled'}
+        onPress={onStart ?? undefined}
       />
-      {display.state === 'active' && onExit ? (
-        <ActionPressable testID={`quest-card-${questKey}-exit`} accessibilityRole="button"
-          accessibilityLabel={QUEST_GUIDE_COPY.actions.exit} onPress={onExit} style={styles.exit}>
-          <Text style={styles.exitText}>{QUEST_GUIDE_COPY.actions.exit}</Text>
-        </ActionPressable>
-      ) : null}
     </View>
   );
 }
@@ -144,7 +134,6 @@ const styles = StyleSheet.create({
   progressText: { fontSize: 14, lineHeight: 22, fontWeight: '700', color: semantic.text },
   notice: { gap: 8 },
   card: { borderWidth: 1, borderColor: semantic.border, borderRadius: 16, padding: 16, backgroundColor: semantic.surface, gap: 10 },
-  cardActive: { borderColor: semantic.info },
   cardHighlighted: { borderColor: semantic.success, borderWidth: 2, padding: 15 },
   cardHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   heading: { flex: 1, minWidth: 0, gap: 2 },
@@ -154,6 +143,4 @@ const styles = StyleSheet.create({
   body: { fontSize: 16, lineHeight: 25, color: semantic.secondary },
   muted: { fontSize: 14, lineHeight: 22, color: semantic.secondary },
   error: { fontSize: 14, lineHeight: 22, color: semantic.error },
-  exit: { minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  exitText: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.secondary },
 });

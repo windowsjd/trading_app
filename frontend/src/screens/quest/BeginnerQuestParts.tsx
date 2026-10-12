@@ -18,11 +18,11 @@ export function QuestReplayIcon() {
 export function QuestStatusBadge({ state, label, testID }: { state: QuestCardState; label: string; testID?: string }) {
   const tone = state === 'error' ? styles.error
     : state === 'completed' ? styles.done
-      : state === 'active' ? styles.active
+      : state === 'inProgress' ? styles.active
         : styles.idle;
   const text = state === 'error' ? styles.errorText
     : state === 'completed' ? styles.doneText
-      : state === 'active' ? styles.activeText
+      : state === 'inProgress' ? styles.activeText
         : styles.idleText;
   return (
     <View style={[styles.badge, tone]} testID={testID}>

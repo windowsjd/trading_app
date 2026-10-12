@@ -22,7 +22,7 @@ export type TradeGuideScreen = 'market' | 'asset' | 'order' | 'futures' | 'holdi
 export type QuestGuideScreen = 'wallet' | 'fx' | 'transfer' | TradeGuideScreen;
 
 export type QuestGuideTargetId =
-  | 'market-viewport' | 'market-tabs' | 'market-assets'
+  | 'market-viewport' | 'market-tabs' | 'market-assets' | 'market-list-header'
   | 'asset-viewport' | 'asset-price' | 'asset-buy' | 'asset-sell' | 'asset-holdings' | 'asset-protection'
   | 'protection-editor' | 'protection-submit' | 'limit-review'
   | 'order-viewport' | 'order-type' | 'order-input' | 'order-preview' | 'order-submit'

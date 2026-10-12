@@ -176,7 +176,8 @@ export default function MarketScreen({ navigation, route }: Props) {
         onEndReachedThreshold={0.4}
         refreshControl={refresh.refreshControl}
         ListHeaderComponent={
-          <View style={styles.headerSection}>
+          // The quest spotlight on the list starts below this header (spot rows only).
+          <View ref={futuresMarket ? undefined : questGuideTarget('market-list-header')} collapsable={false} style={styles.headerSection}>
             <View ref={questGuideTarget('market-tabs')} collapsable={false}>
               <SegmentedControl testID="market-tabs" accessibilityLabel="시장 선택" value={selectedTab} onChange={setSelectedTab}
                 options={TABS.map(tab => ({ key: tab.key, label: tab.label, testID: tab.key === 'domestic_stock'

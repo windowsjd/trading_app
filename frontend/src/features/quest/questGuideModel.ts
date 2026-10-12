@@ -92,6 +92,10 @@ export const VIEWPORT_TARGET: Record<QuestGuideScreen, QuestGuideTargetId> = {
   fx: 'fx-viewport',
   transfer: 'transfer-viewport',
 };
+/** A list target whose own header scrolls with it: the spotlight starts below that header. */
+export const HEADER_TARGET: Partial<Record<QuestGuideTargetId, QuestGuideTargetId>> = {
+  'market-assets': 'market-list-header',
+};
 /** Both quests: the Wallet entry button, then five steps on the practice screen. */
 export const PRACTICE_STEPS = 5;
 const TOTAL_STEPS = PRACTICE_STEPS + 1;
@@ -353,6 +357,23 @@ export function startGuideSession(id: number, accountId: string, quest: Beginner
   return { id, accountId, quest, replay: progress[quest].completed, step: 1, phase: 'guiding', summary: null };
 }
 
+/** The bottom tabs a quest's practice uses; futures funding is topped up in the Wallet tab. */
+export function guidePracticeTabs(quest: BeginnerQuestKey): readonly string[] {
+  if (!isTradingQuest(quest)) return ['WalletTab'];
+  return quest === 'futuresLong' || quest === 'futuresShort' ? ['MarketTab', 'WalletTab'] : ['MarketTab'];
+}
+
+/**
+ * Switching to another bottom tab — the quest list included — ends the guide;
+ * the next start is a new guide from the server's progress. Moves inside the
+ * practice tab (Market → detail → order, Wallet → FX or transfer) keep it, and
+ * a celebration's own return to the list is not a departure.
+ */
+export function leaveGuideTab(session: GuideSession, tab: string | null): GuideSession | null {
+  if (tab === null || ['celebrating', 'replaySucceeded', 'returning'].includes(session.phase)) return session;
+  return guidePracticeTabs(session.quest).includes(tab) ? session : null;
+}
+
 /** Returning to the Wallet root means the practice screen was closed: start it over. */
 export function followGuideFocus(session: GuideSession, focused: FocusedGuideScreen): GuideSession {
   if (isTradingQuest(session.quest)) {
@@ -448,6 +469,13 @@ export function sameRect(a: GuideRect | null, b: GuideRect | null, tolerance = 1
 
 export function inflateRect(rect: GuideRect, by: number): GuideRect {
   return { x: rect.x - by, y: rect.y - by, width: rect.width + by * 2, height: rect.height + by * 2 };
+}
+
+/** The part of `rect` below `header`, unless less than `min` of it would remain. */
+export function clipBelow(rect: GuideRect, header: GuideRect, min: number): GuideRect {
+  const top = header.y + header.height;
+  const bottom = rect.y + rect.height;
+  return top > rect.y && bottom - top >= min ? { ...rect, y: top, height: bottom - top } : rect;
 }
 
 /**

@@ -17,10 +17,18 @@ import { useAppearance } from '../../theme/appearance';
 import { primaryGradient, semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import TabBarIcon from '../../components/navigation/TabBarIcon';
-import { getQuestGuideTarget, revealQuestGuideTarget, type QuestGuideMeasurable, type QuestGuideTargetId } from './questGuideBridge';
+import {
+  getQuestGuideTarget,
+  revealQuestGuideTarget,
+  type QuestGuideMeasurable,
+  type QuestGuideScreen,
+  type QuestGuideTargetId,
+} from './questGuideBridge';
 import { QUEST_CARDS, QUEST_GUIDE_COPY } from './questContent';
 import {
+  HEADER_TARGET,
   VIEWPORT_TARGET,
+  clipBelow,
   inflateRect,
   intersectRects,
   placeGuideCard,
@@ -35,8 +43,14 @@ import type { BeginnerQuestKey } from './questProgress';
 import QuestCelebration from './QuestCelebration';
 import WhaleLoader from '../../components/states/WhaleLoader';
 
-/** Re-measure often enough to follow scroll/keyboard settling, cheaply. */
+/** Re-measure a target that holds still: cheap, and enough to notice a move. */
 const MEASURE_INTERVAL_MS = 160;
+/** While a target settles in or moves (scroll, keyboard), follow it closely. */
+const FOLLOW_INTERVAL_MS = 48;
+/** The one fade-in of a step; afterwards the highlight holds still. */
+const APPEAR_MS = 220;
+/** A list is highlighted below its header only while a row's height of it remains. */
+const MIN_LIST_HEIGHT = 48;
 const HOLE_PADDING = 6;
 const HOLE_RADIUS = 14;
 /** Card padding (2×14), border (2×1) and the gap between text and actions. */
@@ -45,8 +59,14 @@ const CARD_CHROME = 40;
 const TEXT_GAP = 6;
 /** Text the card shows at least before it scrolls: about two lines. */
 const MIN_TEXT_HEIGHT = 48;
+const DIM_LIGHT = 'rgba(16,24,40,0.5)';
+const DIM_DARK = 'rgba(0,0,0,0.62)';
 
-type Frame = { key: string; root: GuideRect; area: GuideRect; hole: GuideRect | null };
+type Frame = { key: string; screen: QuestGuideScreen; root: GuideRect; area: GuideRect; hole: GuideRect | null };
+
+/** Sub-pixel measurement noise is not a move. */
+const sameFrame = (a: Frame, b: Frame) => a.key === b.key && a.screen === b.screen
+  && sameRect(a.root, b.root) && sameRect(a.area, b.area) && sameRect(a.hole, b.hole);
 
 function measure(node: QuestGuideMeasurable | null): Promise<GuideRect | null> {
   return new Promise(resolve => {
@@ -82,9 +102,11 @@ function dimPath(width: number, height: number, hole: GuideRect) {
  * Every layer is visual only (`pointerEvents="none"`) except the step card:
  * the highlighted control receives the user's own press exactly as without
  * the guide, nothing is disabled or enabled here, and scrolling, typing and the
- * keyboard keep working. The spotlight appears only once the target has been
- * laid out and holds still across two measurements; it hides while the target
- * moves (scroll, keyboard, navigation transitions) and follows it afterwards.
+ * keyboard keep working. A step appears once its target has been laid out and
+ * holds still across two measurements (not mid-transition), fading in once.
+ * From then on it stays up and follows the target through scrolling, the
+ * keyboard and layout changes; only a target that is gone (another screen,
+ * unmounted, scrolled out of sight) takes the highlight down.
  */
 export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction }: {
   view: GuideView;
@@ -98,6 +120,9 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
   const insets = useSafeAreaInsets();
   const [frame, setFrame] = useState<Frame | null>(null);
   const [keyboardRevision, setKeyboardRevision] = useState(0);
+  // The last step that appeared: showing it again (a target that briefly went
+  // away) must not replay its fade-in.
+  const shownAnchor = useRef<string | null>(null);
 
   useEffect(() => {
     const update = (top: number) => {
@@ -117,6 +142,7 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
   const screen = measuring ? view.screen : null;
   const targetList = view.kind === 'spotlight' ? view.targets.join(',') : '';
   const firstTarget = view.kind === 'spotlight' ? view.targets[0] : null;
+  const headerTarget = view.kind === 'spotlight' && view.targets.length === 1 ? HEADER_TARGET[view.targets[0]] ?? null : null;
 
   // Once per step: before shrinking a card that does not fit, let the screen
   // scroll the control toward the top to make room for it.
@@ -134,83 +160,90 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
     }
     const targets = targetList ? targetList.split(',') as QuestGuideTargetId[] : [];
     let active = true;
-    let inFlight = false;
-    let previous = '';
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let last: Frame | null = null;
     let revealed = false;
-    const tick = async () => {
-      if (inFlight) return;
-      inFlight = true;
-      try {
-        const [root, viewport, ...parts] = await Promise.all([
-          measure(rootRef.current as QuestGuideMeasurable | null),
-          measure(getQuestGuideTarget(VIEWPORT_TARGET[screen])),
-          ...targets.map(id => measure(getQuestGuideTarget(id))),
-        ]);
-        if (!active) return;
-        if (!root || parts.some(part => !part)) {
-          previous = '';
-          setFrame(null);
-          return;
-        }
-        const signature = JSON.stringify([root, viewport, parts, keyboardTop.current]);
-        if (signature !== previous) {
-          // Moving (layout, scroll, keyboard, transition): wait until it holds still.
-          previous = signature;
-          setFrame(current => current?.key === viewKey ? null : current);
-          return;
-        }
-        const local = (rect: GuideRect) => ({ ...rect, x: rect.x - root.x, y: rect.y - root.y });
-        let area = viewport
-          ? local(viewport)
-          : { x: 0, y: insets.top, width: root.width, height: Math.max(0, root.height - insets.top - insets.bottom) };
-        const keyboard = keyboardTop.current - root.y;
-        if (keyboard < area.y + area.height) area = { ...area, height: Math.max(0, keyboard - area.y) };
-        let hole: GuideRect | null = null;
-        const union = unionRects(parts.filter((part): part is GuideRect => !!part).map(local));
-        if (union) {
-          const visible = intersectRects(union, area);
-          if ((!visible || !sameRect(visible, union)) && !revealed) {
-            // Let the screen scroll its own content once, then measure again.
-            revealed = true;
-            previous = '';
-            revealQuestGuideTarget(screen, targets[0]);
-            return;
-          }
-          hole = visible ? intersectRects(inflateRect(visible, HOLE_PADDING), area) : null;
-          if (!hole) {
-            setFrame(null);
-            return;
-          }
-        }
-        const next: Frame = { key: viewKey, root, area, hole };
-        setFrame(current => current && current.key === next.key && sameRect(current.root, next.root)
-          && sameRect(current.area, next.area) && sameRect(current.hole, next.hole) ? current : next);
-      } finally {
-        inFlight = false;
+    // Resolves whether the target held still since the previous measurement.
+    const follow = async (): Promise<boolean> => {
+      const [root, viewport, header, ...parts] = await Promise.all([
+        measure(rootRef.current as QuestGuideMeasurable | null),
+        measure(getQuestGuideTarget(VIEWPORT_TARGET[screen])),
+        measure(headerTarget ? getQuestGuideTarget(headerTarget) : null),
+        ...targets.map(id => measure(getQuestGuideTarget(id))),
+      ]);
+      if (!active) return true;
+      if (!root || parts.some(part => !part)) {
+        // Gone (another screen, unmounted): never leave a stale highlight.
+        last = null;
+        setFrame(null);
+        return true;
       }
+      const local = (rect: GuideRect) => ({ ...rect, x: rect.x - root.x, y: rect.y - root.y });
+      let area = viewport
+        ? local(viewport)
+        : { x: 0, y: insets.top, width: root.width, height: Math.max(0, root.height - insets.top - insets.bottom) };
+      const keyboard = keyboardTop.current - root.y;
+      if (keyboard < area.y + area.height) area = { ...area, height: Math.max(0, keyboard - area.y) };
+      let hole: GuideRect | null = null;
+      let union = unionRects(parts.filter((part): part is GuideRect => !!part).map(local));
+      if (union && header) union = clipBelow(union, local(header), MIN_LIST_HEIGHT);
+      if (union) {
+        const visible = intersectRects(union, area);
+        if ((!visible || !sameRect(visible, union)) && !revealed) {
+          // Let the screen scroll its own content once, then measure again.
+          revealed = true;
+          last = null;
+          revealQuestGuideTarget(screen, targets[0]);
+          return false;
+        }
+        hole = visible ? intersectRects(inflateRect(visible, HOLE_PADDING), area) : null;
+        if (!hole) {
+          last = null;
+          setFrame(null);
+          return true;
+        }
+      }
+      const next: Frame = { key: viewKey, screen, root, area, hole };
+      const still = last !== null && sameFrame(last, next);
+      last = next;
+      setFrame(current => current?.key === viewKey
+        // Shown: a real move is followed at once, noise is ignored, nothing blinks.
+        ? sameFrame(current, next) ? current : next
+        // Not shown yet: appear once the target holds still (after a transition).
+        : still ? next : current);
+      return still;
     };
-    void tick();
-    const timer = setInterval(() => { void tick(); }, MEASURE_INTERVAL_MS);
+    const run = async () => {
+      const still = await follow();
+      if (active) timer = setTimeout(() => { void run(); }, still ? MEASURE_INTERVAL_MS : FOLLOW_INTERVAL_MS);
+    };
+    void run();
     return () => {
       active = false;
-      clearInterval(timer);
+      clearTimeout(timer);
     };
-  }, [viewKey, screen, targetList, keyboardRevision, insets.top, insets.bottom]);
+  }, [viewKey, screen, targetList, headerTarget, keyboardRevision, insets.top, insets.bottom]);
 
   if (view.kind === 'none') return null;
   if (view.kind === 'celebration') {
     return <QuestCelebration key={view.key} title={view.title} summary={view.summary} leaving={view.leaving} replay={view.replay} reducedMotion={reducedMotion} />;
   }
   const current = frame?.key === view.anchor ? frame : null;
+  // From one step to the next on the same screen the dim stays up (closed
+  // until the next target is measured) instead of blinking off and back.
+  const dim = view.kind === 'spotlight' ? current ?? (frame?.screen === view.screen ? frame : null) : null;
+  const fadeIn = !reducedMotion && shownAnchor.current !== view.anchor;
   return (
     <View ref={rootRef} collapsable={false} pointerEvents="box-none" style={styles.root} testID="quest-guide-overlay">
+      {dim && quest ? <SpotlightDim root={dim.root} hole={current?.hole ?? null} fadeIn={fadeIn} /> : null}
       {current && quest ? (
         <GuideLayer
           key={view.anchor}
           frame={current}
           view={view}
           quest={quest}
-          reducedMotion={reducedMotion}
+          fadeIn={fadeIn}
+          shownAnchor={shownAnchor}
           onAction={onAction}
           requestRoom={requestRoom}
         />
@@ -219,16 +252,42 @@ export default function QuestGuideOverlay({ view, quest, reducedMotion, onAction
   );
 }
 
-function GuideLayer({ frame, view, quest, reducedMotion, onAction, requestRoom }: {
+/** The dimmed screen around the highlighted control; it fades in once, then holds. */
+function SpotlightDim({ root, hole, fadeIn }: { root: GuideRect; hole: GuideRect | null; fadeIn: boolean }) {
+  const { mode } = useAppearance();
+  const initial = useRef(fadeIn).current;
+  const appear = useRef(new Animated.Value(initial ? 0 : 1)).current;
+  const native = Platform.OS !== 'web';
+  useEffect(() => {
+    if (!initial) return;
+    const animation = Animated.timing(appear, { toValue: 1, duration: APPEAR_MS, easing: Easing.out(Easing.quad), useNativeDriver: native });
+    animation.start();
+    return () => animation.stop();
+  }, [appear, initial, native]);
+  return (
+    <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: appear }]} testID="quest-guide-spotlight">
+      <Svg width={root.width} height={root.height} pointerEvents="none" focusable={false} aria-hidden>
+        {hole
+          ? <Path d={dimPath(root.width, root.height, hole)} fill={mode === 'dark' ? DIM_DARK : DIM_LIGHT} fillRule="evenodd" />
+          : <Path d={`M0 0H${root.width}V${root.height}H0Z`} fill={mode === 'dark' ? DIM_DARK : DIM_LIGHT} />}
+      </Svg>
+    </Animated.View>
+  );
+}
+
+function GuideLayer({ frame, view, quest, fadeIn, shownAnchor, onAction, requestRoom }: {
   frame: Frame;
   view: Extract<GuideView, { kind: 'spotlight' | 'message' }>;
   quest: BeginnerQuestKey;
-  reducedMotion: boolean;
+  /** Read once, when the step mounts. */
+  fadeIn: boolean;
+  shownAnchor: React.MutableRefObject<string | null>;
   onAction: (action: GuideAction, step: number | null) => void;
   requestRoom: () => boolean;
 }) {
   const { colors, mode } = useAppearance();
-  const appear = useRef(new Animated.Value(reducedMotion ? 1 : 0)).current;
+  const initial = useRef(fadeIn).current;
+  const appear = useRef(new Animated.Value(initial ? 0 : 1)).current;
   // Natural heights (the quest label + title, the instruction, the actions),
   // measured independently of any maxHeight cap.
   const [headHeight, setHeadHeight] = useState<number | null>(null);
@@ -259,9 +318,14 @@ function GuideLayer({ frame, view, quest, reducedMotion, onAction, requestRoom }
   // A card never sits on the control it explains. When it does not fit as it
   // is, the screen may scroll the control up once to make room; the card is
   // shown (compact, scrolling its own text if still needed) after that settles.
+  // Once shown it stays: a later move (the user's own scroll) is followed, not
+  // answered with another scroll or a hidden card.
   const cramped = compact;
+  const placedOnce = useRef(false);
+  if (placed !== null && (!cramped || roomSettled)) placedOnce.current = true;
+  const ready = placed !== null && placedOnce.current;
   useEffect(() => {
-    if (!cramped || roomSettled) return;
+    if (!cramped || roomSettled || placedOnce.current) return;
     if (!requestRoom()) {
       setRoomSettled(true);
       return;
@@ -270,17 +334,15 @@ function GuideLayer({ frame, view, quest, reducedMotion, onAction, requestRoom }
     return () => clearTimeout(timer);
   }, [cramped, roomSettled, requestRoom]);
 
-  const ready = placed !== null && (!cramped || roomSettled);
+  const anchor = view.anchor;
   useEffect(() => {
     if (!ready) return;
-    if (reducedMotion) {
-      appear.setValue(1);
-      return;
-    }
-    const animation = Animated.timing(appear, { toValue: 1, duration: 180, easing: Easing.out(Easing.quad), useNativeDriver: native });
+    shownAnchor.current = anchor;
+    if (!initial) return;
+    const animation = Animated.timing(appear, { toValue: 1, duration: APPEAR_MS, easing: Easing.out(Easing.quad), useNativeDriver: native });
     animation.start();
     return () => animation.stop();
-  }, [appear, native, ready, reducedMotion]);
+  }, [anchor, appear, initial, native, ready, shownAnchor]);
 
   useEffect(() => {
     AccessibilityInfo.announceForAccessibility(`${view.card.title}. ${view.card.body}`);
@@ -298,12 +360,11 @@ function GuideLayer({ frame, view, quest, reducedMotion, onAction, requestRoom }
   return (
     <>
       {hole ? (
-        <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: appear }]} testID="quest-guide-spotlight">
-          <Svg width={frame.root.width} height={frame.root.height} pointerEvents="none" focusable={false} aria-hidden>
-            <Path d={dimPath(frame.root.width, frame.root.height, hole)} fill={mode === 'dark' ? 'rgba(0,0,0,0.62)' : 'rgba(16,24,40,0.5)'} fillRule="evenodd" />
-          </Svg>
-          <PulseRing hole={hole} color={ring} reducedMotion={reducedMotion} />
-        </Animated.View>
+        // A steady ring: it fades in with the card, then never pulses or blinks.
+        <Animated.View pointerEvents="none" testID="quest-guide-ring" style={[styles.ring, {
+          left: hole.x, top: hole.y, width: hole.width, height: hole.height,
+          borderRadius: Math.min(HOLE_RADIUS, hole.height / 2), borderColor: ring, opacity: appear,
+        }]} />
       ) : null}
       <Animated.View
         testID="quest-guide-card"
@@ -322,33 +383,6 @@ function GuideLayer({ frame, view, quest, reducedMotion, onAction, requestRoom }
           onHeadLayout={keep(setHeadHeight)} onTextLayout={keep(setTextHeight)} onActionsLayout={onActionsLayout}
           onAction={action => onAction(action, view.kind === 'spotlight' ? view.step : null)} />
       </Animated.View>
-    </>
-  );
-}
-
-function PulseRing({ hole, color, reducedMotion }: { hole: GuideRect; color: string; reducedMotion: boolean }) {
-  const pulse = useRef(new Animated.Value(0)).current;
-  const native = Platform.OS !== 'web';
-  useEffect(() => {
-    pulse.setValue(0);
-    if (reducedMotion) return;
-    // A few calm pulses per step, then a steady ring: noticeable, not nagging.
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(pulse, { toValue: 1, duration: 650, easing: Easing.out(Easing.quad), useNativeDriver: native }),
-      Animated.timing(pulse, { toValue: 0, duration: 550, easing: Easing.in(Easing.quad), useNativeDriver: native }),
-    ]), { iterations: 4 });
-    animation.start();
-    return () => animation.stop();
-  }, [native, pulse, reducedMotion]);
-  const frameStyle = { left: hole.x, top: hole.y, width: hole.width, height: hole.height, borderRadius: Math.min(HOLE_RADIUS, hole.height / 2) };
-  return (
-    <>
-      <Animated.View pointerEvents="none" style={[styles.ring, frameStyle, {
-        borderColor: color,
-        opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }),
-        transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.07] }) }],
-      }]} />
-      <View pointerEvents="none" testID="quest-guide-ring" style={[styles.ring, frameStyle, { borderColor: color }]} />
     </>
   );
 }

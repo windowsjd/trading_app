@@ -5,8 +5,11 @@ import type { FxGuideFacts, QuestGuideCommand, TransferGuideFacts, WalletGuideFa
 import {
   advanceGuide,
   claimGuideCommand,
+  clipBelow,
   commandMatchesQuest,
   followGuideFocus,
+  guidePracticeTabs,
+  leaveGuideTab,
   observeGuideProgress,
   placeGuideCard,
   resolveGuideView,
@@ -228,6 +231,27 @@ describe('session movement', () => {
     const same = session({ step: 1 });
     assert.equal(followGuideFocus(same, 'wallet') === same, true);
   });
+
+  it('ends the guide on a switch to the quest list or an unrelated tab, never inside the practice tab', () => {
+    assert.deepEqual(guidePracticeTabs('exchange'), ['WalletTab']);
+    assert.deepEqual(guidePracticeTabs('marketBuy'), ['MarketTab']);
+    assert.deepEqual(guidePracticeTabs('futuresShort'), ['MarketTab', 'WalletTab'], 'futures funding is topped up in the Wallet tab');
+    const guiding = session({ step: 3 });
+    assert.equal(leaveGuideTab(guiding, 'WalletTab') === guiding, true);
+    assert.equal(leaveGuideTab(guiding, null) === guiding, true, 'an unknown tab is not a departure');
+    for (const tab of ['QuestTab', 'HomeTab', 'MarketTab', 'MyTab']) assert.equal(leaveGuideTab(guiding, tab) === null, true, tab);
+    for (const phase of ['verifying', 'unconfirmed', 'completedElsewhere'] as const) {
+      assert.equal(leaveGuideTab(session({ phase }), 'HomeTab') === null, true, phase);
+    }
+    // The completion's own return to the list is not a departure.
+    for (const phase of ['celebrating', 'replaySucceeded', 'returning'] as const) {
+      const done = session({ phase });
+      assert.equal(leaveGuideTab(done, 'QuestTab') === done, true, phase);
+    }
+    const futures: GuideSession = { ...session(), quest: 'futuresLong', step: 0 };
+    assert.equal(leaveGuideTab(futures, 'WalletTab') === futures, true);
+    assert.equal(leaveGuideTab(futures, 'QuestTab') === null, true);
+  });
 });
 
 describe('step card placement', () => {
@@ -273,6 +297,14 @@ describe('step card placement', () => {
     assert.equal(placed.overlaps, true);
     assert.equal(placed.maxHeight, null);
     assert.equal(placed.y >= 0 && placed.y + card.height <= 200, true);
+  });
+
+  it('highlights a list below its scrolling header while a row of it remains', () => {
+    const list = { x: 0, y: 100, width: 390, height: 600 };
+    assert.deepEqual(clipBelow(list, { x: 0, y: 100, width: 390, height: 220 }, 48), { x: 0, y: 320, width: 390, height: 380 });
+    assert.deepEqual(clipBelow(list, { x: 0, y: -40, width: 390, height: 180 }, 48), { x: 0, y: 140, width: 390, height: 560 }, 'partly scrolled away');
+    assert.deepEqual(clipBelow(list, { x: 0, y: -300, width: 390, height: 220 }, 48), list, 'header scrolled out of sight');
+    assert.deepEqual(clipBelow(list, { x: 0, y: 100, width: 390, height: 580 }, 48), list, 'never a sliver: the whole list instead');
   });
 
   it('unions multi-part targets into one spotlight', () => {

@@ -1,5 +1,5 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
-module.exports=async function({page,open,id,tab,out,errors}){
+module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
  const done=[];
  const next=async()=>{await id('quest-guide-next').waitFor();await page.waitForFunction(()=>[...document.querySelectorAll('[data-testid="quest-guide-next"]')].some(el=>el.checkVisibility()&&el.getAttribute('aria-disabled')!=='true'));await id('quest-guide-next').click();};
  const finish=async key=>{
@@ -11,7 +11,25 @@ module.exports=async function({page,open,id,tab,out,errors}){
  };
  const start=async key=>{await tab('퀘스트').click();await id(`quest-card-${key}-start`).click();};
  const buy=async(key,asset)=>{
-  await start(key);await id(`market-item-${asset}`).click();await next();await id('asset-detail-open-buy-order').click();
+  await start(key);
+  if(key==='marketBuy'){
+   // The market list: a steady spotlight on the rows below the list header, then a re-entry starts anew.
+   await page.getByTestId('quest-guide-ring').waitFor();
+   await page.waitForFunction(()=>{const el=document.querySelector('[data-testid="quest-guide-card"]');return el&&Number(getComputedStyle(el).opacity)===1;});
+   // The header ends with the session/sort toolbar; the 6px ring padding may overlap it.
+   const ringTop=await page.getByTestId('quest-guide-ring').evaluate(el=>el.getBoundingClientRect().top);
+   const toolbar=await page.getByTestId('market-session-summary').filter({visible:true}).first().evaluate(el=>el.getBoundingClientRect().bottom);
+   const row=await page.getByTestId('market-item-BTC').filter({visible:true}).first().evaluate(el=>el.getBoundingClientRect().top);
+   assert.ok(ringTop>=toolbar-8&&ringTop<=row,`the ring frames the rows, not the list header ${JSON.stringify({ringTop,toolbar,row})}`);
+   await expectSteady('market list',1500);
+   await page.screenshot({path:path.join(out,'market-list-spotlight.png')});
+   await tab('퀘스트').click();
+   assert.equal(await id('quest-card-marketBuy-start').getAttribute('aria-label'),'퀘스트 시작하기');
+   assert.equal(await page.getByTestId('quest-guide-card').count(),0);
+   await id('quest-card-marketBuy-start').click();
+   await page.getByTestId('quest-guide-ring').waitFor();
+  }
+  await id(`market-item-${asset}`).click();await next();await id('asset-detail-open-buy-order').click();
   if(key==='limitBuy'){await id('order-type-toggle-limit').click();await id('order-limit-price-input').fill('90');}
   await next();await id('order-quantity-input').fill(asset==='BTC'?'100':'1');await next();await next();
   await id('quest-guide-card').waitFor();

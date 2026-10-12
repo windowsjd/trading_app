@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { questProgress, questPayload } from '../../../test/questFixtures.ts';
+import { questProgress, questPayload, questProgressInProgress } from '../../../test/questFixtures.ts';
 import { BEGINNER_QUEST_KEYS, canStartQuest, parseBeginnerQuests } from './questProgress.ts';
 import { startGuideSession, followGuideFocus, claimGuideCommand, settleGuideVerification, observeGuideProgress, resolveGuideView } from './questGuideModel.ts';
+import { TRADING_GUIDE_STEPS } from './tradingGuideSteps.ts';
 const account='beginner-1';
 const spot={kind:'spot' as const,accountId:account,assetId:'crypto-1',assetType:'crypto',side:'buy',orderType:'market',orderId:'new-fill',summary:'실제 체결'};
 for(let count=0;count<=6;count++)test(`foundation ${count}: next practice usable; later practice cannot start`,()=>{
@@ -96,4 +97,23 @@ test('the client rejects forged unlocks and out-of-order financial evidence',()=
   assert.throws(()=>parseBeginnerQuests(forged,account));
   const unordered=questPayload(6);unordered.quests[4].steps[0].completedAt=unordered.quests[3].steps[0].completedAt;
   assert.throws(()=>parseBeginnerQuests(unordered,account));
+});
+test('a new guide resumes from the ledger, never from a remembered step: no repeated fill, order or position',()=>{
+  // QUEST 03 filled, holdings not reviewed: review on that asset's order screen.
+  const filled=startGuideSession(7,account,'marketBuy',questProgressInProgress(2,'fill-1',{spotAssetId:'crypto-1'}))!;
+  assert.deepEqual([filled.step,filled.orderId,filled.assetId,filled.replay],[7,'fill-1','crypto-1',false]);
+  assert.equal(TRADING_GUIDE_STEPS.marketBuy[filled.step].target,'asset-holdings');
+  // QUEST 06 registered, result not reviewed: the open order (and its reservation) is reviewed.
+  const limit=startGuideSession(8,account,'limitBuy',questProgressInProgress(5,'limit-1',{limitAssetId:'crypto-1'}))!;
+  assert.deepEqual([limit.step,limit.orderId,limit.assetId],[7,'limit-1','crypto-1']);
+  assert.equal(TRADING_GUIDE_STEPS.limitBuy[limit.step].target,'limit-review');
+  // Futures opened, not closed: straight to closing that same position.
+  const long=startGuideSession(9,account,'futuresLong',questProgressInProgress(8,'open-1',{longPositionId:'position-1'}))!;
+  assert.deepEqual([long.step,long.positionId],[5,'position-1']);
+  assert.equal(TRADING_GUIDE_STEPS.futuresLong[long.step].target,'futures-position');
+  // Nothing proven yet: the practice starts at its first step.
+  assert.equal(startGuideSession(10,account,'marketBuy',questProgress(2))!.step,0);
+});
+test('no guide copy offers a resume that no longer exists',()=>{
+  assert.doesNotMatch(JSON.stringify(TRADING_GUIDE_STEPS),/이어하기/);
 });

@@ -1,4 +1,4 @@
-import { questPayload, questProgress } from '../../../test/questFixtures.ts';
+import { questPayload, questProgress, questProgressInProgress } from '../../../test/questFixtures.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
@@ -106,34 +106,39 @@ describe('quest card display', () => {
     });
 
   it('labels unknown progress as unknown and offers no practice without a baseline', () => {
-    assert.deepEqual(labels({ progress: null, isError: false, active: false }), [
+    assert.deepEqual(labels({ progress: null, isError: false }), [
       ['loading', '확인 중', null, false], ['loading', '확인 중', null, false],
     ]);
-    assert.deepEqual(labels({ progress: null, isError: true, active: false }), [
+    assert.deepEqual(labels({ progress: null, isError: true }), [
       ['error', '확인 불가', null, false], ['error', '확인 불가', null, false],
     ]);
   });
 
   it('keeps QUEST 02 waiting until QUEST 01 is proven, then each card stands alone', () => {
-    assert.deepEqual(labels({ progress: progress(null, null), isError: false, active: false }), [
+    assert.deepEqual(labels({ progress: progress(null, null), isError: false }), [
       ['available', '미시작', '퀘스트 시작하기', true],
       ['waiting', '대기', '퀘스트 시작하기', false],
     ]);
-    assert.deepEqual(labels({ progress: progress(FX_AT, null), isError: false, active: false }), [
+    assert.deepEqual(labels({ progress: progress(FX_AT, null), isError: false }), [
       ['completed', '완료', '다시하기', true],
       ['available', '미시작', '퀘스트 시작하기', true],
     ]);
-    assert.deepEqual(labels({ progress: progress(FX_AT, TRANSFER_AT), isError: false, active: false }), [
+    assert.deepEqual(labels({ progress: progress(FX_AT, TRANSFER_AT), isError: false }), [
       ['completed', '완료', '다시하기', true],
       ['completed', '완료', '다시하기', true],
     ]);
   });
 
-  it('shows a running guide as in progress without claiming completion', () => {
-    const active = describeQuestCard('exchange', { progress: progress(null, null), isError: false, active: true });
-    assert.deepEqual(active, { state: 'active', statusLabel: '진행 중', actionLabel: '이어하기', canStart: true });
-    const review = describeQuestCard('exchange', { progress: progress(FX_AT, null), isError: false, active: true });
-    assert.equal(review.statusLabel, '완료');
+  it('shows server-proven partial progress as in progress, with a fresh start and never a resume', () => {
+    // QUEST 03 filled, holdings not reviewed yet: the fill stays counted.
+    const filled = questProgressInProgress(2, 'fill-1', { spotAssetId: 'crypto-1' });
+    assert.deepEqual(describeQuestCard('marketBuy', { progress: filled, isError: false }),
+      { state: 'inProgress', statusLabel: '진행 중', actionLabel: '퀘스트 시작하기', canStart: true });
+    assert.equal(describeQuestCard('marketBuy', { progress: questProgress(2), isError: false }).state, 'available');
+    assert.equal(describeQuestCard('protection', { progress: filled, isError: false }).state, 'waiting');
+    for (const key of ['exchange', 'transfer', 'marketBuy'] as const) {
+      assert.notEqual(describeQuestCard(key, { progress: filled, isError: false }).actionLabel, '이어하기');
+    }
   });
 
   it('keeps quest copy free of invented rates, fees, rewards, levels or unlocks', () => {

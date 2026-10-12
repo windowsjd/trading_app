@@ -228,6 +228,34 @@ async function run() {
     async function stopFrames() {
       return page.evaluate(() => { window.questFramesActive = false; return window.questFrames; });
     }
+    /**
+     * Samples the spotlight every animation frame while `action` runs: the
+     * dim, the one steady ring and the card stay fully shown (no pulse, no
+     * blink, no second fade-in) and the ring never scales.
+     */
+    async function expectSteady(context, ms, action = async () => {}) {
+      await page.evaluate(() => {
+        window.steadyFrames = []; window.steadyActive = true;
+        const opacity = el => { let o = 1; for (let n = el; n; n = n.parentElement) o *= Number(getComputedStyle(n).opacity); return o; };
+        const loop = () => {
+          const one = testId => [...document.querySelectorAll(`[data-testid="${testId}"]`)].find(node => node.checkVisibility());
+          const ring = one('quest-guide-ring'), dim = one('quest-guide-spotlight'), card = one('quest-guide-card');
+          const overlay = one('quest-guide-overlay');
+          window.steadyFrames.push({ ring: ring ? opacity(ring) : 0, dim: dim ? opacity(dim) : 0, card: card ? opacity(card) : 0,
+            scaled: ring ? getComputedStyle(ring).transform !== 'none' : false,
+            rings: overlay ? [...overlay.querySelectorAll('*')].filter(node => getComputedStyle(node).borderTopWidth === '3px').length : 0 });
+          if (window.steadyActive) requestAnimationFrame(loop);
+        };
+        requestAnimationFrame(loop);
+      });
+      await action();
+      await page.waitForTimeout(ms);
+      const frames = await page.evaluate(() => { window.steadyActive = false; return window.steadyFrames; });
+      const unsteady = frames.filter(f => f.ring < 0.999 || f.dim < 0.999 || f.card < 0.999 || f.scaled || f.rings !== 1).length;
+      assert.ok(frames.length >= 20, `${context}: sampled ${frames.length} frames`);
+      assert.equal(unsteady, 0, `${context}: ${unsteady} of ${frames.length} frames blinked, pulsed or doubled the ring`);
+      flows.push({ context: `steady ${context}`, frames: frames.length });
+    }
     function assertSmoothReturn(frames, practice) {
       assert.equal(frames.some(frame => frame.sheet), false, 'no FX success sheet next to the celebration');
       const routes = frames.map(frame => frame.route).filter((route, index, all) => route && route !== all[index - 1]);
@@ -246,7 +274,7 @@ async function run() {
     }
 
     if (process.env.FULL_QUEST_BROWSER === '1') {
-      await require('./tradingQuestFlows.cjs')({page,open,id,tab,out,errors});
+      await require('./tradingQuestFlows.cjs')({page,open,id,tab,out,errors,expectSteady});
       return;
     }
     // A: quest list, header and tab icon at small widths, both themes, large fonts.
@@ -309,7 +337,8 @@ async function run() {
       await id('quest-guide-next').click();
       await expectSpotlight([id('wallet-fx-amount-input')], { stepLabel: '3/6', context: `${context} amount` });
       assert.equal(await id('quest-guide-next').getAttribute('aria-disabled'), 'true', 'no amount, no next');
-      await id('wallet-fx-amount-input').fill('135000');
+      // Idle, then typing (the form and the card update under the spotlight).
+      await expectSteady(`${context} amount`, 1500, () => id('wallet-fx-amount-input').fill('135000'));
       await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-next"]')?.getAttribute('aria-disabled') !== 'true');
       await page.screenshot({ path: path.join(out, `fx-3-amount-${context}.png`) });
       await id('quest-guide-next').click();
@@ -528,9 +557,22 @@ async function run() {
     await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
     await id('wallet-screen').waitFor();
     await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === '1/6');
+    // Back to the list ends the guide: no resume, the card starts a new one.
     await tab('퀘스트').click();
-    assert.equal(await text('quest-card-exchange-status'), '진행 중');
-    assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'the overlay pauses on other tabs');
+    assert.equal(await text('quest-card-exchange-status'), '미시작');
+    assert.equal(await id('quest-card-exchange-start').getAttribute('aria-label'), '퀘스트 시작하기');
+    assert.equal(await page.getByText('이어하기').count(), 0, 'no resume anywhere');
+    assert.equal(await page.getByTestId('quest-card-exchange-exit').count(), 0);
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0);
+    await tab('지갑').click(); await id('wallet-screen').waitFor(); await page.waitForTimeout(400);
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'the ended guide does not come back on its tab');
+    await tab('퀘스트').click(); await id('quest-card-exchange-start').click();
+    await id('wallet-screen').waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === '1/6');
+    // Leaving for an unrelated tab ends it too.
+    await tab('홈').click();
+    await tab('지갑').click(); await id('wallet-screen').waitFor(); await page.waitForTimeout(400);
+    assert.equal(await page.getByTestId('quest-guide-card').count(), 0, 'leaving for another tab ended the guide');
     await tab('홈').click();
     await id('trading-account-switcher-trigger').click();
     await id('trading-account-switcher-option-general-account').click();
@@ -544,7 +586,7 @@ async function run() {
     await tab('퀘스트').click();
     assert.equal(await text('quest-card-exchange-status'), '미시작', 'the old session did not survive the switch');
     assert.equal(await page.evaluate(() => window.beginnerFixture.posts.length), 0);
-    flows.push({ context: 'exit-back-switch', pass: true });
+    flows.push({ context: 'exit-back-list-tab-switch', noResume: true, pass: true });
 
     // F: the FX screen for every mode: no account switcher, three equal rows.
     for (const [account, width, fontScale, theme] of [['general', 320, 2, 'light'], ['season', 360, 1, 'dark'], ['beginner', 320, 1, 'dark']]) {

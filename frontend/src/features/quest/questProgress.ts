@@ -97,7 +97,7 @@ export function parseBeginnerQuests(payload: unknown, accountId: string): Beginn
   return { ...parsed, learningAccess: expected, operations: operations as unknown as BeginnerQuestsDto['operations'], practice: practice as unknown as BeginnerQuestsDto['practice'] };
 }
 
-export type QuestCardState = 'loading' | 'error' | 'waiting' | 'available' | 'active' | 'completed';
+export type QuestCardState = 'loading' | 'error' | 'waiting' | 'available' | 'inProgress' | 'completed';
 
 export interface QuestCardDisplay {
   state: QuestCardState;
@@ -107,10 +107,14 @@ export interface QuestCardDisplay {
   canStart: boolean;
 }
 
-/** Unknown progress is shown as unknown — never as not started or complete. */
+/**
+ * Unknown progress is shown as unknown — never as not started or complete.
+ * Only the server's progress decides a card: a guide that was left is not
+ * "in progress", and there is nothing to resume — every practice starts anew.
+ */
 export function describeQuestCard(
   key: BeginnerQuestKey,
-  input: { progress: BeginnerQuests | null; isError: boolean; active: boolean },
+  input: { progress: BeginnerQuests | null; isError: boolean },
 ): QuestCardDisplay {
   const { progress } = input;
   if (!progress) {
@@ -119,12 +123,13 @@ export function describeQuestCard(
       : { state: 'loading', statusLabel: '확인 중', actionLabel: null, canStart: false };
   }
   const quest = progress[key];
-  if (input.active) {
-    return { state: 'active', statusLabel: quest.completed ? '완료' : '진행 중', actionLabel: '이어하기', canStart: true };
-  }
   if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시하기', canStart: true };
   if (!canStartQuest(key, progress)) {
     return { state: 'waiting', statusLabel: '대기', actionLabel: '퀘스트 시작하기', canStart: false };
+  }
+  // Steps the ledger already proves (e.g. a fill awaiting its review) stay done.
+  if (quest.status === 'in_progress') {
+    return { state: 'inProgress', statusLabel: '진행 중', actionLabel: '퀘스트 시작하기', canStart: true };
   }
   return { state: 'available', statusLabel: '미시작', actionLabel: '퀘스트 시작하기', canStart: true };
 }
