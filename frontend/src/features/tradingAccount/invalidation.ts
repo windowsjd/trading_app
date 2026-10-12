@@ -61,6 +61,8 @@ export function invalidateAfterOrderCreate(
   const keys: QueryKey[] = [
     QUERY_KEYS.tradingAccount.quests(accountId),
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
+    // A Conditional BUY row's state follows its linked order.
+    QUERY_KEYS.tradingAccount.conditionalBuy.all(accountId),
     QUERY_KEYS.tradingAccount.protections.all(accountId),
     QUERY_KEYS.tradingAccount.positionsAll(accountId),
     ...walletKeys(accountId),
@@ -87,6 +89,8 @@ export function invalidateAfterOrderCancel(
   const keys: QueryKey[] = [
     QUERY_KEYS.tradingAccount.quests(accountId),
     QUERY_KEYS.tradingAccount.ordersAll(accountId),
+    // A Conditional BUY row's state follows its linked order.
+    QUERY_KEYS.tradingAccount.conditionalBuy.all(accountId),
     QUERY_KEYS.tradingAccount.protections.all(accountId),
     QUERY_KEYS.tradingAccount.positionsAll(accountId),
     ...walletKeys(accountId),

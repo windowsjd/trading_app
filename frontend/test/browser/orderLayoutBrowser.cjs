@@ -85,7 +85,14 @@ async function run() {
       await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?screen=order&asset=SUI`);
       const byId = (id) => page.getByTestId(id);
+      // Nothing is preselected: pick 주문방식 through its sheet first.
+      const pick = async (method) => {
+        await byId('order-type-select').click();
+        await byId(`order-method-${method}`).click();
+        await page.waitForFunction(() => !document.querySelector('[data-testid="order-method-sheet"]'));
+      };
       await byId('asset-trading-columns').waitFor();
+      await pick('market');
       await theme.canvas(page, appearance);
       await theme.background(byId('asset-trading-columns'), appearance, 'surface');
       await theme.background(byId('order-quantity-input'), appearance, 'raised');
@@ -103,8 +110,7 @@ async function run() {
       await input.fill('123456789.123456789');
       assert.equal(await input.inputValue(), '123456789.123456789');
       assert.equal(await input.getAttribute('placeholder'), '매수 금액 입력');
-      await byId('order-type-select').click();
-      await byId('order-type-toggle-limit').click();
+      await pick('limit');
       const limit = byId('order-limit-price-input');
       await limit.fill('0.000000123456789');
       assert.equal(await limit.inputValue(), '0.000000123456789');
@@ -122,6 +128,7 @@ async function run() {
       assert.ok(caret.scrollWidth > caret.clientWidth && caret.scrollLeft > 0, `${appearance}/${width}: native input scrolls its caret`);
       for (const ratio of [25, 50, 75, 100]) await byId(`order-ratio-${ratio}`).click();
       await byId('asset-detail-sell-button').click();
+      await pick('market');
       const quantity = byId('order-quantity-input');
       assert.equal(await quantity.getAttribute('placeholder'), '수량 입력');
       await quantity.fill(longDecimal);
@@ -130,6 +137,8 @@ async function run() {
       console.log(JSON.stringify({ appearance, width, columns, visuals, caret }));
     }
     await page.goto(`${base}/?screen=order&asset=BTC`);
+    await page.getByTestId('order-type-select').click();
+    await page.getByTestId('order-method-market').click();
     await page.getByTestId('order-quantity-input').fill('1');
     await page.getByTestId('order-execute-submit').click();
     await page.waitForTimeout(500);

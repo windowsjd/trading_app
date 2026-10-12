@@ -23,6 +23,14 @@ const prices = {
   SUI: ['Sui', '0.8592', 4],
   币安人生: ['币安人生', '0.51', 4],
 };
+// `?krx=1` adds one open KRX stock (Conditional BUY / LOC screens).
+const krxStock = params.get('krx') === '1' ? [{
+  id: 'SAMSUNG', assetType: 'domestic_stock', symbol: '005930', market: 'KRX',
+  name: params.get('longName') === '1' ? '아주 긴 이름을 가진 국내 상장 주식회사 우선주 Example Holdings' : '삼성전자',
+  priceCurrency: 'KRW', settlementCurrency: 'KRW', displayPriceDecimals: 0, isActive: true, marketStatus: 'open', tradable: true,
+  price: { state: 'available', currentPrice: '70000', priceCurrency: 'KRW', priceKrwState: 'available', priceKrw: '70000', changeRate: '0.43',
+    priceCapturedAt: new Date().toISOString(), priceEffectiveAt: new Date().toISOString() },
+}] : [];
 export const assets = Object.entries(prices).map(
   ([base, [name, price, decimals]]) => ({
     id: base,
@@ -48,7 +56,22 @@ export const assets = Object.entries(prices).map(
       priceEffectiveAt: new Date().toISOString(),
     },
   }),
-);
+).concat(krxStock);
+const conditionalEnabled = params.get('conditional') === 'enabled';
+const locEnabled = params.get('loc') === 'enabled';
+const conditionalRow = (id, state, extra = {}) => ({
+  id, assetId: 'SUI', asset: { id: 'SUI', symbol: 'SUIUSDT', name: assets.find((a) => a.id === 'SUI').name, market: 'BINANCE', assetType: 'crypto' },
+  side: 'buy', triggerCondition: 'at_or_below', triggerPrice: '0.81234567', executionType: 'limit', limitPrice: '0.80123456',
+  quantity: null, amount: '1234567.12345678', currencyCode: 'USD', status: state === 'filled' || state === 'order_pending' ? 'ordered' : state, state,
+  trigger: state === 'watching' ? null : { triggeredAt: new Date().toISOString(), snapshotId: 's', evidence: null },
+  order: state === 'filled' || state === 'order_pending' ? { orderId: 'cond-order-' + id, orderType: 'limit', status: state === 'filled' ? 'executed' : 'submitted',
+    quantity: '1540000.00000000', executedQuantity: null, limitPrice: '0.80123456', executedPrice: state === 'filled' ? '0.80000000' : null, grossAmount: null,
+    feeAmount: null, netAmount: null, reservedAmount: '1235801.23', cancelReason: null, submittedAt: new Date().toISOString(),
+    executedAt: state === 'filled' ? new Date().toISOString() : null, canceledAt: null } : null,
+  attemptCount: 1, lastAttemptAt: null, failureCode: state === 'failed' ? 'INSUFFICIENT_AVAILABLE_BALANCE' : null,
+  terminalReason: state === 'failed' ? 'execution_failed' : state === 'canceled' ? 'user_canceled' : null,
+  createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(), ...extra,
+});
 const account = {
   id: 'account-fixture',
   mode: 'general',
@@ -70,6 +93,11 @@ export const navigation = {
   setParams: (params) => state.setParams(params),
 };
 export const useRootNavigation = () => navigation;
+// Quest provider / root ref imports; inert in the isolated trading fixture.
+export const createNavigationContainerRef = () => ({ isReady: () => false, navigate() {}, reset() {}, dispatch() {},
+  getCurrentRoute: () => undefined, getRootState: () => undefined, addListener: () => () => {} });
+export const StackActions = { push: (...payload) => ({ type: 'PUSH', payload }), pop: (count) => ({ type: 'POP', payload: { count } }),
+  popToTop: () => ({ type: 'POP_TO_TOP' }), replace: (...payload) => ({ type: 'REPLACE', payload }) };
 export const useIsFocused = () => true;
 export const useHeaderHeight = () => 0;
 export const useAssetTicker = () => ({
@@ -119,6 +147,19 @@ export const apiClient = {
       if(protection==='loading') return new Promise(()=>{});
       const id=path.split('/')[2], data=conditionalFixture(id,{enabled:!!protection,active:protection==='active',holding:protection==='holding',mode:state.mode,domain:'spot'});
       return {data:{success:true,data}};
+    }
+    if (path.endsWith('/conditional-buy-orders')) {
+      const id = path.split('/')[2];
+      const rows = options.params?.history === 'true' && params.get('conditionalRows') === '1'
+        ? ['watching', 'triggered', 'order_pending', 'filled', 'failed', 'canceled'].map((s) => conditionalRow('cb-' + s, s)) : [];
+      return response({ tradingAccountId: id, capabilities: { enabled: conditionalEnabled, canCreate: conditionalEnabled, canCancel: true,
+        canUseLimit: conditionalEnabled && params.get('conditionalLimit') !== 'off', markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+        conditionalOrders: rows, pagination: { limit: 30, offset: 0, total: rows.length, returned: rows.length, nextOffset: null } });
+    }
+    if (path.endsWith('/order-capabilities')) {
+      const id = path.split('/')[2];
+      return response({ tradingAccountId: id, limitOrder: { enabled: true, autoExecutionEnabled: false },
+        limitOnClose: { enabled: locEnabled, markets: ['KRX'], sides: ['buy'], attachedProtection: false } });
     }
     state.reads.push(path);
     const u = new URL(path, 'http://fixture'),
@@ -227,7 +268,12 @@ export const apiClient = {
   },
   async post(path, body) {
     state.requests.push({ path, body });
+    if (path.endsWith('/conditional-buy-orders'))
+      return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: { ...conditionalRow('cb-new', 'watching'), ...body,
+        assetId: body.assetId, limitPrice: body.limitPrice ?? null, quantity: body.quantity ?? null, amount: body.amount ?? null } });
     const asset = assets.find((a) => a.id === body.assetId);
+    const loc = body.limitOnClose ? { market: 'KRX', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T00:00:00.000Z',
+      sessionCloseAt: '2026-10-13T06:30:00.000Z', evidenceDeadlineAt: '2026-10-13T09:30:00.000Z', executionPricePolicy: 'final_regular_session_close' } : null;
     if (path.endsWith('/quote'))
       return response({
         state: 'available',
@@ -246,14 +292,16 @@ export const apiClient = {
         feeAmount: '.001',
         netAmount: '.999',
         reservedQuantity: body.quantity,
+        ...(loc ? { limitOnClose: loc } : {}),
       });
     return response({
       order: {
         ...body,
         orderId: 'fixture-order',
         asset,
-        currencyCode: 'USD',
+        currencyCode: asset.settlementCurrency ?? 'USD',
         status: body.orderType === 'limit' ? 'submitted' : 'executed',
+        ...(loc ? { limitOnClose: { ...loc, status: 'pending', decisionReason: null, decidedAt: null, closePrice: null } } : {}),
       },
       execution: {
         state: body.orderType === 'limit' ? 'submitted' : 'executed',

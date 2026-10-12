@@ -118,6 +118,12 @@ async function run() {
     console.log('INITIAL_BROWSER_READY');
     const geometry = async () =>
       JSON.parse(await page.locator('#geometry').textContent());
+    // Nothing is preselected: every form picks 주문방식 through its sheet.
+    const pick = async (method) => {
+      await id('order-type-select').click();
+      await id('order-method-' + method).click();
+      await page.waitForFunction(() => !document.querySelector('[data-testid="order-method-sheet"]'));
+    };
     const controls = [
       'order-type-select',
       'order-ratio-25',
@@ -168,6 +174,7 @@ async function run() {
             'screen=order&asset=' + encodeURIComponent(asset) + '&fontScale=' + fontScale,
           );
           await id('order-type-select').waitFor();
+          await pick('market');
           assert.match(
             await page.locator('body').innerText(),
             /전일대비 \+1.01%/,
@@ -203,7 +210,7 @@ async function run() {
           }
           const filter = await id('holdings-filter-all').boundingBox();
           assert.ok(filter.width < width / 2, 'compact filter');
-          await id('order-type-select').click(); await id('order-type-toggle-limit').click();
+          await pick('limit');
           await id('order-ratio-25').click();
           assert.match(
             await page.locator('body').innerText(),
@@ -212,9 +219,10 @@ async function run() {
           await id('order-limit-price-input').fill('100');
           await id('order-ratio-25').click();
           assert.ok(Number(await id('order-quantity-input').inputValue()) > 0);
-          await id('order-type-select').click(); await id('order-type-toggle-market').click();
+          await pick('market');
           assert.equal(await id('order-limit-price-input').count(), 0);
           await id('asset-detail-sell-button').click();
+          await pick('market');
           assert.equal(await id('order-quote-submit').count(), 0);
           assert.equal(await id('order-execute-submit').innerText(), '매도');
           await id('order-ratio-100').click();
@@ -248,6 +256,7 @@ async function run() {
         await open('screen=order&asset=BNB&fontScale=' + fontScale);
         await id('inline-order-panel').waitFor();
         await id('asset-detail-sell-button').click();
+        await pick('market');
         const column = await id('asset-order-column').boundingBox();
         const boxes = await Promise.all(
           [25, 50, 75, 100].map((p) => id('order-ratio-' + p).boundingBox()),
@@ -322,13 +331,13 @@ async function run() {
     for (const asset of ['BTC', 'BNB', 'PEPE', 'SUI', '币安人生'])
       for (const side of ['buy', 'sell'])
         for (const type of ['market', 'limit']) {
+          // A new sell limit is not offered any more.
+          if (side === 'sell' && type === 'limit') continue;
           await open('screen=order&asset=' + encodeURIComponent(asset));
           await id('inline-order-panel').waitFor();
           if (side === 'sell') await id('asset-detail-sell-button').click();
-          if (type === 'limit') {
-            await id('order-type-select').click(); await id('order-type-toggle-limit').click();
-            await id('order-limit-price-input').fill('100');
-          }
+          await pick(type);
+          if (type === 'limit') await id('order-limit-price-input').fill('100');
           await id('order-quantity-input').fill('1');
           await id('order-execute-submit').click();
           await page.waitForFunction(

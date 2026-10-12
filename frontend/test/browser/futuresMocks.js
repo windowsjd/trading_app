@@ -4,6 +4,11 @@ const params = new URLSearchParams(location.search);
 export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED' };
 export const useIsFocused = () => true;
 export const useHeaderHeight = () => 64;
+// Quest provider / root ref imports; inert in the isolated futures fixture.
+export const createNavigationContainerRef = () => ({ isReady: () => false, navigate() {}, reset() {}, dispatch() {},
+  getCurrentRoute: () => undefined, getRootState: () => undefined, addListener: () => () => {} });
+export const StackActions = { push: (...payload) => ({ type: 'PUSH', payload }), pop: (count) => ({ type: 'POP', payload: { count } }),
+  popToTop: () => ({ type: 'POP_TO_TOP' }), replace: (...payload) => ({ type: 'REPLACE', payload }) };
 export const useTradingAccount = () => ({ accounts, selectedAccountId: state.accountId, isLoading: false });
 export const apiClient = {
   async get(path) {

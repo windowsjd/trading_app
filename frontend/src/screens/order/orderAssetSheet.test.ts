@@ -83,10 +83,11 @@ describe('order screen asset sheet', () => {
     assert.ok(h.keyboardDismissals >= 1);
     await h.update();
     assert.equal(h.routeAccountId, 'general');
-    assert.equal(h.node(qty).props.value, '');
+    // The new asset's order starts with no method and no draft.
+    assert.equal(h.freshForm(), true);
     assert.equal(h.node(TEST_IDS.assetDetail.sellButton).props.accessibilityState.selected, true);
     assert.equal(h.node(submit).props.label, '매도');
-    assert.equal(h.orderType(), '시장가');
+    await h.selectOrderType('market');
     await h.input(qty, '0.5');
     await h.press(submit); await h.flush();
     assert.match(h.requests[0].url, /\/trading-accounts\/general\//);
@@ -104,6 +105,7 @@ describe('order screen asset sheet', () => {
     await h.press('asset-change-pair'); await h.flush();
     await h.press(row('btc'));
     await h.update();
+    await h.selectOrderType('market');
     await h.input(qty, '1');
     await h.press(submit); await h.flush();
     assert.equal(h.success().visible, true);
@@ -122,7 +124,7 @@ describe('order screen asset sheet', () => {
     await h.update();
     await act(async () => h.quoteGate.resolve()); await h.flush();
     assert.equal(h.requests.length, 1, 'the old quote never reaches create');
-    assert.equal(h.node(qty).props.value, '');
+    assert.equal(h.freshForm(), true);
     assert.equal(h.success().visible, false);
   });
 
@@ -153,6 +155,7 @@ describe('order screen asset sheet', () => {
   it('slides up and back down, and Reduced Motion opens and closes without motion', async (t) => {
     const h = inlineTradingHarness();
     await h.mount(); t.after(h.close);
+    h.animations.length = 0; // the 주문방식 pick after mount is not this sheet
     await h.press('asset-change-pair');
     assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.duration]), [[1, 280]]);
     await h.press('order-asset-sheet-close');

@@ -22,6 +22,7 @@ for (const mode of ['light', 'dark'] as const) {
       '../../theme/useReducedMotion': { useReducedMotion: () => false },
       './navigationRef': { rootNavigationRef: {} },
       '../../components/states/ScreenErrorBoundary': { default: 'ScreenErrorBoundary', __esModule: true },
+      '../../features/order/OrderFillNotifier': { default: 'OrderFillNotifier', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
       '../../screens/history/TradeHistoryScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
@@ -40,6 +41,9 @@ for (const mode of ['light', 'dark'] as const) {
     for (const name of ['TradeHistory', 'SeasonJoin']) {
       assert.equal(screens.find((s: any) => s.props.name === name).props.options.animation, 'simple_push');
     }
+    // The fill banner sits beside the root stack, inside navigation, so it
+    // overlays every tab and pushed screen and can open TradeHistory.
+    assert.equal(elements(tree, 'OrderFillNotifier').length, 1);
     const chart = screens.find((s: any) => s.props.name === 'AssetChart');
     assert.equal(chart.props.options.presentation, 'fullScreenModal');
     assert.equal(chart.props.options.animation, 'fade');

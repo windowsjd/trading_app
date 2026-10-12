@@ -14,6 +14,15 @@ import Home from '../../src/screens/home/HomeScreen';
 import Settings from '../../src/screens/my/SettingsScreen';
 import Futures from '../../src/screens/futures/FuturesScreen';
 import { state, navigation } from './tradingMocks';
+import { ScreenSheetHost } from '../../src/components/common/ScreenSheetHost';
+import OrderFillBanner from '../../src/features/order/OrderFillBanner';
+// `?fillBanner=1` overlays one real-fill banner (layout/visual checks only).
+const fillBanner = new URLSearchParams(location.search).get('fillBanner') === '1' ? {
+  id: 'account-fixture:fixture-order', accountId: 'account-fixture', orderId: 'fixture-order',
+  title: new URLSearchParams(location.search).get('longName') === '1'
+    ? '아주 긴 이름을 가진 국내 상장 주식회사 우선주 Example Holdings LOC 매수 체결 완료' : '삼성전자 매수 체결 완료',
+  detail: '일반모드 · 조건주문 · 체결 수량 1,234,567.123456', overflow: 2,
+} : null;
 const client = new QueryClient({
   defaultOptions: {
     queries: { retry: false, staleTime: 60000 },
@@ -79,16 +88,23 @@ function App() {
       <AppearanceProvider>
         <PreferenceProbe />
         <SafeAreaProvider
+          // `?viewport=1`: a device-sized root, so screens scroll inside and
+          // bottom sheets anchor to the visible bottom edge.
+          style={new URLSearchParams(location.search).get('viewport') === '1' ? { height: '100vh', overflow: 'hidden' } : undefined}
           initialMetrics={{
             frame: { x: 0, y: 0, width: 390, height: 800 },
             insets: { top: 0, bottom: 0, left: 0, right: 0 },
           }}
         >
-          <Component
-            key={state.assetId + ':' + screen}
-            route={{ params: { assetId: state.assetId, accountId: state.accountId, instrumentId: state.instrumentId, side: state.side ?? 'buy', returnToAsset: true } }}
-            navigation={navigation}
-          />
+          {/* Same sheet layer MainTabs provides to tab screens. */}
+          <ScreenSheetHost>
+            <Component
+              key={state.assetId + ':' + screen}
+              route={{ params: { assetId: state.assetId, accountId: state.accountId, instrumentId: state.instrumentId, side: state.side ?? 'buy', returnToAsset: true } }}
+              navigation={navigation}
+            />
+          </ScreenSheetHost>
+          <OrderFillBanner notice={fillBanner} onDone={() => {}} onOpenHistory={(notice) => { state.history = notice.accountId; }} />
         </SafeAreaProvider>
       </AppearanceProvider>
     </QueryClientProvider>

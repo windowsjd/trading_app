@@ -1,22 +1,40 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { View } from '../../theme/native';
 
-type SetSheet = (node: React.ReactNode) => void;
+type SetSheet = (key: number, node: React.ReactNode | null) => void;
 const SheetHostContext = createContext<SetSheet | null>(null);
+let nextPortalKey = 0;
 
 /**
  * A layer above the tab screens (their native headers and the tab bar) but
  * below the beginner quest overlay, which MainTabs renders after it. A screen
  * presents a bottom sheet here so the sheet covers the whole app area while
  * the quest spotlight can still point into it.
+ *
+ * Inactive tabs stay mounted, so several portals (Wallet's 이체, the order
+ * screen's 주문방식) can be alive at once: each owns its own keyed slot.
  */
 export function ScreenSheetHost({ children }: { children: React.ReactNode }) {
-  const [sheet, setSheet] = useState<React.ReactNode>(null);
+  const [sheets, setSheets] = useState<ReadonlyMap<number, React.ReactNode>>(() => new Map());
+  const setSheet = useCallback<SetSheet>((key, node) => setSheets((previous) => {
+    if (node === null) {
+      if (!previous.has(key)) return previous;
+      const next = new Map(previous);
+      next.delete(key);
+      return next;
+    }
+    if (previous.get(key) === node) return previous;
+    return new Map(previous).set(key, node);
+  }), []);
   return (
     <SheetHostContext.Provider value={setSheet}>
       <View style={styles.host}>
         {children}
-        {sheet ? <View pointerEvents="box-none" style={styles.layer}>{sheet}</View> : null}
+        {sheets.size ? (
+          <View pointerEvents="box-none" style={styles.layer}>
+            {[...sheets].map(([key, node]) => <React.Fragment key={key}>{node}</React.Fragment>)}
+          </View>
+        ) : null}
       </View>
     </SheetHostContext.Provider>
   );
@@ -25,15 +43,16 @@ export function ScreenSheetHost({ children }: { children: React.ReactNode }) {
 /**
  * Renders its children in the nearest host (or in place without one). The
  * children keep their state across the owner's re-renders; they must not rely
- * on screen-only context such as the header height. The host has one slot
- * (today only Wallet's 이체 sheet): a second portal would need keyed slots.
+ * on screen-only context such as the header height.
  */
 export function SheetPortal({ children }: { children: React.ReactNode }) {
   const setSheet = useContext(SheetHostContext);
+  const key = useRef(0);
+  if (!key.current) key.current = ++nextPortalKey;
   useEffect(() => {
-    setSheet?.(children);
+    setSheet?.(key.current, children);
   });
-  useEffect(() => () => setSheet?.(null), [setSheet]);
+  useEffect(() => () => setSheet?.(key.current, null), [setSheet]);
   return setSheet ? null : <>{children}</>;
 }
 

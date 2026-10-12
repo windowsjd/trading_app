@@ -18,6 +18,7 @@ import SplashScreen from '../../screens/auth/SplashScreen';
 import ModeSelectionScreen from '../../screens/entry/ModeSelectionScreen';
 import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
 import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
+import OrderFillNotifier from '../../features/order/OrderFillNotifier';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -69,6 +70,9 @@ export default function RootNavigator() {
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} layout={pushedRootLayout} options={stackTransition(reducedMotion, Platform.OS)} />
         <Stack.Screen name="AssetChart" component={AssetChartScreen} options={chartTransition(reducedMotion, Platform.OS)} />
       </Stack.Navigator>
+      {/* Real-fill banner over every tab and pushed screen; it watches the
+          signed-in user's accounts only and draws nothing otherwise. */}
+      <OrderFillNotifier />
     </NavigationContainer>
   );
 }

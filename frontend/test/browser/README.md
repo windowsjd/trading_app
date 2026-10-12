@@ -431,3 +431,18 @@ late quest response after switching accounts, guide round trips, three-mode
 selection, explicit creation, hidden disabled entry and delayed portfolio/
 holdings responses during account switching. All external HTTP is blocked.
 These RN Web checks do not replace Android/iOS device acceptance.
+
+Order methods (order UI 2nd phase) use `orderMethodBrowser.cjs` on the trading
+fixture with `?viewport=1` (a device-sized root, so bottom sheets anchor to the
+visible edge) inside the same `ScreenSheetHost` layer MainTabs provides. It
+checks 72 screens: 320/360px × Light/Dark × font scales 1/2 × the unselected
+주문방식 field, crypto/KRX BUY and KRX SELL sheets (every row reachable inside
+the sheet), Conditional BUY entry and registration, KRX LOC entry, the account's
+conditional list (`conditionalRows=1`) and the real-fill banner
+(`fillBanner=1`). Fixture switches: `conditional=enabled`, `loc=enabled`,
+`conditionalLimit=off`, `krx=1`, `longName=1`. Text cut by its box or a
+clipping ancestor and sideways page scroll fail the run; the order-book ladder
+is excluded because its quantity column already overflows at 320px / 2x at
+HEAD. `BEGINNER_CHROMIUM` selects Chromium, `ORDER_METHOD_BROWSER_OUTPUT` the
+screenshots/report.json (default `/tmp/trading-order-method-browser`),
+`ORDER_METHOD_QUICK=1` two combinations only.

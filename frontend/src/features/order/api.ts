@@ -40,7 +40,41 @@ export type OrderQuoteRequestDto = OrderInputDto & {
   orderType?: OrderTypeDto;
   /** Required when orderType='limit'; forbidden for market. */
   limitPrice?: MoneyString;
+  /**
+   * KRX Limit-on-Close BUY: an ordinary limit order bound to one regular
+   * session's final close. Sent only when true, so every other request stays
+   * byte-identical; never a separate orderType.
+   */
+  limitOnClose?: true;
 };
+
+/** Quote-time preview of the session a LOC order would bind to. */
+export interface LimitOnCloseQuoteDto {
+  market: string;
+  sessionDate: string;
+  sessionOpenAt: IsoDateTimeString;
+  sessionCloseAt: IsoDateTimeString;
+  evidenceDeadlineAt: IsoDateTimeString;
+  executionPricePolicy: 'final_regular_session_close' | (string & {});
+}
+
+export type LimitOnCloseStatus =
+  | 'pending'
+  | 'filled'
+  | 'unfilled'
+  | 'expired'
+  | 'canceled'
+  | (string & {});
+
+/** Server-owned LOC state on an order (create, list and detail; not cancel). */
+export interface LimitOnCloseOrderDto extends LimitOnCloseQuoteDto {
+  status: LimitOnCloseStatus;
+  decisionReason: string | null;
+  decidedAt: IsoDateTimeString | null;
+  closePrice: MoneyString | null;
+  lastCheckCode?: string | null;
+  lastCheckedAt?: IsoDateTimeString | null;
+}
 
 export interface OrderQuoteAssetDto {
   id: string;
@@ -110,6 +144,8 @@ export interface OrderQuoteDto {
   estimatedReservedAfter?: MoneyString;
   estimatedAvailableAfter?: MoneyString;
   executionPolicy?: LimitOrderExecutionPolicyDto;
+  /** Present only on a LOC quote. */
+  limitOnClose?: LimitOnCloseQuoteDto;
 }
 
 export type CreateOrderRequestDto = OrderQuoteRequestDto & {
@@ -163,6 +199,8 @@ export interface CreatedOrderDto {
   cancelReason?: string | null;
   submittedAt?: IsoDateTimeString;
   createdAt?: IsoDateTimeString;
+  /** Present only on LOC orders. */
+  limitOnClose?: LimitOnCloseOrderDto | null;
 }
 
 export type OrderExecutionState =

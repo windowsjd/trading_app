@@ -93,6 +93,7 @@ export default function AccountHoldings({
       ) : filter === 'pending' ? (
         <PendingOrders
           accountId={accountId}
+          conditional
           isFocused={isFocused}
           seasonUi={account?.id === accountId && account.mode === 'season'}
         />

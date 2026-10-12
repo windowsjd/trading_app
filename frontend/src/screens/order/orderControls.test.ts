@@ -84,64 +84,151 @@ describe('buy/sell segmented control', () => {
 describe('order panel side change', () => {
   it('remounts a clean form for the new side behind a short fade, without motion under Reduced Motion', async (t) => {
     const h = inlineTradingHarness();
+    h.method = null;
     await h.mount(); t.after(h.close);
+    await h.selectOrderType('market');
     await h.input(TEST_IDS.order.quantityInput, '1');
-    assert.equal(h.animations.length, 0);
+    h.animations.length = 0;
     await h.press(sell);
     // The form fade starts in the press handler; the thumb follows the committed side.
     assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.duration]), [[1, 180], [1, 140]]);
-    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
+    // The new side starts with no method and no draft.
+    assert.equal(h.freshForm(), true);
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.label, '매도');
     h.reduced = true;
     await h.update();
     await h.press(buy);
     assert.equal(h.animations.length, 2);
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.label, '매수');
+    assert.equal(h.freshForm(), true);
   });
 });
 
-describe('market/limit segmented selector', () => {
-  it('is one track of two tab segments keeping a 44dp target', async (t) => {
-    const h = inlineTradingHarness();
-    await h.mount(); t.after(h.close);
-    assert.equal(h.orderType(), '시장가');
-    assert.equal(h.node(TEST_IDS.order.typeSelect).props.accessibilityRole, 'tablist');
-    const market = h.node(TEST_IDS.order.typeToggleMarket);
-    const limit = h.node(TEST_IDS.order.typeToggleLimit);
-    for (const segment of [market, limit]) {
-      assert.equal(segment.props.accessibilityRole, 'tab');
-      const style = flatten(segment.props.style);
-      assert.ok(style.minHeight + segment.props.hitSlop.top + segment.props.hitSlop.bottom >= 44);
-    }
-    assert.deepEqual([market.props.accessibilityState.selected, limit.props.accessibilityState.selected], [true, false]);
-    assert.equal(h.node('order-type-menu') === undefined, true, 'no dropdown menu remains');
-  });
+const methods = (h: any) => ['market', 'limit', 'conditional', 'loc', 'protection']
+  .filter((method) => h.node(`order-method-${method}`) !== undefined);
 
-  it('switches the form on press and clears the limit price when leaving 지정가', async (t) => {
+describe('주문방식 field and sheet', () => {
+  it('starts unselected: one full-width field, no inputs and no submit until a method is chosen', async (t) => {
     const h = inlineTradingHarness();
+    h.method = null;
     await h.mount(); t.after(h.close);
-    await h.selectOrderType('limit');
-    assert.equal(h.orderType(), '지정가');
-    assert.equal(h.node(TEST_IDS.order.limitPriceInput) !== undefined, true);
-    await h.input(TEST_IDS.order.limitPriceInput, '700');
-    await h.selectOrderType('market');
+    const field = h.node(TEST_IDS.order.typeSelect);
+    assert.equal(field.props.accessibilityRole, 'button');
+    assert.ok(flatten(field.props.style).minHeight >= 44);
+    assert.equal(h.orderType(), '주문방식 선택하기');
+    assert.equal(h.node(TEST_IDS.order.quantityInput) === undefined, true);
     assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
-    await h.selectOrderType('limit');
-    assert.equal(h.node(TEST_IDS.order.limitPriceInput).props.value, '', 'market cleared the limit price');
+    assert.equal(h.node('order-ratio-50') === undefined, true);
+    assert.equal(h.node('order-method-required') !== undefined, true);
+    assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled');
+    await h.press(TEST_IDS.order.executeSubmit);
+    assert.equal(h.requests.length, 0);
+    // The old segmented 시장가/지정가 pair is gone.
+    assert.equal(h.node(TEST_IDS.order.typeToggleMarket) === undefined, true);
+    assert.equal(h.node(TEST_IDS.order.typeToggleLimit) === undefined, true);
   });
 
-  it('re-selecting the current type keeps inputs; Reduced Motion moves without animation', async (t) => {
+  it('crypto BUY lists 시장가, 지정가 and a server-gated 조건주문; never LOC', async (t) => {
+    const h = inlineTradingHarness();
+    h.method = null;
+    await h.mount(); t.after(h.close);
+    await h.press(TEST_IDS.order.typeSelect);
+    assert.equal(h.node(TEST_IDS.order.typeSelect).props.accessibilityState.expanded, true);
+    assert.deepEqual(methods(h), ['market', 'limit', 'conditional']);
+    // The server reports new Conditional BUY off: listed, not selectable.
+    assert.equal(h.node('order-method-conditional').props.disabled, true);
+    assert.equal(h.node('order-method-conditional-badge').props.children, '이용 불가');
+    await h.press('order-method-conditional');
+    assert.equal(h.orderType(), '주문방식 선택하기');
+    await h.press('order-method-market');
+    assert.equal(h.node('order-method-market') === undefined, true, 'a choice closes the sheet');
+    assert.equal(h.orderType(), '시장가');
+    await h.press(TEST_IDS.order.typeSelect);
+    assert.equal(h.node('order-method-market').props.accessibilityState.selected, true);
+    assert.equal(h.node('order-method-limit').props.accessibilityState.selected, false);
+  });
+
+  for (const [assetType, expected, ready] of [
+    ['domestic_stock', ['market', 'limit', 'conditional', 'loc'], { conditional: '이용 불가', loc: '이용 불가' }],
+    ['us_stock', ['market', 'limit', 'conditional', 'loc'], { conditional: '준비 중', loc: '준비 중' }],
+  ] as const) {
+    it(`${assetType} BUY lists four methods; new conditional/LOC follow the server or stay 준비 중`, async (t) => {
+      const h = inlineTradingHarness();
+      h.method = null;
+      h.assetId = 'samsung';
+      h.assets.samsung.assetType = assetType;
+      await h.mount(); t.after(h.close);
+      await h.press(TEST_IDS.order.typeSelect);
+      assert.deepEqual(methods(h), expected);
+      for (const [method, badge] of Object.entries(ready)) {
+        assert.equal(h.node(`order-method-${method}`).props.disabled, true, method);
+        assert.equal(h.node(`order-method-${method}-badge`).props.children, badge);
+      }
+    });
+    it(`${assetType} SELL lists 시장가 and three 준비 중 methods, never a new 지정가`, async (t) => {
+      const h = inlineTradingHarness();
+      h.method = null;
+      h.assetId = 'samsung';
+      h.assets.samsung.assetType = assetType;
+      await h.mount(); t.after(h.close);
+      await h.press(sell);
+      await h.press(TEST_IDS.order.typeSelect);
+      assert.deepEqual(methods(h), ['market', 'conditional', 'loc', 'protection']);
+      for (const method of ['conditional', 'loc', 'protection'])
+        assert.equal(h.node(`order-method-${method}-badge`).props.children, '준비 중');
+    });
+  }
+
+  it('the backdrop, the close button and Android back close the sheet without choosing', async (t) => {
+    const h = inlineTradingHarness();
+    h.method = null;
+    await h.mount(); t.after(h.close);
+    for (const close of ['order-method-sheet-backdrop', 'order-method-sheet-close', 'back']) {
+      await h.press(TEST_IDS.order.typeSelect);
+      assert.equal(h.node('order-method-sheet') !== undefined, true);
+      if (close === 'back') {
+        let handled = false;
+        await act(async () => { handled = h.backHandler(); });
+        assert.equal(handled, true);
+      } else await h.press(close);
+      assert.equal(h.node('order-method-sheet') === undefined, true, close);
+      assert.equal(h.orderType(), '주문방식 선택하기');
+    }
+  });
+
+  it('a method change clears the draft and quote; re-choosing the same method keeps them', async (t) => {
     const h = inlineTradingHarness();
     await h.mount(); t.after(h.close);
     await h.input(TEST_IDS.order.quantityInput, '3');
     await h.selectOrderType('market');
-    assert.equal(h.orderType(), '시장가');
-    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '3', 're-selecting the current type keeps inputs');
-    h.reduced = true;
-    await h.update();
-    const before = h.animations.length;
+    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '3', 're-choosing the same method keeps inputs');
     await h.selectOrderType('limit');
     assert.equal(h.orderType(), '지정가');
-    assert.equal(h.animations.filter((a: any) => a.duration === 140).length, h.animations.slice(0, before).filter((a: any) => a.duration === 140).length);
+    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
+    await h.input(TEST_IDS.order.limitPriceInput, '700');
+    await h.input(TEST_IDS.order.quantityInput, '2');
+    await h.selectOrderType('market');
+    assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
+    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
+    await h.selectOrderType('limit');
+    assert.equal(h.node(TEST_IDS.order.limitPriceInput).props.value, '', 'market cleared the limit price');
+  });
+
+  it('the sheet rises and falls with the shared sheet motion, and opens without motion under Reduced Motion', async (t) => {
+    const h = inlineTradingHarness();
+    h.method = null;
+    await h.mount(); t.after(h.close);
+    h.animations.length = 0;
+    await h.press(TEST_IDS.order.typeSelect);
+    await h.press('order-method-market');
+    assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.duration]), [[1, 280], [0, 220]]);
+    h.reduced = true;
+    await h.update();
+    h.animations.length = 0;
+    await h.press(TEST_IDS.order.typeSelect);
+    assert.equal(h.node('order-method-sheet') !== undefined, true);
+    await h.press('order-method-limit');
+    assert.equal(h.animations.length, 0);
+    assert.equal(h.orderType(), '지정가');
   });
 });

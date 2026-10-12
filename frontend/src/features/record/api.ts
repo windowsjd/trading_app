@@ -18,9 +18,12 @@ import {
   getAssetSymbolDisplay,
 } from '../../utils/format';
 import {
+  getLimitOnCloseStatusLabel,
   getOrderStatusLabel,
+  getOrderTypeLabel,
   hasNoExecutionResult,
   isOpenLimitBuyOrder,
+  type LimitOnCloseFields,
 } from './openOrder';
 
 export interface RecordSeasonListItemDto {
@@ -165,6 +168,8 @@ export interface RecordOrderItemDto {
   reservedQuantity?: QuantityString | null;
   reservationReleasedAt?: IsoDateTimeString | null;
   cancelReason?: string | null;
+  /** Present only on KRX Limit-on-Close orders (account-scoped reads). */
+  limitOnClose?: LimitOnCloseFields | null;
 }
 
 export interface RecordExchangeItemDto {
@@ -244,6 +249,7 @@ export {
 } from './openOrder';
 
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
+  const limitOnClose = item.limitOnClose ?? null;
   const currencyCode = item.currencyCode ?? item.fillCurrency ?? '';
   const nameDisplay = getAssetNameDisplay({
     name: item.name,
@@ -270,8 +276,12 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
     side: item.side,
     // Side-aware limit badge input; market rows keep their historical look.
     isLimitOrder: item.orderType === 'limit',
+    isLimitOnClose: !!limitOnClose,
+    orderTypeLabel: getOrderTypeLabel(item),
     ...getMarketExecutionDisplay(item.marketExecution, currencyCode),
-    statusLabel: getOrderStatusLabel(item.status, item.marketExecution),
+    statusLabel: limitOnClose
+      ? getLimitOnCloseStatusLabel(limitOnClose, item.status)
+      : getOrderStatusLabel(item.status, item.marketExecution),
     isOpenLimitBuy: isOpenLimitBuyOrder(item),
     limitPrice: item.limitPrice
       ? formatCurrency(item.limitPrice, currencyCode)

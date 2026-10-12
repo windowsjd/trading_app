@@ -16,6 +16,7 @@ import { LimitOrderCandleEvidenceService } from './limit-order-candle-evidence.s
 import { LimitOrderExecutionService } from './limit-order-execution.service';
 import { LimitOrderMatchingService } from './limit-order-matching.service';
 import { TradingAccountOrdersController } from './trading-account-orders.controller';
+import { TradingAccountOrderCapabilitiesController } from './trading-account-order-capabilities.controller';
 import { OpsJobLockService } from '../ops/ops-job-lock.service';
 import { OpsJobRunService } from '../ops/ops-job-run.service';
 import {
@@ -35,7 +36,11 @@ import { LimitOnCloseWorker } from './limit-on-close-worker.service';
     RedisModule,
     TradingAccountsModule,
   ],
-  controllers: [OrdersController, TradingAccountOrdersController],
+  controllers: [
+    OrdersController,
+    TradingAccountOrdersController,
+    TradingAccountOrderCapabilitiesController,
+  ],
   providers: [
     OrdersService,
     OrderReservationService,

@@ -23,6 +23,9 @@ function createTradingUiHarness(screenName) {
       freshnessAgeSeconds: 123, validUntil: new Date(Date.now() + 3600000).toISOString() },
       isLoading: false, isError: false },
     queries: [], requests: [], navigation: [], jobs: [], ticker: null, tickerStale: false,
+    // Nothing is preselected in the order form: h.render picks this method
+    // through the real 주문방식 field and sheet; null keeps it unselected.
+    method: 'market',
   };
   const slots = [];
   let index = 0;
@@ -45,6 +48,7 @@ function createTradingUiHarness(screenName) {
     Platform: { OS: 'web' },
     useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
     Keyboard: { addListener: () => ({ remove() {} }), dismiss: () => {} },
+    BackHandler: { addEventListener: () => ({ remove() {} }) },
     Modal: 'Modal',
     Easing: { out: fn => fn, in: fn => fn, quad: n => n * n, cubic: n => n * n * n },
     // Side/order-type motion is visual; runs land on their targets at once.
@@ -58,7 +62,7 @@ function createTradingUiHarness(screenName) {
   };
   const mocks = {
     './QuantityRatioSlider': load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {}),
-    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     '@react-navigation/elements': { useHeaderHeight: () => 0 },
     'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
     '../../features/asset/AssetOrderLadder': { default: props => React.createElement('AssetOrderLadder', props, props.currentPrice), __esModule: true },
@@ -71,6 +75,8 @@ function createTradingUiHarness(screenName) {
         return slots[slot].fn;
       },
       useMemo: fn => fn(),
+      // No provider is rendered here: every context reads its default.
+      useContext: context => context._currentValue,
       useState: initial => {
         const slot = index++;
         if (!(slot in slots)) slots[slot] = typeof initial === 'function' ? initial() : initial;
@@ -97,6 +103,12 @@ function createTradingUiHarness(screenName) {
         const [scope, resource] = options.queryKey;
         const base = { refetch: () => {}, isLoading: false, isError: false };
         if (scope === 'asset') return { ...base, data: resource === 'detail' ? { asset: h.asset } : { candles: h.candles ?? [] } };
+        // Server gates for new conditional / LOC orders (closed unless a test opens them).
+        if (resource === 'conditionalBuyOrders') return { ...base, ...h.conditionalQuery, data: h.conditionalQuery?.data ?? { tradingAccountId: h.account.id,
+          capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+          conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
+        if (resource === 'orderCapabilities') return { ...base, ...h.capabilityQuery, data: h.capabilityQuery?.data ?? { tradingAccountId: h.account.id,
+          limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: { tradingAccountId: 'account-1', capabilities: { enabled: false, canCreateSpot: false, canUseSpotLimit: false, canCancel: true }, groups: [] } };
         if (resource === 'positions' || resource === 'holdings') return { ...base, ...h.positionQuery,
           data: h.positionQuery.data ? { tradingAccountId: h.account.id, ...h.positionQuery.data } : undefined };
@@ -144,6 +156,17 @@ function createTradingUiHarness(screenName) {
     ...Object.fromEntries(['AccountSwitcher', 'PreviewAmounts'].map(name => ['../../components/tradingAccount/' + name, { default: name, __esModule: true }])),
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     './OrderSuccessBottomSheet': { default: 'OrderSuccessBottomSheet', __esModule: true },
+    // The real field + sheet (motion, insets, back handling) is covered by the
+    // react-test-renderer harness; positional hook slots here cannot follow a
+    // sheet mounting mid-tree. This stub renders the same testIDs and calls.
+    './OrderTypeSelect': { __esModule: true, default: (props) => {
+      h.methodSlotBoundary = index;
+      const labels = { market: '시장가', limit: '지정가', conditional: '조건주문', loc: 'LOC 주문', protection: '손절·익절 설정' };
+      return React.createElement('OrderTypeSelect', { testID: 'order-type-select', disabled: props.disabled, method: props.method },
+        React.createElement('Text', { testID: 'order-type-select-value' }, props.method ? labels[props.method] : '주문방식 선택하기'),
+        ...props.options.map(option => React.createElement('Pressable', { key: option.method, testID: `order-method-${option.method}`,
+          disabled: option.availability.state !== 'available', availability: option.availability.state, onPress: () => props.onSelect(option.method) })));
+    } },
     // Only OrderTradingScreen renders here; the asset sheet belongs to its route wrapper.
     './OrderAssetSheet': { default: 'OrderAssetSheet', __esModule: true },
     './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
@@ -166,10 +189,23 @@ function createTradingUiHarness(screenName) {
     if (typeof node.type === 'function') return expand(node.type(node.props));
     return React.cloneElement(node, {}, expand(node.props.children));
   }
-  h.render = (side = 'sell') => {
+  const renderOnce = (side) => {
     index = 0; effects = []; h.queries = [];
     const tree = expand(screen({ assetId: h.asset.id, accountId: h.account.id, side, onReturnToAsset: () => {}, route: { params: { assetId: h.asset.id, accountId: h.account.id, side } }, navigation }));
     effects.forEach(fn => fn());
+    return tree;
+  };
+  const find = (tree, testID) => elements(tree).find(node => node.props.testID === testID);
+  h.render = (side = 'sell') => {
+    let tree = renderOnce(side);
+    const value = find(tree, 'order-type-select-value');
+    if (h.method && value && value.props.children === '주문방식 선택하기') {
+      find(tree, `order-method-${h.method}`).props.onPress();
+      // Components after the field mount new inputs now; their slots held
+      // only first-render state, so they start again from their initial values.
+      slots.length = h.methodSlotBoundary;
+      tree = renderOnce(side);
+    }
     return tree;
   };
   h.flush = async () => { await Promise.all(h.jobs.splice(0)); };

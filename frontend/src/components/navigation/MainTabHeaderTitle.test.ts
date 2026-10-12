@@ -39,13 +39,24 @@ for (const [stack, root, label, icon] of [
     assert.equal(title.props.icon, icon);
     assert.equal(title.props.children, label);
     assert.equal(title.props.tintColor, '#f2f5f7');
+    // 종목 상세 and 주문 alone take the heavy theme font (bolder, same size).
+    const bold = stack === 'Market' ? ['AssetDetail', 'Order'] : [];
     for (const screen of screens) {
-      assert.equal(screen.props.options.header, undefined);
-      assert.equal(screen.props.options.headerLeft, undefined);
-      assert.equal(screen.props.options.headerBackVisible, undefined);
+      const resolved = typeof screen.props.options === 'function'
+        ? screen.props.options({ theme: navigationTheme.useTheme() }) : screen.props.options;
+      assert.equal(resolved.header, undefined);
+      assert.equal(resolved.headerLeft, undefined);
+      assert.equal(resolved.headerBackVisible, undefined);
       if (screen !== first) {
-        assert.equal(screen.props.options.headerTitle, undefined, screen.props.name);
-        assert.equal(screen.props.options.headerTitleStyle, undefined, screen.props.name);
+        assert.equal(resolved.headerTitle, undefined, screen.props.name);
+        assert.deepEqual(resolved.headerTitleStyle, bold.includes(screen.props.name)
+          ? { fontFamily: 'System', fontWeight: '700' } : undefined, screen.props.name);
+      }
+    }
+    if (stack === 'Market') {
+      for (const [name, title] of [['AssetDetail', '종목 상세'], ['Order', '주문']]) {
+        const screen = screens.find(item => item.props.name === name);
+        assert.equal(screen.props.options({ theme: navigationTheme.useTheme() }).title, title);
       }
     }
   });

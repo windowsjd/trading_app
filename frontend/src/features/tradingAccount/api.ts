@@ -542,6 +542,36 @@ export async function getTradingAccountOrder(
   );
 }
 
+/**
+ * Server create gates for limit and LOC orders (read-only). The client never
+ * mirrors an operations flag; quote/create still decide every order.
+ */
+export interface TradingAccountOrderCapabilitiesDto {
+  tradingAccountId: string;
+  limitOrder: { enabled: boolean; autoExecutionEnabled: boolean };
+  limitOnClose: {
+    enabled: boolean;
+    markets: string[];
+    sides: string[];
+    attachedProtection: boolean;
+  };
+}
+
+export async function getTradingAccountOrderCapabilities(
+  accountId: string,
+  signal?: AbortSignal,
+) {
+  const response = await apiClient.get<
+    ApiSuccessResponse<TradingAccountOrderCapabilitiesDto>
+  >(accountPath(accountId, '/order-capabilities'), { signal });
+
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/order-capabilities',
+    accountId,
+    response.data.data,
+  );
+}
+
 export async function getAdRewardEligibility(accountId: string) {
   const response = await apiClient.get<
     ApiSuccessResponse<AdRewardEligibilityDto>

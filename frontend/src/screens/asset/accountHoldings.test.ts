@@ -147,7 +147,8 @@ describe('holdings in Order with real React Query and order invalidation', () =>
       h.node('holdings-filter-current').props.accessibilityState.selected,
       true,
     );
-    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
+    // The new asset's form starts without a method or draft.
+    assert.equal(h.freshForm(), true);
     assert.equal(
       h.node('asset-krw-toggle').props.accessibilityState.selected,
       false,
@@ -573,6 +574,6 @@ describe('order screen holdings switch the order in place', () => {
     assert.deepEqual(h.navigation.at(-1), ['setParams', { assetId: 'btc', side: 'buy' }]);
     await h.update(); await h.flush();
     assert.equal(h.routeAccountId, h.accountId, 'the account is never changed');
-    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '', 'the previous asset input does not carry over');
+    assert.equal(h.freshForm(), true, 'the previous asset method and input do not carry over');
   });
 });

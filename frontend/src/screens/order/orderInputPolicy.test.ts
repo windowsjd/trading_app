@@ -54,7 +54,17 @@ for (const accountId of ['general', 'season']) {
         assert.notEqual(h.node(submit).props.state, 'disabled');
         assert.match(json(h), /정규장 외에는 시장가 주문을 할 수 없습니다/);
         assert.equal(h.orderType(), '시장가');
+        if (side === 'sell') {
+          // New sell limits are not offered; the closed session never switches the method.
+          await h.press(TEST_IDS.order.typeSelect);
+          assert.equal(h.node('order-method-limit') === undefined, true);
+          assert.equal(h.orderType(), '시장가');
+          return;
+        }
         await h.selectOrderType('limit');
+        // A method change starts the new method's draft empty.
+        assert.equal(h.node(input).props.value, '');
+        await h.input(input, '0.5');
         await h.input(TEST_IDS.order.limitPriceInput, '70000');
         assert.equal(h.node(submit).props.state, 'disabled');
         assert.match(json(h), /소수점 수량은 시장가만/);

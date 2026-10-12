@@ -32,11 +32,11 @@ export const TRADING_GUIDE_STEPS: Record<TradingQuestKey, TradingGuideStep[]> = 
   marketSell: [
     { screen: 'asset', target: 'asset-sell', title: '판매하기', body: '판매하기를 눌러 매도 화면으로 이동해 주세요.' },
     { ...holdings, body: '주문 화면 아래 보유종목에서 매도 가능한 수량을 확인해 주세요. 수량이 없으면 정상 시장가 매수로 다시 준비할 수 있어요. 보호 주문과 충돌하면 기존 보호를 취소한 뒤 진행해 주세요.' },
-    { ...marketType, body: '시장가를 선택해 주세요. 보유 위험을 줄이는 매도는 학습 진행도와 관계없이 사용할 수 있어요.' }, amount,
+    { ...marketType, body: '시장가로 매도해요. 보유 위험을 줄이는 매도는 학습 진행도와 관계없이 사용할 수 있어요.' }, amount,
     { ...preview, body: '미실현손익은 아직 보유한 자산의 평가 변화예요. 매도가 체결되면 실현손익이 확정돼요. 매도 수수료와 예상 수령액도 확인해 주세요.' }, submit,
   ],
   limitBuy: [market, price, buy,
-    { ...marketType, title: '지정가 주문', body: '지정가를 선택해 주세요. 원하는 가격을 지정하며 접수만으로 체결되지는 않아요.' },
+    { ...marketType, title: '지정가 주문', body: '지정가는 원하는 가격을 지정하는 주문이에요. 접수만으로 체결되지는 않아요.' },
     { ...amount, body: '원하는 지정가격과 매수 금액을 입력해 주세요. 주문에는 수수료를 포함한 예약금이 필요해요.' },
     { ...preview, body: '미체결 주문의 예약금은 다른 거래에 사용할 수 없어요. 취소하면 예약이 해제되고, 체결되면 실제 매수가 이루어져요.' }, submit,
     { screen: 'order', target: 'limit-review', title: '주문 상태와 예약금', body: '등록한 주문의 상태를 확인해 주세요. 미체결이면 주문 취소를 실습해 주세요. 이미 체결되었다면 취소할 필요 없이 결과를 확인하면 돼요.', next: true },

@@ -288,6 +288,13 @@ export const QUERY_KEYS = {
       pending: (id: string) => ['tradingAccount', 'protections', id, 'pending'] as const,
       list: (id: string, domain: 'spot' | 'futures', assetId: string, history = false) => ['tradingAccount', 'protections', id, domain, assetId, history] as const,
     },
+    conditionalBuy: {
+      all: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id] as const,
+      list: (id: string, filters: { history: boolean; limit: number; assetId?: string }) =>
+        ['tradingAccount', 'conditionalBuyOrders', id, 'list', normalizeFilterKey(filters)] as const,
+    },
+    /** Read-only server create gates (limit / LOC) for one account. */
+    orderCapabilities: (id: string) => ['tradingAccount', 'orderCapabilities', id] as const,
     futures: {
       all: (id: string) => ['tradingAccount', 'futures', id] as const,
       instruments: (id: string) => ['tradingAccount', 'futures', id, 'instruments'] as const,

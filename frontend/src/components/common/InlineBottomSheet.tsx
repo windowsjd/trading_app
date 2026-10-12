@@ -74,10 +74,12 @@ type SheetProps = {
   dismissible?: boolean;
   title?: string;
   testID?: string;
+  /** An inset card with every corner rounded, lifted off the screen edges. */
+  floating?: boolean;
   children: React.ReactNode;
 };
 
-function SheetFrame({ visible, onClose, dismissible = true, title, testID, children, progress }: SheetProps & { progress: Animated.Value }) {
+function SheetFrame({ visible, onClose, dismissible = true, title, testID, floating = false, children, progress }: SheetProps & { progress: Animated.Value }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [keyboard, setKeyboard] = useState(0);
@@ -105,13 +107,15 @@ function SheetFrame({ visible, onClose, dismissible = true, title, testID, child
       <Animated.View pointerEvents="none" style={[styles.dim, { opacity: progress }]} />
       <Pressable testID={testID ? `${testID}-backdrop` : undefined} accessible={false} importantForAccessibility="no"
         style={StyleSheet.absoluteFill} onPress={close} />
-      <Animated.View accessibilityViewIsModal style={[styles.anchor, {
-        maxHeight: height * 0.92 - keyboard,
+      <Animated.View accessibilityViewIsModal style={[styles.anchor, floating && {
+        left: FLOAT_GAP, right: FLOAT_GAP, bottom: (keyboard ? 0 : insets.bottom) + FLOAT_GAP,
+      }, {
+        maxHeight: height * 0.92 - keyboard - (floating ? insets.top + FLOAT_GAP : 0),
         marginBottom: keyboard,
         transform: [{ translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [height, 0] }) }],
       }]}>
         {/* Themed colors resolve on View, not on the Animated wrapper. */}
-        <View style={[styles.sheet, { paddingBottom: (keyboard ? 12 : Math.max(insets.bottom, 12)) + 8 }]}>
+        <View style={[styles.sheet, floating ? styles.floatingSheet : { paddingBottom: (keyboard ? 12 : Math.max(insets.bottom, 12)) + 8 }]}>
         <View style={styles.grabber} accessible={false} />
         {title ? (
           <View style={styles.header}>
@@ -129,6 +133,8 @@ function SheetFrame({ visible, onClose, dismissible = true, title, testID, child
   );
 }
 
+const FLOAT_GAP = 10;
+
 const styles = StyleSheet.create({
   dim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.32)' },
   anchor: { position: 'absolute', left: 0, right: 0, bottom: 0 },
@@ -141,6 +147,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 8,
   },
+  floatingSheet: { borderRadius: 24, paddingBottom: 12 },
   grabber: { alignSelf: 'center', width: 36, height: 4, borderRadius: 2, backgroundColor: semantic.border, marginBottom: 4 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 44, paddingHorizontal: 4 },
   title: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },

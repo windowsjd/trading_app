@@ -25,7 +25,7 @@ export type QuestGuideTargetId =
   | 'market-viewport' | 'market-tabs' | 'market-assets' | 'market-list-header'
   | 'asset-viewport' | 'asset-price' | 'asset-buy' | 'asset-sell' | 'asset-holdings' | 'asset-protection'
   | 'protection-editor' | 'protection-submit' | 'limit-review'
-  | 'order-viewport' | 'order-type' | 'order-input' | 'order-preview' | 'order-submit'
+  | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-input' | 'order-preview' | 'order-submit'
   | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
   | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
   | 'wallet-viewport'
@@ -98,7 +98,7 @@ export type TransferGuideFacts = {
 
 export type TradeGuideFacts = { [S in TradeGuideScreen]: {
   screen: S; accountId: string; assetId?: string; assetType?: string;
-  side?: string; orderType?: string; amountValid?: boolean; canExecute?: boolean;
+  side?: string; orderType?: string; methodSheetOpen?: boolean; amountValid?: boolean; canExecute?: boolean;
   pending?: boolean; blocked?: boolean; holdingsVisible?: boolean;
   protectionEditing?: boolean; tpSlReady?: boolean; orderResolved?: boolean;
   direction?: string; leverage?: number; marginMode?: string; positionId?: string;
@@ -212,6 +212,8 @@ export function getQuestGuideTarget(id: QuestGuideTargetId): QuestGuideMeasurabl
 }
 
 export function revealQuestGuideTarget(screen: QuestGuideScreen, id: QuestGuideTargetId) {
+  // Rows of the 주문방식 sheet float above the screen; scrolling it moves nothing they need.
+  if (id === 'order-method-market' || id === 'order-method-limit') return;
   const node = getQuestGuideTarget(id);
   const reveal = reveals.get(screen);
   if (node && reveal) reveal(node);

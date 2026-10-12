@@ -43,6 +43,15 @@ function load(file, mocks) {
     if (name.endsWith('/conditional/api') || (file.includes('/features/conditional/') && name === './api')) {
       return mocks['../../features/conditional/api'] ?? { getProtections: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) };
     }
+    // Conditional BUY transport: screens that exercise it pass their own mock.
+    if (name.endsWith('/conditional/conditionalBuyApi') || (file.includes('/features/conditional/') && name === './conditionalBuyApi')) {
+      return mocks['../../features/conditional/conditionalBuyApi'] ?? {
+        getConditionalBuyOrders: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 }, conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }),
+        getConditionalBuyOrder: async () => { throw new Error('conditional detail not mocked'); },
+        createConditionalBuyOrder: async () => { throw new Error('conditional create not mocked'); },
+        cancelConditionalBuyOrder: async () => { throw new Error('conditional cancel not mocked'); },
+      };
+    }
     // Home reads the shared USD/KRW rate to order spot and futures together.
     // Screens that exercise FX mock this boundary themselves.
     if (name.endsWith('/features/wallet/api')) {

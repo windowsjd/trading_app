@@ -37,6 +37,17 @@ function strOrNull(value: unknown): string | null | undefined {
   return str(value);
 }
 
+/** The LOC state a list row needs; anything else on the server object stays out. */
+function toLimitOnCloseFields(value: unknown): RecordOrderItemDto['limitOnClose'] {
+  if (!value || typeof value !== 'object') return null;
+  const loc = value as Record<string, unknown>;
+  return {
+    status: strOrNull(loc.status) ?? null,
+    sessionDate: strOrNull(loc.sessionDate) ?? null,
+    decisionReason: strOrNull(loc.decisionReason) ?? null,
+  };
+}
+
 export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
   const asset = (row.asset ?? null) as Record<string, unknown> | null;
 
@@ -62,6 +73,7 @@ export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
     reservedQuantity: strOrNull(row.reservedQuantity),
     reservationReleasedAt: strOrNull(row.reservationReleasedAt),
     cancelReason: strOrNull(row.cancelReason),
+    limitOnClose: toLimitOnCloseFields(row.limitOnClose),
     submittedAt: str(row.submittedAt),
     executedAt: str(row.executedAt),
   };

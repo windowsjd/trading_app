@@ -22,7 +22,8 @@ for (const screen of ['inline', 'standalone'])
   for (const account of ['general', 'season'])
     for (const side of ['buy', 'sell'])
       for (const type of ['market', 'limit'])
-        test(`${screen} ${account} ${side} ${type}: presets and slider share quantity policy and selection`, async (t) => {
+        // A new sell limit is not offered (orderInputPolicy covers that).
+        if (!(side === 'sell' && type === 'limit')) test(`${screen} ${account} ${side} ${type}: presets and slider share quantity policy and selection`, async (t) => {
           const h = inlineTradingHarness();
           if (screen === 'standalone') h.Screen = h.OrderScreen;
           h.accountId = account;
@@ -173,9 +174,10 @@ test('manual edits, price, reservations, limit changes and side/account changes 
   h.accountId = 'season';
   h.routeAccountId = 'season';
   await h.update();
-  assert.equal(h.node(qty).props.value, '');
-  assert.equal(h.node(slider).props.value, 0);
-  assert.deepEqual(selected(h), []);
+  // Another account's form starts without a method, draft or ratio.
+  assert.equal(h.freshForm(), true);
+  assert.equal(h.node(slider) === undefined, true);
+  assert.equal(h.node('order-ratio-50') === undefined, true);
 });
 
 for (const scenario of [
@@ -275,8 +277,9 @@ test('standalone account binding clears inputs when selection changes and cannot
   assert.match(json(h), /선택한 계정이 변경되었습니다/);
   h.accountId = 'general';
   await h.update();
-  assert.equal(h.node(qty).props.value, '');
-  assert.equal(h.node(slider).props.value, 0);
-  assert.deepEqual(selected(h), []);
+  // Back on the route account: the abandoned draft and method are gone.
+  assert.equal(h.freshForm(), true);
+  assert.equal(h.node(slider) === undefined, true);
+  assert.equal(h.node('order-ratio-50') === undefined, true);
   assert.equal(h.requests.length, 0);
 });

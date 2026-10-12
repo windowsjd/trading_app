@@ -117,3 +117,34 @@ test('a new guide resumes from the ledger, never from a remembered step: no repe
 test('no guide copy offers a resume that no longer exists',()=>{
   assert.doesNotMatch(JSON.stringify(TRADING_GUIDE_STEPS),/이어하기/);
 });
+test('nothing is preselected: the guide opens 주문방식 and then points at the practiced row', () => {
+  const views = (quest: 'marketBuy' | 'limitBuy' | 'marketSell', form: Record<string, unknown>) => {
+    const started = startGuideSession(1, account, quest, questProgress(6));
+    assert.ok(started, quest);
+    // The order-type step of each practice (marketSell starts on the order screen).
+    const session = { ...started, step: quest === 'marketSell' ? 2 : 3 };
+    return resolveGuideView(session, 'order', { wallet: null, fx: null, transfer: null,
+      practice: { order: orderForm({ side: quest === 'marketSell' ? 'sell' : 'buy', ...form }) } });
+  };
+  for (const [quest, label, row] of [['marketBuy', '시장가', 'order-method-market'], ['limitBuy', '지정가', 'order-method-limit'], ['marketSell', '시장가', 'order-method-market']] as const) {
+    const closed = views(quest, { orderType: undefined, methodSheetOpen: false });
+    assert.equal(closed.kind, 'spotlight');
+    if (closed.kind === 'spotlight') {
+      assert.deepEqual(closed.targets, ['order-type']);
+      assert.match(closed.card.body, new RegExp(`주문방식 선택하기를 눌러 ${label}`));
+    }
+    const open = views(quest, { orderType: undefined, methodSheetOpen: true });
+    if (open.kind === 'spotlight') assert.deepEqual(open.targets, [row]);
+    else assert.fail('the open sheet is spotlighted');
+    // LOC and conditional are other methods, never the practiced one.
+    for (const other of ['loc', 'conditional']) {
+      const view = views(quest, { orderType: other });
+      if (view.kind === 'spotlight') assert.deepEqual(view.targets, ['order-type']);
+      else assert.fail(other);
+    }
+  }
+  const chosen = views('marketBuy', { orderType: 'market' });
+  if (chosen.kind === 'spotlight') assert.deepEqual(chosen.targets, ['order-type']);
+  else assert.fail('the chosen method explains itself on the field');
+  if (chosen.kind === 'spotlight') assert.equal(chosen.card.next, 'enabled');
+});

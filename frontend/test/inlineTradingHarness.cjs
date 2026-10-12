@@ -62,6 +62,12 @@ function inlineTradingHarness() {
     animations: [],
     marketRequests: [],
     keyboardDismissals: 0,
+    // Nothing is preselected in the order form. Tests written for one order
+    // form pick it through the real 주문방식 sheet right after each mount
+    // (see h.mount); a test about the unselected form sets this to null.
+    method: 'market',
+    conditionalList: null,
+    orderCapabilities: null,
   };
   for (const [id, price, type] of [
     ['bnb', '763.79', 'crypto'],
@@ -200,6 +206,7 @@ function inlineTradingHarness() {
     Platform: { OS: 'android' },
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     Keyboard: { addListener: () => ({ remove() {} }), dismiss: () => { h.keyboardDismissals++; } },
+    BackHandler: { addEventListener: (_event, handler) => { h.backHandler = handler; return { remove() { if (h.backHandler === handler) h.backHandler = null; } }; } },
     PanResponder: { create: (config) => { h.panConfig = config; return { panHandlers: {} }; } },
     Easing: { out: (fn) => fn, in: (fn) => fn, quad: (n) => n * n, cubic: (n) => n * n * n },
     // Motion is visual only here: every run lands on its target at once and
@@ -268,6 +275,28 @@ function inlineTradingHarness() {
       createProtection: async (accountId, body) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId,body}); },
       cancelProtection: async (accountId, groupId, key) => { h.protectionRequests ??= []; h.protectionRequests.push({accountId,groupId,key}); if(h.protectionGate) await h.protectionGate.promise; },
     },
+    // Conditional BUY transport: records requests like the order client does.
+    '../../features/conditional/conditionalBuyApi': {
+      getConditionalBuyOrders: async (id) => h.conditionalList,
+      getConditionalBuyOrder: async () => { throw new Error('conditional detail not used here'); },
+      createConditionalBuyOrder: async (id, body) => {
+        h.requests.push({ url: `/trading-accounts/${id}/conditional-buy-orders`, body });
+        if (h.conditionalGate) await h.conditionalGate.promise;
+        if (h.conditionalFailure) throw h.conditionalFailure;
+        const asset = h.assets[body.assetId];
+        return { tradingAccountId: id, duplicate: false, conditionalOrder: {
+          id: `cb-${h.requests.length}`, assetId: body.assetId, asset: { id: asset.id, symbol: asset.symbol, name: asset.name, market: asset.market, assetType: asset.assetType },
+          side: 'buy', triggerCondition: body.triggerCondition, triggerPrice: body.triggerPrice, executionType: body.executionType,
+          limitPrice: body.limitPrice ?? null, quantity: body.quantity ?? null, amount: body.amount ?? null, currencyCode: asset.settlementCurrency,
+          status: 'watching', state: 'watching', trigger: null, order: null, attemptCount: 0, lastAttemptAt: null, failureCode: null,
+          terminalReason: null, createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(),
+        } };
+      },
+      cancelConditionalBuyOrder: async (id, conditionalOrderId) => {
+        h.requests.push({ url: `/trading-accounts/${id}/conditional-buy-orders/${conditionalOrderId}/cancel` });
+        return { tradingAccountId: id, duplicate: false, conditionalOrder: null };
+      },
+    },
     './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
     'react-native': native,
@@ -312,6 +341,12 @@ function inlineTradingHarness() {
                     ],
                   },
           };
+        // Server gates for new conditional / LOC orders: closed unless a test opens them.
+        if (resource === 'conditionalBuyOrders') return { ...base, data: h.conditionalList ?? { tradingAccountId: id,
+          capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+          conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
+        if (resource === 'orderCapabilities') return { ...base, data: h.orderCapabilities ?? { tradingAccountId: id,
+          limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: h.protections ?? { tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { total: 0, limit: 30, offset: 0, hasNext: false } } };
         if (resource === 'detail')
           return { ...base, data: { feePolicy: { tradeFeeRate: h.feeRate ?? '0.001' } } };
@@ -499,9 +534,10 @@ function inlineTradingHarness() {
     );
   h.mount = async () => {
     h.routeAccountId ??= h.accountId;
-    return act(async () => {
+    await act(async () => {
       h.renderer = create(element());
     });
+    if (h.method && h.node('order-type-select')) await h.selectOrderType(h.method);
   };
   h.update = async () =>
     act(async () => {
@@ -523,14 +559,26 @@ function inlineTradingHarness() {
     const node = h.node(id);
     if (!node) throw new Error('Missing ' + id);
     await act(async () => node.props.onPress());
+    // A side switch starts a fresh form with no method; pick h.method again
+    // through the sheet, as the user has to.
+    if ((id === 'asset-detail-buy-button' || id === 'asset-detail-sell-button') && h.method && h.node('order-type-select') && !h.orderMethodChosen())
+      await h.selectOrderType(h.method);
   };
+  h.orderMethodChosen = () => h.orderType() !== '주문방식 선택하기';
+  // A replaced form (asset/account/session/return): no method and no draft.
+  h.freshForm = () => h.orderType() === '주문방식 선택하기'
+    && h.node('order-quantity-input') === undefined && h.node('order-limit-price-input') === undefined;
   h.input = async (id, value) =>
     act(async () => h.node(id).props.onChangeText(value));
-  // 시장가/지정가 are the two segments of one sliding selector.
+  // 주문방식: the field opens the sheet, a row picks the method.
   h.selectOrderType = async (type) => {
-    await h.press(type === 'limit' ? 'order-type-toggle-limit' : 'order-type-toggle-market');
+    await h.press('order-type-select');
+    await h.press(`order-method-${type}`);
   };
-  h.orderType = () => (h.node('order-type-toggle-limit').props.accessibilityState.selected ? '지정가' : '시장가');
+  h.orderType = () => {
+    const value = h.node('order-type-select-value');
+    return value ? [value.props.children].flat().join('') : null;
+  };
   h.slide = async (percent) => act(async () =>
     h.node('order-quantity-slider').props.onChange({ currentTarget: { valueAsNumber: percent } }));
   h.success = () => h.renderer.root.findByType('OrderSuccessBottomSheet').props;

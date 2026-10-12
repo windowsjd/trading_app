@@ -9,6 +9,19 @@ import Decimal from 'decimal.js';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import OrderSideSegment, { type OrderSide } from './OrderSideSegment';
 import OrderTypeSelect from './OrderTypeSelect';
+import ConditionalBuyForm from './ConditionalBuyForm';
+import OrderNumberInput from './OrderNumberInput';
+import {
+  getConditionalBuyGate,
+  getLimitOnCloseGate,
+  getOrderMethodOptions,
+  getOrderTypeForMethod,
+  isOrderMethodSelectable,
+  type OrderMethod,
+} from '../../features/order/orderMethods';
+import { emitOrderFillEvent } from '../../features/order/fillEvents';
+import { getConditionalBuyOrders } from '../../features/conditional/conditionalBuyApi';
+import { getSessionGeneration } from '../../services/api/sessionOwnership';
 import {
   validateOrderQuote,
   OrderQuoteValidationError,
@@ -23,9 +36,7 @@ import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   useWindowDimensions,
-  type TextInputProps,
 } from '../../theme/native';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -44,6 +55,7 @@ import {
   getTradingAccountPositions,
   getTradingAccountWallets,
   getTradingAccount,
+  getTradingAccountOrderCapabilities,
   quoteTradingAccountOrder,
 } from '../../features/tradingAccount/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
@@ -97,7 +109,7 @@ import {
   mapOrderErrorCodeToBlockedReason,
 } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
-import { formatCurrency, formatDisplayDecimal } from '../../utils/format';
+import { formatCurrency, formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
 
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
@@ -125,6 +137,15 @@ type Props = {
 export default function OrderPanel({ onSideChange, ...props }: Props) {
   const [side, setSide] = useState<OrderSide>(props.initialSide ?? 'buy');
   const reduced = useReducedMotion();
+  // Returning to this screen starts a fresh form (no method, no draft, no
+  // quote). Sheets, the keyboard and re-renders keep focus and the draft.
+  const [entry, setEntry] = useState(0);
+  const enabled = props.enabled ?? true;
+  const wasEnabled = useRef(enabled);
+  useEffect(() => {
+    if (enabled && !wasEnabled.current) setEntry((value) => value + 1);
+    wasEnabled.current = enabled;
+  }, [enabled]);
   // The new side's form mounts at once (fresh inputs and quote state); only
   // its appearance settles with a short fade.
   const formOpacity = useRef(new Animated.Value(1)).current;
@@ -146,7 +167,7 @@ export default function OrderPanel({ onSideChange, ...props }: Props) {
       <OrderSideSegment side={side} onChange={changeSide} />
       <Animated.View style={[styles.formFade, { opacity: formOpacity }]}>
         <OrderForm
-          key={`${props.assetId}:${props.accountId}:${side}`}
+          key={`${props.assetId}:${props.accountId}:${side}:${entry}:${getSessionGeneration()}`}
           {...props}
           side={side}
         />
@@ -275,10 +296,15 @@ export function OrderForm({
   );
   const [chosenRatio, setChosenRatio] = useState<number | null>(null);
   const { fontScale } = useWindowDimensions();
-  const [orderType, setOrderType] = useState<'market' | 'limit'>('market');
+  // Nothing is preselected: every new form starts at 주문방식 선택하기.
+  const [orderMethod, setOrderMethod] = useState<OrderMethod | null>(null);
+  const [methodSheetOpen, setMethodSheetOpen] = useState(false);
+  // The ordinary order type behind market/limit/LOC; LOC is a limit order.
+  const orderType = getOrderTypeForMethod(orderMethod) ?? 'market';
+  const limitOnClose = orderMethod === 'loc';
   const [limitPrice, setLimitPrice] = useState('');
   const [protectionDraft, setProtectionDraft] = useState(emptyProtection);
-  const protectionQuery = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'spot', assetId), queryFn: ({ signal }) => getProtections(accountId, 'spot', assetId, false, signal), enabled: accountKnown && side === 'buy' && orderType === 'limit', retry: false });
+  const protectionQuery = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'spot', assetId), queryFn: ({ signal }) => getProtections(accountId, 'spot', assetId, false, signal), enabled: accountKnown && side === 'buy' && orderMethod === 'limit', retry: false });
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [diagnosticRuntime, setDiagnosticRuntime] = useState<RuntimeFacts | null>(null);
@@ -367,6 +393,8 @@ export function OrderForm({
             ...(request.payload.orderType === 'limit'
               ? { orderType: 'limit' as const, limitPrice: quote.limitPrice }
               : {}),
+            // Quote and create carry the same LOC flag; absent otherwise.
+            ...(request.payload.limitOnClose ? { limitOnClose: true as const } : {}),
           }),
         isCurrent: () => isActionCurrent(action.request) && (!action.request.attachedProtection?.length || attachedPermission.current),
       }),
@@ -376,12 +404,17 @@ export function OrderForm({
     },
     onSuccess: async (data, action) => {
       if (!data) return;
+      const createdOrderId = data.result?.order?.orderId ?? data.result?.order?.id;
+      const executed = data.result?.execution?.state === 'executed' || data.result?.execution?.state === 'already_executed';
+      // An open limit/LOC order is watched app-wide for its later real fill.
+      if (createdOrderId && data.result?.execution?.state === 'submitted')
+        emitOrderFillEvent({ kind: 'order', accountId: action.request.accountId, orderId: createdOrderId });
       if (isActionCurrent(action.request)) {
         if (isOrderSuccess(data.result)) {
-          const orderId = data.result.order.orderId ?? data.result.order.id;
+          const orderId = createdOrderId;
           const claimed = !!orderId && action.request.reportQuestCommand({ kind: 'spot', accountId: action.request.accountId,
             orderId, assetId, assetType: data.quote.asset.assetType ?? asset?.assetType ?? '', side: action.request.payload.side,
-            orderType: action.request.payload.orderType ?? 'market', summary: '주문 결과가 서버에서 확인됐어요.' });
+            orderType: action.request.payload.limitOnClose ? 'loc' : action.request.payload.orderType ?? 'market', summary: '주문 결과가 서버에서 확인됐어요.' });
           if (!claimed) setSuccessState(captureOrderSuccess(data.result, data.quote));
           setOrderInput('');
           setProtectionDraft(emptyProtection());
@@ -396,6 +429,11 @@ export function OrderForm({
             '주문 결과를 확인할 수 없습니다. 주문 내역을 확인해주세요.',
           );
         }
+      } else if (executed && createdOrderId) {
+        // The form that would show the detailed result is gone: the confirmed
+        // execution is announced by the app-wide banner instead.
+        emitOrderFillEvent({ kind: 'filled', accountId: action.request.accountId,
+          order: { ...data.result.order, orderId: createdOrderId, executedAt: data.result.order.executedAt ?? data.result.execution.executedAt } });
       }
       await invalidateAfterOrderCreate(queryClient, action.request.accountId, {
         seasonUi: action.request.seasonUi,
@@ -483,6 +521,9 @@ export function OrderForm({
 
     setOrderInput('');
     setLimitPrice('');
+    setOrderMethod(null);
+    setMethodSheetOpen(false);
+    setProtectionDraft(emptyProtection());
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
@@ -504,6 +545,31 @@ export function OrderForm({
   const isAmountBuy = asset?.assetType === 'crypto' && side === 'buy';
   const isStock =
     asset?.assetType === 'domestic_stock' || asset?.assetType === 'us_stock';
+  // Server answers whether NEW conditional/LOC orders may be created; the
+  // live watch list doubles as the app-wide fill watcher's (same cache entry).
+  const conditionalQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.list(accountId, { history: false, limit: 100 }),
+    queryFn: ({ signal }) => getConditionalBuyOrders(accountId, { limit: 100 }, signal),
+    enabled: accountKnown && side === 'buy' && (asset?.assetType === 'domestic_stock' || asset?.assetType === 'crypto'),
+    retry: 1,
+  });
+  const orderCapabilitiesQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.orderCapabilities(accountId),
+    queryFn: ({ signal }) => getTradingAccountOrderCapabilities(accountId, signal),
+    enabled: accountKnown && side === 'buy' && asset?.assetType === 'domestic_stock',
+    retry: 1,
+    staleTime: 30_000,
+  });
+  const conditionalCapabilities = conditionalQuery.data?.tradingAccountId === accountId ? conditionalQuery.data.capabilities : null;
+  const methodOptions = getOrderMethodOptions({
+    assetType: asset?.assetType,
+    side,
+    conditional: getConditionalBuyGate({ ...conditionalQuery, data: conditionalQuery.data?.tradingAccountId === accountId ? conditionalQuery.data : null }, asset?.assetType),
+    loc: getLimitOnCloseGate({ ...orderCapabilitiesQuery, data: orderCapabilitiesQuery.data?.tradingAccountId === accountId ? orderCapabilitiesQuery.data : null }, asset?.assetType),
+  });
+  const selectedMethodOption = methodOptions.find((option) => option.method === orderMethod) ?? null;
+  // A method the server stopped allowing stays shown but cannot submit.
+  const methodReady = !!selectedMethodOption && isOrderMethodSelectable(selectedMethodOption);
   const inputInvalidReason = useMemo(() => {
     if (isAmountBuy) {
       return (
@@ -590,7 +656,8 @@ export function OrderForm({
     positionQuery.data,
     assetId,
   );
-  const attachedEditorVisible = side === 'buy' && orderType === 'limit';
+  // Attached TP/SL belongs to an ordinary limit BUY only; never to LOC.
+  const attachedEditorVisible = side === 'buy' && orderMethod === 'limit';
   const attachedAvailable = !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
   attachedPermission.current = attachedAvailable;
 
@@ -614,9 +681,14 @@ export function OrderForm({
   // Server marketStatus is a UX hint; Quote/Create revalidate their own clock.
   // Never change the selected order type automatically.
   const sessionNotice =
-    stockMarketClosed && orderType === 'market'
-      ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
-      : null;
+    stockMarketClosed && orderMethod === 'market'
+      ? side === 'buy'
+        ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
+        // A new sell limit is not offered, so nothing else is suggested.
+        : '정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요.'
+      : stockMarketClosed && limitOnClose
+        ? 'LOC 매수는 정규장 중에만 등록할 수 있습니다. 서버가 등록 시점의 장 상태를 최종 확인합니다.'
+        : null;
 
   const assetWarningReason =
     (stockMarketClosed &&
@@ -630,7 +702,7 @@ export function OrderForm({
     !isTradableMarketStatus(asset.marketStatus)
       ? '장 상태는 서버 견적에서 최종 확인됩니다.'
       : asset &&
-          orderType === 'market' &&
+          orderMethod === 'market' &&
           !stockMarketClosed &&
           (side === 'buy' ? !previewPriceAvailable : !displayedPriceAvailable)
         ? isAmountBuy
@@ -753,15 +825,23 @@ export function OrderForm({
       ? '잔액이 부족합니다.'
       : null;
 
-  const tradeGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
+  // Conditional BUY and LOC need full trading access on a beginner account.
+  const advancedGate = learning.gate(side === 'sell' ? 'riskReduction' : 'allTrading');
+  const tradeGate = orderMethod === 'conditional' || limitOnClose ? advancedGate
+    : learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
   const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
+  const methodGate = (method: OrderMethod) =>
+    method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : advancedGate;
+  // The ordinary submit serves market/limit/LOC; nothing submits unselected.
   const canExecute =
+    methodReady &&
+    orderMethod !== 'conditional' &&
     !preOrderBlockedReason &&
     !inputInvalidReason &&
     !buyInsufficientReason &&
     !successData &&
     !orderActionRef.current?.completed;
-  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
+  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod ?? undefined, methodSheetOpen, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
   const inputErrorMessage =
     fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 
@@ -864,6 +944,7 @@ export function OrderForm({
           ...(orderType === 'limit'
             ? { orderType: 'limit', limitPrice: limitPrice.trim() }
             : {}),
+          ...(limitOnClose ? { limitOnClose: true } : {}),
         },
       },
       idempotencyKey: createIdempotencyKey('order'),
@@ -912,31 +993,76 @@ export function OrderForm({
     setChosenRatio(null);
     resetOrderActionState();
   };
+  const selectMethod = (next: OrderMethod) => {
+    const option = methodOptions.find((item) => item.method === next);
+    if (!option || !isOrderMethodSelectable(option)) return;
+    methodGate(next).guard(() => {
+      setMethodSheetOpen(false);
+      if (next === orderMethod) return;
+      // A new method never inherits the previous method's draft or quote.
+      resetInput(() => {
+        setOrderMethod(next);
+        setOrderInput('');
+        setLimitPrice('');
+        setProtectionDraft(emptyProtection());
+      });
+    });
+  };
+  const ordinaryForm = orderMethod === 'market' || orderMethod === 'limit' || orderMethod === 'loc';
+  const methodUnavailableReason = selectedMethodOption?.availability.state === 'unavailable'
+    ? selectedMethodOption.availability.reason
+    : orderMethod && !methodReady ? '이 주문방식은 지금 이용할 수 없어요.' : null;
+  const locPreview = limitOnClose ? quotedPreview?.limitOnClose ?? null : null;
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
       <QuestTarget id="order-type"><OrderTypeSelect
-        limitLearningHint={limitGate.locked ? limitGate.message : null}
-        value={orderType}
+        method={orderMethod}
+        options={methodOptions}
         disabled={pending}
-        onChange={(next) =>
-          (next === 'limit' ? limitGate : learning.gate('riskReduction')).guard(() => resetInput(() => {
-            setOrderType(next);
-            if (next === 'market') setLimitPrice('');
-          }))
-        }
+        open={methodSheetOpen && !pending}
+        onOpen={() => setMethodSheetOpen(true)}
+        onClose={() => setMethodSheetOpen(false)}
+        onSelect={selectMethod}
+        learningHints={{
+          limit: limitGate.locked ? limitGate.message : null,
+          conditional: advancedGate.locked ? advancedGate.message : null,
+          loc: advancedGate.locked ? advancedGate.message : null,
+        }}
       /></QuestTarget>
+      {!orderMethod ? (
+        <Text testID="order-method-required" style={styles.helper}>
+          주문방식을 선택하면 가격과 {isAmountBuy ? '금액' : '수량'}을 입력할 수 있어요.
+        </Text>
+      ) : null}
+      {orderMethod === 'conditional' && side === 'buy' ? (
+        <ConditionalBuyForm
+          accountId={accountId}
+          asset={asset}
+          capabilities={conditionalCapabilities}
+          blockedReason={accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason}
+          buyAvailable={buyAvailable}
+          currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
+          learning={advancedGate}
+          onInputFocus={onInputFocus}
+          onInputBlur={onInputBlur}
+        />
+      ) : null}
+      {ordinaryForm ? (
+        <>
       <View style={styles.group}>
-        <Text style={styles.label}>가격 ({asset.settlementCurrency})</Text>
+        <Text style={styles.label}>
+          {limitOnClose ? 'LOC 지정가격' : '가격'} ({asset.settlementCurrency})
+        </Text>
         {orderType === 'limit' ? (
           <OrderNumberInput
             testID={TEST_IDS.order.limitPriceInput}
-            accessibilityLabel={`지정가 가격 ${asset.settlementCurrency}`}
+            accessibilityLabel={`${limitOnClose ? 'LOC 지정가격' : '지정가 가격'} ${asset.settlementCurrency}`}
             editable={!pending}
             style={styles.input}
             value={limitPrice}
             onChangeText={(value) => resetInput(() => setLimitPrice(value))}
             keyboardType="decimal-pad"
-            placeholder="지정가 입력"
+            placeholder={limitOnClose ? '지정가격 입력' : '지정가 입력'}
             onFieldFocus={onInputFocus}
             onBlur={onInputBlur}
           />
@@ -963,6 +1089,24 @@ export function OrderForm({
           onBlur={onInputBlur}
         />
       </View>
+      {limitOnClose ? (
+        <View style={styles.notice} testID="loc-order-notice">
+          {[
+            '이번 한국주식 정규장의 확정 종가가 지정가격 이하이면 그 종가로 매수해요. 지정가격보다 비싸게 사지 않아요.',
+            '정규장 중에만 등록할 수 있고, 이 세션 하루만 유효해요. 다음 거래일로 넘어가지 않아요.',
+            '접수할 때 지정가 주문과 같은 방식으로 필요한 금액(지정가 × 수량 + 수수료)을 예약해요.',
+            '접수는 체결이 아니에요. 종가를 확정해 확인한 뒤에만 체결되므로 마감 후 상당한 시간이 걸릴 수 있어요.',
+            '기한까지 체결되지 않으면 주문이 종료되고 예약금이 해제돼요. 익절·손절은 함께 설정할 수 없어요.',
+          ].map((line) => (
+            <Text key={line} style={styles.noticeLine}>· {line}</Text>
+          ))}
+          {locPreview ? (
+            <Text testID="loc-quote-session" style={styles.noticeLine}>
+              대상 세션 {locPreview.sessionDate} · 정규장 마감 {formatKstDateTime(locPreview.sessionCloseAt)} · 판정 기한 {formatKstDateTime(locPreview.evidenceDeadlineAt)}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
       {attachedEditorVisible ? (
         <View style={styles.group} testID="attached-entry-editor">
           <Text style={styles.label}>체결 후 익절/손절 (선택)</Text>
@@ -1034,11 +1178,18 @@ export function OrderForm({
           </ActionPressable>
         ))}
       </View>
-      <Text style={styles.helper}>
-        {side === 'buy'
-          ? `주문 가능 ${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`
-          : `보유 ${formatDisplayDecimal(positionQuantity)}`}
-      </Text>
+        </>
+      ) : null}
+      {orderMethod !== 'conditional' ? (
+        <Text style={styles.helper}>
+          {side === 'buy'
+            ? `주문 가능 ${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`
+            : `보유 ${formatDisplayDecimal(positionQuantity)}`}
+        </Text>
+      ) : null}
+      {methodUnavailableReason && orderMethod !== 'conditional' ? (
+        <Text testID="order-method-unavailable" style={styles.errorText}>{methodUnavailableReason}</Text>
+      ) : null}
       {buyInsufficientReason ? (
         <Text testID="order-balance-insufficient" accessibilityLiveRegion="polite" style={styles.errorText}>
           {buyInsufficientReason}
@@ -1129,7 +1280,7 @@ export function OrderForm({
           }
         />
       ) : null}
-      {!(stockMarketClosed && orderType === 'market') ? (
+      {ordinaryForm && !(stockMarketClosed && orderMethod === 'market') ? (
         <>
           {!inputInvalidReason ? (
             <View ref={questGuideTarget('order-preview')} collapsable={false} style={styles.preview} testID="order-indicative-preview">
@@ -1162,7 +1313,7 @@ export function OrderForm({
               ) : (
                 <>
                   <Text style={styles.warningText}>{previewNotice}</Text>
-                  {orderType === 'market' && !previewPriceAvailable && !assetWarningReason ? (
+                  {orderMethod === 'market' && !previewPriceAvailable && !assetWarningReason ? (
                     <AdminDiagnosticPanel
                       diagnostic={showAssetPriceDiagnostic &&
                         displayPrice.priceLocal === null &&
@@ -1186,7 +1337,7 @@ export function OrderForm({
                   {feeQuery.isError ? (
                     <AdminDiagnosticPanel error={feeQuery.error} />
                   ) : null}
-                  {orderType === 'market' && !previewPriceAvailable ? (
+                  {orderMethod === 'market' && !previewPriceAvailable ? (
                     <CTAButton
                       variant="neutral" label="시세 다시 불러오기"
                       onPress={() => void assetQuery.refetch()}
@@ -1204,7 +1355,7 @@ export function OrderForm({
           ) : null}
         </>
       ) : null}
-      <View ref={submitRef} collapsable={false}><QuestTarget id="order-submit">
+      {orderMethod !== 'conditional' ? <View ref={submitRef} collapsable={false}><QuestTarget id="order-submit">
         <CTAButton
           testID={TEST_IDS.order.executeSubmit}
           label={side === 'buy' ? '매수' : '매도'}
@@ -1213,7 +1364,7 @@ export function OrderForm({
           learningHint={tradeGate.locked ? tradeGate.message : null}
           onPress={submitOrder}
         />
-      </QuestTarget></View>
+      </QuestTarget></View> : null}
       <OrderSuccessBottomSheet
         visible={!!successData}
         payload={successData}
@@ -1244,36 +1395,6 @@ export function OrderForm({
           });
         }}
       />
-    </View>
-  );
-}
-
-/** Keep the native caret and horizontal scrolling in the actual input. */
-function OrderNumberInput({ onFieldFocus, ...props }: TextInputProps & { onFieldFocus?: (input: View | null) => void }) {
-  const fieldRef = useRef<View>(null);
-  const { fontScale } = useWindowDimensions();
-  const [width, setWidth] = useState(0);
-  const showFullValue =
-    width > 0 && (props.value?.length ?? 0) * 9.6 * fontScale > width - 16;
-  return (
-    <View
-      ref={fieldRef}
-      collapsable={false}
-      style={styles.group}
-      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-    >
-      <TextInput {...props} onFocus={(event) => { props.onFocus?.(event); onFieldFocus?.(fieldRef.current); }} style={[props.style, styles.compactInput,
-        fontScale > 1 && { minHeight: Math.ceil(22 * fontScale + 24), lineHeight: Math.ceil(22 * fontScale) }]} />
-      {showFullValue ? (
-        <Text
-          selectable
-          style={styles.helper}
-          testID={`${props.testID}-full-value`}
-          accessibilityLabel={`${props.accessibilityLabel}, 전체 입력값 ${props.value}`}
-        >
-          {props.value}
-        </Text>
-      ) : null}
     </View>
   );
 }
@@ -1368,4 +1489,6 @@ const styles = StyleSheet.create({
   },
   errorText: { fontSize: 12, color: semantic.error },
   warningText: { fontSize: 12, color: semantic.warning },
+  notice: { gap: 4, padding: 10, borderRadius: 10, backgroundColor: semantic.raised, minWidth: 0 },
+  noticeLine: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
 });

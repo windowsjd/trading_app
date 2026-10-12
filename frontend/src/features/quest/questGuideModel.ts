@@ -324,7 +324,15 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
     const wantedSide = session.quest === 'marketSell' ? 'sell' : 'buy';
     const wantedType = session.quest === 'limitBuy' ? 'limit' : 'market';
     if (form.side !== wantedSide || form.orderType !== wantedType) {
-      return spotlight(session, screen, index, 'choose-order', ['order-type'], card({ title: '주문 방식 확인', body: `${wantedSide === 'buy' ? '매수' : '매도'} · ${wantedType === 'limit' ? '지정가' : '시장가'}를 선택해 주세요.` }));
+      const label = wantedType === 'limit' ? '지정가' : '시장가';
+      // Nothing is preselected: open 주문방식 and pick the practiced method.
+      if (form.side === wantedSide && form.methodSheetOpen) {
+        return spotlight(session, screen, index, 'choose-order', [wantedType === 'limit' ? 'order-method-limit' : 'order-method-market'],
+          card({ title: '주문 방식 확인', body: `목록에서 ${label}를 선택해 주세요.` }));
+      }
+      return spotlight(session, screen, index, 'choose-order', ['order-type'], card({ title: '주문 방식 확인', body: form.side !== wantedSide
+        ? `${wantedSide === 'buy' ? '매수' : '매도'} · ${label}를 선택해 주세요.`
+        : `주문방식 선택하기를 눌러 ${label}를 선택해 주세요.` }));
     }
     if (step.target === 'order-input') ready = ready && form.amountValid === true;
   }

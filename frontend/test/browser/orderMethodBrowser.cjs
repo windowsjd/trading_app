@@ -1,0 +1,192 @@
+// Optional real RN Web check of the 주문방식 sheet, conditional/LOC forms,
+// the conditional list and the real-fill banner: screenshots at 320/360px,
+// light/dark and 1x/2x fonts, plus a clipped-text and page-overflow detector.
+// Requires external esbuild and Playwright (see README).
+const path = require('node:path');
+const fs = require('node:fs');
+const http = require('node:http');
+const assert = require('node:assert/strict');
+const esbuild = require('esbuild');
+const { chromium } = require('playwright');
+const root = path.resolve(__dirname, '../..');
+const out = process.env.ORDER_METHOD_BROWSER_OUTPUT ?? '/tmp/trading-order-method-browser';
+
+/** Text cut by its own box or a clipping ancestor; skips hidden measurers. */
+async function clipped(page) {
+  return page.evaluate(() => {
+    const visible = (el) => {
+      for (let node = el; node && node !== document.body; node = node.parentElement) {
+        const style = getComputedStyle(node);
+        if (node.getAttribute('aria-hidden') === 'true' || style.opacity === '0' || style.visibility === 'hidden' || style.display === 'none') return false;
+      }
+      return true;
+    };
+    const issues = [];
+    // The order-book ladder (price column) already overflows at 320px / large
+    // fonts at HEAD; it is reported separately, not attributed to this UI.
+    const ladder = document.querySelector('[data-testid="asset-order-book"]');
+    for (const el of document.querySelectorAll('div, span')) {
+      const own = [...el.childNodes].some((node) => node.nodeType === 3 && node.textContent.trim());
+      if (!own || !visible(el) || ladder?.contains(el)) continue;
+      const style = getComputedStyle(el);
+      if (style.textOverflow === 'ellipsis' || style.webkitLineClamp !== 'none') issues.push(`ellipsis: ${el.textContent.slice(0, 40)}`);
+      if (el.scrollWidth > el.clientWidth + 1 && style.overflowX !== 'visible') issues.push(`width: ${el.textContent.slice(0, 40)}`);
+      const rect = el.getBoundingClientRect();
+      for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+        const parent = getComputedStyle(node);
+        if (parent.overflow === 'visible' || node.scrollHeight > node.clientHeight + 1 || node.scrollWidth > node.clientWidth + 1) continue;
+        const box = node.getBoundingClientRect();
+        if (rect.right > box.right + 1 || rect.left < box.left - 1) { issues.push(`cut: ${el.textContent.slice(0, 40)}`); break; }
+      }
+    }
+    if (document.documentElement.scrollWidth > innerWidth + 1) issues.push(`page scrolls sideways: ${document.documentElement.scrollWidth}`);
+    return issues;
+  });
+}
+
+async function run() {
+  fs.mkdirSync(out, { recursive: true });
+  await esbuild.build({
+    entryPoints: [path.join(__dirname, 'tradingFixture.jsx')],
+    outfile: path.join(out, 'bundle.js'), bundle: true, minify: true,
+    platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')],
+    resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'],
+    mainFields: ['browser', 'module', 'main'],
+    define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' },
+    loader: { '.png': 'dataurl' },
+    plugins: [{ name: 'isolated-trading-boundaries', setup(b) {
+      b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
+      b.onResolve({ filter: /^@react-navigation\/(native|elements)$/ }, () => ({ path: path.join(__dirname, 'tradingMocks.js') }));
+      b.onResolve({ filter: /(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useMarketTickers)$/ }, () => ({ path: path.join(__dirname, 'tradingMocks.js') }));
+      b.onResolve({ filter: /CandlestickChartRenderer$/ }, (args) => args.importer.endsWith('rendererProbe.jsx') ? undefined : ({ path: path.join(__dirname, 'rendererProbe.jsx') }));
+    } }],
+    logLevel: 'warning',
+  });
+  fs.writeFileSync(path.join(out, 'index.html'), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/bundle.js"></script>');
+  const server = http.createServer((req, res) => {
+    const js = req.url.startsWith('/bundle.js');
+    res.setHeader('Content-Type', js ? 'text/javascript' : 'text/html');
+    res.end(fs.readFileSync(path.join(out, js ? 'bundle.js' : 'index.html')));
+  }).listen(0, '127.0.0.1');
+  await new Promise((resolve) => server.once('listening', resolve));
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'], executablePath: process.env.BEGINNER_CHROMIUM || undefined });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const report = [];
+  try {
+    const quick = process.env.ORDER_METHOD_QUICK === '1';
+    const combos = [];
+    for (const width of [320, 360]) for (const appearance of ['light', 'dark']) for (const fontScale of [1, 2]) combos.push([width, appearance, fontScale]);
+    for (const [width, appearance, fontScale] of quick ? [[360, 'light', 1], [320, 'dark', 2]] : combos) {
+      const page = await browser.newPage({ viewport: { width, height: 760 } });
+      await page.addInitScript(() => localStorage.setItem('trading-app:appearance', 'system'));
+      await page.emulateMedia({ colorScheme: appearance });
+      const errors = [];
+      page.on('pageerror', (error) => errors.push(error.message));
+      await page.route('**/*', (route) => route.request().url().startsWith(base) ? route.continue() : route.abort());
+      const tag = `${width}-${appearance}-${fontScale}x`;
+      const shot = async (name) => {
+        // Let sheet/press motion settle (rows count as visible while still sliding).
+        await page.mouse.move(0, 0);
+        await page.waitForTimeout(450);
+        const issues = await clipped(page);
+        report.push({ shot: `${name}-${tag}`, issues });
+        await page.screenshot({ path: path.join(out, `${name}-${tag}.png`) });
+      };
+      const go = async (query) => {
+        await page.goto(`${base}/?screen=order&viewport=1&fontScale=${fontScale}&${query}`);
+        await page.getByTestId('order-type-select').waitFor();
+      };
+      const field = () => page.getByTestId('order-type-select');
+      // Every row of the open sheet can be brought fully inside the sheet card and the viewport.
+      const sheetReachable = async (methods) => {
+        const card = await page.getByTestId('order-method-list').boundingBox();
+        for (const method of methods) {
+          await page.getByTestId(`order-method-${method}`).scrollIntoViewIfNeeded();
+          await page.waitForTimeout(50);
+          const box = await page.getByTestId(`order-method-${method}`).boundingBox();
+          const list = await page.getByTestId('order-method-list').boundingBox();
+          assert.ok(box.y >= list.y - 1 && box.y + box.height <= list.y + list.height + 1, `${method} inside the sheet (${tag})`);
+          assert.ok(box.y + box.height <= (page.viewportSize().height) + 1, `${method} inside the viewport (${tag})`);
+        }
+        assert.ok(card.y >= 0, `sheet top on screen (${tag})`);
+        await page.getByTestId(`order-method-${methods[0]}`).scrollIntoViewIfNeeded();
+      };
+      const row = (method) => page.getByTestId(`order-method-${method}`);
+
+      // 1. Crypto BUY: unselected field, then the sheet with a server-gated 조건주문.
+      await go('asset=SUI&conditional=enabled&longName=1');
+      assert.equal(await page.getByTestId('order-type-select-value').innerText(), '주문방식 선택하기');
+      assert.equal(await page.getByTestId('order-quantity-input').count(), 0);
+      await shot('crypto-unselected');
+      await field().click();
+      await row('market').waitFor();
+      assert.equal(await row('loc').count(), 0, 'crypto never lists LOC');
+      assert.equal(await row('limit').count(), 1);
+      await shot('crypto-sheet');
+      await sheetReachable(['market', 'limit', 'conditional']);
+      // 2. Conditional form with watch and limit prices.
+      await row('conditional').click();
+      await page.getByTestId('conditional-buy-form').waitFor();
+      await page.getByTestId('conditional-trigger-at_or_below').click();
+      await page.getByTestId('conditional-trigger-price').fill('0.81234567');
+      await page.getByTestId('conditional-execution-limit').click();
+      await page.getByTestId('conditional-limit-price').fill('0.80123456');
+      await page.getByTestId('conditional-size').fill('1234567.12345678');
+      await shot('crypto-conditional');
+      await page.getByTestId('conditional-submit').click();
+      await page.getByTestId('conditional-registered').waitFor();
+      await page.getByTestId('conditional-registered').scrollIntoViewIfNeeded();
+      await shot('crypto-conditional-registered');
+
+      // 3. KRX BUY: four methods, LOC form with its policy notice.
+      await go('krx=1&asset=SAMSUNG&loc=enabled&conditional=enabled&longName=1');
+      await field().click();
+      for (const method of ['market', 'limit', 'conditional', 'loc']) await row(method).waitFor();
+      await shot('krx-sheet');
+      await sheetReachable(['market', 'limit', 'conditional', 'loc']);
+      await row('loc').click();
+      await page.getByTestId('loc-order-notice').waitFor();
+      assert.equal(await page.getByTestId('attached-entry-editor').count(), 0);
+      await page.getByTestId('order-limit-price-input').fill('70000');
+      await page.getByTestId('order-quantity-input').fill('2');
+      await shot('krx-loc');
+
+      // 4. KRX SELL: market only, the rest 준비 중.
+      await go('krx=1&asset=SAMSUNG&longName=1');
+      await page.getByTestId('asset-detail-sell-button').click();
+      await field().click();
+      await row('protection').waitFor();
+      assert.equal(await row('limit').count(), 0, 'no new sell limit');
+      await shot('krx-sell-sheet');
+      await sheetReachable(['market', 'conditional', 'loc', 'protection']);
+      await page.getByTestId('order-method-sheet-close').click();
+
+      // 5. The account's conditional orders with every state.
+      await go('asset=SUI&conditional=enabled&conditionalRows=1');
+      await page.getByTestId('holdings-filter-pending').click();
+      await page.getByTestId('pending-kind-conditional').click();
+      await page.getByTestId('conditional-orders-list').waitFor();
+      await page.getByTestId('conditional-orders-list').scrollIntoViewIfNeeded();
+      await shot('conditional-list');
+
+      // 6. The real-fill banner over the order screen.
+      await go('krx=1&asset=SAMSUNG&fillBanner=1&longName=1');
+      await page.getByTestId('order-fill-banner').waitFor();
+      await shot('fill-banner');
+      assert.deepEqual(errors, [], `${tag} page errors`);
+      await page.close();
+    }
+  } finally {
+    await browser.close();
+    server.close();
+  }
+  fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
+  const failing = report.filter((entry) => entry.issues.length);
+  assert.deepEqual(failing, [], 'clipped text or sideways scroll');
+  console.log(`order method browser: ${report.length} screens checked, screenshots in ${out}`);
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

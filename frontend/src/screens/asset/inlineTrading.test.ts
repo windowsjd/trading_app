@@ -14,8 +14,28 @@ const sell = TEST_IDS.assetDetail.sellButton;
 
 describe('Order screen lifecycle with real React and query mutations', () => {
   for (const accountId of ['general', 'season'])
+    it(`${accountId} sell offers no new limit: 시장가 only, the rest 준비 중`, async (t) => {
+      const h = inlineTradingHarness();
+      h.accountId = accountId;
+      await h.mount();
+      t.after(h.close);
+      await h.press(sell);
+      await h.press('order-type-select');
+      assert.equal(h.node('order-method-limit') === undefined, true);
+      assert.equal(h.node('order-method-market').props.disabled, false);
+      for (const method of ['conditional', 'protection']) {
+        assert.equal(h.node(`order-method-${method}`).props.disabled, true, method);
+        assert.equal(h.node(`order-method-${method}-badge`).props.children, '준비 중');
+      }
+      // crypto has no LOC at all
+      assert.equal(h.node('order-method-loc') === undefined, true);
+    });
+  for (const accountId of ['general', 'season'])
     for (const side of ['buy', 'sell'])
       for (const type of ['market', 'limit']) {
+        // A new sell limit is not offered any more (see the test above);
+        // accepted sell limits keep their server fill/list/cancel paths.
+        if (side === 'sell' && type === 'limit') continue;
         it(`${accountId} ${type} ${side} preserves quote/create, canonical inputs, account and success`, async (t) => {
           const h = inlineTradingHarness();
           h.accountId = accountId;
@@ -90,7 +110,10 @@ describe('Order screen lifecycle with real React and query mutations', () => {
         }
         await h.update();
       }
-      assert.equal(h.node(qty).props.value, '');
+      // The replaced form keeps no draft: a side switch is re-picked empty,
+      // an account/asset change starts without a method at all.
+      if (change === 'side') assert.equal(h.node(qty).props.value, '');
+      else assert.equal(h.freshForm(), true);
       await act(async () => h.quoteGate.resolve());
       await h.flush();
       assert.equal(h.requests.length, 1);
@@ -116,7 +139,8 @@ describe('Order screen lifecycle with real React and query mutations', () => {
       }
       await act(async () => h.quoteGate.resolve());
       await h.flush();
-      assert.equal(h.node(qty).props.value, '');
+      if (change === 'side') assert.equal(h.node(qty).props.value, '');
+      else assert.equal(h.freshForm(), true);
       assert.equal(h.node(submit).props.state, 'disabled');
       assert.equal(h.requests.length, 1);
       assert.equal(h.success().visible, false);
@@ -215,25 +239,26 @@ describe('Order screen lifecycle with real React and query mutations', () => {
     assert.equal(h.requests.length, 3);
     assert.equal(h.success().visible, true);
   });
-  it('locks sell input and type controls through quote and create, including direct stale callbacks', async (t) => {
+  it('locks input and the method field through quote and create, including direct stale callbacks', async (t) => {
     const h = inlineTradingHarness(); h.quoteGate = deferred();
     await h.mount(); t.after(h.close);
-    await h.press(sell); await h.input(qty, '1');
-    const staleLimit = h.node(TEST_IDS.order.typeToggleLimit).props.onPress;
+    await h.input(qty, '1');
+    // A 지정가 row callback captured from the sheet before submitting.
+    await h.press('order-type-select');
+    const staleLimit = h.node('order-method-limit').props.onPress;
+    await h.press('order-method-market');
     await h.press(submit); await h.flush();
     assert.equal(h.node(qty).props.editable, false);
-    // Both segments refuse input while the command is in flight.
-    for (const id of [TEST_IDS.order.typeToggleMarket, TEST_IDS.order.typeToggleLimit]) {
-      assert.equal(h.node(id).props.disabled, true);
-      assert.equal(h.node(id).props.accessibilityState.disabled, true);
-    }
+    // The 주문방식 field refuses input while the command is in flight.
+    assert.equal(h.node(TEST_IDS.order.typeSelect).props.disabled, true);
+    assert.equal(h.node(TEST_IDS.order.typeSelect).props.accessibilityState.disabled, true);
     await h.input(qty, '2');
     await act(async () => staleLimit());
     assert.equal(h.orderType(), '시장가');
     assert.equal(h.node(qty).props.value, '1');
     await act(async () => h.quoteGate.resolve()); await h.flush();
     assert.equal(h.requests.length, 2);
-    assert.equal(h.requests[1].body.quantity, '1');
+    assert.equal(h.requests[1].body.amount, '1');
     assert.equal(h.requests[1].body.orderType, undefined);
   });
   it('uses each account holdings for ratios and blocks overselling and suspended accounts', async (t) => {
@@ -271,7 +296,7 @@ describe('Order screen lifecycle with real React and query mutations', () => {
     await h.update();
     await act(async () => h.quoteGate.resolve());
     await h.flush();
-    assert.equal(h.node(qty).props.value, '');
+    assert.equal(h.freshForm(), true);
     assert.equal(h.requests.length, 1);
   });
 });
@@ -290,7 +315,7 @@ describe('trading and chart screen boundaries', () => {
     assert.deepEqual(h.navigation, [['AssetChart', { assetId: 'bnb' }]]);
     h.assetId = 'btc';
     await h.update();
-    assert.equal(h.node(qty).props.value, '');
+    assert.equal(h.freshForm(), true);
     assert.equal(
       h.node('asset-krw-toggle').props.accessibilityState.selected,
       false,

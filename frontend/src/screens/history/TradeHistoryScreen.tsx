@@ -418,13 +418,7 @@ export default function TradeHistoryScreen({ route }: Props) {
                       : display.executedAt}
                   </Text>
                   <Text style={styles.helper}>
-                    {display.isLimitOrder
-                      ? display.side === 'buy'
-                        ? '지정가 매수'
-                        : '지정가 매도'
-                      : display.side === 'buy'
-                        ? '매수'
-                        : '매도'}
+                    {display.orderTypeLabel}
                     {display.statusLabel ? ` · ${display.statusLabel}` : ''}
                   </Text>
                 </View>

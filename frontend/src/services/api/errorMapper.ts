@@ -384,6 +384,46 @@ export function getErrorMessageFromCode(
       return '지원하지 않는 주문 유형입니다.';
     case ERROR_CODE.PRICE_STALE:
       return '가격 갱신 대기 중입니다.';
+    case ERROR_CODE.LOC_ORDERS_DISABLED:
+      return 'LOC 주문은 현재 운영 상태에서 이용할 수 없습니다.';
+    case ERROR_CODE.LOC_MARKET_NOT_SUPPORTED:
+      return 'LOC 주문은 한국주식 매수만 지원합니다.';
+    case ERROR_CODE.LOC_SIDE_NOT_SUPPORTED:
+      return 'LOC 주문은 현재 매수만 지원합니다.';
+    case ERROR_CODE.LOC_SESSION_NOT_OPEN:
+      return 'LOC 매수는 정규장 중에만 등록할 수 있습니다.';
+    case ERROR_CODE.LOC_SESSION_AFTER_SEASON_END:
+      return '시즌 종료 전에 마감되는 정규장에서만 LOC 주문을 등록할 수 있습니다.';
+    case ERROR_CODE.LOC_ATTACHED_PROTECTION_NOT_SUPPORTED:
+      return 'LOC 매수에는 익절·손절을 함께 설정할 수 없습니다.';
+    case ERROR_CODE.INVALID_LIMIT_ON_CLOSE:
+      return 'LOC 주문 내용을 다시 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_BUY_DISABLED:
+      return '현재 운영 상태에서는 새 조건주문을 등록할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_LIMIT_UNAVAILABLE:
+      return '현재 운영 상태에서는 지정가로 발동하는 조건주문을 등록할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_ACCOUNT_NOT_TRADABLE:
+      return '현재 계정 상태에서는 조건주문을 등록할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_BUY_MARKET_NOT_SUPPORTED:
+      return '조건주문은 한국주식과 암호화폐 현물 매수만 지원합니다.';
+    case ERROR_CODE.CONDITIONAL_BUY_LIMIT_EXCEEDED:
+      return '감시 중인 조건주문이 최대 개수에 도달했습니다. 기존 조건주문을 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_PRICE_UNAVAILABLE:
+      return '감시에 사용할 최신 시세가 없어 등록할 수 없습니다. 한국주식은 정규장 중에 등록해주세요.';
+    case ERROR_CODE.CONDITIONAL_BUY_ALREADY_MET:
+      return '현재 가격이 이미 감시 조건을 충족해 등록할 수 없습니다. 감시가격을 다시 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_IDEMPOTENCY_CONFLICT:
+      return '같은 요청이 다른 내용으로 처리 중입니다. 대기 목록의 조건주문을 확인해주세요.';
+    case ERROR_CODE.INVALID_CONDITIONAL_BUY:
+      return '조건주문 입력값을 다시 확인해주세요.';
+    case ERROR_CODE.INVALID_CONDITIONAL_BUY_PRICE:
+      return '감시가격 또는 지정가격을 다시 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_BUY_NOT_FOUND:
+      return '조건주문을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_BUY_ALREADY_ORDERED:
+      return '이미 주문이 만들어진 조건주문입니다. 연결된 주문의 상태를 확인해주세요.';
+    case ERROR_CODE.BEGINNER_FEATURE_LOCKED:
+      return '학습을 더 진행하면 이용할 수 있는 기능입니다.';
     case 'ORDER_LIQUIDITY_UNAVAILABLE':
       return '현재 체결 가능한 시장 유동성이 없습니다. 새 견적으로 다시 시도해주세요.';
     case 'EXECUTION_EVIDENCE_UNAVAILABLE':

@@ -51,6 +51,8 @@ function harness() {
     '../../components/states/ScreenErrorBoundary': { default: Boundary, __esModule: true },
     '../../theme/useReducedMotion': { useReducedMotion: () => false },
   };
+  // The app-wide fill banner has its own tests; this boundary test renders the navigator only.
+  rootMocks['../../features/order/OrderFillNotifier'] = { default: () => null, __esModule: true };
   for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
     '../../screens/history/TradeHistoryScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
     rootMocks[name] = { default: name, __esModule: true };

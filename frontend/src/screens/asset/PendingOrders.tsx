@@ -1,4 +1,5 @@
 import PendingFuturesAndProtections from './PendingFuturesAndProtections';
+import ConditionalBuyOrdersList from './ConditionalBuyOrdersList';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -28,19 +29,25 @@ type Props = {
   accountId: string;
   isFocused: boolean;
   seasonUi: boolean;
+  /** Spot order screen: also list this account's Conditional BUY watches. */
+  conditional?: boolean;
 };
 
 export default function PendingOrders(props: Props) {
   const { selectedAccountId } = useTradingAccount();
   return selectedAccountId === props.accountId ? <BoundPendingOrders key={`${props.accountId}:${getSessionGeneration()}`} {...props} /> : null;
 }
+const KIND_LABEL = { limit: '지정가', protection: 'TP/SL', conditional: '조건주문' } as const;
 export function BoundPendingOrders(props: Props) {
-  const [kind, setKind] = useState<'limit' | 'protection'>('limit');
+  const [kind, setKind] = useState<keyof typeof KIND_LABEL>('limit');
+  const kinds = props.conditional ? (['limit', 'protection', 'conditional'] as const) : (['limit', 'protection'] as const);
   return <View style={styles.list}>
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 }}>
-      {(['limit', 'protection'] as const).map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(value)} style={styles.retry}><Text style={styles.value}>{value === 'limit' ? '지정가' : 'TP/SL'}</Text></ActionPressable>)}
+      {kinds.map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(value)} style={[styles.retry, value === kind && styles.kindSelected]}><Text style={styles.value}>{KIND_LABEL[value]}</Text></ActionPressable>)}
     </View>
-    {kind === 'limit' ? <LimitPendingOrders {...props} /> : <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />}
+    {kind === 'limit' ? <LimitPendingOrders {...props} />
+      : kind === 'conditional' ? <ConditionalBuyOrdersList key={`conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
+      : <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />}
   </View>;
 }
 function LimitPendingOrders(props: Props) {
@@ -146,7 +153,7 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
               <Text style={styles.label}>{display.symbol}</Text>
             ) : null}
             <Text style={[styles.side, buy ? styles.buy : styles.sell]}>
-              지정가 {buy ? '매수' : '매도'} · {display.statusLabel ?? '미체결'}
+              {display.orderTypeLabel} · {display.statusLabel ?? '미체결'}
             </Text>
             <View style={styles.metric}>
               <Text style={styles.label}>지정가</Text>
@@ -201,6 +208,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     maxWidth: '100%',
   },
+  kindSelected: { borderColor: semantic.selected },
   retry: {
     backgroundColor: semantic.raised,
     alignSelf: 'flex-start',

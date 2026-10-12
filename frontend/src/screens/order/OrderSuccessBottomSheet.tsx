@@ -16,6 +16,7 @@ import {
   getLimitOrderSuccessMessage,
   getOrderSuccessDisplay,
 } from '../../features/order/mapper';
+import { formatKstDateTime } from '../../utils/format';
 
 interface OrderSuccessBottomSheetProps {
   visible: boolean;
@@ -53,6 +54,11 @@ export default function OrderSuccessBottomSheet({
     ? getLimitQuoteEstimateDisplay(quote)
     : null;
   const submittedSide = display?.side === 'sell' ? 'sell' : 'buy';
+  // LOC is a submitted limit BUY bound to one session's final close: its
+  // session comes from the server's order (or the quote it was created from).
+  const loc = isSubmittedLimit
+    ? payload?.order.limitOnClose ?? quote?.limitOnClose ?? null
+    : null;
 
   return (
     <BottomSheetBackdrop visible={visible} onClose={onClose}>
@@ -65,7 +71,9 @@ export default function OrderSuccessBottomSheet({
         </View>
 
         <Text style={styles.title}>
-          {isSubmittedLimit
+          {loc
+            ? 'LOC 매수 주문이 접수되었습니다.'
+            : isSubmittedLimit
             ? `지정가 ${submittedSide === 'buy' ? '매수' : '매도'} 주문이 등록되었습니다.`
             : display?.isPartialExecution
               ? '일부 체결되었습니다'
@@ -76,7 +84,11 @@ export default function OrderSuccessBottomSheet({
             {display.remainderMessage}
           </Text>
         ) : null}
-        {isSubmittedLimit ? (
+        {loc ? (
+          <Text testID="loc-success-message" style={styles.subtitle}>
+            {`접수는 체결이 아니에요. ${loc.sessionDate} 정규장의 확정 종가가 지정가격 이하이면 그 종가로 체결되고, 아니면 주문이 종료되며 예약금이 해제돼요. 종가 확인은 마감 후 시간이 걸릴 수 있어요.`}
+          </Text>
+        ) : isSubmittedLimit ? (
           <Text style={styles.subtitle}>
             {getLimitOrderSuccessMessage(
               payload?.executionPolicy,
@@ -90,11 +102,23 @@ export default function OrderSuccessBottomSheet({
             <Row label="종목" value={display.assetLabel} />
             <Row
               label="주문 유형"
-              value={`지정가 ${submittedSide === 'buy' ? '매수' : '매도'}`}
+              value={loc ? 'LOC 매수' : `지정가 ${submittedSide === 'buy' ? '매수' : '매도'}`}
             />
-            <Row label="상태" value="미체결" />
-            <Row label="지정가" value={display.limitPrice} />
+            <Row label="상태" value={loc ? '종가 판정 대기' : '미체결'} />
+            {loc ? (
+              <Row label="지정가격" value={display.limitPrice} />
+            ) : (
+              <Row label="지정가" value={display.limitPrice} />
+            )}
             <Row label="수량" value={display.quantity} />
+            {loc ? (
+              <>
+                <Row label="대상 정규장" value={loc.sessionDate} />
+                <Row label="정규장 마감" value={formatKstDateTime(loc.sessionCloseAt)} />
+                <Row label="체결 판정 기한" value={formatKstDateTime(loc.evidenceDeadlineAt)} />
+                <Row label="체결 가격 기준" value="확정 종가 (지정가격 이하일 때)" />
+              </>
+            ) : null}
             {/* Estimates from the quote, never a fill: the labels must keep
               saying 예상/예약 기준 so an unfilled order is not read as
               executed. The order's own gross/fee/net stay null until it

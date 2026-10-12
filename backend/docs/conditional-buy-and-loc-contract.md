@@ -222,6 +222,33 @@ Account-scoped order list/detail and the create response add
 continuous `executionPolicy` on a LOC create is `reservation_only` because the
 continuous matcher never fills it.
 
+### Client availability (read-only, 2026-10-13)
+
+No other read exposed `LOC_ORDERS_ENABLED`; the only signal was a refused
+quote. For the order UI the server now reports the create gates without
+deciding anything:
+
+`GET /trading-accounts/:accountId/order-capabilities` (owner only; a foreign
+account is the existing 404 `TRADING_ACCOUNT_NOT_FOUND`)
+
+```json
+{ "tradingAccountId": "…",
+  "limitOrder": { "enabled": false, "autoExecutionEnabled": false },
+  "limitOnClose": { "enabled": false, "markets": ["KRX"], "sides": ["buy"],
+                    "attachedProtection": false } }
+```
+
+- `limitOrder.enabled` = `LIMIT_ORDER_ENABLED`; `autoExecutionEnabled` also
+  needs `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED` (same value as a limit
+  quote's `executionPolicy.autoExecutionEnabled`).
+- `limitOnClose.enabled` = `LIMIT_ORDER_ENABLED && LOC_ORDERS_ENABLED`, the
+  same precedence as create (`LIMIT_ORDER_DISABLED` before
+  `LOC_ORDERS_DISABLED`).
+- It reads flags only: no DB write, no order/wallet/ledger access, no
+  migration. Session, market, Season and account rules stay with quote/create,
+  which remain authoritative after any flag change. A client that cannot read
+  this must treat LOC as unavailable.
+
 ## US stocks — extension contract
 
 Nothing US-specific is implemented or enabled: no worker, table, adapter or

@@ -41,7 +41,10 @@ export function validateOrderQuote(
       : quote.amount == null &&
         sameDecimal(quote.quantity, request.quantity)) ||
     (request.orderType === 'limit' &&
-      !sameDecimal(quote.limitPrice, request.limitPrice))
+      !sameDecimal(quote.limitPrice, request.limitPrice)) ||
+    // A LOC request needs the server's LOC session preview, and an ordinary
+    // request must not come back bound to a closing session.
+    (request.limitOnClose === true) !== !!quote.limitOnClose?.sessionDate
   ) {
     throw new OrderQuoteValidationError(
       '입력한 주문과 견적이 일치하지 않습니다. 다시 시도해주세요.',

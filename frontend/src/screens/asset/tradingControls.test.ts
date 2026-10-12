@@ -11,19 +11,22 @@ const qty = TEST_IDS.order.quantityInput,
 const text = (h: any) => JSON.stringify(h.renderer.toJSON());
 
 for (const side of ['buy', 'sell']) {
-  test(`${side}: market/limit transitions clear stale actions and strip market limitPrice`, async (t) => {
+  // Only BUY can move between market and limit (a new sell limit is not offered).
+  if (side === 'buy') test(`${side}: market/limit transitions clear stale actions and strip market limitPrice`, async (t) => {
     const h = inlineTradingHarness();
     await h.mount();
     t.after(h.close);
-    if (side === 'sell') await h.press(TEST_IDS.assetDetail.sellButton);
     assert.equal(h.node(TEST_IDS.order.quoteSubmit) === undefined, true);
-    assert.equal(h.node(submit).props.label, side === 'buy' ? '매수' : '매도');
+    assert.equal(h.node(submit).props.label, '매수');
     await h.input(qty, '1');
     h.failure = new Error('response lost');
     await h.press(submit);
     await h.flush();
     await h.selectOrderType('limit');
     assert.equal(h.orderType(), '지정가');
+    // The method change dropped the uncertain market draft; re-enter for limit.
+    assert.equal(h.node(qty).props.value, '');
+    await h.input(qty, '1');
     await h.input(TEST_IDS.order.limitPriceInput, '100');
     await h.press(submit);
     await h.flush();
@@ -31,6 +34,7 @@ for (const side of ['buy', 'sell']) {
     assert.equal(h.requests[3].body.limitPrice, '100');
     await h.selectOrderType('market');
     assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
+    await h.input(qty, '1');
     h.failure = null;
     await h.press(submit);
     await h.flush();
@@ -142,20 +146,19 @@ for (const scenario of ['zero', 'wallet', 'price', 'limit', 'position']) {
 for (const quantity of ['1', '4'])
   test(`sell quantity ${quantity}: partial/full holding and canonical quote strings`, async (t) => {
     const h = inlineTradingHarness();
-    h.quoteOverride = {
-      quantity: quantity + '.000000',
-      limitPrice: '100.00000000',
-    };
+    // Sell is market-only for new orders; create still takes the quote's
+    // canonical quantity string for a partial or full holding.
+    h.quoteOverride = { quantity: quantity + '.000000' };
     await h.mount();
     t.after(h.close);
     await h.press(TEST_IDS.assetDetail.sellButton);
-    await h.selectOrderType('limit');
-    await h.input(TEST_IDS.order.limitPriceInput, '100');
     await h.input(qty, quantity);
     await h.press(submit);
     await h.flush();
+    assert.equal(h.requests[0].body.quantity, quantity);
     assert.equal(h.requests[1].body.quantity, quantity + '.000000');
-    assert.equal(h.requests[1].body.limitPrice, '100.00000000');
+    assert.equal(h.requests[1].body.orderType, undefined);
+    assert.equal(h.requests[1].body.limitPrice, undefined);
   });
 for (const mismatch of [
   { asset: { id: 'other' } },

@@ -29,7 +29,7 @@ async function main(){
   await page.goto(`${base}/${kind}?fontScale=${fontScale}&kind=cross&protection=${protection}&screen=${scenario==='attached-entry'?'order':'detail'}&asset=BTC`);
   if(scenario==='attached-entry'){
     await page.getByTestId('order-type-select').click();
-    await page.getByTestId('order-type-toggle-limit').click();
+    await page.getByTestId('order-method-limit').click();
     await page.getByTestId('attached-entry-editor').waitFor();
   }else {
     await page.getByTestId(futures ? 'futures-protection-A:position' : 'holding-protection-BTC').click();

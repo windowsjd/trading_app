@@ -16,7 +16,9 @@ for(const account of ['general','season'])test(`${account} BUY Limit attaches le
  assert.equal(h.requests[1].body.orderType,'limit');assert.equal(h.requests[1].body.side,'buy');
 });
 test('attached inputs are optional and never shown for Market or Sell',async t=>{
- const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};await h.mount();t.after(h.close);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);await h.press(TEST_IDS.assetDetail.sellButton);await h.selectOrderType('limit');assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
+ const h=inlineTradingHarness();h.protections={tradingAccountId:'general',capabilities:{enabled:true,canCreateSpot:true,canUseSpotLimit:true},groups:[]};await h.mount();t.after(h.close);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);await h.press(TEST_IDS.assetDetail.sellButton);
+ // Sell offers no new limit, so there is nothing to attach legs to.
+ await h.press(TEST_IDS.order.typeSelect);assert.equal(h.node('order-method-limit') === undefined, true);assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
 });
 
 for(const phase of ['before-submit','quote-pending']) test(`disabled Spot attachment blocks ${phase} without hiding the editor`,async t=>{

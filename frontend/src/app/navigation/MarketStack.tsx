@@ -30,15 +30,17 @@ export default function MarketStack() {
         component={MarketSearchScreen}
         options={{ title: '종목 검색' }}
       />
+      {/* The trading screens' titles take the tab headers' heavy theme font:
+          same family, color and size, only bolder. */}
       <Stack.Screen
         name="AssetDetail"
         component={AssetDetailScreen}
-        options={{ title: '종목 상세' }}
+        options={({ theme }) => ({ title: '종목 상세', headerTitleStyle: theme.fonts.heavy })}
       />
       <Stack.Screen
         name="Order"
         component={OrderScreen}
-        options={{ title: '주문' }}
+        options={({ theme }) => ({ title: '주문', headerTitleStyle: theme.fonts.heavy })}
       />
       <Stack.Screen name="Futures" component={FuturesScreen} options={{ title: '암호화폐 선물' }} />
     </Stack.Navigator>

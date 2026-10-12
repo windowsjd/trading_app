@@ -184,12 +184,13 @@ async function run() {
     for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.5, 2]) {
       await page.setViewportSize({ width, height: 844 });
       await page.goto(`${base}/trading?screen=order&asset=SUI&fontScale=${fontScale}`);
+      await id('order-type-select').click(); await id('order-method-market').click();
       const input = id('order-quantity-input'); await input.fill('123.456');
       await page.setViewportSize({ width, height: 380 }); await input.focus(); await page.waitForTimeout(150);
       const visible = await input.boundingBox(); assert.ok(visible.y >= 0 && visible.y + visible.height <= 381, 'focused amount is visible after web resize');
       await id('order-execute-submit').scrollIntoViewIfNeeded(); const submit = await id('order-execute-submit').boundingBox(); assert.ok(submit.y >= 0 && submit.y + submit.height <= 381);
       assert.equal(await input.inputValue(), '123.456');
-      await id('order-type-select').click(); await id('order-type-toggle-limit').click(); await id('order-limit-price-input').fill('0.8592'); await page.waitForTimeout(150);
+      await id('order-type-select').click(); await id('order-method-limit').click(); await id('order-limit-price-input').fill('0.8592'); await page.waitForTimeout(150);
       const limit = await id('order-limit-price-input').boundingBox(); assert.ok(limit.y >= 0 && limit.y + limit.height <= 381);
       await page.goto(`${base}/navigation?navigation=1&account=general&fontScale=${fontScale}`); await id('home-total-asset').waitFor();
       await page.getByRole('tab', { name: '지갑', exact: true }).click(); await id('wallet-exchange').click();
