@@ -47,6 +47,7 @@ import { useAppearance, type AppearanceMode } from '../../theme/appearance';
 import { getHomeTier } from '../home/tierPresentation';
 import TierCard, { tierForeground, type TierPresentation } from '../home/TierCard';
 import RankingTierRowBackground, { RANKING_ROW_RADIUS } from './RankingTierRowBackground';
+import { getFinancialColors } from '../../theme/financialColors';
 
 type Props = RankingScreenProps;
 
@@ -402,21 +403,37 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
 }
 
 /**
- * Return rate (rise/fall colors, 0/unknown neutral) above total assets. On a
- * tier card they sit on a plate of the screen's own surface, so the financial
- * colors keep their contrast over every tier's metal; without a known tier the
- * plate is unpainted and the figures stay aligned with the tier rows.
+ * Figures sit directly on the metal. Choose direction colors for the actual
+ * surface (Whale is dark even in Light), keeping the user's financial palette.
  */
 function RankingFigures({ item, tier, mode }: { item: RankingItemDto; tier: TierPresentation | null; mode: AppearanceMode }) {
+  const { financialPreference } = useAppearance();
   const rate = getRecordFinancialDisplay(item.returnRate, 'rate');
   const total = `${formatKrw(item.totalAssetKrw)}원`;
+  const foreground = tier ? tierForeground(tier, mode) : undefined;
+  const darkSurface = mode === 'dark' || tier?.id === 'whale';
+  const direction = getFinancialColors(darkSurface ? 'dark' : 'light', financialPreference);
+  const sign = Number(item.returnRate);
+  const directional = rate.text !== '-' && sign !== 0;
+  // Tint/shade the existing hue only on artwork, whose luminance differs from
+  // the screen. Neutral and unavailable rates use the tier's normal foreground.
+  const ink = directional ? (sign > 0 ? direction.rise : direction.fall) : foreground?.color;
+  const color = tier && ink && directional
+    ? shadeFinancialInk(String(ink), darkSurface, tier.id === 'diamond') : ink ?? rate.color;
   return (
-    <View testID={`ranking-figures-${item.userId}`} style={[styles.figures, tier && (mode === 'dark' ? styles.plateDark : styles.plateLight)]}
+    <View testID={`ranking-figures-${item.userId}`} style={styles.figures}
       accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
-      <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
-      <Text testID={`ranking-total-${item.userId}`} style={styles.totalAsset}>{total}</Text>
+      <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, foreground, { color }]}>{rate.text}</Text>
+      <Text testID={`ranking-total-${item.userId}`} style={[styles.totalAsset, foreground]}>{total}</Text>
     </View>
   );
+}
+
+function shadeFinancialInk(hex: string, dark: boolean, diamond: boolean) {
+  const amount = dark ? .55 : diamond ? .6 : .55;
+  const target = dark ? 255 : 0;
+  return `#${[1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount) + target * amount)
+    .toString(16).padStart(2, '0')).join('')}`;
 }
 
 /**
@@ -434,6 +451,8 @@ function RankingRow({
   onPress: () => void;
 }) {
   const { mode } = useAppearance();
+  const { fontScale } = useWindowDimensions();
+  const stacked = fontScale > 1.3;
   const tier = getHomeTier(getRankingTier(item, rankType), mode);
   const foreground = tier ? tierForeground(tier, mode) : undefined;
   return (
@@ -443,9 +462,9 @@ function RankingRow({
       underlay={tier ? <RankingTierRowBackground tier={tier.id} mode={mode} /> : null}
       onPress={onPress}
     >
-      <View style={styles.rankLeft}>
+      <View style={[styles.rankLeft, stacked && styles.rankLeftStacked]}>
         <Text style={[styles.rankNumber, foreground]}>#{item.rank}</Text>
-        <View style={styles.profile}>
+        <View style={[styles.profile, stacked && styles.rowProfileStacked]}>
           <ProfileAvatar profileImageUrl={item.profileImageUrl} size={32} testID={`ranking-avatar-${item.userId}`} />
           <Text style={[styles.name, foreground]}>{item.nickname}</Text>
         </View>
@@ -477,11 +496,8 @@ const styles = StyleSheet.create({
   tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
   // Only when the figures cannot fit beside the name (narrow screens at large
-  // text) do they wrap under it; long values wrap inside the plate.
-  figures: { marginLeft: 'auto', flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch', gap: 2,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  plateLight: { backgroundColor: 'rgba(255,255,255,0.93)' },
-  plateDark: { backgroundColor: 'rgba(28,29,33,0.86)' },
+  // text) do they wrap under it; long values remain fully visible.
+  figures: { marginLeft: 'auto', flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch', gap: 2 },
   // The app's percent figures: system font, regular weight, tabular digits.
   // Only the size (18) keeps the ranking's emphasis.
   returnValue: { fontSize: 18, lineHeight: 26, textAlign: 'right', fontVariant: ['tabular-nums'] },
@@ -495,7 +511,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: RANKING_ROW_RADIUS,
-    paddingVertical: 8,
+    paddingVertical: 12,
     paddingHorizontal: 14,
     backgroundColor: semantic.surface,
     flexDirection: 'row',
@@ -516,6 +532,8 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   rankNumber: { minWidth: 28, flexShrink: 0, fontSize: 20, lineHeight: 28, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
+  rankLeftStacked: { flexBasis: '100%', flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
+  rowProfileStacked: { alignSelf: 'stretch', alignItems: 'flex-start' },
   name: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 22, fontWeight: '700' },
   footerLoader: { paddingVertical: 16 },
 });

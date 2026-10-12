@@ -1,5 +1,25 @@
 # Trading UI browser regression
 
+Ranking tier rows use `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/rankingTierBrowser.cjs`. The production RankingScreen, SVG artwork,
+theme, React Query, formatters and shared touch ink run with local HTTP fixtures.
+It checks 672 layouts (2,688 rows): six tiers plus unknown, Light/Dark,
+320/360/390/430px, font scales 1/1.5/2, normal/long nicknames and 16-digit assets,
+both financial palettes, and positive/negative/zero/unavailable returns. Raster
+glyph contrast must be >=4.5:1; text bounds/overlap, full values, background/rim
+bounds and absence of a figures plate are checked. Final tier, friends/TOP10,
+user navigation and touch ink with Reduced Motion are also exercised.
+Screenshots place the unchanged My standing card beside the ranking row.
+`RANKING_TIER_OUTPUT` selects artifacts; `RANKING_TIER_QUICK=1` selects the 14
+normal 390px layouts. `RANKING_TIER_BASELINE_SOURCE=/path/to/baseline/frontend`
+captures the same screen before the change (plate/contrast checks apply only to
+the current source). `RANKING_TIER_MODES`, `RANKING_TIER_WIDTHS` and
+`RANKING_TIER_FONTS` accept comma-separated subsets for focused checks.
+`BROWSER_EXECUTABLE_PATH`, `FONTCONFIG_FILE` and
+`LD_LIBRARY_PATH` can select an installed browser and Korean font/libraries.
+These are RN Web observations; physical Android/iOS text and rendering are
+separate device checks. No application dependency or data contract changes.
+
 Holdings and positions uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/holdingsBrowser.cjs`. Production Home (General/Season/Beginner),
 Wallet, Portfolio, market AccountHoldings, Futures detail and friend/ranking user
