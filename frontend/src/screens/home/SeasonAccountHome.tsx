@@ -30,7 +30,7 @@ import HomeAssetTrend, { type HomeEquityRange } from './HomeAssetTrend';
 import HomeAssetHero from './HomeAssetHero';
 import HomeHoldings, { useHomeHoldings } from './HomeHoldings';
 import HomeHotMarket, { type HomeHotMarketData } from './HomeHotMarket';
-import HomeAccountContext, { HomeTierBadge, type HomeAccountContextData } from './HomeAccountContext';
+import HomeAccountContext, { HomeTierBadge, HomeTierName, type HomeAccountContextData } from './HomeAccountContext';
 import type { AssetType } from '../../features/market/api';
 
 /**
@@ -232,6 +232,7 @@ export default function SeasonAccountHome({
           failed={equityQuery.isError}
           error={equityQuery.error}
           general={false}
+          trailing={<HomeTierName context={accountContext} />}
         />
 
         <HomeHoldings holdings={holdings} onOpenAsset={onOpenAsset} />

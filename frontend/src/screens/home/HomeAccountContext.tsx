@@ -14,7 +14,7 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { useAppearance } from '../../theme/appearance';
 import { getHomeTier } from './tierPresentation';
-import TierEmblem from './TierEmblem';
+import TierEmblem, { tierEmblemWidth } from './TierEmblem';
 
 export function useHomeAccountContext(account: TradingAccountDto | null) {
   const season = account?.mode === 'season' ? account.season : null;
@@ -70,23 +70,35 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
   );
 }
 
-/** Emblem sizes beside the total assets, by available width (dp) per text scale. */
+/**
+ * Emblem sizes beside the total assets (dp, before the optical scale), chosen
+ * from the visible Whale silhouette on common phones: the largest that still
+ * fits beside the performance lines without crowding them. Narrow screens and
+ * large text keep a smaller emblem so nothing overlaps or clips.
+ */
 function homeTierBadgeSize(width: number, fontScale: number) {
-  return width < 360 || fontScale > 1.3 ? 88 : 112;
+  if (width < 360 || fontScale > 1.3) return 100;
+  return width < 400 ? 132 : 140;
+}
+
+/** One column for the emblem and its name, so the name centers under it. */
+function useHomeTierColumn(context: HomeAccountContextData) {
+  const { mode } = useAppearance();
+  const { width, fontScale } = useWindowDimensions();
+  const standing = readSeasonStanding(context, mode);
+  const size = homeTierBadgeSize(width, fontScale);
+  return { ...standing, size, column: standing.tier ? tierEmblemWidth(standing.tier.id, size) : size };
 }
 
 /**
  * The season tier emblem beside the total assets. The emblem keeps its
  * original proportions; the numbers stay the primary information. The hero
  * places it beside the total, or lower beside the performance lines when the
- * total needs the width (HomeAssetHero).
+ * total needs the width (HomeAssetHero). Its name is HomeTierName.
  */
 export function HomeTierBadge({ context }: { context: HomeAccountContextData }) {
-  const { mode } = useAppearance();
-  const { width, fontScale } = useWindowDimensions();
-  const { tier, tierLabel } = readSeasonStanding(context, mode);
+  const { tier, size } = useHomeTierColumn(context);
   if (!context.hasSeason) return null;
-  const size = homeTierBadgeSize(width, fontScale);
   return (
     <View testID="home-tier-badge" style={styles.tier}>
       {tier ? <TierEmblem tier={tier.id} size={size} /> :
@@ -94,6 +106,19 @@ export function HomeTierBadge({ context }: { context: HomeAccountContextData }) 
           accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
           <View style={styles.neutralRing}><Text style={styles.neutralMark}>—</Text></View>
         </View>}
+    </View>
+  );
+}
+
+/**
+ * The tier name under the emblem, on the asset trend disclosure's line
+ * (HomeAssetTrend's `trailing`): both share the emblem's right-aligned column.
+ */
+export function HomeTierName({ context }: { context: HomeAccountContextData }) {
+  const { tierLabel, column } = useHomeTierColumn(context);
+  if (!context.hasSeason) return null;
+  return (
+    <View style={[styles.tierNameColumn, { minWidth: column }]}>
       <Text testID={TEST_IDS.home.tier} style={styles.tierName} accessibilityLabel={`시즌 티어 ${tierLabel}`}
         accessibilityLiveRegion="polite">{tierLabel}</Text>
     </View>
@@ -104,7 +129,8 @@ const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
   identity: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0 },
   nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 16, fontWeight: '600', lineHeight: 24 },
-  tier: { alignItems: 'center', gap: 2, flexShrink: 0, maxWidth: 136 },
+  tier: { alignItems: 'center', flexShrink: 0 },
+  tierNameColumn: { maxWidth: '100%', flexShrink: 1, alignItems: 'center' },
   tierName: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
   neutral: { alignItems: 'center', justifyContent: 'center' },
   neutralRing: { width: '65%', height: '65%', borderRadius: 999, borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },

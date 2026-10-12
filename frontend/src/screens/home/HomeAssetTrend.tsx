@@ -12,9 +12,13 @@ import { formatKrwDecimal } from '../../utils/format';
 export const HOME_EQUITY_RANGES = ['7d', '30d', '90d', '180d', '360d'] as const;
 export type HomeEquityRange = typeof HOME_EQUITY_RANGES[number];
 
-/** The disclosure and its content are adjacent in both account modes. */
+/**
+ * The disclosure and its content are adjacent in both account modes. A season
+ * account's tier name shares the disclosure's row (`trailing`), centered on
+ * the same line under the emblem above it.
+ */
 export default function HomeAssetTrend({
-  expanded, onToggle, range, onRangeChange, equity, loading, failed, error, general,
+  expanded, onToggle, range, onRangeChange, equity, loading, failed, error, general, trailing,
 }: {
   expanded: boolean;
   onToggle: () => void;
@@ -25,26 +29,30 @@ export default function HomeAssetTrend({
   failed: boolean;
   error?: unknown;
   general: boolean;
+  trailing?: React.ReactNode;
 }) {
   const points = useMemo(() => equity?.points.map((point) => ({
     x: point.snapshotDate,
     label: point.snapshotDate,
     y: point.totalAssetKrw,
   })) ?? [], [equity]);
+  const toggle = (
+    <ActionPressable
+      testID="home-trend-toggle"
+      accessibilityRole="button"
+      accessibilityLabel="자산추이 보기"
+      accessibilityState={{ expanded }}
+      aria-expanded={expanded}
+      onPress={onToggle}
+      style={[styles.toggle, !!trailing && styles.toggleLead]}
+    >
+      <Text style={styles.toggleText}>자산추이 보기</Text>
+      <DisclosureTriangle testID="home-trend-disclosure" direction={expanded ? 'up' : 'down'} color={semantic.secondaryActionForeground} />
+    </ActionPressable>
+  );
   return (
     <View style={styles.container}>
-      <ActionPressable
-        testID="home-trend-toggle"
-        accessibilityRole="button"
-        accessibilityLabel="자산추이 보기"
-        accessibilityState={{ expanded }}
-        aria-expanded={expanded}
-        onPress={onToggle}
-        style={styles.toggle}
-      >
-        <Text style={styles.toggleText}>자산추이 보기</Text>
-        <DisclosureTriangle testID="home-trend-disclosure" direction={expanded ? 'up' : 'down'} color={semantic.secondaryActionForeground} />
-      </ActionPressable>
+      {trailing ? <View style={styles.toggleRow}>{trailing}{toggle}</View> : toggle}
       {expanded ? (
         <View testID="home-trend-chart" style={styles.card}>
           <View style={styles.header}>
@@ -97,6 +105,10 @@ export default function HomeAssetTrend({
 const styles = StyleSheet.create({
   container: { minWidth: 0 },
   toggle: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', justifyContent: 'center', paddingHorizontal: 8 },
+  // Reversed so a wrapping row (narrow screens, large text) keeps the trailing
+  // tier name under the emblem and moves the disclosure to the next line.
+  toggleRow: { flexDirection: 'row-reverse', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, minWidth: 0 },
+  toggleLead: { marginRight: 'auto', alignSelf: 'auto', flexShrink: 1 },
   toggleText: { flexShrink: 1, fontSize: 13, lineHeight: 20, color: semantic.secondaryActionForeground, fontWeight: '600' },
   // No outline: the transparent 1px border keeps the content inset unchanged.
   card: { borderWidth: 1, borderColor: 'transparent', borderRadius: 14, padding: 16, backgroundColor: semantic.surface, gap: 12 },

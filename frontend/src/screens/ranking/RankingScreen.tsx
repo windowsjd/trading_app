@@ -43,10 +43,10 @@ import SegmentedControl from '../../components/common/SegmentedControl';
 import { getMe, type MeDto } from '../../features/me/api';
 import WhaleLoader from '../../components/states/WhaleLoader';
 import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
-import { useAppearance } from '../../theme/appearance';
+import { useAppearance, type AppearanceMode } from '../../theme/appearance';
 import { getHomeTier } from '../home/tierPresentation';
-import TierEmblem from '../home/TierEmblem';
-import TierCard, { tierForeground } from '../home/TierCard';
+import TierCard, { tierForeground, type TierPresentation } from '../home/TierCard';
+import RankingTierRowBackground, { RANKING_ROW_RADIUS } from './RankingTierRowBackground';
 
 type Props = RankingScreenProps;
 
@@ -401,35 +401,29 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
   );
 }
 
-/** Emblem sizes for ~80% of a one-line row; they never grow with the text. */
-function rankingEmblemSize(width: number) {
-  return width < 380 ? 48 : 60;
-}
-
 /**
- * The tier emblem left of the two figures: return rate (rise/fall colors,
- * 0/unknown neutral) above total assets. Without a known tier an empty slot of
- * the same size keeps every row's figures aligned.
+ * Return rate (rise/fall colors, 0/unknown neutral) above total assets. On a
+ * tier card they sit on a plate of the screen's own surface, so the financial
+ * colors keep their contrast over every tier's metal; without a known tier the
+ * plate is unpainted and the figures stay aligned with the tier rows.
  */
-function RankingFigures({ item, rankType }: { item: RankingItemDto; rankType?: RankingRankType }) {
-  const { mode } = useAppearance();
-  const { width } = useWindowDimensions();
-  const tier = getHomeTier(getRankingTier(item, rankType), mode);
+function RankingFigures({ item, tier, mode }: { item: RankingItemDto; tier: TierPresentation | null; mode: AppearanceMode }) {
   const rate = getRecordFinancialDisplay(item.returnRate, 'rate');
   const total = `${formatKrw(item.totalAssetKrw)}원`;
-  const size = rankingEmblemSize(width);
   return (
-    <View style={styles.figures} accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
-      {tier ? <TierEmblem tier={tier.id} size={size} />
-        : <View testID={`ranking-tier-slot-${item.userId}`} style={{ width: size, height: size }} />}
-      <View style={styles.amounts}>
-        <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
-        <Text testID={`ranking-total-${item.userId}`} style={styles.totalAsset}>{total}</Text>
-      </View>
+    <View testID={`ranking-figures-${item.userId}`} style={[styles.figures, tier && (mode === 'dark' ? styles.plateDark : styles.plateLight)]}
+      accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
+      <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
+      <Text testID={`ranking-total-${item.userId}`} style={styles.totalAsset}>{total}</Text>
     </View>
   );
 }
 
+/**
+ * Each row is drawn as its tier's card, redrawn for the row's wide, short
+ * shape (RankingTierRowBackground); the emblem stays on 내 순위 only. Unknown
+ * tiers keep the plain card.
+ */
 function RankingRow({
   item,
   rankType,
@@ -439,21 +433,25 @@ function RankingRow({
   rankType?: RankingRankType;
   onPress: () => void;
 }) {
+  const { mode } = useAppearance();
+  const tier = getHomeTier(getRankingTier(item, rankType), mode);
+  const foreground = tier ? tierForeground(tier, mode) : undefined;
   return (
     <ActionPressable
       testID={TEST_IDS.ranking.item(item.userId)}
-      style={styles.rankRow}
+      style={[styles.rankRow, tier && { borderWidth: 0, backgroundColor: tier.palette.backgroundColor }]}
+      underlay={tier ? <RankingTierRowBackground tier={tier.id} mode={mode} /> : null}
       onPress={onPress}
     >
       <View style={styles.rankLeft}>
-        <Text style={styles.rankNumber}>#{item.rank}</Text>
+        <Text style={[styles.rankNumber, foreground]}>#{item.rank}</Text>
         <View style={styles.profile}>
           <ProfileAvatar profileImageUrl={item.profileImageUrl} size={32} testID={`ranking-avatar-${item.userId}`} />
-          <Text style={styles.name}>{item.nickname}</Text>
+          <Text style={[styles.name, foreground]}>{item.nickname}</Text>
         </View>
       </View>
 
-      <RankingFigures item={item} rankType={rankType} />
+      <RankingFigures item={item} tier={tier} mode={mode} />
     </ActionPressable>
   );
 }
@@ -478,12 +476,12 @@ const styles = StyleSheet.create({
   myRank: { fontSize: 32, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
   tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
-  // Emblem left of both figures. Only when even that cannot fit (narrow
-  // screens at large text) do the figures wrap under the emblem; long values
-  // wrap inside their full-width lines rather than spilling over the emblem.
-  figures: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', columnGap: 8, rowGap: 4,
-    marginLeft: 'auto', maxWidth: '100%', minWidth: 0 },
-  amounts: { flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch', gap: 2 },
+  // Only when the figures cannot fit beside the name (narrow screens at large
+  // text) do they wrap under it; long values wrap inside the plate.
+  figures: { marginLeft: 'auto', flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch', gap: 2,
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  plateLight: { backgroundColor: 'rgba(255,255,255,0.93)' },
+  plateDark: { backgroundColor: 'rgba(28,29,33,0.86)' },
   // The app's percent figures: system font, regular weight, tabular digits.
   // Only the size (18) keeps the ranking's emphasis.
   returnValue: { fontSize: 18, lineHeight: 26, textAlign: 'right', fontVariant: ['tabular-nums'] },
@@ -496,9 +494,8 @@ const styles = StyleSheet.create({
   rankRow: {
     borderWidth: 1,
     borderColor: semantic.border,
-    borderRadius: 14,
-    // With the 60dp emblem the one-line row is ~76dp tall: emblem ≈ 80%.
-    paddingVertical: 7,
+    borderRadius: RANKING_ROW_RADIUS,
+    paddingVertical: 8,
     paddingHorizontal: 14,
     backgroundColor: semantic.surface,
     flexDirection: 'row',

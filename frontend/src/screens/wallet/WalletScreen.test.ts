@@ -65,9 +65,13 @@ describe('selected account Wallet and shared Home holdings', () => {
       assert.equal(elements(collapsed, 'Pressable').filter(row => row.props.testID?.startsWith('home-position-item-')).length, 1);
       find(collapsed, 'home-holdings-toggle').props.onPress();
       const home = h.render().tree, wallet = h.renderWallet().tree;
-      // The same hero; Home alone adds the season tier badge beside the total.
-      assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')) + (mode === 'season' ? ' Silver' : ''));
+      // The same hero; Home alone adds the season tier emblem beside the total
+      // and its name on the asset trend disclosure's line.
+      assert.equal(text(find(home, 'home-summary-card')), text(find(wallet, 'home-summary-card')));
+      assert.equal(find(home, 'home-tier-badge') !== undefined, mode === 'season');
+      assert.equal(mode === 'season' ? text(find(home, 'home-tier')) : find(home, 'home-tier') === undefined, mode === 'season' ? 'Silver' : true);
       assert.equal(find(wallet, 'home-tier-badge') === undefined, true);
+      assert.equal(find(wallet, 'home-tier') === undefined, true);
       assert.equal(text(find(home, 'home-position-item-0')), text(find(wallet, 'wallet-position-0')));
       for (const [index, quantity] of ['10 주', '0.125 주', '0.000805 BTC'].entries()) {
         assert.equal(find(home, `home-position-item-${index}-quantity`) !== undefined, true);

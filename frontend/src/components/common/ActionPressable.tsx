@@ -29,13 +29,15 @@ type Props = Omit<PressableProps, 'android_ripple'> & {
   /** Trade-executing commands use `subtle`: feedback without emphasis. */
   ripple?: RippleTone;
 };
+/** Row/card decoration painted beneath the press ink (default feedback only). */
+type UnderlayProps = { underlay?: React.ReactNode };
 
 /**
  * Buttons scale slightly and show ink from the touch point; rows/cards show
  * the same ink without scaling. Selection controls keep one static tint (their
  * sliding indicator is the feedback).
  */
-export default function ActionPressable({ feedback, primary = false, gradient, ...props }: Props & {
+export default function ActionPressable({ feedback, primary = false, gradient, underlay, ...props }: Props & UnderlayProps & {
   /** `none` is reserved for Market sort; `button` requires a visual surface. */
   feedback?: 'default' | 'button' | 'selection' | 'none';
 }) {
@@ -43,7 +45,7 @@ export default function ActionPressable({ feedback, primary = false, gradient, .
   if (feedback === 'button' || (feedback === undefined && primary)) {
     return <ButtonActionPressable {...props} gradient={gradient ?? (primary ? primaryGradient : undefined)} />;
   }
-  return <FeedbackActionPressable {...props} primary={primary} ink={feedback !== 'selection'} />;
+  return <FeedbackActionPressable {...props} primary={primary} ink={feedback !== 'selection'} underlay={underlay} />;
 }
 
 const isBlocked = (disabled: PressableProps['disabled'], props: Props) =>
@@ -126,7 +128,7 @@ function clipShape(base: ViewStyle): ViewStyle {
 
 type Measurable = { measure?: (callback: (x: number, y: number, width: number, height: number, pageX: number, pageY: number) => void) => void };
 
-function FeedbackActionPressable({ children, style, disabled, onPress, onPressIn, onPressOut, primary = false, feedbackStyle, ink: inked, ripple: tone, ref, ...props }: Props & { ink: boolean }) {
+function FeedbackActionPressable({ children, style, disabled, onPress, onPressIn, onPressOut, primary = false, feedbackStyle, ink: inked, ripple: tone, underlay, ref, ...props }: Props & UnderlayProps & { ink: boolean }) {
   const { colors, mode, financialPreference } = useAppearance();
   const reduced = useReducedMotion();
   const ink = useInkRipple(reduced);
@@ -189,6 +191,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, onPressIn
         const ripple = getRipplePalette(surface, tone);
         return (
           <>
+            {underlay}
             {showPrimary ? <PrimaryButtonBackground shape={shape} /> : null}
             {enabled && inked ? <InkRippleLayer ripple={ink} color={ripple.rippleColor} opacity={ripple.rippleOpacity} style={layer} /> : null}
             {enabled && !inked ? (

@@ -19,13 +19,15 @@ function setup() {
   // The account box and the tier badge beside the total assets share one context.
   const Card = module.default;
   const Badge = module.HomeTierBadge;
+  const Name = module.HomeTierName;
   const context = {
     hasSeason: true, seasonId: 'selected-season', rankType: 'daily',
     meQuery: { data: { nickname: 'mycroft', profileImageUrl: null } },
     rankingQuery: { isLoading: false, isError: false, data: { state: 'available', myRanking: { state: 'available', rank: 12, provisionalTier: 'gold', finalTier: 'diamond' } } },
   };
   const tree = () => React.createElement(React.Fragment, null,
-    React.createElement(Card, { context }), React.createElement('Hero', null, React.createElement(Badge, { context })));
+    React.createElement(Card, { context }), React.createElement('Hero', null, React.createElement(Badge, { context })),
+    React.createElement('Trend', null, React.createElement(Name, { context })));
   const renderer = h.render(tree());
   const node = id => renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === id)[0];
   return { h, context, renderer, node, update: () => act(() => renderer.update(tree())), close: () => act(() => renderer.unmount()) };
@@ -49,6 +51,9 @@ for (const [canonical, name, id] of [
   // The emblem sits beside the total assets; Home's account box carries no tier art.
   assert.ok(h.renderer.root.findByType('Hero').findAll((n: any) => n.props.testID === `home-emblem-${id}`).length === 1);
   assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.testID === `home-emblem-${id}`).length, 0);
+  // Its name sits on the asset trend disclosure's line, not inside the hero.
+  assert.equal(h.renderer.root.findByType('Trend').findAll((n: any) => n.props.testID === 'home-tier').length > 0, true);
+  assert.equal(h.renderer.root.findByType('Hero').findAll((n: any) => n.props.testID === 'home-tier').length, 0);
   assert.equal(h.node(`home-tier-background-${id}-light`) === undefined, true);
   assert.deepEqual(Object.keys(h.renderer.root.findByType('AccountSwitcher').props).sort(), ['children', 'home']);
 });
@@ -102,6 +107,7 @@ it('general account has no tier, frame, background or rank; missing me does not 
   assert.ok(h.node('home-emblem-gold'));
   h.context.hasSeason = false; h.context.seasonId = null; h.update();
   for (const id of ['home-tier', 'home-tier-image', 'home-tier-neutral', 'home-rank', 'home-tier-badge']) assert.equal(h.node(id) === undefined, true);
+  assert.equal(h.renderer.root.findByType('Trend').findAll((n: any) => typeof n.type === 'string' && n.type !== 'Trend').length, 0);
 });
 
 it('keeps the emblem out of the account box and leaves all text untruncated', t => {
@@ -122,7 +128,7 @@ it('the account box never prints a rank, and an invalid rank never hides the kno
   }
 });
 
-for (const [width, fontScale, size] of [[390, 1, 112], [360, 1.3, 112], [359, 1, 88], [390, 1.5, 88], [320, 2, 88]] as const) {
+for (const [width, fontScale, size] of [[430, 1, 140], [390, 1, 132], [360, 1.3, 132], [359, 1, 100], [390, 1.5, 100], [320, 2, 100]] as const) {
   it(`the emblem beside the total is ${size}dp at ${width}dp / text ×${fontScale}, keeping its proportions`, t => {
     const h = setup(); t.after(h.close);
     h.h.dimensions = { ...h.h.dimensions, width, fontScale };
@@ -133,5 +139,10 @@ for (const [width, fontScale, size] of [[390, 1, 112], [360, 1.3, 112], [359, 1,
     const emblem = flatten(h.node('home-emblem-gold').props.style);
     assert.equal(Math.abs(emblem.width / emblem.height - 1) < 0.2, true, 'original aspect, never stretched to the slot');
     assert.equal(emblem.width > size * 0.8 && emblem.width <= size * 1.1, true);
+    // The name's column is the emblem's own width, so it centers under it.
+    const column = () => flatten(h.renderer.root.findByType('Trend').findAll((n: any) => typeof n.type === 'string' && n.type !== 'Trend')[0].props.style).minWidth;
+    assert.equal(column(), emblem.width);
+    h.context.rankingQuery.data.myRanking.provisionalTier = 'master'; h.update();
+    assert.equal(column(), flatten(h.node('home-emblem-whale').props.style).width);
   });
 }

@@ -18,6 +18,12 @@ export const EMBLEM_OPTICAL_SCALE: Record<HomeTier, number> = {
   bronze: 1, silver: 1.005, gold: 1.01, platinum: 1.015, diamond: 0.985, whale: 1.065,
 };
 
+/** The emblem's slot width at `size`: its visible silhouette, optically scaled. */
+export function tierEmblemWidth(tier: HomeTier, size: number) {
+  // Same arithmetic as TierEmblem, so the column matches its slot exactly.
+  return preparation[tier].displayAt160.width * (size / 160 * EMBLEM_OPTICAL_SCALE[tier]);
+}
+
 export default function TierEmblem({ tier, size }: { tier: HomeTier; size: number }) {
   // Keep the reviewed slot, silhouette area and optical scale. New originals
   // include transparent padding: position the complete canvas around the same

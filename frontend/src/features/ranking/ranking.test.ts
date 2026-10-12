@@ -153,9 +153,14 @@ describe('ranking wire response rendering', () => {
     assert.match(html, /#2/);
     assert.match(html, /10%/);
     assert.match(html, /999,999/);
-    // Tiers are emblems beside the return rate (master is shown as Whale), never raw text.
-    assert.match(html, /home-emblem-whale/);
+    // Each row is drawn as its tier's card (master is shown as Whale), never raw
+    // text; the emblem and the original card artwork stay on 내 순위 only.
+    assert.match(html, /ranking-tier-background-whale-light/);
+    assert.match(html, /ranking-tier-background-silver-light/);
+    assert.equal(html.match(/data-testid="home-emblem-/g)?.length, 1, 'only my card keeps an emblem');
     assert.match(html, /home-emblem-silver/);
+    assert.match(html, /home-tier-background-silver-light/);
+    assert.match(html, /aria-label="Whale 티어, 수익률 \+10%, 총자산 999,999원"/, 'the tier is announced, not only colored');
     assert.doesNotMatch(html, /퍼센타일|등급 |>master<|>silver</);
   });
 
@@ -258,7 +263,35 @@ describe('ranking wire response rendering', () => {
     const html = h.render();
     assert.match(html, /최종 랭킹 확정/);
     assert.match(html, /home-emblem-diamond/);
-    assert.doesNotMatch(html, /home-emblem-whale|home-emblem-silver/);
+    assert.equal(html.match(/data-testid="ranking-tier-background-diamond-light"/g)?.length, 2);
+    assert.doesNotMatch(html, /home-emblem-whale|home-emblem-silver|ranking-tier-background-(whale|silver)/);
+  });
+
+  it('draws every row as its tier card without an emblem; unknown tiers keep the plain card', () => {
+    const h = createHarness();
+    const tiers = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'master', null, 'grandmaster'];
+    h.page.rankings = tiers.map((tier, index) => ({
+      ...availableRankings.rankings[0], rank: index + 1, seasonParticipantId: `sp-${index}`, userId: `user-${index}`,
+      provisionalTier: tier, finalTier: null, returnRate: index % 2 ? '-3.5' : '7.25',
+    }));
+    const html = h.render();
+    const row = (index: number) => {
+      const start = html.indexOf(`data-testid="ranking-item-user-${index}"`);
+      const end = html.indexOf('data-testid="ranking-item-user-', start + 1);
+      return html.slice(start, end === -1 ? undefined : end);
+    };
+    for (const [index, visual] of ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'whale'].entries()) {
+      assert.equal(row(index).includes(`ranking-tier-background-${visual}-light`), true, visual);
+      assert.equal(/home-emblem-|home-tier-image/.test(row(index)), false, `${visual} row has no emblem`);
+      assert.equal(row(index).includes(`aria-label="${visual === 'whale' ? 'Whale' : visual[0].toUpperCase() + visual.slice(1)} 티어, 수익률`), true);
+    }
+    for (const index of [6, 7]) {
+      assert.equal(/ranking-tier-background-|home-emblem-|ranking-tier-slot-/.test(row(index)), false, 'no invented tier');
+      assert.equal(row(index).includes('aria-label="수익률 '), true);
+    }
+    // Rise/fall meaning and both figures stay on every row.
+    assert.equal(/ranking-return-user-1"[^>]*>-3\.5%</.test(html) && /ranking-return-user-0"[^>]*>\+7\.25%</.test(html), true);
+    assert.equal(html.match(/data-testid="ranking-total-user-/g)?.length, tiers.length);
   });
 
   it('renders long nicknames and financial text without a line truncation limit', () => {
