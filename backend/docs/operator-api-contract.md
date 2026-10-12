@@ -438,7 +438,7 @@ Validation:
 - Target not found returns `TARGET_USER_NOT_FOUND`.
 - Admin cannot change their own role: `CANNOT_CHANGE_OWN_ROLE`.
 - Last active admin cannot be demoted to `user` or `operator`: `LAST_ADMIN_ROLE_CHANGE_FORBIDDEN`.
-- Last-admin protection counts only active admin users.
+- Last-admin protection counts only active admin users. Role/status changes lock the target user before reading it; active-admin reductions share a PostgreSQL transaction advisory lock and recount under READ COMMITTED. This preserves at least one active admin across server instances, including mixed role/status requests.
 - Deleted target direct role change is forbidden: `TARGET_USER_DELETED`.
 - Suspended `user` cannot be promoted to `operator` or `admin`: `TARGET_USER_SUSPENDED_PROMOTION_FORBIDDEN`.
 - Suspended `operator` or `admin` can be demoted to `user`.
@@ -493,7 +493,7 @@ Validation:
 - Target not found returns `TARGET_USER_NOT_FOUND`.
 - Admin cannot change their own status: `CANNOT_CHANGE_OWN_STATUS`.
 - Last active admin cannot be suspended or deleted: `LAST_ADMIN_STATUS_CHANGE_FORBIDDEN`.
-- Last-admin protection counts only `status=active AND role=admin`.
+- Last-admin protection counts only `status=active AND role=admin`; suspension/deletion shares the role-change reduction lock. Ordinary user status changes do not acquire that shared lock. Restore locks only its target. User, refresh-session revocation and success audit writes remain in the same transaction.
 - Same-status request returns `USER_STATUS_ALREADY_ASSIGNED`.
 - Deleted users cannot be restored through status patch: `USE_RESTORE_ENDPOINT`.
 - `active -> suspended`, `suspended -> active`, and `active/suspended -> deleted` are allowed.

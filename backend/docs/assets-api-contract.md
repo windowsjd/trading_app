@@ -516,3 +516,15 @@ ordinary error codes/messages and successful price/source payloads are unchanged
 Each row explicitly supplies its own evidence; request/shared cache context is not
 inherited. The source observation boundaries are documented in
 [provider selection diagnostics](provider-ingestion-foundation.md#admin-selection-failure-evidence).
+
+### WebSocket asynchronous message failures
+
+Unexpected message-processing failures return the existing generic WS error
+shape: `{ "type": "error", "code": "SUBSCRIPTION_FAILED", "message":
+"Subscription could not be completed. Please retry." }`. This fixed fallback
+does not replace channel-specific domain validation errors. Server logs retain
+only `websocket_message_failed` / `WS_MESSAGE_FAILED`, without raw DB errors,
+queries, payloads or credentials. The connection remains available for retry;
+other clients and their subscriptions are preserved. Ticker/candle validation
+in flight cannot register a subscription after unsubscribe or disconnect.
+Existing candle-overlay stale and order-book unavailable contracts remain intact.

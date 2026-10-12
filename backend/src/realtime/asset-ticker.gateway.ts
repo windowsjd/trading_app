@@ -23,7 +23,7 @@ import {
 } from '@nestjs/common';
 import { IncomingMessage } from 'node:http';
 import { URL } from 'node:url';
-import { WebSocket, WebSocketServer as WsServer } from 'ws';
+import { WebSocket, WebSocketServer as WsServer, type RawData } from 'ws';
 import { CurrencyCode, UserStatus, Prisma } from '../generated/prisma/client';
 import {
   AssetsService,
@@ -138,6 +138,11 @@ export class AssetTickerGateway
     RealtimeAssetMetadata
   >();
   private readonly clients = new Map<WebSocket, ClientState>();
+  // Identity tokens cancel validations in flight without registering a subscription.
+  private readonly pendingSubscriptions = new WeakMap<
+    ClientState,
+    Map<string, object>
+  >();
   private pollTimer: NodeJS.Timeout | null = null;
   private readonly logger = new Logger(AssetTickerGateway.name);
   private pollInFlight = false;
@@ -192,7 +197,13 @@ export class AssetTickerGateway
     this.unsubscribeProviderPrices =
       this.providerPricePubSub?.subscribe((event) => {
         if (event.type === 'fx_rate_updated') this.pushFxRateUpdate();
-        else void this.pushRealtimePriceEvent(event);
+        else
+          void this.pushRealtimePriceEvent(event).catch(() => {
+            this.logger.warn({
+              event: 'ticker_event_failed',
+              code: 'TICKER_EVENT_FAILED',
+            });
+          });
       }) ?? null;
     this.backpressureTimer = setInterval(() => {
       this.flushPendingCandles();
@@ -247,8 +258,25 @@ export class AssetTickerGateway
       orderBookSubscriptions: new Map(),
       pendingOrderBooks: new Map(),
     });
-    client.on('message', (data) => {
-      void this.handleMessage(client, data.toString());
+    client.on('message', (data: RawData) => {
+      const rawMessage = (
+        Array.isArray(data)
+          ? Buffer.concat(data)
+          : Buffer.isBuffer(data)
+            ? data
+            : Buffer.from(data)
+      ).toString('utf8');
+      void this.handleMessage(client, rawMessage).catch(() => {
+        this.logger.warn({
+          event: 'websocket_message_failed',
+          code: 'WS_MESSAGE_FAILED',
+        });
+        this.sendError(
+          client,
+          'SUBSCRIPTION_FAILED',
+          'Subscription could not be completed. Please retry.',
+        );
+      });
     });
     client.on('error', () => {
       this.handleDisconnect(client);
@@ -259,7 +287,32 @@ export class AssetTickerGateway
     const state = this.clients.get(client);
     state?.orderBookSubscriptions.clear();
     state?.pendingOrderBooks.clear();
+    if (state) this.pendingSubscriptions.delete(state);
     this.clients.delete(client);
+  }
+
+  private beginSubscription(
+    client: WebSocket,
+    state: ClientState,
+    key: string,
+  ) {
+    let pending = this.pendingSubscriptions.get(state);
+    if (!pending) {
+      pending = new Map();
+      this.pendingSubscriptions.set(state, pending);
+    }
+    const token = {};
+    pending.set(key, token);
+    return {
+      current: () =>
+        !this.destroyed &&
+        client.readyState === WebSocket.OPEN &&
+        this.clients.get(client) === state &&
+        pending.get(key) === token,
+      finish: () => {
+        if (pending.get(key) === token) pending.delete(key);
+      },
+    };
   }
 
   private async handleMessage(client: WebSocket, rawMessage: string) {
@@ -320,7 +373,21 @@ export class AssetTickerGateway
       return;
     }
     if (message.type === 'subscribe') {
-      const ticker = await this.buildSnapshotTickerMessage(assetId);
+      const attempt = this.beginSubscription(
+        client,
+        state,
+        `ticker:${assetId}`,
+      );
+      let snapshot: Awaited<
+        ReturnType<AssetTickerGateway['buildSnapshotTickerMessage']>
+      >;
+      try {
+        snapshot = await this.buildSnapshotTickerMessage(assetId);
+        if (!attempt.current()) return;
+      } finally {
+        attempt.finish();
+      }
+      const ticker = snapshot;
       if (!ticker) {
         this.sendInvalidSubscription(client);
         return;
@@ -337,6 +404,7 @@ export class AssetTickerGateway
     }
 
     if (message.type === 'unsubscribe') {
+      this.pendingSubscriptions.get(state)?.delete(`ticker:${assetId}`);
       state.subscriptions.delete(assetId);
       state.pendingTickers.delete(assetId);
       this.sendJson(client, {
@@ -523,6 +591,7 @@ export class AssetTickerGateway
     const interval = message.interval as LiveCandleInterval;
     const key = candleSubscriptionKey(assetId, interval);
     if (message.type === 'unsubscribe') {
+      this.pendingSubscriptions.get(state)?.delete(`candle:${key}`);
       state.candleSubscriptions.delete(key);
       state.pendingCandles.delete(key);
       this.sendJson(client, {
@@ -555,16 +624,25 @@ export class AssetTickerGateway
         );
         return;
       }
-      const asset = await this.prisma.asset.findUnique({
-        where: { id: assetId },
-        select: {
-          id: true,
-          isActive: true,
-          symbol: true,
-          market: true,
-          assetType: true,
-        },
-      });
+      const attempt = this.beginSubscription(client, state, `candle:${key}`);
+      const asset = await (async () => {
+        try {
+          const asset = await this.prisma.asset.findUnique({
+            where: { id: assetId },
+            select: {
+              id: true,
+              isActive: true,
+              symbol: true,
+              market: true,
+              assetType: true,
+            },
+          });
+          return attempt.current() ? asset : undefined;
+        } finally {
+          attempt.finish();
+        }
+      })();
+      if (asset === undefined) return;
       if (!asset?.isActive || isFuturesOnlyAsset(asset)) {
         this.sendCandleSubscriptionError(
           client,

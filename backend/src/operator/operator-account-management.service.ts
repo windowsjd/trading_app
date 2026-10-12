@@ -10,6 +10,7 @@ import type { AuthenticatedUser } from '../auth/auth.types';
 import { buildPagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { OperatorAuditService } from './operator-audit.service';
+import { lockManagedUser, lockActiveAdminReduction } from './active-admin-lock';
 
 export type OperatorRequestContext = {
   requestId?: string | null;
@@ -198,85 +199,90 @@ export class OperatorAccountManagementService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const target = await tx.user.findUnique({
-          where: {
-            id: targetUserId,
-          },
-          select: USER_SAFE_SELECT,
-        });
-
-        if (!target) {
-          this.throwApiError(
-            HttpStatus.NOT_FOUND,
-            'TARGET_USER_NOT_FOUND',
-            'Target user not found.',
-          );
-        }
-
-        this.validateRoleChangeTarget(target, requestedRole);
-
-        if (this.isActiveAdminDemotion(target, requestedRole)) {
-          const activeAdminCount = await tx.user.count({
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await lockManagedUser(tx, targetUserId);
+          const target = await tx.user.findUnique({
             where: {
-              role: UserRole.admin,
-              status: UserStatus.active,
+              id: targetUserId,
             },
+            select: USER_SAFE_SELECT,
           });
 
-          if (activeAdminCount <= 1) {
+          if (!target) {
             this.throwApiError(
-              HttpStatus.CONFLICT,
-              'LAST_ADMIN_ROLE_CHANGE_FORBIDDEN',
-              'Cannot demote the last active admin.',
+              HttpStatus.NOT_FOUND,
+              'TARGET_USER_NOT_FOUND',
+              'Target user not found.',
             );
           }
-        }
 
-        const updated = await tx.user.update({
-          where: {
-            id: target.id,
-          },
-          data: {
-            role: requestedRole,
-          },
-          select: USER_SAFE_SELECT,
-        });
+          this.validateRoleChangeTarget(target, requestedRole);
 
-        await this.auditService.recordSuccess(
-          {
-            actorUserId: actor.userId,
-            actorRole: actor.role,
-            action: 'operator.user_role.update',
-            targetType: 'user',
-            targetId: target.id,
-            requestId: context.requestId,
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-            metadataJson: {
+          if (this.isActiveAdminDemotion(target, requestedRole)) {
+            await lockActiveAdminReduction(tx);
+            const activeAdminCount = await tx.user.count({
+              where: {
+                role: UserRole.admin,
+                status: UserStatus.active,
+              },
+            });
+
+            if (activeAdminCount <= 1) {
+              this.throwApiError(
+                HttpStatus.CONFLICT,
+                'LAST_ADMIN_ROLE_CHANGE_FORBIDDEN',
+                'Cannot demote the last active admin.',
+              );
+            }
+          }
+
+          const updated = await tx.user.update({
+            where: {
+              id: target.id,
+            },
+            data: {
+              role: requestedRole,
+            },
+            select: USER_SAFE_SELECT,
+          });
+
+          await this.auditService.recordSuccess(
+            {
               actorUserId: actor.userId,
-              targetUserId: target.id,
-              beforeRole: target.role,
-              afterRole: requestedRole,
-              reason,
-              requestId: context.requestId ?? null,
+              actorRole: actor.role,
+              action: 'operator.user_role.update',
+              targetType: 'user',
+              targetId: target.id,
+              requestId: context.requestId,
+              ipAddress: context.ipAddress,
+              userAgent: context.userAgent,
+              metadataJson: {
+                actorUserId: actor.userId,
+                targetUserId: target.id,
+                beforeRole: target.role,
+                afterRole: requestedRole,
+                reason,
+                requestId: context.requestId ?? null,
+              },
             },
-          },
-          tx as Pick<PrismaService, 'operatorAuditLog'>,
-        );
+            tx as Pick<PrismaService, 'operatorAuditLog'>,
+          );
 
-        return {
-          success: true,
-          data: {
-            user: this.serializeUser(updated),
-            roleChange: {
-              beforeRole: target.role,
-              afterRole: requestedRole,
-              reason,
+          return {
+            success: true,
+            data: {
+              user: this.serializeUser(updated),
+              roleChange: {
+                beforeRole: target.role,
+                afterRole: requestedRole,
+                reason,
+              },
             },
-          },
-        };
-      });
+          };
+        },
+        { isolationLevel: 'ReadCommitted' },
+      );
     } catch (error) {
       if (error instanceof HttpException) {
         await this.tryRecordRoleChangeFailure({
@@ -572,7 +578,7 @@ export class OperatorAccountManagementService {
   private async tryRecordRoleChangeFailure(input: {
     actor: AuthenticatedUser;
     targetUserId: string;
-    requestedRole: UserRole | string | null;
+    requestedRole: string | null;
     reason: string | null;
     failureCode: string;
     context: OperatorRequestContext;

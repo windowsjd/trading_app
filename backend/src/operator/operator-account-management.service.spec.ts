@@ -70,6 +70,7 @@ describe('OperatorAccountManagementService', () => {
           createdAt: now,
         }),
       },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       $transaction: jest.fn(),
     };
     prisma.$transaction.mockImplementation((callback) => callback(prisma));

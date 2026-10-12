@@ -12,7 +12,6 @@ import {
   SeasonStatus,
   TradingAccountMode,
   TradingAccountStatus,
-  UserRole,
 } from '../generated/prisma/client';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
@@ -498,6 +497,7 @@ export class OperatorSeasonModerationService {
     const tradingAccountId = participant.tradingAccountId;
 
     if (tradingAccountId !== lockedTradingAccountId) {
+      // @diagnosticSurface internal: excludeParticipant catches this integrity error, audits only its code, and normalizeModerationError returns a structured HTTP 500 without details.
       throw new SeasonTradingAccountLinkIntegrityError(
         'Participant trading account link changed while acquiring exclusion locks.',
         {

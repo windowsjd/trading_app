@@ -14,6 +14,7 @@ import {
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { OperatorAuditService } from './operator-audit.service';
+import { lockManagedUser, lockActiveAdminReduction } from './active-admin-lock';
 import type { OperatorRequestContext } from './operator-account-management.service';
 
 export type UserStatusChangeBody = {
@@ -43,7 +44,7 @@ type StatusAuditFailureInput = {
   actor: AuthenticatedUser;
   action: 'operator.user_status.update.failed' | 'operator.user_restore.failed';
   targetUserId: string;
-  requestedStatus?: UserStatus | string | null;
+  requestedStatus?: string | null;
   reason: string | null;
   failureCode: string;
   context: OperatorRequestContext;
@@ -122,99 +123,104 @@ export class OperatorUserStatusService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const target = await tx.user.findUnique({
-          where: {
-            id: targetUserId,
-          },
-          select: USER_SAFE_SELECT,
-        });
-
-        if (!target) {
-          this.throwApiError(
-            HttpStatus.NOT_FOUND,
-            'TARGET_USER_NOT_FOUND',
-            'Target user not found.',
-          );
-        }
-
-        this.validateStatusChangeTarget(target, requestedStatus);
-
-        if (this.isLastActiveAdminStatusChange(target, requestedStatus)) {
-          const activeAdminCount = await tx.user.count({
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await lockManagedUser(tx, targetUserId);
+          const target = await tx.user.findUnique({
             where: {
-              role: UserRole.admin,
-              status: UserStatus.active,
+              id: targetUserId,
             },
+            select: USER_SAFE_SELECT,
           });
 
-          if (activeAdminCount <= 1) {
+          if (!target) {
             this.throwApiError(
-              HttpStatus.CONFLICT,
-              'LAST_ADMIN_STATUS_CHANGE_FORBIDDEN',
-              'Cannot suspend or delete the last active admin.',
+              HttpStatus.NOT_FOUND,
+              'TARGET_USER_NOT_FOUND',
+              'Target user not found.',
             );
           }
-        }
 
-        const revokeResult = await this.revokeRefreshSessionsIfNeeded(
-          tx as Pick<PrismaService, 'refreshTokenSession'>,
-          target.id,
-          requestedStatus,
-        );
-        const updated = await tx.user.update({
-          where: {
-            id: target.id,
-          },
-          data: {
-            status: requestedStatus,
-            ...(requestedStatus === UserStatus.deleted
-              ? { role: UserRole.user }
-              : {}),
-          },
-          select: USER_SAFE_SELECT,
-        });
+          this.validateStatusChangeTarget(target, requestedStatus);
 
-        await this.auditService.recordSuccess(
-          {
-            actorUserId: actor.userId,
-            actorRole: actor.role,
-            action: 'operator.user_status.update',
-            targetType: 'user',
-            targetId: target.id,
-            requestId: context.requestId,
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-            metadataJson: {
+          if (this.isLastActiveAdminStatusChange(target, requestedStatus)) {
+            await lockActiveAdminReduction(tx);
+            const activeAdminCount = await tx.user.count({
+              where: {
+                role: UserRole.admin,
+                status: UserStatus.active,
+              },
+            });
+
+            if (activeAdminCount <= 1) {
+              this.throwApiError(
+                HttpStatus.CONFLICT,
+                'LAST_ADMIN_STATUS_CHANGE_FORBIDDEN',
+                'Cannot suspend or delete the last active admin.',
+              );
+            }
+          }
+
+          const revokeResult = await this.revokeRefreshSessionsIfNeeded(
+            tx as Pick<PrismaService, 'refreshTokenSession'>,
+            target.id,
+            requestedStatus,
+          );
+          const updated = await tx.user.update({
+            where: {
+              id: target.id,
+            },
+            data: {
+              status: requestedStatus,
+              ...(requestedStatus === UserStatus.deleted
+                ? { role: UserRole.user }
+                : {}),
+            },
+            select: USER_SAFE_SELECT,
+          });
+
+          await this.auditService.recordSuccess(
+            {
               actorUserId: actor.userId,
-              targetUserId: target.id,
-              beforeStatus: target.status,
-              afterStatus: updated.status,
-              beforeRole: target.role,
-              afterRole: updated.role,
-              reason,
-              requestId: context.requestId ?? null,
-              revokedRefreshSessionCount: revokeResult.count,
+              actorRole: actor.role,
+              action: 'operator.user_status.update',
+              targetType: 'user',
+              targetId: target.id,
+              requestId: context.requestId,
+              ipAddress: context.ipAddress,
+              userAgent: context.userAgent,
+              metadataJson: {
+                actorUserId: actor.userId,
+                targetUserId: target.id,
+                beforeStatus: target.status,
+                afterStatus: updated.status,
+                beforeRole: target.role,
+                afterRole: updated.role,
+                reason,
+                requestId: context.requestId ?? null,
+                revokedRefreshSessionCount: revokeResult.count,
+              },
             },
-          },
-          tx as Pick<PrismaService, 'operatorAuditLog'>,
-        );
+            tx as Pick<PrismaService, 'operatorAuditLog'>,
+          );
 
-        return {
-          success: true,
-          data: {
-            user: this.serializeUser(updated),
-            statusChange: {
-              beforeStatus: target.status,
-              afterStatus: updated.status,
-              beforeRole: target.role,
-              afterRole: updated.role,
-              reason,
-              revokedRefreshSessionCount: revokeResult.count,
+          return {
+            success: true,
+            data: {
+              user: this.serializeUser(updated),
+              statusChange: {
+                beforeStatus: target.status,
+                afterStatus: updated.status,
+                beforeRole: target.role,
+                afterRole: updated.role,
+                reason,
+                revokedRefreshSessionCount: revokeResult.count,
+              },
             },
-          },
-        };
-      });
+          };
+        },
+        { isolationLevel: 'ReadCommitted' },
+      );
     } catch (error) {
       if (error instanceof HttpException) {
         await this.tryRecordFailure({
@@ -295,80 +301,84 @@ export class OperatorUserStatusService {
     }
 
     try {
-      return await this.prisma.$transaction(async (tx) => {
-        const target = await tx.user.findUnique({
-          where: {
-            id: targetUserId,
-          },
-          select: USER_SAFE_SELECT,
-        });
+      return await this.prisma.$transaction(
+        async (tx) => {
+          await lockManagedUser(tx, targetUserId);
+          const target = await tx.user.findUnique({
+            where: {
+              id: targetUserId,
+            },
+            select: USER_SAFE_SELECT,
+          });
 
-        if (!target) {
-          this.throwApiError(
-            HttpStatus.NOT_FOUND,
-            'TARGET_USER_NOT_FOUND',
-            'Target user not found.',
-          );
-        }
+          if (!target) {
+            this.throwApiError(
+              HttpStatus.NOT_FOUND,
+              'TARGET_USER_NOT_FOUND',
+              'Target user not found.',
+            );
+          }
 
-        if (target.status !== UserStatus.deleted) {
-          this.throwApiError(
-            HttpStatus.CONFLICT,
-            'USER_RESTORE_NOT_ALLOWED',
-            'Only deleted users can be restored.',
-          );
-        }
+          if (target.status !== UserStatus.deleted) {
+            this.throwApiError(
+              HttpStatus.CONFLICT,
+              'USER_RESTORE_NOT_ALLOWED',
+              'Only deleted users can be restored.',
+            );
+          }
 
-        const updated = await tx.user.update({
-          where: {
-            id: target.id,
-          },
-          data: {
-            status: UserStatus.active,
-            role: UserRole.user,
-          },
-          select: USER_SAFE_SELECT,
-        });
+          const updated = await tx.user.update({
+            where: {
+              id: target.id,
+            },
+            data: {
+              status: UserStatus.active,
+              role: UserRole.user,
+            },
+            select: USER_SAFE_SELECT,
+          });
 
-        await this.auditService.recordSuccess(
-          {
-            actorUserId: actor.userId,
-            actorRole: actor.role,
-            action: 'operator.user_restore',
-            targetType: 'user',
-            targetId: target.id,
-            requestId: context.requestId,
-            ipAddress: context.ipAddress,
-            userAgent: context.userAgent,
-            metadataJson: {
+          await this.auditService.recordSuccess(
+            {
               actorUserId: actor.userId,
-              targetUserId: target.id,
-              beforeStatus: target.status,
-              afterStatus: updated.status,
-              beforeRole: target.role,
-              afterRole: updated.role,
-              reason,
-              requestId: context.requestId ?? null,
-              revokedRefreshSessionCount: 0,
+              actorRole: actor.role,
+              action: 'operator.user_restore',
+              targetType: 'user',
+              targetId: target.id,
+              requestId: context.requestId,
+              ipAddress: context.ipAddress,
+              userAgent: context.userAgent,
+              metadataJson: {
+                actorUserId: actor.userId,
+                targetUserId: target.id,
+                beforeStatus: target.status,
+                afterStatus: updated.status,
+                beforeRole: target.role,
+                afterRole: updated.role,
+                reason,
+                requestId: context.requestId ?? null,
+                revokedRefreshSessionCount: 0,
+              },
             },
-          },
-          tx as Pick<PrismaService, 'operatorAuditLog'>,
-        );
+            tx as Pick<PrismaService, 'operatorAuditLog'>,
+          );
 
-        return {
-          success: true,
-          data: {
-            user: this.serializeUser(updated),
-            restore: {
-              beforeStatus: target.status,
-              afterStatus: updated.status,
-              beforeRole: target.role,
-              afterRole: updated.role,
-              reason,
+          return {
+            success: true,
+            data: {
+              user: this.serializeUser(updated),
+              restore: {
+                beforeStatus: target.status,
+                afterStatus: updated.status,
+                beforeRole: target.role,
+                afterRole: updated.role,
+                reason,
+              },
             },
-          },
-        };
-      });
+          };
+        },
+        { isolationLevel: 'ReadCommitted' },
+      );
     } catch (error) {
       if (error instanceof HttpException) {
         await this.tryRecordFailure({
