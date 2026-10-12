@@ -354,6 +354,126 @@ describe('refresh-scoped portfolio source reads', () => {
     },
   );
 
+  describe('account state read boundary (TC-D05)', () => {
+    /** Root client: has `$connect`; account state comes only through `tx`. */
+    function rootSetup() {
+      const { prisma } = setup();
+      const tx = {
+        tradingAccount: prisma.tradingAccount,
+        seasonParticipant: { findUnique: jest.fn() },
+      };
+      const root = {
+        assetPriceSnapshot: prisma.assetPriceSnapshot,
+        fxRateSnapshot: prisma.fxRateSnapshot,
+        tradingAccount: { findUnique: jest.fn() },
+        seasonParticipant: { findUnique: jest.fn() },
+        $connect: jest.fn(),
+        $transaction: jest.fn<
+          Promise<unknown>,
+          [(client: typeof tx) => Promise<unknown>, unknown]
+        >((read) => read(tx)),
+      };
+      const service = new PortfolioValuationService(root as never);
+      const calculate = (
+        id: string,
+        sourceReads?: PortfolioValuationSourceReads,
+      ) =>
+        service.calculateTradingAccountValuation(
+          id,
+          valuationAt,
+          'live_portfolio_valuation',
+          root as never,
+          sourceReads,
+        );
+      return { root, tx, service, calculate };
+    }
+
+    it('reads one account state in ONE RepeatableRead transaction and prices outside it', async () => {
+      const { root, tx, calculate } = rootSetup();
+      const valuation = await calculate('a');
+      expect(valuation.totalAssetKrw).toBe('1230780.00000000');
+      expect(root.$transaction).toHaveBeenCalledTimes(1);
+      expect(root.$transaction.mock.calls[0][1]).toEqual({
+        isolationLevel: 'RepeatableRead',
+      });
+      expect(tx.tradingAccount.findUnique).toHaveBeenCalledTimes(1);
+      expect(root.tradingAccount.findUnique).toHaveBeenCalledTimes(0);
+      expect(root.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(1);
+      expect(root.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps sharing price and FX reads across per-account transactions', async () => {
+      const { root, calculate } = rootSetup();
+      const context: PortfolioValuationSourceReads = {
+        client: root as never,
+        valuationAtMs: valuationAt.getTime(),
+        workflow: 'live_portfolio_valuation',
+        assetPrices: new Map(),
+      };
+      const [a, b] = [
+        await calculate('a', context),
+        await calculate('b', context),
+      ];
+      expect(a.totalAssetKrw).toBe(b.totalAssetKrw);
+      expect(root.$transaction).toHaveBeenCalledTimes(2);
+      expect(root.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(1);
+      expect(root.fxRateSnapshot.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it("uses a caller's transaction as-is: its own writes, no nested transaction", async () => {
+      const { prisma, service } = setup();
+      // Prisma 7 transaction clients expose `$transaction` but not `$connect`.
+      const callerTx = { ...prisma, $transaction: jest.fn() };
+      const valuation = await service.calculateTradingAccountValuation(
+        'a',
+        valuationAt,
+        'live_portfolio_valuation',
+        callerTx as never,
+      );
+      expect(valuation.totalAssetKrw).toBe('1230780.00000000');
+      expect(callerTx.$transaction).toHaveBeenCalledTimes(0);
+      expect(prisma.tradingAccount.findUnique).toHaveBeenCalledTimes(1);
+    });
+
+    it('reads a season participant valuation under the same boundary', async () => {
+      const { root, tx, service } = rootSetup();
+      const a = account('p');
+      tx.seasonParticipant.findUnique.mockResolvedValue({
+        id: a.seasonParticipant.id,
+        userId: a.userId,
+        initialCapitalKrw: a.initialCapitalKrw,
+        tradingAccountId: a.id,
+        tradingAccount: {
+          id: a.id,
+          userId: a.userId,
+          mode: a.mode,
+          initialCapitalKrw: a.initialCapitalKrw,
+          cashWallets: a.cashWallets,
+          positions: a.positions,
+        },
+      });
+      const valuation = await service.calculateSeasonParticipantValuation(
+        a.seasonParticipant.id,
+        valuationAt,
+        'live_portfolio_valuation',
+        root as never,
+      );
+      expect(valuation.totalAssetKrw).toBe('1230780.00000000');
+      expect(root.$transaction).toHaveBeenCalledTimes(1);
+      expect(root.seasonParticipant.findUnique).toHaveBeenCalledTimes(0);
+    });
+
+    it('propagates a failed read unchanged through the read transaction', async () => {
+      const { root, tx, calculate } = rootSetup();
+      tx.tradingAccount.findUnique.mockResolvedValueOnce(null as never);
+      await expect(calculate('missing')).rejects.toMatchObject({
+        code: 'TRADING_ACCOUNT_NOT_FOUND',
+      });
+      expect(root.$transaction).toHaveBeenCalledTimes(1);
+      expect(root.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(0);
+    });
+  });
+
   it('continues to validate canonical account scope on every valuation', async () => {
     const { prisma, reads, calculate } = setup();
     const context = reads();

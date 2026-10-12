@@ -181,6 +181,9 @@ jobs:
       FUTURES_F31_DB_INTEGRATION: "1"
       CONDITIONAL_DB_INTEGRATION: "1"
       FUTURES_LIMIT_DB_INTEGRATION: "1"
+      # TC-D05: one committed account state per valuation while real Spot,
+      # FX, transfer and Futures commands commit between its SELECTs.
+      VALUATION_CONSISTENCY_DB_INTEGRATION: "1"
       MVP_FLOW_DB_SMOKE: "1"
     defaults:
       run:
@@ -243,6 +246,7 @@ jobs:
           src/orders/orders.execute.integration.spec.ts
           src/orders/market-execution.integration.spec.ts
           src/fx/fx.execute.integration.spec.ts
+          src/portfolio/valuation-snapshot-consistency.integration.spec.ts
           src/mvp-flow.integration.spec.ts
       - name: Futures readiness and Last retention PostgreSQL safety
         env:

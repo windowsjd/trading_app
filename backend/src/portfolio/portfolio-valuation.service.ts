@@ -65,6 +65,13 @@ export type PortfolioValuationSourceReads = {
   futuresMarkBoundary?: Date;
 };
 
+type ValuationClient = Prisma.TransactionClient | PrismaService;
+
+/** Interactive transaction clients omit `$connect` (Prisma ITX deny list). */
+function isRootClient(client: ValuationClient): client is PrismaService {
+  return typeof (client as PrismaService).$connect === 'function';
+}
+
 type PositionAssetForSourceSelection = {
   id: string;
   assetType: AssetType;
@@ -78,6 +85,32 @@ type PositionAssetForSourceSelection = {
 export class PortfolioValuationService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * One account's financial state from ONE committed instant (TC-D05).
+   *
+   * The relational read below is several SELECTs (account, participant,
+   * wallets, positions, Futures positions). On the root client each runs in
+   * its own implicit transaction, so a trade committing between them could be
+   * valued as pre-trade cash plus post-trade holdings. A short RepeatableRead
+   * transaction gives all of them one snapshot; it covers this read only and
+   * writes nothing.
+   *
+   * A caller's transaction is used as-is: the valuation must see its own
+   * uncommitted writes, and the financial commands that value in-transaction
+   * already hold the account / participant lock every writer takes. Price,
+   * FX and Mark observations stay on the caller's client so `sourceReads`
+   * sharing across accounts is unchanged.
+   */
+  private readAccountState<T>(
+    client: ValuationClient,
+    read: (reader: ValuationClient) => Promise<T>,
+  ): Promise<T> {
+    if (!isRootClient(client)) return read(client);
+    return client.$transaction((tx) => read(tx), {
+      isolationLevel: 'RepeatableRead',
+    });
+  }
+
   async calculateSeasonParticipantValuation(
     seasonParticipantId: string,
     valuationAt = new Date(),
@@ -86,56 +119,58 @@ export class PortfolioValuationService {
   ): Promise<PortfolioValuationResult> {
     const useSettlementPricePolicy =
       sourceEligibilityWorkflow === 'season_settlement';
-    const participant = await client.seasonParticipant.findUnique({
-      where: {
-        id: seasonParticipantId,
-      },
-      select: {
-        id: true,
-        userId: true,
-        initialCapitalKrw: true,
-        tradingAccountId: true,
-        tradingAccount: {
-          select: {
-            id: true,
-            userId: true,
-            mode: true,
-            initialCapitalKrw: true,
-            cashWallets: {
-              select: {
-                walletScope: true,
-                currencyCode: true,
-                balanceAmount: true,
+    const participant = await this.readAccountState(client, (reader) =>
+      reader.seasonParticipant.findUnique({
+        where: {
+          id: seasonParticipantId,
+        },
+        select: {
+          id: true,
+          userId: true,
+          initialCapitalKrw: true,
+          tradingAccountId: true,
+          tradingAccount: {
+            select: {
+              id: true,
+              userId: true,
+              mode: true,
+              initialCapitalKrw: true,
+              cashWallets: {
+                select: {
+                  walletScope: true,
+                  currencyCode: true,
+                  balanceAmount: true,
+                },
               },
-            },
-            positions: {
-              select: {
-                assetId: true,
-                quantity: true,
-                averageCost: true,
-                currencyCode: true,
-                realizedPnl: true,
-                realizedPnlKrw: true,
-                asset: {
-                  select: {
-                    id: true,
-                    assetType: true,
-                    market: true,
-                    currencyCode: true,
-                    priceCurrency: true,
-                    settlementCurrency: true,
+              positions: {
+                select: {
+                  assetId: true,
+                  quantity: true,
+                  averageCost: true,
+                  currencyCode: true,
+                  realizedPnl: true,
+                  realizedPnlKrw: true,
+                  asset: {
+                    select: {
+                      id: true,
+                      assetType: true,
+                      market: true,
+                      currencyCode: true,
+                      priceCurrency: true,
+                      settlementCurrency: true,
+                    },
                   },
                 },
               },
-            },
-            futuresPositions: {
-              where: { status: 'open' },
-              include: { instrument: { include: { underlyingAsset: true } } },
+              futuresPositions: {
+                where: { status: 'open' },
+                include: { instrument: { include: { underlyingAsset: true } } },
+              },
             },
           },
         },
-      },
-    });
+      }),
+    );
 
     if (!participant) {
       throw new PortfolioValuationError(
@@ -200,53 +235,55 @@ export class PortfolioValuationService {
         'Final Futures projection is only valid for Season settlement previews.',
       );
     }
-    const account = await client.tradingAccount.findUnique({
-      where: { id: tradingAccountId },
-      select: {
-        id: true,
-        userId: true,
-        mode: true,
-        initialCapitalKrw: true,
-        seasonParticipant: {
-          select: {
-            id: true,
-            userId: true,
-            initialCapitalKrw: true,
+    const account = await this.readAccountState(client, (reader) =>
+      reader.tradingAccount.findUnique({
+        where: { id: tradingAccountId },
+        select: {
+          id: true,
+          userId: true,
+          mode: true,
+          initialCapitalKrw: true,
+          seasonParticipant: {
+            select: {
+              id: true,
+              userId: true,
+              initialCapitalKrw: true,
+            },
           },
-        },
-        cashWallets: {
-          select: {
-            walletScope: true,
-            currencyCode: true,
-            balanceAmount: true,
+          cashWallets: {
+            select: {
+              walletScope: true,
+              currencyCode: true,
+              balanceAmount: true,
+            },
           },
-        },
-        positions: {
-          select: {
-            assetId: true,
-            quantity: true,
-            averageCost: true,
-            currencyCode: true,
-            realizedPnl: true,
-            realizedPnlKrw: true,
-            asset: {
-              select: {
-                id: true,
-                assetType: true,
-                market: true,
-                currencyCode: true,
-                priceCurrency: true,
-                settlementCurrency: true,
+          positions: {
+            select: {
+              assetId: true,
+              quantity: true,
+              averageCost: true,
+              currencyCode: true,
+              realizedPnl: true,
+              realizedPnlKrw: true,
+              asset: {
+                select: {
+                  id: true,
+                  assetType: true,
+                  market: true,
+                  currencyCode: true,
+                  priceCurrency: true,
+                  settlementCurrency: true,
+                },
               },
             },
           },
+          futuresPositions: {
+            where: { status: 'open' },
+            include: { instrument: { include: { underlyingAsset: true } } },
+          },
         },
-        futuresPositions: {
-          where: { status: 'open' },
-          include: { instrument: { include: { underlyingAsset: true } } },
-        },
-      },
-    });
+      }),
+    );
 
     if (!account) {
       throw new PortfolioValuationError(
