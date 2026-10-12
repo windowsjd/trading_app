@@ -4,6 +4,8 @@ import {
   isFuturesOnlyAsset,
 } from '../../src/providers/binance/binance-product-catalog';
 import { resolve } from 'node:path';
+import assert from 'node:assert/strict';
+import { Prisma } from '../../src/generated/prisma/client';
 import { setTimeout as delay } from 'node:timers/promises';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import {
@@ -26,6 +28,119 @@ import { AppClient } from './client';
 import { Actor, type Fixture, type FixtureActor } from './actor';
 import { preflight, verifyApi } from './preflight';
 import { parseFuturesContracts } from '../../src/futures/futures-instrument-coverage';
+
+/** Complete the existing learning prerequisites through normal HTTP commands.
+ * Keep every fee, order, acknowledgement and ledger leg in the full audit.
+ * No balance restoration, fabricated quest evidence or learning bypass.
+ */
+async function prepareBeginnerLearning(
+  db: PrismaService,
+  actor: Actor,
+  http: AppClient,
+  assetId: string,
+) {
+  const fxBody = {
+    fromCurrency: 'KRW',
+    toCurrency: 'USD',
+    sourceAmount: '1400000',
+  };
+  const fx = await http.request('POST', actor.path('/fx/quote'), fxBody);
+  await actor.command('/fx/execute', {
+    ...fxBody,
+    quoteId: fx.quoteId,
+    idempotencyKey: actor.idempotency(),
+  });
+  const wallets = await db.cashWallet.findMany({
+    where: { tradingAccountId: actor.fixture.accountId },
+  });
+  await actor.command('/wallet-transfers', {
+    sourceWalletId: wallets.find(
+      (w) => w.walletScope === 'securities' && w.currencyCode === 'USD',
+    )!.id,
+    destinationWalletId: wallets.find((w) => w.walletScope === 'crypto_spot')!
+      .id,
+    amount: '200',
+    idempotencyKey: actor.idempotency(),
+  });
+  const order = async (body: Record<string, string>) => {
+    const quote = await http.request('POST', actor.path('/orders/quote'), body);
+    return actor.command('/orders', {
+      ...body,
+      quoteId: quote.quoteId,
+      idempotencyKey: actor.idempotency(),
+    });
+  };
+  const buy = await order({
+    assetId,
+    side: 'buy',
+    orderType: 'market',
+    amount: '100',
+  });
+  assert.equal(buy.order.status, 'executed');
+  await http.request('POST', actor.path('/quests/acknowledgements'), {
+    stepId: 'holdings_reviewed',
+    orderId: buy.order.orderId,
+  });
+  const position = await db.position.findFirstOrThrow({
+    where: { tradingAccountId: actor.fixture.accountId, assetId },
+  });
+  const detail = await http.get(`/assets/${assetId}`, 0, true);
+  const price = new Prisma.Decimal(detail.asset.price.currentPrice);
+  const protection = await actor.command('/protections', {
+    domain: 'spot',
+    assetId,
+    positionId: position.id,
+    idempotencyKey: actor.idempotency(),
+    legs: [
+      {
+        kind: 'take_profit',
+        triggerPrice: price.mul(2).toFixed(8),
+        childOrderType: 'market',
+      },
+      {
+        kind: 'stop_loss',
+        triggerPrice: price.mul('0.5').toFixed(8),
+        childOrderType: 'market',
+      },
+    ],
+  });
+  await actor.command(`/protections/${protection.groupId}/cancel`, {
+    idempotencyKey: actor.idempotency(),
+  });
+  const sell = await order({
+    assetId,
+    side: 'sell',
+    orderType: 'market',
+    quantity: position.quantity
+      .toDecimalPlaces(6, Prisma.Decimal.ROUND_DOWN)
+      .toFixed(6),
+  });
+  assert.equal(sell.order.status, 'executed');
+  const limit = await order({
+    assetId,
+    side: 'buy',
+    orderType: 'limit',
+    amount: '90',
+    limitPrice: price.mul('0.5').toFixed(8),
+  });
+  assert.equal(limit.order.status, 'submitted');
+  await http.request(
+    'POST',
+    actor.path(`/orders/${limit.order.orderId}/cancel`),
+  );
+  await http.request('POST', actor.path('/quests/acknowledgements'), {
+    stepId: 'limit_result_reviewed',
+    orderId: limit.order.orderId,
+  });
+  const progress = await http.get(actor.path('/quests'), 0, true);
+  assert.equal(progress.learningAccess.allTrading, true);
+  assert.equal(
+    progress.quests
+      .slice(0, 6)
+      .every((q: { status: string }) => q.status === 'completed'),
+    true,
+  );
+}
 
 export async function prepare(
   m: Manifest,
@@ -261,6 +376,8 @@ export async function prepare(
             const wallets = await db.cashWallet.findMany({
               where: { tradingAccountId: accountId },
             });
+            if (mode === 'beginner')
+              await prepareBeginnerLearning(db, actor, http, crypto[0].id);
             for (const scope of ['crypto_spot', 'crypto_futures'] as const) {
               const quote = await http.request(
                 'POST',
