@@ -1,0 +1,41 @@
+{
+  "evidenceType": "LOCAL_PACKAGING_ONLY",
+  "round1Sha256": "4655ed526307e8eff82b9742eb43a509dbc5b727f2ec8d038157a92ca226f12b",
+  "round2Sha256": "3056f399fc87de124d7bc8dba94b35fb835d37823a6182e5006f3059cf2b1f23",
+  "heredocSha256": "328de26acef16fd95c5494b598abb0ffdcb9a7b92e7faebb35cef3575c1d21e7",
+  "oneLineSha256": "a4940c0f4c9456a7a08713432b8e95eaf5e42d7fa75a79de2d33263ed1c2ef54",
+  "decodeMatchesCanonicalSources": {
+    "heredoc": true,
+    "oneLine": true
+  },
+  "checks": [
+    {
+      "env": "no RENDER_SERVICE_ID",
+      "result": "RENDER_SERVICE_MISMATCH",
+      "calls": 0
+    },
+    {
+      "env": "service id, no key",
+      "result": "KEY_MISSING",
+      "calls": 0
+    },
+    {
+      "env": "tampered payload",
+      "result": "PACKAGED_SCRIPT_INVALID",
+      "calls": 0
+    },
+    {
+      "env": "fake key, network namespace without network, private tmpfs /tmp",
+      "result": "start + request(TRANSPORT_ERROR) + summary; second run ONCE_GUARD_BLOCKED",
+      "externalRequests": 0,
+      "stderrBytes": 0,
+      "keyInOutput": false,
+      "urlInOutput": false
+    }
+  ],
+  "formats": [
+    "heredoc",
+    "one-line"
+  ],
+  "koscomApiRequests": 0
+}

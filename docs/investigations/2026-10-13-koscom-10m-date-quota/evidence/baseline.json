@@ -1,0 +1,24 @@
+{
+  "evidenceType": "LOCAL_REPOSITORY_BASELINE",
+  "checkedAt": "2026-10-13",
+  "localHead": "a68837d6f2592e3562b92cafc166d72ba3706564",
+  "originMainAfterFetch": "a68837d6f2592e3562b92cafc166d72ba3706564",
+  "briefMain": "d9e3d8c6e3e54920d74a98502c4f81dedc65c06b",
+  "commitsSinceBriefTouchKoscomOrCandles": false,
+  "initialWorkingTreeClean": true,
+  "parallelWorktrees": {
+    "/tmp/trading-binance-rest-weight": "Binance REST/provider-http changes, untouched",
+    "/tmp/trading-ci-baseline": "clean",
+    "/tmp/trading-ci-stabilization": "clean",
+    "prunable": [
+      "/tmp/trading-fee-pinning",
+      "/tmp/trading-home-market-work",
+      "/tmp/trading-transaction-time"
+    ]
+  },
+  "round1SourceSha256": "4655ed526307e8eff82b9742eb43a509dbc5b727f2ec8d038157a92ca226f12b",
+  "round1SourceMatchesExecuted": true,
+  "krx2026CalendarSha256": "085c9ad218c0bc40712109e097da0735c2d83cb5d2d1fcffbfc018acca76b21f",
+  "krx2026CalendarUnchangedSinceRound1": true,
+  "nodeLocal": "v24.14.1"
+}
