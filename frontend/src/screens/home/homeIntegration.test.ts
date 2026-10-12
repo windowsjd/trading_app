@@ -35,7 +35,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       const { tree } = h.render();
       const textNodes = elements(tree, 'Text');
       const total = textNodes.find((node) => node.props.testID === TEST_IDS.home.totalAsset);
-      assert.equal(total.props.children.join(''), '10,001,000원');
+      assert.equal([total.props.children].flat().join(''), '10,001,000원');
       assert.ok(total.props.style.fontSize > 26);
       assert.ok(texts(tree).includes('-2,345'));
       const detail = textNodes.find((node) => texts(node) === '보유종목 및 포지션');
@@ -52,11 +52,13 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
         const avatar = elements(tree, 'ProfileAvatar')[0];
         assert.equal(avatar.props.profileImageUrl, 'https://example.test/me.png');
         assert.equal(avatar.props.size, 32, 'compact account box');
-        assert.equal(texts(rank), '#2');
+        // The rank is on the Ranking tab; Home keeps the tier beside the total.
+        assert.equal(rank === undefined, true);
+        assert.equal(texts(tree).includes('#2'), false);
         assert.equal(texts(tier), 'Silver');
         assert.ok(textNodes.indexOf(nickname) < textNodes.indexOf(total));
         assert.ok(textNodes.indexOf(tier) < textNodes.indexOf(detail));
-        assert.ok(total.props.style.fontSize > Object.assign({}, ...[rank.props.style].flat().filter(Boolean)).fontSize);
+        assert.ok(total.props.style.fontSize > Object.assign({}, ...[tier.props.style].flat().filter(Boolean)).fontSize);
         assert.ok(h.queries.some((query) => query.queryKey === QUERY_KEYS.me));
       } else {
         assert.equal(texts(nickname), '김재민');
@@ -117,7 +119,8 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
     h.account.season.seasonStatus = 'settled';
     h.seed(h.account, fixture.season.data);
     const tree = h.render().tree;
-    for (const text of ['최종 자산', '#2', 'Gold']) assert.ok(texts(tree).includes(text));
+    for (const text of ['최종 자산', 'Gold']) assert.ok(texts(tree).includes(text));
+    assert.equal(texts(tree).includes('#2'), false, 'no rank in the account box');
     assert.doesNotMatch(texts(tree), /최종 순위|최종 등급/);
     const rankingQuery = h.queries.find((query) => query.queryKey[0] === 'ranking');
     assert.ok(rankingQuery.queryKey.includes(h.account.season.seasonId));
@@ -326,8 +329,9 @@ describe('general/season home API, queries, rendering and navigation integration
         assert.ok(!text.includes('현재 순위'));
         assert.doesNotMatch(text, /자금 구성|최초 지급 자본|누적 외부 자금 유입|누적 광고 보상|투자 손익/);
       } else {
-        for (const label of ['김재민', '#2', 'Silver'])
+        for (const label of ['김재민', 'Silver'])
           assert.ok(text.includes(label));
+        assert.equal(text.includes('#2'), false);
         assert.doesNotMatch(text, /현재 순위|현재 등급/);
         assert.ok(!text.includes('자금 구성'));
       }

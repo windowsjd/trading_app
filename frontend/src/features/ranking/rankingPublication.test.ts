@@ -49,19 +49,26 @@ async function setup(t, conflict = false, state = 'active') {
   t.after(() => { act(() => renderer.unmount()); client.clear(); });
   const flush = async () => { for (let i = 0; i < 8; i++) await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); }); };
   const node = id => renderer.root.findByProps({ testID: id });
+  // The publication (limit 3) is read, never drawn: count its reads and read
+  // my rank from it instead of a podium card.
+  const publicationReads = () => calls.filter(p => p.limit === 3).length;
+  const myRank = () => renderer.root.findAll(n => n.props?.testID === 'ranking-my-rank' && typeof n.type === 'string')[0]?.props.children;
+  const podiumCards = () => renderer.root.findAll(n => typeof n.props?.testID === 'string' && n.props.testID.startsWith('ranking-top')).length;
   await flush();
-  return { renderer, client, calls, node, flush, advance: () => { generation++; } };
+  return { renderer, client, calls, node, flush, publicationReads, myRank, podiumCards, advance: () => { generation++; } };
 }
 
-it('tab changes preserve global TOP3 and refresh adopts one new publication for both queries', async t => {
+it('tab changes keep the canonical publication and refresh adopts one new publication for both queries', async t => {
   const h = await setup(t);
-  const top = () => h.node('ranking-top3').findAllByType('Pressable').map(n => n.props.testID);
-  const initial = top();
+  assert.equal(h.podiumCards(), 0);
+  const reads = h.publicationReads(), rank = h.myRank();
+  assert.equal(rank, '#2');
   await act(async () => h.node('ranking-tab-friends').props.onPress());
-  assert.deepEqual(top(), initial);
+  assert.equal(h.publicationReads(), reads);
   await h.flush();
   assert.ok(h.node('ranking-item-friend-42'));
-  assert.deepEqual(top(), initial);
+  assert.equal(h.publicationReads(), reads, 'a tab change never re-reads the publication');
+  assert.equal(h.myRank(), rank);
   h.advance();
   await act(async () => { await h.client.invalidateQueries({ queryKey: QUERY_KEYS.ranking.list({
     scope: 'all', seasonId: availableRankings.season!.id, rankType: 'daily', limit: 3, offset: 0,
@@ -72,12 +79,12 @@ it('tab changes preserve global TOP3 and refresh adopts one new publication for 
   assert.equal(newest.rankingDate, availableRankings.rankingDate);
   assert.equal(newest.seasonId, availableRankings.season!.id);
   assert.equal(newest.rankType, 'daily');
-  assert.deepEqual(top(), initial);
+  assert.equal(h.myRank(), rank);
 });
 
-it('a publication race recovers by refetching canonical TOP3 before the scoped list', async t => {
+it('a publication race recovers by refetching the canonical publication before the scoped list', async t => {
   const h = await setup(t, true);
-  assert.ok(h.node('ranking-top3'));
+  assert.equal(h.podiumCards(), 0);
   assert.ok(h.node('ranking-item-user-1'));
   const topCalls = h.calls.filter(p => p.limit === 3);
   assert.equal(topCalls.length, 2);
@@ -85,10 +92,9 @@ it('a publication race recovers by refetching canonical TOP3 before the scoped l
   assert.ok(h.calls.length <= 5, 'bounded snapshot recovery');
 });
 
-for (const state of ['active', 'settled']) it(`${state}: secondary tab state preserves canonical TOP3 and scoped publication`, async t => {
+for (const state of ['active', 'settled']) it(`${state}: secondary tab state preserves the canonical and scoped publication`, async t => {
   const h = await setup(t, false, state);
-  const podium = () => h.node('ranking-top3').findAllByType('Pressable').map(n => n.props.testID);
-  const initial = podium();
+  const reads = h.publicationReads(), rank = h.myRank();
   for (const scope of ['all', 'friends', 'top10']) {
     act(() => h.node(`ranking-tab-${scope}`).props.onPress());
     await h.flush();
@@ -102,7 +108,9 @@ for (const state of ['active', 'settled']) it(`${state}: secondary tab state pre
       assert.equal(flatten(tab.props.style).backgroundColor, selected ? semantic.surface : undefined);
       assert.equal(flatten(tab.findByType('Text').props.style).color, selected ? semantic.text : semantic.secondary);
     }
-    assert.deepEqual(podium(), initial);
+    assert.equal(h.publicationReads(), reads);
+    assert.equal(h.myRank(), rank);
+    assert.equal(h.podiumCards(), 0);
     const list = h.calls.filter(p => p.scope === scope && p.limit !== 3).at(-1);
     assert.equal(list.limit, scope === 'top10' ? 10 : 50);
     assert.equal(list.rankType, state === 'settled' ? 'final' : 'daily');

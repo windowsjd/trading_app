@@ -19,7 +19,12 @@ for (const mode of ['general', 'season']) {
     assert.equal(h.renderer.root.findAllByType('Hero').length, 0);
     const contextTexts = h.renderer.root.findAllByType('Text').flatMap(node => node.props.children).filter(value => typeof value === 'string').join(' ');
     assert.match(contextTexts, /mycroft/);
-    if (mode === 'season') assert.match(contextTexts, /#99999/);
+    // The season context keeps reading its ranking row (for the tier) but
+    // never repeats the rank in the account box.
+    if (mode === 'season') {
+      assert.equal(/#99999/.test(contextTexts), false);
+      assert.equal(h.requests.some(r => r.section === 'ranking'), true);
+    }
     const before = h.requests.filter(r => r.section === 'portfolio').length;
     assert.equal(before, 2);
     fails = false; h.focus(); await flush();

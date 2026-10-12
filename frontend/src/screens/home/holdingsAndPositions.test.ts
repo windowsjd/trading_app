@@ -6,29 +6,92 @@ const require = createRequire(import.meta.url);
 const { setup, account, flush, act } = require('../../../test/homeDiscoveryHarness.cjs');
 const { futuresFixture } = require('../../../test/futuresFixtures.cjs');
 
+// One list across both domains. In these fixtures the futures Mark notional
+// (202 USD × 1,350 = 272,700 KRW) is larger than the spot value (150,000 KRW).
+const listRows = h => h.node('home-holdings').findAll(node => node.type === 'Pressable'
+  && /^home-(position-item|futures)-/.test(node.props.testID ?? '')).map(node => node.props.testID);
+const headers = h => h.node('home-holdings').findAll(node => typeof node.type === 'string' && node.props.accessibilityRole === 'header')
+  .map(node => node.props.children);
+const fxReads = h => h.requests.filter(request => request.section === 'fx').length;
+
 for (const mode of ['general', 'season', 'beginner']) for (const [spot, future] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-  it(`${mode}: Spot ${spot} / Futures ${future} remain separate and navigate to their domain`, async t => {
+  it(`${mode}: Spot ${spot} / Futures ${future} form one list by amount and navigate to their domain`, async t => {
     const h = setup(mode, spot); t.after(h.close); await flush();
     h.futures = { [mode]: futuresFixture(mode, { position: !!future, marginMode: 'cross', direction: 'short' }).positions };
     await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.futures.positions(mode) })); await flush();
-    assert.equal(h.rows().length, spot);
-    const rows = h.renderer.root.findAll(node => node.type === 'Pressable' && node.props.testID?.startsWith('home-futures-'));
-    assert.equal(rows.length, future);
+    const spotId = `home-position-item-${mode}-a0`, futuresId = `home-futures-${mode}:position`;
+    assert.deepEqual(headers(h), ['보유종목 및 포지션'], 'no separate 보유종목/포지션 headings');
     const titles = h.renderer.root.findAllByType('InlineEmptyState').map(node => node.props.title ?? '').join(' ');
     assert.equal(titles.includes('보유종목 및 포지션이 없습니다.'), spot === 0 && future === 0);
+    // Collapsed: the single largest row of both domains.
+    assert.deepEqual(listRows(h), future ? [futuresId] : spot ? [spotId] : []);
+    // The rate is read only when KRW spot values and USD notionals must be compared.
+    assert.equal(fxReads(h) > 0, !!(spot && future));
+    assert.equal(h.node('home-holdings-toggle') !== undefined, spot + future > 1);
+    if (spot + future > 1) {
+      await h.press('home-holdings-toggle');
+      assert.deepEqual(listRows(h), [futuresId, spotId]);
+    }
     if (spot) {
       assert.equal(h.positions[mode][0].quantity, '1');
-      await h.press(h.rows()[0].props.testID);
+      await h.press(spotId);
       assert.equal(h.navigation.at(-1)[1].params.screen, 'AssetDetail');
     }
     if (future) {
-      await h.press(rows[0].props.testID);
+      await h.press(futuresId);
       assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: {
         screen: 'Futures', params: { accountId: mode, instrumentId: 'btc' },
       } }]);
     }
   });
 }
+
+it('collapsed picks the larger spot row over a smaller futures notional, expanded keeps one order', async t => {
+  const h = setup('general', 3); t.after(h.close); await flush();
+  // 0.5 USD × 1,350 = 675 KRW sits below every spot row (149,998..150,000 KRW).
+  const book = futuresFixture('general', { position: true }).positions;
+  book.positions[0] = { ...book.positions[0], markNotional: '0.5' };
+  h.futures = { general: book };
+  await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.futures.positions('general') })); await flush();
+  assert.deepEqual(listRows(h), ['home-position-item-general-a0']);
+  await h.press('home-holdings-toggle');
+  assert.deepEqual(listRows(h), ['home-position-item-general-a0', 'home-position-item-general-a1', 'home-position-item-general-a2', 'home-futures-general:position']);
+  await h.press('home-holdings-toggle');
+  assert.deepEqual(listRows(h), ['home-position-item-general-a0']);
+});
+
+it('a mixed list is not ordered until the rate arrives, and an unavailable rate never compares USD with KRW', async t => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  let failRate = false;
+  const h = setup('general', 1, 'home', { beforeRead: async request => {
+    if (request.section === 'fx') { await gate; if (failRate) throw new Error('rate offline'); }
+  } }); t.after(h.close);
+  h.futures = { general: futuresFixture('general', { position: true }).positions };
+  await flush();
+  assert.deepEqual(listRows(h), [], 'no partial order while the rate is pending');
+  assert.equal(h.node('home-holdings').findAllByType('SectionSkeleton').length > 0, true);
+  failRate = true;
+  await act(async () => release()); await flush();
+  // Futures follow the valued spot row and the list says why.
+  assert.deepEqual(listRows(h), ['home-position-item-general-a0']);
+  assert.equal(h.node('home-holdings-fx-notice') !== undefined, true);
+  await h.press('home-holdings-toggle');
+  assert.deepEqual(listRows(h), ['home-position-item-general-a0', 'home-futures-general:position']);
+});
+
+it('a pending futures read never presents the spot row as the whole list', async t => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const h = setup('general', 1, 'home', { beforeRead: async request => {
+    if (request.section === 'futures') await gate;
+  } }); t.after(h.close);
+  h.futures = { general: futuresFixture('general', { position: true }).positions };
+  await flush();
+  assert.deepEqual(listRows(h), []);
+  await act(async () => release()); await flush();
+  assert.deepEqual(listRows(h), ['home-futures-general:position']);
+});
 
 for (const section of ['positions', 'futures']) it(`a failed ${section} read never makes both domains look empty`, async t => {
   const h = setup('general', 1, 'home', { beforeRead: async request => {
@@ -66,6 +129,8 @@ it('opening a Futures position for the same BTC leaves the Spot count, quantity,
   const original = JSON.stringify(h.positions.general);
   h.futures = { general: futuresFixture('general', { position: true, direction: 'long' }).positions };
   await act(async () => h.client.refetchQueries({ predicate: q => q.queryKey.includes('general') })); await flush();
+  // This spot fixture carries no KRW value, so it follows the valued futures row.
+  await h.press('home-holdings-toggle');
   assert.equal(h.rows().length, 1);
   assert.equal(h.node('home-position-item-asset-btc-quantity').props.children, '보유수량 0.00000001 BTC');
   assert.equal(h.node('home-position-item-asset-btc-value').props.children, '$145.28');

@@ -10,6 +10,25 @@
 
 ---
 
+## 2026-10-12 Trading Class UI/UX 보충 9개 (15–23)
+
+- **기능 구현 의도:** 14개 개선 위에서 홈·랭킹·주문의 정보 구조를 정리한다. 서버 금융 값·정책·API는 그대로 두고 표시만 바꾼다.
+- 시작 `main`=`origin/main`=원격 `953576fb`, clean. frontend만, 커밋·push·배포·Migration 없음.
+- 홈: '평가 손익' = 서버 현물 `unrealizedPnlKrw` + 선물 `futuresUnrealizedPnlKrw`(valuation에서 서로 다른 포지션 합이라 중복 없음,
+  decimal 합, 값 누락은 '알 수 없음'), 선물 Mark 줄 삭제. 계정 카드 순위 삭제(랭킹 조회·실패 안내는 티어용으로 유지).
+  티어 앰블럼 112/88, 총자산 자연 폭을 실측해 옆 또는 성과 줄 옆(아래)으로 배치.
+- **보유종목·포지션 단일 목록:** 현물 `positionValueKrw` vs 선물 Mark notional × USD/KRW(지갑과 같은 `/fx/rates/current` key와
+  `isPreviewFxAvailable`, 혼합 보유일 때만 조회) 내림차순. 환율 없으면 USD/KRW 비교 없이 선물을 현물 뒤 + 안내, 금액 없는 행은
+  맨 뒤. 두 도메인(혼합이면 환율도) 응답 전엔 순위를 그리지 않는다. notional은 정렬 전용(총자산·증거금 아님).
+- 랭킹: 상위 랭커 카드 삭제(`limit: 3` publication 조회는 pin·내 순위용으로 유지), 내 티어카드 수익률 삭제, 행은
+  [앰블럼][수익률/총자산] — 390px 0.8, 360px 0.75 비율(좁은 화면·큰 글꼴은 숫자 줄바꿈), 수익률은 앱 퍼센트와 같은 400 굵기.
+- **주문 지정가 호가창:** 지정가 매수의 TP/SL 편집기 때문에 좁은 화면에서 주문·호가를 세로로 쌓아 호가창이 폼 아래로 밀려
+  사라져 보였다. 모든 주문 유형에서 두 열 유지로 수정(TP/SL·주문·호가 정책 무변경).
+- 테스트 하네스: 홈이 `features/wallet/api`를 읽으므로 `ledgerTestHarness`에 기본 환율 mock, `homeDiscoveryHarness`에 제어 가능한
+  mock을 추가했다(없으면 노드가 실제 API client를 불러 120개가 실패).
+- **NOT_RUN:** Android/iOS 실기기. `FuturesLimitEntry`의 간헐 실패 1건은 WSL 시계 역행(이번 프로브 −1.79s)과 같은 패턴이며
+  변경 범위 밖(단독 재실행 PASS). 상세·검증: [보충 15–23](frontend/docs/ui-ux-overhaul-2026-10-12.md#보충-요구사항-9개-1523)
+
 ## 2026-10-12 Trading Class 전반 UI/UX 개선 (14개 요구사항)
 
 - **기능 구현 의도:** 금융 정책·계산·API 계약은 그대로 두고, 터치·전환·로딩의 즉각적이고 일관된 반응,

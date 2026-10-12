@@ -123,7 +123,6 @@ export function OrderTradingScreen({
   const { colors } = useAppearance();
   const compact = width < 600;
   const [showKrw, setShowKrw] = useState(false);
-  const [attachedProtectionVisible, setAttachedProtectionVisible] = useState(false);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const { accounts } = useTradingAccount();
   const account = accounts.find((item) => item.id === accountId) ?? null;
@@ -341,8 +340,11 @@ export function OrderTradingScreen({
               runtime={tickerRuntime}
             />
           ) : null}
-          <View style={[styles.tradingRow, compact && styles.compactTradingRow, compact && attachedProtectionVisible && styles.protectionTradingColumn]} testID="asset-trading-columns">
-            <View style={[styles.orderColumn, compact && attachedProtectionVisible && styles.stackedColumn]} testID="asset-order-column">
+          {/* The quote column stays beside the order inputs for every order type:
+              stacking it under a limit buy's TP/SL editor pushed the order book
+              below the whole form, so it looked gone. */}
+          <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="asset-trading-columns">
+            <View style={styles.orderColumn} testID="asset-order-column">
               {account ? (
                 <OrderPanel
                   key={`${assetId}:${accountId}:${side}`}
@@ -354,7 +356,6 @@ export function OrderTradingScreen({
                   onInputFocus={inputScroll.onInputFocus}
                   onInputBlur={inputScroll.onInputBlur}
                   submitRef={inputScroll.submitRef}
-                  onAttachedProtectionVisibilityChange={setAttachedProtectionVisible}
                   onSideChange={onSideChange}
                   onReturnToAsset={onReturnToAsset ?? (() => navigation.goBack())}
                 />
@@ -365,7 +366,7 @@ export function OrderTradingScreen({
                 />
               )}
             </View>
-            <View style={[styles.priceColumn, compact && attachedProtectionVisible && styles.stackedColumn]} testID="asset-price-column">
+            <View style={styles.priceColumn} testID="asset-price-column">
               {liveOrderBookEnabled ? (
                 <>
                   <AssetOrderLadder
@@ -460,8 +461,6 @@ const styles = StyleSheet.create({
     paddingTop: 14,
   },
   compactTradingRow: { gap: 6 },
-  protectionTradingColumn: { flexDirection: 'column' },
-  stackedColumn: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto' },
   orderColumn: { flex: 1.15, minWidth: 0 },
   priceColumn: { flex: 1, minWidth: 0, overflow: 'hidden' },
   currentPrice: { paddingVertical: 14, gap: 4, minWidth: 0 },

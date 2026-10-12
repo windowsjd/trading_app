@@ -139,8 +139,14 @@ describe('ranking wire response rendering', () => {
     h.queries.set('me', h.ready({ id: 'self', nickname: '내 닉네임', profileImageUrl: 'https://example.test/me.png' }));
     const html = h.render();
     assert.match(html, /ranking-my-avatar-image/);
-    assert.match(html, /ranking-top-avatar-user-1-image/);
+    assert.match(html, /ranking-avatar-user-1-image/);
     assert.match(html, /ranking-avatar-user-2-fallback/);
+    // The list itself shows the top rankers; there is no separate podium card.
+    assert.equal(/ranking-top3|ranking-top-|상위 랭커/.test(html), false, 'podium card removed');
+    // My tier card carries rank and tier only; return rates stay in the list rows.
+    assert.equal(/ranking-my-return|>수익률</.test(html), false, 'my card has no return rate');
+    assert.equal(/ranking-return-user-1/.test(html) && /ranking-return-user-2/.test(html), true, 'list rows keep return rates');
+    assert.equal(/ranking-total-user-1/.test(html), true, 'list rows keep total assets');
     assert.match(html, /trader-1/);
     assert.match(html, /trader-2/);
     assert.match(html, /#1/);
@@ -153,19 +159,14 @@ describe('ranking wire response rendering', () => {
     assert.doesNotMatch(html, /퍼센타일|등급 |>master<|>silver</);
   });
 
-  it('opens the existing summary with userId from both podium and list presses', () => {
+  it('opens the existing summary with userId from list presses (no podium presses remain)', () => {
     const h = createHarness();
     h.render();
     const { TEST_IDS } = h.load(path.join(src, 'constants/testIds'));
-    const podium = h.presses.filter((p) => p.testID?.startsWith('ranking-top-user-'));
-    assert.equal(podium.length, 2);
-    for (const [index, item] of h.page.rankings.entries()) {
-      podium[index].onPress();
+    assert.equal(h.presses.filter((p) => p.testID?.startsWith('ranking-top-')).length, 0);
+    for (const item of h.page.rankings) {
       h.presses.find((p) => p.testID === TEST_IDS.ranking.item(item.userId)).onPress();
-      assert.deepEqual(h.navigations.slice(-2), [
-        ['UserSeasonSummary', { userId: item.userId }],
-        ['UserSeasonSummary', { userId: item.userId }],
-      ]);
+      assert.deepEqual(h.navigations.at(-1), ['UserSeasonSummary', { userId: item.userId }]);
     }
   });
 
@@ -274,13 +275,14 @@ describe('ranking wire response rendering', () => {
 
 describe('ranking API and query contract', () => {
   for (const scope of ['all', 'friends', 'top10']) {
-    it(`${scope} keeps the canonical TOP3 independently of the scoped list`, async () => {
+    it(`${scope} keeps the canonical publication independently of the scoped list`, async () => {
       const h = createHarness(scope);
       const friend = { ...h.page.rankings[0], userId: 'friend-outside-top3', seasonParticipantId: 'friend-sp', rank: 42, nickname: '친구42' };
       h.ranking.data = { pages: [{ ...h.page, rankings: [friend] }] };
       const html = h.render();
-      assert.match(html, /ranking-top-user-1/);
-      assert.doesNotMatch(html, /ranking-top-friend-outside-top3/);
+      // The publication read (limit 3) still pins every scope; it is not drawn.
+      assert.equal(h.queryOptions.some(q => q.queryKey[0] === 'ranking' && q.queryKey[7] === 3), true);
+      assert.equal(/ranking-top-/.test(html), false);
       assert.match(html, /ranking-item-friend-outside-top3/);
       const list = h.queryOptions.find(q => q.getNextPageParam);
       await list.queryFn({ pageParam: list.initialPageParam });
@@ -289,10 +291,10 @@ describe('ranking API and query contract', () => {
         rankingDate: h.page.rankingDate, capturedAt: h.page.capturedAt })) assert.equal(params.get(key), value);
       h.ranking.data = undefined;
       h.ranking.isLoading = true;
-      assert.match(h.render(), /ranking-top-user-1/, 'TOP3 remains during tab loading');
+      assert.equal(/ranking-my-card/.test(h.render()), true, 'my standing remains during tab loading');
       h.ranking.isLoading = false;
       h.ranking.isError = true;
-      assert.match(h.render(), /ranking-top-user-1/, 'TOP3 remains on a scoped list failure');
+      assert.equal(/ranking-my-card/.test(h.render()), true, 'my standing remains on a scoped list failure');
     });
   }
 
@@ -426,11 +428,12 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
 
 describe('other ranking consumers', () => {
   for (const screen of ['my/MyScreen', 'home/HomeScreen']) {
-    it(`${screen} preserves available/final/absent rank display and selected season requests`, async () => {
+    it(`${screen} preserves available/final/absent rank or tier display and selected season requests`, async () => {
       const h = createHarness();
       const account = prepareAccountScreens(h);
       const props = { account };
-      assert.match(h.render(screen, props), /#2/);
+      // Home's account box no longer repeats the rank (the Ranking tab shows it).
+      assert.equal(/#2/.test(h.render(screen, props)), !screen.startsWith('home/'));
       assert.match(h.render(screen, props), screen.startsWith('home/') ? /Silver/ : /silver/);
       h.page.myRanking = { ...availableRankings.myRanking, provisionalTier: 'master', finalTier: null };
       assert.match(h.render(screen, props), screen.startsWith('home/') ? /Whale/ : /master/);

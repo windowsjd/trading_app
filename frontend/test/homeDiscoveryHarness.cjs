@@ -42,6 +42,10 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
       await read('futures', { account: id });
       return h.futures?.[id] ?? require('./futuresFixtures.cjs').futuresFixture(id).positions;
     } },
+    '../../features/wallet/api': { getCurrentFxRate: async (base, quote) => {
+      await read('fx', { base, quote });
+      return h.usdKrw ?? { state: 'available', baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1350', validUntil: new Date(Date.now() + 60_000).toISOString() };
+    } },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ selectedAccount: h.account, selectedAccountId: h.account.id, capabilities: { canTrade: true, canExchange: true } }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate: (...args) => h.navigation.push(args) }) },
     '../../features/tradingAccount/api': {

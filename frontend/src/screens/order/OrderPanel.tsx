@@ -117,7 +117,6 @@ type Props = {
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
   submitRef?: React.RefObject<View | null>;
-  onAttachedProtectionVisibilityChange?: (visible: boolean) => void;
   /** Reports user side changes; the panel keeps owning the side. */
   onSideChange?: (side: OrderSide) => void;
 };
@@ -242,7 +241,6 @@ export function OrderForm({
   onInputFocus,
   onInputBlur,
   submitRef,
-  onAttachedProtectionVisibilityChange,
 }: Props & { side: 'buy' | 'sell' }) {
   // accountId is immutable for this mounted form, supplied by the route or
   // the keyed inline panel. Selection changes never retarget a pending request.
@@ -595,10 +593,6 @@ export function OrderForm({
   const attachedEditorVisible = side === 'buy' && orderType === 'limit';
   const attachedAvailable = !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
   attachedPermission.current = attachedAvailable;
-  useEffect(() => {
-    onAttachedProtectionVisibilityChange?.(attachedEditorVisible);
-    return () => onAttachedProtectionVisibilityChange?.(false);
-  }, [attachedEditorVisible, onAttachedProtectionVisibilityChange]);
 
 
   /**

@@ -43,6 +43,12 @@ function load(file, mocks) {
     if (name.endsWith('/conditional/api') || (file.includes('/features/conditional/') && name === './api')) {
       return mocks['../../features/conditional/api'] ?? { getProtections: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) };
     }
+    // Home reads the shared USD/KRW rate to order spot and futures together.
+    // Screens that exercise FX mock this boundary themselves.
+    if (name.endsWith('/features/wallet/api')) {
+      return mocks['../../features/wallet/api'] ?? { getCurrentFxRate: async () => ({ state: 'available', baseCurrency: 'USD',
+        quoteCurrency: 'KRW', rate: '1350', validUntil: new Date(Date.now() + 60_000).toISOString() }) };
+    }
     if (name.endsWith('.png')) return { uri: resolve(dirname(file), name) };
     if (name.endsWith('.json')) return require(resolve(dirname(file), name));
     // This presentation table imports PNGs, so use the same asset-aware loader

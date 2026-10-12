@@ -199,7 +199,7 @@ describe('the styles long text depends on are present', () => {
     assert.ok(!/numberOfLines=\{/.test(source));
   });
 
-  it('SeasonAccountHome: season name, amounts and the rank pair all wrap', () => {
+  it('SeasonAccountHome: season name, amounts and the nickname all wrap', () => {
     const source = read('screens/home/SeasonAccountHome.tsx');
 
     // A user-supplied season name is unbounded; it wraps rather than truncating.
@@ -207,12 +207,13 @@ describe('the styles long text depends on are present', () => {
     const hero = read('screens/home/HomeAssetHero.tsx');
     assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
-    // The nickname shrinks beside the avatar and rank; the emblem lives beside
-    // the total (the hero row wraps it below long amounts or large text).
+    // The nickname shrinks beside the avatar (the rank moved to the Ranking
+    // tab); the emblem lives beside the total, and the hero row wraps it below
+    // long amounts or large text.
     const context = read('screens/home/HomeAccountContext.tsx');
     assert.equal(/identity:\s*\{[^}]*minWidth:\s*0/s.test(context), true);
     assert.equal(/nickname:\s*\{[^}]*flexShrink:\s*1[^}]*minWidth:\s*0/s.test(context), true);
-    assert.equal(/identity:\s*\{[^}]*flexWrap:\s*'wrap'/s.test(context), true);
+    assert.equal(context.includes('TEST_IDS.home.rank'), false);
     assert.equal(/heroRow:\s*\{[^}]*flexWrap:\s*'wrap'/s.test(hero), true);
     assert.equal(/hero:\s*\{[^}]*flexShrink:\s*1/s.test(hero), true);
     assert.match(read('screens/home/HomeHoldings.tsx'), /<PositionAssetRow/);

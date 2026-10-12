@@ -42,7 +42,8 @@ for (const [canonical, name, id] of [
   assert.ok(h.node(`home-emblem-${id}`));
   assert.ok(h.node('home-tier-image').props.source.uri.endsWith(`/${id}.png`));
   assert.equal(h.node('home-tier-image').props.resizeMode, 'contain');
-  assert.equal(h.node('home-rank').props.children, '#12');
+  // The rank lives on the Ranking tab, not in Home's account box.
+  assert.equal(h.node('home-rank') === undefined, true);
   assert.equal(h.node('home-whale-subject') === undefined, true);
   assert.equal(h.node('home-whale-wave') === undefined, true);
   // The emblem sits beside the total assets; Home's account box carries no tier art.
@@ -57,8 +58,7 @@ it('daily/final selection preserves the existing getRankingTier policy', t => {
   assert.equal(h.node('home-tier').props.children, 'Gold');
   h.context.rankType = 'final'; h.context.rankingQuery.data.myRanking.rank = 245; h.update();
   assert.equal(h.node('home-tier').props.children, 'Diamond');
-  assert.equal(h.node('home-rank').props.children, '#245');
-  assert.match(h.node('home-rank').props.accessibilityLabel, /최종/);
+  assert.equal(h.node('home-rank') === undefined, true);
   h.context.rankingQuery.data.myRanking.finalTier = null; h.update();
   assert.equal(h.node('home-tier').props.children, '티어 미정', 'final never falls back to provisional');
   h.context.rankType = 'daily'; h.context.rankingQuery.data.myRanking.provisionalTier = null;
@@ -85,7 +85,9 @@ for (const state of ['loading', 'error', 'null', 'unknown', 'response-unavailabl
     assert.equal(h.renderer.root.findAll((n: any) => typeof n.type === 'string' && String(n.props?.testID ?? '').startsWith('home-tier-background-')).length, 0);
     if (state === 'loading') assert.equal(h.node('home-tier').props.children, '티어 확인 중');
     if (state === 'error') assert.equal(h.node('home-tier').props.children, '티어 확인 실패');
-    assert.equal(h.node('home-rank').props.children, ['null', 'unknown'].includes(state) ? '#12' : state === 'loading' ? '—' : '-');
+    assert.equal(h.node('home-rank') === undefined, true);
+    // Only a failed read keeps a notice (with its own diagnostic) in the account box.
+    assert.equal(h.renderer.root.findByType('AccountSwitcher').findAll((n: any) => n.props.message === '랭킹 정보를 불러오지 못했습니다.').length > 0, state === 'error');
   });
 }
 
@@ -110,11 +112,26 @@ it('keeps the emblem out of the account box and leaves all text untruncated', t 
   assert.ok(flatten(h.node('home-nickname').props.style).fontSize > 15);
 });
 
-it('an unavailable rank never prints an invalid number or hides the known tier', t => {
+it('the account box never prints a rank, and an invalid rank never hides the known tier', t => {
   const h = setup(); t.after(h.close);
-  for (const rank of [null, undefined, NaN, 0, -1]) {
+  for (const rank of [12, null, undefined, NaN, 0, -1]) {
     h.context.rankingQuery.data.myRanking.rank = rank; h.update();
-    assert.equal(h.node('home-rank').props.children, '-');
+    assert.equal(h.node('home-rank') === undefined, true);
+    assert.equal(h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^#/.test(String(n.props.children))).length, 0);
     assert.equal(h.node('home-tier').props.children, 'Gold');
   }
 });
+
+for (const [width, fontScale, size] of [[390, 1, 112], [360, 1.3, 112], [359, 1, 88], [390, 1.5, 88], [320, 2, 88]] as const) {
+  it(`the emblem beside the total is ${size}dp at ${width}dp / text ×${fontScale}, keeping its proportions`, t => {
+    const h = setup(); t.after(h.close);
+    h.h.dimensions = { ...h.h.dimensions, width, fontScale };
+    h.context.rankingQuery.isError = true; h.update();
+    const neutral = flatten(h.node('home-tier-neutral').props.style);
+    assert.equal(neutral.width, size); assert.equal(neutral.height, size);
+    h.context.rankingQuery.isError = false; h.update();
+    const emblem = flatten(h.node('home-emblem-gold').props.style);
+    assert.equal(Math.abs(emblem.width / emblem.height - 1) < 0.2, true, 'original aspect, never stretched to the slot');
+    assert.equal(emblem.width > size * 0.8 && emblem.width <= size * 1.1, true);
+  });
+}

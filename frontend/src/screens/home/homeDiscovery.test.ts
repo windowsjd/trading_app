@@ -131,7 +131,7 @@ it('category changes never relabel the previous response and late account reads 
   assert.equal(h.rows().length, 1); assert.equal(h.rows()[0].props.testID, 'home-position-item-general-a0');
   assert.equal(h.hotRows().length, 5);
   await h.switch(account('season', 'settled'));
-  assert.equal(h.node('home-rank').props.children, '#99999');
+  assert.equal(h.node('home-rank') === undefined, true, 'the rank is shown on the Ranking tab only');
   assert.ok(h.requests.some(r => r.section === 'ranking' && r.seasonId === 'season-settled'));
 });
 

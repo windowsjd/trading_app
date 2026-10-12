@@ -113,3 +113,68 @@ TierEmblem/TierCardBackground, AccountHoldings, quest bridge)을 재사용해 �
   드롭다운, 25% wash 등)을 단언하므로 갱신이 필요하다(이번에 미수정, `npm run check` 밖).
 - 문의 답변/관리자 화면은 없다(접수·본인 조회만). 운영 반영은 migration 적용 승인 후.
 - 선물 증거금 부족의 일반 사례(free collateral > 0)는 서버 응답으로만 안내.
+
+## 보충 요구사항 9개 (15–23)
+
+시작 `main` = `origin/main` = 원격 main `953576fb`(14개 작업은 `bfb9d016`에 반영됨), working tree clean.
+frontend만 변경. 커밋·push·배포·Migration·서버/API 변경 없음. 화면 계산은 표시용이며 서버 금융 값이 기준이다.
+
+15. **홈 평가손익 통합** (`features/tradingAccount/homePortfolio.ts` `homeUnrealizedPnlKrw`, `HomeAssetHero`)
+    - 근거: 서버 valuation은 현물 포지션의 `unrealizedPnlKrw`와 선물 포지션의 `futuresUnrealizedPnlKrw`(Mark PnL USD ×
+      같은 USD/KRW)를 따로 합산하고, 총자산은 둘 다 이미 포함한다 → 두 값을 더해도 중복이 없다.
+    - '선물 Mark 미실현손익' 줄 삭제, '평가 손익' = 두 서버 값의 decimal.js 합(scale 8), 부호별 금융 색, 0은 중립.
+      어느 한쪽이라도 없거나 형식이 틀리면 '알 수 없음'(0으로 간주하지 않음). 서버는 선물이 없어도 `0.00000000`을 보낸다.
+    - 평가 불가(summary null)·정산 완료(final result) 표시는 그대로. 총자산·수익률·실현손익·Portfolio 화면 표기는 불변.
+16. **홈 티어 앰블럼 확대** (`HomeTierBadge` 84/68 → 112/88, `HomeAssetHero`)
+    - 원본 비율·optical scale 유지. 총자산의 자연 폭(숨김 측정 Text), 앰블럼 폭, 행 폭을 onLayout으로 재서 옆에 들어가면
+      총자산 옆, 아니면 총자산 아래 수익률·평가손익 줄 옆으로 '약간 아래' 배치한다(측정 전 기본값도 아래).
+    - 36dp 8자리 총자산(약 236px) + 112 앰블럼은 390px에서도 한 줄에 못 들어가므로 휴대폰에서는 보통 아래 배치다.
+      추정 폭으로 정하면 글꼴에 따라 '원'이 줄바꿈되거나 360px에서 빈 공간이 크게 생겼다(실측으로 교체한 이유).
+17. **보유종목·포지션 통합 목록** (`orderHomeHoldings`, `HomeHoldings`)
+    - 정렬 값: 현물 = 서버 `positionValueKrw`(available/stale_cache — 서버의 현물 정렬과 같은 기준), 선물 = 행이 보여주는
+      Mark notional(신선할 때만) × 현재 USD/KRW. 환율은 지갑 환전과 같은 `/fx/rates/current` query key와
+      `isPreviewFxAvailable` 검증을 재사용하고, 현물과 선물을 함께 보유할 때만 조회한다(validUntil+1s 재조회, 최대 5분).
+    - 금액 큰 순, 같은 금액은 현물→선물·각 서버 순. 환율이 없으면 USD와 KRW를 비교하지 않는다: 평가된 현물 뒤에 선물
+      (USD끼리 정렬) + 안내 문구. 금액을 표시하지 못하는 행(현물 평가 불가, Mark stale)은 맨 뒤 서버 순.
+      notional은 순서만 정한다(총자산·증거금과 무관).
+    - 접힘: 서버가 KRW 순으로 준 현물 1위(`limit: 1`)와 선물 전체(선물 API는 전체 반환) 중 최대 → 전체 최대와 같다.
+      펼침: 기존 전체 현물 조회 + 선물. 현물·선물(혼합이면 환율까지) 응답 전에는 스켈레톤(부분 결과를 순위로 보이지 않음),
+      한쪽 실패 시 다른 쪽 + 그 오류 상태. 계정별 key와 `tradingAccountId` 검사는 그대로(늦은 응답 격리).
+    - '보유종목'/'포지션' 하위 제목 삭제(카드 제목은 유지), 행 UI·이동(현물 → 종목 상세, 선물 → Futures)·자세히/접기 유지.
+18. **계정 카드 순위 삭제** — 순위 숫자와 '아직 표시할 랭킹 정보가 없습니다.' 삭제, 닉네임이 남는 폭 사용. 랭킹 조회는
+    티어용으로 유지하고 조회 실패 안내(자체 진단 포함)는 남겼다.
+19. **랭킹 수익률 글씨** — 앱의 다른 퍼센트(홈 HOT 등락률, 보유 수익률)와 같은 시스템 폰트·regular(400)·tabular-nums.
+    18 크기와 상승/하락 색 정책 유지(이전 800 굵기 제거).
+20. **내 티어카드 수익률 삭제** — '수익률' 라벨·숫자·chip 배경 삭제(티어 미상 일반 카드도 같다). 목록 수익률 유지.
+21. **사용자 카드 앰블럼** — 오른쪽 [앰블럼][수익률 위/총자산 아래]. 380dp 이상 60, 미만 48, 카드 상하 패딩 7 →
+    390px 한 줄 카드에서 앰블럼 높이/카드 높이 0.79–0.80, 360px 0.74–0.76. 티어 미상은 같은 크기 빈 슬롯.
+    왼쪽(순위·프로필·이름) 기준 폭 106: 320px·글꼴 확대에서는 숫자 묶음이 다음 줄로, 그래도 좁으면 숫자가 앰블럼 아래로
+    감긴다. 긴 값은 자기 줄 안에서 줄바꿈(앰블럼과 겹치지 않음). 순위 숫자는 줄지 않게 했다(긴 닉네임에서 잘리던 문제).
+    360px에서는 이름 폭이 좁아 긴 닉네임이 여러 줄이 된다(80% 앰블럼과 두 숫자를 한 줄에 두는 대가).
+22. **상위 랭커 삭제** — 카드 삭제. `limit: 3` publication 조회는 유지한다(모든 scope의 rankType/rankingDate/capturedAt
+    pin, 내 순위, snapshot 변경 복구). 전체·친구·TOP10, 페이지네이션, 프로필 이동, 현재/최종 구분 유지.
+23. **지정가 호가창** — 원인(실화면 재현): 지정가 매수에서 OrderPanel이 TP/SL 편집기 표시를 알리면 OrderScreen이 좁은
+    화면(<600)에서 주문·호가를 세로로 쌓았다. 호가창은 렌더되지만 긴 폼 아래로 밀려(390px: y 170 → 901, 뷰포트 780 밖)
+    사라진 것처럼 보였다. 수정: 모든 주문 유형에서 두 열 유지(편집기는 원래 세로 구성이라 주문 열에 들어간다),
+    표시 신호·세로 스타일 제거. TP/SL·주문 정책·호가 구독/최신성·WebSocket 무변경.
+
+### 보충 검증
+
+- `npm run lint:accounts:check`, `lint:guides:check`, `typecheck`, `git diff --check`: PASS. 전체 `npm test`
+  **2316 pass / 0 fail / 0 skip**. 신규 단위 테스트 `homePortfolio.test.ts`(합산 6종, 정렬·환율 4종·stale·tie·형식 오류),
+  홈 통합 목록·환율 대기/실패·선물 대기, 앰블럼 크기, 지정가 두 열 회귀 테스트(수정 전 코드에서 실패 확인).
+  바뀐 계약(순위·상위 랭커·수익률 chip)을 단언하던 기존 테스트는 같은 의미로 갱신(삭제·skip 없음).
+- 하네스: 홈이 `features/wallet/api`를 읽어 `ledgerTestHarness`에 기본 USD/KRW mock, `homeDiscoveryHarness`에 제어용 mock 추가.
+- Web/Android/iOS `expo export`: PASS. `test/browser/beginnerBrowser.cjs` 표준(19 layouts, 9 guided flows),
+  `FULL_QUEST_BROWSER=1` 8개 거래 퀘스트(protection·limitBuy 포함), `QUEST_COMPACT=1`: PASS.
+- 간헐 실패: 중간 전체 실행에서 `FuturesLimitEntry` 1건(실행마다 다른 케이스)이 실패했다. 변경 범위가 닿지 않는 화면이고
+  단독 재실행 6회 중 4회 PASS, 같은 시간대 시계 프로브에서 −1.79s 역행을 관측(WSL 시계, 기존 분류와 같음). 최종 전체 실행 PASS.
+- 실제 Web 렌더(Playwright, production navigator + fixture transport, scratchpad): 홈 36조합(320/360/390 × 글꼴 1/1.5/2 ×
+  라이트/다크 × 일반/16자리 총자산) 앰블럼-총자산 겹침 0·순위 0·잘림 0, 평가손익 6사례, 통합 목록 6사례(혼합·선물 1위·
+  환율 실패·현물만·선물만·없음) 순서와 이동. 랭킹 54조합 × 5행 겹침·잘림 0, 수익률 폰트=홈 퍼센트, 탭 3종, 50→53
+  페이지네이션, 정산 상태. 주문 18조합에서 시장가/지정가 × 매수/매도 + TP/SL(손절 지정가+익절) 펼침 모두 호가창 위치
+  동일·주문 옆·첫 화면, 입력 포커스 후 복귀, 호가 미지원(KRX)·호가 실패 상태·종목 전환.
+- **NOT_RUN:** Android/iOS 실기기(소프트 키보드·native 글꼴 폭은 Web 렌더로 대체 불가). 호가 실시간 갱신은 이번 변경이
+  닿지 않는 hook(기존 테스트)으로만 확인.
+- 기존 문제(변경 전과 동일): 호가 사다리 수량 열이 320px·글꼴 확대에서 자기 칸을 넘는다(HEAD 비교 동일). 주문 입력
+  열이 320px·2배 글꼴에서 좁은 것도 시장가와 같은 기존 폭이다.

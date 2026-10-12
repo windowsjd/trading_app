@@ -275,6 +275,9 @@ function createHomeHarness(mode = 'general') {
       investmentPnlKrw: '0',
       realizedPnlKrw: '1234',
       unrealizedPnlKrw: '-2345',
+      // The server always reports the futures part, 0 without positions.
+      futuresUnrealizedPnlUsd: '0.00000000',
+      futuresUnrealizedPnlKrw: '0.00000000',
     };
     client.setQueryData([...base, 'overview'], {
       tradingAccountId: account.id,

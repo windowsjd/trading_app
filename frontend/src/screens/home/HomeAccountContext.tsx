@@ -35,7 +35,7 @@ export function useHomeAccountContext(account: TradingAccountDto | null) {
 
 export type HomeAccountContextData = ReturnType<typeof useHomeAccountContext>;
 
-/** The season ranking row behind Home's rank and tier (never for general/beginner). */
+/** The season ranking row behind Home's tier (never for general/beginner). */
 function readSeasonStanding(context: HomeAccountContextData, mode: 'light' | 'dark') {
   const { rankingQuery, rankType, hasSeason, seasonId } = context;
   const loading = !!seasonId && rankingQuery.isLoading;
@@ -43,22 +43,18 @@ function readSeasonStanding(context: HomeAccountContextData, mode: 'light' | 'da
     rankingQuery.data?.state === 'available' && rankingQuery.data.myRanking.state === 'available'
     ? rankingQuery.data.myRanking : null;
   const tier = hasSeason ? getHomeTier(getRankingTier(myRanking, rankType), mode) : null;
-  const rank = myRanking && Number.isFinite(myRanking.rank) && myRanking.rank > 0 ? `#${myRanking.rank}` : '-';
   const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패' : '티어 미정');
-  const notice = rankingQuery.isError ? '랭킹 정보를 불러오지 못했습니다.' :
-    !loading && !!seasonId && !myRanking ? '아직 표시할 랭킹 정보가 없습니다.' : null;
-  return { loading, tier, rank, tierLabel, notice };
+  return { tier, tierLabel };
 }
 
 /**
  * One account box for general, beginner and season accounts: the mode or
  * season title and the change action on top, the profile right below. The
- * season tier is shown next to the total assets (HomeTierBadge).
+ * rank lives on the Ranking tab; the season tier is shown next to the total
+ * assets (HomeTierBadge).
  */
 export default function HomeAccountContext({ context }: { context: HomeAccountContextData }) {
-  const { meQuery, rankingQuery, rankType, hasSeason } = context;
-  const { mode } = useAppearance();
-  const { loading, rank, notice } = readSeasonStanding(context, mode);
+  const { meQuery, rankingQuery, hasSeason } = context;
   return (
     <AccountSwitcher home>
       <View style={styles.identity}>
@@ -66,28 +62,31 @@ export default function HomeAccountContext({ context }: { context: HomeAccountCo
           <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={32} testID="home-profile-avatar" />
           <Text testID={TEST_IDS.home.nickname} style={styles.nickname}>{meQuery.data.nickname}</Text>
         </> : <View style={styles.flex}><InlineEmptyState message="사용자 정보를 불러오지 못했습니다." /></View>}
-        {hasSeason ? <Text testID={TEST_IDS.home.rank} style={styles.rank}
-          accessibilityLabel={`${rankType === 'final' ? '최종' : '현재'} 순위 ${rank === '-' ? '확인 중 또는 정보 없음' : rank}`}>
-          {loading ? '—' : rank}
-        </Text> : null}
       </View>
-      {hasSeason && notice ? rankingQuery.isError
-        ? <ErrorNotice error={rankingQuery.error} message={notice} style={styles.notice} />
-        : <Text style={styles.notice}>{notice}</Text> : null}
+      {/* The tier still reads this ranking row; its failure keeps its own diagnostic. */}
+      {hasSeason && rankingQuery.isError
+        ? <ErrorNotice error={rankingQuery.error} message="랭킹 정보를 불러오지 못했습니다." style={styles.notice} /> : null}
     </AccountSwitcher>
   );
 }
 
+/** Emblem sizes beside the total assets, by available width (dp) per text scale. */
+function homeTierBadgeSize(width: number, fontScale: number) {
+  return width < 360 || fontScale > 1.3 ? 88 : 112;
+}
+
 /**
  * The season tier emblem beside the total assets. The emblem keeps its
- * original proportions; the numbers stay the larger, primary information.
+ * original proportions; the numbers stay the primary information. The hero
+ * places it beside the total, or lower beside the performance lines when the
+ * total needs the width (HomeAssetHero).
  */
 export function HomeTierBadge({ context }: { context: HomeAccountContextData }) {
   const { mode } = useAppearance();
   const { width, fontScale } = useWindowDimensions();
   const { tier, tierLabel } = readSeasonStanding(context, mode);
   if (!context.hasSeason) return null;
-  const size = width < 360 || fontScale > 1.3 ? 68 : 84;
+  const size = homeTierBadgeSize(width, fontScale);
   return (
     <View testID="home-tier-badge" style={styles.tier}>
       {tier ? <TierEmblem tier={tier.id} size={size} /> :
@@ -103,11 +102,9 @@ export function HomeTierBadge({ context }: { context: HomeAccountContextData }) 
 
 const styles = StyleSheet.create({
   flex: { flex: 1, minWidth: 0 },
-  // The rank sits beside the name and wraps below it when large text needs the room.
-  identity: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 4, minWidth: 0 },
-  nickname: { flexGrow: 1, flexShrink: 1, flexBasis: 120, minWidth: 0, fontSize: 16, fontWeight: '600', lineHeight: 24 },
-  rank: { marginLeft: 'auto', maxWidth: '100%', fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.secondary, fontVariant: ['tabular-nums'] },
-  tier: { alignItems: 'center', gap: 2, flexShrink: 0, maxWidth: 120 },
+  identity: { flexDirection: 'row', alignItems: 'center', columnGap: 10, minWidth: 0 },
+  nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 16, fontWeight: '600', lineHeight: 24 },
+  tier: { alignItems: 'center', gap: 2, flexShrink: 0, maxWidth: 136 },
   tierName: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
   neutral: { alignItems: 'center', justifyContent: 'center' },
   neutralRing: { width: '65%', height: '65%', borderRadius: 999, borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },

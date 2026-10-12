@@ -67,13 +67,14 @@ export default function RankingScreen({ navigation }: Props) {
   const [selectedTab, setSelectedTab] = React.useState<RankingScope>('all');
   const snapshotResetAttemptRef = React.useRef(0);
   const rankingLimit = selectedTab === 'top10' ? 10 : 50;
-  const { width, fontScale } = useWindowDimensions();
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
   });
   // The API defaults to daily, including settled seasons. Select final explicitly
-  // after settlement, then pin every scope to this canonical publication.
+  // after settlement, then pin every scope to this canonical publication. Its
+  // rows are no longer drawn (the list shows the top rankers); it supplies the
+  // publication and my ranking.
   const publicationRankType: RankingRankType = seasonQuery.data?.status === 'settled' ? 'final' : 'daily';
   const publicationParams = { scope: 'all' as const, seasonId: seasonQuery.data?.id, rankType: publicationRankType, limit: 3, offset: 0 };
   const topQuery = useQuery({
@@ -252,8 +253,6 @@ export default function RankingScreen({ navigation }: Props) {
     );
   }
 
-  const top3 = publication?.rankings ?? [];
-
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
@@ -277,32 +276,6 @@ export default function RankingScreen({ navigation }: Props) {
               viewState={viewState}
               onJoin={() => rootNavigation.navigate('SeasonJoin')}
             />
-
-            <View style={styles.card} testID="ranking-top3">
-              <Text style={styles.label}>상위 랭커</Text>
-              <View style={[styles.topRow, (width < 360 || fontScale > 1) && styles.topColumn]}>
-                {top3.map((item) => (
-                  <ActionPressable
-                    key={getRankingItemKey(item)}
-                    testID={`ranking-top-${item.userId}`}
-                    style={styles.topCard}
-                    onPress={() =>
-                      navigation.navigate('UserSeasonSummary', {
-                        userId: item.userId,
-                      })
-                    }
-                  >
-                    <Text style={styles.topRank}>#{item.rank}</Text>
-                    {/* Same profile order everywhere: photo left, name right. */}
-                    <View style={styles.profile}>
-                      <ProfileAvatar profileImageUrl={item.profileImageUrl} size={28} testID={`ranking-top-avatar-${item.userId}`} />
-                      <Text style={styles.topName}>{item.nickname}</Text>
-                    </View>
-                    <RankingReturn item={item} rankType={rankType} compact />
-                  </ActionPressable>
-                ))}
-              </View>
-            </View>
 
             <SegmentedControl testID="ranking-tabs" accessibilityLabel="랭킹 범위" value={selectedTab} onChange={setSelectedTab}
               style={styles.tabs}
@@ -393,15 +366,15 @@ function MyRankingCard({
 
 /**
  * 내 순위 in the season tier card's design (Home's former card), without the
- * account change action or season name: profile, rank, tier and return rate.
- * Without a known tier it keeps the same information on a plain card.
+ * account change action or season name: profile, rank and tier. The return
+ * rate stays in the list rows. Without a known tier it keeps the same
+ * information on a plain card.
  */
 function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extract<MyRankingDto, { state: 'available' }> | null; rankType?: RankingRankType }) {
   const { mode } = useAppearance();
   const { width } = useWindowDimensions();
   const tier = getHomeTier(getRankingTier(ranking, rankType), mode);
   const foreground = tier ? tierForeground(tier, mode) : undefined;
-  const rate = getRecordFinancialDisplay(ranking?.returnRate, 'rate');
   const content = (
     <>
       <Text style={[styles.label, foreground && styles.onArtLabel, foreground]}>내 순위</Text>
@@ -412,11 +385,6 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
         </View>
       ) : null}
       <Text testID="ranking-my-rank" style={[styles.myRank, foreground]}>{ranking ? `#${ranking.rank}` : '-'}</Text>
-      {/* A light chip keeps the rise/fall color legible on every facet. */}
-      <View style={styles.rateChip}>
-        <Text style={styles.rateLabel}>수익률</Text>
-        <Text testID="ranking-my-return" style={[styles.rateValue, { color: rate.color }]}>{rate.text}</Text>
-      </View>
       {rankType === 'final' ? <Text style={[styles.settledText, foreground && styles.onArtSettled]}>최종 랭킹 확정</Text> : null}
     </>
   );
@@ -433,15 +401,31 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
   );
 }
 
-/** The emblem leads the return rate; rates carry rise/fall colors (0/unknown neutral). */
-function RankingReturn({ item, rankType, compact = false }: { item: RankingItemDto; rankType?: RankingRankType; compact?: boolean }) {
+/** Emblem sizes for ~80% of a one-line row; they never grow with the text. */
+function rankingEmblemSize(width: number) {
+  return width < 380 ? 48 : 60;
+}
+
+/**
+ * The tier emblem left of the two figures: return rate (rise/fall colors,
+ * 0/unknown neutral) above total assets. Without a known tier an empty slot of
+ * the same size keeps every row's figures aligned.
+ */
+function RankingFigures({ item, rankType }: { item: RankingItemDto; rankType?: RankingRankType }) {
   const { mode } = useAppearance();
+  const { width } = useWindowDimensions();
   const tier = getHomeTier(getRankingTier(item, rankType), mode);
   const rate = getRecordFinancialDisplay(item.returnRate, 'rate');
+  const total = `${formatKrw(item.totalAssetKrw)}원`;
+  const size = rankingEmblemSize(width);
   return (
-    <View style={[styles.returnLine, compact && styles.returnLineStart]} accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}`}>
-      {tier ? <TierEmblem tier={tier.id} size={compact ? 22 : 26} /> : null}
-      <Text testID={`ranking-return-${item.userId}`} style={[compact ? styles.topReturn : styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
+    <View style={styles.figures} accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
+      {tier ? <TierEmblem tier={tier.id} size={size} />
+        : <View testID={`ranking-tier-slot-${item.userId}`} style={{ width: size, height: size }} />}
+      <View style={styles.amounts}>
+        <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
+        <Text testID={`ranking-total-${item.userId}`} style={styles.totalAsset}>{total}</Text>
+      </View>
     </View>
   );
 }
@@ -469,10 +453,7 @@ function RankingRow({
         </View>
       </View>
 
-      <View style={styles.alignEnd}>
-        <RankingReturn item={item} rankType={rankType} />
-        <Text style={styles.totalAsset}>{formatKrw(item.totalAssetKrw)}원</Text>
-      </View>
+      <RankingFigures item={item} rankType={rankType} />
     </ActionPressable>
   );
 }
@@ -495,41 +476,29 @@ const styles = StyleSheet.create({
   onArtSettled: { fontWeight: '800' },
   myName: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
   myRank: { fontSize: 32, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  rateChip: { alignSelf: 'flex-start', maxWidth: '100%', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6,
-    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, backgroundColor: semantic.surface },
-  rateLabel: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
-  rateValue: { fontSize: 17, lineHeight: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
   tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
-  returnLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 6, maxWidth: '100%' },
-  returnLineStart: { justifyContent: 'flex-start' },
-  returnValue: { fontSize: 18, lineHeight: 26, fontWeight: '800', textAlign: 'right', fontVariant: ['tabular-nums'], flexShrink: 1 },
-  topReturn: { fontSize: 15, lineHeight: 22, fontWeight: '800', fontVariant: ['tabular-nums'], flexShrink: 1 },
+  // Emblem left of both figures. Only when even that cannot fit (narrow
+  // screens at large text) do the figures wrap under the emblem; long values
+  // wrap inside their full-width lines rather than spilling over the emblem.
+  figures: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end', columnGap: 8, rowGap: 4,
+    marginLeft: 'auto', maxWidth: '100%', minWidth: 0 },
+  amounts: { flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch', gap: 2 },
+  // The app's percent figures: system font, regular weight, tabular digits.
+  // Only the size (18) keeps the ranking's emphasis.
+  returnValue: { fontSize: 18, lineHeight: 26, textAlign: 'right', fontVariant: ['tabular-nums'] },
   totalAsset: { fontSize: 15, lineHeight: 22, fontWeight: '600', textAlign: 'right', fontVariant: ['tabular-nums'] },
   title: { fontSize: 22, fontWeight: '700' },
   label: { fontSize: 13, color: semantic.secondary },
   big: { fontSize: 24, fontWeight: '700' },
   helper: { fontSize: 14, color: semantic.secondary },
   settledText: { color: semantic.error, fontWeight: '700' },
-  topRow: { flexDirection: 'row', gap: 10 },
-  topColumn: { flexDirection: 'column' },
-  topCard: {
-    flex: 1,
-    minWidth: 0,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 12,
-    padding: 12,
-    backgroundColor: semantic.raised,
-    gap: 6,
-  },
-  topRank: { fontSize: 16, fontWeight: '800' },
-  topName: { flex: 1, minWidth: 0, fontSize: 14, fontWeight: '700' },
   rankRow: {
     borderWidth: 1,
     borderColor: semantic.border,
     borderRadius: 14,
-    paddingVertical: 14,
+    // With the 60dp emblem the one-line row is ~76dp tall: emblem ≈ 80%.
+    paddingVertical: 7,
     paddingHorizontal: 14,
     backgroundColor: semantic.surface,
     flexDirection: 'row',
@@ -545,11 +514,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexGrow: 1,
     flexShrink: 1,
-    flexBasis: 150,
+    // Rank, avatar and a readable name; below this the figures wrap instead.
+    flexBasis: 106,
     minWidth: 0,
   },
-  rankNumber: { minWidth: 28, fontSize: 20, lineHeight: 28, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
+  rankNumber: { minWidth: 28, flexShrink: 0, fontSize: 20, lineHeight: 28, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
   name: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 22, fontWeight: '700' },
-  alignEnd: { alignItems: 'flex-end', gap: 2, flexGrow: 1, flexShrink: 1, minWidth: 0 },
   footerLoader: { paddingVertical: 16 },
 });

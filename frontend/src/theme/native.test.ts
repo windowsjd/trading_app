@@ -112,6 +112,29 @@ for (const width of [320, 360, 390]) {
     await h.input('order-limit-price-input', '0.000000123456789');
     assert.equal(h.node('order-limit-price-input').props.value, '0.000000123456789');
   });
+
+  test(`${width}px limit buy keeps the quote column beside the order inputs and its TP/SL editor`, async (t) => {
+    const h = inlineTradingHarness(); h.dimensions = { width, height: 700, fontScale: 1.5 };
+    await h.mount(); t.after(h.close);
+    const columns = () => {
+      const row = h.node('asset-trading-columns');
+      return { row: flatten(row.props.style).flexDirection, stacked: row.props.style.some((style: any) => style?.flexDirection === 'column'),
+        price: ((style) => `${style.flex}/${style.flexBasis ?? '-'}`)(flatten(h.node('asset-price-column').props.style)),
+        book: h.node('asset-order-book') !== undefined };
+    };
+    // The quote column keeps its flex share (never collapsed to a stacked `auto` basis).
+    const sideBySide = { row: 'row', stacked: false, price: '1/-', book: true };
+    assert.deepEqual(columns(), sideBySide, 'market buy');
+    await h.selectOrderType('limit');
+    // The TP/SL editor appears for a limit buy and is no reason to move the book.
+    assert.equal(h.node('attached-entry-editor') !== undefined, true);
+    assert.deepEqual(columns(), sideBySide, 'limit buy');
+    await h.press('asset-detail-sell-button');
+    assert.equal(h.node('attached-entry-editor') === undefined, true);
+    assert.deepEqual(columns(), sideBySide, 'limit sell');
+    await h.selectOrderType('market');
+    assert.deepEqual(columns(), sideBySide, 'market sell');
+  });
 }
 
 test('wide Order also keeps the trading and quote columns', async (t) => {
