@@ -1,3 +1,4 @@
+import { futuresCandlesFixture } from '../futuresFixtures.cjs';
 import { recordDetail, recordEquity } from '../recordFixtures';
 import cryptoContract from '../../../backend/src/assets/fixtures/binance-crypto-hot-contract.json';
 // The production screens, query observers and API mappers run unchanged.
@@ -51,6 +52,8 @@ export const apiClient = {
     return response({});
   },
   async get(path, config) {
+    // Contract 4h chart (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
     if (path.endsWith('/futures/positions')) {
       transport.requests.push(path);
       const accountId = path.split('/')[2];

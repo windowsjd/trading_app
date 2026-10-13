@@ -45,6 +45,9 @@ export type AssetCandlesQuery = {
 // 'prev_open'  = previous real market-session open → now
 // 'prev2_open' = second previous real market-session open → now
 // '3d'/'7d'/'14d'/'30d'/'1y' = rolling N days → now
+// '96d' = long-range 4h window (4h only; KRX stocks and crypto only):
+//         KRX = 96th previous real KRX session open → now (96 completed
+//         sessions + today), crypto = rolling 96 × 24h → now.
 // Exported (type-only) so the candle response cache can key on and store the
 // exact HTTP response shape without duplicating these definitions. This does
 // not change the response shape or the provider call flow.
@@ -57,7 +60,8 @@ export type CandleRange =
   | 'prev_open'
   | 'prev2_open'
   | '1y'
-  | 'season';
+  | 'season'
+  | '96d';
 export type CandleInterval =
   | '1m'
   | '5m'
@@ -232,6 +236,7 @@ const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
   prev2_open: '30m',
   '1y': '1d',
   season: '1d',
+  '96d': '4h',
 };
 
 /**
@@ -254,6 +259,8 @@ const ROLLING_RANGE_DURATION_MS: Record<RollingCandleRange, number> = {
   '14d': 14 * DAY_MS,
   '30d': 30 * DAY_MS,
   '1y': 365 * DAY_MS,
+  // Crypto only; KRX resolves '96d' by sessions (resolveRangeWindow).
+  '96d': 96 * DAY_MS,
 };
 
 const CANDLE_INTERVAL_MINUTES: Record<CandleInterval, number> = {
@@ -288,11 +295,17 @@ const CANDLE_RANGES: Record<CandleRange, true> = {
   prev2_open: true,
   '1y': true,
   season: true,
+  '96d': true,
 };
+
+// The long-range window exists only for the 4h chart (stored completed 4h
+// history + the live 5m-aggregated recent buckets).
+export const LONG_FOUR_HOUR_RANGE = '96d' as const;
+export const LONG_FOUR_HOUR_SESSIONS = 96;
 
 const RANGE_INTERVALS: Record<
   CandleRange,
-  Readonly<Record<CandleInterval, true>>
+  Readonly<Partial<Record<CandleInterval, true>>>
 > = {
   '1d': CANDLE_INTERVALS,
   '3d': CANDLE_INTERVALS,
@@ -303,6 +316,7 @@ const RANGE_INTERVALS: Record<
   prev2_open: CANDLE_INTERVALS,
   '1y': CANDLE_INTERVALS,
   season: CANDLE_INTERVALS,
+  '96d': { '4h': true },
 };
 
 const OVERSEAS_CANDLE_PATH =
@@ -1020,6 +1034,18 @@ export class AssetCandlesService {
           ? US_EASTERN_TIME_ZONE
           : UTC_TIME_ZONE;
     const range = this.parseRange(query.range);
+    if (
+      range === LONG_FOUR_HOUR_RANGE &&
+      asset.assetType !== AssetType.domestic_stock &&
+      asset.assetType !== AssetType.crypto
+    ) {
+      // US stocks keep their existing chart windows (no long-range 4h store).
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'ASSET_CANDLES_INVALID_RANGE',
+        'range 96d is available for KRX stocks and crypto only.',
+      );
+    }
     const rangeProvided = this.parseOptionalText(query.range) !== undefined;
     const legacyDateProvided = this.parseOptionalText(query.date) !== undefined;
     const legacyToProvided = this.parseOptionalText(query.to) !== undefined;
@@ -1070,7 +1096,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_RANGE',
-      'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, 1y, or season.',
+      'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, 1y, season, or 96d.',
     );
   }
 
@@ -1106,7 +1132,9 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_INTERVAL',
-      `interval ${interval} is not supported for range ${range}.`,
+      range === LONG_FOUR_HOUR_RANGE
+        ? 'interval 4h is the only interval supported for range 96d.'
+        : `interval ${interval} is not supported for range ${range}.`,
     );
   }
 
@@ -1256,6 +1284,21 @@ export class AssetCandlesService {
         startAt: this.resolveMarketOpenAnchor(
           asset,
           range === 'prev_open' ? 1 : 2,
+          now,
+        ),
+        endAt: now,
+      };
+    }
+
+    if (
+      range === LONG_FOUR_HOUR_RANGE &&
+      asset.assetType !== AssetType.crypto
+    ) {
+      // KRX: the 96 most recent real sessions before today, plus today.
+      return {
+        startAt: this.resolveMarketOpenAnchor(
+          asset,
+          LONG_FOUR_HOUR_SESSIONS,
           now,
         ),
         endAt: now,

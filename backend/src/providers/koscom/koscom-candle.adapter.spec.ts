@@ -336,3 +336,82 @@ describe('KOSCOM candles', () => {
     expect(fetched.complete).toBe(false);
   });
 });
+
+describe('KoscomCandleAdapter.fetchDomesticTenMinuteSession', () => {
+  const tenMinute = (hhmm: string, price: number) => ({
+    inddTm: `${hhmm}0000`,
+    inddOpnprc: String(price),
+    inddHgprc: String(price + 2),
+    inddLwprc: String(price - 1),
+    inddClsprc: String(price + 1),
+    inddTrdvol: '7',
+    inddTrdval: '700',
+  });
+
+  it('asks for one whole calendar session at the 600-second cycle and returns END-labelled rows', async () => {
+    const h = harness([tenMinute('0920', 101), tenMinute('0910', 100)]);
+    const page = await h.adapter.fetchDomesticTenMinuteSession({
+      asset: { symbol: '005930', marketCode: 'KRX' },
+      date: '20260519',
+      openHHmm: '0900',
+      closeHHmm: '1530',
+    });
+    const [path, query] = h.client.get.mock.calls[0];
+    expect(path).toBe('/v3/market/realtime/kospi/stocks/005930/intraday');
+    expect(query).toEqual({
+      inddCycleTpCd: '600',
+      inqStrtDd: '20260519',
+      strtTm: '0900',
+      endTm: '1530',
+    });
+    expect(page.invalidRows).toBe(0);
+    expect(page.rows.map((row) => row.label.toISOString())).toEqual([
+      '2026-05-19T00:10:00.000Z',
+      '2026-05-19T00:20:00.000Z',
+    ]);
+    expect(page.rows[0].close).toBe('101');
+  });
+
+  it('counts unparsable rows instead of repairing them', async () => {
+    const bad = { ...tenMinute('0930', 100), inddHgprc: '1' };
+    const h = harness([tenMinute('0910', 100), bad, { inddTm: 'x' }]);
+    const page = await h.adapter.fetchDomesticTenMinuteSession({
+      asset: { symbol: '005930', marketCode: 'KRX' },
+      date: '20260519',
+      openHHmm: '0900',
+      closeHHmm: '1530',
+    });
+    expect(page.rows.length).toBe(1);
+    expect(page.invalidRows).toBe(2);
+  });
+
+  it('rejects a response for another symbol, another trading date or over 100 rows', async () => {
+    const call = (result: Record<string, unknown>) => {
+      const h = harness([]);
+      h.client.get.mockResolvedValueOnce({ result, receivedAt: now });
+      return h.adapter
+        .fetchDomesticTenMinuteSession({
+          asset: { symbol: '005930', marketCode: 'KRX' },
+          date: '20261009',
+          openHHmm: '0900',
+          closeHHmm: '1530',
+        })
+        .then(
+          () => 'resolved',
+          (error: { code?: string }) => error.code,
+        );
+    };
+    expect(await call({ isuSrtCd: '000660', hisLists: [] })).toBe(
+      'KOSCOM_MALFORMED_CANDLES',
+    );
+    expect(
+      await call({ isuSrtCd: '005930', trdDd: '20261008', hisLists: [] }),
+    ).toBe('KOSCOM_CANDLE_DATE_MISMATCH');
+    expect(
+      await call({
+        isuSrtCd: '005930',
+        hisLists: Array.from({ length: 101 }, () => tenMinute('0910', 1)),
+      }),
+    ).toBe('KOSCOM_MALFORMED_CANDLES');
+  });
+});

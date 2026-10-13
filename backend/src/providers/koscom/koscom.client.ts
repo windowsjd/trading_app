@@ -20,6 +20,17 @@ export type KoscomTarget = {
   market: KoscomMarket;
 };
 export type KoscomBatch = { market: KoscomMarket; targets: KoscomTarget[] };
+/**
+ * Last numeric daily-quota headers this process saw on a successful response.
+ * Several remaining-count streams were observed live (2026-10-12/13) while the
+ * limit read 50,000, so callers treat one observation as a lower bound of the
+ * budget actually left, never as proof of a separate or doubled allowance.
+ */
+export type KoscomObservedRateLimit = {
+  limitDay: number | null;
+  remainingDay: number | null;
+  observedAt: Date;
+};
 
 export function koscomBatches(targets: readonly KoscomTarget[]): KoscomBatch[] {
   const grouped = new Map<KoscomMarket, Map<string, KoscomTarget>>();
@@ -69,6 +80,7 @@ export function koscomRecord(value: unknown): Record<string, unknown> {
 export class KoscomClient {
   private activeRequests = 0;
   private readonly pending = new Map<string, Promise<KoscomResponse>>();
+  private lastRateLimit: KoscomObservedRateLimit | null = null;
 
   constructor(
     private readonly config: KoscomConfigService,
@@ -118,6 +130,11 @@ export class KoscomClient {
       .finally(() => this.pending.delete(identity))
       .catch(() => undefined);
     return promise;
+  }
+
+  /** Daily-quota headers of the most recent successful response, if any. */
+  getLastObservedRateLimit(): KoscomObservedRateLimit | null {
+    return this.lastRateLimit ? { ...this.lastRateLimit } : null;
   }
 
   async batch(
@@ -225,6 +242,7 @@ export class KoscomClient {
       }
       const body = await response.text();
       const receivedAt = new Date();
+      this.recordRateLimit(response.headers, receivedAt);
       if (body.length > 8_000_000)
         throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
           'KOSCOM_RESPONSE_TOO_LARGE',
@@ -264,6 +282,17 @@ export class KoscomClient {
       signal?.removeEventListener('abort', abort);
       await this.locks.release(lock).catch(() => false);
     }
+  }
+
+  private recordRateLimit(headers: Headers, observedAt: Date): void {
+    const read = (name: string) => {
+      const raw = headers.get(name)?.trim();
+      return raw && /^\d{1,9}$/.test(raw) ? Number(raw) : null;
+    };
+    const limitDay = read('x-ratelimit-limit-day');
+    const remainingDay = read('x-ratelimit-remaining-day');
+    if (limitDay === null && remainingDay === null) return;
+    this.lastRateLimit = { limitDay, remainingDay, observedAt };
   }
 
   private async admit(signal?: AbortSignal): Promise<RedisLock> {

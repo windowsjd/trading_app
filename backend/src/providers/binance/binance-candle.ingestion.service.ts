@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import { BinancePublicClient } from './binance-public.client';
 import {
@@ -8,6 +8,7 @@ import {
   type BinanceCandleInterval,
   type BinanceCandlePageInput,
   type BinanceCandlePageResult,
+  type BinanceKlinesSource,
   type CanonicalBinanceCandle,
 } from './binance-candle.types';
 
@@ -18,7 +19,12 @@ const SYMBOL_PATTERN = /^[A-Z0-9\p{Script=Han}]{1,32}$/u;
 const DECIMAL_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u;
 
 /**
- * Page-level Binance Spot /api/v3/klines ingestion (5m/1d/1w).
+ * Page-level Binance Spot /api/v3/klines ingestion (5m/4h/1d/1w).
+ *
+ * The same strict page logic also serves Binance USDⓈ-M `/fapi/v1/klines`
+ * through a separate instance built on `BinanceUsdmKlineClient` (see
+ * BINANCE_USDM_CANDLE_INGESTION). The kline transport decides the market; a
+ * Spot instance never reads contract klines and vice versa.
  *
  * One call fetches at most 1000 klines with a forward startTime cursor;
  * multi-page iteration is owned by the sync orchestrator so the persistent
@@ -35,7 +41,10 @@ const DECIMAL_PATTERN = /^(?:0|[1-9]\d*)(?:\.\d+)?$/u;
  */
 @Injectable()
 export class BinanceCandleIngestionService {
-  constructor(private readonly publicClient: BinancePublicClient) {}
+  constructor(
+    @Inject(BinancePublicClient)
+    private readonly publicClient: BinanceKlinesSource,
+  ) {}
 
   async fetchKlinesPage(
     input: BinanceCandlePageInput,
@@ -230,7 +239,8 @@ export class BinanceCandleIngestionService {
   private requireIntervalMs(interval: BinanceCandleInterval): number {
     const intervalMs = BINANCE_CANDLE_INTERVAL_MS[interval];
     if (!intervalMs) {
-      throw new BinanceCandleInputError('interval must be 5m, 1d, or 1w.');
+      // @diagnosticSurface internal: Programmer-guard on a typed interval; sync callers record a fixed series code.
+      throw new BinanceCandleInputError('interval must be 5m, 4h, 1d, or 1w.');
     }
     return intervalMs;
   }

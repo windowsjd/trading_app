@@ -131,7 +131,17 @@ export class CandleDatabaseLoader {
     let rows: PersistedResponseCandle[];
     let sourceProviders: string[] | undefined;
     let droppedIncompleteBuckets = 0;
-    if (plan.requiresAggregation) {
+    if (plan.history) {
+      const merged = await this.loadLongFourHour(
+        asset,
+        query,
+        plan,
+        plan.history,
+      );
+      rows = merged.rows;
+      sourceProviders = merged.sourceProviders;
+      droppedIncompleteBuckets = merged.droppedIncompleteBuckets;
+    } else if (plan.requiresAggregation) {
       const stored = await this.repository.findRange({
         assetId: plan.assetId,
         interval: '5m',
@@ -254,6 +264,98 @@ export class CandleDatabaseLoader {
       droppedIncompleteBuckets,
       storedCandleCount: rows.length,
       response,
+    };
+  }
+
+  /**
+   * Long-range 4h (`range=96d`). Each 4h bucket comes from exactly ONE source:
+   *  1. the in-progress (current) bucket → 5m aggregation (live path);
+   *  2. a stored COMPLETED '4h' row (Spot native kline / KRX verified KOSCOM
+   *     10-minute history) → that row;
+   *  3. otherwise a complete, closed 5m-aggregated bucket of the recent window
+   *     → that aggregate (e.g. today's finished 09:00 KRX bucket before the
+   *     post-close verification, or history not backfilled yet).
+   * An incomplete bucket without a stored row is dropped (never interpolated),
+   * and the same openTime is never returned twice.
+   */
+  private async loadLongFourHour(
+    asset: AssetCandlesAsset,
+    query: ParsedAssetCandlesQuery,
+    plan: CandleReadPlan,
+    history: NonNullable<CandleReadPlan['history']>,
+  ): Promise<{
+    rows: PersistedResponseCandle[];
+    sourceProviders: string[] | undefined;
+    droppedIncompleteBuckets: number;
+  }> {
+    const [storedHistory, storedFiveMinute] = await Promise.all([
+      this.repository.findRange({
+        assetId: plan.assetId,
+        interval: history.interval,
+        from: plan.requestedRange.from,
+        to: plan.requestedRange.to,
+      }),
+      this.repository.findRange({
+        assetId: plan.assetId,
+        interval: '5m',
+        from: plan.sourceRange.from,
+        to: plan.sourceRange.to,
+      }),
+    ]);
+    const clockMs = query.clock.getTime();
+    const byOpenTime = new Map<
+      number,
+      { row: PersistedResponseCandle; providers: string[] }
+    >();
+    for (const row of storedHistory) {
+      if (!row.isClosed || row.closeTime.getTime() > clockMs) continue;
+      byOpenTime.set(row.openTime.getTime(), {
+        row,
+        providers: [row.sourceProvider],
+      });
+    }
+    const aggregated = this.aggregation.aggregateCandles({
+      assetType: plan.assetType,
+      interval: '4h',
+      candles: storedFiveMinute,
+      from: history.recentRange.from,
+      to: history.recentRange.to,
+      now: query.clock,
+    });
+    let droppedIncompleteBuckets = 0;
+    for (const candle of aggregated.candles) {
+      const openMs = candle.openTime.getTime();
+      const usable = candle.isCurrent || (candle.complete && candle.isClosed);
+      if (byOpenTime.has(openMs) && !candle.isCurrent) continue;
+      if (!usable) {
+        droppedIncompleteBuckets += 1;
+        continue;
+      }
+      const closeMs = candle.closeTime.getTime();
+      byOpenTime.set(openMs, {
+        row: candle,
+        providers: [
+          ...new Set(
+            storedFiveMinute
+              .filter(
+                (source) =>
+                  source.openTime.getTime() >= openMs &&
+                  source.openTime.getTime() < closeMs,
+              )
+              .map((source) => source.sourceProvider),
+          ),
+        ],
+      });
+    }
+    const ordered = [...byOpenTime.entries()].sort((a, b) => a[0] - b[0]);
+    const selected = this.latest(ordered, plan.limit);
+    return {
+      rows: selected.map(([, entry]) => entry.row),
+      sourceProviders:
+        asset.assetType === 'domestic_stock'
+          ? [...new Set(selected.flatMap(([, entry]) => entry.providers))]
+          : undefined,
+      droppedIncompleteBuckets,
     };
   }
 

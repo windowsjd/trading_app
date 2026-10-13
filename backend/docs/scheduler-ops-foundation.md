@@ -96,6 +96,16 @@ EVENT-based matching layer and nothing schedules them.
   per-tick retries would hammer the shared KIS budget. See
   [`candle-live-operations.md`](candle-live-operations.md) for the baseline
   seeding this maintains.)
+- `market_candle_long_sync` (opt-in `SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED`,
+  interval `SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS`, default 900;
+  `SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS=spot,krx`): incremental upkeep of
+  the completed long-range 4h history; runs after `market_candle_sync` in the
+  same tick. Shares its Ops lock with the `candle:long-backfill` operator
+  command. See [`long-range-4h-candles.md`](long-range-4h-candles.md).)
+- `futures_candle_sync` (opt-in `SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED`,
+  interval `SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS`, default 60):
+  USDⓈ-M contract 4h klines incl. the provisional bucket, written only to
+  `futures_market_candles`; independent of Futures Last/Mark ingestion.
 - `limit_order_matcher` (vestigial; the removed event layer used it — never scheduled)
 
 `provider_fx_ingest`, `provider_binance_ingest`, and `provider_kis_ingest` call the existing provider ingestion services through ops locks and write real provider snapshots when provider env is enabled.

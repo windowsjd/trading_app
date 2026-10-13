@@ -730,7 +730,7 @@ describe('MarketCandlesRepository', () => {
           from: new Date('2026-07-10T00:00:00.000Z'),
           to: new Date('2026-07-10T01:00:00.000Z'),
         }),
-      ).rejects.toThrow('interval must be one of 5m, 1d, 1w');
+      ).rejects.toThrow('interval must be one of 5m, 4h, 1d, 1w');
     });
   });
 
@@ -863,7 +863,7 @@ describe('MarketCandlesRepository', () => {
       await expect(
         repository.deleteClosedBefore({
           cutoff: new Date('2026-07-01T00:00:00.000Z'),
-          intervals: ['4h' as never],
+          intervals: ['15m' as never],
         }),
       ).rejects.toThrow(MarketCandleValidationError);
     });
@@ -891,12 +891,35 @@ describe('MarketCandlesRepository', () => {
       expect(query.values).toEqual(['5m', cutoff, 5000]);
     });
 
-    it('rejects non-5m intervals and unsafe limits before SQL execution', async () => {
+    it('prunes the long-range 4h history with the same bounded closed-row delete', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.$executeRaw.mockResolvedValueOnce(3);
+      const cutoff = new Date('2026-04-16T00:00:00.000Z');
+      await expect(
+        repository.deleteClosedBeforeBatch({
+          cutoff,
+          interval: '4h',
+          limit: 5000,
+        }),
+      ).resolves.toBe(3);
+      const query = upsertQueryOf(prisma);
+      expect(query.text).toContain('"is_closed" = TRUE');
+      expect(query.values).toEqual(['4h', cutoff, 5000]);
+    });
+
+    it('rejects non-retained intervals (1d/1w are never pruned) and unsafe limits before SQL execution', async () => {
       const { prisma, repository } = createRepository();
       await expect(
         repository.deleteClosedBeforeBatch({
           cutoff: new Date(),
           interval: '1d' as never,
+          limit: 1,
+        }),
+      ).rejects.toBeInstanceOf(MarketCandleValidationError);
+      await expect(
+        repository.deleteClosedBeforeBatch({
+          cutoff: new Date(),
+          interval: '1w' as never,
           limit: 1,
         }),
       ).rejects.toBeInstanceOf(MarketCandleValidationError);

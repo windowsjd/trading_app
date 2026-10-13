@@ -1,7 +1,7 @@
 // Transport-only browser fixture. Real screens/commands/guide remain mounted.
 import { questPayload } from '../questFixtures';
 import { assets as cryptoAssets, apiClient as chartClient } from './tradingMocks';
-import { futuresFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, futuresCandlesFixture } from '../futuresFixtures.cjs';
 import { conditionalFixture } from '../conditionalFixtures.cjs';
 export function tradingQuestTransport(response, committedAt, accountId, level) {
   const progress = questPayload(level, accountId), orders = new Map(), holdings = new Map();
@@ -22,6 +22,8 @@ export function tradingQuestTransport(response, committedAt, accountId, level) {
   return {
     progress:snapshot,
     async get(path,config){
+    // Contract 4h chart (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
       const url=new URL(path,'https://fixture.invalid'),parts=url.pathname.split('/');
       if(parts[1]==='assets'){
         if(!parts[2]){const rows=assets.filter(a=>a.assetType===(config?.params?.assetType??url.searchParams.get('assetType')??'crypto'));return response({assets:rows,pagination:page(rows),sortSnapshot:'quests'});}

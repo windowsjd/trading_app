@@ -11,6 +11,8 @@ jest.mock('../generated/prisma/client', () => ({
     market_candle_retention: 'market_candle_retention',
     market_candle_sync: 'market_candle_sync',
     market_candle_reconciliation: 'market_candle_reconciliation',
+    market_candle_long_sync: 'market_candle_long_sync',
+    futures_candle_sync: 'futures_candle_sync',
   },
 }));
 
@@ -49,6 +51,8 @@ describe('getOpsSchedulerConfig', () => {
       false,
       false,
       false,
+      false,
+      false,
     ]);
     expect(config.providerIntervalsSeconds[OpsJobName.provider_fx_ingest]).toBe(
       3600,
@@ -75,6 +79,41 @@ describe('getOpsSchedulerConfig', () => {
       intervalSeconds: 600,
       assetIds: undefined,
     });
+    // Long-range 4h upkeep is opt-in; the initial backfill is a separate
+    // operator command and never starts from configuration alone.
+    expect(config.marketCandleLongSync).toEqual({
+      enabled: false,
+      intervalSeconds: 900,
+      markets: ['spot', 'krx'],
+    });
+    expect(config.futuresCandleSync).toEqual({
+      enabled: false,
+      intervalSeconds: 60,
+    });
+  });
+
+  it('enables the long-range 4h jobs only through their own flags', () => {
+    const config = getOpsSchedulerConfig({
+      SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED: 'true',
+      SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS: 'spot',
+      SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED: '1',
+      SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS: '120',
+    });
+    expect(config.enabled).toBe(true);
+    expect(config.jobs[OpsJobName.market_candle_long_sync]).toBe(true);
+    expect(config.jobs[OpsJobName.futures_candle_sync]).toBe(true);
+    expect(config.jobs[OpsJobName.market_candle_sync]).toBe(false);
+    expect(config.marketCandleLongSync.markets).toEqual(['spot']);
+    expect(config.futuresCandleSync.intervalSeconds).toBe(120);
+  });
+
+  it.each([
+    { SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED: 'yes' },
+    { SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS: 'spot,us' },
+    { SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS: '30' },
+    { SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS: '5' },
+  ])('rejects invalid long-range scheduler config %#', (env) => {
+    expect(() => getOpsSchedulerConfig(env)).toThrow(OpsConfigError);
   });
 
   it('enables the scheduled incremental candle sync with its own flag', () => {

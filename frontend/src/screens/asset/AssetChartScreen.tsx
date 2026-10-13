@@ -15,6 +15,7 @@ import {
   DEFAULT_ASSET_CHART_TIMEFRAME,
   getAssetCandles,
   getAssetDetail,
+  resolveAssetChartTimeframe,
   type AssetChartTimeframe,
 } from '../../features/asset/api';
 import { useAssetCandle } from '../../features/asset/useAssetCandle';
@@ -90,19 +91,29 @@ export function AssetMarketChart({
     queryFn: () => getAssetDetail(assetId),
     enabled: isFocused,
   });
+  // The selected tab's request window. Only the 4h tab differs by market
+  // (KRX/crypto: the long-range 4h store, US: 30 days); it waits for the asset
+  // type instead of caching a wrong window, and falls back to the tab's own
+  // window if the detail cannot load.
+  const requestTimeframe =
+    resolveAssetChartTimeframe(
+      selectedTimeframe,
+      detailQuery.data?.asset?.assetType,
+    ) ?? (detailQuery.isError ? selectedTimeframe : null);
+  const chartWindow = requestTimeframe ?? selectedTimeframe;
   const candlesQuery = useQuery({
     queryKey: QUERY_KEYS.asset.candles(assetId, {
-      range: selectedTimeframe.range,
-      interval: selectedTimeframe.interval,
-      limit: selectedTimeframe.limit,
+      range: chartWindow.range,
+      interval: chartWindow.interval,
+      limit: chartWindow.limit,
     }),
     queryFn: () =>
       getAssetCandles(assetId, {
-        range: selectedTimeframe.range,
-        interval: selectedTimeframe.interval,
-        limit: selectedTimeframe.limit,
+        range: chartWindow.range,
+        interval: chartWindow.interval,
+        limit: chartWindow.limit,
       }),
-    enabled: isFocused,
+    enabled: isFocused && requestTimeframe !== null,
   });
   const refresh = usePullToRefresh([
     { ...detailQuery, enabled: isFocused && variant === 'detail' },
@@ -150,7 +161,7 @@ export function AssetMarketChart({
       latestCandle.interval === selectedTimeframe.interval
       ? latestCandle
       : null,
-    selectedTimeframe.limit,
+    chartWindow.limit,
   );
   const detailView = variant === 'detail';
   const changeRate = formatPercent(displayPrice.changeRate);
@@ -291,7 +302,7 @@ export function AssetMarketChart({
           setChartHeight(Math.floor(event.nativeEvent.layout.height))
         }
       >
-        {candlesQuery.isLoading ? (
+        {candlesQuery.isLoading || requestTimeframe === null ? (
           <SectionSkeleton lines={8} />
         ) : candlesQuery.isError && !candlesQuery.data ? (
           <ScrollView contentContainerStyle={styles.error}>

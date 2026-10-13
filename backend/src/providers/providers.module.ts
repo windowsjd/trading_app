@@ -40,6 +40,10 @@ import { KisUsMinuteAdapter } from './kis/candles/kis-us-minute.adapter';
 import { KisOverseasPeriodAdapter } from './kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from './kis/candles/kis-period-candle-normalizer.service';
 import { BinanceCandleIngestionService } from './binance/binance-candle.ingestion.service';
+import {
+  BINANCE_USDM_CANDLE_INGESTION,
+  BinanceUsdmKlineClient,
+} from './binance/binance-kline-usdm.client';
 import { BinanceOrderBookService } from './binance/binance-order-book.service';
 import { OrderBookPubSubService } from './order-book-pubsub.service';
 import { MarketPriceEventService } from './market-price-event.service';
@@ -98,6 +102,15 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     KisOverseasPeriodAdapter,
     KisPeriodCandleNormalizerService,
     BinanceCandleIngestionService,
+    BinanceUsdmKlineClient,
+    {
+      // Same strict page logic as the Spot instance, over the USDⓈ-M
+      // contract-kline transport. Never used for Spot candles.
+      provide: BINANCE_USDM_CANDLE_INGESTION,
+      useFactory: (client: BinanceUsdmKlineClient) =>
+        new BinanceCandleIngestionService(client),
+      inject: [BinanceUsdmKlineClient],
+    },
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,
@@ -138,6 +151,8 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     KisOverseasPeriodAdapter,
     KisPeriodCandleNormalizerService,
     BinanceCandleIngestionService,
+    BinanceUsdmKlineClient,
+    BINANCE_USDM_CANDLE_INGESTION,
     KisRestCurrentPriceIngestionService,
     KisRestHogaIngestionService,
     KisRealtimePriceCacheService,

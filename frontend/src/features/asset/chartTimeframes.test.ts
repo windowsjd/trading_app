@@ -4,6 +4,8 @@ import { test } from 'node:test';
 import {
   ASSET_CHART_TIMEFRAMES,
   DEFAULT_ASSET_CHART_TIMEFRAME,
+  LONG_RANGE_FOUR_HOUR_TIMEFRAME,
+  resolveAssetChartTimeframe,
 } from './chartTimeframes.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 
@@ -128,6 +130,41 @@ test('15m shows the last 3 days from the request clock', () => {
   assert.deepEqual(
     { range: fifteen?.range, limit: fifteen?.limit },
     { range: '3d', limit: 288 },
+  );
+});
+
+test('KRX stocks and crypto read the long-range 4h window; US stocks keep 30 days', () => {
+  const fourHour = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '4h');
+  assert.ok(fourHour);
+  for (const assetType of ['domestic_stock', 'crypto']) {
+    assert.deepEqual(resolveAssetChartTimeframe(fourHour, assetType), {
+      label: '4h',
+      interval: '4h',
+      range: '96d',
+      limit: 600,
+    });
+  }
+  assert.equal(resolveAssetChartTimeframe(fourHour, 'us_stock'), fourHour);
+  // Unknown asset type: wait instead of fetching (and caching) a wrong window.
+  assert.equal(resolveAssetChartTimeframe(fourHour, undefined), null);
+  // Every other tab is identical for every market.
+  for (const tab of ASSET_CHART_TIMEFRAMES.filter((t) => t.interval !== '4h')) {
+    for (const assetType of [undefined, 'domestic_stock', 'us_stock', 'crypto']) {
+      assert.equal(resolveAssetChartTimeframe(tab, assetType), tab);
+    }
+  }
+});
+
+test('the long-range 4h limit carries 96 crypto days plus the current bucket within the 1000 cap', () => {
+  // 96 days × 6 closed buckets + 1 in-progress bucket (crypto upper bound);
+  // KRX returns at most 96 sessions × 2 + today's 2.
+  assert.ok(LONG_RANGE_FOUR_HOUR_TIMEFRAME.limit >= 96 * 6 + 1);
+  assert.ok(LONG_RANGE_FOUR_HOUR_TIMEFRAME.limit >= 96 * 2 + 2);
+  assert.ok(LONG_RANGE_FOUR_HOUR_TIMEFRAME.limit <= BINANCE_KLINE_MAX_LIMIT);
+  // The live-candle merge trims to this limit, so it must not cut history.
+  assert.equal(
+    QUERY_KEYS.asset.candles('asset-1', LONG_RANGE_FOUR_HOUR_TIMEFRAME).join('|'),
+    'asset|candles|asset-1|96d|4h|600',
   );
 });
 

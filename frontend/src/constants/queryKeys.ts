@@ -102,6 +102,23 @@ export const QUERY_KEYS = {
       ] as const,
   },
 
+  // Futures CONTRACT market data (not account-scoped): shared by every
+  // trading account and never invalidated by account mutations.
+  futuresMarket: {
+    candles: (
+      instrumentId: string,
+      params: { range: string; interval: string; limit: number },
+    ) =>
+      [
+        'futuresMarket',
+        'candles',
+        instrumentId,
+        params.range,
+        params.interval,
+        params.limit,
+      ] as const,
+  },
+
   asset: {
     detail: (assetId: string) => ['asset', 'detail', assetId] as const,
     candles: (

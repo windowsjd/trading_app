@@ -44,6 +44,16 @@ import { OpsJobRunService, SerializedOpsJobRun } from './ops-job-run.service';
 import { MarketCandleRetentionService } from '../assets/market-candle-retention.service';
 import { readMarketCandleRetentionConfig } from '../assets/market-candle-retention.config';
 import { MarketCandleSyncService } from '../assets/market-candle-sync.service';
+import { createApiError } from '../common/api-error';
+import {
+  FUTURES_CANDLE_SYNC_LOCK_KEY,
+  LongCandleSyncInputError,
+  MARKET_CANDLE_LONG_SYNC_LOCK_KEY,
+  MarketCandleLongSyncService,
+  type LongCandleKrxOptions,
+  type LongCandleSyncInput,
+  type LongCandleSyncSummary,
+} from '../assets/market-candle-long-sync.service';
 import {
   MARKET_CANDLE_SYNC_FEEDS,
   MarketCandleSyncInputError,
@@ -129,6 +139,25 @@ export type MarketCandleSyncOpsJobInput = OpsJobRunnerInput & {
   maxAssets?: number;
 };
 
+export type MarketCandleLongSyncOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  mode?: string;
+  /** Subset of spot, krx (default both). */
+  markets?: string[];
+  assetIds?: string[];
+  days?: number;
+  sessions?: number;
+  krx?: LongCandleKrxOptions;
+};
+
+export type FuturesCandleSyncOpsJobInput = OpsJobRunnerInput & {
+  now?: string | null;
+  mode?: string;
+  instrumentIds?: string[];
+  includeInactiveFutures?: boolean;
+  days?: number;
+};
+
 export type MarketCandleReconciliationOpsJobInput = OpsJobRunnerInput & {
   now?: string | null;
   assetIds?: string[];
@@ -178,6 +207,8 @@ export class OpsJobRunnerService {
     private readonly marketCandleReconciliationService?: MarketCandleReconciliationService,
     @Optional()
     private readonly limitOrderMatchingService?: LimitOrderMatchingService,
+    @Optional()
+    private readonly marketCandleLongSyncService?: MarketCandleLongSyncService,
   ) {}
 
   /**
@@ -624,11 +655,27 @@ export class OpsJobRunnerService {
           batchSize,
           isLockOwned: context.isLockOwned,
         });
+        const prune = (value: {
+          cutoff: Date;
+          retentionDays: number;
+          deletedCount: number;
+          batchCount: number;
+        }) => ({
+          cutoff: value.cutoff.toISOString(),
+          retentionDays: value.retentionDays,
+          deletedCount: value.deletedCount,
+          batchCount: value.batchCount,
+        });
         return {
           cutoff: result.cutoff.toISOString(),
           retentionDays: result.retentionDays,
           deletedCount: result.deletedCount,
           batchCount: result.batchCount,
+          // Long-range 4h history: separate 180-day cutoff.
+          fourHour: prune(result.fourHour),
+          futuresFourHour: result.futuresFourHour
+            ? prune(result.futuresFourHour)
+            : null,
           startedAt: result.startedAt.toISOString(),
           finishedAt: result.finishedAt.toISOString(),
         };
@@ -708,6 +755,177 @@ export class OpsJobRunnerService {
       },
       { renewLock: true, dryRunResult },
     );
+  }
+
+  /**
+   * Long-range COMPLETED 4h upkeep for Spot (Binance native 4h) and KRX
+   * (KOSCOM 10-minute history verified against the dated daily bar). The
+   * scheduler runs mode=incremental; the operator backfill command shares the
+   * same job lock so the two never overlap. Held KRX sessions (unverifiable
+   * dates) are data-quality outcomes recorded in the result, not failures;
+   * only provider/storage failures fail the run.
+   */
+  async runMarketCandleLongSyncJob(
+    input: MarketCandleLongSyncOpsJobInput = {},
+  ): Promise<OpsJobRunnerResponse> {
+    const service = this.requireLongCandleSync();
+    let parsed: { markets: ('spot' | 'krx')[]; sync: LongCandleSyncInput };
+    let dryRunResult: Record<string, LongCandleSyncSummary> | undefined;
+    try {
+      parsed = this.parseLongSyncInput(input);
+      if (input.dryRun === true) {
+        dryRunResult = await this.runLongSyncMarkets(service, parsed.markets, {
+          ...parsed.sync,
+          dryRun: true,
+        });
+      }
+    } catch (error) {
+      throw this.longSyncInputError(error);
+    }
+    return this.runLockedOpsJob(
+      OpsJobName.market_candle_long_sync,
+      input,
+      MARKET_CANDLE_LONG_SYNC_LOCK_KEY,
+      async (context) => {
+        const results = await this.runLongSyncMarkets(service, parsed.markets, {
+          ...parsed.sync,
+          dryRun: false,
+          signal: context.signal,
+        });
+        const failed = Object.values(results).some(
+          (summary) => summary.totals.failed > 0,
+        );
+        if (failed) {
+          this.throwProviderJobFailed(
+            'MARKET_CANDLE_LONG_SYNC_FAILED',
+            'Long-range 4h candle sync finished with failed series.',
+            results,
+          );
+        }
+        return results;
+      },
+      { renewLock: true, dryRunResult },
+    );
+  }
+
+  /**
+   * Binance USDⓈ-M contract 4h upkeep per FuturesInstrument, including the
+   * open (provisional) bucket. Writes only futures_market_candles; Futures
+   * Last/Mark collection and every futures price source stay untouched.
+   */
+  async runFuturesCandleSyncJob(
+    input: FuturesCandleSyncOpsJobInput = {},
+  ): Promise<OpsJobRunnerResponse> {
+    const service = this.requireLongCandleSync();
+    let sync: LongCandleSyncInput;
+    let dryRunResult: LongCandleSyncSummary | undefined;
+    try {
+      sync = {
+        mode: this.parseLongSyncMode(input.mode),
+        now: this.parseOptionalDate(input.now) ?? new Date(),
+        instrumentIds: input.instrumentIds,
+        includeInactiveFutures: input.includeInactiveFutures === true,
+        days: input.days,
+      };
+      if (input.dryRun === true) {
+        dryRunResult = await service.syncFutures({ ...sync, dryRun: true });
+      }
+    } catch (error) {
+      throw this.longSyncInputError(error);
+    }
+    return this.runLockedOpsJob(
+      OpsJobName.futures_candle_sync,
+      input,
+      FUTURES_CANDLE_SYNC_LOCK_KEY,
+      async (context) => {
+        const summary = await service.syncFutures({
+          ...sync,
+          dryRun: false,
+          signal: context.signal,
+        });
+        if (summary.totals.failed > 0) {
+          this.throwProviderJobFailed(
+            'FUTURES_CANDLE_SYNC_FAILED',
+            'Futures 4h candle sync finished with failed instruments.',
+            summary,
+          );
+        }
+        return summary;
+      },
+      { renewLock: true, dryRunResult },
+    );
+  }
+
+  private async runLongSyncMarkets(
+    service: MarketCandleLongSyncService,
+    markets: readonly ('spot' | 'krx')[],
+    sync: LongCandleSyncInput,
+  ): Promise<Record<string, LongCandleSyncSummary>> {
+    const results: Record<string, LongCandleSyncSummary> = {};
+    for (const market of markets) {
+      results[market] =
+        market === 'spot'
+          ? await service.syncSpot(sync)
+          : await service.syncKrx(sync);
+    }
+    return results;
+  }
+
+  private parseLongSyncInput(input: MarketCandleLongSyncOpsJobInput): {
+    markets: ('spot' | 'krx')[];
+    sync: LongCandleSyncInput;
+  } {
+    const markets = [...new Set(input.markets ?? ['spot', 'krx'])];
+    if (
+      markets.length === 0 ||
+      markets.some((market) => market !== 'spot' && market !== 'krx')
+    ) {
+      // @diagnosticSurface internal: Operator/scheduler input validation; mapped below to MARKET_CANDLE_LONG_SYNC_INVALID_INPUT.
+      throw new LongCandleSyncInputError(
+        'markets must be a subset of spot, krx.',
+      );
+    }
+    return {
+      markets: markets as ('spot' | 'krx')[],
+      sync: {
+        mode: this.parseLongSyncMode(input.mode),
+        now: this.parseOptionalDate(input.now) ?? new Date(),
+        assetIds: input.assetIds,
+        days: input.days,
+        sessions: input.sessions,
+        krx: input.krx,
+      },
+    };
+  }
+
+  private parseLongSyncMode(value: string | undefined) {
+    const mode = value ?? 'incremental';
+    if (mode !== 'incremental' && mode !== 'backfill') {
+      // @diagnosticSurface internal: Operator/scheduler input validation; mapped below to MARKET_CANDLE_LONG_SYNC_INVALID_INPUT.
+      throw new LongCandleSyncInputError(
+        'mode must be incremental or backfill.',
+      );
+    }
+    return mode;
+  }
+
+  private longSyncInputError(error: unknown): unknown {
+    if (error instanceof LongCandleSyncInputError) {
+      return createApiError(
+        'MARKET_CANDLE_LONG_SYNC_INVALID_INPUT',
+        error.message,
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    return error;
+  }
+
+  private requireLongCandleSync(): MarketCandleLongSyncService {
+    if (!this.marketCandleLongSyncService) {
+      // @diagnosticSurface internal: Only reachable when the Ops module is built without AssetsModule; callers record the fixed job failure.
+      throw new Error('Long-range candle sync service is unavailable.');
+    }
+    return this.marketCandleLongSyncService;
   }
 
   async runMarketCandleReconciliationJob(
