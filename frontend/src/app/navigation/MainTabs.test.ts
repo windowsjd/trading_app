@@ -174,7 +174,7 @@ describe('mode-aware bottom tabs', () => {
   });
 
   it('extends the existing Guide stack with MarketBasics and leaves Ranking intact', () => {
-    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 10);
+    assert.equal([...guideStack.matchAll(/<Stack\.Screen\b/g)].length, 9);
     assert.match(guideStack, /name="Guide"/);
     assert.match(guideStack, /component=\{beginner \? BeginnerLearningScreen : GuideScreen\}/);
     // Quests start the real Wallet practice directly: no text detail route.
@@ -182,7 +182,7 @@ describe('mode-aware bottom tabs', () => {
     assert.match(guideStack, /name="MarketBasics"/);
     assert.match(guideStack, /component=\{MarketBasicsScreen\}/);
     assert.match(guideStack, /component=\{MarketBasicsChaptersScreen\}/);
-    for (const route of ['OrderBookLesson', 'Liquidity', 'Candles', 'OrderTypes', 'StockCharacteristics', 'CorporateActions', 'EtfIndex', 'GuideChapter']) {
+    for (const route of ['OrderBookLesson', 'Liquidity', 'Candles', 'OrderTypes', 'StockCharacteristics', 'EtfIndex', 'GuideChapter']) {
       assert.ok(guideStack.includes(`name="${route}"`));
     }
     assert.match(guideStack, /title: '시장기초'/);

@@ -9,17 +9,9 @@ import {
   lessonStyles as s,
 } from './LessonUi';
 import { Basis, Choices, LessonPlot, Values } from './MarketLessonUi';
+import { benchmarkPath, fundAssets, fundNavPath } from './marketLessonData';
 import {
-  benchmarkPath,
-  fundAssets,
-  fundNavPath,
-  stableDifferences,
-  variableDifferences,
-} from './marketLessonData';
-import {
-  usTradingSession,
   changeRate,
-  differenceStats,
   indexImpact,
   nav,
   normalize,
@@ -48,136 +40,186 @@ function Flow({
     </View>
   );
 }
-const etfTakeaways = [
-  '지수는 여러 자산의 움직임을 하나의 기준 숫자로 나타냅니다.',
-  'ETF는 여러 자산을 담은 펀드의 지분을 거래소에서 사고팔 수 있게 만든 상품입니다.',
-  '지수와 ETF는 같은 것이 아닙니다.',
-  '지수를 추종하는 ETF는 해당 지수의 움직임을 비슷하게 따라가도록 운용됩니다.',
-  'ETF에는 보유자산으로 계산한 NAV와 거래소에서 형성되는 시장가격이 존재합니다.',
-  'ETF를 볼 때는 가격뿐 아니라 추종대상과 구성자산을 함께 확인합니다.',
-];
+// The virtual ABC index and the ETF that holds the same three stocks.
+const start = indexImpact(fundAssets, [0, 0, 0]);
+const shares = 100;
+// One example move shared by the index and NAV lessons: A +10% · B 0% · C -5%.
+const sample = [10, 0, -5];
+const weight = (i: number) => `${start.rows[i].weight * 100}%`;
+const moves = (returns: number[]) =>
+  fundAssets
+    .map((asset, i) => `${asset.name} ${percent(returns[i])}`)
+    .join(' · ');
+const indexMove = (index: number) =>
+  `${start.index.toLocaleString('ko-KR')} → ${index.toLocaleString('ko-KR')}포인트`;
+
 export function IndexLesson() {
-  const [returns, setReturns] = useState([10, 0, -5]);
+  const [guess, setGuess] = useState<'a' | 'c' | null>(null);
+  const [recorded, setRecorded] = useState(false);
   const [applied, setApplied] = useState(false);
-  const impact = indexImpact(fundAssets, returns);
+  const rise = 10;
+  const onlyA = indexImpact(fundAssets, [rise, 0, 0]);
+  const onlyC = indexImpact(fundAssets, [0, 0, rise]);
+  const merged = indexImpact(fundAssets, sample);
   return (
     <>
       <Section title="지수 (Index)" id="index-definition">
+        <Body>
+          내 종목 하나가 아니라 시장 전체가 올랐는지 내렸는지 궁금할 때가
+          있습니다. 이때 종목을 하나씩 살펴보지 않고 숫자 하나로 확인하는 것이
+          지수입니다.
+        </Body>
         <Body>
           여러 자산의 가격 움직임을 하나의 숫자로 요약해 특정 시장이나 자산
           집단의 움직임을 나타내는 기준입니다. 지수 자체는 일반적인 개별
           주식처럼 거래소에서 한 주를 직접 사는 종목이 아닙니다.
         </Body>
         <Body>
-          가상 ABC 지수는 1,000에서 시작합니다. 비중은 전체 움직임에 각 기업을
-          얼마나 반영할지 나타내며 A 50%, B 30%, C 20%입니다.
+          {`가상 ABC 지수는 ${start.index.toLocaleString('ko-KR')}에서 시작합니다. 비중은 전체 움직임에 각 기업을 얼마나 반영할지 나타내며 A ${weight(0)}, B ${weight(1)}, C ${weight(2)}입니다.`}
         </Body>
       </Section>
-      <Section title="실습 · 세 기업에서 하나의 지수로" id="index-a">
+      <Section title="실습 · 비중이 다른 두 기업" id="index-predict">
         <Body>
-          A·B·C의 가격 변화를 선택하고 적용하세요. 각각의 변화에 시작 비중을
-          곱한 기여도를 더하면 지수 전체의 변화가 됩니다.
+          {`A 기업만 ${percent(rise)} 오른 경우와 C 기업만 ${percent(rise)} 오른 경우, 어느 쪽이 지수를 더 올릴까요? 예측을 하나 고르세요.`}
         </Body>
-        {fundAssets.map((asset, i) => (
-          <View key={asset.name} style={s.section}>
-            <Body>
-              {asset.name} 기업 · 시작 비중 {impact.rows[i].weight * 100}% ·
-              가격 변화 선택
-            </Body>
-            <Choices<number>
-              id={`index-${asset.name.toLowerCase()}-return`}
-              options={[-10, -5, 0, 5, 10].map((value) => ({
-                value,
-                label: percent(value),
-              }))}
-              value={returns[i]}
-              disabled={applied}
-              onChange={(value) =>
-                setReturns((previous) =>
-                  previous.map((r, j) => (i === j ? value : r)),
-                )
-              }
-            />
-          </View>
-        ))}
-        <LessonAction
-          id="index-apply"
-          label="가격 변화를 하나의 지수로 모으기"
-          disabled={applied}
-          onPress={() => setApplied(true)}
+        <Choices<'a' | 'c'>
+          id="index-predict"
+          options={[
+            { value: 'a', label: `A 기업만 ${percent(rise)}` },
+            { value: 'c', label: `C 기업만 ${percent(rise)}` },
+          ]}
+          value={guess}
+          disabled={recorded}
+          onChange={setGuess}
         />
-        {applied ? (
-          <>
-            <Flow
-              id="index-flow"
-              steps={[
+        {guess ? (
+          <Result title="예측 결과" id="index-predict-result">
+            <Body>
+              {guess === 'a'
+                ? '예측이 맞았습니다. A 기업만 오른 경우가 지수를 더 크게 올립니다.'
+                : 'A 기업만 오른 경우가 지수를 더 크게 올립니다. C 기업은 비중이 작아 같은 비율로 올라도 지수를 덜 움직입니다.'}
+            </Body>
+            <Values
+              rows={[
                 [
-                  'A/B/C 가격 움직임',
-                  returns
-                    .map(
-                      (value, i) => `${fundAssets[i].name} ${percent(value)}`,
-                    )
-                    .join(' · '),
+                  `A 기업만 ${percent(rise)}`,
+                  `${weight(0)} × ${rise}% = ${percent(onlyA.rows[0].contribution)}포인트\n지수 ${indexMove(onlyA.index)}`,
                 ],
                 [
-                  '시작 비중 반영 · 각 기업의 기여도',
-                  impact.rows
-                    .map(
-                      (row, i) =>
-                        `${fundAssets[i].name}: ${row.weight * 100}% × ${percent(returns[i])} = ${row.contribution > 0 ? '+' : ''}${row.contribution}%포인트`,
-                    )
-                    .join('\n'),
-                ],
-                [
-                  '하나의 기준 숫자',
-                  `1,000 → ${impact.index.toLocaleString('ko-KR')}포인트`,
+                  `C 기업만 ${percent(rise)}`,
+                  `${weight(2)} × ${rise}% = ${percent(onlyC.rows[2].contribution)}포인트\n지수 ${indexMove(onlyC.index)}`,
                 ],
               ]}
             />
-            <Result title="지수 변화 결과" id="index-result">
-              <Values
-                rows={[
-                  ['합산한 지수 변화율', percent(impact.rate)],
+            <Body>
+              같은 비율로 움직여도 비중이 큰 종목이 지수를 더 크게 움직입니다.
+            </Body>
+          </Result>
+        ) : null}
+        <LessonAction
+          id="index-predict-record"
+          label="예측 기록하고 합쳐 보기"
+          disabled={guess === null || recorded}
+          onPress={() => setRecorded(true)}
+        />
+      </Section>
+      {recorded ? (
+        <Section title="실습 · 세 기업을 하나의 지수로" id="index-merge">
+          <Body>
+            이번에는 세 기업이 함께 움직입니다. 각 기업의 변화에 비중을 곱한
+            기여도를 모두 더하면 지수 전체의 변화가 됩니다.
+          </Body>
+          <LessonAction
+            id="index-apply"
+            label={`${moves(sample)}를 하나의 지수로 모으기`}
+            disabled={applied}
+            onPress={() => setApplied(true)}
+          />
+          {applied ? (
+            <>
+              <Flow
+                id="index-flow"
+                steps={[
+                  ['세 종목 움직임', moves(sample)],
                   [
-                    '지수',
-                    `1,000 → ${impact.index.toLocaleString('ko-KR')}포인트`,
+                    '비중 × 변화 = 기여도',
+                    merged.rows
+                      .map(
+                        (row, i) =>
+                          `${fundAssets[i].name}: ${weight(i)} × ${percent(sample[i])} = ${percent(row.contribution)}포인트`,
+                      )
+                      .join('\n'),
                   ],
+                  ['하나의 기준 숫자', indexMove(merged.index)],
                 ]}
               />
-              <Body>
-                기본 선택 A +10%, B 0%, C -5%는 +5%포인트 + 0%포인트 - 1%포인트
-                = +4%입니다. ‘지수 1,040’은 주식 한 주의 가격이 아닙니다.
-              </Body>
-              <Body>
-                여기서는 시작 비중으로 한 구간의 수익률을 계산했습니다. 실제
-                지수마다 계산방법이 다르며 모든 지수가 동일한 가중방식을 쓰지는
-                않습니다.
-              </Body>
-            </Result>
-            <Takeaways
-              items={[
-                '지수는 여러 자산의 움직임을 요약한 기준 숫자입니다.',
-                '종목별 움직임에 비중을 반영해 전체 움직임을 계산할 수 있습니다.',
-                '다음 강의에서는 실제로 거래할 수 있는 펀드인 ETF를 알아봅니다.',
-              ]}
-            />
-          </>
-        ) : null}
-      </Section>
+              <Result title="지수 변화 결과" id="index-result">
+                <Values
+                  rows={[
+                    ['합산 변화율', percent(merged.rate)],
+                    ['지수', indexMove(merged.index)],
+                  ]}
+                />
+                <Body>
+                  {`세 기여도를 더한 ${percent(merged.rate)}가 지수의 변화율입니다. 지수 ${merged.index.toLocaleString('ko-KR')}은 주식 한 주의 가격이 아닙니다.`}
+                </Body>
+                <Body>
+                  여기서는 시작 비중으로 한 구간의 변화를 계산했습니다. 실제
+                  지수마다 계산방법이 다릅니다. 모든 지수가 같은 가중방식을
+                  쓰지는 않습니다.
+                </Body>
+              </Result>
+            </>
+          ) : null}
+        </Section>
+      ) : null}
+      {applied ? (
+        <Takeaways
+          items={[
+            '지수는 시장 전체의 움직임을 보는 기준 숫자이고, 내가 직접 살 수 있는 종목이 아닙니다.',
+            '같은 비율로 움직여도 비중이 큰 종목일수록 지수를 더 크게 움직입니다.',
+            '다음 강의에서는 이 지수를 한 번에 담아 거래하는 방법인 ETF를 알아봅니다.',
+          ]}
+        />
+      ) : null}
     </>
   );
 }
 export function EtfLesson() {
   const [viewed, setViewed] = useState(false);
-  const assets = indexImpact(fundAssets, [0, 0, 0]);
-  const fund = nav(assets.initialValue, 0, 100);
+  const [pick, setPick] = useState<string | null>(null);
+  const [recorded, setRecorded] = useState(false);
+  const drop = -20;
+  const fund = nav(start.initialValue, 0, shares);
+  const invested = `${start.initialValue / 10000}만 원`;
+  const alone = start.initialValue * (1 + drop / 100);
+  const aloneRow = [
+    `그 종목에만 ${invested}`,
+    `${won(start.initialValue)} → ${won(alone)} (${percent(changeRate(start.initialValue, alone))})`,
+  ] as const;
+  const target = fundAssets.findIndex(
+    (asset) => asset.name.toLowerCase() === pick,
+  );
+  const shock = indexImpact(
+    fundAssets,
+    fundAssets.map((_, i) => (i === target ? drop : 0)),
+  );
+  const market = indexImpact(
+    fundAssets,
+    fundAssets.map(() => drop),
+  );
   return (
     <>
       <Section title="ETF (Exchange-Traded Fund)" id="etf-definition">
         <Body>
-          여러 자산을 하나의 펀드에 담고 그 펀드의 지분을 주식처럼 거래소에서
-          사고팔 수 있게 만든 상품입니다. 펀드는 투자자의 돈을 모아 자산을
-          보유하고 운용하는 구조입니다.
+          여러 자산을 담은 펀드의 지분을 주식처럼 거래소에서 사고팔 수 있게
+          만든 상품입니다. 펀드는 투자자의 돈을 모아 자산을 보유하고 운용하는
+          구조입니다.
+        </Body>
+        <Body>
+          ETF를 한 번 주문하면 A·B·C 세 기업의 주식을 함께 담는 효과가
+          있습니다. 다만 ETF를 사도 담긴 주식을 각각 직접 소유하는 것은
+          아닙니다.
         </Body>
         <Values
           rows={[
@@ -188,9 +230,7 @@ export function EtfLesson() {
       </Section>
       <Section title="실습 · 펀드 안의 자산과 ETF 한 주" id="etf-share">
         <Body>
-          가상 펀드는 A 50%, B 30%, C 20%를 보유합니다. 전체 순자산은
-          1,000,000원, 발행 ETF는 100주입니다. ETF 1주 보기를 눌러 어떤 지분을
-          보유하는지 확인하세요.
+          {`가상 펀드는 A ${weight(0)}, B ${weight(1)}, C ${weight(2)}를 보유합니다. 전체 순자산은 ${won(fund.netAssets)}, 발행 ETF는 ${shares}주입니다. ETF 1주 보기를 눌러 어떤 지분을 보유하는지 확인하세요.`}
         </Body>
         <LessonAction
           id="etf-unit"
@@ -201,137 +241,120 @@ export function EtfLesson() {
         <Flow
           id="etf-structure"
           steps={[
-            ['펀드가 담은 주식', 'A 주식 50% · B 주식 30% · C 주식 20%'],
+            [
+              '펀드가 담은 주식',
+              fundAssets
+                .map((asset, i) => `${asset.name} 주식 ${weight(i)}`)
+                .join(' · '),
+            ],
             [
               '하나의 ETF 펀드',
-              `전체 순자산 ${won(fund.netAssets)} · 발행 ETF 100주`,
+              `전체 순자산 ${won(fund.netAssets)} · 발행 ETF ${shares}주`,
             ],
             ...(viewed
               ? [
                   [
                     'ETF 1주',
-                    `${won(fund.netAssets)} ÷ 100주 = 한 주당 순자산가치 ${won(fund.perShare)}`,
+                    `펀드 지분의 1/${shares} = ${won(fund.netAssets)} ÷ ${shares}주 = 한 주당 가치 ${won(fund.perShare)}`,
                   ] as const,
                 ]
               : []),
           ]}
         />
         {viewed ? (
-          <>
-            <Result title="ETF 한 주의 의미" id="etf-unit-result">
-              <Body>
-                ETF 한 주를 산다고 A/B/C 주식을 각각 한 주씩 직접 소유하는 것은
-                아닙니다. ETF 투자자는 펀드의 지분을 보유합니다. 이 예제에서는
-                ETF 한 주가 펀드 지분의 1/100에 해당합니다.
-              </Body>
-              <Body>
-                지수는 측정 기준이고 ETF는 거래 가능한 펀드입니다. ETF가 무엇을
-                담는지, 어떤 기준을 따라 운용되는지 먼저 확인합니다.
-              </Body>
-            </Result>
-            <Takeaways items={etfTakeaways.slice(0, 3)} />
-          </>
+          <Result title="ETF 한 주의 의미" id="etf-unit-result">
+            <Body>
+              {`ETF 한 주를 산다고 A/B/C 주식을 각각 한 주씩 직접 소유하는 것은 아닙니다. ETF 투자자는 펀드의 지분을 보유합니다. 이 예제에서는 ETF 한 주가 펀드 지분의 1/${shares}에 해당합니다.`}
+            </Body>
+          </Result>
         ) : null}
       </Section>
-    </>
-  );
-}
-export function FollowingLesson() {
-  const [applied, setApplied] = useState(false);
-  const changes = [10, 0, -5];
-  const initial = indexImpact(fundAssets, [0, 0, 0]);
-  const result = indexImpact(fundAssets, applied ? changes : [0, 0, 0]);
-  const fund = nav(result.value, 0, 100);
-  return (
-    <>
-      <Body>
-        앞선 가상 ABC 지수와 같은 비중의 주식을 담은 ETF를 비교합니다. ‘추종’은
-        기준지수의 움직임을 비슷하게 반영하도록 운용한다는 뜻입니다.
-      </Body>
-      <Section title="실습 · 같은 구성종목 변화의 전달" id="following-a">
-        <Body>
-          구성종목 가격 변화 적용을 누르세요. A +10%, B 0%, C -5%가 지수와 ETF의
-          자산, 한 주당 가치에 함께 반영됩니다.
-        </Body>
-        <Basis>
-          부채·운용비용·자금 유출입 없음 · ETF 발행수량 100주 고정 · 같은 구간
-          시작 비중
-        </Basis>
-        <LessonAction
-          id="following-apply"
-          label="구성종목 가격 변화 적용"
-          disabled={applied}
-          onPress={() => setApplied(true)}
-        />
-        <Flow
-          id="following-flow"
-          steps={[
-            [
-              '구성종목',
-              applied
-                ? 'A +10% · B 0% · C -5%'
-                : 'A 50% · B 30% · C 20% · 아직 가격 변화 없음',
-            ],
-            ['지수', `1,000 → ${result.index.toLocaleString('ko-KR')}포인트`],
-            [
-              'ETF 기초자산의 가치 · 부채가 없어 순자산과 같음',
-              `${won(initial.value)} → ${won(fund.netAssets)}`,
-            ],
-            [
-              'ETF 한 주당 순자산가치',
-              `${won(initial.value / 100)} → ${won(fund.perShare)}`,
-            ],
-          ]}
-        />
-        {applied ? (
-          <>
-            <Result title="같은 움직임, 다른 단위" id="following-result">
+      {viewed ? (
+        <Section
+          title={`실습 · 한 종목이 갑자기 ${percent(drop)} 내려간다면`}
+          id="etf-shock"
+        >
+          <Body>
+            {`${invested}을 (가) 그 종목 하나에만 넣었을 때와 (나) ETF에 넣었을 때를 비교합니다. 어느 기업에 사고가 날지는 미리 알 수 없습니다. ${percent(drop)} 내려갈 기업을 하나 고르세요.`}
+          </Body>
+          <Choices<string>
+            id="etf-shock-pick"
+            options={fundAssets.map((asset) => ({
+              value: asset.name.toLowerCase(),
+              label: `${asset.name} 기업이 ${percent(drop)}`,
+            }))}
+            value={pick}
+            disabled={recorded}
+            onChange={setPick}
+          />
+          {pick ? (
+            <Result title="한 종목 사고의 결과" id="etf-shock-result">
               <Values
                 rows={[
-                  ['지수 수익률', percent(result.rate)],
+                  aloneRow,
                   [
-                    'ETF 순자산 변화율',
-                    percent(changeRate(initial.value, result.value)),
-                  ],
-                  [
-                    '100주 기준 한 주당 가치',
-                    `${won(fund.netAssets)} ÷ 100주 = ${won(fund.perShare)}`,
+                    `ETF에 ${invested}`,
+                    `${won(start.initialValue)} → ${won(shock.value)} (${percent(shock.rate)})\n${fundAssets[target].name} 비중 ${weight(target)} × ${percent(drop)} = ${percent(shock.rate)}`,
                   ],
                 ]}
               />
               <Body>
-                지수 1,040포인트와 ETF 한 주당 10,400원은 같은 숫자가 될 필요가
-                없습니다. 이 예제에서 둘 다 +4%인 이유는 같은 구성자산의
-                움직임을 반영했기 때문입니다. 실제 ETF에는 비용과 운용 차이가
-                있습니다.
-              </Body>
-              <Body>
-                ETF는 추종하는 자산들의 움직임을 비슷하게 반영하도록 운용됩니다.
-                모든 ETF가 지수추종형인 것은 아니며 운용자가 전략에 따라
-                투자하는 액티브 ETF도 있습니다.
-              </Body>
-              <Body>
-                이 한 주당 순자산가치를 NAV라고 부릅니다. 다음 강의에서 자산으로
-                계산한 가치와 거래소의 시장가격을 구분합니다.
+                여러 종목에 나눠 담으면 한 종목의 사고가 그 종목의 비중만큼
+                나뉘어 전달됩니다. 이렇게 여러 자산에 나눠 담아 한 자산의
+                영향을 줄이는 것을 분산이라고 합니다.
               </Body>
             </Result>
-            <Takeaways items={etfTakeaways.slice(2, 4)} />
-          </>
-        ) : null}
-      </Section>
+          ) : null}
+          <LessonAction
+            id="etf-shock-record"
+            label="선택 기록하고 시장 전체 하락 보기"
+            disabled={pick === null || recorded}
+            onPress={() => setRecorded(true)}
+          />
+          {recorded ? (
+            <Result
+              title={`이번에는 세 종목이 모두 ${percent(drop)}`}
+              id="etf-market-result"
+            >
+              <Values
+                rows={[
+                  aloneRow,
+                  [
+                    `ETF에 ${invested}`,
+                    `${won(start.initialValue)} → ${won(market.value)} (${percent(market.rate)})`,
+                  ],
+                ]}
+              />
+              <Body>
+                {`A·B·C가 모두 ${percent(drop)}이면 ETF도 ${percent(market.rate)}로, 한 종목에만 담았을 때와 같습니다. 분산은 한 종목의 사고를 줄여 줄 뿐 시장 전체의 하락을 피하게 해 주지는 않습니다. ETF는 원금이 보장되는 상품이 아닙니다.`}
+              </Body>
+            </Result>
+          ) : null}
+        </Section>
+      ) : null}
+      {recorded ? (
+        <Takeaways
+          items={[
+            'ETF는 여러 자산을 담은 펀드의 지분을 주식처럼 거래하는 상품입니다.',
+            'ETF를 사도 담긴 주식을 각각 직접 소유하는 것은 아닙니다.',
+            '여러 종목에 나눠 담으면 한 종목의 사고는 줄지만, 시장 전체가 내리는 위험은 피할 수 없습니다.',
+          ]}
+        />
+      ) : null}
     </>
   );
 }
-export function NavLesson() {
-  const [calculated, setCalculated] = useState(false);
+export function EtfPriceLesson() {
+  const [applied, setApplied] = useState(false);
   const [price, setPrice] = useState<number | null>(null);
   const [recorded, setRecorded] = useState(false);
-  const [timing, setTiming] = useState<'same' | 'stale' | null>(null);
-  const result = nav(1000000, 0, 100);
-  const gap = price === null ? null : premium(price, result.perShare);
+  const before = nav(start.initialValue, 0, shares);
+  const result = indexImpact(fundAssets, sample);
+  const after = nav(result.value, 0, shares);
+  const gap = price === null ? null : premium(price, before.perShare);
   return (
     <>
-      <Section title="순자산가치와 시장가격" id="nav-definition">
+      <Section title="순자산가치와 시장가격" id="etf-price-definition">
         <Body>
           순자산가치(NAV, Net Asset Value)는 ETF가 보유한 자산에서 부채를 뺀
           순자산 가치입니다. 1주당 NAV는 ETF 순자산 ÷ ETF 발행주식수로
@@ -339,48 +362,73 @@ export function NavLesson() {
         </Body>
         <Body>
           시장가격은 실제 거래소에서 ETF 매수자와 매도자가 거래해 형성되는
-          가격입니다. 자산으로 계산한 NAV와 항상 같지는 않습니다.
+          가격입니다. 자산으로 계산한 NAV와 항상 같지는 않습니다. NAV를 계산한
+          기준 시각과 시장가격이 정해진 시각도 다를 수 있습니다.
         </Body>
       </Section>
-      <Section title="실습 A · 한 주당 가치 계산" id="nav-a">
+      <Section
+        title="실습 · 바구니 값에서 ETF 한 주의 NAV까지"
+        id="etf-price-follow"
+      >
         <Body>
-          순자산 1,000,000원과 발행 ETF 100주를 나눠 한 주당 NAV를 확인하세요.
+          ETF가 지수를 ‘추종’한다는 것은 기준 지수의 움직임을 비슷하게
+          반영하도록 운용한다는 뜻입니다. 가상 ABC 지수와 같은 비중으로 A·B·C를
+          담은 ETF에 구성종목 가격 변화를 적용해 보세요.
         </Body>
         <LessonAction
-          id="nav-calculate"
-          label="1주당 NAV 계산"
-          disabled={calculated}
-          onPress={() => setCalculated(true)}
+          id="etf-price-apply"
+          label="구성종목 가격 변화 적용"
+          disabled={applied}
+          onPress={() => setApplied(true)}
         />
-        {calculated ? (
-          <Result title="NAV 계산 결과" id="nav-result">
+        {applied ? (
+          <>
             <Flow
-              id="nav-calculation"
+              id="etf-price-flow"
               steps={[
-                ['ETF 순자산', won(result.netAssets)],
-                ['ETF 발행수량', '100주'],
+                ['구성종목 가격 변화', moves(sample)],
+                ['지수', indexMove(result.index)],
                 [
-                  '1주당 NAV',
-                  `${won(result.netAssets)} ÷ 100주 = ${won(result.perShare)}`,
+                  '바구니 · ETF 순자산',
+                  `${won(before.netAssets)} → ${won(after.netAssets)}`,
+                ],
+                [
+                  `1주당 NAV (÷${shares}주)`,
+                  `${won(before.perShare)} → ${won(after.perShare)}`,
                 ],
               ]}
             />
-            <Body>전체 펀드의 순자산과 한 주당 NAV를 구분해서 읽습니다.</Body>
-          </Result>
+            <Result title="같은 움직임, 다른 단위" id="etf-price-result">
+              <Values
+                rows={[
+                  ['지수 변화율', percent(result.rate)],
+                  [
+                    '1주당 NAV 변화율',
+                    percent(changeRate(before.perShare, after.perShare)),
+                  ],
+                ]}
+              />
+              <Body>
+                {`지수 ${result.index.toLocaleString('ko-KR')}포인트와 ETF 한 주 ${won(after.perShare)}은 같은 숫자가 될 필요가 없습니다. 이 예제에서 둘 다 ${percent(result.rate)}인 이유는 같은 구성자산의 움직임을 반영했기 때문입니다. 실제 ETF에는 비용과 운용 차이가 있습니다.`}
+              </Body>
+              <Body>
+                모든 ETF가 지수추종형은 아니며, 운용자가 전략에 따라 투자하는
+                액티브 ETF도 있습니다.
+              </Body>
+              <Basis>
+                {`부채·비용·자금 유출입 없음 · 발행 ${shares}주 고정`}
+              </Basis>
+            </Result>
+          </>
         ) : null}
       </Section>
-      {calculated ? (
-        <Section title="실습 B · 시장가격과 NAV 비교" id="nav-b">
+      {applied ? (
+        <Section title="실습 · 시장가격과 NAV 비교" id="etf-price-gap">
           <Body>
-            괴리율은 ETF 시장가격과 NAV 사이의 차이를 비율로 나타낸 값입니다.
-            (시장가격 - NAV) ÷ NAV × 100으로 계산합니다.
-          </Body>
-          <Body>
-            1주당 NAV를 10,000원으로 고정하고 시장가격을 선택하세요. 같은 시점의
-            가상 평가라고 가정합니다.
+            {`괴리율은 ETF 시장가격이 NAV와 얼마나 차이 나는지를 비율로 나타낸 값입니다. 1주당 NAV를 ${won(before.perShare)}으로 고정하고 시장가격을 선택하세요.`}
           </Body>
           <Choices<number>
-            id="nav-price"
+            id="etf-price-gap"
             options={[9800, 10000, 10200].map((value) => ({
               value,
               label: won(value),
@@ -390,18 +438,18 @@ export function NavLesson() {
             onChange={setPrice}
           />
           {gap !== null ? (
-            <Result title="시장가격 차이의 결과" id="nav-premium-result">
+            <Result title="시장가격 차이의 결과" id="etf-price-gap-result">
               <Values
                 rows={[
                   ['시장가격', won(price)],
-                  ['1주당 NAV', won(result.perShare)],
+                  ['1주당 NAV', won(before.perShare)],
                   [
                     '괴리율',
-                    `${percent(gap)} · ${gap > 0 ? `NAV보다 ${Math.abs(gap)}% 높은 가격 · 할증` : gap < 0 ? `NAV보다 ${Math.abs(gap)}% 낮은 가격 · 할인` : 'NAV와 동일'}`,
+                    `${percent(gap)} · ${gap > 0 ? `NAV보다 ${Math.abs(gap)}% 높은 가격 · 할증` : gap < 0 ? `NAV보다 ${Math.abs(gap)}% 낮은 가격 · 할인` : 'NAV와 같은 가격'}`,
                   ],
                   [
                     '계산',
-                    `(${won(price)} - ${won(result.perShare)}) ÷ ${won(result.perShare)} × 100`,
+                    `(시장가격 - NAV) ÷ NAV × 100\n= (${won(price)} - ${won(before.perShare)}) ÷ ${won(before.perShare)} × 100`,
                   ],
                 ]}
               />
@@ -413,7 +461,7 @@ export function NavLesson() {
             </Result>
           ) : null}
           <LessonAction
-            id="nav-record"
+            id="etf-price-record"
             label="선택한 비교 결과 기록"
             disabled={gap === null || recorded}
             onPress={() => setRecorded(true)}
@@ -421,268 +469,150 @@ export function NavLesson() {
         </Section>
       ) : null}
       {recorded ? (
-        <Section title="이어서 · 평가 기준시각" id="nav-c">
-          <Body>
-            NAV 기준시점과 시장가격 시점은 다를 수 있습니다. 같은 시점의 평가와
-            이전 NAV를 비교해보세요.
-          </Body>
-          <Choices<'same' | 'stale'>
-            id="nav-timing"
-            options={[
-              { value: 'same', label: '동일시점 가상 평가' },
-              { value: 'stale', label: '이전 NAV' },
-            ]}
-            value={timing}
-            onChange={setTiming}
-          />
-          {timing ? (
-            <Result title="기준시각 비교" id="nav-timing-result">
-              <Values
-                rows={[
-                  ['시장가격', '10,200원 · 2026-07-08 10:00 KST'],
-                  [
-                    '1주당 NAV',
-                    `10,000원 · ${timing === 'same' ? '2026-07-08 10:00 KST · 동일시점 가상 평가' : `${usTradingSession('2026-07-07').closeEt} ET = ${usTradingSession('2026-07-07').closeKst} KST · 이전 NAV`}`,
-                  ],
-                ]}
-              />
-              <Body>
-                {timing === 'stale'
-                  ? '계산상 +2%여도 이전 평가값과의 비교입니다. 같은 시점에 확정한 가치와의 차이라고 단정할 수 없습니다.'
-                  : '원리를 이해하기 위한 동시점 가정입니다. 실제 공표 NAV가 항상 실시간 값이라는 뜻은 아닙니다.'}
-              </Body>
-              <Body>
-                평가 기준시각과 통화, 자료의 정의를 함께 확인합니다. NAV는 그
-                가격에 바로 체결할 수 있다는 보장도 아닙니다.
-              </Body>
-            </Result>
-          ) : null}
-        </Section>
+        <Takeaways
+          items={[
+            'ETF 한 주의 NAV는 담은 자산의 가치를 발행 주수로 나눈 값입니다.',
+            '거래소의 시장가격은 NAV와 다를 수 있고, 그 차이는 괴리율로 봅니다.',
+            '지수 포인트와 ETF 가격은 서로 다른 숫자라서 같은 값일 필요가 없습니다.',
+          ]}
+        />
       ) : null}
     </>
   );
 }
-
-const productInfo = [
-  {
-    id: 'assets',
-    title: '투자대상',
-    value: '가상 주식 A·B·C',
-    meaning:
-      '어떤 자산과 시장에 투자하는지 확인합니다. ETF라는 이름만으로 원금보장이나 충분한 분산이 보장되지는 않습니다.',
-  },
-  {
-    id: 'benchmark',
-    title: '추종지수',
-    value: '가상 ABC 지수',
-    meaning:
-      '지수의 구성과 산출 방법, 가격수익·총수익 등 비교 기준을 확인합니다. 액티브 ETF는 운용 방식이 다를 수 있습니다.',
-  },
-  {
-    id: 'weights',
-    title: '주요 구성종목과 비중',
-    value: 'A 50% · B 30% · C 20% (구간 시작)',
-    meaning:
-      '상위 종목과 비중을 보면 특정 기업·업종에 얼마나 집중되어 있는지 알 수 있습니다.',
-  },
-  {
-    id: 'costs',
-    title: '운용비용',
-    value: '교육 예제 연 0.2% · 별도 거래비용은 제외',
-    meaning:
-      '보수와 기타 비용은 펀드 자산과 수익률에 영향을 줍니다. 운용보수 하나만으로 지수와의 모든 차이를 설명할 수는 없습니다.',
-  },
-  {
-    id: 'distribution',
-    title: '분배금 정책',
-    value: '가상 연 1회 분배 · 금액 변동 가능',
-    meaning:
-      '분배 시기·재원·기준일·지급일을 확인합니다. 분배금이 고정되거나 추가 수익을 보장하는 것은 아닙니다.',
-  },
-  {
-    id: 'nav',
-    title: 'NAV',
-    value: '1주당 NAV 10,000원 · 2026-07-07 16:00 ET 평가',
-    meaning:
-      '보유자산과 부채에서 계산한 가치입니다. 통화와 기준시점, 평가 방식을 확인합니다.',
-  },
-  {
-    id: 'price',
-    title: '시장가격',
-    value: '10,200원 · 2026-07-08 10:00 KST 체결',
-    meaning:
-      '거래소에서 형성된 가격입니다. 이 카드의 NAV와는 기준시점이 다르므로 현재 확정 가치와의 차이로 단정하지 않습니다.',
-  },
-];
-export function TrackingLesson() {
-  const [compared, setCompared] = useState(false);
-  const [stable, setStable] = useState(false);
-  const [variable, setVariable] = useState(false);
-  const [opened, setOpened] = useState<string[]>([]);
+export function EtfPickLesson() {
+  const [choice, setChoice] = useState<'x' | 'y' | null>(null);
+  const [recorded, setRecorded] = useState(false);
+  const [shown, setShown] = useState(false);
   const indexReturn = changeRate(benchmarkPath[0], benchmarkPath.at(-1));
-  const etfReturn = changeRate(fundNavPath[0], fundNavPath.at(-1));
-  const trackingDifference = etfReturn - indexReturn;
-  const a = differenceStats(stableDifferences);
-  const b = differenceStats(variableDifferences);
-  const labels = ['시작', '구간 1', '구간 2', '종료'];
-  const differenceLabels = ['구간 1', '구간 2', '구간 3', '구간 4'];
-  const comparisonDomain = priceDomain([
+  const navReturn = changeRate(fundNavPath[0], fundNavPath.at(-1));
+  const domain = priceDomain([
     ...normalize(benchmarkPath),
     ...normalize(fundNavPath),
   ]);
-  const differenceDomain = priceDomain([
-    ...stableDifferences,
-    ...variableDifferences,
-  ]);
   return (
     <>
-      <Basis>가상 지수추종 ETF · 동일 기간·원화 기준·분배금 없는 구간</Basis>
-      <Body>
-        추적차이는 같은 기간 ETF 수익률에서 추종지수 수익률을 뺀 값입니다.
-        추적오차는 그 수익률 차이가 시간에 따라 얼마나 들쑥날쑥한지를
-        나타냅니다. 아래에서 두 개념을 차례로 비교합니다.
-      </Body>
-      <Section title="실습 A · 같은 기간 수익률" id="tracking-a">
+      <Section title="고르기 전에 묻는 세 가지" id="etf-pick-intro">
         <Body>
-          기준지수 1,000→1,100과 ETF NAV 10,000원→10,980원을 시작값 100으로
-          맞춥니다. 예제 차이는 운용비용·현금 보유·편입 조정 효과를 합한
-          가정이며 각 원인의 비중을 추정하지 않습니다.
+          ETF를 고를 때는 ‘무엇을 담았나’, ‘무엇을 따라가나’, ‘얼마가 드나’ 세
+          가지를 차례로 확인합니다. 가상 ETF 두 개로 하나씩 살펴봅니다.
         </Body>
-        <LessonAction
-          id="tracking-compare"
-          label="시작값 100으로 맞춰 수익률 비교"
-          disabled={compared}
-          onPress={() => setCompared(true)}
+      </Section>
+      <Section title="실습 · 가상 ETF 두 개 비교" id="etf-pick-compare">
+        <Basis>가상 ETF 두 개 · 실제 상품 아님 · 교육용 가정</Basis>
+        <Values
+          id="etf-pick-cards"
+          rows={[
+            ['ETF X', '30종목 · 여러 업종 · 비용 연 0.2%'],
+            ['ETF Y', '5종목 · 한 업종 · 비용 연 0.9%'],
+          ]}
         />
-        {compared ? (
-          <Result title="추적차이 결과" id="tracking-result">
-            <LessonPlot
-              id="tracking-normalized"
-              domain={comparisonDomain}
-              labels={labels}
-              unit=" (시작=100)"
-              series={[
-                { name: '기준지수', values: normalize(benchmarkPath) },
-                { name: 'ETF NAV', values: normalize(fundNavPath) },
-              ]}
-            />
-            <Values
-              rows={[
-                ['기준지수 수익률', percent(indexReturn)],
-                ['ETF NAV 수익률', percent(etfReturn)],
-                [
-                  '추적차이 (ETF - 지수)',
-                  `${trackingDifference.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}%포인트`,
-                ],
-              ]}
-            />
+        <Body>한 업종이 크게 부진할 때 어느 쪽이 덜 흔들릴까요?</Body>
+        <Choices<'x' | 'y'>
+          id="etf-pick-shake"
+          options={[
+            { value: 'x', label: 'ETF X' },
+            { value: 'y', label: 'ETF Y' },
+          ]}
+          value={choice}
+          disabled={recorded}
+          onChange={setChoice}
+        />
+        {choice ? (
+          <Result title="흔들림 비교 결과" id="etf-pick-shake-result">
             <Body>
-              추적차이는 같은 기간 ETF와 기준지수의 수익률 차이입니다.
-              시장가격과 NAV를 비교하는 괴리율도, 수익률 차이의 변동성을
-              나타내는 추적오차도 아닙니다.
+              {choice === 'x'
+                ? '예상이 맞았습니다. ETF X가 덜 흔들립니다.'
+                : 'ETF Y가 아니라 ETF X가 덜 흔들립니다.'}
+            </Body>
+            <Body>
+              ETF X는 여러 업종의 종목에 나눠 담아 더 분산되어 있습니다. ETF
+              Y는 한 업종에 몰려 있어 그 업종이 부진하면 담은 종목이 거의 함께
+              내려갑니다.
+            </Body>
+            <Body>
+              이름에 ETF가 붙었다는 것만으로 원금이 보장되거나 충분히 분산되는
+              것은 아닙니다. 담은 종목 수가 많아도 비슷하게 움직이는 종목이면
+              분산 효과가 작을 수 있습니다.
             </Body>
           </Result>
         ) : null}
+        <LessonAction
+          id="etf-pick-record"
+          label="선택 기록하고 비용 보기"
+          disabled={choice === null || recorded}
+          onPress={() => setRecorded(true)}
+        />
       </Section>
-      {compared ? (
-        <Section title="실습 B · 평균 차이와 변동성" id="tracking-b">
+      {recorded ? (
+        <Section title="실습 · 비용과 지수와의 차이" id="etf-pick-cost">
           <Body>
-            차이가 일정한 사례를 먼저 보고, 그 아래에서 위아래로 흔들리는 사례를
-            실행하세요. 숫자 하나보다 시간에 따른 선의 모양을 비교합니다.
+            ETF를 운용하는 데 드는 비용은 펀드 자산에서 나갑니다. 그래서 같은
+            지수를 따라가도 ETF의 수익률이 지수와 조금 달라질 수 있습니다.
           </Body>
+          <Basis>
+            가상 지수추종 ETF · 앞의 ETF X·Y와 별개의 예제 · 같은 기간·원화 기준
+          </Basis>
           <LessonAction
-            id="tracking-stable"
-            label="매 구간 차이가 일정한 사례 적용"
-            disabled={stable}
-            onPress={() => setStable(true)}
+            id="etf-pick-gap"
+            label="비용이 지수와의 차이로 나타나는 모습 보기"
+            disabled={shown}
+            onPress={() => setShown(true)}
           />
-          {stable ? (
-            <>
-              <Result title="일정한 차이의 결과" id="tracking-stable-result">
-                <LessonPlot
-                  id="tracking-stable-plot"
-                  domain={differenceDomain}
-                  labels={differenceLabels}
-                  unit="%포인트"
-                  series={[
-                    {
-                      name: '매 구간 ETF 수익률 - 지수 수익률',
-                      values: stableDifferences,
-                    },
-                  ]}
-                />
-                <Values
-                  rows={[
-                    ['구간 차이의 평균', `${a.mean.toFixed(2)}%포인트`],
-                    ['차이의 움직임', '매 구간 일정함'],
-                  ]}
-                />
-              </Result>
-              <LessonAction
-                id="tracking-variable"
-                label="평균은 비슷하고 편차가 큰 사례 적용"
-                disabled={variable}
-                onPress={() => setVariable(true)}
-              />
-            </>
-          ) : null}
-          {variable ? (
-            <Result title="편차가 큰 사례의 결과" id="tracking-variable-result">
+          {shown ? (
+            <Result title="지수와의 차이" id="etf-pick-gap-result">
               <LessonPlot
-                id="tracking-variable-plot"
-                domain={differenceDomain}
-                labels={differenceLabels}
-                unit="%포인트"
+                id="etf-pick-plot"
+                domain={domain}
+                labels={['시작', '구간 1', '구간 2', '종료']}
+                unit=" (시작=100)"
                 series={[
-                  {
-                    name: '매 구간 ETF 수익률 - 지수 수익률',
-                    values: variableDifferences,
-                  },
+                  { name: '지수', values: normalize(benchmarkPath) },
+                  { name: 'ETF NAV', values: normalize(fundNavPath) },
                 ]}
               />
               <Values
                 rows={[
-                  ['구간 차이의 평균', `${b.mean.toFixed(2)}%포인트`],
-                  ['차이의 움직임', '위아래로 크게 변함'],
+                  ['지수 수익률', percent(indexReturn)],
+                  ['ETF NAV 수익률', percent(navReturn)],
+                  [
+                    '추적차이 (ETF - 지수)',
+                    `${percent(navReturn - indexReturn)}포인트`,
+                  ],
                 ]}
               />
               <Body>
-                두 사례는 평균 차이가 같아도 시간에 따른 흔들림이 다릅니다. 이런
-                변동성을 나타내는 개념이 추적오차입니다. 한 번의 -0.2%포인트
-                차이는 추적차이이며, ‘추적오차 -0.2%’라고 부르지 않습니다.
+                추적차이는 같은 기간 ETF 수익률에서 지수 수익률을 뺀 값입니다. 이
+                예제의 차이는 비용·현금 보유·편입 조정 효과를 합친 가정이며,
+                원인별 비중은 추정하지 않습니다.
               </Body>
             </Result>
           ) : null}
         </Section>
       ) : null}
-      {variable ? (
-        <Section title="실습 C · 가상 ETF 상품정보" id="tracking-c">
-          <Body>각 항목을 눌러 표시된 정보와 의미를 확인하세요.</Body>
-          {productInfo.slice(0, opened.length + 1).map((item) => (
-            <View key={item.id} style={s.section}>
-              <LessonAction
-                id={`product-${item.id}`}
-                label={`${item.title} 확인`}
-                secondary
-                disabled={opened.includes(item.id)}
-                onPress={() =>
-                  setOpened((items) =>
-                    items.includes(item.id) ? items : [...items, item.id],
-                  )
-                }
-              />
-              {opened.includes(item.id) ? (
-                <Result title={item.title} id={`product-${item.id}-result`}>
-                  <Body>{item.value}</Body>
-                  <Body>{item.meaning}</Body>
-                </Result>
-              ) : null}
-            </View>
-          ))}
-          {opened.length === productInfo.length ? (
-            <Takeaways items={etfTakeaways} />
-          ) : null}
-        </Section>
+      {shown ? (
+        <>
+          <Section title="ETF를 고를 때 확인할 곳">
+            <Values
+              id="etf-pick-checklist"
+              rows={[
+                ['무엇을 담았나', '구성종목·업종·비중'],
+                ['무엇을 따라가나', '추종하는 지수 또는 운용 방식'],
+                ['얼마가 드나', '총보수 등 비용과 지수와의 차이'],
+              ]}
+            />
+          </Section>
+          <Takeaways
+            items={[
+              '지수는 여러 자산의 움직임을 하나의 기준 숫자로 나타냅니다.',
+              'ETF는 여러 자산을 담은 펀드의 지분을 거래소에서 사고팔 수 있게 만든 상품입니다.',
+              '분산은 한 종목의 위험을 줄이지만 시장 전체의 하락은 피하지 못합니다.',
+              'ETF에는 자산으로 계산한 NAV와 거래소에서 형성되는 시장가격이 있습니다.',
+              '비용 등의 영향으로 ETF 수익률은 지수와 차이가 날 수 있습니다.',
+              'ETF를 고를 때는 무엇을 담았는지, 무엇을 따라가는지, 비용이 얼마인지 확인합니다.',
+            ]}
+          />
+        </>
       ) : null}
     </>
   );

@@ -160,10 +160,10 @@ function assertUniqueTestIds(h: any) {
 }
 
 describe('guide home and market basics lesson', () => {
-  it('opens all six available guides with the existing touch surface', (t) => {
+  it('opens all five available guides with the existing touch surface', (t) => {
     const h = setup(t, true);
     const buttons = h.renderer.root.findAllByType('Pressable');
-    assert.equal(buttons.length, 6);
+    assert.equal(buttons.length, 5);
     assert.equal(buttons[0].props.testID, ids.marketBasicsCard);
     assert.equal(buttons[0].props.accessibilityRole, 'button');
     h.press(ids.marketBasicsCard);
@@ -171,9 +171,9 @@ describe('guide home and market basics lesson', () => {
     h.press('guide-candles-card');
     h.press('guide-order-types-card');
     assert.deepEqual(h.routes, ['MarketBasics', 'Candles', 'OrderTypes']);
-    for (const route of ['StockCharacteristics', 'CorporateActions', 'EtfIndex']) h.press(`guide-topic-card-${route}`);
-    assert.deepEqual(h.routes, ['MarketBasics', 'Candles', 'OrderTypes', 'StockCharacteristics', 'CorporateActions', 'EtfIndex']);
-    for (const title of ['시장기초', '캔들', '주문방식', '주식특성', '기업행동과 조정주가', 'ETF와 지수']) assert.ok(h.text().includes(title));
+    for (const route of ['StockCharacteristics', 'EtfIndex']) h.press(`guide-topic-card-${route}`);
+    assert.deepEqual(h.routes, ['MarketBasics', 'Candles', 'OrderTypes', 'StockCharacteristics', 'EtfIndex']);
+    for (const title of ['시장기초', '캔들', '주문방식', '주식특성', 'ETF와 지수']) assert.ok(h.text().includes(title));
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '준비 중').length, 0);
     assert.equal(h.renderer.root.findAllByType('Text').filter((node: any) => node.props.children === '가이드').length, 0);
     // The shared touch feedback: the card's own ink layer starts at the touch.
@@ -499,7 +499,7 @@ describe('guide home and market basics lesson', () => {
     // Each card: a larger number than before (14) that stays below a heavy title
     // in weight balance, and a visible 학습 시작 button inside the one touch target.
     const numbers = texts.filter((node: any) => /^0\d$/.test(textContent(node)));
-    assert.equal(numbers.length, 6);
+    assert.equal(numbers.length, 5);
     for (const number of numbers) {
       const style = flatten(number.props.style);
       assert.equal(style.fontSize > 20 && style.fontSize <= 28, true);

@@ -60,7 +60,6 @@ export type GuideStackParamList = {
   Candles: undefined;
   OrderTypes: undefined;
   StockCharacteristics: undefined;
-  CorporateActions: undefined;
   EtfIndex: undefined;
   GuideChapter: { chapter: GuideChapter };
 };

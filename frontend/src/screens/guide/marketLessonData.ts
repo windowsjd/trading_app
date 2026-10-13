@@ -137,19 +137,6 @@ export const marketExamples = [
     ],
   },
 ] as const;
-export const splitCandles = [
-  { open: 98000, high: 102000, low: 97000, close: 100000 },
-  { open: 50000, high: 51000, low: 49000, close: 50000 },
-];
-export const dividendCandles = [
-  { open: 9900, high: 10100, low: 9800, close: 10000 },
-  { open: 9500, high: 9500, low: 9500, close: 9500 },
-];
-export const dividendNotice = {
-  exDate: '2026-03-16',
-  recordDate: '2026-03-16',
-  paymentDate: '2026-03-17',
-};
 export const fundAssets = [
   { name: 'A', price: 10000, quantity: 50 },
   { name: 'B', price: 5000, quantity: 60 },
@@ -157,5 +144,3 @@ export const fundAssets = [
 ];
 export const benchmarkPath = [1000, 1030, 1070, 1100];
 export const fundNavPath = [10000, 10280, 10660, 10980];
-export const stableDifferences = [-0.2, -0.2, -0.2, -0.2];
-export const variableDifferences = [-0.8, 0.4, -0.8, 0.4];

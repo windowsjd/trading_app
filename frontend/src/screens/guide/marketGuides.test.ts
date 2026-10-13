@@ -5,12 +5,8 @@ import { createRequire } from 'node:module';
 import { describe, it, type TestContext } from 'node:test';
 import { readFileSync } from 'node:fs';
 import {
-  adjustOhlc,
   callAuction,
   changeRate,
-  differenceStats,
-  dividendAssets,
-  eligibleDividend,
   indexImpact,
   nav,
   normalize,
@@ -19,8 +15,6 @@ import {
   priceDomain,
   sessionOhlc,
   sessionTimeline,
-  payoutRatio,
-  shareConversion,
   usTradingSession,
 } from './marketLessonCalculations.ts';
 import {
@@ -29,11 +23,12 @@ import {
   fundAssets,
   sessionTrades,
   usSessionTrades,
-  splitCandles,
-  stableDifferences,
-  variableDifferences,
 } from './marketLessonData.ts';
-import { guideTopics, type GuideChapter } from './guideTopics.ts';
+import {
+  guideChapters,
+  guideTopics,
+  type GuideChapter,
+} from './guideTopics.ts';
 import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors.ts';
 
 const require = createRequire(import.meta.url);
@@ -82,7 +77,7 @@ function setup(
     },
   });
   const mocks: any = { './LessonUi': ui, './MarketLessonUi': figures };
-  for (const name of ['StockLessons', 'CorporateLessons', 'EtfLessons'])
+  for (const name of ['StockLessons', 'EtfLessons'])
     mocks[`./${name}`] = h.load(`src/screens/guide/${name}.tsx`, mocks);
   h.Screen = h.load(
     `src/screens/guide/${topic ? 'GuideTopicScreen' : 'GuideChapterScreen'}.tsx`,
@@ -225,7 +220,7 @@ describe('market guide calculations from local inputs', () => {
     assert.equal(JSON.stringify([auctionBuys, auctionSells]), original);
   });
   it('filters the same trades into OHLC, keeps raw candles, and sizes shared axes', () => {
-    const original = JSON.stringify([sessionTrades, splitCandles]);
+    const original = JSON.stringify(sessionTrades);
     assert.deepEqual(sessionOhlc(sessionTrades, false).candle, {
       open: 10700,
       high: 10750,
@@ -240,15 +235,9 @@ describe('market guide calculations from local inputs', () => {
     });
     assert.equal(sessionOhlc([], true).candle, null);
     assert.equal(changeRate(10000, 10600), 6);
-    assert.deepEqual(adjustOhlc(splitCandles[0], 0.5), {
-      open: 49000,
-      high: 51000,
-      low: 48500,
-      close: 50000,
-    });
     const domain = priceDomain([7000, 13000, 50000, 100000]);
     assert.ok(domain[0] < 7000 && domain[1] > 100000);
-    assert.equal(JSON.stringify([sessionTrades, splitCandles]), original);
+    assert.equal(JSON.stringify(sessionTrades), original);
   });
   it('builds both market timelines from the same immutable session records', () => {
     for (const trades of [sessionTrades, usSessionTrades]) {
@@ -288,46 +277,8 @@ describe('market guide calculations from local inputs', () => {
       low: 102,
       close: 108,
     });
-    assert.deepEqual(
-      [20, 30, 50].map((value) => payoutRatio(value, 100)),
-      [20, 30, 50],
-    );
-    assert.equal(payoutRatio(20, 0), null);
-    assert.equal(payoutRatio(20, -10), null);
   });
-  it('conserves conversion value and keeps dividends receivable separate from cash', () => {
-    assert.deepEqual(shareConversion(100000, 10, 2), {
-      price: 50000,
-      quantity: 20,
-      value: 1000000,
-    });
-    assert.deepEqual(shareConversion(50000, 20, 0.5), {
-      price: 100000,
-      quantity: 10,
-      value: 1000000,
-    });
-    assert.equal(eligibleDividend('2026-03-13', '2026-03-16'), true);
-    assert.equal(eligibleDividend('2026-03-16', '2026-03-16'), false);
-    for (const stage of ['before', 'ex', 'paid'] as const)
-      assert.equal(dividendAssets(stage).total, 100000);
-    assert.deepEqual(dividendAssets('ex'), {
-      price: 9500,
-      quantity: 10,
-      stock: 95000,
-      receivable: 5000,
-      cash: 0,
-      total: 100000,
-    });
-    assert.deepEqual(dividendAssets('paid'), {
-      price: 9500,
-      quantity: 10,
-      stock: 95000,
-      receivable: 0,
-      cash: 5000,
-      total: 100000,
-    });
-  });
-  it('computes index contributions, NAV, premium, normalized returns and dispersion', () => {
+  it('computes index contributions, NAV, premium and normalized returns', () => {
     const result = indexImpact(fundAssets, [10, 0, -5]);
     near(
       result.rows.reduce((sum, row) => sum + row.weight, 0),
@@ -350,14 +301,10 @@ describe('market guide calculations from local inputs', () => {
     near(changeRate(10000, 10980)! - changeRate(1000, 1100)!, -0.2);
     assert.equal(normalize([10000, 10980])[0], 100);
     near(normalize([10000, 10980])[1], 109.8);
-    near(differenceStats(stableDifferences)!.deviation, 0);
-    near(differenceStats(variableDifferences)!.mean, -0.2);
-    near(differenceStats(variableDifferences)!.deviation, 0.6);
     assert.equal(nav(1, 0, 0).perShare, null);
     assert.equal(premium(1, 0), null);
     assert.equal(changeRate(0, 1), null);
     assert.deepEqual(normalize([]), []);
-    assert.equal(differenceStats([]), null);
     assert.notEqual(indexImpact(fundAssets, [0, 0, 0]).index, result.index);
   });
 });
@@ -534,207 +481,283 @@ describe('new guide chapters preserve downward learning flow', () => {
       );
     }
   });
-  it('applies split/reverse once and preserves independent results', (t) => {
-    const h = setup(t, 'splits');
-    const press = h.find('split-apply').props.onPress;
-    act(() => {
-      press();
-      press();
-    });
-    assert.match(h.text('split-result'), /50,000원.*20주.*1,000,000원/s);
-    const split = h.text('split-result');
-    h.press('reverse-apply');
-    assert.match(h.text('reverse-result'), /100,000원.*10주.*1,000,000원/s);
-    assert.equal(h.text('split-result'), split);
-    h.order('split-result', 'split-b', 'reverse-result');
-    h.readable();
-  });
-  it('teaches dividends before two major phases and transfers receivable only on payment', (t) => {
-    const h = setup(t, 'dividends');
-    assert.match(
-      h.text('dividend-terms'),
-      /배당\(Dividend\).*배당락\(Ex-Dividend\).*배당성향\(Payout Ratio\)/s,
-    );
-    assert.match(h.text('dividend-before'), /100,000원.*5,000원.*현금0원/s);
-    h.press('dividend-hold');
-    const before = h.text('dividend-before');
-    assert.match(
-      h.text('dividend-eligibility'),
-      /이번 배당을 받을 권리가 있습니다/,
-    );
-    assert.match(h.text('dividend-eligibility'), /2026-03-16.*2026-03-17/s);
-    h.press('dividend-ex');
-    const ex = h.text('dividend-ex-result');
-    assert.match(
-      ex,
-      /9,500원.*95,000원.*받을 배당금5,000원.*배당 현금0원.*100,000원/s,
-    );
-    const pay = h.find('dividend-pay').props.onPress;
-    act(() => {
-      pay();
-      pay();
-    });
-    const paid = h.text('dividend-paid-result');
-    assert.match(paid, /받을 배당금0원.*배당 현금5,000원.*100,000원/s);
-    for (const amount of [20, 30, 50]) {
-      h.press(`payout-${amount}`);
-      assert.ok(
-        h.text('payout-result').includes(`${amount} ÷ 100 × 100 = ${amount}%`),
-      );
-    }
-    assert.equal(h.text('dividend-before'), before);
-    assert.equal(h.text('dividend-ex-result'), ex);
-    assert.equal(h.text('dividend-paid-result'), paid);
-    const headings = h.renderer.root
-      .findAllByType('Text')
-      .filter((node: any) => node.props.accessibilityRole === 'header')
-      .map((node: any) => textContent(node));
-    assert.deepEqual(
-      headings.filter((text: string) => /^\d\. 배당락/.test(text)),
-      ['1. 배당락 전', '2. 배당락 후'],
-    );
-    h.order(
-      'dividend-terms',
-      'dividend-before',
-      'dividend-eligibility',
-      'dividend-after',
-      'dividend-ex-result',
-      'dividend-pay',
-      'dividend-paid-result',
-      'dividend-payout',
-      'payout-result',
-    );
-    h.readable();
-  });
-  it('adjusts all OHLC values on a common axis and keeps the prior chart fixed', (t) => {
-    const h = setup(t, 'adjusted');
-    const original = h.text('adjust-split-chart');
-    h.press('adjust-split-adjusted');
-    assert.match(
-      h.text('adjust-split-chart'),
-      /49,000원.*51,000원.*48,500원.*50,000원/s,
-    );
-    h.press('adjust-split-raw');
-    assert.equal(h.text('adjust-split-chart'), original);
-    h.press('adjust-split-adjusted');
-    h.press('adjust-split-record');
-    const split = h.text('adjust-split-chart');
-    h.press('adjust-dividend-dividend');
-    assert.match(
-      h.text('adjust-dividend-chart'),
-      /9,405원.*9,595원.*9,310원.*9,500원/s,
-    );
-    assert.equal(h.text('adjust-split-chart'), split);
-    h.readable();
-  });
-  it('teaches index then ETF before following, NAV and tracking', (t) => {
+  it('keeps ETF and index as guide 05 with four chapters and no corporate actions', () => {
     assert.deepEqual(
       guideTopics.EtfIndex.chapters.map((c) => c.id),
-      ['index', 'etf', 'following', 'nav', 'tracking'],
+      ['index', 'etf', 'etf-price', 'etf-pick'],
     );
+    assert.equal(guideTopics.EtfIndex.number, '05');
+    assert.equal(guideTopics.StockCharacteristics.number, '04');
+    assert.equal(Object.keys(guideTopics).includes('CorporateActions'), false);
+    const ids: string[] = guideChapters.map((c) => c.id);
+    for (const removed of ['splits', 'dividends', 'adjusted', 'following', 'nav', 'tracking'])
+      assert.equal(ids.includes(removed), false, removed);
+  });
+  it('predicts which weighted move lifts the index more, then merges three moves into one index', (t) => {
     const h = setup(t, 'index');
     assert.match(
       h.text('index-definition'),
-      /여러 자산의 가격 움직임.*기준.*직접 사는 종목이 아닙니다/s,
+      /시장 전체.*숫자 하나.*여러 자산의 가격 움직임.*기준.*직접 사는 종목이 아닙니다.*1,000에서 시작.*A 50%, B 30%, C 20%/s,
     );
-    assert.doesNotMatch(h.text(), /NAV|추적오차/);
+    assert.equal(h.find('index-predict-result') === undefined, true);
+    assert.equal(h.find('index-merge') === undefined, true);
+    assert.equal(h.find('index-predict-record').props.disabled, true);
+    h.press('index-predict-a');
+    const right = h.text('index-predict-result');
+    for (const value of ['50% × 10%', '+5%포인트', '1,000 → 1,050포인트', '20% × 10%', '+2%포인트', '1,000 → 1,020포인트'])
+      assert.ok(right.includes(value), value);
+    assert.match(right, /예측이 맞았습니다/);
+    assert.match(right, /같은 비율로 움직여도 비중이 큰 종목이 지수를 더 크게 움직입니다/);
+    h.press('index-predict-c');
+    const wrong = h.text('index-predict-result');
+    assert.equal(wrong === right, false);
+    assert.doesNotMatch(wrong, /예측이 맞았습니다/);
+    assert.match(wrong, /A 기업만 오른 경우가 지수를 더 크게 올립니다.*C 기업은 비중이 작아/s);
+    for (const value of ['50% × 10%', '1,050', '20% × 10%', '1,020'])
+      assert.ok(wrong.includes(value), value);
+    assert.equal(h.find('index-merge') === undefined, true);
+    h.press('index-predict-record');
+    for (const id of ['index-predict-a', 'index-predict-c', 'index-predict-record'])
+      assert.equal(h.find(id).props.disabled, true, id);
+    assert.equal(h.find('index-predict-c').props.accessibilityState.selected, true);
+    assert.equal(h.text('index-predict-result'), wrong);
+    assert.equal(h.find('index-result') === undefined, true);
+    assert.equal(h.find('lesson-takeaways') === undefined, true);
+    assert.equal(
+      h.find('index-apply').props.accessibilityLabel,
+      'A +10% · B 0% · C -5%를 하나의 지수로 모으기',
+    );
     h.press('index-apply');
-    assert.match(h.text('index-result'), /\+4%.*1,040포인트/s);
-    h.order('index-definition', 'index-apply', 'index-flow', 'index-result');
-    h.press('reset-index');
-    h.press('index-b-return-10');
-    h.press('index-apply');
-    assert.match(h.text('index-result'), /\+7%.*1,070포인트/s);
+    assert.match(
+      h.text('index-flow'),
+      /A \+10% · B 0% · C -5%.*A: 50% × \+10% = \+5%포인트\nB: 30% × 0% = 0%포인트\nC: 20% × -5% = -1%포인트.*1,000 → 1,040포인트/s,
+    );
+    const result = h.text('index-result');
+    assert.match(result, /합산 변화율\+4%.*1,000 → 1,040포인트/s);
+    assert.match(result, /지수 1,040은 주식 한 주의 가격이 아닙니다/);
+    assert.match(
+      result,
+      /실제 지수마다 계산방법이 다릅니다\. 모든 지수가 같은 가중방식을 쓰지는 않습니다/,
+    );
+    assert.equal(h.find('index-apply').props.disabled, true);
+    assert.equal(h.text('index-predict-result'), wrong);
+    assert.doesNotMatch(h.text(), /NAV|괴리율|추적차이|운용비용|추종|분산/);
+    h.order(
+      'index-definition',
+      'index-predict',
+      'index-predict-record',
+      'index-apply',
+      'index-flow',
+      'index-result',
+      'lesson-takeaways',
+    );
     h.readable();
   });
-  it('shows assets → fund → one ETF share without direct constituent ownership', (t) => {
+  it('puts one ETF share in a basket, then compares a one-stock drop with a whole-market drop', (t) => {
     const h = setup(t, 'etf');
     assert.match(
       h.text('etf-definition'),
-      /Exchange-Traded Fund.*펀드의 지분.*지수.*기준 숫자.*ETF.*펀드 상품/s,
+      /Exchange-Traded Fund.*펀드의 지분.*각각 직접 소유하는 것은 아닙니다.*지수.*기준 숫자.*ETF.*펀드 상품/s,
     );
+    assert.doesNotMatch(h.text('etf-definition') + h.text('etf-share'), /분산/);
+    assert.equal(h.find('etf-shock') === undefined, true);
     h.press('etf-unit');
     assert.match(
       h.text('etf-structure'),
       /A 주식 50%.*B 주식 30%.*C 주식 20%.*1,000,000원.*100주.*10,000원/s,
     );
+    const unit = h.text('etf-unit-result');
+    assert.match(unit, /각각 한 주씩 직접 소유하는 것은 아닙니다.*펀드의 지분/s);
+    assert.match(h.text('etf-shock'), /한 종목이 갑자기 -20% 내려간다면.*미리 알 수 없습니다/s);
+    assert.equal(h.find('etf-shock-result') === undefined, true);
+    assert.equal(h.find('etf-shock-record').props.disabled, true);
+    for (const [pick, etf, share] of [
+      ['a', '1,000,000원 → 900,000원 (-10%)', 'A 비중 50% × -20% = -10%'],
+      ['b', '1,000,000원 → 940,000원 (-6%)', 'B 비중 30% × -20% = -6%'],
+      ['c', '1,000,000원 → 960,000원 (-4%)', 'C 비중 20% × -20% = -4%'],
+    ]) {
+      h.press(`etf-shock-pick-${pick}`);
+      const shock = h.text('etf-shock-result');
+      assert.ok(shock.includes('그 종목에만 100만 원1,000,000원 → 800,000원 (-20%)'), pick);
+      assert.ok(shock.includes(`ETF에 100만 원${etf}`), etf);
+      assert.ok(shock.includes(share), share);
+      assert.match(shock, /분산이라고 합니다/);
+    }
+    h.press('etf-shock-pick-b');
+    const shock = h.text('etf-shock-result');
+    assert.equal(h.find('etf-market-result') === undefined, true);
+    assert.equal(h.find('lesson-takeaways') === undefined, true);
+    h.press('etf-shock-record');
+    for (const id of ['etf-shock-pick-a', 'etf-shock-pick-b', 'etf-shock-pick-c', 'etf-shock-record'])
+      assert.equal(h.find(id).props.disabled, true, id);
+    assert.equal(h.find('etf-shock-pick-b').props.accessibilityState.selected, true);
+    assert.equal(h.text('etf-shock-result'), shock);
+    assert.equal(h.text('etf-unit-result'), unit);
+    const market = h.text('etf-market-result');
+    assert.match(market, /이번에는 세 종목이 모두 -20%/);
+    assert.ok(market.includes('ETF에 100만 원1,000,000원 → 800,000원 (-20%)'));
     assert.match(
-      h.text('etf-unit-result'),
-      /각각 한 주씩 직접 소유하는 것은 아닙니다.*펀드의 지분/s,
+      market,
+      /분산은 한 종목의 사고를 줄여 줄 뿐 시장 전체의 하락을 피하게 해 주지는 않습니다/,
     );
-    h.order('etf-definition', 'etf-unit', 'etf-structure', 'etf-unit-result');
+    assert.match(market, /ETF는 원금이 보장되는 상품이 아닙니다/);
+    assert.doesNotMatch(h.text(), /NAV|괴리율|추적차이|운용비용|추종|순자산가치/);
+    h.order(
+      'etf-definition',
+      'etf-unit',
+      'etf-structure',
+      'etf-unit-result',
+      'etf-shock',
+      'etf-shock-pick-a',
+      'etf-shock-result',
+      'etf-shock-record',
+      'etf-market-result',
+      'lesson-takeaways',
+    );
     h.readable();
   });
-  it('applies one asset change to index, fund assets and per-share value together', (t) => {
-    const h = setup(t, 'following');
-    h.press('following-apply');
+  it('carries the basket change into one-share NAV, then compares market prices with a fixed NAV', (t) => {
+    const h = setup(t, 'etf-price');
     assert.match(
-      h.text('following-flow'),
+      h.text('etf-price-definition'),
+      /NAV, Net Asset Value.*부채를 뺀.*발행주식수.*시장가격.*항상 같지는 않습니다.*기준 시각.*다를 수 있습니다/s,
+    );
+    assert.match(
+      h.text('etf-price-follow'),
+      /‘추종’.*기준 지수의 움직임을 비슷하게 반영하도록 운용/s,
+    );
+    for (const id of ['etf-price-flow', 'etf-price-result', 'etf-price-gap', 'lesson-takeaways'])
+      assert.equal(h.find(id) === undefined, true, id);
+    h.press('etf-price-apply');
+    assert.match(
+      h.text('etf-price-flow'),
       /1,000 → 1,040포인트.*1,000,000원 → 1,040,000원.*10,000원 → 10,400원/s,
     );
+    assert.match(h.text('etf-price-flow'), /÷100주/);
+    const follow = h.text('etf-price-result');
+    assert.match(follow, /지수 변화율\+4%.*1주당 NAV 변화율\+4%/s);
     assert.match(
-      h.text('following-result'),
-      /\+4%.*100주 = 10,400원.*액티브 ETF/s,
+      follow,
+      /지수 1,040포인트와 ETF 한 주 10,400원은 같은 숫자가 될 필요가 없습니다/,
     );
-    h.readable();
-  });
-  it('separates net assets, unit NAV, premium and mismatched timestamps', (t) => {
-    const h = setup(t, 'nav');
-    h.press('nav-calculate');
-    const first = h.text('nav-result');
-    for (const [price, value] of [
-      [10200, '+2%'],
-      [10000, '0%'],
-      [9800, '-2%'],
-    ]) {
-      h.press(`nav-price-${price}`);
-      assert.ok(h.text('nav-premium-result').includes(value));
+    assert.match(follow, /액티브 ETF/);
+    assert.match(follow, /부채·비용·자금 유출입 없음 · 발행 100주 고정/);
+    assert.equal(h.find('etf-price-apply').props.disabled, true);
+    assert.equal(h.find('etf-price-gap-result') === undefined, true);
+    assert.equal(h.find('etf-price-record').props.disabled, true);
+    for (const [price, value, label] of [
+      [9800, '-2%', 'NAV보다 2% 낮은 가격 · 할인'],
+      [10000, '0%', 'NAV와 같은 가격'],
+      [10200, '+2%', 'NAV보다 2% 높은 가격 · 할증'],
+    ] as const) {
+      h.press(`etf-price-gap-${price}`);
+      const gap = h.text('etf-price-gap-result');
+      assert.ok(gap.includes(`괴리율${value} · ${label}`), value);
+      assert.match(gap, /\(시장가격 - NAV\) ÷ NAV × 100/);
+      assert.match(
+        gap,
+        /NAV보다 싸다고 반드시 좋은 매수기회나 저평가라고 판단할 수는 없습니다/,
+      );
     }
-    h.press('nav-record');
-    const premium = h.text('nav-premium-result');
-    h.press('nav-timing-stale');
-    assert.match(h.text('nav-timing-result'), /2026-07-08 05:00/);
-    assert.match(h.text('nav-timing-result'), /이전/);
-    assert.equal(h.text('nav-result'), first);
-    assert.equal(h.text('nav-premium-result'), premium);
+    const gap = h.text('etf-price-gap-result');
+    h.press('etf-price-record');
+    for (const price of [9800, 10000, 10200])
+      assert.equal(h.find(`etf-price-gap-${price}`).props.disabled, true, String(price));
+    assert.equal(h.find('etf-price-record').props.disabled, true);
+    assert.equal(h.text('etf-price-gap-result'), gap);
+    assert.equal(h.text('etf-price-result'), follow);
     h.order(
-      'nav-result',
-      'nav-b',
-      'nav-premium-result',
-      'nav-c',
-      'nav-timing-result',
+      'etf-price-definition',
+      'etf-price-follow',
+      'etf-price-apply',
+      'etf-price-flow',
+      'etf-price-result',
+      'etf-price-gap',
+      'etf-price-gap-10200',
+      'etf-price-gap-result',
+      'etf-price-record',
+      'lesson-takeaways',
     );
     h.readable();
   });
-  it('compares normalized returns and sequential dispersion examples before product details', (t) => {
-    const h = setup(t, 'tracking');
-    h.press('tracking-compare');
-    assert.match(h.text('tracking-result'), /-0.2%포인트/);
-    const result = h.text('tracking-result');
-    assert.equal(h.find('tracking-variable') === undefined, true);
-    h.press('tracking-stable');
-    const stable = h.text('tracking-stable-result');
-    h.press('tracking-variable');
-    assert.match(h.text('tracking-variable-result'), /위아래로 크게 변함/);
-    for (const id of [
-      'assets',
-      'benchmark',
-      'weights',
-      'costs',
-      'distribution',
-      'nav',
-      'price',
-    ])
-      h.press(`product-${id}`);
-    assert.equal(h.text('tracking-result'), result);
-    assert.equal(h.text('tracking-stable-result'), stable);
+  it('compares two virtual ETFs, then shows cost as the gap from the index and a checklist', (t) => {
+    const h = setup(t, 'etf-pick');
+    assert.match(h.text('etf-pick-intro'), /무엇을 담았나.*무엇을 따라가나.*얼마가 드나/s);
+    assert.match(h.text('etf-pick-compare'), /가상 ETF 두 개 · 실제 상품 아님 · 교육용 가정/);
+    assert.match(
+      h.text('etf-pick-cards'),
+      /ETF X30종목 · 여러 업종 · 비용 연 0\.2%.*ETF Y5종목 · 한 업종 · 비용 연 0\.9%/s,
+    );
+    assert.equal(h.find('etf-pick-shake-result') === undefined, true);
+    assert.equal(h.find('etf-pick-record').props.disabled, true);
+    h.press('etf-pick-shake-y');
+    const y = h.text('etf-pick-shake-result');
+    h.press('etf-pick-shake-x');
+    const x = h.text('etf-pick-shake-result');
+    assert.equal(x === y, false);
+    assert.match(x, /예상이 맞았습니다/);
+    assert.doesNotMatch(y, /예상이 맞았습니다/);
+    for (const text of [x, y]) {
+      assert.match(text, /ETF X는 여러 업종.*분산.*ETF Y는 한 업종에 몰려 있어.*함께 내려갑니다/s);
+      assert.match(
+        text,
+        /이름에 ETF가 붙었다는 것만으로 원금이 보장되거나 충분히 분산되는 것은 아닙니다/,
+      );
+      assert.match(
+        text,
+        /담은 종목 수가 많아도 비슷하게 움직이는 종목이면 분산 효과가 작을 수 있습니다/,
+      );
+    }
+    assert.equal(h.find('etf-pick-cost') === undefined, true);
+    h.press('etf-pick-record');
+    for (const id of ['etf-pick-shake-x', 'etf-pick-shake-y', 'etf-pick-record'])
+      assert.equal(h.find(id).props.disabled, true, id);
+    assert.equal(h.text('etf-pick-shake-result'), x);
+    for (const id of ['etf-pick-gap-result', 'etf-pick-checklist', 'lesson-takeaways'])
+      assert.equal(h.find(id) === undefined, true, id);
+    h.press('etf-pick-gap');
+    const gap = h.text('etf-pick-gap-result');
+    assert.match(
+      gap,
+      /지수 수익률\+10%.*ETF NAV 수익률\+9\.8%.*추적차이 \(ETF - 지수\)-0\.2%포인트/s,
+    );
+    assert.match(gap, /추적차이는 같은 기간 ETF 수익률에서 지수 수익률을 뺀 값입니다/);
+    assert.match(gap, /비용·현금 보유·편입 조정 효과를 합친 가정.*원인별 비중은 추정하지 않습니다/s);
+    // The -0.2%p example is not tied to ETF X's 0.2% yearly cost.
+    assert.doesNotMatch(gap, /ETF X|ETF Y|연 0\.2%|0\.9%/);
+    assert.match(
+      h.text('etf-pick-plot'),
+      /지수시작: 100 \(시작=100\).*종료: 110 \(시작=100\).*ETF NAV시작: 100 \(시작=100\).*종료: 109\.8 \(시작=100\)/s,
+    );
+    assert.match(
+      h.text('etf-pick-checklist'),
+      /무엇을 담았나구성종목·업종·비중.*무엇을 따라가나추종하는 지수 또는 운용 방식.*얼마가 드나총보수 등 비용과 지수와의 차이/s,
+    );
+    const takeaways = h.text('lesson-takeaways');
+    for (const [i, item] of [
+      '지수는 여러 자산의 움직임을 하나의 기준 숫자로 나타냅니다.',
+      'ETF는 여러 자산을 담은 펀드의 지분을 거래소에서 사고팔 수 있게 만든 상품입니다.',
+      '분산은 한 종목의 위험을 줄이지만 시장 전체의 하락은 피하지 못합니다.',
+      'ETF에는 자산으로 계산한 NAV와 거래소에서 형성되는 시장가격이 있습니다.',
+      '비용 등의 영향으로 ETF 수익률은 지수와 차이가 날 수 있습니다.',
+      'ETF를 고를 때는 무엇을 담았는지, 무엇을 따라가는지, 비용이 얼마인지 확인합니다.',
+    ].entries())
+      assert.ok(takeaways.includes(`${i + 1}. ${item}`), item);
+    assert.doesNotMatch(takeaways, /7\./);
+    assert.doesNotMatch(h.text(), /추적오차/);
+    assert.equal(h.text('etf-pick-shake-result'), x);
     h.order(
-      'tracking-result',
-      'tracking-stable',
-      'tracking-stable-result',
-      'tracking-variable',
-      'tracking-variable-result',
-      'tracking-c',
+      'etf-pick-intro',
+      'etf-pick-compare',
+      'etf-pick-cards',
+      'etf-pick-shake-x',
+      'etf-pick-shake-result',
+      'etf-pick-record',
+      'etf-pick-cost',
+      'etf-pick-gap',
+      'etf-pick-gap-result',
+      'etf-pick-plot',
+      'etf-pick-checklist',
       'lesson-takeaways',
     );
     h.readable();
@@ -750,30 +773,44 @@ describe('new guide chapters preserve downward learning flow', () => {
       'closed-market-open',
       'closed-market-finish',
     ],
-    splits: ['split-apply', 'reverse-apply'],
-    dividends: ['dividend-hold', 'dividend-ex', 'dividend-pay', 'payout-50'],
-    adjusted: [
-      'adjust-split-adjusted',
-      'adjust-split-record',
-      'adjust-dividend-dividend',
-    ],
-    index: ['index-apply'],
-    etf: ['etf-unit'],
-    following: ['following-apply'],
-    nav: ['nav-calculate', 'nav-price-10200', 'nav-record', 'nav-timing-stale'],
-    tracking: [
-      'tracking-compare',
-      'tracking-stable',
-      'tracking-variable',
-      'product-assets',
-      'product-benchmark',
-      'product-weights',
-      'product-costs',
-      'product-distribution',
-      'product-nav',
-      'product-price',
-    ],
+    index: ['index-predict-a', 'index-predict-record', 'index-apply'],
+    etf: ['etf-unit', 'etf-shock-pick-a', 'etf-shock-record'],
+    'etf-price': ['etf-price-apply', 'etf-price-gap-10200', 'etf-price-record'],
+    'etf-pick': ['etf-pick-shake-x', 'etf-pick-record', 'etf-pick-gap'],
   };
+  it('ends each of the first three ETF chapters with its own summary', (t) => {
+    const owners = new Map<string, string>();
+    for (const chapter of ['index', 'etf', 'etf-price'] as const) {
+      const h = setup(t, chapter);
+      for (const action of completionActions[chapter]) h.press(action);
+      const summaries = h.renderer.root.findAll(
+        (node: any) =>
+          typeof node.type === 'string' && node.props.testID === 'lesson-takeaways',
+      );
+      assert.equal(summaries.length, 1, chapter);
+      const items: string[] = summaries[0]
+        .findAll(
+          (node: any) =>
+            node.type === 'Text' && node.props.accessibilityRole !== 'header',
+        )
+        .map((node: any) => textContent(node).replace(/^\d+\. /, ''));
+      assert.equal(items.length, 3, chapter);
+      for (const item of items) {
+        assert.equal(owners.has(item), false, `${chapter} repeats ${owners.get(item)}: ${item}`);
+        owners.set(item, chapter);
+      }
+      act(() => h.renderer.unmount());
+    }
+    assert.equal(owners.size, 9);
+  });
+  it('leaves no removed ETF wording after finishing every ETF chapter', (t) => {
+    for (const { id } of guideTopics.EtfIndex.chapters) {
+      const h = setup(t, id);
+      for (const action of completionActions[id]) h.press(action);
+      assert.doesNotMatch(h.text(), /추적오차|분배금|총수익/, id);
+      act(() => h.renderer.unmount());
+    }
+  });
   for (const chapter of Object.values(guideTopics).flatMap((topic) => [
     ...topic.chapters,
   ]))
@@ -806,7 +843,6 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.match(source, /financialColors.candleDown/);
     for (const name of [
       'StockLessons',
-      'CorporateLessons',
       'EtfLessons',
       'GuideChapterScreen',
     ]) {

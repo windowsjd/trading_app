@@ -5,41 +5,27 @@ import { LessonAction, LessonPage, Section } from './LessonUi';
 import { Basis } from './MarketLessonUi';
 import { ClosedMarketLesson } from './StockLessons';
 import {
-  AdjustedLesson,
-  DividendsLesson,
-  SplitsLesson,
-} from './CorporateLessons';
-import {
   IndexLesson,
   EtfLesson,
-  FollowingLesson,
-  NavLesson,
-  TrackingLesson,
+  EtfPriceLesson,
+  EtfPickLesson,
 } from './EtfLessons';
 import { chapterTitle, type GuideChapter } from './guideTopics';
 import { VERIFIED_ON } from './marketLessonData';
 
 const lessons = {
   'closed-market': ClosedMarketLesson,
-  splits: SplitsLesson,
-  dividends: DividendsLesson,
-  adjusted: AdjustedLesson,
   index: IndexLesson,
   etf: EtfLesson,
-  following: FollowingLesson,
-  nav: NavLesson,
-  tracking: TrackingLesson,
+  'etf-price': EtfPriceLesson,
+  'etf-pick': EtfPickLesson,
 } satisfies Record<GuideChapter, React.ComponentType>;
 const sources: Record<GuideChapter, string> = {
   'closed-market': 'KRX 거래시간·매매체결·시간외 거래, NYSE 거래시간',
-  splits: 'SEC 주식병합, KRX 기준가격, TradingView 주식분할',
-  dividends: 'SEC 배당락일, KRX 배당성향·기준가격',
-  adjusted: 'TradingView 분할·배당 조정, KRX 기준가격',
   index: 'SEC 지수펀드·ETF',
-  etf: 'SEC ETF',
-  following: 'SEC 지수펀드·ETF',
-  nav: 'SEC ETF',
-  tracking: 'Vanguard 지수 추종, SEC ETF·지수펀드',
+  etf: 'SEC ETF, SEC 분산투자',
+  'etf-price': 'SEC ETF',
+  'etf-pick': 'SEC ETF·지수펀드, Vanguard 지수 추종',
 };
 export default function GuideChapterScreen({
   route,

@@ -1,4 +1,4 @@
-import { ohlcFromPrices, type Ohlc, type Quote } from './lessonCalculations.ts';
+import { ohlcFromPrices, type Quote } from './lessonCalculations.ts';
 import type { SessionTrade } from './marketLessonData';
 
 export const percent = (value: number) =>
@@ -118,47 +118,6 @@ export function sessionTimeline(trades: SessionTrade[], extended: boolean) {
       : [item];
   });
 }
-export const payoutRatio = (dividends: number, netIncome: number) =>
-  netIncome > 0 ? (dividends / netIncome) * 100 : null;
-export function adjustOhlc(candle: Ohlc, factor: number): Ohlc {
-  return {
-    open: candle.open * factor,
-    high: candle.high * factor,
-    low: candle.low * factor,
-    close: candle.close * factor,
-  };
-}
-export function shareConversion(
-  price: number,
-  quantity: number,
-  afterPerBefore: number,
-) {
-  return {
-    price: price / afterPerBefore,
-    quantity: quantity * afterPerBefore,
-    value: price * quantity,
-  };
-}
-export function dividendAssets(
-  stage: 'before' | 'ex' | 'paid',
-  price = 10000,
-  quantity = 10,
-  dividend = 500,
-) {
-  const stock = (stage === 'before' ? price : price - dividend) * quantity;
-  const receivable = stage === 'ex' ? dividend * quantity : 0;
-  const cash = stage === 'paid' ? dividend * quantity : 0;
-  return {
-    price: stage === 'before' ? price : price - dividend,
-    quantity,
-    stock,
-    receivable,
-    cash,
-    total: stock + receivable + cash,
-  };
-}
-export const eligibleDividend = (purchaseDay: string, exDay: string) =>
-  purchaseDay < exDay;
 export function indexImpact(
   assets: { price: number; quantity: number }[],
   returns: number[],
@@ -201,17 +160,6 @@ export const normalize = (values: number[]) =>
   values.length && values[0] > 0
     ? values.map((value) => (value / values[0]) * 100)
     : [];
-export function differenceStats(values: number[]) {
-  if (!values.length) return null;
-  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-  return {
-    mean,
-    deviation: Math.sqrt(
-      values.reduce((sum, value) => sum + (value - mean) ** 2, 0) /
-        values.length,
-    ),
-  };
-}
 export function priceDomain(values: number[]): [number, number] {
   const finite = values.filter(Number.isFinite);
   if (!finite.length) return [0, 1];

@@ -1,6 +1,6 @@
 # 가이드 수정 및 완료 전 검토 기록
 
-현재 구성·문구 보완일: 2026-10-13. 최초 재구성 기준 `origin/main`: `cc37e6ea20c801c3bba39aa1b233f5ef530ab944`. 후속 정확성 보완의 시작 HEAD는 `59c907b2f5a9cd668a33b1dc19ec95e82c6ac030`이다. 아래 재구성 기록은 당시 실행 이력이며, 이번 문구 보완 결과는 마지막 절에 구분한다.
+현재 구성 보완일: 2026-10-14(05 ‘기업행동과 조정주가’ 삭제와 ‘ETF와 지수’ 4챕터 개편, 시작 HEAD `fd76c0067efd399a23ef74860318769db2292754`). 04의 최초 재구성 기준 `origin/main`: `cc37e6ea20c801c3bba39aa1b233f5ef530ab944`. 후속 정확성 보완의 시작 HEAD는 `59c907b2f5a9cd668a33b1dc19ec95e82c6ac030`이다. 아래 재구성 기록은 당시 실행 이력이며, 날짜별 변경 결과는 각 절에 구분한다.
 이전 검증일: 2026-09-19. 당시 조사 기준 HEAD: `554c2c18` (작업 시작 시 working tree clean). 이전 실행 수치와 브라우저 기록은 역사적 검증이며 이번 실행을 의미하지 않는다.
 공식 근거와 계산 가정은 [guide-market-sources.md](./guide-market-sources.md)에 정리했다.
 
@@ -12,8 +12,7 @@
 | 캔들 | 단일 예시 캔들에 시가·고가·저가·종가·몸통·윗꼬리·아랫꼬리의 위치와 정의 연결. 그 아래 기존 캔들 만들기, 같은 OHLC/다른 경로, 5분→15분 집계 유지 |
 | 주문방식 | 기존 실습·계산 유지. 초기화 표시만 ‘처음부터’로 통일 |
 | 주식특성 04 | ‘장이 닫혀 있는 동안’ 한 챕터·4장 카드: 정규장 마감 → 지정가 매수 10주 가상 예약·08:30 개장 접수 → 09:00 시가와 체결 여부 → 갭 정리·더 알아보기. 선택 가격은 10,100/10,300원. 종가와 체결 건수는 가상 개장 단일가 범위로 표시 |
-| 기업행동과 조정주가 | 주식분할과 병합 / 배당과 배당락 / 조정주가 읽기 유지. 배당은 용어 설명→배당락 전→배당락 후(권리와 이후 지급)→배당성향 계산 |
-| ETF와 지수 | 지수란 무엇인가 / ETF란 무엇인가 / ETF는 지수를 어떻게 따라가는가 / ETF 시장가격과 NAV / ETF를 볼 때 확인해야 할 정보 |
+| ETF와 지수 05 | 4챕터. 지수는 시장의 온도계(A만/C만 +10% 예측 → 세 종목을 하나의 지수로) / ETF는 한 번에 담는 바구니(펀드와 ETF 1주 → 한 종목 −20% 충격과 분산 → 세 종목 동시 −20%) / ETF 가격은 바구니 값을 따라간다(NAV·시장가격 정의 → 지수·순자산·1주당 NAV 흐름 → 괴리율 −2/0/+2%) / ETF를 고를 때 보는 세 가지(가상 ETF X/Y 비교 → 비용과 추적차이 → 확인 목록). 예측·선택은 기록 버튼 전까지 바꿀 수 있고 기록 후 고정. 핵심 정리는 챕터당 한 번, 4챕터만 6문장 전체 요약 |
 
 삭제한 내용:
 
@@ -22,11 +21,13 @@
 - 독립적인 한국 제도 암기형 선택 목록과 NXT 혼합 fixture를 두 시장 비교 구조로 교체.
 - 개장·마감 강의의 중복 잔량 비교를 미국 경매 비교로 교체하고 사용처가 사라진 `limitBuy` 제거. 기존 주문방식의 지정가 실습은 유지.
 - 2026-10-13: 기존 주식특성 세 챕터의 거래시간 비교·개장/마감 비교·갭/음봉/표시 범위 UI와 해당 렌더 테스트 3개를 단일 챕터로 교체. 단계 순서·앞선 결과 고정·가독성 검증은 새 렌더 테스트에 옮겼다. 기존 시간대·OHLC·시간축 export와 계산 테스트는 삭제하지 않았다.
-- ETF 초반 부채 선택·고급 용어 중심 흐름을 기본 개념 중심으로 교체. 추적오차의 통계 공식 표시 대신 선의 변화를 비교.
+- 2026-09-19: ETF 초반 부채 선택·고급 용어 중심 흐름을 기본 개념 중심으로 교체. 추적오차의 통계 공식 표시 대신 선의 변화를 비교.
+- 2026-10-14: 05 ‘기업행동과 조정주가’(주식분할과 병합·배당과 배당락·조정주가 읽기)를 대체 없이 삭제. 라우트 `CorporateActions`, `CorporateLessons.tsx`, 전용 helper `adjustOhlc`·`shareConversion`·`dividendAssets`·`eligibleDividend`·`payoutRatio`와 fixture `splitCandles`·`dividendCandles`·`dividendNotice`, 전용 테스트(렌더 3개·계산 1개)를 지웠다. ‘ETF와 지수’는 06에서 05로 당겼다.
+- 2026-10-14: ETF 5챕터(지수/ETF/추종/NAV/추적)를 4챕터로 재구성. `FollowingLesson`·`NavLesson`·`TrackingLesson`, 종목별 5지선다 지수 선택지, 추적오차의 일정/변동 비교와 `differenceStats`·`stableDifferences`·`variableDifferences`, 상품정보 7개 reveal과 `productInfo`, 평가 기준시각 실습, 분배금·가격수익/총수익 설명, 공유 `etfTakeaways`를 삭제. 기존 ETF 렌더 테스트 5개는 새 테스트로 교체했다.
 
-## 이전 계산과 상태 검증 (2026-09-19)
+## 계산과 상태 검증 (2026-09-19 작성, 2026-10-14 갱신)
 
-가이드 상세 테스트 **61개**: `guideLesson` 9개, `guideContent` 19개, `marketGuides` 33개 통과.
+가이드 상세 테스트 **56개**(측정 2026-10-14): `guideLesson` 10개, `guideContent` 21개, `marketGuides` 25개 통과. 2026-09-19 당시에는 61개(9/19/33개)였다. 아래 표에서 날짜 표시가 없는 행은 2026-09-19 당시 기록이다.
 
 | 대상 | 확인한 결과 |
 | --- | --- |
@@ -35,24 +36,24 @@
 | 거래시간 | KRX 09:00–15:30, 미국 09:30–16:00 ET. 2026-01-07 23:30→익일 06:00 KST, 2026-07-08 22:30→익일 05:00. 두 시장의 원본 필터링과 시간축 생성, 선택 결과 고정 |
 | 갭/방향 | 한국 10,000→10,700원, 미국 100→107달러 갭. 한국 종가 10,600원은 음봉이면서 전일 대비 +6%. 실제 차트와 동일한 색상 상수 사용 |
 | 세션 OHLC | 각 시장에서 원본 기록 하나로 정규장/확장 범위를 계산. 원본 가격을 바꾸는 테스트에서 OHLC도 변함. 원본 불변, 빈 구간은 null |
-| 배당 | 주요 단계 2개만 표시. 배당락 후 9,500원×10주=95,000원, 받을 배당 5,000원, 현금 0. 지급 후 받을 배당 0, 현금 5,000원. 총액 100,000원 유지, 연속 클릭에도 중복 지급 없음 |
-| 배당성향 | 20/30/50억원 ÷ 순이익 100억원 → 20/30/50%. 0/음수 분모는 null |
-| 지수/ETF | 기본 입력의 기여도 +5/0/−1%포인트, 지수 1,000→1,040. ETF 순자산 1,000,000→1,040,000원, 100주당 한 주 가치 10,000→10,400원. B 수익률을 바꾸면 결과도 재계산 |
-| NAV/추종 | 괴리율 −2/0/+2%, 추적차이 −0.2%포인트. 추적오차는 시간에 따른 차이의 변동으로 구분. 지수/ETF 정의가 NAV/추적 강의보다 먼저 나옴 |
-| 초기화/타이머 | 모든 초기화 이름 ‘처음부터’. 11개 챕터는 전체 완료 후 초기 텍스트·선택·결과로 복귀. 기존 재생은 중복 시작·blur·reset·unmount 회귀 검사 통과. 새 타이머 없음 |
+| 지수/ETF (2026-10-14 개편) | 지수 예측: A만 +10%는 50%×10%=+5%포인트·지수 1,050, C만 +10%는 20%×10%=+2%포인트·1,020. 선택에 따라 피드백이 달라지고 기록 후 고정. 합치기 +10/0/−5% → +5/0/−1%포인트, +4%, 지수 1,000→1,040. ETF −20% 충격: 그 종목에만 1,000,000→800,000원, ETF는 A/B/C 선택별 900,000/940,000/960,000원, 세 종목 모두 −20%면 ETF도 800,000원(−20%) |
+| NAV/괴리율/추적차이 (2026-10-14 개편) | 같은 +10/0/−5% 변화로 순자산 1,000,000→1,040,000원, 1주당 NAV 10,000→10,400원. NAV 10,000원 고정에서 괴리율 −2/0/+2%. 지수 +10%, ETF NAV +9.8%, 추적차이 −0.2%포인트. 1·2챕터에는 NAV·괴리율·추적차이·운용비용이 없고, 1~3챕터 핵심 정리 문장은 서로 겹치지 않음 |
+| 초기화/타이머 | 모든 초기화 이름 ‘처음부터’. 2026-10-14 실행 기준 `GuideChapterScreen`의 5개 챕터(closed-market과 ETF 4개)는 전체 완료 후 초기 텍스트·선택·결과로 복귀. 기존 재생은 중복 시작·blur·reset·unmount 회귀 검사 통과(2026-09-19). 새 타이머 없음 |
 | 공통 | 결과→다음 실습의 DOM 순서, 앞선 결과 freeze, 중복 testID 없음, NaN/Infinity 없음, 가이드의 서비스/API import 및 외부 요청 없음 |
 
-## 이전 프로젝트 품질 게이트 (2026-09-19)
+## 프로젝트 품질 게이트 (2026-09-19 작성, 2026-10-14 갱신)
 
 `frontend/`에서 실행했다. npm 스크립트나 lint 범위는 변경하지 않았다.
 
-- `npm run check` 통과: `lint:accounts:check`, `lint:guides:check` 모두 경고 0, `npm run typecheck`, 전체 테스트 **81개 파일 성공 / 실패 0**.
-- `node src/screens/guide/guideLesson.test.ts`, `node src/screens/guide/guideContent.test.ts`, `node src/screens/guide/marketGuides.test.ts`: 위 61개 상세 사례 확인.
-- `npm run export:web` 통과. 결과 `frontend/dist`는 추적 제외.
-- `npx expo export --platform android --output-dir /tmp/trading-guides-revised-android` 통과. Hermes 번들 생성.
-- `git diff --check` 통과. 모든 변경은 `frontend/src/screens/guide`와 `frontend/docs`에 한정.
+- `npm run check` 통과(측정 2026-10-14, 종료 코드 0): `lint:accounts:check`, `lint:guides:check` 모두 경고 0, `npm run typecheck` 통과, 전체 테스트 파일 **188개**(`src/**/*.test.ts`)·테스트 **2,523개** 통과, 실패·취소·skip 0. 2026-09-19 당시에는 81개 파일 성공이었다.
+- `node src/screens/guide/guideLesson.test.ts`, `node src/screens/guide/guideContent.test.ts`, `node src/screens/guide/marketGuides.test.ts`: 위 56개 상세 사례 확인(측정 2026-10-14).
+- `npm run export:web` 통과(2026-09-19 기록, 2026-10-14 미실행). 결과 `frontend/dist`는 추적 제외.
+- `npx expo export --platform android --output-dir /tmp/trading-guides-revised-android` 통과(2026-09-19 기록, 2026-10-14 미실행). Hermes 번들 생성.
+- `git diff --check` 통과(2026-09-19 기록). 당시 모든 변경은 `frontend/src/screens/guide`와 `frontend/docs`에 한정.
 
 ## 이전 좁은 화면·큰 글꼴과 실제 화면 조작 (2026-09-19)
+
+2026-09-19 기준이며 2026-10-14 개편분은 재검증하지 않음. 아래의 챕터 수·흐름·스크린샷은 삭제 전 05와 개편 전 ETF 5챕터를 포함한 당시 구성의 기록이다.
 
 기존 임시 브라우저 하네스를 재사용했다. 실제 `GuideStack`, 각 화면, `ActionPressable`, React Native Web을 Chromium/Playwright에서 실행한다. 앱 로그인 및 계정 provider와 분리된 임시 진입점이며 제품 진입점/의존성은 변경하지 않았다.
 
@@ -91,7 +92,7 @@
 - `frontend/src/screens/guide/CandleFigures.tsx`
 - `frontend/src/screens/guide/CandlesScreen.tsx`
 - `frontend/src/screens/guide/StockLessons.tsx`
-- `frontend/src/screens/guide/CorporateLessons.tsx`
+- `frontend/src/screens/guide/CorporateLessons.tsx` (2026-10-14 삭제)
 - `frontend/src/screens/guide/EtfLessons.tsx`
 - `frontend/src/screens/guide/MarketBasicsScreen.tsx`
 - `frontend/src/screens/guide/OrderTypesScreen.tsx`
@@ -232,3 +233,54 @@ Chromium/Playwright 임시 하네스는 이 Worktree의 실제 `GuideChapterScre
 - 계산·예제 값·카드 순서·결과 고정·초기화·더 알아보기 토글·접근성 라벨과 주문·체결 엔진은 바꾸지 않았다.
 
 검증: 본문 한글 음절 684/682자(700 이하). `marketGuides` 32·`guideContent` 21·`guideLesson` 10개 통과, `lint:guides:check`·`typecheck` 통과. 실제 `GuideChapterScreen`의 RN Web 렌더링 48개 조합(320/360/390/430px × Light/Dark × 글꼴 1/1.5/2배 × 두 가격 경로)에서 새 두 문장 표시, 가로 넘침·잘림·말줄임 없음, 최소 대비 5.97:1, 외부 요청 0. 숫자와 단위가 줄바꿈으로 갈라지는 현상(예: `20`/`주`)은 변경 전 HEAD와 동일하게 38개 조합에서 관찰되며 새 문장에는 숫자·단위가 없다. 이 기존 현상과 실기기·네이티브 글꼴 확대 확인은 별도 과제로 남긴다.
+
+## 2026-10-14 변경 기록 · 05 삭제와 ‘ETF와 지수’ 4챕터 개편
+
+`main` 체크아웃(HEAD `fd76c0067efd399a23ef74860318769db2292754`, 작업 트리 clean)에서 바로 작업했다. 04 작업(`59c907b2`·`33d4d81f`·`2bd7071e`)은 커밋된 상태 그대로 두었고 새 Worktree·브랜치·커밋은 만들지 않았다.
+
+시작 전 기준선(같은 날 실행): `guideLesson` 10개, `guideContent` 21개, `marketGuides` 32개, 합계 63개 통과. `npm run typecheck` 통과. 참고로 `MainTabs` 18개 통과, `lint:guides:check` 경고 0.
+
+05 ‘기업행동과 조정주가’는 대체 없이 지웠고 ‘ETF와 지수’를 05로 당겼다. ETF는 4챕터로 다시 만들었다. 분산의 ‘왜’를 2챕터 충격 실습으로 보여 주고, 지수 예측·충격 기업·괴리율 가격·ETF X/Y 선택은 기록 버튼 전까지 바꿀 수 있으며 기록 후 선택지가 잠기고 결과가 고정된다. 처음에는 정의 Section과 첫 실습만 보이고 이후 Section·결과·핵심 정리는 버튼으로만 열린다. 용어는 정의한 챕터부터 쓴다(분산 2챕터, NAV·괴리율·추종 3챕터, 추적차이 4챕터). 핵심 정리는 챕터당 한 번이며 1~3챕터는 서로 다른 3문장, 4챕터만 6문장 전체 요약이다. 공용 `Section`·`Body`·`Result`·`LessonAction`·`Takeaways`·`Values`·`Basis`·`Choices`·`LessonPlot`과 기존 `Flow`만 사용했고, 새 스타일·라이브러리·타이머·애니메이션·자동 스크롤은 없다.
+
+| 테스트 변경 | 내용 |
+| --- | --- |
+| 삭제(05 전용) | 렌더 3개(`applies split/reverse…`, `teaches dividends…`, `adjusts all OHLC values…`)와 계산 1개(`conserves conversion value…`). 대상 화면·helper가 함께 삭제되어 검증할 대상이 없다 |
+| 단언만 삭제 | `filters the same trades…`의 `adjustOhlc` 블록(불변 검사는 `JSON.stringify(sessionTrades)`로 유지), `builds both market timelines…`의 `payoutRatio` 3줄, 계산 테스트의 `differenceStats` 단언(제목에서 dispersion 제거). `changeRate(10000, 10980) − changeRate(1000, 1100) ≈ −0.2`는 유지 |
+| 교체 | 기존 ETF 렌더 5개 → 메타(4챕터·번호 05/04·삭제된 토픽/챕터 없음), `index`, `etf`, `etf-price`, `etf-pick`, 1~3챕터 핵심 정리 중복 없음, 4챕터 전체 완료 후 `추적오차`·`분배금`·`총수익` 없음의 7개 |
+| 공용 루프 | `completionActions`를 새 4챕터로 바꿔 `처음부터` 라벨, 글꼴 1·2·3배 `readable`, 초기화 후 초기 텍스트 복귀를 5개 챕터에서 확인 |
+| 스펙 외 최소 수정 | `guideLesson`의 홈 글꼴 테스트가 가이드 번호 6개를 세고 있어 5개로, `MainTabs`의 GuideStack 화면 수 10을 9로 바꿨다. 둘 다 05 삭제의 직접 결과이며 다른 단언은 그대로다 |
+
+새·수정 테스트의 UI 존재 단언은 `=== undefined`의 boolean으로 비교하고 비활성 여부는 `props.disabled` 원시값으로 비교한다. 큰 ReactTestInstance를 null/undefined와 직접 비교하지 않는다. 테스트 삭제는 위 05 전용 항목뿐이며 skip·실패 무시·단언 완화는 없다. 소스를 일부러 4가지로 망가뜨려(같은 피드백, 기록 후 선택지 활성, 4챕터에 `추적오차` 추가, 2챕터가 1챕터 정리 문장 반복) 각각 해당 테스트가 실패하는 것을 확인한 뒤 원본으로 복원했다(복원 후 파일 동일 확인).
+
+이번에 `frontend/`에서 실행한 검사(2026-10-14):
+
+- `npm run typecheck`: 통과.
+- `npm run lint:guides:check`: 경고 0으로 통과.
+- `node src/screens/guide/guideLesson.test.ts`: 10개 통과(기준선 10).
+- `node src/screens/guide/guideContent.test.ts`: 21개 통과(기준선 21).
+- `node src/screens/guide/marketGuides.test.ts`: 25개 통과(기준선 32 − 삭제·교체 16 + 신규 9).
+- `node src/app/navigation/MainTabs.test.ts`: 18개 통과(기준선 18).
+- `npm run check`: 종료 코드 0. 두 lint 경고 0, typecheck 통과, 테스트 파일 188개·테스트 2,523개 통과, 실패·취소·skip 0.
+- `git diff --check` 통과. 변경은 `frontend/src/screens/guide`, `frontend/src/app/navigation`, `frontend/docs`에만 있다.
+- 잔여 참조 검색(`src`·`docs`): 제거한 레슨·helper·fixture·라우트 이름은 `src`에서 새 테스트의 ‘없음’ 단언에만 남는다. `docs`에서는 날짜가 붙은 기록(2026-09-19 절, 이 절, 삭제 항목, 과거 파일 목록의 삭제 표시)에만 남는다.
+- 모든 테스트는 프로세스 전체에 메모리·시간 제한(`systemd-run --user --scope -p MemoryMax=…`, `timeout`)을 걸고 실행했다. 메모리 급증이나 비정상 종료는 없었다.
+
+출처 확인(2026-10-14): investor.gov ‘Diversify Your Investments’에서 분산이 한 투자의 손실을 줄일 수 있지만 시장 하락 시 손실을 막는다고 보장하지 않는다는 설명을 확인해 2챕터 출처를 `SEC ETF, SEC 분산투자`로 넓혔다. ‘ETF는 원금이 보장되는 상품이 아닙니다’는 기존 ETF 공지(investor-bulletins-24) 본문에는 없고, investor.gov ‘Exchange-Traded Funds (ETFs)’ 기본 페이지에서 확인했다. 두 출처는 [guide-market-sources.md](./guide-market-sources.md) 표에 확인일과 함께 추가했다.
+
+미실행: Chromium/RN Web 실제 화면 조작과 좁은 화면·큰 글꼴 확인, 실기기 iOS/Android, 네이티브 OS 글꼴 확대, TalkBack/VoiceOver 읽기, Expo web/Android export. 위 2026-09-19 브라우저 기록은 개편 전 구성이다.
+
+이번 변경 파일:
+
+- `frontend/src/screens/guide/CorporateLessons.tsx` (삭제)
+- `frontend/src/screens/guide/EtfLessons.tsx`
+- `frontend/src/screens/guide/GuideChapterScreen.tsx`
+- `frontend/src/screens/guide/guideTopics.ts`
+- `frontend/src/screens/guide/marketLessonCalculations.ts`
+- `frontend/src/screens/guide/marketLessonData.ts`
+- `frontend/src/screens/guide/marketGuides.test.ts`
+- `frontend/src/screens/guide/guideLesson.test.ts`
+- `frontend/src/app/navigation/GuideStack.tsx`
+- `frontend/src/app/navigation/types.ts`
+- `frontend/src/app/navigation/MainTabs.test.ts`
+- `frontend/docs/guide-market-sources.md`
+- `frontend/docs/guide-market-validation.md`

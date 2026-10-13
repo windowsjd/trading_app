@@ -49,7 +49,6 @@ export default function GuideStack({ beginner = false }: { beginner?: boolean } 
       <Stack.Screen name="Candles" component={CandlesScreen} options={{ title: '캔들' }} />
       <Stack.Screen name="OrderTypes" component={OrderTypesScreen} options={{ title: '주문방식' }} />
       <Stack.Screen name="StockCharacteristics" component={GuideTopicScreen} options={{ title: '주식특성' }} />
-      <Stack.Screen name="CorporateActions" component={GuideTopicScreen} options={{ title: '기업행동과 조정주가' }} />
       <Stack.Screen name="EtfIndex" component={GuideTopicScreen} options={{ title: 'ETF와 지수' }} />
       <Stack.Screen name="GuideChapter" component={GuideChapterScreen} options={{ title: '가이드 실습' }} />
     </Stack.Navigator>
