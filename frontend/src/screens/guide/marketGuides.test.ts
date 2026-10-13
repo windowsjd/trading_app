@@ -375,8 +375,11 @@ describe('new guide chapters preserve downward learning flow', () => {
       }
       h.readable();
     });
-  it('keeps the last price fixed overnight and fills a 10,300-won buy at the opening price', (t) => {
+  it('keeps virtual reservations separate from opening reception and fills a 10,300-won buy at the opening price', (t) => {
     const h = setup(t, 'closed-market');
+    assert.match(h.text(), /개장 단일가만 다루는 가상 예제/);
+    assert.match(h.text('closed-market-close'), /정규장 종가10,000원.*예제 속 체결0건/s);
+    assert.match(h.text('closed-market-1'), /가상으로 준비.*개장 주문 접수는 08:30부터/s);
     assert.equal(h.find('closed-market-2') === undefined, true);
     assert.equal(h.find('closed-market-time') === undefined, true);
     h.press('closed-market-next');
@@ -387,11 +390,12 @@ describe('new guide chapters preserve downward learning flow', () => {
     h.press('closed-market-price-10300');
     h.press('closed-market-order');
     const order = h.text('closed-market-order-result');
-    assert.match(order, /10,300원에 10주.*아직 체결되지 않았습니다/s);
+    assert.match(order, /가상 예약 완료.*10,300원에 10주.*가상으로 예약.*아직 체결되지 않았습니다/s);
+    assert.doesNotMatch(order, /접수되었습니다/);
     assert.equal(h.find('closed-market-order').props.disabled, true);
     for (const price of [10100, 10300])
       assert.equal(h.find(`closed-market-price-${price}`).props.disabled, true);
-    assert.match(h.text('closed-market-book'), /매수내 주문 · 10,300원 · 10주매도아직 접수된 주문 없음/);
+    assert.match(h.text('closed-market-book'), /매수내 주문 · 10,300원 · 10주매도아직 쌓인 주문 없음/);
     const own = h.find('closed-market-book').findAll(
       (node: any) => node.type === 'Text' && textContent(node).startsWith('내 주문'),
     )[0];
@@ -401,7 +405,9 @@ describe('new guide chapters preserve downward learning flow', () => {
     for (let stage = 0; stage <= 3; stage++) {
       if (stage) h.press('closed-market-time');
       const status = h.text('closed-market-status');
-      assert.match(status, /현재가10,000원.*지금까지 체결0건/s);
+      assert.match(status, /전일 정규장 종가10,000원.*예제 속 체결0건/s);
+      assert.ok(status.includes(stage === 3 ? '주문 단계거래소 개장 주문 접수' : '주문 단계가상 예약'));
+      assert.doesNotMatch(status, /현재가|지금까지 체결/);
       assert.ok(status.includes(times[stage]));
       assert.ok(status.includes(`매수 ${quantities[stage][0]}주 · 매도 ${quantities[stage][1]}주`));
       assert.equal(h.text('closed-market-order-result'), order);
@@ -413,13 +419,15 @@ describe('new guide chapters preserve downward learning flow', () => {
     }
     assert.match(h.text('closed-market-status'), /매수 170주.*매도 180주/);
     const pile = h.text('closed-market-pile-result');
+    assert.match(pile, /08:30부터 개장 단일가 주문을 접수.*이 예제는 09:00 체결 전까지 종가 10,000원을 기준값으로/s);
     h.press('closed-market-open');
     assert.equal(h.find('closed-market-open').props.disabled, true);
     assert.match(h.text('closed-market-candidates'), /10,200원: 매수 90주 · 매도 80주 → 80주 ← 시가/);
     assert.match(h.text('closed-market-open-values'), /10,200원 · 80주 체결.*\+2%/s);
-    assert.match(h.text('closed-market-my-result'), /10,200원에 체결.*10주.*1,000원 싸게/s);
+    assert.match(h.text('closed-market-my-result'), /내 주문: 10,200원에 체결.*10,300원 지정가 매수 10주가 주당 10,200원에 체결.*주당 100원, 10주 전체는 총 1,000원 싸게/s);
     assert.match(h.text('closed-market-my-result'), /10,100원을 냈다면.*체결되지 않았을/);
-    assert.match(h.text('closed-market-open-candle'), /전 거래일 · 종가 10,000원.*밤사이 · 체결 없음.*09:00 · 시가 10,200원/s);
+    assert.match(h.text('closed-market-open-candle'), /전 거래일 · 정규장 종가 10,000원.*밤사이 · 예제 속 체결 없음.*09:00 · 시가 10,200원/s);
+    assert.match(h.text('closed-market-3'), /체결되는 주문은 같은 시가.*같은 가격에서는 접수 순서에 따라 일부만 체결될 수/s);
     for (const index of [0, 2])
       assert.equal(h.find(`closed-market-open-candle-body-${index}`) !== undefined, true);
     assert.equal(h.find('closed-market-open-candle-body-1') === undefined, true);
@@ -428,6 +436,8 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.equal(h.find('closed-market-finish').props.disabled, true);
     assert.equal(h.text('closed-market-order-result'), order);
     assert.equal(h.text('closed-market-pile-result'), pile);
+    assert.match(h.text('lesson-takeaways'), /가상으로 준비한 주문.*08:30.*09:00.*정규장 종가.*갭.*체결될 수 있습니다/s);
+    assert.doesNotMatch(h.text(), /장 마감 후 체결|현재가는 계속|오늘의 마지막 가격/);
     const syllables = (h.prose().match(/[가-힣]/g) ?? []).length;
     assert.ok(syllables <= 700, `${syllables} Hangul syllables in lesson prose`);
     t.diagnostic(`10,300-won path: ${syllables} Hangul syllables, including shared Basis text`);
@@ -471,8 +481,12 @@ describe('new guide chapters preserve downward learning flow', () => {
       h.press('closed-market-more');
       assert.equal(h.find('closed-market-more-text') !== undefined, expanded);
       assert.equal(h.find('closed-market-more').props.accessibilityLabel, expanded ? '더 알아보기 접기' : '더 알아보기 열기');
-      if (expanded)
+      if (expanded) {
         assert.match(h.text('closed-market-more-text'), /08:30.*09:00.*15:20~15:30.*NYSE Arca.*암호화폐는 24시간/s);
+        assert.match(h.text('closed-market-more-text'), /야간 가상 예약은 거래소 접수가 아닙니다/);
+        assert.match(h.text('closed-market-more-text'), /예약주문의 접수 시간과 처리 방식은 이용하는 증권사에서 확인/);
+        assert.match(h.text('closed-market-more-text'), /정규장과 별도의 시간외 거래.*0건은 개장 단일가 체결만/s);
+      }
       assert.equal(h.text('closed-market-1'), close);
       assert.equal(h.text('closed-market-2'), night);
       assert.equal(h.text('closed-market-3'), opening);
@@ -498,6 +512,11 @@ describe('new guide chapters preserve downward learning flow', () => {
       guideTopics.StockCharacteristics.chapters.map((c) => c.id),
       ['closed-market'],
     );
+    assert.equal(guideTopics.StockCharacteristics.number, '04');
+    assert.equal(guideTopics.StockCharacteristics.title, '주식특성');
+    assert.equal(guideTopics.StockCharacteristics.chapters[0].title, '장이 닫혀 있는 동안');
+    assert.match(guideTopics.StockCharacteristics.description, /가상으로 주문을 준비.*체결 여부/);
+    assert.match(guideTopics.StockCharacteristics.chapters[0].description, /시가가 어떻게 결정.*체결 여부가 어떻게 정해지는지/);
     for (const name of [
       'StockLessons.tsx',
       'guideTopics.ts',
