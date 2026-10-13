@@ -24,6 +24,10 @@
  * --min-remaining-daily N (stop at this observed KOSCOM daily remainder,
  * default 20000), --min-call-interval-ms N (KRX pacing, default 1000),
  * --allow-during-krx-session, --no-fetch-missing-daily.
+ *
+ * Exit code 1 (and a failed ops_job_runs row) when a series failed, the run
+ * was stopped (Ctrl-C/SIGTERM) or the Ops lock was busy or lost. Held/pending
+ * KRX sessions and planned stops (call cap, quota reserve) exit 0.
  */
 import 'reflect-metadata';
 
@@ -36,10 +40,14 @@ import {
   parseCandleLongBackfillArgs,
   type CandleLongBackfillArgs,
 } from './lib/candle-long-backfill-args';
+import {
+  runLongBackfillGroup,
+  type LongBackfillResults,
+} from './lib/candle-long-backfill-run';
 
 loadRuntimeEnv();
 
-import { OpsJobName, OpsJobTrigger } from '../src/generated/prisma/client';
+import { OpsJobName } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { readRedisConfig } from '../src/redis/redis.config';
@@ -69,9 +77,6 @@ import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { MarketSessionOverrideLoaderService } from '../src/orders/market-calendar/market-session-override.loader.service';
 import { getMarketSessionOverrideRuntimeStatus } from '../src/orders/market-calendar/market-session-override.store';
-
-const LOCK_TTL_SECONDS = 900;
-const LOCK_EXTEND_MS = 60_000;
 
 function createService(prisma: PrismaService, redis: RedisService) {
   const repository = new MarketCandlesRepository(prisma);
@@ -154,7 +159,7 @@ function print(summary: LongCandleSyncSummary) {
     }
   }
   console.log(
-    `totals series=${summary.totals.series} written=${summary.totals.rowsWritten} calls=${summary.totals.providerCalls} held=${summary.totals.held} pending=${summary.totals.pending} failed=${summary.totals.failed} stop=${summary.stopReason ?? '-'}` +
+    `totals series=${summary.totals.series} written=${summary.totals.rowsWritten} calls=${summary.totals.providerCalls} held=${summary.totals.held} pending=${summary.totals.pending} failed=${summary.totals.failed} notStarted=${summary.totals.notStarted} stop=${summary.stopReason ?? '-'} runFailed=${summary.runFailed}` +
       (summary.observedRemainingDaily !== undefined
         ? ` koscomRemainingDaily(min observed)=${summary.observedRemainingDaily ?? '-'}`
         : ''),
@@ -171,76 +176,31 @@ async function runGroup(
   args: CandleLongBackfillArgs,
   signal: AbortSignal,
 ): Promise<boolean> {
-  const execute = async () => {
-    const results: Record<string, LongCandleSyncSummary> = {};
-    for (const market of markets) {
-      const input = syncInput(market, args, signal);
-      results[market] =
-        market === 'spot'
-          ? await service.syncSpot(input)
-          : market === 'krx'
-            ? await service.syncKrx(input)
-            : await service.syncFutures(input);
-      print(results[market]);
-    }
-    return results;
-  };
-  if (!args.apply) {
-    await execute();
-    return true;
-  }
-  const lock = await locks.acquireLock({
+  return runLongBackfillGroup({
+    locks,
+    runs,
     jobName,
     lockKey,
-    ttlSeconds: LOCK_TTL_SECONDS,
-  });
-  if (!lock.acquired) {
-    console.error(
-      `${jobName}: another run holds the Ops job lock (${lockKey}) until ${lock.expiresAt?.toISOString() ?? '?'}; nothing was started.`,
-    );
-    return false;
-  }
-  const run = await runs.createRunning({
-    jobName,
-    trigger: OpsJobTrigger.manual_script,
-    requestedBy: 'script:candle-long-backfill',
-    lockKey,
+    apply: args.apply,
     metadataJson: { markets, days: args.days, sessions: args.sessions },
+    signal,
+    // `groupSignal` also aborts when the Ops lock lease is lost.
+    execute: async (groupSignal) => {
+      const results: LongBackfillResults = {};
+      for (const market of markets) {
+        if (groupSignal.aborted) break;
+        const input = syncInput(market, args, groupSignal);
+        results[market] =
+          market === 'spot'
+            ? await service.syncSpot(input)
+            : market === 'krx'
+              ? await service.syncKrx(input)
+              : await service.syncFutures(input);
+        print(results[market]);
+      }
+      return results;
+    },
   });
-  const extend = setInterval(() => {
-    void locks
-      .extendLock({
-        lockKey,
-        ownerId: lock.ownerId,
-        ttlSeconds: LOCK_TTL_SECONDS,
-      })
-      .catch(() => false);
-  }, LOCK_EXTEND_MS);
-  try {
-    const results = await execute();
-    const failed = Object.values(results).some((s) => s.totals.failed > 0);
-    if (failed) {
-      await runs.recordFailed(run, {
-        errorCode: 'MARKET_CANDLE_LONG_BACKFILL_FAILED',
-        errorMessage: 'Long-range 4h backfill finished with failed series.',
-        resultJson: results,
-      });
-    } else {
-      await runs.recordSucceeded(run, { resultJson: results });
-    }
-    return !failed;
-  } catch (error) {
-    await runs.recordFailed(run, {
-      errorCode: 'MARKET_CANDLE_LONG_BACKFILL_FAILED',
-      errorMessage: 'Long-range 4h backfill stopped with an error.',
-    });
-    throw error;
-  } finally {
-    clearInterval(extend);
-    await locks
-      .releaseLock({ lockKey, ownerId: lock.ownerId })
-      .catch(() => false);
-  }
 }
 
 export async function main(
@@ -255,12 +215,18 @@ export async function main(
   const prisma = new PrismaService();
   const calendarLoader = new MarketSessionOverrideLoaderService(prisma);
   const controller = new AbortController();
+  // Stays registered until cleanup ends: a repeated Ctrl-C must not kill the
+  // process before the run is recorded and the Ops lock released.
   const onSignal = () => {
-    console.error('Stopping after the current provider call…');
+    console.error(
+      controller.signal.aborted
+        ? 'Already stopping; recording the run and releasing the lock…'
+        : 'Stopping after the current provider call…',
+    );
     controller.abort();
   };
-  process.once('SIGINT', onSignal);
-  process.once('SIGTERM', onSignal);
+  process.on('SIGINT', onSignal);
+  process.on('SIGTERM', onSignal);
   let redis: RedisService | undefined;
   try {
     await prisma.$connect();
@@ -307,7 +273,8 @@ export async function main(
     if (!args.apply) {
       console.log('\ndry run: no provider call and no write happened.');
     }
-    return ok ? 0 : 1;
+    // A stopped run (even one stopped before the futures group) is not a success.
+    return ok && !controller.signal.aborted ? 0 : 1;
   } finally {
     process.off('SIGINT', onSignal);
     process.off('SIGTERM', onSignal);
