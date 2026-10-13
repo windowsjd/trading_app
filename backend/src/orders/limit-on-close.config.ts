@@ -1,11 +1,15 @@
 /**
- * Dependency-free Limit-on-Close configuration. LOC_ORDERS_ENABLED gates only
- * NEW registrations; settlement/expiry of already accepted orders always runs
- * so a day-bound reservation can never strand. Evidence timing values are
- * seconds and are strictly bounded at startup.
+ * Dependency-free Limit-on-Close configuration. LOC_ORDERS_ENABLED (BUY) and
+ * LOC_SELL_ORDERS_ENABLED (SELL, 2026-10-13) gate only NEW registrations of
+ * their side; settlement/expiry of already accepted orders always runs so a
+ * day-bound reservation can never strand. Evidence timing values are seconds
+ * and are strictly bounded at startup.
  */
 export type LimitOnCloseConfig = {
+  /** BUY registrations (LOC_ORDERS_ENABLED). */
   enabled: boolean;
+  /** SELL registrations (LOC_SELL_ORDERS_ENABLED); independent of BUY. */
+  sellEnabled: boolean;
   /** First close observation no earlier than session close + this delay. */
   evidenceMinDelayMs: number;
   /** An identical observation at least this long after the first is final. */
@@ -21,6 +25,10 @@ export function readLimitOnCloseConfig(
   if (!['true', 'false'].includes(value))
     // @diagnosticSurface internal: Startup rejects invalid fixed feature configuration before serving requests.
     throw new Error('LOC_ORDERS_ENABLED must be true or false');
+  const sellValue = env.LOC_SELL_ORDERS_ENABLED ?? 'false';
+  if (!['true', 'false'].includes(sellValue))
+    // @diagnosticSurface internal: Startup rejects invalid fixed feature configuration before serving requests.
+    throw new Error('LOC_SELL_ORDERS_ENABLED must be true or false');
   const minDelay = seconds(
     env,
     'LOC_CLOSE_EVIDENCE_MIN_DELAY_SECONDS',
@@ -46,6 +54,7 @@ export function readLimitOnCloseConfig(
     );
   return {
     enabled: value === 'true',
+    sellEnabled: sellValue === 'true',
     evidenceMinDelayMs: minDelay * 1000,
     evidenceConfirmMs: confirm * 1000,
     evidenceDeadlineMs: deadline * 1000,
@@ -54,6 +63,10 @@ export function readLimitOnCloseConfig(
 
 export function limitOnCloseEnabled(env: NodeJS.ProcessEnv = process.env) {
   return readLimitOnCloseConfig(env).enabled;
+}
+
+export function limitOnCloseSellEnabled(env: NodeJS.ProcessEnv = process.env) {
+  return readLimitOnCloseConfig(env).sellEnabled;
 }
 
 function seconds(

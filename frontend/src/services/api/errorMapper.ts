@@ -387,11 +387,41 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.LOC_ORDERS_DISABLED:
       return 'LOC 주문은 현재 운영 상태에서 이용할 수 없습니다.';
     case ERROR_CODE.LOC_MARKET_NOT_SUPPORTED:
-      return 'LOC 주문은 한국주식 매수만 지원합니다.';
+      return 'LOC 주문은 한국주식만 지원합니다.';
     case ERROR_CODE.LOC_SIDE_NOT_SUPPORTED:
       return 'LOC 주문은 현재 매수만 지원합니다.';
     case ERROR_CODE.LOC_SESSION_NOT_OPEN:
-      return 'LOC 매수는 정규장 중에만 등록할 수 있습니다.';
+      return 'LOC 주문은 정규장 중에만 등록할 수 있습니다.';
+    case ERROR_CODE.LOC_SELL_ORDERS_DISABLED:
+      return 'LOC 매도는 현재 운영 상태에서 이용할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_SELL_DISABLED:
+      return '현재 운영 상태에서는 새 조건주문 매도를 등록할 수 없습니다.';
+    case ERROR_CODE.INDEPENDENT_TP_SL_DISABLED:
+      return '현재 운영 상태에서는 새 손절·익절을 등록할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_SELL_MARKET_NOT_SUPPORTED:
+      return '매도 조건주문과 손절·익절은 한국주식과 암호화폐 현물만 지원합니다.';
+    case ERROR_CODE.CONDITIONAL_SELL_LIMIT_EXCEEDED:
+      return '감시 중인 매도 설정이 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_SELL_ALREADY_MET:
+      return '현재 가격이 이미 감시 조건을 충족해 등록할 수 없습니다. 감시가격을 다시 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_SELL_POSITION_UNAVAILABLE:
+      return '보유 수량이 없어 매도 설정을 등록할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING:
+      return '설정 수량은 현재 보유 수량을 넘을 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_SELL_QUANTITY_UNAVAILABLE:
+      return '지금 매도할 수 있는 수량이 없습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.';
+    case ERROR_CODE.CONDITIONAL_SELL_NOT_FOUND:
+      return '매도 설정을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_SELL_ALREADY_ORDERED:
+      return '이미 매도 주문이 만들어진 설정입니다. 연결된 주문의 상태를 확인해주세요.';
+    case ERROR_CODE.CONDITIONAL_SELL_CONFLICT:
+      return '이 종목에 매도 조건주문 또는 손절·익절 설정이 있어 TP/SL 보호를 등록할 수 없습니다. 기존 설정을 먼저 취소해주세요.';
+    case ERROR_CODE.INVALID_CONDITIONAL_SELL:
+      return '매도 설정 입력값을 다시 확인해주세요.';
+    case ERROR_CODE.INVALID_CONDITIONAL_SELL_PRICE:
+      return '감시가격, 지정가격 또는 수량을 다시 확인해주세요.';
+    case ERROR_CODE.PROTECTION_CONFLICT:
+      return '이 종목의 기존 TP/SL 보호 조건과 함께 사용할 수 없습니다. 기존 보호 조건을 먼저 확인해주세요.';
     case ERROR_CODE.LOC_SESSION_AFTER_SEASON_END:
       return '시즌 종료 전에 마감되는 정규장에서만 LOC 주문을 등록할 수 있습니다.';
     case ERROR_CODE.LOC_ATTACHED_PROTECTION_NOT_SUPPORTED:

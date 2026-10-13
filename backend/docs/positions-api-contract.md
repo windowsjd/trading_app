@@ -103,6 +103,8 @@
         "assetType": "domestic_stock | us_stock | crypto",
         "currencyCode": "KRW | USD",
         "quantity": "<decimal string>",
+        "reservedQuantity": "<decimal string: held by submitted limit/LOC sells (2026-10-13)>",
+        "availableQuantity": "<decimal string: quantity - reservedQuantity, what a new sell can use>",
         "averageCost": "<decimal string>",
         "realizedPnl": "<decimal string>",
         "realizedPnlKrw": "<decimal string>",

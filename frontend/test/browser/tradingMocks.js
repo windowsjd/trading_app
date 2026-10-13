@@ -73,6 +73,35 @@ const conditionalRow = (id, state, extra = {}) => ({
   terminalReason: state === 'failed' ? 'execution_failed' : state === 'canceled' ? 'user_canceled' : null,
   createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(), ...extra,
 });
+// SELL settings: `sell=enabled` opens both families, `sellRows=1` lists one
+// row per state for each family; `locSell=enabled` opens LOC SELL;
+// `reserved=<n>` reports that much of the holding held by other orders.
+const sellEnabled = params.get('sell') === 'enabled';
+const sellAssetId = () => state.assetId;
+const sellAsset = () => assets.find((a) => a.id === sellAssetId());
+const sellRow = (id, kind, stateName, extra = {}) => ({
+  id, assetId: sellAssetId(), asset: { id: sellAsset().id, symbol: sellAsset().symbol, name: sellAsset().name, market: sellAsset().market, assetType: sellAsset().assetType },
+  side: 'sell', kind, positionId: 'spot-position', triggerCondition: kind === 'take_profit' ? 'at_or_above' : 'at_or_below',
+  triggerPrice: sellAsset().assetType === 'crypto' ? '0.81234567' : '69000', executionType: stateName === 'order_pending' ? 'limit' : 'market',
+  limitPrice: stateName === 'order_pending' ? (sellAsset().assetType === 'crypto' ? '0.90123456' : '71000') : null,
+  quantity: '1234567.123456', currencyCode: sellAsset().settlementCurrency,
+  status: stateName === 'filled' || stateName.startsWith('order_') ? 'ordered' : stateName, state: stateName,
+  position: stateName === 'watching' || stateName === 'triggered'
+    ? { holdingQuantity: '1234567.12345678', reservedQuantity: '1000000.00000000', availableQuantity: '234567.12345678', executableQuantity: '234567.12345600' } : null,
+  executionAvailableQuantity: stateName === 'filled' ? '234567.12345678' : null,
+  quantityLimited: stateName === 'filled',
+  trigger: stateName === 'watching' ? null : { triggeredAt: new Date().toISOString(), snapshotId: 's', evidence: null },
+  order: stateName === 'filled' || stateName.startsWith('order_') ? { orderId: 'sell-order-' + id, orderType: stateName === 'order_pending' ? 'limit' : 'market',
+    status: { filled: 'executed', order_pending: 'submitted', order_canceled: 'canceled', order_rejected: 'rejected' }[stateName],
+    quantity: '234567.123456', executedQuantity: stateName === 'filled' ? '234567.123456' : null, canceledQuantity: null,
+    limitPrice: stateName === 'order_pending' ? '0.90123456' : null, executedPrice: stateName === 'filled' ? '0.80000000' : null,
+    grossAmount: null, feeAmount: null, netAmount: null, reservedQuantity: stateName === 'order_pending' ? '234567.123456' : null,
+    cancelReason: null, submittedAt: new Date().toISOString(), executedAt: stateName === 'filled' ? new Date().toISOString() : null, canceledAt: null } : null,
+  attemptCount: 1, lastAttemptAt: null, failureCode: stateName === 'failed' ? 'CONDITIONAL_SELL_QUANTITY_UNAVAILABLE' : null,
+  terminalReason: stateName === 'failed' ? 'quantity_unavailable' : stateName === 'canceled' ? 'position_closed' : null,
+  createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(), ...extra,
+});
+const sellStates = ['watching', 'triggered', 'order_pending', 'filled', 'failed', 'canceled', 'order_canceled'];
 const account = {
   id: 'account-fixture',
   mode: 'general',
@@ -173,7 +202,26 @@ export const apiClient = {
     if (path.endsWith('/order-capabilities')) {
       const id = path.split('/')[2];
       return response({ tradingAccountId: id, limitOrder: { enabled: true, autoExecutionEnabled: false },
-        limitOnClose: { enabled: locEnabled, markets: ['KRX'], sides: ['buy'], attachedProtection: false } });
+        limitOnClose: { enabled: locEnabled, markets: ['KRX'], sides: ['buy'], attachedProtection: false },
+        limitOnCloseSell: { enabled: params.get('locSell') === 'enabled', markets: ['KRX'] } });
+    }
+    if (path.endsWith('/conditional-sell-orders')) {
+      const id = path.split('/')[2];
+      const all = params.get('sellRows') === '1'
+        ? ['condition', 'stop_loss', 'take_profit'].flatMap((kind) => sellStates.map((s) => sellRow(`${kind}-${s}`, kind, s)))
+        : [];
+      const open = new Set(['watching', 'triggered', 'order_pending']);
+      const query = options.params ?? {};
+      const kindRows = all.filter((r) => !query.kind || (query.kind === 'condition' ? r.kind === 'condition' : r.kind !== 'condition'));
+      const rows = query.state === 'open' ? kindRows.filter((r) => open.has(r.state))
+        : query.state === 'ended' ? kindRows.filter((r) => !open.has(r.state))
+        : query.history === 'true' ? kindRows : kindRows.filter((r) => r.state === 'watching' || r.state === 'triggered');
+      const offset = Number(query.offset ?? 0), limit = Number(query.limit ?? 30);
+      const page = rows.slice(offset, offset + limit);
+      const family = { enabled: sellEnabled, canCreate: sellEnabled, canUseLimit: sellEnabled };
+      return response({ tradingAccountId: id, capabilities: { enabled: sellEnabled, condition: family, protection: family, canCancel: true,
+        markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
+        conditionalOrders: page, pagination: { limit, offset, total: rows.length, returned: page.length, nextOffset: offset + page.length < rows.length ? offset + page.length : null } });
     }
     state.reads.push(path);
     const u = new URL(path, 'http://fixture'),
@@ -261,7 +309,11 @@ export const apiClient = {
                 ...assets.find((a) => a.id === state.assetId),
                 assetId: state.assetId,
                 positionId: 'spot-position',
-                quantity: String(state.position),
+                quantity: params.get('holding') ?? String(state.position),
+                ...(params.has('reserved') ? {
+                  reservedQuantity: params.get('reserved'),
+                  availableQuantity: String(Math.max(0, Number(params.get('holding') ?? state.position) - Number(params.get('reserved')))),
+                } : {}),
                 averageCost: '0.5',
                 currencyCode: 'USD',
                 valuation: { state: 'unavailable' },
@@ -293,6 +345,15 @@ export const apiClient = {
       throw Object.assign(new Error('Request failed with status code 409'), { isAxiosError: true,
         response: { status: 409, data: { success: false, error: { code: 'CONDITIONAL_BUY_ALREADY_ORDERED', message: 'raw server text' } } } });
     if (conditionalCancel) return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: null });
+    if (path.endsWith('/conditional-sell-orders')) {
+      const legs = body.kind === 'condition' ? [['condition', body]]
+        : [['stop_loss', body.stopLoss], ['take_profit', body.takeProfit]].filter((leg) => leg[1]);
+      return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrders: legs.map(([kind, leg], i) => ({
+        ...sellRow(`new-${kind}-${i}`, kind, 'watching'), triggerPrice: leg.triggerPrice, executionType: leg.executionType,
+        limitPrice: leg.limitPrice ?? null, quantity: leg.quantity, position: null })) });
+    }
+    if (path.includes('/conditional-sell-orders/') && path.endsWith('/cancel'))
+      return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: null });
     const asset = assets.find((a) => a.id === body.assetId);
     const loc = body.limitOnClose ? { market: 'KRX', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T00:00:00.000Z',
       sessionCloseAt: '2026-10-13T06:30:00.000Z', evidenceDeadlineAt: '2026-10-13T09:30:00.000Z', executionPricePolicy: 'final_regular_session_close' } : null;
@@ -315,6 +376,15 @@ export const apiClient = {
         netAmount: '.999',
         reservedQuantity: body.quantity,
         ...(loc ? { limitOnClose: loc } : {}),
+        // `reserved=<n>`: a LOC SELL above the unreserved part is accepted for less.
+        ...(loc && body.side === 'sell' && params.has('reserved')
+          && Number(body.quantity) > Number(params.get('holding') ?? state.position) - Number(params.get('reserved'))
+          ? (() => {
+              const accepted = String(Math.floor(Number(params.get('holding') ?? state.position) - Number(params.get('reserved'))));
+              return { quantity: accepted, quantityAdjustment: { reason: 'available_quantity', requestedQuantity: body.quantity,
+                acceptedQuantity: accepted, availableQuantity: accepted } };
+            })()
+          : {}),
       });
     return response({
       order: {
@@ -323,7 +393,8 @@ export const apiClient = {
         asset,
         currencyCode: asset.settlementCurrency ?? 'USD',
         status: body.orderType === 'limit' ? 'submitted' : 'executed',
-        ...(loc ? { limitOnClose: { ...loc, status: 'pending', decisionReason: null, decidedAt: null, closePrice: null } } : {}),
+        ...(loc ? { limitOnClose: { ...loc, status: 'pending', decisionReason: null, decidedAt: null, closePrice: null,
+          requestedQuantity: body.requestedQuantity ?? null } } : {}),
       },
       execution: {
         state: body.orderType === 'limit' ? 'submitted' : 'executed',

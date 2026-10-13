@@ -356,7 +356,8 @@ export const OpsJobName = {
   futures_limit_matching: 'futures_limit_matching',
   futures_last_price_retention: 'futures_last_price_retention',
   conditional_buy_orders: 'conditional_buy_orders',
-  limit_on_close_settlement: 'limit_on_close_settlement'
+  limit_on_close_settlement: 'limit_on_close_settlement',
+  conditional_sell_orders: 'conditional_sell_orders'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -493,6 +494,34 @@ export const ConditionalBuyStatus = {
 } as const
 
 export type ConditionalBuyStatus = (typeof ConditionalBuyStatus)[keyof typeof ConditionalBuyStatus]
+
+
+export const ConditionalSellKind = {
+  condition: 'condition',
+  stop_loss: 'stop_loss',
+  take_profit: 'take_profit'
+} as const
+
+export type ConditionalSellKind = (typeof ConditionalSellKind)[keyof typeof ConditionalSellKind]
+
+
+export const ConditionalSellTrigger = {
+  at_or_above: 'at_or_above',
+  at_or_below: 'at_or_below'
+} as const
+
+export type ConditionalSellTrigger = (typeof ConditionalSellTrigger)[keyof typeof ConditionalSellTrigger]
+
+
+export const ConditionalSellStatus = {
+  watching: 'watching',
+  triggered: 'triggered',
+  ordered: 'ordered',
+  canceled: 'canceled',
+  failed: 'failed'
+} as const
+
+export type ConditionalSellStatus = (typeof ConditionalSellStatus)[keyof typeof ConditionalSellStatus]
 
 
 export const LimitOnCloseStatus = {

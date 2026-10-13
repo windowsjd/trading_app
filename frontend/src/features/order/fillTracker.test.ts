@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   FILL_RETRY_BASE_MS,
   FILL_RETRY_MAX_MS,
+  FILL_SETTLED_MAX,
   FILL_UNRESOLVED_MAX,
   FILL_UNRESOLVED_MAX_AGE_MS,
   buildFillNotice,
@@ -208,5 +209,68 @@ describe('watched accounts', () => {
     assert.equal(isFillWatchAccount({ status: 'active', mode: 'season', season: { seasonStatus: 'active' } }), true);
     assert.equal(isFillWatchAccount({ status: 'active', mode: 'season', season: { seasonStatus: 'ended' } }), false);
     assert.equal(isFillWatchAccount({ status: 'active', mode: 'season', season: null }), false);
+  });
+});
+
+describe('SELL intents and bounded session memory', () => {
+  it('SELL intents diff in their own set, apart from BUY watches and orders', () => {
+    const tracker = createFillTracker();
+    tracker.observeWatches('a', ['w1']);
+    tracker.observeSellWatches('a', ['s1', 's2']);
+    tracker.trackSellWatch('a', 's3');
+    assert.deepEqual(tracker.observeSellWatches('a', ['s2']), ['s1', 's3']);
+    assert.deepEqual(tracker.observeWatches('a', ['w1']), []);
+    assert.equal(tracker.hasOpenSellWatches('a'), true);
+    assert.equal(tracker.hasOpenOrders('a'), false);
+    assert.deepEqual(tracker.observeSellWatches('a', []), ['s2']);
+    assert.equal(tracker.hasOpenSellWatches('a'), false);
+  });
+
+  it('SELL intent reads are single-flight and retried with their own kind', () => {
+    const tracker = createFillTracker();
+    assert.equal(tracker.beginRead('a', 'sell_watch', 's1'), true);
+    assert.equal(tracker.beginRead('a', 'sell_watch', 's1'), false);
+    // Same id as a BUY watch or an order is a different target.
+    assert.equal(tracker.beginRead('a', 'watch', 's1'), true);
+    assert.equal(tracker.beginRead('a', 'order', 's1'), true);
+    tracker.endRead('a', 'sell_watch', 's1');
+    tracker.defer('a', { kind: 'sell_watch', id: 's1', origin: 'conditional' }, 0);
+    assert.deepEqual(tracker.due('a', FILL_RETRY_BASE_MS), [{ kind: 'sell_watch', id: 's1', origin: 'conditional' }]);
+  });
+
+  it('an announced or cancel-resolved order leaves no origin or pending entry behind', () => {
+    const tracker = createFillTracker();
+    tracker.trackOrder('a', 'o1', 'stop_loss');
+    tracker.trackOrder('a', 'o2', 'take_profit');
+    assert.equal(tracker.originOf('a', 'o1'), 'stop_loss');
+    assert.equal(tracker.settle('a', 'o1'), true);
+    assert.equal(tracker.originOf('a', 'o1'), 'order', 'origin dropped once announced');
+    tracker.forgetOrder('a', 'o2');
+    assert.equal(tracker.originOf('a', 'o2'), 'order');
+    assert.equal(tracker.hasOpenOrders('a'), false);
+    // Deduplication still holds for the announced one.
+    assert.equal(tracker.settle('a', 'o1'), false);
+  });
+
+  it('keeps deduplicating recent announcements while bounding the whole session', () => {
+    const tracker = createFillTracker();
+    for (let i = 0; i < FILL_SETTLED_MAX + 1; i++) assert.equal(tracker.settle('a', `o${i}`), true);
+    // The most recent ones are still remembered (no duplicate banner).
+    assert.equal(tracker.settle('a', `o${FILL_SETTLED_MAX}`), false);
+    assert.equal(tracker.settle('a', `o${FILL_SETTLED_MAX - 1}`), false);
+    // Only the oldest beyond the bound was forgotten.
+    assert.equal(tracker.settle('a', 'o0'), true);
+  });
+
+  it('names SELL fills by their origin and LOC SELL by its type', () => {
+    const stop = buildFillNotice('a', executed({ side: 'sell' }), { origin: 'stop_loss' });
+    assert.equal(stop?.title, '삼성전자 매도 체결 완료');
+    assert.equal(stop?.detail, '손절 · 체결 수량 3');
+    assert.equal(buildFillNotice('a', executed({ side: 'sell' }), { origin: 'take_profit' })?.detail, '익절 · 체결 수량 3');
+    assert.equal(buildFillNotice('a', executed({ side: 'sell' }), { origin: 'conditional' })?.detail, '조건주문 · 체결 수량 3');
+    assert.equal(buildFillNotice('a', executed({ side: 'sell', limitOnClose: { status: 'filled' } }))?.title, '삼성전자 LOC 매도 체결 완료');
+    // Never from a submitted or canceled order.
+    assert.equal(buildFillNotice('a', executed({ side: 'sell', status: 'submitted' }), { origin: 'stop_loss' }), null);
+    assert.equal(buildFillNotice('a', executed({ side: 'sell', status: 'canceled' })), null);
   });
 });

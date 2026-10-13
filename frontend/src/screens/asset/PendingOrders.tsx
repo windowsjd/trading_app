@@ -1,5 +1,6 @@
 import PendingFuturesAndProtections from './PendingFuturesAndProtections';
 import ConditionalBuyOrdersList from './ConditionalBuyOrdersList';
+import ConditionalSellOrdersList from './ConditionalSellOrdersList';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -29,7 +30,8 @@ type Props = {
   accountId: string;
   isFocused: boolean;
   seasonUi: boolean;
-  /** Spot order screen: also list this account's Conditional BUY watches. */
+  /** Spot order screen: also list this account's Conditional BUY watches and
+   * SELL intents (conditions; independent stop-loss/take-profit beside OCO). */
   conditional?: boolean;
 };
 
@@ -46,8 +48,14 @@ export function BoundPendingOrders(props: Props) {
       {kinds.map(value => <ActionPressable key={value} testID={`pending-kind-${value}`} accessibilityRole="button" accessibilityState={{ selected: value === kind }} aria-pressed={value === kind} onPress={() => setKind(value)} style={[styles.retry, value === kind && styles.kindSelected]}><Text style={styles.value}>{KIND_LABEL[value]}</Text></ActionPressable>)}
     </View>
     {kind === 'limit' ? <LimitPendingOrders {...props} />
-      : kind === 'conditional' ? <ConditionalBuyOrdersList key={`conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
-      : <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />}
+      : kind === 'conditional' ? <>
+        <ConditionalBuyOrdersList key={`conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
+        <ConditionalSellOrdersList key={`sell-condition:${props.accountId}`} accountId={props.accountId} family="condition" isFocused={props.isFocused} seasonUi={props.seasonUi} />
+      </>
+      : <>
+        <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />
+        {props.conditional ? <ConditionalSellOrdersList key={`sell-protection:${props.accountId}`} accountId={props.accountId} family="protection" isFocused={props.isFocused} seasonUi={props.seasonUi} /> : null}
+      </>}
   </View>;
 }
 function LimitPendingOrders(props: Props) {

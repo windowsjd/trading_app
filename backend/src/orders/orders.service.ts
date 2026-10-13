@@ -22,6 +22,13 @@ import {
   linkConditionalBuyOrder,
   lockTriggeredConditionalBuy,
 } from '../conditional/conditional-buy-state';
+import {
+  assertConditionalSellExecutionWindow,
+  closeConditionalSellsOnFlatPosition,
+  linkConditionalSellOrder,
+  lockTriggeredConditionalSell,
+} from '../conditional/conditional-sell-state';
+import { resolveSellExecutionQuantity } from '../conditional/conditional-sell-policy';
 import { readLimitOnCloseConfig } from './limit-on-close.config';
 import {
   resolveLimitOnCloseRegistration,
@@ -185,8 +192,13 @@ export type OrdersQuery = {
 
 export type OrderRequestBody = {
   attachedProtection?: unknown;
-  /** Additive LOC flag: `true` on a KRX stock BUY limit (server-gated). */
+  /** Additive LOC flag: `true` on a KRX stock BUY or SELL limit (server-gated). */
   limitOnClose?: unknown;
+  /**
+   * LOC SELL create only, display data: the quantity the user asked for when
+   * the quote accepted less (`quantity` = the quote's accepted quantity).
+   */
+  requestedQuantity?: unknown;
   assetId?: unknown;
   side?: unknown;
   orderType?: unknown;
@@ -248,8 +260,12 @@ type ParsedOrderRequest = {
   protectionChildId?: string;
   /** Internal worker capability, never parsed from HTTP. */
   conditionalBuyOrderId?: string;
+  /** Internal worker capability, never parsed from HTTP. */
+  conditionalSellOrderId?: string;
   attachedProtection?: ProtectionLegInput[];
   limitOnClose?: true;
+  /** LOC SELL create only (display data, ≥ quantity). */
+  requestedQuantity?: Prisma.Decimal;
   assetId: string;
   side: OrderSide;
   orderType: OrderType;
@@ -844,6 +860,7 @@ export class OrdersService {
     body: OrderRequestBody = {},
     conditionalChildId?: string,
     conditionalBuyOrderId?: string,
+    conditionalSellOrderId?: string,
   ): Promise<OrderQuoteResponse> {
     if (!userId) {
       this.throwApiError(
@@ -855,6 +872,25 @@ export class OrdersService {
 
     const quoteAt = new Date();
     const request = this.parseOrderRequest(body);
+    if (conditionalSellOrderId) {
+      // Courtesy pre-check; create re-locks and re-validates the intent.
+      const intent = await this.prisma.conditionalSellOrder.findFirst({
+        where: {
+          id: conditionalSellOrderId,
+          tradingAccountId,
+          status: 'triggered',
+          orderId: null,
+        },
+        select: { id: true },
+      });
+      if (!intent)
+        throw createApiError(
+          'CONDITIONAL_SELL_CHANGED',
+          'The conditional order changed before execution.',
+          409,
+        );
+      request.conditionalSellOrderId = conditionalSellOrderId;
+    }
     if (conditionalBuyOrderId) {
       // Courtesy pre-check; create re-locks and re-validates the watch.
       const watch = await this.prisma.conditionalBuyOrder.findFirst({
@@ -1210,6 +1246,22 @@ export class OrdersService {
       );
     }
     this.assertOrderAssetTradable(asset, quoteAt, OrderType.limit);
+    // LOC courtesy check only; create re-validates at its post-lock DB clock.
+    const limitOnClose = request.limitOnClose
+      ? resolveLimitOnCloseRegistration({
+          asset,
+          now: quoteAt,
+          seasonEndAt: context.season?.endAt ?? null,
+          config: readLimitOnCloseConfig(),
+        })
+      : null;
+    const quantityAdjustment = limitOnClose
+      ? await this.sizeLimitOnCloseSell(
+          context.tradingAccountId,
+          asset,
+          request,
+        )
+      : null;
     const preview =
       await this.requireLimitOrderCreateService().buildLimitSellQuotePreview({
         tradingAccountId: context.tradingAccountId,
@@ -1311,8 +1363,96 @@ export class OrdersService {
           preview.estimatedPositionAvailableAfter,
           quantityScale,
         ),
-        executionPolicy: this.limitOrderExecutionPolicy(),
+        executionPolicy: limitOnClose
+          ? buildLimitOrderExecutionPolicy({ autoExecutionEnabled: false })
+          : this.limitOrderExecutionPolicy(),
+        ...(limitOnClose
+          ? {
+              limitOnClose: {
+                market: limitOnClose.market,
+                sessionDate: sessionDateText(limitOnClose.sessionDate),
+                sessionOpenAt: limitOnClose.session.openTime.toISOString(),
+                sessionCloseAt: limitOnClose.session.closeTime.toISOString(),
+                evidenceDeadlineAt:
+                  limitOnClose.evidenceDeadlineAt.toISOString(),
+                executionPricePolicy: 'final_regular_session_close' as const,
+              },
+              // The accepted quantity is `quantity`; create sends it with
+              // `requestedQuantity` so the order keeps both.
+              quantityAdjustment: quantityAdjustment
+                ? {
+                    reason: 'available_quantity' as const,
+                    requestedQuantity: this.formatDecimal(
+                      quantityAdjustment.requestedQuantity,
+                      quantityScale,
+                    ),
+                    acceptedQuantity: this.formatDecimal(
+                      quantityAdjustment.acceptedQuantity,
+                      quantityScale,
+                    ),
+                    availableQuantity: this.formatDecimal(
+                      quantityAdjustment.availableQuantity,
+                      quantityScale,
+                    ),
+                  }
+                : null,
+            }
+          : {}),
       },
+    };
+  }
+
+  /**
+   * LOC SELL sizing at quote time (the create's atomic reservation still
+   * decides): the order is for min(requested, holding − every other order's
+   * reservation), cut to whole shares, so it never re-reserves quantity that
+   * another order (a limit/LOC sell or an OCO child) already holds. More than
+   * the holding is refused, nothing unreserved is refused, and a smaller
+   * acceptance is reported instead of being presented as the request.
+   */
+  private async sizeLimitOnCloseSell(
+    tradingAccountId: string,
+    asset: OrderAsset,
+    request: PricedOrderRequest,
+  ) {
+    const position = await this.prisma.position.findUnique({
+      where: {
+        tradingAccountId_assetId: { tradingAccountId, assetId: asset.id },
+      },
+      select: {
+        tradingAccountId: true,
+        quantity: true,
+        reservedQuantity: true,
+      },
+    });
+    if (position)
+      this.assertPositionTradingScope(position, { tradingAccountId });
+    if (!position || request.quantity.gt(position.quantity))
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_QUANTITY',
+        'The quantity exceeds the current holding.',
+      );
+    const sizing = resolveSellExecutionQuantity({
+      target: request.quantity,
+      holding: position.quantity,
+      reserved: position.reservedQuantity,
+      assetType: asset.assetType,
+      orderType: OrderType.limit,
+    });
+    if (!sizing.quantity)
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'INSUFFICIENT_QUANTITY',
+        'No unreserved quantity is available to sell.',
+      );
+    if (sizing.quantity.eq(request.quantity)) return null;
+    const requestedQuantity = request.quantity;
+    request.quantity = sizing.quantity;
+    return {
+      requestedQuantity,
+      acceptedQuantity: sizing.quantity,
+      availableQuantity: sizing.available,
     };
   }
 
@@ -1400,6 +1540,7 @@ export class OrdersService {
     body: OrderRequestBody = {},
     conditionalChildId?: string,
     conditionalBuyOrderId?: string,
+    conditionalSellOrderId?: string,
   ): Promise<CreateOrderResponse | LimitOrderCreateResponse> {
     if (!userId) {
       this.throwApiError(
@@ -1412,6 +1553,7 @@ export class OrdersService {
     const request = this.parseOrderRequest(body);
     request.protectionChildId = conditionalChildId;
     request.conditionalBuyOrderId = conditionalBuyOrderId;
+    request.conditionalSellOrderId = conditionalSellOrderId;
     const submittedAt = new Date();
 
     if (request.orderType === OrderType.limit) {
@@ -1530,6 +1672,16 @@ export class OrdersService {
           return this.replayIdempotentCreateOrder(racedOrder, idempotency);
         await this.lockTradingContextInTransaction(tx, input.context, userId);
         let transactionNow = await this.readTransactionWallClock(tx);
+        // A SELL intent is locked (and checked against whole-position OCO
+        // protection) before protection preparation could touch anything.
+        const triggeredSell = request.conditionalSellOrderId
+          ? await lockTriggeredConditionalSell(
+              tx,
+              request.conditionalSellOrderId,
+              tradingAccountId,
+              request,
+            )
+          : null;
         await this.prepareProtection(
           tx,
           tradingAccountId,
@@ -1643,6 +1795,14 @@ export class OrdersService {
             orderId,
             transactionNow,
           );
+        if (request.conditionalSellOrderId)
+          await linkConditionalSellOrder(
+            tx,
+            request.conditionalSellOrderId,
+            tradingAccountId,
+            orderId,
+            transactionNow,
+          );
         const executionOrder = order as OrderExecutionRecord;
         this.assertExecutableSeasonAndAsset(executionOrder, transactionNow);
         const plan = await this.buildOrderExecutionPlan(
@@ -1679,11 +1839,16 @@ export class OrdersService {
           },
         });
         // Last statement: no lock wait during the writes above carries a
-        // conditional BUY past its execution window (the create rolls back).
+        // conditional BUY/SELL past its execution window (the create rolls back).
         if (triggeredWatch)
           await assertConditionalBuyExecutionWindow(
             tx,
             triggeredWatch.triggeredAt,
+          );
+        if (triggeredSell)
+          await assertConditionalSellExecutionWindow(
+            tx,
+            triggeredSell.triggeredAt,
           );
 
         didExecute = true;
@@ -1898,6 +2063,16 @@ export class OrdersService {
         // lock wait time is never omitted from final quote/season/market
         // checks.
         let transactionNow = await this.readTransactionWallClock(tx);
+        // A SELL intent is locked (and checked against whole-position OCO
+        // protection) before protection preparation could touch anything.
+        const triggeredSell = request.conditionalSellOrderId
+          ? await lockTriggeredConditionalSell(
+              tx,
+              request.conditionalSellOrderId,
+              tradingAccountId,
+              request,
+            )
+          : null;
         await this.prepareProtection(
           tx,
           tradingAccountId,
@@ -1987,12 +2162,29 @@ export class OrdersService {
                 ...createInput.quote,
                 quotedNetAmount: quote.quotedNetAmount,
               },
+              limitOnClose,
+              requestedQuantity: request.requestedQuantity ?? null,
             });
           if (input.conditionalChildId)
             await tx.protectionChild.update({
               where: { id: input.conditionalChildId },
               data: { orderId: response.data.order.orderId },
             });
+          if (request.conditionalSellOrderId)
+            await linkConditionalSellOrder(
+              tx,
+              request.conditionalSellOrderId,
+              tradingAccountId,
+              response.data.order.orderId,
+              transactionNow,
+            );
+          // Last statement: a lock wait during the reservation cannot carry
+          // a SELL intent past its execution window (the create rolls back).
+          if (triggeredSell)
+            await assertConditionalSellExecutionWindow(
+              tx,
+              triggeredSell.triggeredAt,
+            );
           return response;
         }
         const response =
@@ -2532,6 +2724,7 @@ export class OrdersService {
           id: true,
           quoteId: true,
           protectionChild: { select: { id: true } },
+          conditionalSell: { select: { id: true, kind: true } },
           limitOnClose: { select: LIMIT_ON_CLOSE_SELECT },
           side: true,
           orderType: true,
@@ -2580,6 +2773,11 @@ export class OrdersService {
         orders: orders.map((order) => ({
           ...this.formatOrder(order),
           conditionalChildId: order.protectionChild?.id ?? null,
+          // The SELL intent (condition / stop-loss / take-profit) that
+          // submitted this order, if any.
+          conditionalSell: order.conditionalSell
+            ? { id: order.conditionalSell.id, kind: order.conditionalSell.kind }
+            : null,
         })),
       },
     };
@@ -3166,6 +3364,91 @@ export class OrdersService {
       },
       undefined,
       conditionalBuyOrderId,
+    );
+  }
+
+  /**
+   * Worker-only adapter for a triggered SELL intent (condition, independent
+   * stop-loss or take-profit). The order is sized NOW from the live holding:
+   * min(target, holding − every other order's reservation), never above it
+   * (no short position, no second claim on a reservation). Nothing left →
+   * CONDITIONAL_SELL_QUANTITY_UNAVAILABLE and no order. The ordinary user
+   * quote/create core then prices, reserves or executes and settles; the
+   * intent is re-locked and linked inside that create transaction, where the
+   * atomic position guards make a concurrent SELL lose instead of overselling
+   * (a lost race is INSUFFICIENT_QUANTITY and the next attempt sizes again).
+   * The deterministic idempotency key keeps at most one Order per intent.
+   */
+  async executeConditionalSell(
+    userId: string,
+    accountId: string,
+    conditionalSellOrderId: string,
+  ) {
+    const intent = await this.prisma.conditionalSellOrder.findFirst({
+      where: {
+        id: conditionalSellOrderId,
+        tradingAccountId: accountId,
+        status: 'triggered',
+        orderId: null,
+      },
+      include: { asset: { select: { assetType: true } } },
+    });
+    if (!intent) return null;
+    const position = await this.prisma.position.findUnique({
+      where: {
+        tradingAccountId_assetId: {
+          tradingAccountId: accountId,
+          assetId: intent.assetId,
+        },
+      },
+      select: { quantity: true, reservedQuantity: true },
+    });
+    const sizing = resolveSellExecutionQuantity({
+      target: intent.quantity,
+      holding: position?.quantity,
+      reserved: position?.reservedQuantity,
+      assetType: intent.asset.assetType,
+      orderType: intent.executionType,
+    });
+    // Display evidence of why an order may be smaller than its target.
+    await this.prisma.conditionalSellOrder.updateMany({
+      where: { id: intent.id, status: 'triggered', orderId: null },
+      data: { executionAvailableQuantity: sizing.available },
+    });
+    if (!sizing.quantity)
+      throw createApiError(
+        'CONDITIONAL_SELL_QUANTITY_UNAVAILABLE',
+        'No unreserved quantity is available to sell.',
+        409,
+      );
+    const request: OrderRequestBody = {
+      assetId: intent.assetId,
+      side: OrderSide.sell,
+      orderType: intent.executionType,
+      quantity: sizing.quantity.toFixed(quantityScale),
+      ...(intent.limitPrice
+        ? { limitPrice: intent.limitPrice.toFixed(monetaryScale) }
+        : {}),
+    };
+    const quote = await this.quoteOrderForTradingAccount(
+      userId,
+      accountId,
+      request,
+      undefined,
+      undefined,
+      conditionalSellOrderId,
+    );
+    return this.createOrderForTradingAccount(
+      userId,
+      accountId,
+      {
+        ...request,
+        quoteId: quote.data.quoteId,
+        idempotencyKey: `conditional-sell:${conditionalSellOrderId}`,
+      },
+      undefined,
+      undefined,
+      conditionalSellOrderId,
     );
   }
 
@@ -4015,6 +4298,14 @@ export class OrdersService {
       tradingAccountId,
       order.assetId,
       order.id,
+      plan.executedAt,
+    );
+    // A SELL that left the holding flat ends every live SELL intent on it
+    // in this transaction; a later re-buy never inherits them.
+    await closeConditionalSellsOnFlatPosition(
+      tx,
+      tradingAccountId,
+      order.assetId,
       plan.executedAt,
     );
     setAdminDiagnosticContext({
@@ -5977,6 +6268,14 @@ export class OrdersService {
         : {}),
       // Legacy requests keep their exact hash bytes.
       ...(request.limitOnClose ? { limitOnClose: true } : {}),
+      ...(request.requestedQuantity
+        ? {
+            requestedQuantity: this.formatDecimal(
+              request.requestedQuantity,
+              quantityScale,
+            ),
+          }
+        : {}),
     };
     const canonicalJson = JSON.stringify(canonicalPayload);
     const requestHash = createHash('sha256')
@@ -6033,6 +6332,12 @@ export class OrdersService {
       : this.parsePositiveQuantityField(body.quantity);
 
     if (orderType === OrderType.market) {
+      if (this.hasProvidedValue(body.requestedQuantity))
+        throw createApiError(
+          'INVALID_LIMIT_ON_CLOSE',
+          'requestedQuantity is accepted only on Limit-on-Close SELL orders.',
+          400,
+        );
       // Historical behavior: a market request carrying limitPrice keeps the
       // original ORDER_TYPE_NOT_SUPPORTED rejection.
       if (this.hasProvidedValue(body.limitPrice)) {
@@ -6062,6 +6367,10 @@ export class OrdersService {
       );
     }
 
+    const requestedQuantity = this.parseRequestedQuantity(
+      body.requestedQuantity,
+      { side, limitOnClose: !!limitOnClose, quantity },
+    );
     return {
       assetId: this.parseRequiredText(body.assetId, 'assetId'),
       side,
@@ -6070,6 +6379,7 @@ export class OrdersService {
       amount,
       attachedProtection,
       ...(limitOnClose ? { limitOnClose } : {}),
+      ...(requestedQuantity ? { requestedQuantity } : {}),
       limitPrice: this.parsePositiveDecimalField(
         body.limitPrice,
         'limitPrice',
@@ -6102,12 +6412,9 @@ export class OrdersService {
         'Limit-on-Close requires a limit order.',
         400,
       );
-    if (request.side !== OrderSide.buy)
-      throw createApiError(
-        'LOC_SIDE_NOT_SUPPORTED',
-        'Limit-on-Close currently supports BUY orders only.',
-        400,
-      );
+    // BUY (cash reservation) and SELL (position quantity reservation) share
+    // the session binding and the final-close settlement; each side has its
+    // own registration flag.
     if (request.attachedProtection)
       throw createApiError(
         'LOC_ATTACHED_PROTECTION_NOT_SUPPORTED',
@@ -6118,12 +6425,53 @@ export class OrdersService {
   }
 
   private assertLimitOnCloseFeatureEnabled(request: ParsedOrderRequest) {
-    if (request.limitOnClose && !readLimitOnCloseConfig().enabled)
+    if (!request.limitOnClose) return;
+    const config = readLimitOnCloseConfig();
+    if (request.side === OrderSide.sell) {
+      if (!config.sellEnabled)
+        throw createApiError(
+          'LOC_SELL_ORDERS_DISABLED',
+          'Limit-on-Close SELL orders are currently disabled.',
+          409,
+        );
+      return;
+    }
+    if (!config.enabled)
       throw createApiError(
         'LOC_ORDERS_DISABLED',
         'Limit-on-Close orders are currently disabled.',
         409,
       );
+  }
+
+  /**
+   * Display-only companion of a LOC SELL create whose quote accepted less
+   * than asked (quantity = the accepted, reserved part). Never priced,
+   * reserved or settled; absent keeps every existing request byte-identical.
+   */
+  private parseRequestedQuantity(
+    value: unknown,
+    request: {
+      side: OrderSide;
+      limitOnClose: boolean;
+      quantity: Prisma.Decimal | null;
+    },
+  ): Prisma.Decimal | undefined {
+    if (!this.hasProvidedValue(value)) return undefined;
+    if (!request.limitOnClose || request.side !== OrderSide.sell)
+      throw createApiError(
+        'INVALID_LIMIT_ON_CLOSE',
+        'requestedQuantity is accepted only on Limit-on-Close SELL orders.',
+        400,
+      );
+    const requested = this.parsePositiveQuantityField(value);
+    if (!request.quantity || requested.lt(request.quantity))
+      throw createApiError(
+        'INVALID_LIMIT_ON_CLOSE',
+        'requestedQuantity must be at least the order quantity.',
+        400,
+      );
+    return requested;
   }
 
   private parseOrderId(orderId: string | undefined): string {

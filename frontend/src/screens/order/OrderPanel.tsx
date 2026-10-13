@@ -10,10 +10,13 @@ import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import OrderSideSegment, { type OrderSide } from './OrderSideSegment';
 import OrderTypeSelect from './OrderTypeSelect';
 import ConditionalBuyForm from './ConditionalBuyForm';
+import SellIntentForm from './SellIntentForm';
 import OrderNumberInput from './OrderNumberInput';
 import {
   getConditionalBuyGate,
+  getConditionalSellGate,
   getLimitOnCloseGate,
+  getLimitOnCloseSellGate,
   getOrderMethodOptions,
   getOrderTypeForMethod,
   isOrderMethodSelectable,
@@ -21,6 +24,7 @@ import {
 } from '../../features/order/orderMethods';
 import { emitOrderFillEvent } from '../../features/order/fillEvents';
 import { getConditionalBuyOrders } from '../../features/conditional/conditionalBuyApi';
+import { getConditionalSellOrders } from '../../features/conditional/conditionalSellApi';
 import { getSessionGeneration } from '../../services/api/sessionOwnership';
 import {
   validateOrderQuote,
@@ -51,6 +55,8 @@ import { isTradableMarketStatus } from '../../features/asset/mapper';
 import type { OrderQuoteDto } from '../../features/order/api';
 import {
   createTradingAccountOrder,
+  findAccountPosition,
+  getAccountPositionAvailableQuantity,
   getAccountPositionQuantity,
   getTradingAccountPositions,
   getTradingAccountWallets,
@@ -395,6 +401,10 @@ export function OrderForm({
               : {}),
             // Quote and create carry the same LOC flag; absent otherwise.
             ...(request.payload.limitOnClose ? { limitOnClose: true as const } : {}),
+            // LOC SELL accepted less than asked: keep what was asked (display only).
+            ...(request.payload.limitOnClose && quote.quantityAdjustment
+              ? { requestedQuantity: quote.quantityAdjustment.requestedQuantity }
+              : {}),
           }),
         isCurrent: () => isActionCurrent(action.request) && (!action.request.attachedProtection?.length || attachedPermission.current),
       }),
@@ -556,16 +566,32 @@ export function OrderForm({
   const orderCapabilitiesQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.orderCapabilities(accountId),
     queryFn: ({ signal }) => getTradingAccountOrderCapabilities(accountId, signal),
-    enabled: accountKnown && side === 'buy' && asset?.assetType === 'domestic_stock',
+    enabled: accountKnown && asset?.assetType === 'domestic_stock',
     retry: 1,
     staleTime: 30_000,
   });
+  // SELL intents (conditions, independent stop-loss/take-profit): the live
+  // list carries the server gates and doubles as the fill watcher's entry.
+  const sellIntentsQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.conditionalSell.list(accountId, { history: false, limit: 100 }),
+    queryFn: ({ signal }) => getConditionalSellOrders(accountId, { limit: 100 }, signal),
+    enabled: accountKnown && side === 'sell' && (asset?.assetType === 'domestic_stock' || asset?.assetType === 'crypto'),
+    retry: 1,
+  });
   const conditionalCapabilities = conditionalQuery.data?.tradingAccountId === accountId ? conditionalQuery.data.capabilities : null;
-  const methodOptions = getOrderMethodOptions({
+  const sellIntentData = sellIntentsQuery.data?.tradingAccountId === accountId ? sellIntentsQuery.data : null;
+  const capabilityData = orderCapabilitiesQuery.data?.tradingAccountId === accountId ? orderCapabilitiesQuery.data : null;
+  const methodOptions = getOrderMethodOptions(side === 'buy' ? {
     assetType: asset?.assetType,
     side,
     conditional: getConditionalBuyGate({ ...conditionalQuery, data: conditionalQuery.data?.tradingAccountId === accountId ? conditionalQuery.data : null }, asset?.assetType),
-    loc: getLimitOnCloseGate({ ...orderCapabilitiesQuery, data: orderCapabilitiesQuery.data?.tradingAccountId === accountId ? orderCapabilitiesQuery.data : null }, asset?.assetType),
+    loc: getLimitOnCloseGate({ ...orderCapabilitiesQuery, data: capabilityData }, asset?.assetType),
+  } : {
+    assetType: asset?.assetType,
+    side,
+    conditional: getConditionalSellGate({ ...sellIntentsQuery, data: sellIntentData }, asset?.assetType, 'condition'),
+    protection: getConditionalSellGate({ ...sellIntentsQuery, data: sellIntentData }, asset?.assetType, 'protection'),
+    loc: getLimitOnCloseSellGate({ ...orderCapabilitiesQuery, data: capabilityData }, asset?.assetType),
   });
   const selectedMethodOption = methodOptions.find((option) => option.method === orderMethod) ?? null;
   // A method the server stopped allowing stays shown but cannot submit.
@@ -656,6 +682,12 @@ export function OrderForm({
     positionQuery.data,
     assetId,
   );
+  // What a new sell can use (holding − other orders' reservations), as the
+  // server reports it; null on an older server (then only the holding is known).
+  const positionAvailable = getAccountPositionAvailableQuantity(positionQuery.data, assetId);
+  const positionReserved = findAccountPosition(positionQuery.data, assetId)?.reservedQuantity ?? null;
+  const sellCapacity = positionAvailable ?? positionQuantity;
+  const automationForm = orderMethod === 'conditional' || orderMethod === 'protection';
   // Attached TP/SL belongs to an ordinary limit BUY only; never to LOC.
   const attachedEditorVisible = side === 'buy' && orderMethod === 'limit';
   const attachedAvailable = !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
@@ -687,7 +719,7 @@ export function OrderForm({
         // A new sell limit is not offered, so nothing else is suggested.
         : '정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요.'
       : stockMarketClosed && limitOnClose
-        ? 'LOC 매수는 정규장 중에만 등록할 수 있습니다. 서버가 등록 시점의 장 상태를 최종 확인합니다.'
+        ? `LOC ${side === 'buy' ? '매수' : '매도'}는 정규장 중에만 등록할 수 있습니다. 서버가 등록 시점의 장 상태를 최종 확인합니다.`
         : null;
 
   const assetWarningReason =
@@ -723,9 +755,13 @@ export function OrderForm({
         ? '보유 수량을 확인할 수 없어 매도할 수 없습니다.'
         : side === 'sell' && Number(positionQuantity) <= 0
           ? '보유 수량이 없어 매도할 수 없습니다.'
-          : side === 'sell' && Number(orderInput) > Number(positionQuantity)
+          : side === 'sell' && !automationForm && Number(orderInput) > Number(positionQuantity)
             ? '보유 수량을 초과하여 매도할 수 없습니다.'
-            : null;
+            : side === 'sell' && limitOnClose && positionAvailable !== null && Number(positionAvailable) < 1
+              ? 'LOC 매도로 접수할 수 있는 수량이 없습니다. 다른 주문이 보유 수량을 예약하고 있습니다.'
+              : side === 'sell' && orderMethod === 'market' && positionAvailable !== null && Number(orderInput) > Number(positionAvailable)
+                ? '매도 가능 수량을 초과했습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.'
+                : null;
 
   const preOrderBlockedReason =
     accountBlockedReason ?? assetHardBlockedReason ?? sellBlockedReason;
@@ -758,6 +794,7 @@ export function OrderForm({
   const limitPriceValue = parsePositiveDecimal(limitPrice);
   const ratioPriceValue = orderType === 'limit' ? limitPriceValue : priceValue;
   const positionQuantityValue = parsePositiveDecimal(positionQuantity);
+  const sellCapacityValue = parsePositiveDecimal(sellCapacity);
 
   const ratioDisabledReason = useMemo(() => {
     if (accountBlockedReason || assetHardBlockedReason)
@@ -766,6 +803,7 @@ export function OrderForm({
       if (positionQuery.isLoading) return '보유 수량을 확인하는 중입니다.';
       if (positionUnavailable) return '보유 수량을 확인할 수 없습니다.';
       if (!positionQuantityValue) return '보유 수량이 없습니다.';
+      if (!sellCapacityValue) return '다른 주문이 예약해 매도 가능한 수량이 없습니다.';
       return null;
     }
 
@@ -806,6 +844,7 @@ export function OrderForm({
     positionUnavailable,
     positionQuery.isLoading,
     positionQuantityValue,
+    sellCapacityValue,
     ratioPriceValue,
     settlementCurrency,
     side,
@@ -825,9 +864,10 @@ export function OrderForm({
       ? '잔액이 부족합니다.'
       : null;
 
-  // Conditional BUY and LOC need full trading access on a beginner account.
-  const advancedGate = learning.gate(side === 'sell' ? 'riskReduction' : 'allTrading');
-  const tradeGate = orderMethod === 'conditional' || limitOnClose ? advancedGate
+  // Conditional, LOC and stop-loss/take-profit automation (either side) need
+  // full trading access on a beginner account; a plain sell stays risk reduction.
+  const advancedGate = learning.gate('allTrading');
+  const tradeGate = automationForm || limitOnClose ? advancedGate
     : learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
   const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
   const methodGate = (method: OrderMethod) =>
@@ -835,7 +875,7 @@ export function OrderForm({
   // The ordinary submit serves market/limit/LOC; nothing submits unselected.
   const canExecute =
     methodReady &&
-    orderMethod !== 'conditional' &&
+    !automationForm &&
     !preOrderBlockedReason &&
     !inputInvalidReason &&
     !buyInsufficientReason &&
@@ -849,7 +889,7 @@ export function OrderForm({
   // fee policy and writes gross amount, never a client execution quantity.
   const quantityAtRatio = (ratio: number) =>
     side === 'sell'
-      ? (positionQuantityValue ?? 0) * ratio
+      ? (sellCapacityValue ?? 0) * ratio
       : ((buyAvailableValue ?? 0) * ratio) /
         // Never below the real fee, so 100% stays within the live balance check.
         ((ratioPriceValue ?? 0) * (1 + Math.max(BUY_FEE_BUFFER, Number(tradeFeeRate) || 0)));
@@ -1027,6 +1067,7 @@ export function OrderForm({
           limit: limitGate.locked ? limitGate.message : null,
           conditional: advancedGate.locked ? advancedGate.message : null,
           loc: advancedGate.locked ? advancedGate.message : null,
+          protection: advancedGate.locked ? advancedGate.message : null,
         }}
       /></QuestTarget>
       {!orderMethod ? (
@@ -1042,6 +1083,26 @@ export function OrderForm({
           blockedReason={accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason}
           buyAvailable={buyAvailable}
           currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
+          learning={advancedGate}
+          onInputFocus={onInputFocus}
+          onInputBlur={onInputBlur}
+        />
+      ) : null}
+      {automationForm && side === 'sell' ? (
+        <SellIntentForm
+          key={orderMethod}
+          mode={orderMethod === 'conditional' ? 'condition' : 'protection'}
+          accountId={accountId}
+          asset={asset}
+          capabilities={sellIntentData?.capabilities ?? null}
+          blockedReason={accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason
+            ?? (positionQuery.isLoading ? '보유 수량을 확인하는 중입니다.'
+              : positionUnavailable ? '보유 수량을 확인할 수 없어 매도 설정을 등록할 수 없습니다.'
+              : Number(positionQuantity) <= 0 ? '보유 수량이 없어 매도 설정을 등록할 수 없습니다.' : null)}
+          holding={positionQuery.isLoading || positionUnavailable ? null : positionQuantity}
+          available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
+          reserved={positionReserved}
+          currentPrice={displayPrice.priceLocal}
           learning={advancedGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
@@ -1091,15 +1152,28 @@ export function OrderForm({
       </View>
       {limitOnClose ? (
         <View style={styles.notice} testID="loc-order-notice">
-          {[
+          {(side === 'buy' ? [
             '이번 한국주식 정규장의 확정 종가가 지정가격 이하이면 그 종가로 매수해요. 지정가격보다 비싸게 사지 않아요.',
             '정규장 중에만 등록할 수 있고, 이 세션 하루만 유효해요. 다음 거래일로 넘어가지 않아요.',
             '접수할 때 지정가 주문과 같은 방식으로 필요한 금액(지정가 × 수량 + 수수료)을 예약해요.',
             '접수는 체결이 아니에요. 종가를 확정해 확인한 뒤에만 체결되므로 마감 후 상당한 시간이 걸릴 수 있어요.',
             '기한까지 체결되지 않으면 주문이 종료되고 예약금이 해제돼요. 익절·손절은 함께 설정할 수 없어요.',
-          ].map((line) => (
+          ] : [
+            '이번 한국주식 정규장의 확정 종가가 지정가격 이상이면 그 종가로 매도해요. 지정가격보다 싸게 팔지 않아요.',
+            '정규장 중에만 등록할 수 있고, 이 세션 하루만 유효해요. 다음 거래일로 넘어가지 않아요.',
+            '접수할 때 매도 수량만큼 보유 수량을 예약해요. 다른 주문이 이미 예약한 수량은 다시 예약하지 않아요.',
+            '입력 수량이 매도 가능 수량보다 많으면 서버가 매도 가능 수량만 접수하고, 접수 결과에 요청·접수 수량을 함께 보여줘요.',
+            '접수는 체결이 아니에요. 종가를 확정해 확인한 뒤에만 체결되므로 마감 후 상당한 시간이 걸릴 수 있어요.',
+            '기한까지 체결되지 않으면 주문이 종료되고 예약 수량이 해제돼요.',
+          ]).map((line) => (
             <Text key={line} style={styles.noticeLine}>· {line}</Text>
           ))}
+          {side === 'sell' && positionAvailable !== null && Number(orderInput) > Number(positionAvailable)
+            && Number(orderInput) <= Number(positionQuantity) && Number(positionAvailable) >= 1 ? (
+            <Text testID="loc-sell-adjust-notice" style={styles.warningText}>
+              다른 주문이 예약한 수량({formatDisplayDecimal(positionReserved)})을 제외한 매도 가능 수량({formatDisplayDecimal(positionAvailable)})만 접수돼요.
+            </Text>
+          ) : null}
           {locPreview ? (
             <Text testID="loc-quote-session" style={styles.noticeLine}>
               대상 세션 {locPreview.sessionDate} · 정규장 마감 {formatKstDateTime(locPreview.sessionCloseAt)} · 판정 기한 {formatKstDateTime(locPreview.evidenceDeadlineAt)}
@@ -1180,14 +1254,16 @@ export function OrderForm({
       </View>
         </>
       ) : null}
-      {orderMethod !== 'conditional' ? (
-        <Text style={styles.helper}>
+      {!automationForm ? (
+        <Text style={styles.helper} testID="order-available-helper">
           {side === 'buy'
             ? `주문 가능 ${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`
-            : `보유 ${formatDisplayDecimal(positionQuantity)}`}
+            : positionAvailable !== null && positionReserved !== null && Number(positionReserved) > 0
+              ? `보유 ${formatDisplayDecimal(positionQuantity)} · 매도 가능 ${formatDisplayDecimal(positionAvailable)} (다른 주문 예약 ${formatDisplayDecimal(positionReserved)})`
+              : `보유 ${formatDisplayDecimal(positionQuantity)}`}
         </Text>
       ) : null}
-      {methodUnavailableReason && orderMethod !== 'conditional' ? (
+      {methodUnavailableReason && !automationForm ? (
         <Text testID="order-method-unavailable" style={styles.errorText}>{methodUnavailableReason}</Text>
       ) : null}
       {buyInsufficientReason ? (
@@ -1355,7 +1431,7 @@ export function OrderForm({
           ) : null}
         </>
       ) : null}
-      {orderMethod !== 'conditional' ? <View ref={submitRef} collapsable={false}><QuestTarget id="order-submit">
+      {!automationForm ? <View ref={submitRef} collapsable={false}><QuestTarget id="order-submit">
         <CTAButton
           testID={TEST_IDS.order.executeSubmit}
           label={side === 'buy' ? '매수' : '매도'}

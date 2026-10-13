@@ -29,6 +29,21 @@ export function validateOrderQuote(
     const b = positiveDecimal(right);
     return !!a && !!b && a.eq(b);
   };
+  // A LOC SELL may be accepted for less than asked (other orders hold part of
+  // the holding): only with the server's explicit adjustment for exactly this
+  // request, and never for more.
+  const adjustment = quote.quantityAdjustment ?? null;
+  const accepted = positiveDecimal(quote.quantity);
+  const requested = positiveDecimal(request.quantity);
+  const acceptedLess =
+    request.limitOnClose === true &&
+    request.side === 'sell' &&
+    !!adjustment &&
+    sameDecimal(adjustment.requestedQuantity, request.quantity) &&
+    sameDecimal(adjustment.acceptedQuantity, quote.quantity) &&
+    !!accepted &&
+    !!requested &&
+    accepted.lt(requested);
   if (
     quote.state !== 'available' ||
     !quote.quoteId ||
@@ -39,7 +54,8 @@ export function validateOrderQuote(
       ? sameDecimal(quote.amount, request.amount) &&
         !!positiveDecimal(quote.quantity)
       : quote.amount == null &&
-        sameDecimal(quote.quantity, request.quantity)) ||
+        (sameDecimal(quote.quantity, request.quantity) || acceptedLess)) ||
+    (adjustment !== null && !acceptedLess) ||
     (request.orderType === 'limit' &&
       !sameDecimal(quote.limitPrice, request.limitPrice)) ||
     // A LOC request needs the server's LOC session preview, and an ordinary

@@ -490,6 +490,18 @@ export function getAccountPositionQuantity(
   return findAccountPosition(positions, assetId)?.quantity ?? '0';
 }
 
+/**
+ * What a new sell can use now (holding − other orders' reservations), as the
+ * server reports it; null when an older server did not say.
+ */
+export function getAccountPositionAvailableQuantity(
+  positions: TradingAccountPositionsDto | null | undefined,
+  assetId: string,
+) {
+  const position = findAccountPosition(positions, assetId);
+  return position ? position.availableQuantity ?? null : '0';
+}
+
 export interface TradingAccountOrdersParams {
   status?: string;
   side?: string;
@@ -555,6 +567,8 @@ export interface TradingAccountOrderCapabilitiesDto {
     sides: string[];
     attachedProtection: boolean;
   };
+  /** LOC SELL (own flag). Absent on an older server: treat as unavailable. */
+  limitOnCloseSell?: { enabled: boolean; markets: string[] };
 }
 
 export async function getTradingAccountOrderCapabilities(

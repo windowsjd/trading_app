@@ -355,6 +355,7 @@ export type PositionWhereInput = {
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   protectionGroups?: Prisma.ProtectionGroupListRelationFilter
+  conditionalSellOrders?: Prisma.ConditionalSellOrderListRelationFilter
 }
 
 export type PositionOrderByWithRelationInput = {
@@ -378,6 +379,7 @@ export type PositionOrderByWithRelationInput = {
   tradingAccount?: Prisma.TradingAccountOrderByWithRelationInput
   asset?: Prisma.AssetOrderByWithRelationInput
   protectionGroups?: Prisma.ProtectionGroupOrderByRelationAggregateInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderOrderByRelationAggregateInput
 }
 
 export type PositionWhereUniqueInput = Prisma.AtLeast<{
@@ -405,6 +407,7 @@ export type PositionWhereUniqueInput = Prisma.AtLeast<{
   tradingAccount?: Prisma.XOR<Prisma.TradingAccountScalarRelationFilter, Prisma.TradingAccountWhereInput>
   asset?: Prisma.XOR<Prisma.AssetScalarRelationFilter, Prisma.AssetWhereInput>
   protectionGroups?: Prisma.ProtectionGroupListRelationFilter
+  conditionalSellOrders?: Prisma.ConditionalSellOrderListRelationFilter
 }, "id" | "tradingAccountId_assetId">
 
 export type PositionOrderByWithAggregationInput = {
@@ -474,6 +477,7 @@ export type PositionCreateInput = {
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutPositionsInput
   asset: Prisma.AssetCreateNestedOneWithoutPositionsInput
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutPositionInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutPositionInput
 }
 
 export type PositionUncheckedCreateInput = {
@@ -495,6 +499,7 @@ export type PositionUncheckedCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutPositionInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutPositionInput
 }
 
 export type PositionUpdateInput = {
@@ -516,6 +521,7 @@ export type PositionUpdateInput = {
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutPositionsNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutPositionsNestedInput
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutPositionNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionUncheckedUpdateInput = {
@@ -537,6 +543,7 @@ export type PositionUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutPositionNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionCreateManyInput = {
@@ -705,6 +712,11 @@ export type PositionSumOrderByAggregateInput = {
   unrealizedPnlKrw?: Prisma.SortOrder
 }
 
+export type PositionScalarRelationFilter = {
+  is?: Prisma.PositionWhereInput
+  isNot?: Prisma.PositionWhereInput
+}
+
 export type PositionCreateNestedManyWithoutTradingAccountInput = {
   create?: Prisma.XOR<Prisma.PositionCreateWithoutTradingAccountInput, Prisma.PositionUncheckedCreateWithoutTradingAccountInput> | Prisma.PositionCreateWithoutTradingAccountInput[] | Prisma.PositionUncheckedCreateWithoutTradingAccountInput[]
   connectOrCreate?: Prisma.PositionCreateOrConnectWithoutTradingAccountInput | Prisma.PositionCreateOrConnectWithoutTradingAccountInput[]
@@ -805,6 +817,20 @@ export type PositionUpdateOneWithoutProtectionGroupsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.PositionUpdateToOneWithWhereWithoutProtectionGroupsInput, Prisma.PositionUpdateWithoutProtectionGroupsInput>, Prisma.PositionUncheckedUpdateWithoutProtectionGroupsInput>
 }
 
+export type PositionCreateNestedOneWithoutConditionalSellOrdersInput = {
+  create?: Prisma.XOR<Prisma.PositionCreateWithoutConditionalSellOrdersInput, Prisma.PositionUncheckedCreateWithoutConditionalSellOrdersInput>
+  connectOrCreate?: Prisma.PositionCreateOrConnectWithoutConditionalSellOrdersInput
+  connect?: Prisma.PositionWhereUniqueInput
+}
+
+export type PositionUpdateOneRequiredWithoutConditionalSellOrdersNestedInput = {
+  create?: Prisma.XOR<Prisma.PositionCreateWithoutConditionalSellOrdersInput, Prisma.PositionUncheckedCreateWithoutConditionalSellOrdersInput>
+  connectOrCreate?: Prisma.PositionCreateOrConnectWithoutConditionalSellOrdersInput
+  upsert?: Prisma.PositionUpsertWithoutConditionalSellOrdersInput
+  connect?: Prisma.PositionWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.PositionUpdateToOneWithWhereWithoutConditionalSellOrdersInput, Prisma.PositionUpdateWithoutConditionalSellOrdersInput>, Prisma.PositionUncheckedUpdateWithoutConditionalSellOrdersInput>
+}
+
 export type PositionCreateWithoutTradingAccountInput = {
   id?: string
   quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
@@ -823,6 +849,7 @@ export type PositionCreateWithoutTradingAccountInput = {
   updatedAt?: Date | string
   asset: Prisma.AssetCreateNestedOneWithoutPositionsInput
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutPositionInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutPositionInput
 }
 
 export type PositionUncheckedCreateWithoutTradingAccountInput = {
@@ -843,6 +870,7 @@ export type PositionUncheckedCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutPositionInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutPositionInput
 }
 
 export type PositionCreateOrConnectWithoutTradingAccountInput = {
@@ -912,6 +940,7 @@ export type PositionCreateWithoutAssetInput = {
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutPositionsInput
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutPositionInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutPositionInput
 }
 
 export type PositionUncheckedCreateWithoutAssetInput = {
@@ -932,6 +961,7 @@ export type PositionUncheckedCreateWithoutAssetInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutPositionInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutPositionInput
 }
 
 export type PositionCreateOrConnectWithoutAssetInput = {
@@ -978,6 +1008,7 @@ export type PositionCreateWithoutProtectionGroupsInput = {
   updatedAt?: Date | string
   tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutPositionsInput
   asset: Prisma.AssetCreateNestedOneWithoutPositionsInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutPositionInput
 }
 
 export type PositionUncheckedCreateWithoutProtectionGroupsInput = {
@@ -998,6 +1029,7 @@ export type PositionUncheckedCreateWithoutProtectionGroupsInput = {
   unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutPositionInput
 }
 
 export type PositionCreateOrConnectWithoutProtectionGroupsInput = {
@@ -1034,6 +1066,7 @@ export type PositionUpdateWithoutProtectionGroupsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutPositionsNestedInput
   asset?: Prisma.AssetUpdateOneRequiredWithoutPositionsNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionUncheckedUpdateWithoutProtectionGroupsInput = {
@@ -1054,6 +1087,107 @@ export type PositionUncheckedUpdateWithoutProtectionGroupsInput = {
   unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutPositionNestedInput
+}
+
+export type PositionCreateWithoutConditionalSellOrdersInput = {
+  id?: string
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageCost: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode: $Enums.CurrencyCode
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutPositionsInput
+  asset: Prisma.AssetCreateNestedOneWithoutPositionsInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutPositionInput
+}
+
+export type PositionUncheckedCreateWithoutConditionalSellOrdersInput = {
+  id?: string
+  tradingAccountId: string
+  assetId: string
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageCost: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode: $Enums.CurrencyCode
+  realizedPnl?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutPositionInput
+}
+
+export type PositionCreateOrConnectWithoutConditionalSellOrdersInput = {
+  where: Prisma.PositionWhereUniqueInput
+  create: Prisma.XOR<Prisma.PositionCreateWithoutConditionalSellOrdersInput, Prisma.PositionUncheckedCreateWithoutConditionalSellOrdersInput>
+}
+
+export type PositionUpsertWithoutConditionalSellOrdersInput = {
+  update: Prisma.XOR<Prisma.PositionUpdateWithoutConditionalSellOrdersInput, Prisma.PositionUncheckedUpdateWithoutConditionalSellOrdersInput>
+  create: Prisma.XOR<Prisma.PositionCreateWithoutConditionalSellOrdersInput, Prisma.PositionUncheckedCreateWithoutConditionalSellOrdersInput>
+  where?: Prisma.PositionWhereInput
+}
+
+export type PositionUpdateToOneWithWhereWithoutConditionalSellOrdersInput = {
+  where?: Prisma.PositionWhereInput
+  data: Prisma.XOR<Prisma.PositionUpdateWithoutConditionalSellOrdersInput, Prisma.PositionUncheckedUpdateWithoutConditionalSellOrdersInput>
+}
+
+export type PositionUpdateWithoutConditionalSellOrdersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedQuantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageCost?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutPositionsNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutPositionsNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutPositionNestedInput
+}
+
+export type PositionUncheckedUpdateWithoutConditionalSellOrdersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedQuantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  averageCost?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  realizedPnl?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  realizedPnlKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currentPriceLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currentPriceKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  marketValueKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlLocal?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unrealizedPnlKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionCreateManyTradingAccountInput = {
@@ -1093,6 +1227,7 @@ export type PositionUpdateWithoutTradingAccountInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   asset?: Prisma.AssetUpdateOneRequiredWithoutPositionsNestedInput
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutPositionNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionUncheckedUpdateWithoutTradingAccountInput = {
@@ -1113,6 +1248,7 @@ export type PositionUncheckedUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutPositionNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -1171,6 +1307,7 @@ export type PositionUpdateWithoutAssetInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutPositionsNestedInput
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutPositionNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionUncheckedUpdateWithoutAssetInput = {
@@ -1191,6 +1328,7 @@ export type PositionUncheckedUpdateWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutPositionNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutPositionNestedInput
 }
 
 export type PositionUncheckedUpdateManyWithoutAssetInput = {
@@ -1219,10 +1357,12 @@ export type PositionUncheckedUpdateManyWithoutAssetInput = {
 
 export type PositionCountOutputType = {
   protectionGroups: number
+  conditionalSellOrders: number
 }
 
 export type PositionCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   protectionGroups?: boolean | PositionCountOutputTypeCountProtectionGroupsArgs
+  conditionalSellOrders?: boolean | PositionCountOutputTypeCountConditionalSellOrdersArgs
 }
 
 /**
@@ -1240,6 +1380,13 @@ export type PositionCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Ext
  */
 export type PositionCountOutputTypeCountProtectionGroupsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.ProtectionGroupWhereInput
+}
+
+/**
+ * PositionCountOutputType without action
+ */
+export type PositionCountOutputTypeCountConditionalSellOrdersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ConditionalSellOrderWhereInput
 }
 
 
@@ -1264,6 +1411,7 @@ export type PositionSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   protectionGroups?: boolean | Prisma.Position$protectionGroupsArgs<ExtArgs>
+  conditionalSellOrders?: boolean | Prisma.Position$conditionalSellOrdersArgs<ExtArgs>
   _count?: boolean | Prisma.PositionCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["position"]>
 
@@ -1336,6 +1484,7 @@ export type PositionInclude<ExtArgs extends runtime.Types.Extensions.InternalArg
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
   asset?: boolean | Prisma.AssetDefaultArgs<ExtArgs>
   protectionGroups?: boolean | Prisma.Position$protectionGroupsArgs<ExtArgs>
+  conditionalSellOrders?: boolean | Prisma.Position$conditionalSellOrdersArgs<ExtArgs>
   _count?: boolean | Prisma.PositionCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type PositionIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1353,6 +1502,7 @@ export type $PositionPayload<ExtArgs extends runtime.Types.Extensions.InternalAr
     tradingAccount: Prisma.$TradingAccountPayload<ExtArgs>
     asset: Prisma.$AssetPayload<ExtArgs>
     protectionGroups: Prisma.$ProtectionGroupPayload<ExtArgs>[]
+    conditionalSellOrders: Prisma.$ConditionalSellOrderPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1769,6 +1919,7 @@ export interface Prisma__PositionClient<T, Null = never, ExtArgs extends runtime
   tradingAccount<T extends Prisma.TradingAccountDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccountDefaultArgs<ExtArgs>>): Prisma.Prisma__TradingAccountClient<runtime.Types.Result.GetResult<Prisma.$TradingAccountPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   asset<T extends Prisma.AssetDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.AssetDefaultArgs<ExtArgs>>): Prisma.Prisma__AssetClient<runtime.Types.Result.GetResult<Prisma.$AssetPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   protectionGroups<T extends Prisma.Position$protectionGroupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Position$protectionGroupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  conditionalSellOrders<T extends Prisma.Position$conditionalSellOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Position$conditionalSellOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConditionalSellOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2237,6 +2388,30 @@ export type Position$protectionGroupsArgs<ExtArgs extends runtime.Types.Extensio
   take?: number
   skip?: number
   distinct?: Prisma.ProtectionGroupScalarFieldEnum | Prisma.ProtectionGroupScalarFieldEnum[]
+}
+
+/**
+ * Position.conditionalSellOrders
+ */
+export type Position$conditionalSellOrdersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ConditionalSellOrder
+   */
+  select?: Prisma.ConditionalSellOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ConditionalSellOrder
+   */
+  omit?: Prisma.ConditionalSellOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConditionalSellOrderInclude<ExtArgs> | null
+  where?: Prisma.ConditionalSellOrderWhereInput
+  orderBy?: Prisma.ConditionalSellOrderOrderByWithRelationInput | Prisma.ConditionalSellOrderOrderByWithRelationInput[]
+  cursor?: Prisma.ConditionalSellOrderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ConditionalSellOrderScalarFieldEnum | Prisma.ConditionalSellOrderScalarFieldEnum[]
 }
 
 /**

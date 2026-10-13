@@ -75,6 +75,10 @@ export interface PositionItemDto {
   assetType: AssetType;
   currencyCode: CurrencyCode;
   quantity: QuantityString;
+  /** Owner surfaces: held by submitted limit/LOC sells (still owned). */
+  reservedQuantity?: QuantityString;
+  /** Owner surfaces: quantity − reservedQuantity, what a new sell can use. */
+  availableQuantity?: QuantityString;
   averageCost: MoneyString;
   realizedPnl: MoneyString;
   realizedPnlKrw: MoneyString;

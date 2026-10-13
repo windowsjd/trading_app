@@ -14,6 +14,10 @@ import {
   liveConditionalBuy,
   type ConditionalBuyLifecycleReason,
 } from '../conditional/conditional-buy-state';
+import {
+  cancelLiveConditionalSellsInTransaction,
+  liveConditionalSell,
+} from '../conditional/conditional-sell-state';
 import { limitOnCloseOrderCanceled } from './limit-on-close-state';
 import {
   CurrencyCode,
@@ -487,8 +491,15 @@ export class LimitOrderCancelService {
         input.reason,
         input.canceledAt,
       );
-    // Conditional BUY watches reserve nothing; the same fence terminalizes them.
+    // Conditional BUY watches and SELL intents reserve nothing; the same
+    // fence terminalizes them.
     await cancelLiveConditionalBuysInTransaction(
+      tx,
+      input.tradingAccountId,
+      conditionalBuyLifecycleReason(input.reason),
+      input.canceledAt,
+    );
+    await cancelLiveConditionalSellsInTransaction(
       tx,
       input.tradingAccountId,
       conditionalBuyLifecycleReason(input.reason),
@@ -717,6 +728,44 @@ export class LimitOrderCancelService {
         await cancelLiveConditionalBuysInTransaction(
           tx,
           watch.tradingAccountId,
+          'season_ended',
+          input.now,
+        );
+      });
+    }
+    // Reservation-less SELL intents of ended seasons, same fence.
+    const intents = await this.prisma.conditionalSellOrder.findMany({
+      where: {
+        ...liveConditionalSell,
+        tradingAccount: {
+          mode: 'season',
+          seasonParticipant: {
+            season: { status: { in: ['ended', 'settled'] } },
+          },
+        },
+      },
+      distinct: ['tradingAccountId'],
+      select: {
+        tradingAccountId: true,
+        tradingAccount: {
+          select: { seasonParticipant: { select: { id: true } } },
+        },
+      },
+      orderBy: { tradingAccountId: 'asc' },
+      take: batchSize,
+    });
+    for (const intent of intents) {
+      if (input.isLockOwned && !input.isLockOwned())
+        // @diagnosticSurface internal: Existing Ops runner records lease loss and retries lifecycle cleanup.
+        throw new Error('Ops job lock ownership was lost.');
+      await this.prisma.$transaction(async (tx) => {
+        await lockSeasonTradingContext(tx, {
+          seasonParticipantId: intent.tradingAccount.seasonParticipant!.id,
+          participantWrite: true,
+        });
+        await cancelLiveConditionalSellsInTransaction(
+          tx,
+          intent.tradingAccountId,
           'season_ended',
           input.now,
         );

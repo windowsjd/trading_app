@@ -125,8 +125,8 @@ A virtual LOC, not an exchange auction replica: a BUY fills when the **final
 regular-session close** of the bound session is at or below the limit, at that
 close price. Above the limit it ends unfilled. It is a day order for exactly
 one session and never carries over. The shared rule `decideLimitOnClose`
-already covers SELL (close ≥ limit) for a later sell rework; SELL LOC is not
-accepted now (`LOC_SIDE_NOT_SUPPORTED`).
+covers SELL (close ≥ limit); LOC SELL is accepted since 2026-10-13 behind its
+own flag — see [SELL intents and LOC SELL](conditional-sell-and-loc-sell-contract.md).
 
 ### Registration
 
@@ -235,7 +235,8 @@ account is the existing 404 `TRADING_ACCOUNT_NOT_FOUND`)
 { "tradingAccountId": "…",
   "limitOrder": { "enabled": false, "autoExecutionEnabled": false },
   "limitOnClose": { "enabled": false, "markets": ["KRX"], "sides": ["buy"],
-                    "attachedProtection": false } }
+                    "attachedProtection": false },
+  "limitOnCloseSell": { "enabled": false, "markets": ["KRX"] } }
 ```
 
 - `limitOrder.enabled` = `LIMIT_ORDER_ENABLED`; `autoExecutionEnabled` also
@@ -243,7 +244,9 @@ account is the existing 404 `TRADING_ACCOUNT_NOT_FOUND`)
   quote's `executionPolicy.autoExecutionEnabled`).
 - `limitOnClose.enabled` = `LIMIT_ORDER_ENABLED && LOC_ORDERS_ENABLED`, the
   same precedence as create (`LIMIT_ORDER_DISABLED` before
-  `LOC_ORDERS_DISABLED`).
+  `LOC_ORDERS_DISABLED`). It stays the BUY answer.
+- `limitOnCloseSell.enabled` = `LIMIT_ORDER_ENABLED && LOC_SELL_ORDERS_ENABLED`
+  (2026-10-13, additive).
 - It reads flags only: no DB write, no order/wallet/ledger access, no
   migration. Session, market, Season and account rules stay with quote/create,
   which remain authoritative after any flag change. A client that cannot read

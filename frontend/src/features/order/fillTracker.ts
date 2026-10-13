@@ -10,8 +10,9 @@ import { formatDisplayDecimal, getAssetNameDisplay } from '../../utils/format.ts
  *
  * WHY A SET DIFF. The order list is `submittedAt DESC`, so a page of recent
  * orders misses an old limit order that fills today. Instead the watcher reads
- * the COMPLETE set of submitted orders (every page) and the complete set of
- * live Conditional BUY watches. Anything that leaves a set is a candidate and
+ * the COMPLETE set of submitted orders (every page) and the complete sets of
+ * live Conditional BUY watches and live SELL intents (condition, stop-loss,
+ * take-profit). Anything that leaves a set is a candidate and
  * is resolved by its own detail read; it is announced only if that detail is
  * an execution. Orders already executed when first seen are history and never
  * candidates, so app start does not replay past fills.
@@ -28,14 +29,17 @@ import { formatDisplayDecimal, getAssetNameDisplay } from '../../utils/format.ts
  * and request cost stay bounded: at most 30 targets per account, each given
  * up 24 h after its first failure (the order history still has the result).
  */
-export type FillOrigin = 'order' | 'conditional';
+export type FillOrigin = 'order' | 'conditional' | 'stop_loss' | 'take_profit';
 
-export type FillTarget = { kind: 'order' | 'watch'; id: string; origin: FillOrigin };
+/** `watch` = Conditional BUY watch, `sell_watch` = SELL condition / stop-loss / take-profit. */
+export type FillTarget = { kind: 'order' | 'watch' | 'sell_watch'; id: string; origin: FillOrigin };
 type Unresolved = FillTarget & { failures: number; since: number; retryAt: number };
 
 type AccountState = {
   pending: Set<string>;
   watches: Set<string>;
+  sellWatches: Set<string>;
+  /** Only for orders still open in this session; dropped once resolved. */
   origins: Map<string, FillOrigin>;
   /** Keyed like `reading`: order id, or `watch:<id>`; insertion order = oldest first. */
   unresolved: Map<string, Unresolved>;
@@ -46,6 +50,13 @@ export const FILL_RETRY_BASE_MS = 15_000;
 export const FILL_RETRY_MAX_MS = 5 * 60_000;
 export const FILL_UNRESOLVED_MAX_AGE_MS = 24 * 60 * 60_000;
 export const FILL_UNRESOLVED_MAX = 30;
+/**
+ * Announced (account, order) keys kept for deduplication. An executed order
+ * never re-enters an open set, so only recent ones can be seen again; the
+ * oldest beyond this bound are forgotten instead of growing for the whole
+ * session.
+ */
+export const FILL_SETTLED_MAX = 500;
 
 /** Backoff after the n-th consecutive failure (n ≥ 1). */
 export function fillRetryDelay(failures: number) {
@@ -61,7 +72,8 @@ export function isTransientFillReadFailure(info: { hasResponse: boolean; status:
   return !info.hasResponse || info.status === null || ![400, 403, 404, 410, 422].includes(info.status);
 }
 
-const targetKey = (kind: FillTarget['kind'], id: string) => (kind === 'order' ? id : `watch:${id}`);
+const targetKey = (kind: FillTarget['kind'], id: string) =>
+  kind === 'order' ? id : kind === 'watch' ? `watch:${id}` : `sell:${id}`;
 
 export function createFillTracker() {
   const accounts = new Map<string, AccountState>();
@@ -69,7 +81,7 @@ export function createFillTracker() {
   const account = (accountId: string) => {
     let state = accounts.get(accountId);
     if (!state) {
-      state = { pending: new Set(), watches: new Set(), origins: new Map(), unresolved: new Map(), reading: new Set() };
+      state = { pending: new Set(), watches: new Set(), sellWatches: new Set(), origins: new Map(), unresolved: new Map(), reading: new Set() };
       accounts.set(accountId, state);
     }
     return state;
@@ -94,6 +106,13 @@ export function createFillTracker() {
       state.watches = current;
       return gone;
     },
+    /** A complete, successful read of live SELL intents; returns ids that left it. */
+    observeSellWatches(accountId: string, ids: Iterable<string>) {
+      const state = account(accountId);
+      const { current, gone } = diff(state.sellWatches, ids);
+      state.sellWatches = current;
+      return gone;
+    },
     /** An order this session knows is open (created here or linked to a watch). */
     trackOrder(accountId: string, orderId: string, origin: FillOrigin = 'order') {
       const state = account(accountId);
@@ -103,6 +122,15 @@ export function createFillTracker() {
     trackWatch(accountId: string, watchId: string) {
       account(accountId).watches.add(watchId);
     },
+    trackSellWatch(accountId: string, watchId: string) {
+      account(accountId).sellWatches.add(watchId);
+    },
+    /** An order resolved without a fill (canceled/rejected): nothing left to keep. */
+    forgetOrder(accountId: string, orderId: string) {
+      const state = accounts.get(accountId);
+      state?.pending.delete(orderId);
+      state?.origins.delete(orderId);
+    },
     originOf(accountId: string, orderId: string): FillOrigin {
       return accounts.get(accountId)?.origins.get(orderId) ?? 'order';
     },
@@ -111,6 +139,9 @@ export function createFillTracker() {
     },
     hasOpenWatches(accountId: string) {
       return (accounts.get(accountId)?.watches.size ?? 0) > 0;
+    },
+    hasOpenSellWatches(accountId: string) {
+      return (accounts.get(accountId)?.sellWatches.size ?? 0) > 0;
     },
     /** Claims the one detail read of a target; false while another is running. */
     beginRead(accountId: string, kind: FillTarget['kind'], id: string) {
@@ -174,9 +205,12 @@ export function createFillTracker() {
       const key = `${accountId}:${orderId}`;
       if (settled.has(key)) return false;
       settled.add(key);
+      // Insertion order = oldest first; recent announcements stay deduplicated.
+      while (settled.size > FILL_SETTLED_MAX) settled.delete(settled.values().next().value as string);
       const state = accounts.get(accountId);
       state?.pending.delete(orderId);
       state?.unresolved.delete(orderId);
+      state?.origins.delete(orderId);
       return true;
     },
   };
@@ -208,6 +242,12 @@ export type FilledOrderFacts = {
   limitOnClose?: unknown;
 };
 
+const ORIGIN_LABEL: Record<Exclude<FillOrigin, 'order'>, string> = {
+  conditional: '조건주문',
+  stop_loss: '손절',
+  take_profit: '익절',
+};
+
 export function buildFillNotice(
   accountId: string,
   order: FilledOrderFacts,
@@ -223,7 +263,7 @@ export function buildFillNotice(
   const quantity = order.marketExecution?.executedQuantity ?? order.quantity;
   const detail = [
     options.accountLabel || null,
-    options.origin === 'conditional' ? '조건주문' : null,
+    options.origin && options.origin !== 'order' ? ORIGIN_LABEL[options.origin] : null,
     quantity ? `체결 수량 ${formatDisplayDecimal(quantity)}` : null,
   ].filter((part): part is string => !!part);
   return {

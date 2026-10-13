@@ -801,7 +801,8 @@ export class LimitOrderCreateService {
     return response;
   }
 
-  /** Submitted limit sell: reserve position quantity, consume quote, persist replay. */
+  /** Submitted limit sell: reserve position quantity, consume quote, persist
+   * replay. A Limit-on-Close SELL binds the same reservation to one session. */
   async createSubmittedLimitSellInTransaction(
     tx: LimitCreateTransactionClient,
     input: {
@@ -824,6 +825,10 @@ export class LimitOrderCreateService {
       idempotency: { idempotencyKey: string; requestHash: string };
       submittedAt: Date;
       autoExecutionEnabled?: boolean;
+      /** Limit-on-Close session binding, already validated post-lock. */
+      limitOnClose?: LimitOnCloseRegistration;
+      /** LOC SELL display data: what the user asked for (≥ quantity). */
+      requestedQuantity?: Prisma.Decimal | null;
     },
   ): Promise<LimitOrderCreateResponse> {
     setAdminDiagnosticContext({
@@ -1092,6 +1097,15 @@ export class LimitOrderCreateService {
         'Quote is not active.',
       );
     }
+    if (input.limitOnClose)
+      await createLimitOnCloseInTransaction(tx, {
+        orderId: created.id,
+        tradingAccountId: input.tradingAccountId,
+        assetId: input.quote.asset.id,
+        registration: input.limitOnClose,
+        now: input.submittedAt,
+        requestedQuantity: input.requestedQuantity ?? null,
+      });
     setAdminDiagnosticContext({
       failureStage: 'order_read_back',
       evidence: {
@@ -1135,8 +1149,10 @@ export class LimitOrderCreateService {
           reservationFeeRate: feeRateText,
           duplicate: false,
         },
+        // The continuous matcher never fills a LOC order.
         executionPolicy: buildLimitOrderExecutionPolicy({
-          autoExecutionEnabled: input.autoExecutionEnabled === true,
+          autoExecutionEnabled:
+            !input.limitOnClose && input.autoExecutionEnabled === true,
         }),
       },
     };

@@ -10,6 +10,50 @@
 
 ---
 
+## 2026-10-13 Trading Class 3차 현물 매도 주문 통합 (조건 매도·독립 손절/익절·KRX LOC SELL)
+
+- **기능 구현 의도:** "설정은 독립적으로 허용하고, 실행은 실제 보유수량과 예약수량에 따라 제한한다."
+  KRX·암호화폐 Spot에 조건 매도와 각자 수량을 가진 손절/익절(OCO 아님)을, KRX에 LOC SELL을 더한다.
+  미국주식 신규 매도 기능은 '준비 중', Futures는 범위 밖이다.
+- 시작 `main`=`origin/main`=`ffb9a515`, clean. main checkout에서 branch 없이 작업. commit·push·배포·운영 Migration 없음(미커밋 인계).
+- **수량 규칙:** 새 `conditional_sell_orders`(kind condition/stop_loss/take_profit)는 수량을 예약하지 않는다.
+  등록 시 각 설정 ≤ 보유(합계 100% 초과 허용), 실행 시 `min(남은 목표, 보유 − 다른 주문 예약)`
+  (주식 지정가는 정수)으로 정해 기존 quote→create 코어(`conditional-sell:{id}` 멱등 키)로 주문한다.
+  경쟁은 기존 원자적 Position guard와 계정 fence가 결정한다(30초 실행 창, 최대 3회).
+  보유가 0이 되는 체결 transaction이 live 설정을 `position_closed`로 끝내므로 재매수는 설정을 물려받지 않는다.
+- **OCO와 상호 배제:** live OCO가 있으면 새 설정은 `PROTECTION_CONFLICT`, live 설정이 있으면 OCO 등록은
+  `CONDITIONAL_SELL_CONFLICT`. 기존 OCO와 보유카드 TP/SL(초보 퀘스트 증거가 OCO group을 요구)은 그대로다.
+- **LOC SELL:** 일반 지정가 SELL + `limit_on_close_orders` 행(제출 시 수량 예약). 최종 KOSCOM 종가 증거와
+  정산 worker는 LOC BUY를 재사용한다(종가 ≥ 지정가 → 종가 체결). 다른 예약 때문에 quote가 수량을 줄이면
+  `quantityAdjustment`를 주고, create는 `requestedQuantity`를 되돌려 보내 hash·LOC 행에 남긴다(표시 전용).
+- 플래그(strict true/false, 기본 false): `CONDITIONAL_SELL_ORDERS_ENABLED`, `INDEPENDENT_TP_SL_ORDERS_ENABLED`,
+  `LOC_SELL_ORDERS_ENABLED`. BUY 플래그와 별개다. 꺼져도 조회·취소·수명주기 정리는 유지된다.
+  API: `/api/v1/trading-accounts/:accountId/conditional-sell-orders`(목록·상세·등록·`/:id/cancel`). Worker 1초/100행 + OpsJobLock.
+- 추가형 migration `20261013120000_add_conditional_sell_and_loc_sell`: enum 3개, `OpsJobName.conditional_sell_orders`,
+  `limit_on_close_orders.requested_quantity`, 종가 증거 shape CHECK의 BUY 전용 조건 제거(NOT VALID → VALIDATE).
+  기존 행 변환 없음. 시즌 종료·참가자 제외 정리와 정산 차단에 SELL 설정을 연결했다.
+- 프론트: 주문방식 sheet(KRX 매도 시장가/조건주문/LOC/손절·익절, 암호화폐 매도 시장가/조건주문/손절·익절,
+  직접 지정가 매도 없음), `SellIntentForm`, 대기/종료 목록, 설정 수량과 실행 가능 수량 구분, 학습 가이드(`allTrading`),
+  실제 매도 체결 배너(중복 제거, tracker 상한 500).
+- **정책 변경:** 매도 조건주문/LOC/손절·익절 행은 '준비 중' 고정에서 서버 gate 기반(기본 '이용 불가')으로 바뀌었다.
+  해당 기존 테스트 기대값을 갱신했고, LOC BUY runner의 매도 거절 코드는 `LOC_SIDE_NOT_SUPPORTED` → `LOC_SELL_ORDERS_DISABLED`다.
+- **주의:** `scripts/season-lifecycle-lease-integration.ts`처럼 `LimitOrderCancelService`에 부분 Prisma 객체를 주는
+  fixture는 `conditionalSellOrder` delegate가 필요하다(없으면 successor 정리 run이 실패한다).
+- 검증: SELL PG runner 63 시나리오(다중 매도 15종, 경쟁, LOC SELL 증거·동시 정산). CI DB 목록 3회 실행:
+  core 24/24, 금융 26-suite는 fresh jest cache(CI 순서)에서 25/26이다. 남은 `futures-f3`는 WSL 시계 역행 시각(16:11:01)과
+  일치하고 단독 재실행 PASS다. 이 작업이 만든 실패 2건(LOC BUY runner의 매도 거절 코드, lease fixture delegate)은 수정했다.
+  price-safety·active-admin 1/1, repair/audit dry-run 0건, backend unit 276 suites/4,422 tests(93 opt-in skip), e2e 406,
+  typecheck/build/lint/format/diagnostic/load-test 103, 생성물·migration drift 없음.
+  frontend check 2,507/0/0, Web export, 브라우저 sellOrder 208·orderMethod 224·tradingBrowser 133·orderLayout PASS.
+  `orderControlsBrowser`·`conditionalBrowser`는 시작 HEAD 사본에서도 같은 단계로 실패한다(기존 스크립트 노후, 미수정).
+- **기존 문제(미수정):** `scripts/order-input-policy-integration.ts`(변경 없음)는 실행마다 USD/KRW 1400 snapshot 3건을 남긴다
+  (HEAD 사본에서 동일 재현). 같은 DB에서 그 뒤에 도는 orders.execute·fx.execute·market-execution·mvp-flow가 환율 1400을 보고
+  실패한다(jest가 직전 실패 suite를 먼저 돌릴 때 재현). 깨끗한 DB에서는 네 suite 모두 PASS. 후속 정리 권장.
+- **NOT_RUN:** Android/iOS 실기기·IME·하드웨어 뒤로가기, hosted GitHub Actions(push 권한 없음), 실 KOSCOM·운영 활성화.
+  WSL 시계 역행(약 32초마다)과 겹친 CI suite 실패는 시각 대조와 단독 재실행 PASS로 분류했다.
+  상세 계약: [SELL 설정·LOC SELL](backend/docs/conditional-sell-and-loc-sell-contract.md),
+  브라우저 점검: [README](frontend/test/browser/README.md).
+
 ## 2026-10-12 가이드 화면 정리·체결괴리 방지시스템 공지
 
 - **기능 구현 의도:** 가이드를 간결하게(중복 문구 삭제, 학습 시작 CTA 명확화), 체험이 모의투자임을 분명히 하고 공지와 연결하며,

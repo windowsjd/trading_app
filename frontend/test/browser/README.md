@@ -451,3 +451,19 @@ is excluded because its quantity column already overflows at 320px / 2x at
 HEAD. `BEGINNER_CHROMIUM` selects Chromium, `ORDER_METHOD_BROWSER_OUTPUT` the
 screenshots/report.json (default `/tmp/trading-order-method-browser`),
 `ORDER_METHOD_QUICK=1` two combinations only.
+
+SELL order methods (3rd order phase) use `sellOrderBrowser.cjs` on the same
+trading fixture and `?viewport=1` root. It checks 208 screens: 320/360/390/430px
+× Light/Dark × font scales 1/2 × the KRX SELL sheet (시장가 plus the
+server-gated 조건주문/LOC/손절·익절 rows, never a direct 지정가), the SELL
+condition form and its registration, crypto stop-loss/take-profit with their
+own quantities and tiny decimals, LOC SELL accepted at the unreserved quantity
+(10 asked, 6 reserved elsewhere → 4) with its success sheet, a market SELL with
+part of the holding reserved, the SELL condition/TP·SL pending lists and
+history, and a stop-loss fill banner. Besides the clipped-text and sideways-
+scroll detector it requires 31.5px touch targets, an accessible name on every
+control and the checkbox state of the TP/SL toggles. Fixture switches:
+`sell=enabled`, `locSell=enabled`, `sellRows=1`, `holding=<qty>`,
+`reserved=<qty>`, `fillBanner=sell`. `BEGINNER_CHROMIUM` selects Chromium,
+`SELL_ORDER_BROWSER_OUTPUT` the screenshots/report.json (default
+`/tmp/trading-sell-order-browser`), `SELL_ORDER_QUICK=1` two combinations only.

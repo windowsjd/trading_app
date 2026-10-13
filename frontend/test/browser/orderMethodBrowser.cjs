@@ -168,7 +168,7 @@ async function run() {
       await page.getByTestId('order-quantity-input').fill('2');
       await shot('krx-loc');
 
-      // 4. KRX SELL: market only, the rest 준비 중.
+      // 4. KRX SELL: market plus the server-gated 조건주문/LOC/손절·익절 rows; no direct limit.
       await go('krx=1&asset=SAMSUNG&longName=1');
       await page.getByTestId('asset-detail-sell-button').click();
       await field().click();

@@ -297,6 +297,19 @@ export const QUERY_KEYS = {
       /** Ended history, paged. */
       ended: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id, 'ended'] as const,
     },
+    /** SELL intents: conditions and independent stop-loss/take-profit. */
+    conditionalSell: {
+      all: (id: string) => ['tradingAccount', 'conditionalSellOrders', id] as const,
+      /** Live rows (watching/triggered): order-form gate + fill watcher. */
+      list: (id: string, filters: { history: boolean; limit: number }) =>
+        ['tradingAccount', 'conditionalSellOrders', id, 'list', normalizeFilterKey(filters)] as const,
+      /** Every row the owner can still cancel of one kind, all pages. */
+      open: (id: string, kind: 'condition' | 'protection') =>
+        ['tradingAccount', 'conditionalSellOrders', id, 'open', kind, 'complete'] as const,
+      /** Ended history of one kind, paged. */
+      ended: (id: string, kind: 'condition' | 'protection') =>
+        ['tradingAccount', 'conditionalSellOrders', id, 'ended', kind] as const,
+    },
     /** Read-only server create gates (limit / LOC) for one account. */
     orderCapabilities: (id: string) => ['tradingAccount', 'orderCapabilities', id] as const,
     futures: {

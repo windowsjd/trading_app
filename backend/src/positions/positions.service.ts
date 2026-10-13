@@ -97,6 +97,8 @@ type PositionRecord = {
   id: string;
   assetId: string;
   quantity: Prisma.Decimal;
+  /** Quantity locked by submitted limit/LOC sells; owner surfaces only. */
+  reservedQuantity?: Prisma.Decimal;
   averageCost: Prisma.Decimal;
   currencyCode: CurrencyCode;
   realizedPnl: Prisma.Decimal;
@@ -215,6 +217,10 @@ type PositionItemWithSort = {
   assetType: AssetType;
   currencyCode: CurrencyCode;
   quantity: string;
+  /** Held by submitted limit/LOC sells (still owned, not sellable again). */
+  reservedQuantity: string;
+  /** quantity − reservedQuantity: what a new sell can use now. */
+  availableQuantity: string;
   averageCost: string;
   realizedPnl: string;
   realizedPnlKrw: string;
@@ -507,6 +513,7 @@ export class PositionsService {
       usdKrwSelection,
     );
 
+    const reserved = position.reservedQuantity ?? new Prisma.Decimal(0);
     return {
       positionId: position.id,
       assetId: position.assetId,
@@ -516,6 +523,11 @@ export class PositionsService {
       assetType: position.asset.assetType,
       currencyCode: position.currencyCode,
       quantity: this.formatDecimal(position.quantity, 8),
+      reservedQuantity: this.formatDecimal(reserved, 8),
+      availableQuantity: this.formatDecimal(
+        Prisma.Decimal.max(position.quantity.sub(reserved), 0),
+        8,
+      ),
       averageCost: this.formatDecimal(position.averageCost, 8),
       realizedPnl: this.formatDecimal(position.realizedPnl, 8),
       realizedPnlKrw: this.formatDecimal(position.realizedPnlKrw, 8),
@@ -1127,6 +1139,8 @@ export class PositionsService {
       assetType: item.assetType,
       currencyCode: item.currencyCode,
       quantity: item.quantity,
+      reservedQuantity: item.reservedQuantity,
+      availableQuantity: item.availableQuantity,
       averageCost: item.averageCost,
       realizedPnl: item.realizedPnl,
       realizedPnlKrw: item.realizedPnlKrw,
@@ -1166,6 +1180,7 @@ export class PositionsService {
         id: true,
         assetId: true,
         quantity: true,
+        reservedQuantity: true,
         averageCost: true,
         currencyCode: true,
         realizedPnl: true,

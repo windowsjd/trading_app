@@ -25,7 +25,31 @@ describe('readOrderCapabilities', () => {
         sides: ['buy'],
         attachedProtection: false,
       },
+      limitOnCloseSell: { enabled: false, markets: ['KRX'] },
     });
+  });
+
+  it('gates LOC SELL by its own flag, never by the BUY flag', () => {
+    const buyOnly = readOrderCapabilities(
+      env({ LIMIT_ORDER_ENABLED: 'true', LOC_ORDERS_ENABLED: 'true' }),
+    );
+    expect(buyOnly.limitOnClose.enabled).toBe(true);
+    expect(buyOnly.limitOnCloseSell.enabled).toBe(false);
+    const sellOnly = readOrderCapabilities(
+      env({ LIMIT_ORDER_ENABLED: 'true', LOC_SELL_ORDERS_ENABLED: 'true' }),
+    );
+    expect(sellOnly.limitOnClose.enabled).toBe(false);
+    expect(sellOnly.limitOnCloseSell.enabled).toBe(true);
+    expect(
+      readOrderCapabilities(
+        env({ LIMIT_ORDER_ENABLED: 'false', LOC_SELL_ORDERS_ENABLED: 'true' }),
+      ).limitOnCloseSell.enabled,
+    ).toBe(false);
+    expect(() =>
+      readOrderCapabilities(
+        env({ LIMIT_ORDER_ENABLED: 'true', LOC_SELL_ORDERS_ENABLED: 'on' }),
+      ),
+    ).toThrow('LOC_SELL_ORDERS_ENABLED must be true or false');
   });
 
   it('never reports LOC without the limit-order gate the create checks first', () => {
@@ -111,6 +135,7 @@ describe('TradingAccountOrderCapabilitiesController', () => {
           sides: ['buy'],
           attachedProtection: false,
         },
+        limitOnCloseSell: { enabled: false, markets: ['KRX'] },
       },
     });
   });
@@ -188,6 +213,7 @@ describe('GET /api/v1/trading-accounts/:accountId/order-capabilities (HTTP)', ()
             sides: ['buy'],
             attachedProtection: false,
           },
+          limitOnCloseSell: { enabled: false, markets: ['KRX'] },
         },
       });
       expect(getOwnedAccountOrThrow).toHaveBeenCalledWith('u1', 'a1');

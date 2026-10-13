@@ -640,6 +640,45 @@ describe('PositionsService', () => {
     expectNoPositionWrites(prisma);
   });
 
+  it('shows the owner the reserved and still-sellable quantity, never to friends', async () => {
+    const { prisma, service } = createService();
+    mockCurrentSeason(prisma);
+    mockJoined(prisma);
+    prisma.position.findMany.mockResolvedValue([
+      {
+        ...position({
+          id: 'position-reserved',
+          quantity: '10.00000000',
+          averageCost: '90.00000000',
+        }),
+        reservedQuantity: new Prisma.Decimal('6'),
+      },
+    ]);
+    prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
+      priceSnapshot('price-reserved', '100.00000000'),
+    );
+
+    const response = await service.getPositions('user-1');
+
+    expect(response.data.positions[0]).toMatchObject({
+      quantity: '10.00000000',
+      reservedQuantity: '6.00000000',
+      availableQuantity: '4.00000000',
+    });
+    expect(prisma.position.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({ reservedQuantity: true }),
+      }),
+    );
+    const [projection] = await service.readOpenHoldingProjection(
+      participant.tradingAccountId,
+      new Date(),
+    );
+    expect(JSON.stringify(projection)).not.toMatch(
+      /"(?:reservedQuantity|availableQuantity)"/,
+    );
+  });
+
   it('returns KRW position valuation from admin_manual asset price', async () => {
     const { prisma, service } = createService();
     mockCurrentSeason(prisma);

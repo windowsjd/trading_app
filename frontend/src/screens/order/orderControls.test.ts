@@ -165,7 +165,7 @@ describe('주문방식 field and sheet', () => {
         assert.equal(h.node(`order-method-${method}-badge`).props.children, badge);
       }
     });
-    it(`${assetType} SELL lists 시장가 and three 준비 중 methods, never a new 지정가`, async (t) => {
+    it(`${assetType} SELL lists 시장가 and three server-gated methods (US 준비 중), never a new 지정가`, async (t) => {
       const h = inlineTradingHarness();
       h.method = null;
       h.assetId = 'samsung';
@@ -174,8 +174,11 @@ describe('주문방식 field and sheet', () => {
       await h.press(sell);
       await h.press(TEST_IDS.order.typeSelect);
       assert.deepEqual(methods(h), ['market', 'conditional', 'loc', 'protection']);
-      for (const method of ['conditional', 'loc', 'protection'])
-        assert.equal(h.node(`order-method-${method}-badge`).props.children, '준비 중');
+      // KRX follows the (default off) server gates; US waits for a data provider.
+      for (const method of ['conditional', 'loc', 'protection']) {
+        assert.equal(h.node(`order-method-${method}`).props.disabled, true, method);
+        assert.equal(h.node(`order-method-${method}-badge`).props.children, assetType === 'us_stock' ? '준비 중' : '이용 불가');
+      }
     });
   }
 

@@ -7,6 +7,7 @@ import {
   liveProtection,
   protectionInclude,
 } from '../conditional/conditional-state';
+import { closeConditionalSellsOnFlatPosition } from '../conditional/conditional-sell-state';
 import {
   HttpException,
   HttpStatus,
@@ -875,6 +876,15 @@ export class LimitOrderExecutionService {
         order.id,
         transactionNow,
       );
+      // A SELL fill that left the holding flat ends every live SELL intent
+      // on it here, so a later re-buy never inherits them.
+      if (order.side === OrderSide.sell)
+        await closeConditionalSellsOnFlatPosition(
+          tx,
+          tradingAccountId,
+          order.assetId,
+          transactionNow,
+        );
       // 11) Equity snapshot — reuse the market path's exact valuation so a
       // limit fill and a market fill leave identical portfolio state.
       await this.ordersService.recordOrderExecutedPortfolioSnapshotInTransaction(

@@ -129,6 +129,7 @@ const settlement = new LimitOnCloseSettlementService(
 const CONFIRM_MS = 400;
 const config: LimitOnCloseConfig = {
   enabled: true,
+  sellEnabled: false,
   evidenceMinDelayMs: 0,
   evidenceConfirmMs: CONFIRM_MS,
   evidenceDeadlineMs: 10_800_000,
@@ -810,7 +811,8 @@ async function registrationRules() {
   });
   await locScenario('season', async (s) => {
     for (const [patch, expected] of [
-      [{ side: 'sell' }, 'LOC_SIDE_NOT_SUPPORTED'],
+      // LOC SELL has its own flag (off here); the BUY flag never opens it.
+      [{ side: 'sell' }, 'LOC_SELL_ORDERS_DISABLED'],
       [
         { orderType: 'market', limitPrice: undefined },
         'INVALID_LIMIT_ON_CLOSE',

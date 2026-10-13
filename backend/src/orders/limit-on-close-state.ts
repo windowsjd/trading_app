@@ -3,7 +3,8 @@ import { formatDecimalScale, monetaryScale } from '../fx/fx-decimal-policy';
 import type { LimitOnCloseRegistration } from './limit-on-close.policy';
 import { sessionDateText } from './limit-on-close.policy';
 
-/** Same transaction as the submitted limit Order and its cash reservation. */
+/** Same transaction as the submitted limit Order and its reservation (cash
+ * for BUY, position quantity for SELL). */
 export async function createLimitOnCloseInTransaction(
   tx: Prisma.TransactionClient,
   input: {
@@ -12,6 +13,8 @@ export async function createLimitOnCloseInTransaction(
     assetId: string;
     registration: LimitOnCloseRegistration;
     now: Date;
+    /** SELL only: what the user asked for when less was accepted. */
+    requestedQuantity?: Prisma.Decimal | null;
   },
 ) {
   return tx.limitOnCloseOrder.create({
@@ -19,6 +22,7 @@ export async function createLimitOnCloseInTransaction(
       orderId: input.orderId,
       tradingAccountId: input.tradingAccountId,
       assetId: input.assetId,
+      requestedQuantity: input.requestedQuantity ?? null,
       market: input.registration.market,
       sessionDate: input.registration.sessionDate,
       sessionOpenAt: input.registration.session.openTime,
@@ -53,6 +57,7 @@ export const LIMIT_ON_CLOSE_SELECT = {
   sessionOpenAt: true,
   sessionCloseAt: true,
   evidenceDeadlineAt: true,
+  requestedQuantity: true,
   status: true,
   decisionReason: true,
   decidedAt: true,
@@ -90,6 +95,10 @@ export function presentLimitOnClose(row: LimitOnCloseRecord) {
     sessionOpenAt: row.sessionOpenAt.toISOString(),
     sessionCloseAt: row.sessionCloseAt.toISOString(),
     evidenceDeadlineAt: row.evidenceDeadlineAt.toISOString(),
+    // SELL only: the quantity asked for when the order accepted less.
+    requestedQuantity: row.requestedQuantity
+      ? formatDecimalScale(row.requestedQuantity, monetaryScale)
+      : null,
     status: row.status,
     decisionReason: row.decisionReason,
     decidedAt: row.decidedAt?.toISOString() ?? null,

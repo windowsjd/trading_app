@@ -10,14 +10,23 @@ import { ConditionalWorker } from './conditional-worker.service';
 import { ConditionalBuyService } from './conditional-buy.service';
 import { ConditionalBuyController } from './conditional-buy.controller';
 import { ConditionalBuyWorker } from './conditional-buy-worker.service';
+import { ConditionalSellService } from './conditional-sell.service';
+import { ConditionalSellController } from './conditional-sell.controller';
+import { ConditionalSellWorker } from './conditional-sell-worker.service';
 @Module({
   imports: [OrdersModule, FuturesModule, TradingAccountsModule],
-  controllers: [ConditionalController, ConditionalBuyController],
+  controllers: [
+    ConditionalController,
+    ConditionalBuyController,
+    ConditionalSellController,
+  ],
   providers: [
     ConditionalService,
     ConditionalWorker,
     ConditionalBuyService,
     ConditionalBuyWorker,
+    ConditionalSellService,
+    ConditionalSellWorker,
     OpsJobLockService,
     OpsJobRunService,
   ],

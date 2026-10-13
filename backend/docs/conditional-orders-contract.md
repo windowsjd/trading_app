@@ -4,7 +4,12 @@ Current contract: server capability defaults OFF; production activation is a sep
 
 Conditional BUY watches and Limit-on-Close are a separate contract and flag
 ([Conditional BUY / LOC](conditional-buy-and-loc-contract.md));
-`CONDITIONAL_ORDERS_ENABLED` never enables them.
+`CONDITIONAL_ORDERS_ENABLED` never enables them. The same holds for the
+independent SELL settings (conditions, stop-loss/take-profit with their own
+quantities) and LOC SELL ([SELL intents](conditional-sell-and-loc-sell-contract.md)):
+an OCO group and live SELL settings never share a holding — each refuses
+registration while the other is live (`PROTECTION_CONFLICT` /
+`CONDITIONAL_SELL_CONFLICT`); existing OCO behavior is unchanged.
 
 ## Intent and boundaries
 

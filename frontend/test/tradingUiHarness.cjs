@@ -107,6 +107,9 @@ function createTradingUiHarness(screenName) {
         if (resource === 'conditionalBuyOrders') return { ...base, ...h.conditionalQuery, data: h.conditionalQuery?.data ?? { tradingAccountId: h.account.id,
           capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
           conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
+        if (resource === 'conditionalSellOrders') return { ...base, ...h.sellQuery, data: h.sellQuery?.data ?? { tradingAccountId: h.account.id,
+          capabilities: { enabled: false, condition: { enabled: false, canCreate: false, canUseLimit: false }, protection: { enabled: false, canCreate: false, canUseLimit: false }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
+          conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
         if (resource === 'orderCapabilities') return { ...base, ...h.capabilityQuery, data: h.capabilityQuery?.data ?? { tradingAccountId: h.account.id,
           limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: { tradingAccountId: 'account-1', capabilities: { enabled: false, canCreateSpot: false, canUseSpotLimit: false, canCancel: true }, groups: [] } };

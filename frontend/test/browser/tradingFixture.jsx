@@ -16,12 +16,15 @@ import Futures from '../../src/screens/futures/FuturesScreen';
 import { state, navigation } from './tradingMocks';
 import { ScreenSheetHost } from '../../src/components/common/ScreenSheetHost';
 import OrderFillBanner from '../../src/features/order/OrderFillBanner';
-// `?fillBanner=1` overlays one real-fill banner (layout/visual checks only).
-const fillBanner = new URLSearchParams(location.search).get('fillBanner') === '1' ? {
+// `?fillBanner=1` overlays one real-fill banner (layout/visual checks only);
+// `?fillBanner=sell` the banner of a stop-loss sale.
+const fillBannerKind = new URLSearchParams(location.search).get('fillBanner');
+const fillBanner = fillBannerKind === '1' || fillBannerKind === 'sell' ? {
   id: 'account-fixture:fixture-order', accountId: 'account-fixture', orderId: 'fixture-order',
   title: new URLSearchParams(location.search).get('longName') === '1'
-    ? '아주 긴 이름을 가진 국내 상장 주식회사 우선주 Example Holdings LOC 매수 체결 완료' : '삼성전자 매수 체결 완료',
-  detail: '일반모드 · 조건주문 · 체결 수량 1,234,567.123456', overflow: 2,
+    ? `아주 긴 이름을 가진 국내 상장 주식회사 우선주 Example Holdings LOC ${fillBannerKind === 'sell' ? '매도' : '매수'} 체결 완료`
+    : `삼성전자 ${fillBannerKind === 'sell' ? '매도' : '매수'} 체결 완료`,
+  detail: `일반모드 · ${fillBannerKind === 'sell' ? '손절' : '조건주문'} · 체결 수량 1,234,567.123456`, overflow: 2,
 } : null;
 const client = new QueryClient({
   defaultOptions: {

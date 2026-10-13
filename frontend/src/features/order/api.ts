@@ -41,12 +41,23 @@ export type OrderQuoteRequestDto = OrderInputDto & {
   /** Required when orderType='limit'; forbidden for market. */
   limitPrice?: MoneyString;
   /**
-   * KRX Limit-on-Close BUY: an ordinary limit order bound to one regular
-   * session's final close. Sent only when true, so every other request stays
-   * byte-identical; never a separate orderType.
+   * KRX Limit-on-Close BUY or SELL: an ordinary limit order bound to one
+   * regular session's final close. Sent only when true, so every other
+   * request stays byte-identical; never a separate orderType.
    */
   limitOnClose?: true;
 };
+
+/**
+ * LOC SELL quote: the server accepted less than asked because other orders
+ * already reserve part of the holding (`quantity` is the accepted part).
+ */
+export interface QuantityAdjustmentDto {
+  reason: 'available_quantity' | (string & {});
+  requestedQuantity: QuantityString;
+  acceptedQuantity: QuantityString;
+  availableQuantity: QuantityString;
+}
 
 /** Quote-time preview of the session a LOC order would bind to. */
 export interface LimitOnCloseQuoteDto {
@@ -68,6 +79,8 @@ export type LimitOnCloseStatus =
 
 /** Server-owned LOC state on an order (create, list and detail; not cancel). */
 export interface LimitOnCloseOrderDto extends LimitOnCloseQuoteDto {
+  /** SELL only: the quantity asked for when the order accepted less. */
+  requestedQuantity?: QuantityString | null;
   status: LimitOnCloseStatus;
   decisionReason: string | null;
   decidedAt: IsoDateTimeString | null;
@@ -146,10 +159,14 @@ export interface OrderQuoteDto {
   executionPolicy?: LimitOrderExecutionPolicyDto;
   /** Present only on a LOC quote. */
   limitOnClose?: LimitOnCloseQuoteDto;
+  /** LOC SELL only: null when the whole request was accepted. */
+  quantityAdjustment?: QuantityAdjustmentDto | null;
 }
 
 export type CreateOrderRequestDto = OrderQuoteRequestDto & {
   attachedProtection?: import('../conditional/api').ProtectionLeg[];
+  /** LOC SELL only, display data: what was asked when less was accepted. */
+  requestedQuantity?: QuantityString;
   quoteId: string;
   idempotencyKey: string;
 };

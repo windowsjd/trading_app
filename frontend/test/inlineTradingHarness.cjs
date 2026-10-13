@@ -20,6 +20,16 @@ function deferred() {
   });
   return { promise, resolve, reject };
 }
+/** Server gates for new SELL intents: closed unless a test opens them. */
+function defaultSellList(id) {
+  return {
+    tradingAccountId: id,
+    capabilities: { enabled: false, condition: { enabled: false, canCreate: false, canUseLimit: false },
+      protection: { enabled: false, canCreate: false, canUseLimit: false }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
+    conditionalOrders: [],
+    pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null },
+  };
+}
 function inlineTradingHarness() {
   const h = {
     assetId: 'bnb',
@@ -30,6 +40,7 @@ function inlineTradingHarness() {
     role: 'user',
     priceErrors: [],
     requests: [],
+    alerts: [],
     invalidations: [],
     queries: [],
     navigation: [],
@@ -67,6 +78,8 @@ function inlineTradingHarness() {
     // (see h.mount); a test about the unselected form sets this to null.
     method: 'market',
     conditionalList: null,
+    // SELL intents list (gates + live rows) and its create answers.
+    sellList: null,
     orderCapabilities: null,
   };
   for (const [id, price, type] of [
@@ -202,6 +215,8 @@ function inlineTradingHarness() {
     ),
     Modal: 'Modal',
     ActivityIndicator: 'ActivityIndicator',
+    // Recorded, never shown: e.g. the beginner learning guard's explanation.
+    Alert: { alert: (...args) => { h.alerts.push(args); } },
     StyleSheet: { create: (value) => value, absoluteFillObject: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 } },
     Platform: { OS: 'android' },
     AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
@@ -299,12 +314,38 @@ function inlineTradingHarness() {
         return { tradingAccountId: id, duplicate: false, conditionalOrder: null };
       },
     },
+    // SELL intent transport: records requests like the order client does.
+    '../../features/conditional/conditionalSellApi': {
+      getConditionalSellOrders: async (id) => h.sellList ?? defaultSellList(id),
+      getConditionalSellOrder: async () => { throw new Error('conditional sell detail not used here'); },
+      createConditionalSellOrder: async (id, body) => {
+        h.requests.push({ url: `/trading-accounts/${id}/conditional-sell-orders`, body });
+        if (h.sellGate) await h.sellGate.promise;
+        if (h.sellFailure) throw h.sellFailure;
+        const asset = h.assets[body.assetId];
+        const legs = body.kind === 'condition'
+          ? [['condition', body.triggerCondition, body]]
+          : [['stop_loss', 'at_or_below', body.stopLoss], ['take_profit', 'at_or_above', body.takeProfit]].filter((leg) => leg[2]);
+        return { tradingAccountId: id, duplicate: !!h.sellResult, conditionalOrders: legs.map(([kind, triggerCondition, leg], index) => ({
+          id: `cs-${h.requests.length}-${index}`, assetId: body.assetId, asset: { id: asset.id, symbol: asset.symbol, name: asset.name, market: asset.market, assetType: asset.assetType },
+          side: 'sell', kind, positionId: `${id}${body.assetId}`, triggerCondition, triggerPrice: leg.triggerPrice, executionType: leg.executionType,
+          limitPrice: leg.limitPrice ?? null, quantity: leg.quantity, currencyCode: asset.settlementCurrency,
+          status: 'watching', state: 'watching', position: null, executionAvailableQuantity: null, quantityLimited: false,
+          trigger: null, order: null, attemptCount: 0, lastAttemptAt: null, failureCode: null, terminalReason: null,
+          createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(), ...h.sellResult,
+        })) };
+      },
+      cancelConditionalSellOrder: async (id, conditionalOrderId) => {
+        h.requests.push({ url: `/trading-accounts/${id}/conditional-sell-orders/${conditionalOrderId}/cancel` });
+        return { tradingAccountId: id, duplicate: false, conditionalOrder: null };
+      },
+    },
     './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
     'react-native': native,
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }) },
     '@react-navigation/elements': { useHeaderHeight: () => 48 },
-    'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
+    'react-native-svg': { default: 'Svg', Path: 'Path', Rect: 'Rect', __esModule: true },
     '../../features/auth/useAdminDiagnostics': adminHook,
     '@react-navigation/native': { useIsFocused: () => h.focused },
     '../../theme/useReducedMotion': { useReducedMotion: () => h.reduced ?? false },
@@ -347,6 +388,7 @@ function inlineTradingHarness() {
         if (resource === 'conditionalBuyOrders') return { ...base, data: h.conditionalList ?? { tradingAccountId: id,
           capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
           conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
+        if (resource === 'conditionalSellOrders') return { ...base, data: h.sellList ?? defaultSellList(id) };
         if (resource === 'orderCapabilities') return { ...base, data: h.orderCapabilities ?? { tradingAccountId: id,
           limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: h.protections ?? { tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { total: 0, limit: 30, offset: 0, hasNext: false } } };
@@ -380,6 +422,9 @@ function inlineTradingHarness() {
                 {
                   assetId: h.assetId,
                   quantity: h.positions[id] ?? '0',
+                  // Server-reported reservation facts, when a test sets them.
+                  ...(h.positionAvailable?.[id] !== undefined ? { availableQuantity: h.positionAvailable[id] } : {}),
+                  ...(h.positionReserved?.[id] !== undefined ? { reservedQuantity: h.positionReserved[id] } : {}),
                   averageCost: '700',
                   currencyCode: 'USD',
                   valuation: { state: 'unavailable' },

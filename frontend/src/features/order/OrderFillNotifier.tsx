@@ -11,6 +11,7 @@ import {
 } from '../tradingAccount/api';
 import { getAccountPendingOrders } from '../record/accountOrders';
 import { getConditionalBuyOrder, getConditionalBuyOrders } from '../conditional/conditionalBuyApi';
+import { getConditionalSellOrder, getConditionalSellOrders } from '../conditional/conditionalSellApi';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
 import { getApiErrorInfo } from '../../services/api/errorMapper';
 import { rootNavigationRef } from '../../app/navigation/navigationRef';
@@ -98,6 +99,7 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
       if (order.status === 'submitted') tracker.trackOrder(accountId, orderId, effectiveOrigin);
       else if (order.status === 'executed') announce(accountId, { ...order, orderId }, effectiveOrigin);
       // canceled / rejected (incl. LOC unfilled or expired): nothing to announce.
+      else tracker.forgetOrder(accountId, orderId);
     } catch (cause) {
       failed(accountId, { kind: 'order', id: orderId, origin: effectiveOrigin }, cause);
     } finally {
@@ -124,15 +126,36 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
     }
   }, [current, failed, resolveOrder, touched, tracker]);
 
+  /** A SELL intent left the live list: follow its linked order, never the trigger. */
+  const resolveSellWatch = useCallback(async (accountId: string, watchId: string) => {
+    if (!tracker.beginRead(accountId, 'sell_watch', watchId)) return;
+    try {
+      const { conditionalOrder: row } = await getConditionalSellOrder(accountId, watchId);
+      if (!current()) return;
+      tracker.resolved(accountId, 'sell_watch', watchId);
+      const origin: FillOrigin = row.kind === 'condition' ? 'conditional' : row.kind;
+      if (row.state === 'watching' || row.state === 'triggered') tracker.trackSellWatch(accountId, watchId);
+      else if (row.state === 'order_pending' && row.order?.orderId) tracker.trackOrder(accountId, row.order.orderId, origin);
+      else if (row.state === 'filled' && row.order?.orderId) await resolveOrder(accountId, row.order.orderId, origin);
+      // failed / canceled (incl. nothing left to sell): no fill to announce.
+    } catch (cause) {
+      failed(accountId, { kind: 'sell_watch', id: watchId, origin: 'conditional' }, cause);
+    } finally {
+      tracker.endRead(accountId, 'sell_watch', watchId);
+      if (current()) touched();
+    }
+  }, [current, failed, resolveOrder, touched, tracker]);
+
   /** Re-read the targets whose backoff ran out (foreground only). */
   const retryDue = useCallback((accountId: string) => {
     if (!current()) return;
     for (const target of tracker.due(accountId, Date.now())) {
       if (target.kind === 'order') void resolveOrder(accountId, target.id, target.origin);
+      else if (target.kind === 'sell_watch') void resolveSellWatch(accountId, target.id);
       else void resolveWatch(accountId, target.id);
     }
     touched();
-  }, [current, resolveOrder, resolveWatch, touched, tracker]);
+  }, [current, resolveOrder, resolveSellWatch, resolveWatch, touched, tracker]);
 
   // Back from the background: check every unresolved target once now.
   const wasActive = useRef(active);
@@ -147,6 +170,7 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
   useEffect(() => subscribeOrderFillEvents((event) => {
     if (!current() || !watchedIds.has(event.accountId)) return;
     if (event.kind === 'order') tracker.trackOrder(event.accountId, event.orderId, event.origin);
+    else if (event.kind === 'watch' && event.side === 'sell') tracker.trackSellWatch(event.accountId, event.watchId);
     else if (event.kind === 'watch') tracker.trackWatch(event.accountId, event.watchId);
     else announce(event.accountId, event.order, 'order');
     touched();
@@ -157,7 +181,8 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
     <>
       {accounts.map((account) => (
         <AccountFillWatcher key={account.id} accountId={account.id} active={active} tracker={tracker}
-          onOrderGone={resolveOrder} onWatchGone={resolveWatch} onRetryDue={retryDue} touched={touched} />
+          onOrderGone={resolveOrder} onWatchGone={resolveWatch} onSellWatchGone={resolveSellWatch}
+          onRetryDue={retryDue} touched={touched} />
       ))}
       <OrderFillBanner
         notice={head}
@@ -181,17 +206,19 @@ function openHistory(notice: FillNotice): FillHistoryOutcome {
   return 'opened';
 }
 
-function AccountFillWatcher({ accountId, active, tracker, onOrderGone, onWatchGone, onRetryDue, touched }: {
+function AccountFillWatcher({ accountId, active, tracker, onOrderGone, onWatchGone, onSellWatchGone, onRetryDue, touched }: {
   accountId: string;
   active: boolean;
   tracker: FillTracker;
   onOrderGone: (accountId: string, orderId: string) => Promise<void>;
   onWatchGone: (accountId: string, watchId: string) => Promise<void>;
+  onSellWatchGone: (accountId: string, watchId: string) => Promise<void>;
   onRetryDue: (accountId: string) => void;
   touched: () => void;
 }) {
   const openOrders = tracker.hasOpenOrders(accountId);
   const openWatches = tracker.hasOpenWatches(accountId);
+  const openSellWatches = tracker.hasOpenSellWatches(accountId);
   // Unresolved reads wait for their backoff; nothing runs in the background.
   const retryAt = tracker.nextRetryAt(accountId);
   useEffect(() => {
@@ -220,6 +247,17 @@ function AccountFillWatcher({ accountId, active, tracker, onOrderGone, onWatchGo
     retry: 1,
   });
 
+  // Live SELL intents (watching/triggered); same key as the sell order form's gate.
+  const sellWatches = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.conditionalSell.list(accountId, { history: false, limit: 100 }),
+    queryFn: ({ signal }) => getConditionalSellOrders(accountId, { limit: 100 }, signal),
+    enabled: active,
+    // With both SELL flags off nothing triggers, so there is nothing to wait for.
+    refetchInterval: (query) => active && openSellWatches && query.state.data?.capabilities.enabled === true ? FILL_POLL_MS : false,
+    refetchIntervalInBackground: false,
+    retry: 1,
+  });
+
   const pendingSeen = useRef(0);
   useEffect(() => {
     const data = pending.data;
@@ -240,5 +278,16 @@ function AccountFillWatcher({ accountId, active, tracker, onOrderGone, onWatchGo
     gone.forEach((watchId) => void onWatchGone(accountId, watchId));
     touched();
   }, [accountId, onWatchGone, touched, tracker, watches.data, watches.dataUpdatedAt]);
+
+  const sellWatchesSeen = useRef(0);
+  useEffect(() => {
+    const data = sellWatches.data;
+    if (!data || data.tradingAccountId !== accountId || sellWatches.dataUpdatedAt === sellWatchesSeen.current) return;
+    if (data.pagination.nextOffset !== null) return; // incomplete set: never diff it
+    sellWatchesSeen.current = sellWatches.dataUpdatedAt;
+    const gone = tracker.observeSellWatches(accountId, data.conditionalOrders.map((row) => row.id));
+    gone.forEach((watchId) => void onSellWatchGone(accountId, watchId));
+    touched();
+  }, [accountId, onSellWatchGone, sellWatches.data, sellWatches.dataUpdatedAt, touched, tracker]);
   return null;
 }

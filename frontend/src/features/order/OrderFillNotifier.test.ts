@@ -22,6 +22,9 @@ function notifierHarness() {
     accounts: [{ id: 'general', mode: 'general', status: 'active', season: null }, seasonAccount],
     pending: { general: [], season: [] } as Record<string, Row[]>,
     watches: { general: [], season: [] } as Record<string, Row[]>,
+    sellWatches: { general: [], season: [] } as Record<string, Row[]>,
+    sellEnabled: true,
+    sellDetails: {} as Record<string, Row>,
     watchEnabled: true,
     details: {} as Record<string, Row>,
     watchDetails: {} as Record<string, Row>,
@@ -59,6 +62,18 @@ function notifierHarness() {
         h.reads.push(`watch:${id}:${watchId}`);
         if (!h.watchDetails[`${id}:${watchId}`]) throw new Error('network');
         return { tradingAccountId: id, conditionalOrder: h.watchDetails[`${id}:${watchId}`], duplicate: false };
+      },
+    },
+    '../conditional/conditionalSellApi': {
+      getConditionalSellOrders: async (id: string) => {
+        h.reads.push(`sell-watches:${id}`);
+        return { tradingAccountId: id, capabilities: { enabled: h.sellEnabled }, conditionalOrders: h.sellWatches[id],
+          pagination: { limit: 100, offset: 0, total: h.sellWatches[id].length, returned: h.sellWatches[id].length, nextOffset: null } };
+      },
+      getConditionalSellOrder: async (id: string, watchId: string) => {
+        h.reads.push(`sell-watch:${id}:${watchId}`);
+        if (!h.sellDetails[`${id}:${watchId}`]) throw new Error('network');
+        return { tradingAccountId: id, conditionalOrder: h.sellDetails[`${id}:${watchId}`], duplicate: false };
       },
     },
     '../../services/api/sessionOwnership': { getSessionGeneration: () => h.generation, isCurrentSession: (owner: number) => owner === h.generation },
@@ -475,5 +490,73 @@ describe('banner timing', () => {
     } finally {
       mock.timers.reset();
     }
+  });
+});
+
+describe('SELL intents (condition, stop-loss, take-profit) and LOC SELL', () => {
+  const sellExecuted = (orderId: string, extra: Row = {}) => ({ ...executed(orderId), side: 'sell', ...extra });
+  it('announces the real sale behind a stop-loss once, named as 손절, never the trigger', async (t) => {
+    const h = notifierHarness();
+    h.sellWatches.general = [{ id: 'sl-1', state: 'watching' }];
+    await h.mount(); t.after(h.close);
+    assert.deepEqual(h.banner(), []);
+    // Fired and sold in one worker pass: the intent leaves the live list.
+    h.sellWatches.general = [];
+    h.sellDetails['general:sl-1'] = { id: 'sl-1', kind: 'stop_loss', state: 'filled', order: { orderId: 'o-sl', status: 'executed' } };
+    h.details['general:o-sl'] = sellExecuted('o-sl');
+    await h.refresh();
+    assert.deepEqual(h.banner(), ['삼성전자 매도 체결 완료']);
+    assert.deepEqual(h.detail(), ['일반모드 · 손절 · 체결 수량 3']);
+    await h.refresh();
+    assert.equal(h.banner().length, 1, 'one banner per order');
+    assert.equal(h.detailReads('o-sl'), 1);
+  });
+
+  it('a limit take-profit waits as an open order; only its later fill is announced', async (t) => {
+    const h = notifierHarness();
+    h.sellWatches.general = [{ id: 'tp-1', state: 'watching' }];
+    await h.mount(); t.after(h.close);
+    h.sellWatches.general = [];
+    h.sellDetails['general:tp-1'] = { id: 'tp-1', kind: 'take_profit', state: 'order_pending', order: { orderId: 'o-tp', status: 'submitted' } };
+    h.pending.general = [{ ...submitted('o-tp'), side: 'sell' }];
+    await h.refresh();
+    assert.deepEqual(h.banner(), [], 'an accepted limit sell is not a fill');
+    h.pending.general = [];
+    h.details['general:o-tp'] = sellExecuted('o-tp');
+    await h.refresh();
+    assert.deepEqual(h.banner(), ['삼성전자 매도 체결 완료']);
+    assert.deepEqual(h.detail(), ['일반모드 · 익절 · 체결 수량 3']);
+  });
+
+  it('stays silent for a failed setting (nothing left to sell), a canceled one and a LOC SELL that missed', async (t) => {
+    const h = notifierHarness();
+    h.sellWatches.general = [{ id: 'f-1', state: 'watching' }, { id: 'c-1', state: 'watching' }];
+    h.pending.general = [{ ...submitted('loc-s'), side: 'sell' }];
+    await h.mount(); t.after(h.close);
+    h.sellWatches.general = [];
+    h.pending.general = [];
+    h.sellDetails['general:f-1'] = { id: 'f-1', kind: 'condition', state: 'failed', failureCode: 'CONDITIONAL_SELL_QUANTITY_UNAVAILABLE', order: null };
+    h.sellDetails['general:c-1'] = { id: 'c-1', kind: 'condition', state: 'canceled', terminalReason: 'position_closed', order: null };
+    h.details['general:loc-s'] = { ...submitted('loc-s'), side: 'sell', status: 'canceled', limitOnClose: { status: 'unfilled' } };
+    await h.refresh();
+    assert.deepEqual(h.banner(), []);
+  });
+
+  it('names a LOC SELL close fill and a registration made on this device is followed at once', async (t) => {
+    const h = notifierHarness();
+    await h.mount(); t.after(h.close);
+    await act(async () => fillEvents.emitOrderFillEvent({ kind: 'watch', side: 'sell', accountId: 'general', watchId: 'new-1' }));
+    await act(async () => fillEvents.emitOrderFillEvent({ kind: 'order', accountId: 'general', orderId: 'loc-2' }));
+    h.sellDetails['general:new-1'] = { id: 'new-1', kind: 'condition', state: 'filled', order: { orderId: 'o-new', status: 'executed' } };
+    h.details['general:o-new'] = sellExecuted('o-new');
+    h.details['general:loc-2'] = sellExecuted('loc-2', { limitOnClose: { status: 'filled' } });
+    await h.refresh();
+    // Both fills are announced, one banner at a time.
+    const shown = [h.banner()[0]];
+    await act(async () => h.renderer.root.findAll((node: any) => node.props.testID === 'order-fill-banner-history' && typeof node.type === 'string')[0].props.onPress());
+    await h.finishAnimations();
+    shown.push(h.banner()[0]);
+    assert.deepEqual(shown.sort(), ['삼성전자 LOC 매도 체결 완료', '삼성전자 매도 체결 완료']);
+    assert.ok(h.reads.includes('sell-watch:general:new-1'));
   });
 });

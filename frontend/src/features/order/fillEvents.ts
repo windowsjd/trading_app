@@ -7,14 +7,15 @@ import type { FilledOrderFacts, FillOrigin } from './fillTracker';
  *
  * - `order`: an order this screen just submitted and that is still open
  *   (limit/LOC), so its later fill is found even before the next list read.
- * - `watch`: a Conditional BUY watch just registered.
+ * - `watch`: a Conditional BUY watch (or, with `side: 'sell'`, a SELL
+ *   condition / stop-loss / take-profit) just registered.
  * - `filled`: a confirmed immediate execution whose detailed result could not
  *   be shown (the submitting form was gone). A result the user is looking at
  *   in the order result sheet is not repeated as a banner.
  */
 export type OrderFillEvent =
   | { kind: 'order'; accountId: string; orderId: string; origin?: FillOrigin }
-  | { kind: 'watch'; accountId: string; watchId: string }
+  | { kind: 'watch'; accountId: string; watchId: string; side?: 'buy' | 'sell' }
   | { kind: 'filled'; accountId: string; order: FilledOrderFacts };
 
 type Listener = (event: OrderFillEvent) => void;

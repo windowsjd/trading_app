@@ -272,6 +272,7 @@ enum OpsJobName {
   futures_last_price_retention
   conditional_buy_orders
   limit_on_close_settlement
+  conditional_sell_orders
 }
 
 enum MarketCandleSyncMode {
@@ -487,6 +488,7 @@ model TradingAccount {
   protectionGroups              ProtectionGroup[]
   protectionCommands            ProtectionCommand[]
   conditionalBuyOrders          ConditionalBuyOrder[]
+  conditionalSellOrders         ConditionalSellOrder[]
   limitOnCloseOrders            LimitOnCloseOrder[]
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
@@ -703,6 +705,7 @@ model Asset {
   futuresInstruments       FuturesInstrument[]
   protectionGroups         ProtectionGroup[]
   conditionalBuyOrders     ConditionalBuyOrder[]
+  conditionalSellOrders    ConditionalSellOrder[]
   limitOnCloseOrders       LimitOnCloseOrder[]
   sessionCloseEvidences    SessionClosePriceEvidence[]
 
@@ -727,14 +730,16 @@ model AssetPriceSnapshot {
   rawPayloadJson  Json?                @map("raw_payload_json")
   note            String?
 
-  asset                       Asset                 @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  orders                      Order[]
-  quotes                      Quote[]
-  futuresExecutions           FuturesExecution[]
-  futuresSeasonPrices         FuturesSeasonPrice[]
-  protectionChildren          ProtectionChild[]
-  conditionalBuyRegistrations ConditionalBuyOrder[] @relation("ConditionalBuyRegistrationSnapshot")
-  conditionalBuyTriggers      ConditionalBuyOrder[] @relation("ConditionalBuyTriggerSnapshot")
+  asset                        Asset                  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  orders                       Order[]
+  quotes                       Quote[]
+  futuresExecutions            FuturesExecution[]
+  futuresSeasonPrices          FuturesSeasonPrice[]
+  protectionChildren           ProtectionChild[]
+  conditionalBuyRegistrations  ConditionalBuyOrder[]  @relation("ConditionalBuyRegistrationSnapshot")
+  conditionalBuyTriggers       ConditionalBuyOrder[]  @relation("ConditionalBuyTriggerSnapshot")
+  conditionalSellRegistrations ConditionalSellOrder[] @relation("ConditionalSellRegistrationSnapshot")
+  conditionalSellTriggers      ConditionalSellOrder[] @relation("ConditionalSellTriggerSnapshot")
 
   @@index([assetId, effectiveAt])
   @@index([assetId, capturedAt])
@@ -1180,9 +1185,10 @@ model Position {
   createdAt          DateTime     @default(now()) @map("created_at")
   updatedAt          DateTime     @updatedAt @map("updated_at")
 
-  tradingAccount   TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  asset            Asset             @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  protectionGroups ProtectionGroup[]
+  tradingAccount        TradingAccount         @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset                 Asset                  @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  protectionGroups      ProtectionGroup[]
+  conditionalSellOrders ConditionalSellOrder[]
 
   // One aggregate position per asset per canonical trading account.
   @@unique([tradingAccountId, assetId])
@@ -1234,7 +1240,7 @@ model Order {
   // Closed-candle evidence link written by scheduler path-B matching.
   limitOrderCandleEvidenceId String?      @map("limit_order_candle_evidence_id")
   // Final session-close evidence of a filled Limit-on-Close order (SQL CHECK:
-  // exclusive with the snapshot/candle links, limit BUY only).
+  // exclusive with the snapshot/candle links, limit orders only).
   sessionCloseEvidenceId     String?      @map("session_close_evidence_id")
   submittedAt                DateTime     @map("submitted_at")
   executedAt                 DateTime?    @map("executed_at")
@@ -1244,25 +1250,26 @@ model Order {
   createdAt                  DateTime     @default(now()) @map("created_at")
   updatedAt                  DateTime     @updatedAt @map("updated_at")
 
-  tradingAccount     TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  asset              Asset                     @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  quote              Quote?                    @relation(fields: [quoteId], references: [id], onDelete: Restrict)
-  assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
-  fxRateSnapshot     FxRateSnapshot?           @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
-  candleEvidence     LimitOrderCandleEvidence? @relation(fields: [limitOrderCandleEvidenceId], references: [id], onDelete: Restrict)
+  tradingAccount       TradingAccount             @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset                Asset                      @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  quote                Quote?                     @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+  assetPriceSnapshot   AssetPriceSnapshot?        @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
+  fxRateSnapshot       FxRateSnapshot?            @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
+  candleEvidence       LimitOrderCandleEvidence?  @relation(fields: [limitOrderCandleEvidenceId], references: [id], onDelete: Restrict)
   sessionCloseEvidence SessionClosePriceEvidence? @relation(fields: [sessionCloseEvidenceId], references: [id], onDelete: Restrict)
-  attachedProtection ProtectionGroup?
-  protectionChild    ProtectionChild?
-  conditionalBuy     ConditionalBuyOrder?
-  limitOnClose       LimitOnCloseOrder?
+  attachedProtection   ProtectionGroup?
+  protectionChild      ProtectionChild?
+  conditionalBuy       ConditionalBuyOrder?
+  conditionalSell      ConditionalSellOrder?
+  limitOnClose         LimitOnCloseOrder?
 
   beginnerQuestAcknowledgements BeginnerQuestAcknowledgement[]
 
   // Account-scoped create idempotency: the same key may be reused by the
   // SAME user on a different trading account. idempotencyKey stays nullable.
   @@unique([tradingAccountId, idempotencyKey])
-  @@index([tradingAccountId, submittedAt])
   @@unique([id, tradingAccountId])
+  @@index([tradingAccountId, submittedAt])
   @@index([tradingAccountId, status])
   @@index([assetId])
   @@index([quoteId])
@@ -1337,6 +1344,87 @@ model ConditionalBuyOrder {
   @@map("conditional_buy_orders")
 }
 
+enum ConditionalSellKind {
+  condition
+  stop_loss
+  take_profit
+}
+
+enum ConditionalSellTrigger {
+  at_or_above
+  at_or_below
+}
+
+enum ConditionalSellStatus {
+  watching
+  triggered
+  ordered
+  canceled
+  failed
+}
+
+// Reservation-free SELL intent on one open Spot position (KRX stocks, crypto
+// Spot): a user condition, an independent stop-loss or an independent
+// take-profit. Each keeps its own target quantity (at most the holding when
+// registered); the targets of one position may add up to more than the
+// holding. Watching reserves nothing. A trigger submits at most ONE ordinary
+// market or limit SELL through the user quote/create core for
+// min(target, holding - other orders' reservations) at that moment; that
+// Order (never this row) is the financial evidence. Live rows end in the
+// transaction that makes the position flat (`position_closed`), so a later
+// re-buy never inherits them. SQL CHECKs (migration only) bind kind/trigger,
+// execution type/limit price and status/order/trigger consistency.
+model ConditionalSellOrder {
+  id                         String                 @id @default(uuid())
+  tradingAccountId           String                 @map("trading_account_id")
+  assetId                    String                 @map("asset_id")
+  positionId                 String                 @map("position_id")
+  kind                       ConditionalSellKind
+  triggerCondition           ConditionalSellTrigger @map("trigger_condition")
+  triggerPrice               Decimal                @map("trigger_price") @db.Decimal(24, 8)
+  executionType              OrderType              @map("execution_type")
+  limitPrice                 Decimal?               @map("limit_price") @db.Decimal(24, 8)
+  // The user's target quantity (shares or base units).
+  quantity                   Decimal                @db.Decimal(24, 8)
+  currencyCode               CurrencyCode           @map("currency_code")
+  status                     ConditionalSellStatus  @default(watching)
+  orderId                    String?                @unique @map("order_id")
+  // Holding minus other orders' reservations when the order was sized.
+  executionAvailableQuantity Decimal?               @map("execution_available_quantity") @db.Decimal(24, 8)
+  registrationSnapshotId     String?                @map("registration_snapshot_id")
+  triggerSnapshotId          String?                @map("trigger_snapshot_id")
+  triggerEvidenceJson        Json?                  @map("trigger_evidence_json")
+  triggeredAt                DateTime?              @map("triggered_at")
+  attemptCount               Int                    @default(0) @map("attempt_count")
+  lastAttemptAt              DateTime?              @map("last_attempt_at")
+  failureCode                String?                @map("failure_code")
+  terminalReason             String?                @map("terminal_reason")
+  // One create command; a stop-loss/take-profit pair shares it.
+  idempotencyKey             String                 @map("idempotency_key")
+  requestHash                String                 @map("request_hash")
+  createdAt                  DateTime               @default(now()) @map("created_at")
+  endedAt                    DateTime?              @map("ended_at")
+  updatedAt                  DateTime               @updatedAt @map("updated_at")
+
+  tradingAccount       TradingAccount      @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset                Asset               @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  position             Position            @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  order                Order?              @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  registrationSnapshot AssetPriceSnapshot? @relation("ConditionalSellRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
+  triggerSnapshot      AssetPriceSnapshot? @relation("ConditionalSellTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, tradingAccountId])
+  @@unique([tradingAccountId, idempotencyKey, kind])
+  @@index([status, id])
+  @@index([tradingAccountId, createdAt, id])
+  @@index([tradingAccountId, assetId, status])
+  @@index([assetId])
+  @@index([positionId])
+  @@index([registrationSnapshotId])
+  @@index([triggerSnapshotId])
+  @@map("conditional_sell_orders")
+}
+
 enum LimitOnCloseStatus {
   pending
   filled
@@ -1345,10 +1433,11 @@ enum LimitOnCloseStatus {
   canceled
 }
 
-// A LOC BUY is an ordinary submitted limit Order (reservation, cancel and
-// lifecycle cleanup unchanged) plus this row: the one regular session it is
-// bound to and its decision against final close evidence. The continuous
-// matcher (paths A/B) never fills an Order that has this row.
+// A LOC order is an ordinary submitted limit Order (BUY reserves cash, SELL
+// reserves position quantity; cancel and lifecycle cleanup unchanged) plus
+// this row: the one regular session it is bound to and its decision against
+// final close evidence. The continuous matcher (paths A/B) never fills an
+// Order that has this row.
 model LimitOnCloseOrder {
   orderId            String               @id @map("order_id")
   tradingAccountId   String               @map("trading_account_id")
@@ -1358,6 +1447,10 @@ model LimitOnCloseOrder {
   sessionOpenAt      DateTime             @map("session_open_at")
   sessionCloseAt     DateTime             @map("session_close_at")
   evidenceDeadlineAt DateTime             @map("evidence_deadline_at")
+  // LOC SELL only: the quantity the user asked for. The Order's quantity is
+  // the accepted (reserved) part, never more than the unreserved holding at
+  // submission. Display only; money uses the Order.
+  requestedQuantity  Decimal?             @map("requested_quantity") @db.Decimal(24, 8)
   status             LimitOnCloseStatus   @default(pending)
   decisionReason     String?              @map("decision_reason")
   decidedAt          DateTime?            @map("decided_at")
@@ -1427,13 +1520,13 @@ model SessionClosePriceEvidence {
 
 // UI learning only. Financial success remains proven by the referenced Order.
 model BeginnerQuestAcknowledgement {
-  tradingAccountId String @map("trading_account_id")
-  stepId String @map("step_id")
-  orderId String @map("order_id")
-  acknowledgedAt DateTime @map("acknowledged_at")
+  tradingAccountId String   @map("trading_account_id")
+  stepId           String   @map("step_id")
+  orderId          String   @map("order_id")
+  acknowledgedAt   DateTime @map("acknowledged_at")
 
   tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict, map: "beginner_quest_acknowledgements_account_fkey")
-  order Order @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict, map: "beginner_quest_acknowledgements_order_fkey")
+  order          Order          @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict, map: "beginner_quest_acknowledgements_order_fkey")
 
   @@id([tradingAccountId, stepId])
   @@index([orderId, tradingAccountId])

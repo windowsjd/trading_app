@@ -953,6 +953,57 @@ export type EnumConditionalBuyStatusWithAggregatesFilter<$PrismaModel = never> =
   _max?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
 }
 
+export type EnumConditionalSellKindFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellKind | Prisma.EnumConditionalSellKindFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellKindFilter<$PrismaModel> | $Enums.ConditionalSellKind
+}
+
+export type EnumConditionalSellTriggerFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellTrigger | Prisma.EnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellTriggerFilter<$PrismaModel> | $Enums.ConditionalSellTrigger
+}
+
+export type EnumConditionalSellStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellStatus | Prisma.EnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel> | $Enums.ConditionalSellStatus
+}
+
+export type EnumConditionalSellKindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellKind | Prisma.EnumConditionalSellKindFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellKindWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalSellKind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalSellKindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalSellKindFilter<$PrismaModel>
+}
+
+export type EnumConditionalSellTriggerWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellTrigger | Prisma.EnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellTriggerWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalSellTrigger
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalSellTriggerFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalSellTriggerFilter<$PrismaModel>
+}
+
+export type EnumConditionalSellStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellStatus | Prisma.EnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellStatusWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalSellStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
+}
+
 export type EnumLimitOnCloseStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.LimitOnCloseStatus | Prisma.EnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
   in?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
@@ -2240,6 +2291,57 @@ export type NestedEnumConditionalBuyStatusWithAggregatesFilter<$PrismaModel = ne
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumConditionalBuyStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumConditionalSellKindFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellKind | Prisma.EnumConditionalSellKindFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellKindFilter<$PrismaModel> | $Enums.ConditionalSellKind
+}
+
+export type NestedEnumConditionalSellTriggerFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellTrigger | Prisma.EnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellTriggerFilter<$PrismaModel> | $Enums.ConditionalSellTrigger
+}
+
+export type NestedEnumConditionalSellStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellStatus | Prisma.EnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel> | $Enums.ConditionalSellStatus
+}
+
+export type NestedEnumConditionalSellKindWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellKind | Prisma.EnumConditionalSellKindFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellKind[] | Prisma.ListEnumConditionalSellKindFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellKindWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalSellKind
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalSellKindFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalSellKindFilter<$PrismaModel>
+}
+
+export type NestedEnumConditionalSellTriggerWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellTrigger | Prisma.EnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellTrigger[] | Prisma.ListEnumConditionalSellTriggerFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellTriggerWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalSellTrigger
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalSellTriggerFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalSellTriggerFilter<$PrismaModel>
+}
+
+export type NestedEnumConditionalSellStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.ConditionalSellStatus | Prisma.EnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.ConditionalSellStatus[] | Prisma.ListEnumConditionalSellStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumConditionalSellStatusWithAggregatesFilter<$PrismaModel> | $Enums.ConditionalSellStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumLimitOnCloseStatusFilter<$PrismaModel = never> = {

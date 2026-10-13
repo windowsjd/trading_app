@@ -48,6 +48,7 @@ export async function runSeasonLifecycleLeaseIntegration(
     protectionGroup: prisma.protectionGroup,
     futuresLimitOrder: prisma.futuresLimitOrder,
     conditionalBuyOrder: prisma.conditionalBuyOrder,
+    conditionalSellOrder: prisma.conditionalSellOrder,
     order: {
       findMany: (args: Prisma.OrderFindManyArgs) => {
         selections += 1;

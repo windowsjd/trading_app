@@ -538,6 +538,7 @@ export type OrderWhereInput = {
   attachedProtection?: Prisma.XOR<Prisma.ProtectionGroupNullableScalarRelationFilter, Prisma.ProtectionGroupWhereInput> | null
   protectionChild?: Prisma.XOR<Prisma.ProtectionChildNullableScalarRelationFilter, Prisma.ProtectionChildWhereInput> | null
   conditionalBuy?: Prisma.XOR<Prisma.ConditionalBuyOrderNullableScalarRelationFilter, Prisma.ConditionalBuyOrderWhereInput> | null
+  conditionalSell?: Prisma.XOR<Prisma.ConditionalSellOrderNullableScalarRelationFilter, Prisma.ConditionalSellOrderWhereInput> | null
   limitOnClose?: Prisma.XOR<Prisma.LimitOnCloseOrderNullableScalarRelationFilter, Prisma.LimitOnCloseOrderWhereInput> | null
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementListRelationFilter
 }
@@ -592,6 +593,7 @@ export type OrderOrderByWithRelationInput = {
   attachedProtection?: Prisma.ProtectionGroupOrderByWithRelationInput
   protectionChild?: Prisma.ProtectionChildOrderByWithRelationInput
   conditionalBuy?: Prisma.ConditionalBuyOrderOrderByWithRelationInput
+  conditionalSell?: Prisma.ConditionalSellOrderOrderByWithRelationInput
   limitOnClose?: Prisma.LimitOnCloseOrderOrderByWithRelationInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementOrderByRelationAggregateInput
 }
@@ -651,6 +653,7 @@ export type OrderWhereUniqueInput = Prisma.AtLeast<{
   attachedProtection?: Prisma.XOR<Prisma.ProtectionGroupNullableScalarRelationFilter, Prisma.ProtectionGroupWhereInput> | null
   protectionChild?: Prisma.XOR<Prisma.ProtectionChildNullableScalarRelationFilter, Prisma.ProtectionChildWhereInput> | null
   conditionalBuy?: Prisma.XOR<Prisma.ConditionalBuyOrderNullableScalarRelationFilter, Prisma.ConditionalBuyOrderWhereInput> | null
+  conditionalSell?: Prisma.XOR<Prisma.ConditionalSellOrderNullableScalarRelationFilter, Prisma.ConditionalSellOrderWhereInput> | null
   limitOnClose?: Prisma.XOR<Prisma.LimitOnCloseOrderNullableScalarRelationFilter, Prisma.LimitOnCloseOrderWhereInput> | null
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementListRelationFilter
 }, "id" | "quoteId" | "tradingAccountId_idempotencyKey" | "id_tradingAccountId">
@@ -790,6 +793,7 @@ export type OrderCreateInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -837,6 +841,7 @@ export type OrderUncheckedCreateInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -884,6 +889,7 @@ export type OrderUpdateInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -931,6 +937,7 @@ export type OrderUncheckedUpdateInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -1420,6 +1427,22 @@ export type OrderUpdateOneWithoutConditionalBuyNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutConditionalBuyInput, Prisma.OrderUpdateWithoutConditionalBuyInput>, Prisma.OrderUncheckedUpdateWithoutConditionalBuyInput>
 }
 
+export type OrderCreateNestedOneWithoutConditionalSellInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutConditionalSellInput, Prisma.OrderUncheckedCreateWithoutConditionalSellInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutConditionalSellInput
+  connect?: Prisma.OrderWhereUniqueInput
+}
+
+export type OrderUpdateOneWithoutConditionalSellNestedInput = {
+  create?: Prisma.XOR<Prisma.OrderCreateWithoutConditionalSellInput, Prisma.OrderUncheckedCreateWithoutConditionalSellInput>
+  connectOrCreate?: Prisma.OrderCreateOrConnectWithoutConditionalSellInput
+  upsert?: Prisma.OrderUpsertWithoutConditionalSellInput
+  disconnect?: Prisma.OrderWhereInput | boolean
+  delete?: Prisma.OrderWhereInput | boolean
+  connect?: Prisma.OrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.OrderUpdateToOneWithWhereWithoutConditionalSellInput, Prisma.OrderUpdateWithoutConditionalSellInput>, Prisma.OrderUncheckedUpdateWithoutConditionalSellInput>
+}
+
 export type OrderCreateNestedOneWithoutLimitOnCloseInput = {
   create?: Prisma.XOR<Prisma.OrderCreateWithoutLimitOnCloseInput, Prisma.OrderUncheckedCreateWithoutLimitOnCloseInput>
   connectOrCreate?: Prisma.OrderCreateOrConnectWithoutLimitOnCloseInput
@@ -1658,6 +1681,7 @@ export type OrderCreateWithoutTradingAccountInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -1704,6 +1728,7 @@ export type OrderUncheckedCreateWithoutTradingAccountInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -1821,6 +1846,7 @@ export type OrderCreateWithoutAssetInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -1867,6 +1893,7 @@ export type OrderUncheckedCreateWithoutAssetInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -1939,6 +1966,7 @@ export type OrderCreateWithoutAssetPriceSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -1985,6 +2013,7 @@ export type OrderUncheckedCreateWithoutAssetPriceSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -2057,6 +2086,7 @@ export type OrderCreateWithoutAttachedProtectionInput = {
   sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceCreateNestedOneWithoutOrdersInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -2103,6 +2133,7 @@ export type OrderUncheckedCreateWithoutAttachedProtectionInput = {
   updatedAt?: Date | string
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -2165,6 +2196,7 @@ export type OrderUpdateWithoutAttachedProtectionInput = {
   sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceUpdateOneWithoutOrdersNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -2211,6 +2243,7 @@ export type OrderUncheckedUpdateWithoutAttachedProtectionInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -2257,6 +2290,7 @@ export type OrderCreateWithoutProtectionChildInput = {
   sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceCreateNestedOneWithoutOrdersInput
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -2303,6 +2337,7 @@ export type OrderUncheckedCreateWithoutProtectionChildInput = {
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -2365,6 +2400,7 @@ export type OrderUpdateWithoutProtectionChildInput = {
   sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceUpdateOneWithoutOrdersNestedInput
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -2411,6 +2447,7 @@ export type OrderUncheckedUpdateWithoutProtectionChildInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -2457,6 +2494,7 @@ export type OrderCreateWithoutConditionalBuyInput = {
   sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceCreateNestedOneWithoutOrdersInput
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -2503,6 +2541,7 @@ export type OrderUncheckedCreateWithoutConditionalBuyInput = {
   updatedAt?: Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -2565,6 +2604,7 @@ export type OrderUpdateWithoutConditionalBuyInput = {
   sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceUpdateOneWithoutOrdersNestedInput
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -2611,6 +2651,211 @@ export type OrderUncheckedUpdateWithoutConditionalBuyInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
+  limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderCreateWithoutConditionalSellInput = {
+  id?: string
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  cashWalletScope: $Enums.WalletScope
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutOrdersInput
+  asset: Prisma.AssetCreateNestedOneWithoutOrdersInput
+  quote?: Prisma.QuoteCreateNestedOneWithoutOrdersInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutOrdersInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotCreateNestedOneWithoutOrdersInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedOneWithoutOrdersInput
+  sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceCreateNestedOneWithoutOrdersInput
+  attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
+  conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
+}
+
+export type OrderUncheckedCreateWithoutConditionalSellInput = {
+  id?: string
+  tradingAccountId: string
+  assetId: string
+  quoteId?: string | null
+  side: $Enums.OrderSide
+  orderType: $Enums.OrderType
+  status?: $Enums.OrderStatus
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode: $Enums.CurrencyCode
+  cashWalletScope: $Enums.WalletScope
+  grossAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: string | null
+  fxRateSnapshotId?: string | null
+  idempotencyKey?: string | null
+  requestHash?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Date | string | null
+  cancelReason?: string | null
+  limitOrderCandleEvidenceId?: string | null
+  sessionCloseEvidenceId?: string | null
+  submittedAt: Date | string
+  executedAt?: Date | string | null
+  canceledAt?: Date | string | null
+  rejectedAt?: Date | string | null
+  rejectReason?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
+  protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
+  conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
+}
+
+export type OrderCreateOrConnectWithoutConditionalSellInput = {
+  where: Prisma.OrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.OrderCreateWithoutConditionalSellInput, Prisma.OrderUncheckedCreateWithoutConditionalSellInput>
+}
+
+export type OrderUpsertWithoutConditionalSellInput = {
+  update: Prisma.XOR<Prisma.OrderUpdateWithoutConditionalSellInput, Prisma.OrderUncheckedUpdateWithoutConditionalSellInput>
+  create: Prisma.XOR<Prisma.OrderCreateWithoutConditionalSellInput, Prisma.OrderUncheckedCreateWithoutConditionalSellInput>
+  where?: Prisma.OrderWhereInput
+}
+
+export type OrderUpdateToOneWithWhereWithoutConditionalSellInput = {
+  where?: Prisma.OrderWhereInput
+  data: Prisma.XOR<Prisma.OrderUpdateWithoutConditionalSellInput, Prisma.OrderUncheckedUpdateWithoutConditionalSellInput>
+}
+
+export type OrderUpdateWithoutConditionalSellInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  cashWalletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutOrdersNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutOrdersNestedInput
+  quote?: Prisma.QuoteUpdateOneWithoutOrdersNestedInput
+  assetPriceSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutOrdersNestedInput
+  fxRateSnapshot?: Prisma.FxRateSnapshotUpdateOneWithoutOrdersNestedInput
+  candleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateOneWithoutOrdersNestedInput
+  sessionCloseEvidence?: Prisma.SessionClosePriceEvidenceUpdateOneWithoutOrdersNestedInput
+  attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
+  conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
+}
+
+export type OrderUncheckedUpdateWithoutConditionalSellInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  quoteId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  side?: Prisma.EnumOrderSideFieldUpdateOperationsInput | $Enums.OrderSide
+  orderType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  canceledQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  requestedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  unspentAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executionEvidence?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  executedPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  cashWalletScope?: Prisma.EnumWalletScopeFieldUpdateOperationsInput | $Enums.WalletScope
+  grossAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  feeAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  netAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  assetPriceSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  fxRateSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  requestHash?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  reservedAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationFeeRate?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  reservationReleasedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  limitOrderCandleEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sessionCloseEvidenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  submittedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  canceledAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  rejectReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
+  protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -2658,6 +2903,7 @@ export type OrderCreateWithoutLimitOnCloseInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
 
@@ -2704,6 +2950,7 @@ export type OrderUncheckedCreateWithoutLimitOnCloseInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
 
@@ -2766,6 +3013,7 @@ export type OrderUpdateWithoutLimitOnCloseInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
 
@@ -2812,6 +3060,7 @@ export type OrderUncheckedUpdateWithoutLimitOnCloseInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
 
@@ -2857,6 +3106,7 @@ export type OrderCreateWithoutSessionCloseEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -2903,6 +3153,7 @@ export type OrderUncheckedCreateWithoutSessionCloseEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -2976,6 +3227,7 @@ export type OrderCreateWithoutBeginnerQuestAcknowledgementsInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
 }
 
@@ -3022,6 +3274,7 @@ export type OrderUncheckedCreateWithoutBeginnerQuestAcknowledgementsInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
 }
 
@@ -3084,6 +3337,7 @@ export type OrderUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
 }
 
@@ -3130,6 +3384,7 @@ export type OrderUncheckedUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
 }
 
@@ -3175,6 +3430,7 @@ export type OrderCreateWithoutFxRateSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -3221,6 +3477,7 @@ export type OrderUncheckedCreateWithoutFxRateSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -3293,6 +3550,7 @@ export type OrderCreateWithoutQuoteInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -3339,6 +3597,7 @@ export type OrderUncheckedCreateWithoutQuoteInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -3411,6 +3670,7 @@ export type OrderCreateWithoutCandleEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutOrderInput
 }
@@ -3457,6 +3717,7 @@ export type OrderUncheckedCreateWithoutCandleEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentOrderInput
   protectionChild?: Prisma.ProtectionChildUncheckedCreateNestedOneWithoutOrderInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedCreateNestedOneWithoutOrderInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedCreateNestedOneWithoutOrderInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedCreateNestedOneWithoutOrderInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutOrderInput
 }
@@ -3570,6 +3831,7 @@ export type OrderUpdateWithoutTradingAccountInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -3616,6 +3878,7 @@ export type OrderUncheckedUpdateWithoutTradingAccountInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -3744,6 +4007,7 @@ export type OrderUpdateWithoutAssetInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -3790,6 +4054,7 @@ export type OrderUncheckedUpdateWithoutAssetInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -3918,6 +4183,7 @@ export type OrderUpdateWithoutAssetPriceSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -3964,6 +4230,7 @@ export type OrderUncheckedUpdateWithoutAssetPriceSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -4092,6 +4359,7 @@ export type OrderUpdateWithoutSessionCloseEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -4138,6 +4406,7 @@ export type OrderUncheckedUpdateWithoutSessionCloseEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -4266,6 +4535,7 @@ export type OrderUpdateWithoutFxRateSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -4312,6 +4582,7 @@ export type OrderUncheckedUpdateWithoutFxRateSnapshotInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -4440,6 +4711,7 @@ export type OrderUpdateWithoutQuoteInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -4486,6 +4758,7 @@ export type OrderUncheckedUpdateWithoutQuoteInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -4614,6 +4887,7 @@ export type OrderUpdateWithoutCandleEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutOrderNestedInput
 }
@@ -4660,6 +4934,7 @@ export type OrderUncheckedUpdateWithoutCandleEvidenceInput = {
   attachedProtection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentOrderNestedInput
   protectionChild?: Prisma.ProtectionChildUncheckedUpdateOneWithoutOrderNestedInput
   conditionalBuy?: Prisma.ConditionalBuyOrderUncheckedUpdateOneWithoutOrderNestedInput
+  conditionalSell?: Prisma.ConditionalSellOrderUncheckedUpdateOneWithoutOrderNestedInput
   limitOnClose?: Prisma.LimitOnCloseOrderUncheckedUpdateOneWithoutOrderNestedInput
   beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutOrderNestedInput
 }
@@ -4786,6 +5061,7 @@ export type OrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   attachedProtection?: boolean | Prisma.Order$attachedProtectionArgs<ExtArgs>
   protectionChild?: boolean | Prisma.Order$protectionChildArgs<ExtArgs>
   conditionalBuy?: boolean | Prisma.Order$conditionalBuyArgs<ExtArgs>
+  conditionalSell?: boolean | Prisma.Order$conditionalSellArgs<ExtArgs>
   limitOnClose?: boolean | Prisma.Order$limitOnCloseArgs<ExtArgs>
   beginnerQuestAcknowledgements?: boolean | Prisma.Order$beginnerQuestAcknowledgementsArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
@@ -4943,6 +5219,7 @@ export type OrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   attachedProtection?: boolean | Prisma.Order$attachedProtectionArgs<ExtArgs>
   protectionChild?: boolean | Prisma.Order$protectionChildArgs<ExtArgs>
   conditionalBuy?: boolean | Prisma.Order$conditionalBuyArgs<ExtArgs>
+  conditionalSell?: boolean | Prisma.Order$conditionalSellArgs<ExtArgs>
   limitOnClose?: boolean | Prisma.Order$limitOnCloseArgs<ExtArgs>
   beginnerQuestAcknowledgements?: boolean | Prisma.Order$beginnerQuestAcknowledgementsArgs<ExtArgs>
   _count?: boolean | Prisma.OrderCountOutputTypeDefaultArgs<ExtArgs>
@@ -4979,6 +5256,7 @@ export type $OrderPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     attachedProtection: Prisma.$ProtectionGroupPayload<ExtArgs> | null
     protectionChild: Prisma.$ProtectionChildPayload<ExtArgs> | null
     conditionalBuy: Prisma.$ConditionalBuyOrderPayload<ExtArgs> | null
+    conditionalSell: Prisma.$ConditionalSellOrderPayload<ExtArgs> | null
     limitOnClose: Prisma.$LimitOnCloseOrderPayload<ExtArgs> | null
     beginnerQuestAcknowledgements: Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>[]
   }
@@ -5426,6 +5704,7 @@ export interface Prisma__OrderClient<T, Null = never, ExtArgs extends runtime.Ty
   attachedProtection<T extends Prisma.Order$attachedProtectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$attachedProtectionArgs<ExtArgs>>): Prisma.Prisma__ProtectionGroupClient<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   protectionChild<T extends Prisma.Order$protectionChildArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$protectionChildArgs<ExtArgs>>): Prisma.Prisma__ProtectionChildClient<runtime.Types.Result.GetResult<Prisma.$ProtectionChildPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   conditionalBuy<T extends Prisma.Order$conditionalBuyArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$conditionalBuyArgs<ExtArgs>>): Prisma.Prisma__ConditionalBuyOrderClient<runtime.Types.Result.GetResult<Prisma.$ConditionalBuyOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  conditionalSell<T extends Prisma.Order$conditionalSellArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$conditionalSellArgs<ExtArgs>>): Prisma.Prisma__ConditionalSellOrderClient<runtime.Types.Result.GetResult<Prisma.$ConditionalSellOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   limitOnClose<T extends Prisma.Order$limitOnCloseArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$limitOnCloseArgs<ExtArgs>>): Prisma.Prisma__LimitOnCloseOrderClient<runtime.Types.Result.GetResult<Prisma.$LimitOnCloseOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   beginnerQuestAcknowledgements<T extends Prisma.Order$beginnerQuestAcknowledgementsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Order$beginnerQuestAcknowledgementsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$BeginnerQuestAcknowledgementPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -6046,6 +6325,25 @@ export type Order$conditionalBuyArgs<ExtArgs extends runtime.Types.Extensions.In
    */
   include?: Prisma.ConditionalBuyOrderInclude<ExtArgs> | null
   where?: Prisma.ConditionalBuyOrderWhereInput
+}
+
+/**
+ * Order.conditionalSell
+ */
+export type Order$conditionalSellArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ConditionalSellOrder
+   */
+  select?: Prisma.ConditionalSellOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ConditionalSellOrder
+   */
+  omit?: Prisma.ConditionalSellOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConditionalSellOrderInclude<ExtArgs> | null
+  where?: Prisma.ConditionalSellOrderWhereInput
 }
 
 /**

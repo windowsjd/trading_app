@@ -19,6 +19,7 @@ it('records the observed missing conditional reference without financial values'
   try {
     const tx = {
       protectionGroup: { findFirst: jest.fn().mockResolvedValue(null) },
+      conditionalSellOrder: { count: jest.fn().mockResolvedValue(0) },
       asset: {
         findUniqueOrThrow: jest
           .fn()

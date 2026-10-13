@@ -10,6 +10,10 @@ import { futuresMarkRetentionConfig } from '../futures/futures-mark-retention.co
 import { futuresLastPriceRetentionConfig } from '../futures/futures-last-price-retention.config';
 import { conditionalEnabled } from '../conditional/conditional.config';
 import { conditionalBuyEnabled } from '../conditional/conditional-buy.config';
+import {
+  conditionalSellEnabled,
+  independentTpSlEnabled,
+} from '../conditional/conditional-sell.config';
 import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
 
 /**
@@ -53,6 +57,8 @@ export function validateEnv(
   collect(errors, () => futuresLastPriceRetentionConfig(env));
   collect(errors, () => conditionalEnabled(env));
   collect(errors, () => conditionalBuyEnabled(env));
+  collect(errors, () => conditionalSellEnabled(env));
+  collect(errors, () => independentTpSlEnabled(env));
   collect(errors, () => readLimitOnCloseConfig(env));
   collect(errors, () => readGeneralFxFeeRate(env));
   collect(errors, () => readProfileImageStorageConfig(config));

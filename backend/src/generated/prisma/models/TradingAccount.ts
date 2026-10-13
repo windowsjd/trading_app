@@ -267,6 +267,7 @@ export type TradingAccountWhereInput = {
   protectionGroups?: Prisma.ProtectionGroupListRelationFilter
   protectionCommands?: Prisma.ProtectionCommandListRelationFilter
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderListRelationFilter
+  conditionalSellOrders?: Prisma.ConditionalSellOrderListRelationFilter
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
@@ -305,6 +306,7 @@ export type TradingAccountOrderByWithRelationInput = {
   protectionGroups?: Prisma.ProtectionGroupOrderByRelationAggregateInput
   protectionCommands?: Prisma.ProtectionCommandOrderByRelationAggregateInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderOrderByRelationAggregateInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderOrderByRelationAggregateInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
   adRewardClaims?: Prisma.AdRewardClaimOrderByRelationAggregateInput
@@ -346,6 +348,7 @@ export type TradingAccountWhereUniqueInput = Prisma.AtLeast<{
   protectionGroups?: Prisma.ProtectionGroupListRelationFilter
   protectionCommands?: Prisma.ProtectionCommandListRelationFilter
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderListRelationFilter
+  conditionalSellOrders?: Prisma.ConditionalSellOrderListRelationFilter
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
@@ -415,6 +418,7 @@ export type TradingAccountCreateInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -452,6 +456,7 @@ export type TradingAccountUncheckedCreateInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -489,6 +494,7 @@ export type TradingAccountUpdateInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -526,6 +532,7 @@ export type TradingAccountUncheckedUpdateInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -827,6 +834,20 @@ export type TradingAccountUpdateOneRequiredWithoutConditionalBuyOrdersNestedInpu
   update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutConditionalBuyOrdersInput, Prisma.TradingAccountUpdateWithoutConditionalBuyOrdersInput>, Prisma.TradingAccountUncheckedUpdateWithoutConditionalBuyOrdersInput>
 }
 
+export type TradingAccountCreateNestedOneWithoutConditionalSellOrdersInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutConditionalSellOrdersInput, Prisma.TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutConditionalSellOrdersInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+}
+
+export type TradingAccountUpdateOneRequiredWithoutConditionalSellOrdersNestedInput = {
+  create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutConditionalSellOrdersInput, Prisma.TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput>
+  connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutConditionalSellOrdersInput
+  upsert?: Prisma.TradingAccountUpsertWithoutConditionalSellOrdersInput
+  connect?: Prisma.TradingAccountWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TradingAccountUpdateToOneWithWhereWithoutConditionalSellOrdersInput, Prisma.TradingAccountUpdateWithoutConditionalSellOrdersInput>, Prisma.TradingAccountUncheckedUpdateWithoutConditionalSellOrdersInput>
+}
+
 export type TradingAccountCreateNestedOneWithoutLimitOnCloseOrdersInput = {
   create?: Prisma.XOR<Prisma.TradingAccountCreateWithoutLimitOnCloseOrdersInput, Prisma.TradingAccountUncheckedCreateWithoutLimitOnCloseOrdersInput>
   connectOrCreate?: Prisma.TradingAccountCreateOrConnectWithoutLimitOnCloseOrdersInput
@@ -1064,6 +1085,7 @@ export type TradingAccountCreateWithoutUserInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -1100,6 +1122,7 @@ export type TradingAccountUncheckedCreateWithoutUserInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1177,6 +1200,7 @@ export type TradingAccountCreateWithoutSeasonParticipantInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -1213,6 +1237,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonParticipantInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1265,6 +1290,7 @@ export type TradingAccountUpdateWithoutSeasonParticipantInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -1301,6 +1327,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonParticipantInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1337,6 +1364,7 @@ export type TradingAccountCreateWithoutFuturesPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -1373,6 +1401,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1425,6 +1454,7 @@ export type TradingAccountUpdateWithoutFuturesPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -1461,6 +1491,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1497,6 +1528,7 @@ export type TradingAccountCreateWithoutFuturesExecutionsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -1533,6 +1565,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesExecutionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1585,6 +1618,7 @@ export type TradingAccountUpdateWithoutFuturesExecutionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -1621,6 +1655,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesExecutionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1657,6 +1692,7 @@ export type TradingAccountCreateWithoutFuturesExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -1693,6 +1729,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1745,6 +1782,7 @@ export type TradingAccountUpdateWithoutFuturesExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -1781,6 +1819,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1817,6 +1856,7 @@ export type TradingAccountCreateWithoutFuturesLimitOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -1853,6 +1893,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesLimitOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -1905,6 +1946,7 @@ export type TradingAccountUpdateWithoutFuturesLimitOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -1941,6 +1983,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesLimitOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -1977,6 +2020,7 @@ export type TradingAccountCreateWithoutProtectionGroupsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -2013,6 +2057,7 @@ export type TradingAccountUncheckedCreateWithoutProtectionGroupsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2065,6 +2110,7 @@ export type TradingAccountUpdateWithoutProtectionGroupsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -2101,6 +2147,7 @@ export type TradingAccountUncheckedUpdateWithoutProtectionGroupsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2137,6 +2184,7 @@ export type TradingAccountCreateWithoutProtectionCommandsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -2173,6 +2221,7 @@ export type TradingAccountUncheckedCreateWithoutProtectionCommandsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2225,6 +2274,7 @@ export type TradingAccountUpdateWithoutProtectionCommandsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -2261,6 +2311,7 @@ export type TradingAccountUncheckedUpdateWithoutProtectionCommandsInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2297,6 +2348,7 @@ export type TradingAccountCreateWithoutPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -2333,6 +2385,7 @@ export type TradingAccountUncheckedCreateWithoutPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2385,6 +2438,7 @@ export type TradingAccountUpdateWithoutPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -2421,6 +2475,7 @@ export type TradingAccountUncheckedUpdateWithoutPositionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2457,6 +2512,7 @@ export type TradingAccountCreateWithoutOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -2493,6 +2549,7 @@ export type TradingAccountUncheckedCreateWithoutOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2545,6 +2602,7 @@ export type TradingAccountUpdateWithoutOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -2581,6 +2639,7 @@ export type TradingAccountUncheckedUpdateWithoutOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2617,6 +2676,7 @@ export type TradingAccountCreateWithoutConditionalBuyOrdersInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -2653,6 +2713,7 @@ export type TradingAccountUncheckedCreateWithoutConditionalBuyOrdersInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2705,6 +2766,7 @@ export type TradingAccountUpdateWithoutConditionalBuyOrdersInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -2741,6 +2803,171 @@ export type TradingAccountUncheckedUpdateWithoutConditionalBuyOrdersInput = {
   futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutTradingAccountNestedInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountCreateWithoutConditionalSellOrdersInput = {
+  id?: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTradingAccountsInput
+  seasonParticipant?: Prisma.SeasonParticipantCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestCreateNestedManyWithoutTradingAccountInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutTradingAccountInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput = {
+  id?: string
+  userId: string
+  mode: $Enums.TradingAccountMode
+  status?: $Enums.TradingAccountStatus
+  initialCapitalKrw: runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt: Date | string
+  closedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedCreateNestedOneWithoutTradingAccountInput
+  cashWallets?: Prisma.CashWalletUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransfers?: Prisma.WalletTransferUncheckedCreateNestedManyWithoutTradingAccountInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutTradingAccountInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedCreateNestedManyWithoutTradingAccountInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedCreateNestedOneWithoutTradingAccountInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
+  equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
+  seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutTradingAccountInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUncheckedCreateNestedManyWithoutTradingAccountInput
+}
+
+export type TradingAccountCreateOrConnectWithoutConditionalSellOrdersInput = {
+  where: Prisma.TradingAccountWhereUniqueInput
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutConditionalSellOrdersInput, Prisma.TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput>
+}
+
+export type TradingAccountUpsertWithoutConditionalSellOrdersInput = {
+  update: Prisma.XOR<Prisma.TradingAccountUpdateWithoutConditionalSellOrdersInput, Prisma.TradingAccountUncheckedUpdateWithoutConditionalSellOrdersInput>
+  create: Prisma.XOR<Prisma.TradingAccountCreateWithoutConditionalSellOrdersInput, Prisma.TradingAccountUncheckedCreateWithoutConditionalSellOrdersInput>
+  where?: Prisma.TradingAccountWhereInput
+}
+
+export type TradingAccountUpdateToOneWithWhereWithoutConditionalSellOrdersInput = {
+  where?: Prisma.TradingAccountWhereInput
+  data: Prisma.XOR<Prisma.TradingAccountUpdateWithoutConditionalSellOrdersInput, Prisma.TradingAccountUncheckedUpdateWithoutConditionalSellOrdersInput>
+}
+
+export type TradingAccountUpdateWithoutConditionalSellOrdersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTradingAccountsNestedInput
+  seasonParticipant?: Prisma.SeasonParticipantUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUpdateManyWithoutTradingAccountNestedInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
+  equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
+  dailyPortfolioSnapshots?: Prisma.DailyPortfolioSnapshotUpdateManyWithoutTradingAccountNestedInput
+  seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutTradingAccountNestedInput
+  beginnerQuestAcknowledgements?: Prisma.BeginnerQuestAcknowledgementUpdateManyWithoutTradingAccountNestedInput
+}
+
+export type TradingAccountUncheckedUpdateWithoutConditionalSellOrdersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  mode?: Prisma.EnumTradingAccountModeFieldUpdateOperationsInput | $Enums.TradingAccountMode
+  status?: Prisma.EnumTradingAccountStatusFieldUpdateOperationsInput | $Enums.TradingAccountStatus
+  initialCapitalKrw?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  openedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  closedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  seasonParticipant?: Prisma.SeasonParticipantUncheckedUpdateOneWithoutTradingAccountNestedInput
+  cashWallets?: Prisma.CashWalletUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransactions?: Prisma.WalletTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransfers?: Prisma.WalletTransferUncheckedUpdateManyWithoutTradingAccountNestedInput
+  walletTransferExecuteRequests?: Prisma.WalletTransferExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresPositions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresExecuteRequests?: Prisma.FuturesExecuteRequestUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLimitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresLiquidations?: Prisma.FuturesLiquidationUncheckedUpdateManyWithoutTradingAccountNestedInput
+  futuresSeasonSettlement?: Prisma.FuturesSeasonSettlementUncheckedUpdateOneWithoutTradingAccountNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
+  protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2778,6 +3005,7 @@ export type TradingAccountCreateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -2814,6 +3042,7 @@ export type TradingAccountUncheckedCreateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -2866,6 +3095,7 @@ export type TradingAccountUpdateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -2902,6 +3132,7 @@ export type TradingAccountUncheckedUpdateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -2938,6 +3169,7 @@ export type TradingAccountCreateWithoutBeginnerQuestAcknowledgementsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -2974,6 +3206,7 @@ export type TradingAccountUncheckedCreateWithoutBeginnerQuestAcknowledgementsInp
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3026,6 +3259,7 @@ export type TradingAccountUpdateWithoutBeginnerQuestAcknowledgementsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -3062,6 +3296,7 @@ export type TradingAccountUncheckedUpdateWithoutBeginnerQuestAcknowledgementsInp
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3097,6 +3332,7 @@ export type TradingAccountCreateWithoutCashWalletsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -3133,6 +3369,7 @@ export type TradingAccountUncheckedCreateWithoutCashWalletsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3185,6 +3422,7 @@ export type TradingAccountUpdateWithoutCashWalletsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -3221,6 +3459,7 @@ export type TradingAccountUncheckedUpdateWithoutCashWalletsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3257,6 +3496,7 @@ export type TradingAccountCreateWithoutWalletTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -3293,6 +3533,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3345,6 +3586,7 @@ export type TradingAccountUpdateWithoutWalletTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -3381,6 +3623,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3418,6 +3661,7 @@ export type TradingAccountCreateWithoutAdRewardClaimsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -3454,6 +3698,7 @@ export type TradingAccountUncheckedCreateWithoutAdRewardClaimsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3506,6 +3751,7 @@ export type TradingAccountUpdateWithoutAdRewardClaimsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3542,6 +3788,7 @@ export type TradingAccountUncheckedUpdateWithoutAdRewardClaimsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3577,6 +3824,7 @@ export type TradingAccountCreateWithoutExchangeTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -3613,6 +3861,7 @@ export type TradingAccountUncheckedCreateWithoutExchangeTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3665,6 +3914,7 @@ export type TradingAccountUpdateWithoutExchangeTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -3701,6 +3951,7 @@ export type TradingAccountUncheckedUpdateWithoutExchangeTransactionsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3738,6 +3989,7 @@ export type TradingAccountCreateWithoutQuotesInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotCreateNestedManyWithoutTradingAccountInput
@@ -3774,6 +4026,7 @@ export type TradingAccountUncheckedCreateWithoutQuotesInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3826,6 +4079,7 @@ export type TradingAccountUpdateWithoutQuotesInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUpdateManyWithoutTradingAccountNestedInput
@@ -3862,6 +4116,7 @@ export type TradingAccountUncheckedUpdateWithoutQuotesInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
   equitySnapshots?: Prisma.EquitySnapshotUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -3897,6 +4152,7 @@ export type TradingAccountCreateWithoutWalletTransfersInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -3933,6 +4189,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransfersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -3985,6 +4242,7 @@ export type TradingAccountUpdateWithoutWalletTransfersInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4021,6 +4279,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransfersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -4057,6 +4316,7 @@ export type TradingAccountCreateWithoutWalletTransferExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -4093,6 +4353,7 @@ export type TradingAccountUncheckedCreateWithoutWalletTransferExecuteRequestsInp
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -4145,6 +4406,7 @@ export type TradingAccountUpdateWithoutWalletTransferExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4181,6 +4443,7 @@ export type TradingAccountUncheckedUpdateWithoutWalletTransferExecuteRequestsInp
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -4217,6 +4480,7 @@ export type TradingAccountCreateWithoutFxExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -4253,6 +4517,7 @@ export type TradingAccountUncheckedCreateWithoutFxExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -4305,6 +4570,7 @@ export type TradingAccountUpdateWithoutFxExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4341,6 +4607,7 @@ export type TradingAccountUncheckedUpdateWithoutFxExecuteRequestsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -4378,6 +4645,7 @@ export type TradingAccountCreateWithoutEquitySnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -4414,6 +4682,7 @@ export type TradingAccountUncheckedCreateWithoutEquitySnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -4466,6 +4735,7 @@ export type TradingAccountUpdateWithoutEquitySnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4502,6 +4772,7 @@ export type TradingAccountUncheckedUpdateWithoutEquitySnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -4538,6 +4809,7 @@ export type TradingAccountCreateWithoutDailyPortfolioSnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -4574,6 +4846,7 @@ export type TradingAccountUncheckedCreateWithoutDailyPortfolioSnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -4626,6 +4899,7 @@ export type TradingAccountUpdateWithoutDailyPortfolioSnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4662,6 +4936,7 @@ export type TradingAccountUncheckedUpdateWithoutDailyPortfolioSnapshotsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -4698,6 +4973,7 @@ export type TradingAccountCreateWithoutSeasonRankingsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -4734,6 +5010,7 @@ export type TradingAccountUncheckedCreateWithoutSeasonRankingsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -4786,6 +5063,7 @@ export type TradingAccountUpdateWithoutSeasonRankingsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4822,6 +5100,7 @@ export type TradingAccountUncheckedUpdateWithoutSeasonRankingsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -4857,6 +5136,7 @@ export type TradingAccountCreateWithoutFuturesLiquidationsInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -4893,6 +5173,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesLiquidationsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -4945,6 +5226,7 @@ export type TradingAccountUpdateWithoutFuturesLiquidationsInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -4981,6 +5263,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesLiquidationsInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -5017,6 +5300,7 @@ export type TradingAccountCreateWithoutFuturesSeasonSettlementInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutTradingAccountInput
@@ -5053,6 +5337,7 @@ export type TradingAccountUncheckedCreateWithoutFuturesSeasonSettlementInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutTradingAccountInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedCreateNestedManyWithoutTradingAccountInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutTradingAccountInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutTradingAccountInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutTradingAccountInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutTradingAccountInput
@@ -5105,6 +5390,7 @@ export type TradingAccountUpdateWithoutFuturesSeasonSettlementInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -5141,6 +5427,7 @@ export type TradingAccountUncheckedUpdateWithoutFuturesSeasonSettlementInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -5188,6 +5475,7 @@ export type TradingAccountUpdateWithoutUserInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutTradingAccountNestedInput
@@ -5224,6 +5512,7 @@ export type TradingAccountUncheckedUpdateWithoutUserInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutTradingAccountNestedInput
   protectionCommands?: Prisma.ProtectionCommandUncheckedUpdateManyWithoutTradingAccountNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
+  conditionalSellOrders?: Prisma.ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutTradingAccountNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutTradingAccountNestedInput
@@ -5266,6 +5555,7 @@ export type TradingAccountCountOutputType = {
   protectionGroups: number
   protectionCommands: number
   conditionalBuyOrders: number
+  conditionalSellOrders: number
   limitOnCloseOrders: number
   quotes: number
   adRewardClaims: number
@@ -5292,6 +5582,7 @@ export type TradingAccountCountOutputTypeSelect<ExtArgs extends runtime.Types.Ex
   protectionGroups?: boolean | TradingAccountCountOutputTypeCountProtectionGroupsArgs
   protectionCommands?: boolean | TradingAccountCountOutputTypeCountProtectionCommandsArgs
   conditionalBuyOrders?: boolean | TradingAccountCountOutputTypeCountConditionalBuyOrdersArgs
+  conditionalSellOrders?: boolean | TradingAccountCountOutputTypeCountConditionalSellOrdersArgs
   limitOnCloseOrders?: boolean | TradingAccountCountOutputTypeCountLimitOnCloseOrdersArgs
   quotes?: boolean | TradingAccountCountOutputTypeCountQuotesArgs
   adRewardClaims?: boolean | TradingAccountCountOutputTypeCountAdRewardClaimsArgs
@@ -5426,6 +5717,13 @@ export type TradingAccountCountOutputTypeCountConditionalBuyOrdersArgs<ExtArgs e
 /**
  * TradingAccountCountOutputType without action
  */
+export type TradingAccountCountOutputTypeCountConditionalSellOrdersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ConditionalSellOrderWhereInput
+}
+
+/**
+ * TradingAccountCountOutputType without action
+ */
 export type TradingAccountCountOutputTypeCountLimitOnCloseOrdersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.LimitOnCloseOrderWhereInput
 }
@@ -5502,6 +5800,7 @@ export type TradingAccountSelect<ExtArgs extends runtime.Types.Extensions.Intern
   protectionGroups?: boolean | Prisma.TradingAccount$protectionGroupsArgs<ExtArgs>
   protectionCommands?: boolean | Prisma.TradingAccount$protectionCommandsArgs<ExtArgs>
   conditionalBuyOrders?: boolean | Prisma.TradingAccount$conditionalBuyOrdersArgs<ExtArgs>
+  conditionalSellOrders?: boolean | Prisma.TradingAccount$conditionalSellOrdersArgs<ExtArgs>
   limitOnCloseOrders?: boolean | Prisma.TradingAccount$limitOnCloseOrdersArgs<ExtArgs>
   quotes?: boolean | Prisma.TradingAccount$quotesArgs<ExtArgs>
   adRewardClaims?: boolean | Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>
@@ -5571,6 +5870,7 @@ export type TradingAccountInclude<ExtArgs extends runtime.Types.Extensions.Inter
   protectionGroups?: boolean | Prisma.TradingAccount$protectionGroupsArgs<ExtArgs>
   protectionCommands?: boolean | Prisma.TradingAccount$protectionCommandsArgs<ExtArgs>
   conditionalBuyOrders?: boolean | Prisma.TradingAccount$conditionalBuyOrdersArgs<ExtArgs>
+  conditionalSellOrders?: boolean | Prisma.TradingAccount$conditionalSellOrdersArgs<ExtArgs>
   limitOnCloseOrders?: boolean | Prisma.TradingAccount$limitOnCloseOrdersArgs<ExtArgs>
   quotes?: boolean | Prisma.TradingAccount$quotesArgs<ExtArgs>
   adRewardClaims?: boolean | Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>
@@ -5609,6 +5909,7 @@ export type $TradingAccountPayload<ExtArgs extends runtime.Types.Extensions.Inte
     protectionGroups: Prisma.$ProtectionGroupPayload<ExtArgs>[]
     protectionCommands: Prisma.$ProtectionCommandPayload<ExtArgs>[]
     conditionalBuyOrders: Prisma.$ConditionalBuyOrderPayload<ExtArgs>[]
+    conditionalSellOrders: Prisma.$ConditionalSellOrderPayload<ExtArgs>[]
     limitOnCloseOrders: Prisma.$LimitOnCloseOrderPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
     adRewardClaims: Prisma.$AdRewardClaimPayload<ExtArgs>[]
@@ -6040,6 +6341,7 @@ export interface Prisma__TradingAccountClient<T, Null = never, ExtArgs extends r
   protectionGroups<T extends Prisma.TradingAccount$protectionGroupsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$protectionGroupsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   protectionCommands<T extends Prisma.TradingAccount$protectionCommandsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$protectionCommandsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionCommandPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   conditionalBuyOrders<T extends Prisma.TradingAccount$conditionalBuyOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$conditionalBuyOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConditionalBuyOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  conditionalSellOrders<T extends Prisma.TradingAccount$conditionalSellOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$conditionalSellOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConditionalSellOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   limitOnCloseOrders<T extends Prisma.TradingAccount$limitOnCloseOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$limitOnCloseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LimitOnCloseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.TradingAccount$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   adRewardClaims<T extends Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.TradingAccount$adRewardClaimsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardClaimPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -6905,6 +7207,30 @@ export type TradingAccount$conditionalBuyOrdersArgs<ExtArgs extends runtime.Type
   take?: number
   skip?: number
   distinct?: Prisma.ConditionalBuyOrderScalarFieldEnum | Prisma.ConditionalBuyOrderScalarFieldEnum[]
+}
+
+/**
+ * TradingAccount.conditionalSellOrders
+ */
+export type TradingAccount$conditionalSellOrdersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ConditionalSellOrder
+   */
+  select?: Prisma.ConditionalSellOrderSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ConditionalSellOrder
+   */
+  omit?: Prisma.ConditionalSellOrderOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ConditionalSellOrderInclude<ExtArgs> | null
+  where?: Prisma.ConditionalSellOrderWhereInput
+  orderBy?: Prisma.ConditionalSellOrderOrderByWithRelationInput | Prisma.ConditionalSellOrderOrderByWithRelationInput[]
+  cursor?: Prisma.ConditionalSellOrderWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ConditionalSellOrderScalarFieldEnum | Prisma.ConditionalSellOrderScalarFieldEnum[]
 }
 
 /**

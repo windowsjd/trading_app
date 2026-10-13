@@ -3,7 +3,9 @@ import { describe, it } from 'node:test';
 import {
   getAvailabilityLabel,
   getConditionalBuyGate,
+  getConditionalSellGate,
   getLimitOnCloseGate,
+  getLimitOnCloseSellGate,
   getOrderMethodOptions,
   getOrderTypeForMethod,
   isOrderMethodSelectable,
@@ -12,10 +14,10 @@ import {
 
 const open: ServerGate = { state: 'ready', enabled: true };
 const closed: ServerGate = { state: 'ready', enabled: false, reason: '서버 꺼짐' };
-const list = (assetType: string, side: 'buy' | 'sell', conditional: ServerGate = open, loc: ServerGate = open) =>
-  getOrderMethodOptions({ assetType, side, conditional, loc });
-const summary = (assetType: string, side: 'buy' | 'sell', conditional: ServerGate = open, loc: ServerGate = open) =>
-  list(assetType, side, conditional, loc).map((option) => `${option.method}:${option.availability.state}`);
+const list = (assetType: string, side: 'buy' | 'sell', conditional: ServerGate = open, loc: ServerGate = open, protection: ServerGate = open) =>
+  getOrderMethodOptions({ assetType, side, conditional, loc, protection });
+const summary = (assetType: string, side: 'buy' | 'sell', conditional: ServerGate = open, loc: ServerGate = open, protection: ServerGate = open) =>
+  list(assetType, side, conditional, loc, protection).map((option) => `${option.method}:${option.availability.state}`);
 
 describe('주문방식 list per market and side', () => {
   it('KRX buy: market, limit, conditional and LOC, the last two following the server', () => {
@@ -31,13 +33,27 @@ describe('주문방식 list per market and side', () => {
     assert.deepEqual(summary('crypto', 'buy'), ['market:available', 'limit:available', 'conditional:available']);
   });
 
-  it('stock sell: market plus conditional, LOC and stop/take 준비 중; no new limit', () => {
-    for (const assetType of ['domestic_stock', 'us_stock'])
-      assert.deepEqual(summary(assetType, 'sell'), ['market:available', 'conditional:preparing', 'loc:preparing', 'protection:preparing']);
+  it('KRX sell: market plus conditional, LOC and stop/take following their own server gates; no new limit', () => {
+    assert.deepEqual(summary('domestic_stock', 'sell'), ['market:available', 'conditional:available', 'loc:available', 'protection:available']);
+    assert.deepEqual(summary('domestic_stock', 'sell', closed, closed, closed),
+      ['market:available', 'conditional:unavailable', 'loc:unavailable', 'protection:unavailable']);
+    assert.deepEqual(summary('domestic_stock', 'sell', open, closed, open),
+      ['market:available', 'conditional:available', 'loc:unavailable', 'protection:available']);
   });
 
-  it('crypto sell: market plus conditional and stop/take 준비 중; no limit, no LOC', () => {
-    assert.deepEqual(summary('crypto', 'sell'), ['market:available', 'conditional:preparing', 'protection:preparing']);
+  it('US sell lists the same, but new SELL automation stays 준비 중 even if a gate says open', () => {
+    assert.deepEqual(summary('us_stock', 'sell'), ['market:available', 'conditional:preparing', 'loc:preparing', 'protection:preparing']);
+  });
+
+  it('crypto sell: market plus conditional and stop/take; no limit, no LOC', () => {
+    assert.deepEqual(summary('crypto', 'sell'), ['market:available', 'conditional:available', 'protection:available']);
+    assert.equal(list('crypto', 'sell').some((option) => option.method === 'limit' || option.method === 'loc'), false);
+  });
+
+  it('a sell gate still loading is 확인 중, never available', () => {
+    const options = getOrderMethodOptions({ assetType: 'crypto', side: 'sell', conditional: { state: 'loading' }, loc: { state: 'loading' } });
+    assert.deepEqual(options.map((option) => `${option.method}:${option.availability.state}`),
+      ['market:available', 'conditional:checking', 'protection:checking']);
   });
 
   it('keeps the product copy for each method', () => {
@@ -84,6 +100,34 @@ describe('server gates', () => {
     assert.equal((getConditionalBuyGate(capabilities({ canCreate: false }), 'domestic_stock') as { enabled: boolean }).enabled, false);
     assert.deepEqual(getConditionalBuyGate(capabilities(), 'domestic_stock'), { state: 'ready', enabled: true });
     assert.deepEqual(getConditionalBuyGate(capabilities(), 'crypto'), { state: 'ready', enabled: true });
+  });
+
+  it('SELL condition and stop/take gates read their own family', () => {
+    const sell = (condition: Partial<{ enabled: boolean; canCreate: boolean }>, protection: Partial<{ enabled: boolean; canCreate: boolean }>, markets = ['KRX', 'CRYPTO_SPOT']) => ({
+      isLoading: false, isError: false,
+      data: { capabilities: { enabled: true, markets, condition: { enabled: true, canCreate: true, ...condition }, protection: { enabled: true, canCreate: true, ...protection } } },
+    });
+    assert.deepEqual(getConditionalSellGate({ isLoading: true, isError: false }, 'crypto', 'condition'), { state: 'loading' });
+    assert.deepEqual(getConditionalSellGate({ isLoading: false, isError: true }, 'crypto', 'protection'), { state: 'error' });
+    const onlyCondition = sell({}, { enabled: false });
+    assert.deepEqual(getConditionalSellGate(onlyCondition, 'domestic_stock', 'condition'), { state: 'ready', enabled: true });
+    assert.equal((getConditionalSellGate(onlyCondition, 'domestic_stock', 'protection') as { enabled: boolean }).enabled, false);
+    assert.equal((getConditionalSellGate(sell({ canCreate: false }, {}), 'crypto', 'condition') as { enabled: boolean }).enabled, false);
+    assert.equal((getConditionalSellGate(sell({}, {}, ['KRX']), 'crypto', 'protection') as { enabled: boolean }).enabled, false);
+    assert.equal((getConditionalSellGate(sell({}, {}), 'us_stock', 'condition') as { enabled: boolean }).enabled, false);
+  });
+
+  it('LOC SELL: its own flag, KRX only; the BUY flag never opens it', () => {
+    const caps = (sellEnabled: boolean | undefined, buyEnabled = true) => ({
+      isLoading: false, isError: false,
+      data: { limitOnClose: { enabled: buyEnabled, markets: ['KRX'], sides: ['buy'] },
+        ...(sellEnabled === undefined ? {} : { limitOnCloseSell: { enabled: sellEnabled, markets: ['KRX'] } }) },
+    });
+    assert.equal((getLimitOnCloseSellGate(caps(undefined), 'domestic_stock') as { enabled: boolean }).enabled, false);
+    assert.equal((getLimitOnCloseSellGate(caps(false), 'domestic_stock') as { enabled: boolean }).enabled, false);
+    assert.equal((getLimitOnCloseSellGate(caps(true), 'crypto') as { enabled: boolean }).enabled, false);
+    assert.deepEqual(getLimitOnCloseSellGate(caps(true, false), 'domestic_stock'), { state: 'ready', enabled: true });
+    assert.deepEqual(getLimitOnCloseSellGate({ isLoading: true, isError: false }, 'domestic_stock'), { state: 'loading' });
   });
 
   it('LOC: open only when the server reports it for KRX BUY', () => {

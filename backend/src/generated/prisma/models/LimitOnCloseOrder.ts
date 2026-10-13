@@ -27,10 +27,12 @@ export type AggregateLimitOnCloseOrder = {
 }
 
 export type LimitOnCloseOrderAvgAggregateOutputType = {
+  requestedQuantity: runtime.Decimal | null
   closePrice: runtime.Decimal | null
 }
 
 export type LimitOnCloseOrderSumAggregateOutputType = {
+  requestedQuantity: runtime.Decimal | null
   closePrice: runtime.Decimal | null
 }
 
@@ -43,6 +45,7 @@ export type LimitOnCloseOrderMinAggregateOutputType = {
   sessionOpenAt: Date | null
   sessionCloseAt: Date | null
   evidenceDeadlineAt: Date | null
+  requestedQuantity: runtime.Decimal | null
   status: $Enums.LimitOnCloseStatus | null
   decisionReason: string | null
   decidedAt: Date | null
@@ -63,6 +66,7 @@ export type LimitOnCloseOrderMaxAggregateOutputType = {
   sessionOpenAt: Date | null
   sessionCloseAt: Date | null
   evidenceDeadlineAt: Date | null
+  requestedQuantity: runtime.Decimal | null
   status: $Enums.LimitOnCloseStatus | null
   decisionReason: string | null
   decidedAt: Date | null
@@ -83,6 +87,7 @@ export type LimitOnCloseOrderCountAggregateOutputType = {
   sessionOpenAt: number
   sessionCloseAt: number
   evidenceDeadlineAt: number
+  requestedQuantity: number
   status: number
   decisionReason: number
   decidedAt: number
@@ -97,10 +102,12 @@ export type LimitOnCloseOrderCountAggregateOutputType = {
 
 
 export type LimitOnCloseOrderAvgAggregateInputType = {
+  requestedQuantity?: true
   closePrice?: true
 }
 
 export type LimitOnCloseOrderSumAggregateInputType = {
+  requestedQuantity?: true
   closePrice?: true
 }
 
@@ -113,6 +120,7 @@ export type LimitOnCloseOrderMinAggregateInputType = {
   sessionOpenAt?: true
   sessionCloseAt?: true
   evidenceDeadlineAt?: true
+  requestedQuantity?: true
   status?: true
   decisionReason?: true
   decidedAt?: true
@@ -133,6 +141,7 @@ export type LimitOnCloseOrderMaxAggregateInputType = {
   sessionOpenAt?: true
   sessionCloseAt?: true
   evidenceDeadlineAt?: true
+  requestedQuantity?: true
   status?: true
   decisionReason?: true
   decidedAt?: true
@@ -153,6 +162,7 @@ export type LimitOnCloseOrderCountAggregateInputType = {
   sessionOpenAt?: true
   sessionCloseAt?: true
   evidenceDeadlineAt?: true
+  requestedQuantity?: true
   status?: true
   decisionReason?: true
   decidedAt?: true
@@ -260,6 +270,7 @@ export type LimitOnCloseOrderGroupByOutputType = {
   sessionOpenAt: Date
   sessionCloseAt: Date
   evidenceDeadlineAt: Date
+  requestedQuantity: runtime.Decimal | null
   status: $Enums.LimitOnCloseStatus
   decisionReason: string | null
   decidedAt: Date | null
@@ -303,6 +314,7 @@ export type LimitOnCloseOrderWhereInput = {
   sessionOpenAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
   sessionCloseAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
+  requestedQuantity?: Prisma.DecimalNullableFilter<"LimitOnCloseOrder"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFilter<"LimitOnCloseOrder"> | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.StringNullableFilter<"LimitOnCloseOrder"> | string | null
   decidedAt?: Prisma.DateTimeNullableFilter<"LimitOnCloseOrder"> | Date | string | null
@@ -327,6 +339,7 @@ export type LimitOnCloseOrderOrderByWithRelationInput = {
   sessionOpenAt?: Prisma.SortOrder
   sessionCloseAt?: Prisma.SortOrder
   evidenceDeadlineAt?: Prisma.SortOrder
+  requestedQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   decisionReason?: Prisma.SortOrderInput | Prisma.SortOrder
   decidedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -355,6 +368,7 @@ export type LimitOnCloseOrderWhereUniqueInput = Prisma.AtLeast<{
   sessionOpenAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
   sessionCloseAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
+  requestedQuantity?: Prisma.DecimalNullableFilter<"LimitOnCloseOrder"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFilter<"LimitOnCloseOrder"> | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.StringNullableFilter<"LimitOnCloseOrder"> | string | null
   decidedAt?: Prisma.DateTimeNullableFilter<"LimitOnCloseOrder"> | Date | string | null
@@ -379,6 +393,7 @@ export type LimitOnCloseOrderOrderByWithAggregationInput = {
   sessionOpenAt?: Prisma.SortOrder
   sessionCloseAt?: Prisma.SortOrder
   evidenceDeadlineAt?: Prisma.SortOrder
+  requestedQuantity?: Prisma.SortOrderInput | Prisma.SortOrder
   status?: Prisma.SortOrder
   decisionReason?: Prisma.SortOrderInput | Prisma.SortOrder
   decidedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -407,6 +422,7 @@ export type LimitOnCloseOrderScalarWhereWithAggregatesInput = {
   sessionOpenAt?: Prisma.DateTimeWithAggregatesFilter<"LimitOnCloseOrder"> | Date | string
   sessionCloseAt?: Prisma.DateTimeWithAggregatesFilter<"LimitOnCloseOrder"> | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeWithAggregatesFilter<"LimitOnCloseOrder"> | Date | string
+  requestedQuantity?: Prisma.DecimalNullableWithAggregatesFilter<"LimitOnCloseOrder"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusWithAggregatesFilter<"LimitOnCloseOrder"> | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.StringNullableWithAggregatesFilter<"LimitOnCloseOrder"> | string | null
   decidedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"LimitOnCloseOrder"> | Date | string | null
@@ -424,6 +440,7 @@ export type LimitOnCloseOrderCreateInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -447,6 +464,7 @@ export type LimitOnCloseOrderUncheckedCreateInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -464,6 +482,7 @@ export type LimitOnCloseOrderUpdateInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -487,6 +506,7 @@ export type LimitOnCloseOrderUncheckedUpdateInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -507,6 +527,7 @@ export type LimitOnCloseOrderCreateManyInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -524,6 +545,7 @@ export type LimitOnCloseOrderUpdateManyMutationInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -543,6 +565,7 @@ export type LimitOnCloseOrderUncheckedUpdateManyInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -583,6 +606,7 @@ export type LimitOnCloseOrderCountOrderByAggregateInput = {
   sessionOpenAt?: Prisma.SortOrder
   sessionCloseAt?: Prisma.SortOrder
   evidenceDeadlineAt?: Prisma.SortOrder
+  requestedQuantity?: Prisma.SortOrder
   status?: Prisma.SortOrder
   decisionReason?: Prisma.SortOrder
   decidedAt?: Prisma.SortOrder
@@ -595,6 +619,7 @@ export type LimitOnCloseOrderCountOrderByAggregateInput = {
 }
 
 export type LimitOnCloseOrderAvgOrderByAggregateInput = {
+  requestedQuantity?: Prisma.SortOrder
   closePrice?: Prisma.SortOrder
 }
 
@@ -607,6 +632,7 @@ export type LimitOnCloseOrderMaxOrderByAggregateInput = {
   sessionOpenAt?: Prisma.SortOrder
   sessionCloseAt?: Prisma.SortOrder
   evidenceDeadlineAt?: Prisma.SortOrder
+  requestedQuantity?: Prisma.SortOrder
   status?: Prisma.SortOrder
   decisionReason?: Prisma.SortOrder
   decidedAt?: Prisma.SortOrder
@@ -627,6 +653,7 @@ export type LimitOnCloseOrderMinOrderByAggregateInput = {
   sessionOpenAt?: Prisma.SortOrder
   sessionCloseAt?: Prisma.SortOrder
   evidenceDeadlineAt?: Prisma.SortOrder
+  requestedQuantity?: Prisma.SortOrder
   status?: Prisma.SortOrder
   decisionReason?: Prisma.SortOrder
   decidedAt?: Prisma.SortOrder
@@ -639,6 +666,7 @@ export type LimitOnCloseOrderMinOrderByAggregateInput = {
 }
 
 export type LimitOnCloseOrderSumOrderByAggregateInput = {
+  requestedQuantity?: Prisma.SortOrder
   closePrice?: Prisma.SortOrder
 }
 
@@ -810,6 +838,7 @@ export type LimitOnCloseOrderCreateWithoutTradingAccountInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -831,6 +860,7 @@ export type LimitOnCloseOrderUncheckedCreateWithoutTradingAccountInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -880,6 +910,7 @@ export type LimitOnCloseOrderScalarWhereInput = {
   sessionOpenAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
   sessionCloseAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFilter<"LimitOnCloseOrder"> | Date | string
+  requestedQuantity?: Prisma.DecimalNullableFilter<"LimitOnCloseOrder"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFilter<"LimitOnCloseOrder"> | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.StringNullableFilter<"LimitOnCloseOrder"> | string | null
   decidedAt?: Prisma.DateTimeNullableFilter<"LimitOnCloseOrder"> | Date | string | null
@@ -897,6 +928,7 @@ export type LimitOnCloseOrderCreateWithoutAssetInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -918,6 +950,7 @@ export type LimitOnCloseOrderUncheckedCreateWithoutAssetInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -961,6 +994,7 @@ export type LimitOnCloseOrderCreateWithoutOrderInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -981,6 +1015,7 @@ export type LimitOnCloseOrderUncheckedCreateWithoutOrderInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -1014,6 +1049,7 @@ export type LimitOnCloseOrderUpdateWithoutOrderInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1034,6 +1070,7 @@ export type LimitOnCloseOrderUncheckedUpdateWithoutOrderInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1051,6 +1088,7 @@ export type LimitOnCloseOrderCreateWithoutCloseEvidenceInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -1073,6 +1111,7 @@ export type LimitOnCloseOrderUncheckedCreateWithoutCloseEvidenceInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -1117,6 +1156,7 @@ export type LimitOnCloseOrderCreateManyTradingAccountInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -1134,6 +1174,7 @@ export type LimitOnCloseOrderUpdateWithoutTradingAccountInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1155,6 +1196,7 @@ export type LimitOnCloseOrderUncheckedUpdateWithoutTradingAccountInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1174,6 +1216,7 @@ export type LimitOnCloseOrderUncheckedUpdateManyWithoutTradingAccountInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1193,6 +1236,7 @@ export type LimitOnCloseOrderCreateManyAssetInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -1210,6 +1254,7 @@ export type LimitOnCloseOrderUpdateWithoutAssetInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1231,6 +1276,7 @@ export type LimitOnCloseOrderUncheckedUpdateWithoutAssetInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1250,6 +1296,7 @@ export type LimitOnCloseOrderUncheckedUpdateManyWithoutAssetInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1270,6 +1317,7 @@ export type LimitOnCloseOrderCreateManyCloseEvidenceInput = {
   sessionOpenAt: Date | string
   sessionCloseAt: Date | string
   evidenceDeadlineAt: Date | string
+  requestedQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: $Enums.LimitOnCloseStatus
   decisionReason?: string | null
   decidedAt?: Date | string | null
@@ -1286,6 +1334,7 @@ export type LimitOnCloseOrderUpdateWithoutCloseEvidenceInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1308,6 +1357,7 @@ export type LimitOnCloseOrderUncheckedUpdateWithoutCloseEvidenceInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1327,6 +1377,7 @@ export type LimitOnCloseOrderUncheckedUpdateManyWithoutCloseEvidenceInput = {
   sessionOpenAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   sessionCloseAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   evidenceDeadlineAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  requestedQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumLimitOnCloseStatusFieldUpdateOperationsInput | $Enums.LimitOnCloseStatus
   decisionReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   decidedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1348,6 +1399,7 @@ export type LimitOnCloseOrderSelect<ExtArgs extends runtime.Types.Extensions.Int
   sessionOpenAt?: boolean
   sessionCloseAt?: boolean
   evidenceDeadlineAt?: boolean
+  requestedQuantity?: boolean
   status?: boolean
   decisionReason?: boolean
   decidedAt?: boolean
@@ -1372,6 +1424,7 @@ export type LimitOnCloseOrderSelectCreateManyAndReturn<ExtArgs extends runtime.T
   sessionOpenAt?: boolean
   sessionCloseAt?: boolean
   evidenceDeadlineAt?: boolean
+  requestedQuantity?: boolean
   status?: boolean
   decisionReason?: boolean
   decidedAt?: boolean
@@ -1396,6 +1449,7 @@ export type LimitOnCloseOrderSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   sessionOpenAt?: boolean
   sessionCloseAt?: boolean
   evidenceDeadlineAt?: boolean
+  requestedQuantity?: boolean
   status?: boolean
   decisionReason?: boolean
   decidedAt?: boolean
@@ -1420,6 +1474,7 @@ export type LimitOnCloseOrderSelectScalar = {
   sessionOpenAt?: boolean
   sessionCloseAt?: boolean
   evidenceDeadlineAt?: boolean
+  requestedQuantity?: boolean
   status?: boolean
   decisionReason?: boolean
   decidedAt?: boolean
@@ -1431,7 +1486,7 @@ export type LimitOnCloseOrderSelectScalar = {
   updatedAt?: boolean
 }
 
-export type LimitOnCloseOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"orderId" | "tradingAccountId" | "assetId" | "market" | "sessionDate" | "sessionOpenAt" | "sessionCloseAt" | "evidenceDeadlineAt" | "status" | "decisionReason" | "decidedAt" | "closeEvidenceId" | "closePrice" | "lastCheckCode" | "lastCheckedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOnCloseOrder"]>
+export type LimitOnCloseOrderOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"orderId" | "tradingAccountId" | "assetId" | "market" | "sessionDate" | "sessionOpenAt" | "sessionCloseAt" | "evidenceDeadlineAt" | "requestedQuantity" | "status" | "decisionReason" | "decidedAt" | "closeEvidenceId" | "closePrice" | "lastCheckCode" | "lastCheckedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["limitOnCloseOrder"]>
 export type LimitOnCloseOrderInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   order?: boolean | Prisma.OrderDefaultArgs<ExtArgs>
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -1468,6 +1523,7 @@ export type $LimitOnCloseOrderPayload<ExtArgs extends runtime.Types.Extensions.I
     sessionOpenAt: Date
     sessionCloseAt: Date
     evidenceDeadlineAt: Date
+    requestedQuantity: runtime.Decimal | null
     status: $Enums.LimitOnCloseStatus
     decisionReason: string | null
     decidedAt: Date | null
@@ -1912,6 +1968,7 @@ export interface LimitOnCloseOrderFieldRefs {
   readonly sessionOpenAt: Prisma.FieldRef<"LimitOnCloseOrder", 'DateTime'>
   readonly sessionCloseAt: Prisma.FieldRef<"LimitOnCloseOrder", 'DateTime'>
   readonly evidenceDeadlineAt: Prisma.FieldRef<"LimitOnCloseOrder", 'DateTime'>
+  readonly requestedQuantity: Prisma.FieldRef<"LimitOnCloseOrder", 'Decimal'>
   readonly status: Prisma.FieldRef<"LimitOnCloseOrder", 'LimitOnCloseStatus'>
   readonly decisionReason: Prisma.FieldRef<"LimitOnCloseOrder", 'String'>
   readonly decidedAt: Prisma.FieldRef<"LimitOnCloseOrder", 'DateTime'>

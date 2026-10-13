@@ -7,6 +7,15 @@
 > `20261006160000_pin_order_wallet_and_add_transfers` migration은 기존 order Quotes/Orders를 Securities로 backfill한다. 기존 잔액/예약금/Position은 이동하지 않는다.
 > 기존 account scope·replay·예약·fee pinning은 유지한다. [Wallet provenance/Transfer 계약](wallet-transfers-api-contract.md)을 함께 읽는다.
 
+## SELL settings and LOC SELL extension (2026-10-13)
+
+Account order rows add `conditionalSell: { id, kind } | null` (the SELL
+condition / stop-loss / take-profit that submitted the order). A LOC SELL is a
+limit SELL with `limitOnClose: true`; its quote may accept less than asked
+(`quantityAdjustment`), and its create may carry the display-only
+`requestedQuantity`. Account positions add `reservedQuantity` and
+`availableQuantity`. Contract: [SELL intents and LOC SELL](conditional-sell-and-loc-sell-contract.md).
+
 ## B2-1 market execution extension (2026-10-02)
 
 Both account modes share the additive terminal `marketExecution` contract in

@@ -13,6 +13,7 @@ import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { conditionalPrice } from './conditional-price';
 import { liveProtection } from './conditional-state';
+import { countLiveConditionalSells } from './conditional-sell-state';
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 
 /** Caller owns the existing account/lifecycle fence. Registration never reserves. */
@@ -63,6 +64,18 @@ export async function createProtectionInTransaction(
     throw createApiError(
       'PROTECTION_CONFLICT',
       'This position already has active protection.',
+      409,
+    );
+  // Whole-position OCO protection never shares a holding with independent
+  // SELL intents (conditions, stop-loss/take-profit settings): its child
+  // sells and reserves the whole position.
+  if (
+    input.domain === 'spot' &&
+    (await countLiveConditionalSells(tx, input.accountId, asset.id))
+  )
+    throw createApiError(
+      'CONDITIONAL_SELL_CONFLICT',
+      'Cancel conditional sell orders before protecting the whole position.',
       409,
     );
   let direction: 'long' | 'short' = 'long';

@@ -56,8 +56,12 @@ function option(method: OrderMethod, description: string, availability: OrderMet
 export function getOrderMethodOptions(input: {
   assetType?: string | null;
   side: 'buy' | 'sell';
+  /** The side's own conditional gate (BUY watches or SELL conditions). */
   conditional: ServerGate;
+  /** The side's own LOC gate (LOC BUY or LOC SELL). */
   loc: ServerGate;
+  /** SELL only: independent stop-loss/take-profit gate. */
+  protection?: ServerGate;
 }): OrderMethodOption[] {
   const { assetType, side } = input;
   const krx = assetType === 'domestic_stock';
@@ -76,11 +80,16 @@ export function getOrderMethodOptions(input: {
     return options;
   }
   // New sell limit is not offered here; already accepted sell limits keep
-  // their server fill, list and cancel paths.
+  // their server fill, list and cancel paths. US SELL automation waits for an
+  // approved quote/close data provider: listed, never enabled.
   const options = [option('market', '현재 거래 가능한 가격으로 매도를 시도합니다.', AVAILABLE)];
-  if (krx || us || crypto) options.push(option('conditional', '감시가격에 도달하면 설정한 방식으로 매도합니다.', PREPARING));
-  if (krx || us) options.push(option('loc', '정규장 마감가격이 지정가격 이상이면 종가로 매도합니다.', PREPARING));
-  if (krx || us || crypto) options.push(option('protection', '보유 수량에 손절·익절 가격을 정해 두고 매도합니다.', PREPARING));
+  if (krx || us || crypto)
+    options.push(option('conditional', '감시가격에 도달하면 설정한 방식으로 매도합니다.', us ? PREPARING : fromGate(input.conditional)));
+  if (krx || us)
+    options.push(option('loc', '정규장 마감가격이 지정가격 이상이면 종가로 매도합니다.', us ? PREPARING : fromGate(input.loc)));
+  if (krx || us || crypto)
+    options.push(option('protection', '손절·익절 가격과 각각의 수량을 정해 두고 매도합니다.',
+      us ? PREPARING : fromGate(input.protection ?? { state: 'loading' })));
   return options;
 }
 
@@ -114,6 +123,45 @@ export function getConditionalBuyGate(
   if (!enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 새 조건주문을 등록할 수 없어요.' };
   if (!market || !markets.includes(market)) return { state: 'ready', enabled: false, reason: '이 시장은 조건주문을 지원하지 않아요.' };
   if (!canCreate) return { state: 'ready', enabled: false, reason: '현재 계정 상태에서는 조건주문을 등록할 수 없어요.' };
+  return { state: 'ready', enabled: true };
+}
+
+type SellCapabilities = {
+  enabled: boolean;
+  condition: { enabled: boolean; canCreate: boolean };
+  protection: { enabled: boolean; canCreate: boolean };
+  markets: string[];
+};
+
+/** Server capability → gate for a new SELL condition or stop-loss/take-profit. */
+export function getConditionalSellGate(
+  query: { isLoading: boolean; isError: boolean; data?: { capabilities: SellCapabilities } | null },
+  assetType: string | null | undefined,
+  family: 'condition' | 'protection',
+): ServerGate {
+  if (query.isError) return { state: 'error' };
+  if (query.isLoading || !query.data) return { state: 'loading' };
+  const capability = query.data.capabilities[family];
+  const name = family === 'condition' ? '조건주문' : '손절·익절';
+  const market = assetType === 'crypto' ? 'CRYPTO_SPOT' : assetType === 'domestic_stock' ? 'KRX' : null;
+  if (!capability?.enabled) return { state: 'ready', enabled: false, reason: `현재 운영 상태에서 새 ${name} 매도를 등록할 수 없어요.` };
+  if (!market || !query.data.capabilities.markets.includes(market))
+    return { state: 'ready', enabled: false, reason: `이 시장은 ${name} 매도를 지원하지 않아요.` };
+  if (!capability.canCreate) return { state: 'ready', enabled: false, reason: `현재 계정 상태에서는 ${name} 매도를 등록할 수 없어요.` };
+  return { state: 'ready', enabled: true };
+}
+
+/** Server capability → gate for a new LOC SELL (its own flag, never the BUY one). */
+export function getLimitOnCloseSellGate(
+  query: { isLoading: boolean; isError: boolean; data?: { limitOnCloseSell?: { enabled: boolean; markets: string[] } } | null },
+  assetType?: string | null,
+): ServerGate {
+  if (query.isError) return { state: 'error' };
+  if (query.isLoading || !query.data) return { state: 'loading' };
+  const sell = query.data.limitOnCloseSell;
+  if (!sell?.enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 LOC 매도를 이용할 수 없어요.' };
+  if (assetType !== 'domestic_stock' || !sell.markets.includes('KRX'))
+    return { state: 'ready', enabled: false, reason: 'LOC 매도는 한국주식만 지원해요.' };
   return { state: 'ready', enabled: true };
 }
 

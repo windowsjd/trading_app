@@ -81,6 +81,7 @@ export const ModelName = {
   Position: 'Position',
   Order: 'Order',
   ConditionalBuyOrder: 'ConditionalBuyOrder',
+  ConditionalSellOrder: 'ConditionalSellOrder',
   LimitOnCloseOrder: 'LimitOnCloseOrder',
   SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
@@ -736,6 +737,39 @@ export const ConditionalBuyOrderScalarFieldEnum = {
 export type ConditionalBuyOrderScalarFieldEnum = (typeof ConditionalBuyOrderScalarFieldEnum)[keyof typeof ConditionalBuyOrderScalarFieldEnum]
 
 
+export const ConditionalSellOrderScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  assetId: 'assetId',
+  positionId: 'positionId',
+  kind: 'kind',
+  triggerCondition: 'triggerCondition',
+  triggerPrice: 'triggerPrice',
+  executionType: 'executionType',
+  limitPrice: 'limitPrice',
+  quantity: 'quantity',
+  currencyCode: 'currencyCode',
+  status: 'status',
+  orderId: 'orderId',
+  executionAvailableQuantity: 'executionAvailableQuantity',
+  registrationSnapshotId: 'registrationSnapshotId',
+  triggerSnapshotId: 'triggerSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ConditionalSellOrderScalarFieldEnum = (typeof ConditionalSellOrderScalarFieldEnum)[keyof typeof ConditionalSellOrderScalarFieldEnum]
+
+
 export const LimitOnCloseOrderScalarFieldEnum = {
   orderId: 'orderId',
   tradingAccountId: 'tradingAccountId',
@@ -745,6 +779,7 @@ export const LimitOnCloseOrderScalarFieldEnum = {
   sessionOpenAt: 'sessionOpenAt',
   sessionCloseAt: 'sessionCloseAt',
   evidenceDeadlineAt: 'evidenceDeadlineAt',
+  requestedQuantity: 'requestedQuantity',
   status: 'status',
   decisionReason: 'decisionReason',
   decidedAt: 'decidedAt',

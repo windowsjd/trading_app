@@ -35,6 +35,7 @@ const d = (value: string) => new Prisma.Decimal(value);
 const krx = { assetType: AssetType.domestic_stock, market: 'KRX' };
 const config: LimitOnCloseConfig = {
   enabled: true,
+  sellEnabled: false,
   evidenceMinDelayMs: 1_200_000,
   evidenceConfirmMs: 300_000,
   evidenceDeadlineMs: 10_800_000,
