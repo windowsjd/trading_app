@@ -3,7 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { GuideStackParamList } from '../../app/navigation/types';
 import { LessonAction, LessonPage, Section } from './LessonUi';
 import { Basis } from './MarketLessonUi';
-import { AuctionsLesson, GapsLesson, SessionsLesson } from './StockLessons';
+import { ClosedMarketLesson } from './StockLessons';
 import {
   AdjustedLesson,
   DividendsLesson,
@@ -20,9 +20,7 @@ import { chapterTitle, type GuideChapter } from './guideTopics';
 import { VERIFIED_ON } from './marketLessonData';
 
 const lessons = {
-  sessions: SessionsLesson,
-  auctions: AuctionsLesson,
-  gaps: GapsLesson,
+  'closed-market': ClosedMarketLesson,
   splits: SplitsLesson,
   dividends: DividendsLesson,
   adjusted: AdjustedLesson,
@@ -33,9 +31,7 @@ const lessons = {
   tracking: TrackingLesson,
 } satisfies Record<GuideChapter, React.ComponentType>;
 const sources: Record<GuideChapter, string> = {
-  sessions: 'KRX 거래시간·시간외 거래, NYSE 거래일정, NIST 서머타임',
-  auctions: 'KRX 매매체결·시간외 거래, NYSE 개장·마감 경매',
-  gaps: 'KRX 거래시간, NYSE 거래시간',
+  'closed-market': 'KRX 거래시간·매매체결·시간외 거래, NYSE 거래시간',
   splits: 'SEC 주식병합, KRX 기준가격, TradingView 주식분할',
   dividends: 'SEC 배당락일, KRX 배당성향·기준가격',
   adjusted: 'TradingView 분할·배당 조정, KRX 기준가격',

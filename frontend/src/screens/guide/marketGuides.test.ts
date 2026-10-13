@@ -1,4 +1,4 @@
-import { financial, resolveFinancialColor } from '../../theme/financialColors.ts';
+import { financial } from '../../theme/financialColors.ts';
 import assert from 'node:assert/strict';
 import { URL } from 'node:url';
 import { createRequire } from 'node:module';
@@ -14,6 +14,7 @@ import {
   indexImpact,
   nav,
   normalize,
+  openingBuyOrder,
   premium,
   priceDomain,
   sessionOhlc,
@@ -104,6 +105,9 @@ function setup(
     act(() => button.props.onPress());
   };
   h.text = (id?: string) => textContent(id ? h.find(id) : h.renderer.toJSON());
+  h.prose = () => h.renderer.root.findAll(
+    (node: any) => [ui.Body, figures.Basis].includes(node.type),
+  ).map(textContent).join('');
   h.order = (...ids: string[]) => {
     const all = h.renderer.root.findAll(
       (node: any) => typeof node.type === 'string',
@@ -183,6 +187,41 @@ describe('market guide calculations from local inputs', () => {
     assert.equal(callAuction([], []).result, null);
     const changed = callAuction(auctionBuys, [{ price: 10100, quantity: 5 }]);
     assert.equal(changed.candidates[0].quantity, 5, 'uses input quantities');
+    assert.equal(JSON.stringify([auctionBuys, auctionSells]), original);
+  });
+  it('adds an opening buy without mutating orders and leaves same-price allocation undetermined', () => {
+    const buys = auctionBuys.map((order) => ({ ...order }));
+    const sells = auctionSells.map((order) => ({ ...order }));
+    const original = JSON.stringify([buys, sells]);
+    for (const orders of [buys, sells]) {
+      orders.forEach(Object.freeze);
+      Object.freeze(orders);
+    }
+    const filled = openingBuyOrder(10300, 10, buys, sells);
+    assert.equal(filled.status, 'filled');
+    assert.equal(filled.price, 10200);
+    assert.equal(filled.quantity, 10);
+    assert.equal(filled.saved, 1000);
+    assert.deepEqual(filled.auction.result, {
+      price: 10200, buy: 90, sell: 80, quantity: 80,
+    });
+    assert.deepEqual(
+      filled.auction.candidates.map(({ price, quantity }) => [price, quantity]),
+      [[10100, 20], [10200, 80], [10300, 40]],
+    );
+    const unfilled = openingBuyOrder(10100, 10, buys, sells);
+    assert.equal(unfilled.status, 'unfilled');
+    assert.equal(unfilled.auction.result?.price, 10200);
+    assert.equal(unfilled.auction.result?.quantity, 80);
+    assert.deepEqual(
+      unfilled.auction.candidates.map(({ price, quantity }) => [price, quantity]),
+      [[10100, 20], [10200, 80], [10300, 30]],
+    );
+    assert.equal(openingBuyOrder(10200, 10, buys, sells).status, 'undetermined');
+    const empty = openingBuyOrder(10300, 10, [], []);
+    assert.equal(empty.status, 'undetermined');
+    assert.equal(empty.auction.result === null, true);
+    assert.equal(JSON.stringify([buys, sells]), original);
     assert.equal(JSON.stringify([auctionBuys, auctionSells]), original);
   });
   it('filters the same trades into OHLC, keeps raw candles, and sizes shared axes', () => {
@@ -326,7 +365,7 @@ describe('market guide calculations from local inputs', () => {
 describe('new guide chapters preserve downward learning flow', () => {
   for (const topic of Object.keys(guideTopics) as (keyof typeof guideTopics)[])
     it(`${topic} opens each chapter through the existing stack`, (t) => {
-      const h = setup(t, 'sessions', topic);
+      const h = setup(t, 'closed-market', topic);
       for (const chapter of guideTopics[topic].chapters) {
         h.press(`guide-chapter-${chapter.id}`);
         assert.deepEqual(h.routes.at(-1), [
@@ -336,108 +375,128 @@ describe('new guide chapters preserve downward learning flow', () => {
       }
       h.readable();
     });
-  it('compares Korea and the US on the same session timeline, then freezes before dates', (t) => {
-    const h = setup(t, 'sessions');
-    assert.match(h.text(), /Regular Session.*Pre-Market.*After-Hours/s);
-    assert.match(h.text('session-kr'), /09:00~15:30.*15:20~15:30/s);
-    assert.match(
-      h.text('session-us'),
-      /04:00~09:30.*09:30~16:00.*16:00~20:00/s,
-    );
-    assert.equal(h.find('session-record').props.disabled, true);
-    h.press('session-scope-regular');
-    assert.match(h.text('session-kr-summary'), /4개.*10,750원.*10,550원/s);
-    h.press('session-scope-extended');
-    assert.match(h.text('session-kr-summary'), /6개.*10,850원.*10,000원/s);
-    assert.match(h.text('session-us-summary'), /7개.*108.5달러.*102달러/s);
-    h.press('session-record');
-    const before = h.text('sessions-a');
-    h.press('us-date-2026-01-07');
-    assert.match(
-      h.text('us-date-result'),
-      /2026-01-07 23:30.*2026-01-08 06:00/s,
-    );
-    h.press('us-date-2026-07-08');
-    assert.match(
-      h.text('us-date-result'),
-      /2026-07-08 22:30.*2026-07-09 05:00/s,
-    );
-    h.press('us-date-record');
-    const us = h.text('us-date-result');
-    assert.match(h.text('sessions-c'), /Market Holiday.*Early Close/s);
-    for (const id of ['weekend', 'krx-holiday', 'us-holiday']) {
-      h.press(`calendar-${id}`);
-      assert.match(h.text('calendar-result'), /운영하지 않음/);
+  it('keeps the last price fixed overnight and fills a 10,300-won buy at the opening price', (t) => {
+    const h = setup(t, 'closed-market');
+    assert.equal(h.find('closed-market-2') === undefined, true);
+    assert.equal(h.find('closed-market-time') === undefined, true);
+    h.press('closed-market-next');
+    assert.equal(h.find('closed-market-next').props.disabled, true);
+    assert.equal(h.find('closed-market-order').props.disabled, true);
+    assert.equal(h.find('closed-market-time') === undefined, true);
+    h.press('closed-market-price-10100');
+    h.press('closed-market-price-10300');
+    h.press('closed-market-order');
+    const order = h.text('closed-market-order-result');
+    assert.match(order, /10,300원에 10주.*아직 체결되지 않았습니다/s);
+    assert.equal(h.find('closed-market-order').props.disabled, true);
+    for (const price of [10100, 10300])
+      assert.equal(h.find(`closed-market-price-${price}`).props.disabled, true);
+    assert.match(h.text('closed-market-book'), /매수내 주문 · 10,300원 · 10주매도아직 접수된 주문 없음/);
+    const own = h.find('closed-market-book').findAll(
+      (node: any) => node.type === 'Text' && textContent(node).startsWith('내 주문'),
+    )[0];
+    assert.equal(flatten(own.props.style).fontWeight, '700');
+    const quantities = [[10, 0], [40, 20], [90, 80], [170, 180]];
+    const times = ['장 마감 직후', '밤 22:00', '새벽 05:00', '08:30'];
+    for (let stage = 0; stage <= 3; stage++) {
+      if (stage) h.press('closed-market-time');
+      const status = h.text('closed-market-status');
+      assert.match(status, /현재가10,000원.*지금까지 체결0건/s);
+      assert.ok(status.includes(times[stage]));
+      assert.ok(status.includes(`매수 ${quantities[stage][0]}주 · 매도 ${quantities[stage][1]}주`));
+      assert.equal(h.text('closed-market-order-result'), order);
+      assert.equal(h.find('closed-market-time').props.accessibilityLabel, `시간 보내기 (${stage}/3)`);
+      assert.equal(h.find('closed-market-time').props.disabled, stage === 3);
+      assert.equal(h.find('closed-market-open') === undefined, stage < 3);
+      assert.equal(h.find('closed-market-3') === undefined, true);
+      h.readable();
     }
-    h.press('calendar-us-may');
-    assert.doesNotMatch(h.text('calendar-result'), /운영하지 않음/);
-    h.press('calendar-early');
-    assert.match(h.text('calendar-result'), /13:00.*2026-11-28 03:00/s);
-    assert.equal(h.text('sessions-a'), before);
-    assert.equal(h.text('us-date-result'), us);
-    h.order(
-      'session-result',
-      'sessions-b',
-      'us-date-result',
-      'sessions-c',
-      'calendar-result',
-    );
+    assert.match(h.text('closed-market-status'), /매수 170주.*매도 180주/);
+    const pile = h.text('closed-market-pile-result');
+    h.press('closed-market-open');
+    assert.equal(h.find('closed-market-open').props.disabled, true);
+    assert.match(h.text('closed-market-candidates'), /10,200원: 매수 90주 · 매도 80주 → 80주 ← 시가/);
+    assert.match(h.text('closed-market-open-values'), /10,200원 · 80주 체결.*\+2%/s);
+    assert.match(h.text('closed-market-my-result'), /10,200원에 체결.*10주.*1,000원 싸게/s);
+    assert.match(h.text('closed-market-my-result'), /10,100원을 냈다면.*체결되지 않았을/);
+    assert.match(h.text('closed-market-open-candle'), /전 거래일 · 종가 10,000원.*밤사이 · 체결 없음.*09:00 · 시가 10,200원/s);
+    for (const index of [0, 2])
+      assert.equal(h.find(`closed-market-open-candle-body-${index}`) !== undefined, true);
+    assert.equal(h.find('closed-market-open-candle-body-1') === undefined, true);
+    assert.equal(h.find('closed-market-4') === undefined, true);
+    h.press('closed-market-finish');
+    assert.equal(h.find('closed-market-finish').props.disabled, true);
+    assert.equal(h.text('closed-market-order-result'), order);
+    assert.equal(h.text('closed-market-pile-result'), pile);
+    const syllables = (h.prose().match(/[가-힣]/g) ?? []).length;
+    assert.ok(syllables <= 700, `${syllables} Hangul syllables in lesson prose`);
+    t.diagnostic(`10,300-won path: ${syllables} Hangul syllables, including shared Basis text`);
     h.readable();
   });
-  it('collects without execution, creates first/last candles and compares US auctions sequentially', (t) => {
-    const h = setup(t, 'auctions');
-    for (let i = 0; i < 3; i++) {
-      h.press('auction-collect');
-      assert.match(h.text('auction-collection'), /10,000원.*0주/s);
+  it('leaves a 10,100-won buy unfilled at the same 10,200-won opening and 80-share volume', (t) => {
+    const h = setup(t, 'closed-market');
+    for (const id of [
+      'closed-market-next', 'closed-market-price-10100', 'closed-market-order',
+      'closed-market-time', 'closed-market-time', 'closed-market-time',
+      'closed-market-open', 'closed-market-finish',
+    ]) h.press(id);
+    assert.match(h.text('closed-market-open-values'), /10,200원 · 80주 체결.*\+2%/s);
+    assert.match(h.text('closed-market-candidates'), /10,200원: 매수 80주 · 매도 80주 → 80주 ← 시가/);
+    assert.match(h.text('closed-market-my-result'), /내 주문: 체결되지 않음.*시가 10,200원.*낸 가격 10,100원/s);
+    assert.match(h.text('closed-market-my-result'), /10,300원을 냈다면 10,200원에 체결/);
+    const syllables = (h.prose().match(/[가-힣]/g) ?? []).length;
+    assert.ok(syllables <= 700, `${syllables} Hangul syllables in lesson prose`);
+    t.diagnostic(`10,100-won path: ${syllables} Hangul syllables, including shared Basis text`);
+    h.readable();
+  });
+  it('reveals four cards in order, freezes earlier results and toggles optional detail', (t) => {
+    const h = setup(t, 'closed-market');
+    const close = h.text('closed-market-1');
+    h.press('closed-market-next');
+    h.press('closed-market-price-10300');
+    h.press('closed-market-order');
+    const order = h.text('closed-market-order-result');
+    for (let stage = 0; stage < 3; stage++) h.press('closed-market-time');
+    const night = h.text('closed-market-2');
+    const pile = h.text('closed-market-pile-result');
+    h.press('closed-market-open');
+    const mine = h.text('closed-market-my-result');
+    const opening = h.text('closed-market-3');
+    h.press('closed-market-finish');
+    h.order('closed-market-1', 'closed-market-2', 'closed-market-3', 'closed-market-4');
+    h.order('closed-market-order-result', 'closed-market-pile-result', 'closed-market-my-result', 'lesson-takeaways');
+    assert.equal(h.find('closed-market-more-text') === undefined, true);
+    assert.equal(h.find('closed-market-more').props.accessibilityLabel, '더 알아보기 열기');
+    for (const expanded of [true, false]) {
+      h.press('closed-market-more');
+      assert.equal(h.find('closed-market-more-text') !== undefined, expanded);
+      assert.equal(h.find('closed-market-more').props.accessibilityLabel, expanded ? '더 알아보기 접기' : '더 알아보기 열기');
+      if (expanded)
+        assert.match(h.text('closed-market-more-text'), /08:30.*09:00.*15:20~15:30.*NYSE Arca.*암호화폐는 24시간/s);
+      assert.equal(h.text('closed-market-1'), close);
+      assert.equal(h.text('closed-market-2'), night);
+      assert.equal(h.text('closed-market-3'), opening);
+      assert.equal(h.text('closed-market-order-result'), order);
+      assert.equal(h.text('closed-market-pile-result'), pile);
+      assert.equal(h.text('closed-market-my-result'), mine);
+      h.readable();
     }
-    assert.match(h.text('auction-candidates'), /10,200원.*80주/);
-    h.press('auction-match');
-    assert.match(h.text('auction-result'), /10,200원에서 80주/);
-    const opening = h.text('auction-result');
-    h.press('close-collect');
-    h.press('close-match');
-    const close = h.text('close-result');
-    h.press('close-after');
-    assert.match(h.text('after-close-result'), /10,200원.*10,250원/s);
-    h.press('auction-us-open');
-    const us = h.text('auction-us-open-result');
-    h.press('auction-us-close');
-    assert.match(h.text('auction-us-open-result'), /시가 102달러/);
-    assert.match(h.text('auction-us-close-result'), /종가 102.2달러/);
-    assert.equal(h.text('auction-result'), opening);
-    assert.equal(h.text('close-result'), close);
-    assert.equal(h.text('auction-us-open-result'), us);
-    h.order(
-      'auction-result',
-      'auction-b',
-      'close-result',
-      'after-close-result',
-      'auction-c',
-      'auction-us-open-result',
-      'auction-us-close',
-      'auction-us-close-result',
-    );
-    h.readable();
+    h.press('closed-market-more');
+    h.press('reset-closed-market');
+    assert.equal(h.find('closed-market-2') === undefined, true);
+    assert.equal(h.find('closed-market-more-text') === undefined, true);
+    h.press('closed-market-next');
+    assert.equal(h.find('closed-market-order').props.disabled, true);
+    for (const price of [10100, 10300]) {
+      assert.equal(h.find(`closed-market-price-${price}`).props.disabled, false);
+      assert.equal(h.find(`closed-market-price-${price}`).props.accessibilityState.selected, false);
+    }
+    assert.equal(h.find('closed-market-order-result') === undefined, true);
   });
-  it('renders the gap and a falling candle with +6%, then filters the original records', (t) => {
-    const h = setup(t, 'gaps');
-    h.press('gap-open');
-    const gap = h.text('gap-result');
-    h.press('gap-close');
-    assert.equal(h.find('gap-candle-body-0')?.props.fill, resolveFinancialColor(DOWN_COLOR, 'light'));
-    assert.match(h.text('gap-close-result'), /음봉.*\+6%/s);
-    const result = h.text('gap-close-result');
-    h.press('gap-scope-extended');
-    assert.match(h.text('gap-scope-candle'), /10,000원.*10,850원/s);
-    assert.equal(h.text('gap-result'), gap);
-    assert.equal(h.text('gap-close-result'), result);
-    h.order('gap-result', 'gap-close', 'gap-close-result', 'gaps-c');
-    h.readable();
-  });
-  it('keeps three stock chapters without removed safeguards content', () => {
+  it('keeps one closed-market stock chapter without removed content', () => {
     assert.deepEqual(
       guideTopics.StockCharacteristics.chapters.map((c) => c.id),
-      ['sessions', 'auctions', 'gaps'],
+      ['closed-market'],
     );
     for (const name of [
       'StockLessons.tsx',
@@ -657,26 +716,16 @@ describe('new guide chapters preserve downward learning flow', () => {
     h.readable();
   });
   const completionActions: Record<GuideChapter, string[]> = {
-    sessions: [
-      'session-scope-regular',
-      'session-scope-extended',
-      'session-record',
-      'us-date-2026-07-08',
-      'us-date-record',
-      'calendar-early',
+    'closed-market': [
+      'closed-market-next',
+      'closed-market-price-10300',
+      'closed-market-order',
+      'closed-market-time',
+      'closed-market-time',
+      'closed-market-time',
+      'closed-market-open',
+      'closed-market-finish',
     ],
-    auctions: [
-      'auction-collect',
-      'auction-collect',
-      'auction-collect',
-      'auction-match',
-      'close-collect',
-      'close-match',
-      'close-after',
-      'auction-us-open',
-      'auction-us-close',
-    ],
-    gaps: ['gap-open', 'gap-close', 'gap-scope-extended'],
     splits: ['split-apply', 'reverse-apply'],
     dividends: ['dividend-hold', 'dividend-ex', 'dividend-pay', 'payout-50'],
     adjusted: [
