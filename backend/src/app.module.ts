@@ -30,6 +30,7 @@ import { RedisModule } from './redis/redis.module';
 import { SeasonsModule } from './seasons/seasons.module';
 import { TradingAccountsModule } from './trading-accounts/trading-accounts.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { WatchlistModule } from './watchlist/watchlist.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { WalletsModule } from './wallets/wallets.module';
     SeasonsModule,
     TradingAccountsModule,
     WalletsModule,
+    WatchlistModule,
   ],
   controllers: [AppController],
   providers: [

@@ -278,6 +278,8 @@ export const apiClient = {
       });
     if (parts[1] === 'trading-accounts')
       return response({ ...account, feePolicy: { tradeFeeRate: '0.001' } });
+    // Market/search rows read the user's watchlist for their stars; empty here.
+    if (u.pathname === '/watchlist') return response({ items: [], limit: 50 });
     throw Error('Unexpected fixture read ' + path);
   },
   async post(path, body) {

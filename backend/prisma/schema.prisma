@@ -343,8 +343,25 @@ model User {
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
   rewardFulfillmentsCanceled  RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
   inquiries                   Inquiry[]
+  watchlistItems              WatchlistItem[]
 
   @@map("users")
+}
+
+/// A user's watched Spot asset. Owned by the user, not a trading account, so
+/// every account of one user shares the list. Not financial: no account,
+/// order, wallet or ranking link. The (user, asset) key makes a repeated add a
+/// no-op and serves every per-user read; the 50-item cap is enforced by
+/// WatchlistService under a users-row lock.
+model WatchlistItem {
+  userId    String   @map("user_id")
+  assetId   String   @map("asset_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([userId, assetId])
+  @@map("watchlist_items")
 }
 
 enum InquiryCategory {
@@ -705,6 +722,7 @@ model Asset {
   conditionalBuyOrders     ConditionalBuyOrder[]
   limitOnCloseOrders       LimitOnCloseOrder[]
   sessionCloseEvidences    SessionClosePriceEvidence[]
+  watchlistItems           WatchlistItem[]
 
   @@unique([market, symbol])
   @@index([assetType, market])

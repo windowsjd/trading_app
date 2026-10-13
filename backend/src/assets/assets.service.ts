@@ -403,6 +403,25 @@ export class AssetsService {
     };
   }
 
+  /**
+   * Market-list rows for assets another feature already selected and ordered
+   * (a user's watchlist), priced by the same snapshot, freshness and FX policy
+   * as `getAssets`. Membership, Spot filtering and order stay the caller's;
+   * an id without an asset row is skipped.
+   */
+  async getListItemsByIds(assetIds: readonly string[]) {
+    const records = assetIds.length
+      ? await this.prisma.asset.findMany({
+          where: { id: { in: [...assetIds] } },
+          select: this.assetSelect(),
+        })
+      : [];
+    const byId = new Map(records.map((record) => [record.id, record]));
+    return this.buildAssetsWithPrices(
+      assetIds.flatMap((id) => byId.get(id) ?? []),
+    );
+  }
+
   private async getSortedAssets(
     query: ParsedAssetsQuery,
   ): Promise<AssetsListResponse> {

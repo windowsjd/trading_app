@@ -141,6 +141,9 @@ const SAFE_MESSAGES = new Set<string>([
   'Admin role is required.',
   'All four canonical cash wallets are required for portfolio valuation.',
   'Allocation cannot be calculated when totalAssetKrw is zero.',
+  // User watchlist (2026-10-13).
+  'The watchlist is full.',
+  'Invalid asset id.',
   'Asset is inactive.',
   'Asset is not active.',
   'Asset is not tradable.',

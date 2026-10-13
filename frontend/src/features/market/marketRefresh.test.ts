@@ -10,6 +10,22 @@ const {
   act,
 } = require('../../../test/interactionTestHarness.cjs');
 
+// The watchlist has its own hook and screen tests; here it is an idle boundary.
+const idleWatchlist = {
+  '../../features/watchlist/useWatchlist': {
+    useWatchlist: () => ({
+      query: { isError: false, isFetching: false, refetch: async () => {} },
+      watchStateOf: () => ({ watched: false, pending: false }),
+      setWatched() {},
+    }),
+    useWatchlistAssets: () => ({ isLoading: false, isError: false, isFetching: false, refetch: async () => {} }),
+  },
+  '../../features/watchlist/WatchlistNotices': {
+    WatchlistEmptyState: 'WatchlistEmptyState',
+    WatchlistErrorNotice: 'WatchlistErrorNotice',
+  },
+};
+
 for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
   it(`${screen} refreshes the first page and carries the new token through real infinite Query`, async () => {
     const h = interactionHarness('android');
@@ -75,6 +91,7 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
         ]),
       ),
       '../../features/market/api': marketApi,
+      ...idleWatchlist,
       // Both screens share the real search/list hook over the same fixture API.
       '../../features/market/useMarketAssetSearch': h.load(
         'src/features/market/useMarketAssetSearch.ts',
@@ -172,6 +189,7 @@ it('Market consumes repeated Home category intents and preserves subsequent manu
     '../../features/market/useMarketTickers': { useMarketTickers: () => ({ tickersByAssetId: new Map(), staleAssetIds: new Set() }) },
     '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => false },
     '../../constants/env': { buildWsUrl: () => null },
+    ...idleWatchlist,
     ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'EmptyState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
   }).default;
   let navigateCategory;

@@ -45,6 +45,15 @@ export { Prisma }
  */
 export type User = Prisma.UserModel
 /**
+ * Model WatchlistItem
+ * A user's watched Spot asset. Owned by the user, not a trading account, so
+ * every account of one user shares the list. Not financial: no account,
+ * order, wallet or ranking link. The (user, asset) key makes a repeated add a
+ * no-op and serves every per-user read; the 50-item cap is enforced by
+ * WatchlistService under a users-row lock.
+ */
+export type WatchlistItem = Prisma.WatchlistItemModel
+/**
  * Model Inquiry
  * A user's support inquiry. Not financial: no account, order or ledger link.
  * (userId, clientRequestId) makes a resubmitted form return the same row.

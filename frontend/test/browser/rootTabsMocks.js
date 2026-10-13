@@ -119,6 +119,8 @@ export const apiClient = {
       if (account) return response(account);
       if (url.pathname === '/fx/rates/current') return response({ state: 'unavailable' });
     }
+    // Market/search rows read the user's watchlist for their stars; empty here.
+    if (url.pathname === '/watchlist') return response({ items: [], limit: 50 });
     return homeClient.get(path, config);
   },
 };

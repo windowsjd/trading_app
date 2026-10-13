@@ -10,6 +10,28 @@
 
 ---
 
+## 2026-10-13 사용자별 현물 관심종목(Watchlist)
+
+- **기능 구현 의도:** 마켓 목록·검색 결과에서 현물 종목을 별(★)로 등록·해제하고, 마켓 화면의 `전체 종목 | 관심종목`
+  범위로 현재 현물 시장의 관심종목만 모아 본다. 관심종목은 **User** 소유(계정 전환과 무관), PostgreSQL이 원천이다.
+  주문·지갑·원장·시즌·랭킹·Futures·실시간 인프라는 변경하지 않는다.
+- 시작 `ffb9a515`, 브랜치 `eval/claude-watchlist`(worktree `trading-app-claude`).
+- **DB:** `watchlist_items(user_id, asset_id, created_at)` PK `(user_id, asset_id)`, users/assets FK `RESTRICT`.
+  Additive migration `20261013120000_add_user_watchlist`(운영 미적용).
+- **API**(`backend/docs/watchlist-api-contract.md`): `GET /watchlist`, `PUT|DELETE /watchlist/:assetId`(멱등 목표 상태),
+  `GET /watchlist/assets?assetType=`(시장 목록과 같은 `AssetsService.getListItemsByIds` 가격 정책).
+  50개 제한은 add 트랜잭션이 users 행을 `FOR NO KEY UPDATE`(READ COMMITTED)로 잠근 뒤 count → insert.
+- **Frontend:** `features/watchlist/useWatchlist.tsx` 하나가 멤버십(`QUERY_KEYS.watchlist.items(userId)`)과 변경을 담당.
+  요청 중에는 목표 상태를 pending으로만 보여주고 캐시는 서버 확인 후에만 갱신(실패 시 서버 상태 유지 + Alert + 재조회).
+  같은 종목은 응답 전 재요청을 무시한다. `MarketAssetRow`는 `onWatchChange`가 있을 때만 별을 상세 이동과 분리된 형제 타깃으로 그린다
+  (주문 시트는 별 없음).
+- **주의:** 확인 직후 `cancelQueries`는 필수다(첫 목록 조회 중 확인된 변경을 invalidate가 덮지 못하게 함, 훅 테스트가 고정).
+  RN Web은 `accessibilityState`를 무시하므로 별은 `aria-*`도 함께 준다. 브라우저 고정 mock(`tradingMocks`/`rootTabsMocks`)에
+  빈 `/watchlist` 응답을 추가했다. Futures 전용으로 재분류된 기존 항목은 `/watchlist`에는 남고(해제·개수 포함) 시장 보기에선 빠진다.
+- 검증: backend unit 4408·e2e 406·핵심 DB 통합 목록+watchlist(Redis 포함) PASS, 무잠금 변형에서 49+2 경쟁이 실패함을 확인.
+  frontend `npm test` 2486/0, lint 2종·typecheck·진단 gate PASS, 브라우저 `watchlistBrowser.cjs` 42케이스·`tradingBrowser` 133·
+  초보 퀘스트 전체 흐름 PASS. Android/iOS 실기기 NOT_RUN.
+
 ## 2026-10-12 가이드 화면 정리·체결괴리 방지시스템 공지
 
 - **기능 구현 의도:** 가이드를 간결하게(중복 문구 삭제, 학습 시작 CTA 명확화), 체험이 모의투자임을 분명히 하고 공지와 연결하며,

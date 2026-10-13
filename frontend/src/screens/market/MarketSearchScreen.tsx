@@ -11,6 +11,8 @@ import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import MarketAssetRow from '../../features/market/MarketAssetRow';
+import { useWatchlist } from '../../features/watchlist/useWatchlist';
+import { WatchlistErrorNotice } from '../../features/watchlist/WatchlistNotices';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
@@ -50,6 +52,9 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
   const refresh = usePullToRefresh([{ ...searchQuery, enabled: trimmedSearchText.length > 0 }],
     () => { refreshSort.current = true; },
     () => { refreshSort.current = false; });
+
+  // Same cache as the market list, so both screens always show one state.
+  const watchlist = useWatchlist();
 
   const assetIds = useMemo(() => items.map((item) => item.id), [items]);
   const { tickersByAssetId, staleAssetIds } = useMarketTickers({
@@ -143,6 +148,12 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
               <MarketSortControl value={sort} onChange={setSort} />
             </View>
 
+            {watchlist.query.isError && !watchlist.query.data ? (
+              <WatchlistErrorNotice testID="watchlist-status-error" error={watchlist.query.error}
+                message="관심종목 정보를 불러오지 못해 별 표시를 사용할 수 없습니다."
+                onRetry={() => { void watchlist.query.refetch(); }} />
+            ) : null}
+
             {hasPriceErrors ? (
               <View style={styles.inlineWarning}>
                 <Text style={styles.inlineWarningText}>
@@ -172,10 +183,14 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
             />
           )
         }
-        renderItem={({ item }) => (
-          <MarketAssetRow item={item} ticker={tickersByAssetId.get(item.id)}
-            isStale={staleAssetIds.has(item.id)} onPress={openAsset} />
-        )}
+        renderItem={({ item }) => {
+          const watch = watchlist.watchStateOf(item.id);
+          return (
+            <MarketAssetRow item={item} ticker={tickersByAssetId.get(item.id)}
+              isStale={staleAssetIds.has(item.id)} onPress={openAsset}
+              watched={watch.watched} watchPending={watch.pending} onWatchChange={watchlist.setWatched} />
+          );
+        }}
         ListFooterComponent={
           searchQuery.isFetchNextPageError ? (
             <ActionPressable accessibilityRole="button" onPress={() => void searchQuery.refetch()} style={{ minHeight: 48, justifyContent: 'center' }}>

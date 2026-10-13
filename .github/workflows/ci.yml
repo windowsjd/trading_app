@@ -318,6 +318,9 @@ jobs:
       AD_REWARD_ENABLED: "true"
       AUTH_DB_SMOKE: "1"
       OPS_JOB_LOCK_DB_SMOKE: "1"
+      # User watchlist: ownership, idempotent add/remove and the 50-item cap
+      # under concurrent adds (real HTTP guard + PostgreSQL row lock).
+      WATCHLIST_DB_INTEGRATION: "1"
       JWT_ACCESS_SECRET: ci-core-account-secret
     defaults:
       run:
@@ -377,6 +380,7 @@ jobs:
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts
           src/ops/ops-job-lock.integration.spec.ts
+          src/watchlist/watchlist.integration.spec.ts
       - name: Active administrator concurrency PostgreSQL integration
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/active_admin_race_test?schema=public

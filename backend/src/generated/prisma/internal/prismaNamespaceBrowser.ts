@@ -52,6 +52,7 @@ export const AnyNull = runtime.AnyNull
 
 export const ModelName = {
   User: 'User',
+  WatchlistItem: 'WatchlistItem',
   Inquiry: 'Inquiry',
   Friendship: 'Friendship',
   OperatorAuditLog: 'OperatorAuditLog',
@@ -140,6 +141,15 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const WatchlistItemScalarFieldEnum = {
+  userId: 'userId',
+  assetId: 'assetId',
+  createdAt: 'createdAt'
+} as const
+
+export type WatchlistItemScalarFieldEnum = (typeof WatchlistItemScalarFieldEnum)[keyof typeof WatchlistItemScalarFieldEnum]
 
 
 export const InquiryScalarFieldEnum = {

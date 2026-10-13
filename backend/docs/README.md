@@ -7,6 +7,7 @@ First compare current implementation, tests and migrations with explicit current
 1. API contracts — the request/response contract for each surface:
    - `docs/auth-api-contract.md`
    - `docs/friends-api-contract.md`
+   - `docs/watchlist-api-contract.md` — per-user Spot watchlist: idempotent PUT/DELETE, 50-item cap under concurrency, priced market view
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`
    - `docs/assets-api-contract.md`

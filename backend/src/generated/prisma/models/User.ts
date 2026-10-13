@@ -238,6 +238,7 @@ export type UserWhereInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestListRelationFilter
   inquiries?: Prisma.InquiryListRelationFilter
+  watchlistItems?: Prisma.WatchlistItemListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -267,6 +268,7 @@ export type UserOrderByWithRelationInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
   inquiries?: Prisma.InquiryOrderByRelationAggregateInput
+  watchlistItems?: Prisma.WatchlistItemOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -299,6 +301,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestListRelationFilter
   inquiries?: Prisma.InquiryListRelationFilter
+  watchlistItems?: Prisma.WatchlistItemListRelationFilter
 }, "id" | "email" | "nickname">
 
 export type UserOrderByWithAggregationInput = {
@@ -360,6 +363,7 @@ export type UserCreateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -389,6 +393,7 @@ export type UserUncheckedCreateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -418,6 +423,7 @@ export type UserUpdateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -447,6 +453,7 @@ export type UserUncheckedUpdateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -559,6 +566,20 @@ export type EnumUserRoleFieldUpdateOperationsInput = {
 
 export type DateTimeFieldUpdateOperationsInput = {
   set?: Date | string
+}
+
+export type UserCreateNestedOneWithoutWatchlistItemsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutWatchlistItemsInput, Prisma.UserUncheckedCreateWithoutWatchlistItemsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWatchlistItemsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutWatchlistItemsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutWatchlistItemsInput, Prisma.UserUncheckedCreateWithoutWatchlistItemsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutWatchlistItemsInput
+  upsert?: Prisma.UserUpsertWithoutWatchlistItemsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutWatchlistItemsInput, Prisma.UserUpdateWithoutWatchlistItemsInput>, Prisma.UserUncheckedUpdateWithoutWatchlistItemsInput>
 }
 
 export type UserCreateNestedOneWithoutInquiriesInput = {
@@ -789,6 +810,138 @@ export type UserUpdateOneRequiredWithoutFxExecuteRequestsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutFxExecuteRequestsInput, Prisma.UserUpdateWithoutFxExecuteRequestsInput>, Prisma.UserUncheckedUpdateWithoutFxExecuteRequestsInput>
 }
 
+export type UserCreateWithoutWatchlistItemsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutWatchlistItemsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutWatchlistItemsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutWatchlistItemsInput, Prisma.UserUncheckedCreateWithoutWatchlistItemsInput>
+}
+
+export type UserUpsertWithoutWatchlistItemsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutWatchlistItemsInput, Prisma.UserUncheckedUpdateWithoutWatchlistItemsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutWatchlistItemsInput, Prisma.UserUncheckedCreateWithoutWatchlistItemsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutWatchlistItemsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutWatchlistItemsInput, Prisma.UserUncheckedUpdateWithoutWatchlistItemsInput>
+}
+
+export type UserUpdateWithoutWatchlistItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutWatchlistItemsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+}
+
 export type UserCreateWithoutInquiriesInput = {
   id?: string
   email: string
@@ -815,6 +968,7 @@ export type UserCreateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutInquiriesInput = {
@@ -843,6 +997,7 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutInquiriesInput = {
@@ -887,6 +1042,7 @@ export type UserUpdateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutInquiriesInput = {
@@ -915,6 +1071,7 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFriendshipsLowInput = {
@@ -943,6 +1100,7 @@ export type UserCreateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsLowInput = {
@@ -971,6 +1129,7 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsLowInput = {
@@ -1004,6 +1163,7 @@ export type UserCreateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFriendshipsHighInput = {
@@ -1032,6 +1192,7 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFriendshipsHighInput = {
@@ -1076,6 +1237,7 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
@@ -1104,6 +1266,7 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutFriendshipsHighInput = {
@@ -1143,6 +1306,7 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
@@ -1171,6 +1335,7 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutOperatorAuditLogsInput = {
@@ -1199,6 +1364,7 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
@@ -1227,6 +1393,7 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutOperatorAuditLogsInput = {
@@ -1271,6 +1438,7 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
@@ -1299,6 +1467,7 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRefreshTokenSessionsInput = {
@@ -1327,6 +1496,7 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
@@ -1355,6 +1525,7 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRefreshTokenSessionsInput = {
@@ -1399,6 +1570,7 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
@@ -1427,6 +1599,7 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTradingAccountsInput = {
@@ -1455,6 +1628,7 @@ export type UserCreateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTradingAccountsInput = {
@@ -1483,6 +1657,7 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTradingAccountsInput = {
@@ -1527,6 +1702,7 @@ export type UserUpdateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTradingAccountsInput = {
@@ -1555,6 +1731,7 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonParticipantsInput = {
@@ -1583,6 +1760,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
@@ -1611,6 +1789,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonParticipantsInput = {
@@ -1655,6 +1834,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
@@ -1683,6 +1863,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutUserBadgesInput = {
@@ -1711,6 +1892,7 @@ export type UserCreateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutUserBadgesInput = {
@@ -1739,6 +1921,7 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutUserBadgesInput = {
@@ -1783,6 +1966,7 @@ export type UserUpdateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutUserBadgesInput = {
@@ -1811,6 +1995,7 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutSeasonRewardsInput = {
@@ -1839,6 +2024,7 @@ export type UserCreateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutSeasonRewardsInput = {
@@ -1867,6 +2053,7 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutSeasonRewardsInput = {
@@ -1911,6 +2098,7 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
@@ -1939,6 +2127,7 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRewardFulfillmentTargetsInput = {
@@ -1967,6 +2156,7 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
@@ -1995,6 +2185,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentTargetsInput = {
@@ -2028,6 +2219,7 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
@@ -2056,6 +2248,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsRequestedInput = {
@@ -2089,6 +2282,7 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
@@ -2117,6 +2311,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsProcessedInput = {
@@ -2150,6 +2345,7 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
@@ -2178,6 +2374,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRewardFulfillmentsCanceledInput = {
@@ -2222,6 +2419,7 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
@@ -2250,6 +2448,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsRequestedInput = {
@@ -2289,6 +2488,7 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
@@ -2317,6 +2517,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsProcessedInput = {
@@ -2356,6 +2557,7 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
@@ -2384,6 +2586,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutRewardFulfillmentsCanceledInput = {
@@ -2423,6 +2626,7 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
@@ -2451,6 +2655,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAdRewardClaimsInput = {
@@ -2479,6 +2684,7 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
@@ -2507,6 +2713,7 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAdRewardClaimsInput = {
@@ -2551,6 +2758,7 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
@@ -2579,6 +2787,7 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutQuotesInput = {
@@ -2607,6 +2816,7 @@ export type UserCreateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutQuotesInput = {
@@ -2635,6 +2845,7 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutQuotesInput = {
@@ -2679,6 +2890,7 @@ export type UserUpdateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutQuotesInput = {
@@ -2707,6 +2919,7 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutFxExecuteRequestsInput = {
@@ -2735,6 +2948,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
@@ -2763,6 +2977,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutFxExecuteRequestsInput = {
@@ -2807,6 +3022,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
@@ -2835,6 +3051,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  watchlistItems?: Prisma.WatchlistItemUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -2859,6 +3076,7 @@ export type UserCountOutputType = {
   rewardFulfillmentsProcessed: number
   rewardFulfillmentsCanceled: number
   inquiries: number
+  watchlistItems: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2878,6 +3096,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   rewardFulfillmentsProcessed?: boolean | UserCountOutputTypeCountRewardFulfillmentsProcessedArgs
   rewardFulfillmentsCanceled?: boolean | UserCountOutputTypeCountRewardFulfillmentsCanceledArgs
   inquiries?: boolean | UserCountOutputTypeCountInquiriesArgs
+  watchlistItems?: boolean | UserCountOutputTypeCountWatchlistItemsArgs
 }
 
 /**
@@ -3002,6 +3221,13 @@ export type UserCountOutputTypeCountInquiriesArgs<ExtArgs extends runtime.Types.
   where?: Prisma.InquiryWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountWatchlistItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WatchlistItemWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -3030,6 +3256,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
   rewardFulfillmentsCanceled?: boolean | Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>
   inquiries?: boolean | Prisma.User$inquiriesArgs<ExtArgs>
+  watchlistItems?: boolean | Prisma.User$watchlistItemsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -3090,6 +3317,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
   rewardFulfillmentsCanceled?: boolean | Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>
   inquiries?: boolean | Prisma.User$inquiriesArgs<ExtArgs>
+  watchlistItems?: boolean | Prisma.User$watchlistItemsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -3114,6 +3342,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     rewardFulfillmentsProcessed: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
     rewardFulfillmentsCanceled: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
     inquiries: Prisma.$InquiryPayload<ExtArgs>[]
+    watchlistItems: Prisma.$WatchlistItemPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -3536,6 +3765,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   rewardFulfillmentsProcessed<T extends Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rewardFulfillmentsCanceled<T extends Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   inquiries<T extends Prisma.User$inquiriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$inquiriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InquiryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  watchlistItems<T extends Prisma.User$watchlistItemsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$watchlistItemsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WatchlistItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -4349,6 +4579,30 @@ export type User$inquiriesArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.InquiryScalarFieldEnum | Prisma.InquiryScalarFieldEnum[]
+}
+
+/**
+ * User.watchlistItems
+ */
+export type User$watchlistItemsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WatchlistItem
+   */
+  select?: Prisma.WatchlistItemSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WatchlistItem
+   */
+  omit?: Prisma.WatchlistItemOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WatchlistItemInclude<ExtArgs> | null
+  where?: Prisma.WatchlistItemWhereInput
+  orderBy?: Prisma.WatchlistItemOrderByWithRelationInput | Prisma.WatchlistItemOrderByWithRelationInput[]
+  cursor?: Prisma.WatchlistItemWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WatchlistItemScalarFieldEnum | Prisma.WatchlistItemScalarFieldEnum[]
 }
 
 /**

@@ -14,6 +14,7 @@ import { getMarketChangeDisplay, getMarketException } from './marketPresentation
 import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
+import WatchlistToggle from '../watchlist/WatchlistToggle';
 
 type Props = {
   /** REST baseline row — never rebuilt when some other asset ticks. */
@@ -24,6 +25,11 @@ type Props = {
   isStale?: boolean;
   priceError?: AssetPriceErrorDto;
   onPress: (assetId: string) => void;
+  /** Watchlist star target; without it (e.g. the order sheet) no star renders. */
+  onWatchChange?: (assetId: string, watched: boolean) => void;
+  /** null: the watchlist is not known yet, so the star is disabled. */
+  watched?: boolean | null;
+  watchPending?: boolean;
 };
 
 /**
@@ -40,6 +46,9 @@ function MarketAssetRowComponent({
   isStale,
   priceError,
   onPress,
+  onWatchChange,
+  watched = null,
+  watchPending = false,
 }: Props) {
   const displayItem = useMemo(
     () => mergeMarketAssetTicker(item, ticker ?? undefined),
@@ -50,35 +59,51 @@ function MarketAssetRowComponent({
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
 
+  const body = (
+    <ActionPressable
+      testID={TEST_IDS.market.item(item.id)}
+      style={onWatchChange ? styles.itemBody : styles.itemRow}
+      onPress={() => onPress(item.id)}
+    >
+      <View style={styles.identity}>
+        <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
+        {symbolMarketDisplay ? (
+          <Text style={styles.helper}>{symbolMarketDisplay}</Text>
+        ) : null}
+      </View>
+
+      <View style={styles.alignEnd}>
+        <Text
+          style={[
+            styles.itemPrice,
+            isStale &&
+              displayItem.marketStatus !== 'closed' &&
+              styles.itemPriceStale,
+          ]}
+        >
+          {getAssetPriceText(displayItem)}
+        </Text>
+        <Text testID={`market-change-${item.id}`} style={[styles.helper, { color: change.color }]}>{change.text}</Text>
+        {exception ? <Text style={styles.exception}>{exception}</Text> : null}
+      </View>
+    </ActionPressable>
+  );
+
   return (
     <View>
-      <ActionPressable
-        testID={TEST_IDS.market.item(item.id)}
-        style={styles.itemRow}
-        onPress={() => onPress(item.id)}
-      >
-        <View style={styles.identity}>
-          <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
-          {symbolMarketDisplay ? (
-            <Text style={styles.helper}>{symbolMarketDisplay}</Text>
-          ) : null}
+      {onWatchChange ? (
+        // The star is a sibling of the detail press, never nested inside it.
+        <View style={styles.itemCard}>
+          {body}
+          <WatchlistToggle
+            assetId={item.id}
+            assetName={nameDisplay.primary}
+            watched={watched}
+            pending={watchPending}
+            onChange={onWatchChange}
+          />
         </View>
-
-        <View style={styles.alignEnd}>
-          <Text
-            style={[
-              styles.itemPrice,
-              isStale &&
-                displayItem.marketStatus !== 'closed' &&
-                styles.itemPriceStale,
-            ]}
-          >
-            {getAssetPriceText(displayItem)}
-          </Text>
-          <Text testID={`market-change-${item.id}`} style={[styles.helper, { color: change.color }]}>{change.text}</Text>
-          {exception ? <Text style={styles.exception}>{exception}</Text> : null}
-        </View>
-      </ActionPressable>
+      ) : body}
       {priceError && displayItem.price?.state !== 'available' ? (
         <AdminDiagnosticPanel diagnostic={priceError.diagnostic} />
       ) : null}
@@ -95,7 +120,10 @@ export const MarketAssetRow = React.memo(
     (previous.ticker ?? null) === (next.ticker ?? null) &&
     previous.isStale === next.isStale &&
     previous.priceError === next.priceError &&
-    previous.onPress === next.onPress,
+    previous.onPress === next.onPress &&
+    previous.onWatchChange === next.onWatchChange &&
+    (previous.watched ?? null) === (next.watched ?? null) &&
+    !!previous.watchPending === !!next.watchPending,
 );
 
 const styles = StyleSheet.create({
@@ -110,6 +138,24 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: semantic.border,
+  },
+  // With a star: the card frame holds the detail body and the star side by side.
+  itemCard: {
+    marginBottom: 8, borderRadius: 12, overflow: 'hidden',
+    backgroundColor: semantic.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: semantic.border,
+  },
+  itemBody: {
+    flex: 1, minWidth: 0,
+    paddingLeft: 12,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
   },
   itemSymbol: { fontSize: 16, fontWeight: '700' },
   itemPrice: { maxWidth: '100%', textAlign: 'right', fontSize: 15, fontWeight: '600' },

@@ -33,6 +33,8 @@ import {
 } from '../../features/market/api';
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
+import { useWatchlist, useWatchlistAssets } from '../../features/watchlist/useWatchlist';
+import { WatchlistEmptyState, WatchlistErrorNotice } from '../../features/watchlist/WatchlistNotices';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -47,6 +49,13 @@ const TABS: Array<{ key: AssetType; label: string }> = [
   { key: 'us_stock', label: '미국 주식' },
   { key: 'crypto', label: '암호화폐' },
 ];
+
+type ListScope = 'all' | 'watchlist';
+const SCOPES: Array<{ key: ListScope; label: string; testID: string }> = [
+  { key: 'all', label: '전체 종목', testID: TEST_IDS.market.scopeAll },
+  { key: 'watchlist', label: '관심종목', testID: TEST_IDS.market.scopeWatchlist },
+];
+const NO_ASSETS: MarketAssetItemDto[] = [];
 
 export default function MarketScreen({ navigation, route }: Props) {
   const isAdmin = useAdminDiagnostics();
@@ -63,7 +72,10 @@ export default function MarketScreen({ navigation, route }: Props) {
     }
   }, [route?.params?.assetType, navigation]);
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
+  const [listScope, setListScope] = useState<ListScope>('all');
   const futuresMarket = selectedTab === 'crypto' && cryptoProduct === 'futures';
+  // Spot only: the Futures list never shows or edits the Spot watchlist.
+  const showWatchlist = listScope === 'watchlist' && !futuresMarket;
   useTradingGuideFacts({ screen: 'market', accountId: guide?.active?.accountId ?? '', assetType: selectedTab });
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
@@ -92,14 +104,19 @@ export default function MarketScreen({ navigation, route }: Props) {
     enabled: !futuresMarket,
   });
 
-  const refresh = usePullToRefresh([marketQuery],
+  const watchlist = useWatchlist();
+  // The server's watched rows of this market — independent of how many market
+  // pages are loaded, so an item outside the first 20 still appears.
+  const watchlistAssets = useWatchlistAssets(selectedTab, showWatchlist);
+
+  const refresh = usePullToRefresh(showWatchlist ? [watchlistAssets, watchlist.query] : [marketQuery, watchlist.query],
     () => { refreshSort.current = true; },
     () => { refreshSort.current = false; });
 
   // REST is the baseline and stays untouched: rows receive their ticker as a
   // separate prop and merge it themselves, so one asset's tick never rebuilds
   // the other rows' data.
-  const items = useMemo(() => {
+  const marketItems = useMemo(() => {
     const byId = new Map<string, MarketAssetItemDto>();
 
     marketQuery.data?.pages.forEach((page) => {
@@ -110,15 +127,17 @@ export default function MarketScreen({ navigation, route }: Props) {
 
     return Array.from(byId.values());
   }, [marketQuery.data]);
+  const items = showWatchlist ? watchlistAssets.data?.assets ?? NO_ASSETS : marketItems;
 
   const assetIds = useMemo(() => items.map((item) => item.id), [items]);
   const priceErrorsByAssetId = useMemo(
     () => new Map(
-      marketQuery.data?.pages
-        .flatMap((page) => page.priceErrors ?? [])
-        .map((error) => [error.assetId, error] as const) ?? [],
+      (showWatchlist
+        ? watchlistAssets.data?.priceErrors ?? []
+        : marketQuery.data?.pages.flatMap((page) => page.priceErrors ?? []) ?? [])
+        .map((error) => [error.assetId, error] as const),
     ),
-    [marketQuery.data],
+    [showWatchlist, watchlistAssets.data, marketQuery.data],
   );
 
   // Live overlay: the currently loaded rows subscribe on the app's shared
@@ -139,15 +158,16 @@ export default function MarketScreen({ navigation, route }: Props) {
   const viewState = useMemo(() => {
     if (marketQuery.isLoading) return 'market_loading';
     if (marketQuery.isError && !marketQuery.data) return 'market_error';
-    if (!items.length) return 'market_empty';
+    if (!marketItems.length) return 'market_empty';
     return 'market_ready';
-  }, [marketQuery.isLoading, marketQuery.isError, marketQuery.data, items.length]);
+  }, [marketQuery.isLoading, marketQuery.isError, marketQuery.data, marketItems.length]);
 
-  if (!futuresMarket && viewState === 'market_loading') {
+  // The watchlist view keeps its own loading/error states below the header.
+  if (!futuresMarket && !showWatchlist && viewState === 'market_loading') {
     return <FullPageLoading message="종목 목록을 불러오는 중입니다." />;
   }
 
-  if (!futuresMarket && viewState === 'market_error') {
+  if (!futuresMarket && !showWatchlist && viewState === 'market_error') {
     return (
       <ErrorState
         title="종목 목록을 불러오지 못했습니다."
@@ -169,7 +189,7 @@ export default function MarketScreen({ navigation, route }: Props) {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
         onEndReached={() => {
-          if (!futuresMarket && marketQuery.hasNextPage && !marketQuery.isFetching && !marketQuery.isError) {
+          if (!futuresMarket && !showWatchlist && marketQuery.hasNextPage && !marketQuery.isFetching && !marketQuery.isError) {
             void marketQuery.fetchNextPage();
           }
         }}
@@ -199,12 +219,29 @@ export default function MarketScreen({ navigation, route }: Props) {
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
             </ActionPressable>
 
+            <SegmentedControl testID="market-scope" accessibilityLabel="목록 범위" compact value={listScope} onChange={setListScope}
+              options={SCOPES} />
+
             <View style={styles.toolbar}>
               <Text testID="market-session-summary" style={styles.sessionSummary}>
                 {getMarketSessionLabel(selectedTab, items, tickersByAssetId)}
               </Text>
-              <MarketSortControl value={sort} onChange={setSort} />
+              {/* Watchlist order is fixed: most recently added first. */}
+              {showWatchlist
+                ? <Text style={styles.orderCaption}>최근 추가한 순</Text>
+                : <MarketSortControl value={sort} onChange={setSort} />}
             </View>
+
+            {watchlist.query.isError && !watchlist.query.data ? (
+              <WatchlistErrorNotice testID="watchlist-status-error" error={watchlist.query.error}
+                message="관심종목 정보를 불러오지 못해 별 표시를 사용할 수 없습니다."
+                onRetry={() => { void watchlist.query.refetch(); }} />
+            ) : null}
+            {showWatchlist && watchlistAssets.isError && watchlistAssets.data ? (
+              <WatchlistErrorNotice testID="watchlist-refresh-error" error={watchlistAssets.error}
+                message="관심종목을 새로 불러오지 못해 마지막으로 받은 목록을 표시합니다."
+                onRetry={() => { void watchlistAssets.refetch(); }} />
+            ) : null}
 
             {/* One screen-level notice; rows never repeat a connection error. */}
             {isAdmin && showReconnectBanner ? (
@@ -225,23 +262,37 @@ export default function MarketScreen({ navigation, route }: Props) {
             </>}
           </View>
         }
-        ListEmptyComponent={futuresMarket ? null :
+        ListEmptyComponent={futuresMarket ? null : showWatchlist ? (
+          <WatchlistEmptyState
+            isLoading={watchlistAssets.isLoading}
+            isError={watchlistAssets.isError}
+            error={watchlistAssets.error}
+            onRetry={() => { void watchlistAssets.refetch(); }}
+            marketLabel={TABS.find((tab) => tab.key === selectedTab)?.label ?? ''}
+          />
+        ) :
           <EmptyState
             title="표시할 종목이 없습니다."
             message="현재 조건에서 조회 가능한 종목이 없습니다."
           />
         }
-        renderItem={({ item }) => (
-          <MarketAssetRow
-            item={item}
-            ticker={tickersByAssetId.get(item.id) ?? null}
-            isStale={staleAssetIds.has(item.id)}
-            priceError={priceErrorsByAssetId.get(item.id)}
-            onPress={openAsset}
-          />
-        )}
+        renderItem={({ item }) => {
+          const watch = watchlist.watchStateOf(item.id);
+          return (
+            <MarketAssetRow
+              item={item}
+              ticker={tickersByAssetId.get(item.id) ?? null}
+              isStale={staleAssetIds.has(item.id)}
+              priceError={priceErrorsByAssetId.get(item.id)}
+              onPress={openAsset}
+              watched={watch.watched}
+              watchPending={watch.pending}
+              onWatchChange={watchlist.setWatched}
+            />
+          );
+        }}
         ListFooterComponent={
-          futuresMarket ? null : marketQuery.isFetchNextPageError ? (
+          futuresMarket || showWatchlist ? null : marketQuery.isFetchNextPageError ? (
             <ActionPressable accessibilityRole="button" onPress={() => void marketQuery.refetch()} style={{ minHeight: 48, justifyContent: 'center' }}>
               <Text>목록을 새로고침해 계속 보기</Text>
             </ActionPressable>
@@ -299,5 +350,6 @@ const styles = StyleSheet.create({
   inlineWarningText: { fontSize: 13, color: semantic.warning },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', columnGap: 8, rowGap: 0 },
   sessionSummary: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 12, lineHeight: 18, color: semantic.secondary },
+  orderCaption: { paddingVertical: 12, fontSize: 13, lineHeight: 20, color: semantic.secondary },
   footerLoader: { paddingVertical: 16 },
 });

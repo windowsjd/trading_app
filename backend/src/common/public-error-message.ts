@@ -108,6 +108,10 @@ const PUBLIC_MESSAGES = new Set<string>([
   'Trading account is not active.',
   'Trading fees could not be verified. Please try again.',
   'Transfer would spend isolated Futures collateral.',
+  // User watchlist (2026-10-13).
+  'The watchlist is full.',
+  'Invalid asset id.',
+  'Invalid assetType.',
   'Asset is inactive.',
   'Asset is not active.',
   'Asset is not tradable.',

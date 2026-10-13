@@ -68,6 +68,9 @@ export const TEST_IDS = {
     tabCrypto: 'market-tab-crypto',
     searchInput: 'market-search-input',
     item: (assetId: string) => `market-item-${assetId}`,
+    watchToggle: (assetId: string) => `market-watch-${assetId}`,
+    scopeAll: 'market-scope-all',
+    scopeWatchlist: 'market-scope-watchlist',
     reconnectBanner: 'market-reconnect-banner',
   },
 

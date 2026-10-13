@@ -4,6 +4,20 @@
 export const QUERY_KEYS = {
   me: ['me'] as const,
   inquiries: { mine: ['inquiries', 'me'] as const },
+  /**
+   * Per USER, not per trading account: an account switch keeps it, and the
+   * userId in the key means a late response can only land in its own user's
+   * entry (the same reasoning as `tradingAccount.list`).
+   */
+  watchlist: {
+    /** Both entries of one user; the after-change invalidation target. */
+    all: (userId: string) => ['watchlist', userId] as const,
+    /** Membership and order — the source of every star. */
+    items: (userId: string) => ['watchlist', userId, 'items'] as const,
+    /** One Spot market's watched assets as priced market rows. */
+    assets: (userId: string, assetType: string) =>
+      ['watchlist', userId, 'assets', assetType] as const,
+  },
   friends: {
     all: ['friends'] as const,
     list: ['friends', 'list', 'infinite'] as const,
