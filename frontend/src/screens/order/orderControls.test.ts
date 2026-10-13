@@ -109,13 +109,15 @@ describe('order panel side change', () => {
     const h = inlineTradingHarness();
     h.method = null;
     await h.mount(); t.after(h.close);
-    await h.selectOrderType('market');
+    await h.selectOrderType('limit');
+    await h.input(TEST_IDS.order.limitPriceInput, '700');
     await h.input(TEST_IDS.order.quantityInput, '1');
+    assert.equal(h.freshForm(), false);
     h.animations.length = 0;
     await h.press(sell);
     // The form fade starts in the press handler; the thumb springs to the committed side.
     assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.spring ? 'spring' : a.duration]), [[1, 180], [1, 'spring']]);
-    // The new side starts with no method and no draft.
+    // The new side starts at 시장가 with no draft.
     assert.equal(h.freshForm(), true);
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.label, '매도');
     h.reduced = true;
@@ -131,18 +133,23 @@ const methods = (h: any) => ['market', 'limit', 'conditional', 'loc', 'protectio
   .filter((method) => h.node(`order-method-${method}`) !== undefined);
 
 describe('주문방식 field and sheet', () => {
-  it('starts unselected: one full-width field, no inputs and no submit until a method is chosen', async (t) => {
+  it('starts at 시장가: one full-width field with a small 주문방식 선택하기 hint; nothing submits until the draft is valid', async (t) => {
     const h = inlineTradingHarness();
     h.method = null;
     await h.mount(); t.after(h.close);
     const field = h.node(TEST_IDS.order.typeSelect);
     assert.equal(field.props.accessibilityRole, 'button');
     assert.ok(flatten(field.props.style).minHeight >= 44);
-    assert.equal(h.orderType(), '주문방식 선택하기');
-    assert.equal(h.node(TEST_IDS.order.quantityInput) === undefined, true);
+    assert.equal(h.orderType(), '시장가');
+    assert.equal(field.props.accessibilityLabel, '주문방식 시장가, 주문방식 선택하기');
+    // The hint sits after the value, in the field's own row, as two wrappable words.
+    const hint = h.node('order-type-select-hint');
+    assert.equal(hint.findAll((n: any) => n.type === 'Text').map((n: any) => [n.props.children].flat().join('')).join(' '), '주문방식 선택하기');
+    assert.equal(flatten(field.props.style).flexDirection, 'row');
+    // The market draft is ready and empty: no limit price, no unselected notice.
+    assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
     assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
-    assert.equal(h.node('order-ratio-50') === undefined, true);
-    assert.equal(h.node('order-method-required') !== undefined, true);
+    assert.equal(h.node('order-method-required') === undefined, true);
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled');
     await h.press(TEST_IDS.order.executeSubmit);
     assert.equal(h.requests.length, 0);
@@ -162,7 +169,7 @@ describe('주문방식 field and sheet', () => {
     assert.equal(h.node('order-method-conditional').props.disabled, true);
     assert.equal(h.node('order-method-conditional-badge').props.children, '이용 불가');
     await h.press('order-method-conditional');
-    assert.equal(h.orderType(), '주문방식 선택하기');
+    assert.equal(h.orderType(), '시장가', 'a refused choice keeps the default');
     await h.press('order-method-market');
     assert.equal(h.node('order-method-market') === undefined, true, 'a choice closes the sheet');
     assert.equal(h.orderType(), '시장가');
@@ -207,8 +214,9 @@ describe('주문방식 field and sheet', () => {
 
   it('the backdrop, the close button and Android back close the sheet without choosing', async (t) => {
     const h = inlineTradingHarness();
-    h.method = null;
+    h.method = 'limit';
     await h.mount(); t.after(h.close);
+    await h.input(TEST_IDS.order.limitPriceInput, '700');
     for (const close of ['order-method-sheet-backdrop', 'order-method-sheet-close', 'back']) {
       await h.press(TEST_IDS.order.typeSelect);
       assert.equal(h.node('order-method-sheet') !== undefined, true);
@@ -218,7 +226,8 @@ describe('주문방식 field and sheet', () => {
         assert.equal(handled, true);
       } else await h.press(close);
       assert.equal(h.node('order-method-sheet') === undefined, true, close);
-      assert.equal(h.orderType(), '주문방식 선택하기');
+      assert.equal(h.orderType(), '지정가');
+      assert.equal(h.node(TEST_IDS.order.limitPriceInput).props.value, '700', 'closing keeps the draft');
     }
   });
 

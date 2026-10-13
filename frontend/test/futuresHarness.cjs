@@ -40,7 +40,9 @@ function futuresHarness(options = {}) {
   });
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
   native.useWindowDimensions = () => options.dimensions ?? { width: 390, height: 844, fontScale: 1 };
-  Object.assign(native, { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} } });
+  Object.assign(native, { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
+    // Bottom sheets (주문방식, 선물 상품) mount these only while open.
+    Pressable: 'Pressable', BackHandler: { addEventListener: () => ({ remove() {} }) } });
   const conditionalApi = load(resolve(__dirname, '../src/features/conditional/api.ts'), {
     '../../services/api/client': { apiClient: {
       get: async (path, config) => { const id = path.split('/')[2]; h.protectionReads ??= []; h.protectionReads.push({path,config}); return { data: { data: conditionalFixture(id, { domain:'futures', enabled: options.protectionEnabled === true, ...h.protectionOptions }) } }; },
@@ -49,6 +51,7 @@ function futuresHarness(options = {}) {
   });
   const mocks = {
     'react-native': native,
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     '../../components/states/AdminDiagnosticPanel': { default: () => null, __esModule: true },
     './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     '@react-navigation/native': { useIsFocused: () => true }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
@@ -81,6 +84,13 @@ function futuresHarness(options = {}) {
   h.input = async (label, value) => { await act(async () => h.renderer.root.findAll(n => n.type === 'TextInput' && n.props.accessibilityLabel === label)[0].props.onChangeText(value)); };
   h.press = async id => { await act(async () => h.node(id).props.onPress()); await h.flush(); };
   h.choose = async label => { await act(async () => h.renderer.root.findAll(n => n.type === 'Pressable' && n.props.accessibilityLabel === label)[0].props.onPress()); await h.flush(); };
+  // 주문방식 through the real field and sheet, as the user picks it.
+  h.selectMethod = async method => { await h.press('order-type-select'); await h.press(`order-method-${method}`); };
+  h.orderType = () => [h.node('order-type-select-value')?.props.children].flat().join('');
+  // Another contract through the header's picker sheet.
+  h.selectInstrument = async id => { await h.press('futures-instrument-select'); await h.press(`futures-instrument-${id}`); };
+  // The positions / pending / history views under the trade card.
+  h.view = async view => h.press(`futures-view-${view}`);
   h.text = () => JSON.stringify(h.renderer.toJSON());
   h.api = api; h.client = client;
   h.close = async () => { await act(async () => h.renderer.unmount()); client.clear(); };

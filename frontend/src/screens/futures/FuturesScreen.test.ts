@@ -24,18 +24,67 @@ for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: detail
   }
 });
 
-test('the detailed TP/SL entrance manages one existing group and never opens a duplicate registration', async t => {
+test('the card TP/SL entrance opens that position\'s 조건주문: one panel manages the existing group, never a duplicate registration', async t => {
   const h = futuresHarness({ position: true, protectionEnabled: true });
   h.protectionOptions = { active: true };
   await h.start(); t.after(h.close);
-  assert.equal(h.renderer.root.findAllByType('Text').some(n => [n.props.children].flat().join('') === 'TP/SL 보호 중'), true);
-  assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
-  await h.press('futures-protection-A:position');
-  assert.equal(h.renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === 'protection-panel').length, 1);
+  const panels = () => h.renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === 'protection-panel').length;
+  // The card reads the live group at a glance: TP / SL triggers.
+  assert.equal(h.node('futures-position-A:position-protection-status').props.children, '$123,456,789.12 / $90,000');
+  assert.equal(h.node('futures-position-A:position-protection').props.label, 'TP/SL 관리');
+  assert.equal(panels(), 0);
+  await h.press('futures-position-A:position-protection');
+  assert.equal(h.orderType(), '조건주문');
+  assert.equal(panels(), 1);
   assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
   assert.equal(h.renderer.root.findAllByType('CTAButton').some(n => n.props.label === '보호 조건 취소'), true);
+  assert.equal(h.node('futures-submit') === undefined, true, 'a conditional order is not a market execution');
   assert.equal(h.requests.length, 0);
-  await h.press('futures-protection-A:position');
+  await h.press('futures-position-A:position-protection');
+  assert.equal(panels(), 1);
+  assert.equal(h.requests.length, 0);
+});
+
+test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 조건주문; flat 조건주문 and held 지정가 explain why they wait', async t => {
+  const methods = (h: any) => ['market', 'limit', 'conditional', 'loc', 'protection'].filter(m => h.node(`order-method-${m}`) !== undefined);
+  const flat = futuresHarness({ protectionEnabled: true });
+  await flat.start(); t.after(flat.close);
+  assert.equal(flat.orderType(), '시장가');
+  assert.equal(flat.node('order-type-select').props.accessibilityLabel, '주문방식 시장가, 주문방식 선택하기');
+  await flat.press('order-type-select');
+  assert.deepEqual(methods(flat), ['market', 'limit', 'conditional']);
+  assert.equal(flat.node('order-method-conditional').props.disabled, true);
+  assert.equal(flat.node('order-method-conditional-badge').props.children, '이용 불가');
+  await flat.press('order-method-conditional');
+  assert.equal(flat.orderType(), '시장가', 'a refused choice keeps the method');
+  await flat.press('order-method-limit');
+  assert.equal(flat.orderType(), '지정가');
+  assert.equal(flat.node('futures-limit-price').props.value, '');
+  assert.equal(flat.node('futures-submit') === undefined, true, 'the limit entry submits through its own form');
+  const held = futuresHarness({ position: true, protectionEnabled: true });
+  await held.start(); t.after(held.close);
+  assert.equal(held.orderType(), '시장가');
+  await held.press('order-type-select');
+  assert.deepEqual(methods(held), ['market', 'limit', 'conditional']);
+  assert.equal(held.node('order-method-limit').props.disabled, true);
+  assert.equal(held.node('order-method-conditional').props.disabled, false);
+  await held.press('order-method-limit');
+  assert.equal(held.orderType(), '시장가');
+  assert.equal(held.requests.length + flat.requests.length, 0);
+});
+
+test('a contract change starts at 시장가 with the entry draft cleared', async t => {
+  const h = futuresHarness({ futuresOnly: true });
+  await h.start(); t.after(h.close);
+  await h.selectMethod('limit');
+  await h.change('futures-limit-price', '100');
+  await h.change('futures-quantity', '1');
+  await h.selectInstrument('hype');
+  assert.equal(h.orderType(), '시장가');
+  assert.equal(h.node('futures-quantity').props.value, '');
+  assert.equal(h.node('futures-limit-price') === undefined, true);
+  await h.selectMethod('limit');
+  assert.equal(h.node('futures-limit-price').props.value, '');
   assert.equal(h.requests.length, 0);
 });
 
@@ -211,6 +260,7 @@ test("liquidation history exposes economic loss, actual cash and shortfall separ
   const h = futuresHarness({ position: true, marginMode: "cross" });
   await h.start();
   t.after(h.close);
+  await h.view("history");
   await h.choose("강제청산 기록");
   assert.match(h.text(), /경제적 실현 손익/);
   assert.match(h.text(), /실제 현금 정산/);

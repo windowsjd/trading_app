@@ -5,7 +5,12 @@ import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideReveal } 
 import QuestTarget from '../../features/quest/QuestTarget';
 import FuturesLimitEntryForm from './FuturesLimitEntryForm';
 import FuturesCandleChart from './FuturesCandleChart';
+import FuturesHistory from './FuturesHistory';
+import FuturesInstrumentSheet from './FuturesInstrumentSheet';
 import PendingOrders from '../asset/PendingOrders';
+import OrderSideSegment from '../order/OrderSideSegment';
+import OrderTypeSelect from '../order/OrderTypeSelect';
+import OrderNumberInput, { orderInputStyle } from '../order/OrderNumberInput';
 import React, { useEffect, useRef, useState } from "react";
 import ProtectionPanel from "../../features/conditional/ProtectionPanel";
 import {
@@ -14,9 +19,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
+  useWindowDimensions,
 } from "../../theme/native";
+import Svg, { Path } from 'react-native-svg';
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
@@ -26,7 +32,6 @@ import { resolveAccountBinding } from "../../features/tradingAccount/accountBind
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import {
   executeFutures,
-  getFuturesHistory,
   getFuturesInstruments,
   getFuturesPositions,
   getFuturesFinalSettlement,
@@ -46,22 +51,26 @@ import {
   positionCommand,
 } from "../../features/futures/policy";
 import {
+  DEFAULT_ORDER_METHOD,
+  getFuturesOrderMethodOptions,
+  isOrderMethodSelectable,
+  type OrderMethod,
+} from '../../features/order/orderMethods';
+import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
+import {
   getSessionGeneration,
   isCurrentSession,
 } from "../../services/api/sessionOwnership";
 import { getApiErrorInfo } from "../../services/api/errorMapper";
 import { createIdempotencyKey } from "../../utils/idempotency";
-import {
-  formatAssetPrice,
-  formatDisplayDecimal,
-  formatUsd,
-} from "../../utils/format";
+import { formatAssetPrice, formatUsd } from "../../utils/format";
 import { useFocusedInputScroll } from "../../hooks/useFocusedInputScroll";
 import { getScreenContentStyle } from "../../theme/screenLayout";
 import { semantic } from "../../theme/tokens";
-import { financial } from "../../theme/financialColors";
+import { useAppearance } from '../../theme/appearance';
 import CTAButton from "../../components/common/CTAButton";
 import ActionPressable from "../../components/common/ActionPressable";
+import SegmentedControl from '../../components/common/SegmentedControl';
 import ErrorNotice from "../../components/states/ErrorNotice";
 import ErrorState from "../../components/states/ErrorState";
 import FullPageLoading from "../../components/states/FullPageLoading";
@@ -70,10 +79,23 @@ import FuturesPositionCard from './FuturesPositionCard';
 export default function FuturesScreen(props: FuturesScreenProps) {
   return <BoundFuturesScreen key={`${props.route.params.accountId}:${props.route.params.instrumentId ?? ""}:${getSessionGeneration()}`} {...props} />;
 }
+
+type ListView = 'positions' | 'pending' | 'history';
+
+/**
+ * The futures trading screen, laid out like the spot order screen: the
+ * contract header (picker, 무기한, chart), its Last and Mark prices, one trade
+ * card (롱/숏, margin mode and leverage, 주문방식, inputs, submit), then the
+ * futures wallet and the positions/pending/history views. Futures keeps its
+ * own financial rules: execution on Futures Last, valuation and liquidation on
+ * Mark, an individual liquidation price for isolated positions only.
+ */
 export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const accountId = route.params.accountId;
   const learning = useLearningAccess(accountId);
   const guide = useQuestGuide();
+  const { colors } = useAppearance();
+  const { width, fontScale } = useWindowDimensions();
   const { accounts, selectedAccountId, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   const binding = resolveAccountBinding({
     boundAccountId: accountId,
@@ -88,26 +110,25 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const { revealView } = inputScroll;
   useEffect(() => { registerQuestGuideReveal('futures', node => revealView(node, 'start')); return () => { registerQuestGuideReveal('futures', null); }; }, [revealView]);
   const headerHeight = useHeaderHeight();
-  const quantityRef = useRef<TextInput>(null);
-  const leverageRef = useRef<TextInput>(null);
   const tradeOffset = useRef(0);
   const [, setClock] = useState(Date.now());
   const clock = Date.now();
   const [selectedId, setSelectedId] = useState(route.params.instrumentId ?? "");
-  const [instrumentSearch, setInstrumentSearch] = useState("");
+  const [instrumentSheetOpen, setInstrumentSheetOpen] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
   const [direction, setDirection] = useState<Direction>("long");
   const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
   const [leverage, setLeverage] = useState("1");
   const [quantity, setQuantity] = useState("");
-  const [entryType, setEntryType] = useState<"market" | "limit">("market");
+  // Like the spot order form, every contract starts at 시장가.
+  const [method, setMethod] = useState<OrderMethod>(DEFAULT_ORDER_METHOD);
+  const [methodSheetOpen, setMethodSheetOpen] = useState(false);
+  const [limitPrice, setLimitPrice] = useState("");
   const [limitBusy, setLimitBusy] = useState(false);
   const [operation, setOperation] = useState<Operation>("open");
   const [failure, setFailure] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [historyKind, setHistoryKind] = useState<"executions" | "liquidations">(
-    "executions",
-  );
-  const [offset, setOffset] = useState(0);
+  const [listView, setListView] = useState<ListView>('positions');
   const scope = useRef({ key: "", epoch: 0, mounted: true });
   const session = getSessionGeneration();
   const scopeKey = `${accountId}:${selectedAccountId}:${bound}:${session}`;
@@ -148,17 +169,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     queryFn: ({ signal }) => getFuturesPositions(accountId, signal),
     enabled: bound && focused,
     refetchInterval: 2000,
-    retry: false,
-  });
-  const history = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.futures.history(
-      accountId,
-      historyKind,
-      offset,
-    ),
-    queryFn: ({ signal }) =>
-      getFuturesHistory(accountId, historyKind, offset, signal),
-    enabled: bound && focused,
     retry: false,
   });
   const final = useQuery({
@@ -226,9 +236,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     return <ErrorState error={error} title="계정 정보를 불러오지 못했습니다." onRetry={() => void refetchAccounts()} />;
   if (!bound)
     return (
-      <View style={styles.card}>
+      <View style={[styles.card, styles.unbound]}>
         <Text style={styles.heading}>선택한 계정이 변경되었습니다.</Text>
-        <Text>마켓에서 선물 상품을 다시 선택해주세요.</Text>
+        <Text style={styles.muted}>마켓에서 선물 상품을 다시 선택해주세요.</Text>
         <CTAButton label="마켓으로" onPress={() => navigation.navigate("Market")} />
       </View>
     );
@@ -248,13 +258,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const allInstruments = instruments.isError
     ? []
     : (instruments.data?.instruments ?? []);
-  const search =
-    allInstruments.length > 12 ? instrumentSearch.trim().toLowerCase() : "";
-  const matchingInstruments = allInstruments.filter((i) =>
-    `${i.underlying.symbol} ${i.underlying.name}`
-      .toLowerCase()
-      .includes(search),
-  );
   const instrument =
     allInstruments.find((i) => i.id === selectedId) ??
     data.positions.find((p) => p.instrumentId === selectedId)?.instrument ??
@@ -317,13 +320,21 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       markFresh,
       referenceFresh,
     );
+  // A command in flight, an unresolved result or a held limit entry keeps
+  // the contract, side and method that request was made with.
+  const locked = mutation.isPending || pendingResult || limitBusy;
   const choose = (id: string) => {
     if (submitLock.current || pendingResult || limitBusy) return;
+    setInstrumentSheetOpen(false);
     setSelectedId(id);
     setQuantity("");
     setOperation("open");
     setNotice(null);
     action.current = null;
+    // Another contract starts at 시장가 without a limit draft (the spot rule).
+    setMethod(DEFAULT_ORDER_METHOD);
+    setMethodSheetOpen(false);
+    setLimitPrice("");
   };
   // Certain-only live check: opening or increasing needs some free collateral.
   // The margin a positive amount needs (Mark, leverage, fees) stays the
@@ -331,9 +342,27 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const collateralShort = (selectedOperation === 'open' || selectedOperation === 'increase') &&
     !!selectedQuantity.trim() && !inputError && hasNoFreeCollateral(data.collateral.freeCollateral);
   const entryGate = learning.gate(selectedOperation === 'close' || selectedOperation === 'reduce' ? 'riskReduction' : 'allTrading');
+  const advancedGate = learning.gate('allTrading');
+  const methodOptions = getFuturesOrderMethodOptions(!!position);
+  const selectedMethodOption = methodOptions.find((option) => option.method === method);
+  // A method the position state no longer allows stays shown, never submits.
+  const methodUnavailableReason = selectedMethodOption?.availability.state === 'unavailable'
+    ? selectedMethodOption.availability.reason : null;
+  const selectMethod = (next: OrderMethod) => {
+    const option = methodOptions.find((item) => item.method === next);
+    if (!option || !isOrderMethodSelectable(option) || submitLock.current || pendingResult || limitBusy) return;
+    (next === 'market' ? learning.gate('riskReduction') : advancedGate).guard(() => {
+      setMethodSheetOpen(false);
+      if (next === method) return;
+      // A new method never inherits the previous method's limit draft.
+      setMethod(next);
+      setLimitPrice("");
+      setNotice(null);
+    });
+  };
   const submit = () => {
     if (!entryGate.allowed) { entryGate.guard(() => undefined); return; }
-    if (!allowed || inputError || collateralShort || submitLock.current || !instrument) return;
+    if (method !== 'market' || !allowed || inputError || collateralShort || submitLock.current || !instrument) return;
     const signature = JSON.stringify([
       scope.current.epoch,
       instrument.id,
@@ -374,6 +403,13 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setNotice(null);
     mutation.mutate(action.current);
   };
+  const focusTrade = () => inputScroll.scrollRef.current?.scrollTo({ y: tradeOffset.current, animated: true });
+  const orderDirection = position?.direction ?? direction;
+  const entering = selectedOperation === 'open' || selectedOperation === 'increase';
+  const stackedControls = width / fontScale < 360;
+  const accountLabel = binding.account.mode === "beginner" ? "초보모드" : binding.account.mode === "general"
+    ? "일반모드"
+    : (binding.account.season?.seasonName ?? "시즌 투자");
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -391,281 +427,260 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         onContentSizeChange={inputScroll.revealFocusedInput}
         testID="futures-screen"
       >
-        <Text style={styles.title}>암호화폐 선물</Text>
-        <Text style={styles.muted}>
-          {binding.account.mode === "beginner" ? "초보모드" : binding.account.mode === "general"
-            ? "일반모드"
-            : (binding.account.season?.seasonName ?? "시즌 투자")}{" "}
-          · USD 가상 무기한 계약
-        </Text>
-        <View ref={questGuideTarget('futures-funding')} collapsable={false} style={styles.card}>
-          <Text style={styles.heading}>
-            {modeLabel[data.capabilities.tradingMode]}
-          </Text>
-          <Text style={styles.muted}>
-            시장가로 전량 체결됩니다. 교차 담보도 선물 USD 지갑만 사용합니다.
-          </Text>
-          <Metric
-            label="선물 USD 현금"
-            value={usd(data.collateral.balanceAmount)}
-          />
-          <Metric
-            label="격리 할당 담보"
-            value={usd(data.collateral.totalMarginUsed)}
-          />
-          <Metric
-            label="사용 가능 담보"
-            value={
-              timely && crossFresh
-                ? usd(data.collateral.freeCollateral)
-                : "평가 대기"
-            }
-          />
+        <View style={styles.header}>
+          <View ref={questGuideTarget('futures-instrument')} collapsable={false} style={styles.pairGroup}>
+            <ActionPressable
+              testID="futures-instrument-select"
+              style={styles.pairButton}
+              accessibilityRole="button"
+              accessibilityLabel={instrument ? `선물 상품 변경, ${instrument.underlying.symbol}` : '선물 상품 선택'}
+              accessibilityHint="선물 상품 목록을 엽니다"
+              accessibilityState={{ disabled: locked || !allInstruments.length, expanded: instrumentSheetOpen }}
+              disabled={locked || !allInstruments.length}
+              onPress={() => setInstrumentSheetOpen(true)}
+            >
+              <Text style={styles.pair}>{instrument?.underlying.symbol ?? '선물 상품'}{allInstruments.length ? ' ▾' : ''}</Text>
+            </ActionPressable>
+            <Text style={styles.badge}>무기한</Text>
+          </View>
+          {instrument ? (
+            <ActionPressable
+              testID="futures-chart-toggle"
+              style={[styles.iconButton, chartOpen && styles.iconButtonActive]}
+              accessibilityRole="button"
+              accessibilityLabel={chartOpen ? '4시간봉 차트 접기' : '4시간봉 차트 보기'}
+              accessibilityState={{ selected: chartOpen }}
+              aria-pressed={chartOpen}
+              onPress={() => setChartOpen((open) => !open)}
+            >
+              <Svg width={22} height={22} viewBox="0 0 24 24" aria-hidden>
+                <Path d="M5 3v18M2 8h6v7H2zM12 2v17M9 5h6v8H9zM19 6v16M16 11h6v7h-6z" fill="none"
+                  stroke={chartOpen ? colors.onAccent : colors.secondary} strokeWidth={1.5} />
+              </Svg>
+            </ActionPressable>
+          ) : null}
         </View>
-        {data.cross.positionIds.length > 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.heading}>교차(Cross) 공동 담보</Text>
-            {timely && crossFresh && data.cross.metrics ? (
-              <>
-                <Metric
-                  label="교차 equity"
-                  value={usd(data.cross.metrics.crossEquity)}
-                />
-                <Metric
-                  label="초기 증거금 요구액"
-                  value={usd(data.cross.metrics.crossInitialMarginRequirement)}
-                />
-                <Metric
-                  label="유지 증거금 + 종료 수수료"
-                  value={usd(data.cross.metrics.crossMaintenanceRequirement)}
-                />
-                <Metric
-                  label="청산 여유"
-                  value={usd(data.cross.metrics.liquidationBuffer)}
-                />
-              </>
-            ) : (
+        <Text style={styles.muted}>
+          {instrument ? `${instrument.underlying.name} · ` : ''}{accountLabel} · USD 가상 무기한 계약
+        </Text>
+        {instrument ? (
+          <>
+            <View style={styles.prices} testID="futures-prices">
+              <View style={[styles.priceCell, stackedControls && styles.full]}>
+                <Text style={styles.priceLabel}>현재가 · 선물 Last 거래 기준</Text>
+                <Text selectable style={styles.price} testID="futures-last-price">
+                  {referenceFresh ? price(reference, instrument) : "시세 확인 불가"}
+                </Text>
+              </View>
+              <View style={[styles.priceCell, stackedControls && styles.full]}>
+                <Text style={styles.priceLabel}>Mark Price · 평가/청산 기준</Text>
+                <Text selectable style={styles.price} testID="futures-mark-price">
+                  {markFresh ? price(position?.markPrice ?? instrument.markPrice, instrument) : "Mark 확인 불가"}
+                </Text>
+              </View>
+            </View>
+            {!markFresh ? (
               <Text style={styles.warning}>
-                Mark 정보를 확인할 수 없어 위험 평가를 표시하지 않습니다.
+                Mark가 없거나 오래되었습니다. Open/Increase는 제한되며,
+                현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.
               </Text>
-            )}
-            <Text style={styles.muted}>
-              교차 포지션은 공동 평가되며, 개별 청산가는 제공하지 않습니다.
-            </Text>
-          </View>
+            ) : null}
+            {chartOpen ? (
+              <View style={styles.card}>
+                <FuturesCandleChart
+                  key={instrument.id}
+                  instrumentId={instrument.id}
+                  displayPriceDecimals={instrument.underlying.displayPriceDecimals}
+                  currentPrice={referenceFresh && reference ? reference : null}
+                />
+              </View>
+            ) : null}
+          </>
         ) : null}
-        {pendingResult ? (
-          <View style={styles.card}>
-            <Text style={styles.warning}>
-              이전 요청의 체결 여부를 확인해야 합니다. 포지션이나 운영 모드가
-              바뀌어도 같은 요청으로 결과를 확인합니다.
-            </Text>
-            <CTAButton
-              testID="futures-retry"
-              label="이전 체결 결과 확인"
-              onPress={retryResult}
-              state={mutation.isPending ? "loading" : "enabled"}
-            />
-          </View>
-        ) : null}
-        <Text accessibilityRole="header" style={styles.heading}>포지션</Text>
-        {!data.positions.length ? (
-          <Text style={styles.muted}>보유 중인 선물 포지션이 없습니다.</Text>
-        ) : (
-          data.positions.map((p) => (
-            <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={clock}
-              disabled={mutation.isPending || pendingResult || limitBusy} capabilities={data.capabilities}
-              onSelect={op => {
-                if (submitLock.current || pendingResult || limitBusy) return;
-                choose(p.instrumentId); setEntryType('market'); setOperation(op);
-                inputScroll.scrollRef.current?.scrollTo({ y: tradeOffset.current, animated: true });
-              }}
-              onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
-          ))
-        )}
-        <View style={styles.card} onLayout={event => { tradeOffset.current = event.nativeEvent.layout.y; }}>
-          <Text style={styles.heading}>선물 거래</Text>
-          {!position ? <View style={styles.choices}>{(["market", "limit"] as const).map(type => <Choice key={type} label={type === "market" ? "시장가" : "지정가 진입"} selected={entryType === type} disabled={mutation.isPending || pendingResult || limitBusy} onPress={() => setEntryType(type)} />)}</View> : null}
+        <View style={styles.tradeCard} testID="futures-trade" onLayout={event => { tradeOffset.current = event.nativeEvent.layout.y; }}>
+          {pendingResult ? (
+            <View style={styles.pendingResult}>
+              <Text style={styles.warning}>
+                이전 요청의 체결 여부를 확인해야 합니다. 포지션이나 운영 모드가
+                바뀌어도 같은 요청으로 결과를 확인합니다.
+              </Text>
+              <CTAButton
+                testID="futures-retry"
+                label="이전 체결 결과 확인"
+                onPress={retryResult}
+                state={mutation.isPending ? "loading" : "enabled"}
+              />
+            </View>
+          ) : null}
+          {data.capabilities.tradingMode !== 'ENABLED' ? (
+            <Text testID="futures-mode-notice" style={styles.warning}>{modeLabel[data.capabilities.tradingMode]}</Text>
+          ) : null}
           {instruments.isError ? (
             <ErrorNotice error={instruments.error} style={styles.warning}
               message="상품 목록을 불러오지 못했습니다. 보유 포지션에서 다시 선택할 수 있습니다." />
-          ) : null}
-          {allInstruments.length > 12 ? (
-            <>
-              <Text style={styles.label}>상품 검색</Text>
-              <TextInput
-                accessibilityLabel="선물 상품 검색"
-                value={instrumentSearch}
-                onChangeText={setInstrumentSearch}
-                placeholder="이름 또는 심볼"
-                style={styles.input}
-                autoCapitalize="none"
-              />
-            </>
-          ) : null}
-          <View ref={questGuideTarget('futures-instrument')} collapsable={false} style={styles.choices}>
-            {matchingInstruments.slice(0, 12).map((i) => (
-              <Choice
-                key={i.id}
-                label={i.underlying.symbol}
-                selected={i.id === instrument?.id}
-                disabled={mutation.isPending || pendingResult || limitBusy}
-                onPress={() => choose(i.id)}
-              />
-            ))}
-          </View>
-          {matchingInstruments.length > 12 ? (
-            <Text style={styles.muted}>
-              검색어를 입력하면 다른 상품을 찾을 수 있습니다.
-            </Text>
-          ) : search && !matchingInstruments.length ? (
-            <Text style={styles.muted}>검색 결과가 없습니다.</Text>
           ) : null}
           {!instrument ? (
             <Text style={styles.muted}>현재 검증된 선물 상품이 없습니다.</Text>
           ) : (
             <>
-              <Text style={styles.heading}>{instrument.underlying.name}</Text>
-              <Metric
-                label="현재가 · 선물 Last 거래 기준"
-                value={
-                  referenceFresh
-                    ? price(reference, instrument)
-                    : "시세 확인 불가"
-                }
-              />
-              <Metric
-                label="Mark Price · 평가/청산 기준"
-                value={
-                  markFresh
-                    ? price(
-                        position?.markPrice ?? instrument.markPrice,
-                        instrument,
-                      )
-                    : "Mark 확인 불가"
-                }
-              />
-              {!markFresh ? (
-                <Text style={styles.warning}>
-                  Mark가 없거나 오래되었습니다. Open/Increase는 제한되며,
-                  현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.
-                </Text>
-              ) : null}
-              <FuturesCandleChart
-                key={instrument.id}
-                instrumentId={instrument.id}
-                displayPriceDecimals={instrument.underlying.displayPriceDecimals}
-                currentPrice={referenceFresh && reference ? reference : null}
-              />
               {position ? (
-                <>
-                  <Text style={styles.muted}>
-                    {directionLabel[position.direction]} ·{" "}
-                    {marginLabel[position.marginMode]} · {position.leverage}x
-                    고정
-                  </Text>
-                  <Text style={styles.muted}>
+                <View style={styles.group} testID="futures-position-terms">
+                  <View style={styles.terms}>
+                    <Text style={[styles.termsDirection, { color: position.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>
+                      {directionLabel[position.direction]}
+                    </Text>
+                    <Text style={styles.termsText}>{marginLabel[position.marginMode]} · {position.leverage}x 고정</Text>
+                  </View>
+                  <Text style={styles.helper}>
                     방향·레버리지·증거금 모드는 전량 종료 후 새 포지션에서
                     선택할 수 있습니다.
                   </Text>
-                  <View style={styles.choices}>
-                    {(["increase", "reduce", "close"] as const).map((op) => (
-                      <Choice
-                        key={op}
-                        label={operationLabel[op]}
-                        selected={selectedOperation === op}
-                        disabled={mutation.isPending || pendingResult || limitBusy}
-                        onPress={() => {
-                          setOperation(op);
-                          setNotice(null);
-                        }}
-                      />
-                    ))}
-                  </View>
-                </>
+                </View>
               ) : (
                 <>
-                  <View ref={questGuideTarget('futures-direction')} collapsable={false} style={styles.choices}>
-                    {(["long", "short"] as const).map((dir) => (
-                      <Choice
-                        key={dir}
-                        label={directionLabel[dir]}
-                        selected={direction === dir}
-                        disabled={mutation.isPending || pendingResult || limitBusy}
-                        onPress={() => setDirection(dir)}
-                      />
-                    ))}
+                  <View ref={questGuideTarget('futures-direction')} collapsable={false}>
+                    <OrderSideSegment
+                      testID="futures-direction"
+                      side={direction === 'long' ? 'buy' : 'sell'}
+                      labels={{ buy: directionLabel.long, sell: directionLabel.short }}
+                      testIDs={{ buy: 'futures-direction-long', sell: 'futures-direction-short' }}
+                      disabled={locked}
+                      onChange={(side) => setDirection(side === 'buy' ? 'long' : 'short')}
+                    />
                   </View>
-                  <View ref={questGuideTarget('futures-margin')} collapsable={false} style={styles.choices}>
-                    {(["isolated", "cross"] as const).map((m) => (
-                      <Choice
-                        key={m}
-                        label={marginLabel[m]}
-                        selected={marginMode === m}
-                        disabled={mutation.isPending || pendingResult || limitBusy}
-                        onPress={() => setMarginMode(m)}
+                  <View ref={questGuideTarget('futures-margin')} collapsable={false} style={styles.controls}>
+                    <View style={[styles.marginGroup, stackedControls && styles.full]}>
+                      <Text style={styles.label}>증거금 모드</Text>
+                      <SegmentedControl testID="futures-margin-mode" accessibilityLabel="증거금 모드" compact value={marginMode}
+                        onChange={setMarginMode}
+                        options={(['isolated', 'cross'] as const).map((mode) => ({
+                          key: mode, label: mode === 'isolated' ? '격리' : '교차', accessibilityLabel: marginLabel[mode],
+                          testID: `futures-margin-${mode}`, disabled: locked,
+                        }))} />
+                    </View>
+                    <View style={[styles.leverageGroup, stackedControls && styles.full]}>
+                      <Text style={styles.label}>레버리지 (1~100)</Text>
+                      <OrderNumberInput
+                        accessibilityLabel="레버리지"
+                        testID="futures-leverage"
+                        value={leverage}
+                        onChangeText={setLeverage}
+                        editable={!locked}
+                        keyboardType="number-pad"
+                        style={[styles.input, styles.leverageInput]}
+                        onFieldFocus={inputScroll.onInputFocus}
+                        onBlur={inputScroll.onInputBlur}
                       />
-                    ))}
+                    </View>
                   </View>
-                  <Text style={styles.label}>레버리지 · 1~100 정수</Text>
-                  <TextInput
-                    ref={leverageRef}
-                    accessibilityLabel="레버리지"
-                    testID="futures-leverage"
-                    value={leverage}
-                    onChangeText={setLeverage}
-                    editable={!mutation.isPending && !pendingResult && !limitBusy}
-                    keyboardType="number-pad"
-                    style={styles.input}
-                    onFocus={() =>
-                      inputScroll.onInputFocus(leverageRef.current)
-                    }
-                    onBlur={inputScroll.onInputBlur}
-                  />
                 </>
               )}
-              <Text style={styles.label}>
-                {selectedOperation === "close" ? "전량 종료 수량" : "거래 수량"}
-              </Text>
-              <TextInput
-                ref={quantityRef}
-                accessibilityLabel="거래 수량"
-                testID="futures-quantity"
-                value={selectedQuantity}
-                onChangeText={setQuantity}
-                editable={
-                  selectedOperation !== "close" &&
-                  !mutation.isPending &&
-                  !pendingResult && !limitBusy
-                }
-                keyboardType="decimal-pad"
-                style={styles.input}
-                onFocus={() => inputScroll.onInputFocus(quantityRef.current)}
-                onBlur={inputScroll.onInputBlur}
+              <OrderTypeSelect
+                method={method}
+                options={methodOptions}
+                disabled={locked}
+                open={methodSheetOpen && !locked}
+                onOpen={() => setMethodSheetOpen(true)}
+                onClose={() => setMethodSheetOpen(false)}
+                onSelect={selectMethod}
+                learningHints={{
+                  limit: advancedGate.locked ? advancedGate.message : null,
+                  conditional: advancedGate.locked ? advancedGate.message : null,
+                }}
               />
-              {selectedQuantity && inputError ? (
-                <Text style={styles.warning}>{inputError}</Text>
-              ) : null}
-              {collateralShort ? (
-                <Text testID="futures-collateral-insufficient" accessibilityLiveRegion="polite" style={styles.warning}>
-                  {futuresErrorMessage('FUTURES_INSUFFICIENT_FREE_COLLATERAL')}
-                </Text>
-              ) : null}
-              {!position && entryType === 'limit' ? <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id} assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage} quantity={quantity} allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !collateralShort && !pendingResult} onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} /> : <View ref={inputScroll.submitRef}>
-                <QuestTarget id="futures-submit"><CTAButton
-                  learningHint={entryGate.locked ? entryGate.message : null}
-                  label={`${operationLabel[selectedOperation]} · ${directionLabel[position?.direction ?? direction]}`}
-                  testID="futures-submit"
-                  onPress={submit}
-                  state={
-                    mutation.isPending
-                      ? "loading"
-                      : allowed && !inputError && !collateralShort
-                        ? "enabled"
-                        : "disabled"
-                  }
-                /></QuestTarget>
-              </View>}
+              {methodUnavailableReason ? (
+                <Text testID="futures-method-unavailable" style={styles.error}>{methodUnavailableReason}</Text>
+              ) : method === 'conditional' && position ? (
+                <ProtectionPanel
+                  accountId={accountId}
+                  assetId={instrument.underlying.assetId}
+                  domain="futures"
+                  positionId={position.id}
+                  currency="USD"
+                  onInputFocus={inputScroll.onInputFocus}
+                  onInputBlur={inputScroll.onInputBlur}
+                />
+              ) : (
+                <>
+                  {position ? (
+                    <SegmentedControl testID="futures-operation" accessibilityLabel="포지션 조작" value={selectedOperation === 'open' ? 'increase' : selectedOperation}
+                      onChange={(op) => { setOperation(op); setNotice(null); }}
+                      options={(['increase', 'reduce', 'close'] as const).map((op) => ({
+                        key: op, label: operationShortLabel[op], accessibilityLabel: operationLabel[op],
+                        testID: `futures-operation-${op}`, disabled: locked,
+                      }))} />
+                  ) : null}
+                  <View style={styles.group}>
+                    <Text style={styles.label}>{method === 'limit' ? '진입 지정가' : '가격'} (USD)</Text>
+                    {method === 'limit' ? (
+                      <OrderNumberInput
+                        accessibilityLabel="선물 진입 지정가"
+                        testID="futures-limit-price"
+                        value={limitPrice}
+                        onChangeText={setLimitPrice}
+                        editable={!locked}
+                        keyboardType="decimal-pad"
+                        placeholder="지정가 입력"
+                        style={styles.input}
+                        onFieldFocus={inputScroll.onInputFocus}
+                        onBlur={inputScroll.onInputBlur}
+                      />
+                    ) : (
+                      <Text style={styles.marketPrice}>시장가 · 선물 Last 기준 체결</Text>
+                    )}
+                  </View>
+                  <View style={styles.group}>
+                    <Text style={styles.label}>{selectedOperation === "close" ? "전량 종료 수량" : "거래 수량"}</Text>
+                    <OrderNumberInput
+                      accessibilityLabel="거래 수량"
+                      testID="futures-quantity"
+                      value={selectedQuantity}
+                      onChangeText={setQuantity}
+                      editable={selectedOperation !== "close" && !locked}
+                      keyboardType="decimal-pad"
+                      placeholder="수량 입력"
+                      style={styles.input}
+                      onFieldFocus={inputScroll.onInputFocus}
+                      onBlur={inputScroll.onInputBlur}
+                    />
+                  </View>
+                  {selectedQuantity && inputError ? (
+                    <Text style={styles.error}>{inputError}</Text>
+                  ) : null}
+                  {collateralShort ? (
+                    <Text testID="futures-collateral-insufficient" accessibilityLiveRegion="polite" style={styles.error}>
+                      {futuresErrorMessage('FUTURES_INSUFFICIENT_FREE_COLLATERAL')}
+                    </Text>
+                  ) : null}
+                  <Text style={styles.helper} testID="futures-available-collateral">
+                    사용 가능 담보 {timely && crossFresh ? usd(data.collateral.freeCollateral) : '평가 대기'}
+                  </Text>
+                  {method === 'limit' ? (
+                    <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
+                      assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage}
+                      quantity={quantity} limitPrice={limitPrice}
+                      allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !collateralShort && !pendingResult}
+                      onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
+                  ) : (
+                    <View ref={inputScroll.submitRef}>
+                      <QuestTarget id="futures-submit"><CTAButton
+                        learningHint={entryGate.locked ? entryGate.message : null}
+                        label={`${directionLabel[orderDirection]} ${operationVerb[selectedOperation]}`}
+                        testID="futures-submit"
+                        style={entering ? { backgroundColor: orderDirection === 'long' ? BUY_COLOR : SELL_COLOR } : undefined}
+                        onPress={submit}
+                        state={
+                          mutation.isPending
+                            ? "loading"
+                            : allowed && !inputError && !collateralShort
+                              ? "enabled"
+                              : "disabled"
+                        }
+                      /></QuestTarget>
+                    </View>
+                  )}
+                </>
+              )}
               {notice ? (
                 failure ? (
                   <ErrorNotice
@@ -683,6 +698,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           )}
         </View>
         {instrument && !position ? (
+          // Completed TP/SL history stays readable after the position is flat.
           <ProtectionPanel
             accountId={accountId}
             assetId={instrument.underlying.assetId}
@@ -690,123 +706,73 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             currency="USD"
           />
         ) : null}
-        <View style={styles.card}><Text style={styles.heading}>대기 주문</Text><PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.state === "bound" && binding.account.mode === "season"} /></View>
-        <View style={styles.card}>
-          <Text style={styles.heading}>선물 기록</Text>
-          <View style={styles.choices}>
-            {(["executions", "liquidations"] as const).map((kind) => (
-              <Choice
-                key={kind}
-                label={kind === "executions" ? "체결 기록" : "강제청산 기록"}
-                selected={kind === historyKind}
-                onPress={() => {
-                  setHistoryKind(kind);
-                  setOffset(0);
-                }}
-              />
-            ))}
+        <View ref={questGuideTarget('futures-funding')} collapsable={false} style={styles.card} testID="futures-wallet">
+          <View style={styles.cardHeader}>
+            <Text accessibilityRole="header" style={styles.heading}>선물 지갑</Text>
+            <Text style={[styles.modeBadge, data.capabilities.tradingMode !== 'ENABLED' && styles.modeBadgeLimited]}>
+              {modeLabel[data.capabilities.tradingMode]}
+            </Text>
           </View>
-          {history.isError ? (
-            <>
-            <ErrorNotice error={history.error} message="기록을 불러오지 못했습니다." style={styles.warning} />
-            <CTAButton
-              label="기록 다시 불러오기"
-              variant="secondary"
-              onPress={() => void history.refetch()}
-            />
-            </>
-          ) : history.isPending ? (
-            <Text>기록을 불러오고 있습니다.</Text>
-          ) : (
-            <>
-              {(history.data.executions ?? []).map((e) => (
-                <View key={e.id} style={styles.history}>
-                  <Text>
-                    {e.instrument.underlying.symbol} ·{" "}
-                    {operationLabel[e.operation]} ·{" "}
-                    {directionLabel[e.direction]}
-                  </Text>
-                  <Metric
-                    label={[
-                      "수량 / 체결가",
-                      futuresPriceBasisLabel(e.priceEvidence?.priceBasis),
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                    value={`${formatDisplayDecimal(e.quantity)} / ${price(e.executionPrice, e.instrument)}`}
-                  />
-                  <Metric
-                    label="실현 손익 / 수수료"
-                    value={`${usd(e.realizedPnl)} / ${usd(e.feeAmount)}`}
-                  />
-                  <Text style={styles.muted}>
-                    {new Date(e.executedAt).toLocaleString("ko-KR")}
-                  </Text>
-                </View>
-              ))}
-              {(history.data.liquidations ?? []).map((e) => (
-                <View key={e.id} style={styles.history}>
-                  <Text>
-                    {marginLabel[e.marginMode]} 전량 강제청산 ·{" "}
-                    {e.closes.length}개 포지션
-                  </Text>
-                  <Metric label="경제적 실현 손익" value={usd(e.realizedPnl)} />
-                  <Metric label="경제적 종료 수수료" value={usd(e.feeAmount)} />
-                  {e.settledFee !== undefined ? (
-                    <Metric
-                      label="실제 정산 수수료"
-                      value={usd(e.settledFee)}
-                    />
-                  ) : null}
-                  <Metric label="실제 현금 정산" value={usd(e.settledCash)} />
-                  <Metric
-                    label="미충당 손실 · 부채 이월 없음"
-                    value={usd(e.bankruptcyShortfall)}
-                  />
-                  {e.closes.map((c) => (
-                    <View key={c.positionId} style={styles.history}>
-                      <Text>
-                        {c.markSnapshot?.symbol ?? "종료 포지션"} ·{" "}
-                        {directionLabel[c.direction]}
-                      </Text>
-                      <Metric
-                        label="종료 수량"
-                        value={formatDisplayDecimal(c.quantity)}
-                      />
-                      <Metric
-                        label="Mark 청산가"
-                        value={formatAssetPrice(
-                          c.executionPrice,
-                          "USD",
-                          allInstruments.find((i) => i.id === c.instrumentId)
-                            ?.underlying.displayPriceDecimals ?? 8,
-                        )}
-                      />
-                    </View>
-                  ))}
-                  <Text style={styles.muted}>
-                    {new Date(e.executedAt).toLocaleString("ko-KR")}
-                  </Text>
-                </View>
-              ))}
-              {history.data.pagination.returned === 0 ? (
-                <Text style={styles.muted}>기록이 없습니다.</Text>
-              ) : null}
-              <View style={styles.choices}>
-                <Choice
-                  label="이전"
-                  disabled={offset === 0}
-                  onPress={() => setOffset(Math.max(0, offset - 20))}
-                />
-                <Choice
-                  label="다음"
-                  disabled={history.data.pagination.nextOffset == null}
-                  onPress={() =>
-                    setOffset(history.data.pagination.nextOffset ?? offset)
-                  }
-                />
+          <Text style={styles.muted}>교차 담보도 선물 USD 지갑만 사용합니다.</Text>
+          <View style={styles.metrics}>
+            <Metric columns={stackedControls ? 1 : 3} label="선물 USD 현금" value={usd(data.collateral.balanceAmount)} />
+            <Metric columns={stackedControls ? 1 : 3} label="격리 할당 담보" value={usd(data.collateral.totalMarginUsed)} />
+            <Metric columns={stackedControls ? 1 : 3} label="사용 가능 담보" value={timely && crossFresh ? usd(data.collateral.freeCollateral) : "평가 대기"} />
+          </View>
+        </View>
+        {data.cross.positionIds.length > 0 ? (
+          <View style={styles.card} testID="futures-cross">
+            <Text style={styles.heading}>교차(Cross) 공동 담보</Text>
+            {timely && crossFresh && data.cross.metrics ? (
+              <View style={styles.metrics}>
+                <Metric columns={stackedControls ? 1 : 2} label="교차 equity" value={usd(data.cross.metrics.crossEquity)} />
+                <Metric columns={stackedControls ? 1 : 2} label="초기 증거금 요구액" value={usd(data.cross.metrics.crossInitialMarginRequirement)} />
+                <Metric columns={stackedControls ? 1 : 2} label="유지 증거금 + 종료 수수료" value={usd(data.cross.metrics.crossMaintenanceRequirement)} />
+                <Metric columns={stackedControls ? 1 : 2} label="청산 여유" value={usd(data.cross.metrics.liquidationBuffer)} />
               </View>
-            </>
+            ) : (
+              <Text style={styles.warning}>
+                Mark 정보를 확인할 수 없어 위험 평가를 표시하지 않습니다.
+              </Text>
+            )}
+            <Text style={styles.muted}>
+              교차 포지션은 공동 평가되며, 개별 청산가는 제공하지 않습니다.
+            </Text>
+          </View>
+        ) : null}
+        <View style={styles.section} testID="futures-lists">
+          <Text accessibilityRole="header" style={styles.sectionTitle} testID="futures-lists-title">
+            {listView === 'pending' ? '대기 주문' : listView === 'history' ? '선물 기록' : `포지션 ${data.positions.length}`}
+          </Text>
+          <SegmentedControl testID="futures-lists-view" accessibilityLabel="선물 목록 보기" compact value={listView} onChange={setListView}
+            options={[
+              { key: 'positions', label: '포지션', testID: 'futures-view-positions' },
+              { key: 'pending', label: '대기 주문', testID: 'futures-view-pending' },
+              { key: 'history', label: '기록', testID: 'futures-view-history' },
+            ]} />
+          {listView === 'positions' ? (
+            !data.positions.length ? (
+              <Text style={styles.muted}>보유 중인 선물 포지션이 없습니다.</Text>
+            ) : (
+              data.positions.map((p) => (
+                <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={clock}
+                  disabled={locked} capabilities={data.capabilities}
+                  onSelect={op => {
+                    if (submitLock.current || pendingResult || limitBusy) return;
+                    choose(p.instrumentId); setOperation(op);
+                    focusTrade();
+                  }}
+                  onProtection={() => {
+                    if (submitLock.current || pendingResult || limitBusy) return;
+                    choose(p.instrumentId); setMethod('conditional');
+                    focusTrade();
+                  }} />
+              ))
+            )
+          ) : listView === 'pending' ? (
+            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} />
+          ) : (
+            <FuturesHistory key={accountId} accountId={accountId} instruments={allInstruments} />
           )}
         </View>
         {!final.isError && final.data?.settlement ? (
@@ -828,25 +794,22 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 .join(" · ")}{" "}
               체결
             </Text>
-            <Metric
-              label="실현 손익"
-              value={usd(final.data.settlement.realizedPnl)}
-            />
-            <Metric
-              label="종료 수수료"
-              value={usd(final.data.settlement.feeAmount)}
-            />
-            <Metric
-              label="실제 현금 정산"
-              value={usd(final.data.settlement.settledCash)}
-            />
-            <Metric
-              label="미충당 손실"
-              value={usd(final.data.settlement.bankruptcyShortfall)}
-            />
+            <View style={styles.metrics}>
+              <Metric columns={stackedControls ? 1 : 2} label="실현 손익" value={usd(final.data.settlement.realizedPnl)} />
+              <Metric columns={stackedControls ? 1 : 2} label="종료 수수료" value={usd(final.data.settlement.feeAmount)} />
+              <Metric columns={stackedControls ? 1 : 2} label="실제 현금 정산" value={usd(final.data.settlement.settledCash)} />
+              <Metric columns={stackedControls ? 1 : 2} label="미충당 손실" value={usd(final.data.settlement.bankruptcyShortfall)} />
+            </View>
           </View>
         ) : null}
       </ScrollView>
+      <FuturesInstrumentSheet
+        visible={instrumentSheetOpen && !locked}
+        instruments={allInstruments}
+        selectedId={instrument?.id}
+        onSelect={choose}
+        onClose={() => setInstrumentSheetOpen(false)}
+      />
     </View>
     </KeyboardAvoidingView>
   );
@@ -859,6 +822,8 @@ const operationLabel = {
   reduce: "수량 감소(Reduce)",
   close: "전량 종료(Close)",
 };
+const operationShortLabel = { increase: "수량 추가", reduce: "수량 감소", close: "전량 종료" };
+const operationVerb = { open: "진입", increase: "수량 추가", reduce: "수량 감소", close: "전량 종료" };
 const modeLabel = {
   ENABLED: "거래 가능",
   REDUCE_ONLY: "위험 축소만 가능 · Reduce/Close",
@@ -879,60 +844,14 @@ function price(
         instrument.underlying.displayPriceDecimals,
       );
 }
-function Metric({
-  label,
-  value,
-  pnl,
-}: {
-  label: string;
-  value: string;
-  pnl?: string | null;
-}) {
+/** Fixed columns keep a short last row aligned with the rows above it. */
+const COLUMN_WIDTH = { 1: '100%', 2: '46%', 3: '30%' } as const;
+function Metric({ label, value, columns }: { label: string; value: string; columns: 1 | 2 | 3 }) {
   return (
-    <View style={styles.metric}>
+    <View style={[styles.metric, { width: COLUMN_WIDTH[columns] }]}>
       <Text style={styles.muted}>{label}</Text>
-      <Text
-        selectable
-        style={[
-          styles.value,
-          pnl && Number(pnl) !== 0
-            ? { color: Number(pnl) > 0 ? financial.rise : financial.fall }
-            : undefined,
-        ]}
-      >
-        {value}
-      </Text>
+      <Text selectable style={styles.value}>{value}</Text>
     </View>
-  );
-}
-function Choice({
-  label,
-  selected,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  selected?: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <ActionPressable
-      accessibilityRole="button"
-      accessibilityState={{ selected: !!selected, disabled: !!disabled }}
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={[
-        styles.choice,
-        selected && styles.selected,
-        disabled && styles.disabled,
-      ]}
-    >
-      <Text style={[styles.choiceText, selected && styles.selectedText]}>
-        {label}
-      </Text>
-    </ActionPressable>
   );
 }
 /** A known zero/negative free collateral; unknown (null) never counts as short. */
@@ -961,65 +880,64 @@ function futuresErrorMessage(code: string | null) {
 }
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
+  // The spot order screen's spacing (12px sides, 12px between sections).
   content: {
     ...getScreenContentStyle(Platform.OS),
-    gap: 16,
-    padding: 16,
-    paddingBottom: 40,
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 32,
+    gap: 12,
   },
-  title: { fontSize: 24, fontWeight: "700", lineHeight: 34 },
-  heading: { fontSize: 17, fontWeight: "700", lineHeight: 26 },
-  card: {
-    padding: 16,
-    borderRadius: 16,
+  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  pairGroup: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8 },
+  pairButton: { flexShrink: 1, minWidth: 0, minHeight: 44, justifyContent: 'center' },
+  pair: { fontSize: 20, fontWeight: '700', color: semantic.text },
+  badge: { fontSize: 11, color: semantic.muted, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: semantic.raised, borderRadius: 5 },
+  iconButton: { minWidth: 44, minHeight: 44, padding: 8, borderRadius: 8, backgroundColor: semantic.raised, alignItems: 'center', justifyContent: 'center' },
+  iconButtonActive: { backgroundColor: semantic.selected },
+  // Rows wrap; on narrow widths and large fonts each item takes a full line.
+  full: { flexBasis: '100%', width: '100%' },
+  prices: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 8, minWidth: 0 },
+  priceCell: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 2 },
+  priceLabel: { fontSize: 11, lineHeight: 16, color: semantic.muted },
+  price: { fontSize: 18, lineHeight: 26, fontWeight: '700', color: semantic.text, fontVariant: ['tabular-nums'] },
+  tradeCard: {
+    padding: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderTopWidth: 1,
+    borderColor: semantic.border,
     backgroundColor: semantic.surface,
     gap: 12,
     minWidth: 0,
   },
-  muted: {
-    color: semantic.secondary,
-    fontSize: 13,
-    lineHeight: 21,
-    flexShrink: 1,
-  },
-  label: { fontSize: 14, lineHeight: 22 },
-  metric: { gap: 3, minWidth: 0 },
-  value: {
-    fontSize: 16,
-    lineHeight: 25,
-    flexShrink: 1,
-    fontVariant: ["tabular-nums"],
-  },
-  choices: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  choice: {
-    minHeight: 44,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: semantic.raised,
-    flexShrink: 1,
-  },
-  choiceText: { fontSize: 14, lineHeight: 22, textAlign: "center" },
-  selected: { backgroundColor: semantic.secondaryActionSurface },
-  selectedText: {
-    color: semantic.secondaryActionForeground,
-    fontWeight: "700",
-  },
-  disabled: { opacity: 0.45 },
-  input: {
-    padding: 12,
-    fontSize: 17,
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 10,
-    backgroundColor: semantic.raised,
-  },
-  warning: { color: semantic.secondary, fontSize: 14, lineHeight: 23 },
-  notice: { fontSize: 14, lineHeight: 23 },
-  history: {
-    gap: 8,
-    borderTopWidth: 1,
-    borderColor: semantic.border,
-    paddingTop: 12,
-  },
+  pendingResult: { gap: 10, padding: 12, borderRadius: 10, backgroundColor: semantic.warningSurface, minWidth: 0 },
+  group: { gap: 4, minWidth: 0 },
+  terms: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 2 },
+  termsDirection: { fontSize: 15, lineHeight: 22, fontWeight: '800' },
+  termsText: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.text, flexShrink: 1 },
+  controls: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: 10, rowGap: 10, minWidth: 0 },
+  marginGroup: { flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0, gap: 4 },
+  leverageGroup: { width: 116, gap: 4 },
+  // The segmented control's height, so both controls line up.
+  leverageInput: { minHeight: 44, paddingVertical: 4 },
+  label: { fontSize: 12, color: semantic.muted },
+  helper: { fontSize: 12, color: semantic.secondary },
+  input: { ...orderInputStyle },
+  marketPrice: { fontSize: 14, color: semantic.muted, backgroundColor: semantic.raised, borderRadius: 8, padding: 12, minHeight: 46 },
+  error: { fontSize: 12, color: semantic.error },
+  warning: { color: semantic.warning, fontSize: 13, lineHeight: 20 },
+  notice: { fontSize: 14, lineHeight: 23, color: semantic.text },
+  card: { padding: 14, borderRadius: 12, backgroundColor: semantic.surface, gap: 10, minWidth: 0 },
+  unbound: { margin: 16 },
+  cardHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 4 },
+  heading: { fontSize: 16, fontWeight: "700", lineHeight: 24, color: semantic.text },
+  modeBadge: { fontSize: 11, lineHeight: 15, fontWeight: '600', color: semantic.success, backgroundColor: semantic.successSurface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5, overflow: 'hidden' },
+  modeBadgeLimited: { color: semantic.warning, backgroundColor: semantic.warningSurface },
+  muted: { color: semantic.secondary, fontSize: 13, lineHeight: 20, flexShrink: 1 },
+  metrics: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 10 },
+  metric: { minWidth: 0, gap: 2 },
+  value: { fontSize: 15, lineHeight: 23, color: semantic.text, flexShrink: 1, fontVariant: ["tabular-nums"] },
+  section: { borderTopWidth: 1, borderColor: semantic.border, paddingTop: 16, marginTop: 8, gap: 12, minWidth: 0 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: semantic.text },
 });

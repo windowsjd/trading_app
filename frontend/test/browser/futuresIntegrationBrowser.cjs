@@ -9,7 +9,11 @@ async function overflow(page){return page.evaluate(()=>[...document.querySelecto
  // viewport. Check that viewport, not its deliberately wider scroll content.
  const ladder=el.closest('[data-testid="asset-order-book-asks-scroll"], [data-testid="asset-order-book-bids-scroll"]');
  if(ladder && ladder!==el)return[];
- if(r.left < -1 || r.right > innerWidth+1)return[{text:el.textContent.slice(0,100),reason:'box',rect:[r.left,r.right]}];
+ // Only what can paint: clip the box to its overflow-clipping ancestors (a press
+ // ripple scales far past its button but stays inside the button's clip).
+ let left=r.left,right=r.right;
+ for(let node=el.parentElement;node;node=node.parentElement){if(getComputedStyle(node).overflowX!=='visible'){const b=node.getBoundingClientRect();left=Math.max(left,b.left);right=Math.min(right,b.right);}}
+ if(right>left&&(left < -1 || right > innerWidth+1))return[{text:el.textContent.slice(0,100),reason:'box',rect:[left,right]}];
  if(el.childNodes.length===1&&el.firstChild.nodeType===Node.TEXT_NODE)return [...el.textContent.matchAll(/\S+/gu)].flatMap(m=>{const range=document.createRange();range.setStart(el.firstChild,m.index);range.setEnd(el.firstChild,m.index+m[0].length);return [...range.getClientRects()].filter(t=>t.left<r.left-1||t.right>r.right+1||(s.overflow==='hidden'&&(t.top<r.top-1||t.bottom>r.bottom+1))).map(()=>({text:el.textContent,reason:'glyph'}));});
  return[];
 }));}
@@ -32,6 +36,9 @@ async function main(){
   page=await browser.newPage();page.setDefaultTimeout(10000);
   page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   const screen=scenario==='market'?'market':scenario.startsWith('limit-')?'futures':'order';
+  // 지정가 through the 주문방식 sheet; the next steps start once it has closed.
+  const pickLimit=async()=>{await page.getByTestId('order-type-select').click();await page.getByTestId('order-method-limit').click();
+   await page.waitForFunction(()=>!document.querySelector('[data-testid="order-method-sheet"]'));};
   await page.setViewportSize({width,height:width===320?568:844});await page.emulateMedia({colorScheme:theme});
   await page.goto(`${base}/?screen=${screen}&asset=SUI&longName=1&pending=1&pendingKind=${scenario==='pending-futures-only'?'futures-only':scenario==='pending-spot-only'?'spot-only':scenario==='pending-empty'?'none':'mixed'}&fontScale=${fontScale}&protection=${scenario==='pending-protection'?'holding':'editor'}`);
   await page.waitForFunction(()=>window.tradingAppearance);await page.evaluate(v=>window.tradingAppearance.setPreference(v),theme);
@@ -44,8 +51,8 @@ async function main(){
    assert.equal(await page.evaluate(()=>window.fixture.state.instrumentId),'btc');
   }else if(scenario.endsWith('-error')){
    const long=scenario.startsWith('limit-long'),sl=scenario.includes('-sl-');
-   await page.getByRole('button',{name:'지정가 진입',exact:true}).click();
-   await page.getByRole('button',{name:long?'롱(Long)':'숏(Short)',exact:true}).click();
+   await pickLimit();
+   await page.getByRole('tab',{name:long?'롱(Long)':'숏(Short)',exact:true}).click();
    await page.getByTestId('futures-quantity').fill('1');await page.getByTestId('futures-limit-price').fill('100');
    await page.getByTestId(`protection-${sl?'stop_loss':'take_profit'}-toggle`).click();
    await page.getByLabel(`${sl?'손절 (Stop Loss)':'익절 (Take Profit)'} 조건 가격`,{exact:true}).fill('100');
@@ -54,9 +61,9 @@ async function main(){
    await page.getByText(`${long?'LONG':'SHORT'} ${sl?'손절가':'익절가'}는 진입 지정가보다 ${below?'낮아야':'높아야'} 합니다.`,{exact:true}).waitFor();
    assert.equal(await page.evaluate(()=>window.fixture.state.requests.length),0,'invalid attachment must stop before API transport');
   }else if(scenario.startsWith('limit-')){
-   await page.getByRole('button',{name:'지정가 진입',exact:true}).click();
-   await page.getByRole('button',{name:scenario==='limit-long'?'롱(Long)':'숏(Short)',exact:true}).click();
-   await page.getByRole('button',{name:scenario==='limit-long'?'교차(Cross)':'격리(Isolated)',exact:true}).click();
+   await pickLimit();
+   await page.getByRole('tab',{name:scenario==='limit-long'?'롱(Long)':'숏(Short)',exact:true}).click();
+   await page.getByRole('tab',{name:scenario==='limit-long'?'교차(Cross)':'격리(Isolated)',exact:true}).click();
    await page.getByTestId('futures-leverage').fill('100');await page.getByTestId('futures-quantity').fill('0.12345678');
    await page.getByTestId('futures-limit-price').fill('1234567890123456.12345678');
    for(const kind of ['stop_loss','take_profit']){
@@ -66,7 +73,8 @@ async function main(){
    }
   }else if(scenario==='holdings'){
    await page.getByTestId('holding-protection-SUI').click();await page.getByTestId('protection-panel').waitFor();
-   assert.equal(await page.getByTestId('holdings-filter-current').getAttribute('aria-pressed'),'true');
+   // The holdings filter is a segmented control (tabs): selection is aria-selected.
+   assert.equal(await page.getByTestId('holdings-filter-current').getAttribute('aria-selected'),'true');
   }else{
    await page.getByTestId('holdings-filter-pending').click();await page.getByTestId('pending-futures').waitFor({state:'attached'});
    if(scenario==='pending-protection'){await page.getByTestId('pending-kind-protection').click();await page.getByTestId('pending-protections').waitFor();assert.equal(await page.getByTestId('pending-futures').count(),0);}

@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  DEFAULT_ORDER_METHOD,
+  ORDER_METHOD_HINT,
   getAvailabilityLabel,
+  getFuturesOrderMethodOptions,
   getConditionalBuyGate,
   getConditionalSellGate,
   getLimitOnCloseGate,
@@ -74,6 +77,18 @@ describe('주문방식 list per market and side', () => {
     assert.equal(getAvailabilityLabel(loading[0].availability), null);
   });
 
+  it('every form starts at 시장가, which every market and side offers as selectable', () => {
+    assert.equal(DEFAULT_ORDER_METHOD, 'market');
+    assert.equal(ORDER_METHOD_HINT, '주문방식 선택하기');
+    for (const assetType of ['domestic_stock', 'us_stock', 'crypto'])
+      for (const side of ['buy', 'sell'] as const)
+        for (const gate of [open, closed, { state: 'loading' } as ServerGate, { state: 'error' } as ServerGate]) {
+          const market = list(assetType, side, gate, gate, gate).find((option) => option.method === DEFAULT_ORDER_METHOD);
+          assert.equal(market !== undefined && isOrderMethodSelectable(market), true, `${assetType}/${side}/${gate.state}`);
+          assert.equal(market?.label, '시장가');
+        }
+  });
+
   it('LOC submits as an ordinary limit order; conditional/stop-take have no ordinary type', () => {
     assert.equal(getOrderTypeForMethod('market'), 'market');
     assert.equal(getOrderTypeForMethod('limit'), 'limit');
@@ -81,6 +96,39 @@ describe('주문방식 list per market and side', () => {
     assert.equal(getOrderTypeForMethod('conditional'), null);
     assert.equal(getOrderTypeForMethod('protection'), null);
     assert.equal(getOrderTypeForMethod(null), null);
+  });
+});
+
+describe('futures 주문방식', () => {
+  const futures = (hasPosition: boolean) =>
+    getFuturesOrderMethodOptions(hasPosition).map((option) => `${option.method}:${option.availability.state}`);
+
+  it('lists exactly 시장가, 지정가 and 조건주문 — never LOC or the spot SELL settings', () => {
+    for (const hasPosition of [false, true]) {
+      const options = getFuturesOrderMethodOptions(hasPosition);
+      assert.deepEqual(options.map((option) => option.label), ['시장가', '지정가', '조건주문']);
+      assert.equal(options.some((option) => option.method === 'loc' || option.method === 'protection'), false);
+    }
+  });
+
+  it('flat: market and limit open a new position; 조건주문 waits for a position and says why', () => {
+    assert.deepEqual(futures(false), ['market:available', 'limit:available', 'conditional:unavailable']);
+    const conditional = getFuturesOrderMethodOptions(false)[2].availability;
+    assert.equal(conditional.state === 'unavailable' && /보유 포지션이 있을 때/.test(conditional.reason), true);
+  });
+
+  it('open position: market adjusts it and 조건주문 is its stop-loss/take-profit; limit is entry-only', () => {
+    assert.deepEqual(futures(true), ['market:available', 'limit:unavailable', 'conditional:available']);
+    const limit = getFuturesOrderMethodOptions(true)[1].availability;
+    assert.equal(limit.state === 'unavailable' && /새 포지션 진입에만/.test(limit.reason), true);
+    assert.match(getFuturesOrderMethodOptions(true)[2].description, /손절·익절/);
+  });
+
+  it('the default method is available whether or not a position is open', () => {
+    for (const hasPosition of [false, true]) {
+      const market = getFuturesOrderMethodOptions(hasPosition).find((option) => option.method === DEFAULT_ORDER_METHOD);
+      assert.equal(market !== undefined && isOrderMethodSelectable(market), true);
+    }
   });
 });
 

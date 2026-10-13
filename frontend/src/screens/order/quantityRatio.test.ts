@@ -174,10 +174,10 @@ test('manual edits, price, reservations, limit changes and side/account changes 
   h.accountId = 'season';
   h.routeAccountId = 'season';
   await h.update();
-  // Another account's form starts without a method, draft or ratio.
+  // Another account's form starts at 시장가 with no draft and no ratio.
   assert.equal(h.freshForm(), true);
-  assert.equal(h.node(slider) === undefined, true);
-  assert.equal(h.node('order-ratio-50') === undefined, true);
+  assert.equal(h.node(slider).props.value, 0);
+  assert.deepEqual(selected(h), []);
 });
 
 for (const scenario of [
@@ -277,9 +277,9 @@ test('standalone account binding clears inputs when selection changes and cannot
   assert.match(json(h), /선택한 계정이 변경되었습니다/);
   h.accountId = 'general';
   await h.update();
-  // Back on the route account: the abandoned draft and method are gone.
+  // Back on the route account: the abandoned draft and ratio are gone; 시장가 again.
   assert.equal(h.freshForm(), true);
-  assert.equal(h.node(slider) === undefined, true);
-  assert.equal(h.node('order-ratio-50') === undefined, true);
+  assert.equal(h.node(slider).props.value, 0);
+  assert.deepEqual(selected(h), []);
   assert.equal(h.requests.length, 0);
 });

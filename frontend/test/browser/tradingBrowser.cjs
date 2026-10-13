@@ -118,7 +118,7 @@ async function run() {
     console.log('INITIAL_BROWSER_READY');
     const geometry = async () =>
       JSON.parse(await page.locator('#geometry').textContent());
-    // Nothing is preselected: every form picks 주문방식 through its sheet.
+    // Forms start at 시장가; another 주문방식 is picked through its sheet.
     const pick = async (method) => {
       await id('order-type-select').click();
       await id('order-method-' + method).click();

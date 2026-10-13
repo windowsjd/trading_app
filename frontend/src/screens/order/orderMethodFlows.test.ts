@@ -295,7 +295,7 @@ describe('KRX LOC BUY', () => {
       await h.press(TEST_IDS.order.typeSelect);
       assert.equal(h.node('order-method-loc').props.disabled, true);
       await h.press('order-method-loc');
-      assert.equal(h.orderType(), '주문방식 선택하기');
+      assert.equal(h.orderType(), '시장가', 'a refused LOC keeps the default');
       await h.close();
     }
   });

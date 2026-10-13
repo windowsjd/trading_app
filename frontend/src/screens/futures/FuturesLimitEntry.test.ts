@@ -58,7 +58,7 @@ test('server trigger rejection retains direction guidance and the authoritative 
 });
 
 async function draft(h: any) {
-  await h.choose('지정가 진입');
+  await h.selectMethod('limit');
   await h.change('futures-quantity', '1.25');
   await h.change('futures-limit-price', '100');
 }
@@ -133,7 +133,7 @@ test('a new session clears an uncertain Limit request even for the same selected
   assert.equal(h.node('futures-limit-submit').props.label,'동일 진입 요청 확인');
   h.session++; await h.update();
   assert.equal(h.node('futures-limit-submit') === undefined,true);
-  await h.choose('지정가 진입');
+  await h.selectMethod('limit');
   assert.equal(h.node('futures-limit-price').props.value,'');
   assert.equal(h.node('futures-limit-submit').props.state,'disabled');
   assert.equal(h.requests.length,1);

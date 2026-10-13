@@ -1,5 +1,6 @@
 /**
- * Spot order methods offered by the 주문방식 sheet (order UI 2nd phase).
+ * Order methods offered by the 주문방식 sheet (spot: order UI 2nd phase; futures
+ * below).
  *
  * The list is product policy per market and side; whether a NEW conditional
  * or LOC order may be created is the server's answer (capabilities), never a
@@ -35,7 +36,13 @@ export const ORDER_METHOD_LABEL: Record<OrderMethod, string> = {
   protection: '손절·익절 설정',
 };
 
-export const ORDER_METHOD_PLACEHOLDER = '주문방식 선택하기';
+/**
+ * Every new form starts at 시장가: it is offered and available on both sides
+ * of every market, and choosing it never needed a learning step. The field's
+ * small hint says the method can be changed.
+ */
+export const DEFAULT_ORDER_METHOD: OrderMethod = 'market';
+export const ORDER_METHOD_HINT = '주문방식 선택하기';
 
 const AVAILABLE: OrderMethodAvailability = { state: 'available' };
 const PREPARING: OrderMethodAvailability = { state: 'preparing' };
@@ -91,6 +98,28 @@ export function getOrderMethodOptions(input: {
     options.push(option('protection', '손절·익절 가격과 각각의 수량을 정해 두고 매도합니다.',
       us ? PREPARING : fromGate(input.protection ?? { state: 'loading' })));
   return options;
+}
+
+/**
+ * Futures (USDⓈ-M synthetic perpetual) offers 시장가, 지정가 and 조건주문 only:
+ * never LOC or the spot SELL settings. 지정가 opens a new position (Futures
+ * Limit Entry v1), so it needs a flat instrument. 조건주문 is the open
+ * position's stop-loss/take-profit (Conditional Orders v1), the only futures
+ * conditional engine; its create/cancel gates stay in the protection panel,
+ * which keeps an existing group manageable while creation is paused.
+ */
+export function getFuturesOrderMethodOptions(hasPosition: boolean): OrderMethodOption[] {
+  return [
+    option('market', hasPosition
+      ? '현재 거래 가능한 가격으로 포지션 수량을 늘리거나 줄이거나 전량 종료합니다.'
+      : '현재 거래 가능한 가격으로 새 포지션에 진입합니다.', AVAILABLE),
+    option('limit', '롱은 지정가 이하, 숏은 지정가 이상에서 새 포지션에 진입합니다. 체결 전까지 담보를 예약합니다.', hasPosition
+      ? { state: 'unavailable', reason: '지정가는 새 포지션 진입에만 쓸 수 있어요. 보유 포지션은 시장가로 조정해 주세요.' }
+      : AVAILABLE),
+    option('conditional', '보유 포지션에 손절·익절 가격을 정해 두고, 조건 가격에 도달하면 종료합니다.', hasPosition
+      ? AVAILABLE
+      : { state: 'unavailable', reason: '보유 포지션이 있을 때 등록할 수 있어요. 지정가 진입에서는 체결 후 TP/SL을 함께 설정할 수 있어요.' }),
+  ];
 }
 
 export function isOrderMethodSelectable(option: OrderMethodOption) {

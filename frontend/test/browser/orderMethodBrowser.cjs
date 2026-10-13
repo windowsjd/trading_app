@@ -97,6 +97,18 @@ async function run() {
         await page.getByTestId('order-type-select').waitFor();
       };
       const field = () => page.getByTestId('order-type-select');
+      // A new form reads 시장가; the hint sits inside the field at its right
+      // edge — beside the value, or wrapped under it — and is never cut.
+      const defaultField = async () => {
+        assert.equal(await page.getByTestId('order-type-select-value').innerText(), '시장가', `default method (${tag})`);
+        assert.equal((await page.getByTestId('order-type-select-hint').innerText()).replace(/\s+/g, ' '), '주문방식 선택하기');
+        const box = await field().boundingBox();
+        const hint = await page.getByTestId('order-type-select-hint').boundingBox();
+        const value = await page.getByTestId('order-type-select-value').boundingBox();
+        assert.ok(hint.x >= box.x && hint.x + hint.width <= box.x + box.width + 1 && hint.y >= box.y && hint.y + hint.height <= box.y + box.height + 1, `hint inside the field (${tag})`);
+        assert.ok(box.x + box.width - (hint.x + hint.width) <= 40, `hint at the field's right (${tag})`);
+        assert.ok(hint.x >= value.x + value.width - 1 || hint.y >= value.y + value.height - 1, `hint after the value (${tag})`);
+      };
       // Every row of the open sheet can be brought fully inside the sheet card and the viewport.
       const sheetReachable = async (methods) => {
         const card = await page.getByTestId('order-method-list').boundingBox();
@@ -113,11 +125,12 @@ async function run() {
       };
       const row = (method) => page.getByTestId(`order-method-${method}`);
 
-      // 1. Crypto BUY: unselected field, then the sheet with a server-gated 조건주문.
+      // 1. Crypto BUY: 시장가 by default with the small 주문방식 선택하기 hint on the
+      // field's right, then the sheet with a server-gated 조건주문.
       await go('asset=SUI&conditional=enabled&longName=1');
-      assert.equal(await page.getByTestId('order-type-select-value').innerText(), '주문방식 선택하기');
-      assert.equal(await page.getByTestId('order-quantity-input').count(), 0);
-      await shot('crypto-unselected');
+      await defaultField();
+      assert.equal(await page.getByTestId('order-quantity-input').count(), 1, 'the market draft is ready');
+      await shot('crypto-default');
       await field().click();
       await row('market').waitFor();
       assert.equal(await row('loc').count(), 0, 'crypto never lists LOC');
@@ -155,8 +168,10 @@ async function run() {
         await shot(`conditional-replay-${result}`);
       }
 
-      // 3. KRX BUY: four methods, LOC form with its policy notice.
+      // 3. KRX BUY: 시장가 by default; four methods, LOC form with its policy notice.
       await go('krx=1&asset=SAMSUNG&loc=enabled&conditional=enabled&longName=1');
+      await defaultField();
+      await shot('krx-default');
       await field().click();
       for (const method of ['market', 'limit', 'conditional', 'loc']) await row(method).waitFor();
       await shot('krx-sheet');
@@ -171,6 +186,7 @@ async function run() {
       // 4. KRX SELL: market plus the server-gated 조건주문/LOC/손절·익절 rows; no direct limit.
       await go('krx=1&asset=SAMSUNG&longName=1');
       await page.getByTestId('asset-detail-sell-button').click();
+      await defaultField();
       await field().click();
       await row('protection').waitFor();
       assert.equal(await row('limit').count(), 0, 'no new sell limit');

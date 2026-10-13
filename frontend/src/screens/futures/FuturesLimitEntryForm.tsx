@@ -2,9 +2,9 @@ import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Text, TextInput, View, StyleSheet } from '../../theme/native';
+import { Text, View, StyleSheet } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
-import { formatDisplayDecimal } from '../../utils/format';
+import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import CTAButton from '../../components/common/CTAButton';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { ProtectionEditor, emptyProtection, draftLegs, protectionInputError } from '../../features/conditional/ProtectionEditor';
@@ -16,19 +16,24 @@ import { getApiErrorInfo } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
 
-export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId, direction, marginMode, leverage, quantity, allowed, onBusy, onInputFocus, onInputBlur }: {
+/**
+ * 지정가 진입 (Futures Limit Entry v1): the screen owns direction, margin mode,
+ * leverage, quantity and the limit price fields; this form adds the optional
+ * attached TP/SL and owns the idempotent submit. `onBusy` holds the screen's
+ * inputs while a request or an uncertain result keeps this exact intent.
+ */
+export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId, direction, marginMode, leverage, quantity, limitPrice, allowed, onBusy, onInputFocus, onInputBlur }: {
   accountId: string; instrumentId: string; assetId: string; direction: Direction; marginMode: MarginMode;
-  leverage: string; quantity: string; allowed: boolean; onBusy: (busy: boolean) => void;
+  leverage: string; quantity: string; limitPrice: string; allowed: boolean; onBusy: (busy: boolean) => void;
   onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
 }) {
   const learning = useLearningAccess(accountId).gate('allTrading');
-  const [limitPrice, setLimitPrice] = useState('');
   const [draft, setDraft] = useState(emptyProtection);
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState<string | null>(null), [failure, setFailure] = useState<unknown>(null);
   const { selectedAccountId } = useTradingAccount();
   const client = useQueryClient();
-  const alive = useRef(true), locked = useRef(false), input = useRef<TextInput>(null);
+  const alive = useRef(true), locked = useRef(false);
   const session = getSessionGeneration();
   const selected = useRef(selectedAccountId); selected.current = selectedAccountId;
   const request = useRef<FuturesLimitCommand | null>(null);
@@ -63,15 +68,16 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
     } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } }
   };
   return <View style={styles.stack} testID="futures-limit-entry">
-    <Text style={styles.text}>진입 지정가 · USD</Text>
-    <TextInput ref={input} accessibilityLabel="선물 진입 지정가" testID="futures-limit-price" value={limitPrice} onChangeText={setLimitPrice} editable={!busy && !uncertain} keyboardType="decimal-pad" style={styles.input} onFocus={() => onInputFocus?.(input.current)} onBlur={onInputBlur} />
-    {limitPrice.length > 12 ? <Text style={styles.hint}>입력 지정가 {formatDisplayDecimal(limitPrice)}</Text> : null}
     <Text style={styles.hint}>새 포지션 진입만 지원합니다. 초기 증거금과 예상 수수료를 예약하며, 체결 시 담보와 Mark를 다시 확인합니다.</Text>
-    <Text style={styles.text}>체결 후 TP/SL (선택)</Text>
-    {!canAttach ? <Text style={styles.hint}>현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다.</Text> : null}
-    <ProtectionEditor value={draft} onChange={setDraft} disabled={busy || uncertain || !canAttach} canLimit onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
-    <CTAButton testID="futures-limit-submit" label={uncertain ? '동일 진입 요청 확인' : `지정가 ${direction === 'long' ? 'Long' : 'Short'} 진입`} learningHint={learning.locked ? learning.message : null} onPress={() => learning.guard(() => void submit())} state={busy ? 'loading' : uncertain || (allowed && validPrice) ? 'enabled' : 'disabled'} />
+    <View style={styles.attached} testID="futures-attached-entry-editor">
+      <Text style={styles.label}>체결 후 TP/SL (선택)</Text>
+      {!canAttach ? <Text style={styles.hint}>현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다.</Text> : null}
+      <ProtectionEditor value={draft} onChange={setDraft} disabled={busy || uncertain || !canAttach} canLimit onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
+    </View>
+    <CTAButton testID="futures-limit-submit" label={uncertain ? '동일 진입 요청 확인' : `${direction === 'long' ? '롱(Long)' : '숏(Short)'} 지정가 진입`}
+      style={{ backgroundColor: direction === 'long' ? BUY_COLOR : SELL_COLOR }}
+      learningHint={learning.locked ? learning.message : null} onPress={() => learning.guard(() => void submit())} state={busy ? 'loading' : uncertain || (allowed && validPrice) ? 'enabled' : 'disabled'} />
     {message ? failure ? <ErrorNotice error={failure} message={message} /> : <Text style={styles.text} accessibilityLiveRegion="polite">{message}</Text> : null}
   </View>;
 }
-const styles = StyleSheet.create({ stack: { gap: 12, minWidth: 0 }, text: { color: semantic.text, fontSize: 15, flexShrink: 1 }, hint: { color: semantic.secondary, fontSize: 13, flexShrink: 1 }, input: { borderWidth: 1, borderColor: semantic.border, borderRadius: 8, color: semantic.text, padding: 12, minWidth: 0, width: '100%' } });
+const styles = StyleSheet.create({ stack: { gap: 12, minWidth: 0 }, attached: { gap: 8, minWidth: 0 }, label: { color: semantic.muted, fontSize: 12 }, text: { color: semantic.text, fontSize: 14, flexShrink: 1 }, hint: { color: semantic.secondary, fontSize: 12, flexShrink: 1 } });

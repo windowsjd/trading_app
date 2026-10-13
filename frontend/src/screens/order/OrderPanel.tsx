@@ -13,6 +13,7 @@ import ConditionalBuyForm from './ConditionalBuyForm';
 import SellIntentForm from './SellIntentForm';
 import OrderNumberInput from './OrderNumberInput';
 import {
+  DEFAULT_ORDER_METHOD,
   getConditionalBuyGate,
   getConditionalSellGate,
   getLimitOnCloseGate,
@@ -143,7 +144,7 @@ type Props = {
 export default function OrderPanel({ onSideChange, ...props }: Props) {
   const [side, setSide] = useState<OrderSide>(props.initialSide ?? 'buy');
   const reduced = useReducedMotion();
-  // Returning to this screen starts a fresh form (no method, no draft, no
+  // Returning to this screen starts a fresh form (시장가, no draft, no
   // quote). Sheets, the keyboard and re-renders keep focus and the draft.
   const [entry, setEntry] = useState(0);
   const enabled = props.enabled ?? true;
@@ -302,8 +303,8 @@ export function OrderForm({
   );
   const [chosenRatio, setChosenRatio] = useState<number | null>(null);
   const { fontScale } = useWindowDimensions();
-  // Nothing is preselected: every new form starts at 주문방식 선택하기.
-  const [orderMethod, setOrderMethod] = useState<OrderMethod | null>(null);
+  // Every new form (asset, side, account, session or a return) starts at 시장가.
+  const [orderMethod, setOrderMethod] = useState<OrderMethod>(DEFAULT_ORDER_METHOD);
   const [methodSheetOpen, setMethodSheetOpen] = useState(false);
   // The ordinary order type behind market/limit/LOC; LOC is a limit order.
   const orderType = getOrderTypeForMethod(orderMethod) ?? 'market';
@@ -531,7 +532,7 @@ export function OrderForm({
 
     setOrderInput('');
     setLimitPrice('');
-    setOrderMethod(null);
+    setOrderMethod(DEFAULT_ORDER_METHOD);
     setMethodSheetOpen(false);
     setProtectionDraft(emptyProtection());
     setFieldError(null);
@@ -872,7 +873,7 @@ export function OrderForm({
   const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
   const methodGate = (method: OrderMethod) =>
     method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : advancedGate;
-  // The ordinary submit serves market/limit/LOC; nothing submits unselected.
+  // The ordinary submit serves market/limit/LOC.
   const canExecute =
     methodReady &&
     !automationForm &&
@@ -881,7 +882,7 @@ export function OrderForm({
     !buyInsufficientReason &&
     !successData &&
     !orderActionRef.current?.completed;
-  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod ?? undefined, methodSheetOpen, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
+  useTradingGuideFacts({ screen: 'order', accountId, assetId, assetType: asset?.assetType, side, orderType: orderMethod, methodSheetOpen, amountValid: !inputInvalidReason && !buyInsufficientReason, canExecute, pending: orderPending, blocked: !!preOrderBlockedReason }, enabled);
   const inputErrorMessage =
     fieldError ?? (orderInput.trim() ? inputInvalidReason : null);
 
@@ -1051,7 +1052,7 @@ export function OrderForm({
   const ordinaryForm = orderMethod === 'market' || orderMethod === 'limit' || orderMethod === 'loc';
   const methodUnavailableReason = selectedMethodOption?.availability.state === 'unavailable'
     ? selectedMethodOption.availability.reason
-    : orderMethod && !methodReady ? '이 주문방식은 지금 이용할 수 없어요.' : null;
+    : !methodReady ? '이 주문방식은 지금 이용할 수 없어요.' : null;
   const locPreview = limitOnClose ? quotedPreview?.limitOnClose ?? null : null;
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
@@ -1070,11 +1071,6 @@ export function OrderForm({
           protection: advancedGate.locked ? advancedGate.message : null,
         }}
       /></QuestTarget>
-      {!orderMethod ? (
-        <Text testID="order-method-required" style={styles.helper}>
-          주문방식을 선택하면 가격과 {isAmountBuy ? '금액' : '수량'}을 입력할 수 있어요.
-        </Text>
-      ) : null}
       {orderMethod === 'conditional' && side === 'buy' ? (
         <ConditionalBuyForm
           accountId={accountId}

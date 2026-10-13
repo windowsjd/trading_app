@@ -29,6 +29,9 @@ export const apiClient = {
     if(path.endsWith('/orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
     return { data: { success: true, data: path.includes('instruments') ? fixture.catalog : path.includes('positions') ? fixture.positions : path.includes('liquidations') ? fixture.liquidations : path.includes('executions') ? fixture.executions : fixture.final } };
   },
-  async post(path, body) { state.requests.push({ path, body }); if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture', execution: { operation: body.operation, feeAmount: '0.2' } } } }; },
+  async post(path, body) { state.requests.push({ path, body }); if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture',
+    // The execution shape the screen reports (quest command included), as in test/futuresHarness.cjs.
+    execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 1),
+      positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.2' } } } }; },
 };
 window.futuresFixture = state;

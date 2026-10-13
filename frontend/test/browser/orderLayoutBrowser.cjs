@@ -85,7 +85,7 @@ async function run() {
       await page.emulateMedia({ colorScheme: appearance });
       await page.goto(`${base}/?screen=order&asset=SUI`);
       const byId = (id) => page.getByTestId(id);
-      // Nothing is preselected: pick 주문방식 through its sheet first.
+      // Forms start at 시장가; pick() re-chooses or changes it through the sheet.
       const pick = async (method) => {
         await byId('order-type-select').click();
         await byId(`order-method-${method}`).click();

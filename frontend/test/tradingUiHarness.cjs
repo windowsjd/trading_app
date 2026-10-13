@@ -6,6 +6,8 @@ const { load, elements } = require('./ledgerTestHarness.cjs');
 const { getTradingAccountCapabilities } = require('../src/features/tradingAccount/capabilities.ts');
 const timeframes = require('../src/features/asset/chartTimeframes.ts');
 
+// The field's value per method (features/order/orderMethods ORDER_METHOD_LABEL).
+const METHOD_LABEL = { market: '시장가', limit: '지정가', conditional: '조건주문', loc: 'LOC 주문', protection: '손절·익절 설정' };
 function createTradingUiHarness(screenName) {
   const now = new Date().toISOString();
   const h = {
@@ -23,8 +25,8 @@ function createTradingUiHarness(screenName) {
       freshnessAgeSeconds: 123, validUntil: new Date(Date.now() + 3600000).toISOString() },
       isLoading: false, isError: false },
     queries: [], requests: [], navigation: [], jobs: [], ticker: null, tickerStale: false,
-    // Nothing is preselected in the order form: h.render picks this method
-    // through the real 주문방식 field and sheet; null keeps it unselected.
+    // Every order form starts at 시장가: h.render picks another method
+    // through the 주문방식 field; null keeps each form at its default.
     method: 'market',
   };
   const slots = [];
@@ -165,9 +167,8 @@ function createTradingUiHarness(screenName) {
     // sheet mounting mid-tree. This stub renders the same testIDs and calls.
     './OrderTypeSelect': { __esModule: true, default: (props) => {
       h.methodSlotBoundary = index;
-      const labels = { market: '시장가', limit: '지정가', conditional: '조건주문', loc: 'LOC 주문', protection: '손절·익절 설정' };
       return React.createElement('OrderTypeSelect', { testID: 'order-type-select', disabled: props.disabled, method: props.method },
-        React.createElement('Text', { testID: 'order-type-select-value' }, props.method ? labels[props.method] : '주문방식 선택하기'),
+        React.createElement('Text', { testID: 'order-type-select-value' }, METHOD_LABEL[props.method]),
         ...props.options.map(option => React.createElement('Pressable', { key: option.method, testID: `order-method-${option.method}`,
           disabled: option.availability.state !== 'available', availability: option.availability.state, onPress: () => props.onSelect(option.method) })));
     } },
@@ -203,7 +204,7 @@ function createTradingUiHarness(screenName) {
   h.render = (side = 'sell') => {
     let tree = renderOnce(side);
     const value = find(tree, 'order-type-select-value');
-    if (h.method && value && value.props.children === '주문방식 선택하기') {
+    if (h.method && value && value.props.children !== METHOD_LABEL[h.method]) {
       find(tree, `order-method-${h.method}`).props.onPress();
       // Components after the field mount new inputs now; their slots held
       // only first-render state, so they start again from their initial values.

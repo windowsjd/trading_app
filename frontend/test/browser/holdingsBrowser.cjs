@@ -67,7 +67,7 @@ async function main() {
           await visit({ screen, mode, width, theme, fontScale, long: 1, kind: 'mixed' }); await ready(screen);
           if (['home', 'wallet', 'portfolio'].includes(screen)) await page.getByText('포지션', { exact: true }).waitFor();
           if (screen === 'friend') {
-            assert.equal(await page.getByTestId(/holding-protection-|futures-protection-|futures-submit|futures-position-.*-(increase|reduce|close)$/).count(), 0);
+            assert.equal(await page.getByTestId(/holding-protection-|futures-protection-|futures-submit|futures-position-.*-(increase|reduce|close|protection)$/).count(), 0);
             assert.equal(await page.getByText('자산 비중 33.33%', { exact: true }).count(), 3);
           }
           if (screen === 'futures') assert.equal(await page.getByText('예상 청산가', { exact: true }).count(), 0);

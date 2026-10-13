@@ -117,7 +117,7 @@ test('a new guide resumes from the ledger, never from a remembered step: no repe
 test('no guide copy offers a resume that no longer exists',()=>{
   assert.doesNotMatch(JSON.stringify(TRADING_GUIDE_STEPS),/이어하기/);
 });
-test('nothing is preselected: the guide opens 주문방식 and then points at the practiced row', () => {
+test('another practiced method: the guide opens 주문방식 선택하기 and then points at the practiced row', () => {
   const views = (quest: 'marketBuy' | 'limitBuy' | 'marketSell', form: Record<string, unknown>) => {
     const started = startGuideSession(1, account, quest, questProgress(6));
     assert.ok(started, quest);
@@ -147,4 +147,14 @@ test('nothing is preselected: the guide opens 주문방식 and then points at th
   if (chosen.kind === 'spotlight') assert.deepEqual(chosen.targets, ['order-type']);
   else assert.fail('the chosen method explains itself on the field');
   if (chosen.kind === 'spotlight') assert.equal(chosen.card.next, 'enabled');
+  // Forms start at 시장가: a market practice reads its step at once, while the
+  // limit practice is sent to 주문방식 선택하기 from that default.
+  const fromDefault = views('limitBuy', { orderType: 'market', methodSheetOpen: false });
+  if (fromDefault.kind === 'spotlight') {
+    assert.deepEqual(fromDefault.targets, ['order-type']);
+    assert.match(fromDefault.card.body, /주문방식 선택하기를 눌러 지정가/);
+  } else assert.fail('the limit practice points at the field');
+  const sellDefault = views('marketSell', { orderType: 'market' });
+  if (sellDefault.kind === 'spotlight') assert.equal(sellDefault.card.next, 'enabled');
+  else assert.fail('the market sell practice reads its step');
 });

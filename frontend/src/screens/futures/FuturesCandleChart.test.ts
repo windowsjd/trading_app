@@ -12,6 +12,12 @@ test('shows the selected contract chart from the account-free futures market-dat
   const h = futuresHarness();
   await h.start();
   t.after(h.close);
+  // Collapsed by default, like the spot order screen's chart button: no read until opened.
+  assert.equal(chart(h) === undefined, true);
+  assert.equal(h.candleReads === undefined, true);
+  assert.equal(h.node('futures-chart-toggle').props['aria-pressed'], false);
+  await h.press('futures-chart-toggle');
+  assert.equal(h.node('futures-chart-toggle').props['aria-pressed'], true);
   const node = chart(h);
   assert.equal(node === undefined, false);
   assert.equal(node.props.candles.length, 4);
@@ -45,8 +51,9 @@ test('switching contracts remounts the chart with the other contract only (futur
   };
   await h.start();
   t.after(h.close);
+  await h.press('futures-chart-toggle');
   assert.equal(chart(h).props.candles[0].open, '60000.00000000');
-  await h.choose('HYPEUSDT');
+  await h.selectInstrument('hype');
   const node = chart(h);
   assert.equal(node.props.viewportResetKey, 'hype:4h');
   assert.equal(node.props.displayPriceDecimals, 3);
@@ -62,6 +69,7 @@ test('a response for another contract is never drawn under the selected one', as
   });
   await h.start();
   t.after(h.close);
+  await h.press('futures-chart-toggle');
   assert.equal(chart(h) === undefined, true);
   assert.equal(
     h.renderer.root.findAll((n: any) => n.props?.message === '선물 차트를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.').length > 0,
@@ -74,6 +82,7 @@ test('shows an empty state before collection and an error state on failure, with
   empty.futuresCandles = (id: string) => ({ ...futuresCandlesFixture(id), state: 'empty', candles: [] });
   await empty.start();
   t.after(empty.close);
+  await empty.press('futures-chart-toggle');
   assert.equal(chart(empty) === undefined, true);
   assert.match(empty.text(), /아직 수집된 선물 차트 데이터가 없습니다/);
   assert.equal(empty.node('futures-submit') === undefined, false);
@@ -82,6 +91,7 @@ test('shows an empty state before collection and an error state on failure, with
   failed.candleFailure = Object.assign(new Error('network'), { code: 'ERR_NETWORK' });
   await failed.start();
   t.after(failed.close);
+  await failed.press('futures-chart-toggle');
   assert.equal(chart(failed) === undefined, true);
   assert.equal(failed.node('futures-submit') === undefined, false);
 });
@@ -90,6 +100,7 @@ test('switching the trading account drops the account-bound screen before any ch
   const h = futuresHarness();
   await h.start();
   t.after(h.close);
+  await h.press('futures-chart-toggle');
   assert.equal(chart(h) === undefined, false);
   h.accountId = 'B';
   await h.update();

@@ -325,7 +325,7 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
     const wantedType = session.quest === 'limitBuy' ? 'limit' : 'market';
     if (form.side !== wantedSide || form.orderType !== wantedType) {
       const label = wantedType === 'limit' ? '지정가' : '시장가';
-      // Nothing is preselected: open 주문방식 and pick the practiced method.
+      // Forms start at 시장가; another practiced method is picked from 주문방식 선택하기.
       if (form.side === wantedSide && form.methodSheetOpen) {
         return spotlight(session, screen, index, 'choose-order', [wantedType === 'limit' ? 'order-method-limit' : 'order-method-market'],
           card({ title: '주문 방식 확인', body: `목록에서 ${label}를 선택해 주세요.` }));

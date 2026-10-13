@@ -30,6 +30,8 @@ function defaultSellList(id) {
     pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null },
   };
 }
+// The field's value per method (features/order/orderMethods ORDER_METHOD_LABEL).
+const METHOD_LABEL = { market: '시장가', limit: '지정가', conditional: '조건주문', loc: 'LOC 주문', protection: '손절·익절 설정' };
 function inlineTradingHarness() {
   const h = {
     assetId: 'bnb',
@@ -73,9 +75,9 @@ function inlineTradingHarness() {
     animations: [],
     marketRequests: [],
     keyboardDismissals: 0,
-    // Nothing is preselected in the order form. Tests written for one order
-    // form pick it through the real 주문방식 sheet right after each mount
-    // (see h.mount); a test about the unselected form sets this to null.
+    // Every order form starts at 시장가. Tests written for another order form
+    // pick it through the real 주문방식 sheet right after each mount (see
+    // h.mount); null leaves every new form at its own default.
     method: 'market',
     conditionalList: null,
     // SELL intents list (gates + live rows) and its create answers.
@@ -592,7 +594,7 @@ function inlineTradingHarness() {
     await act(async () => {
       h.renderer = create(element());
     });
-    if (h.method && h.node('order-type-select')) await h.selectOrderType(h.method);
+    if (h.method && h.node('order-type-select') && !h.orderMethodChosen()) await h.selectOrderType(h.method);
   };
   h.update = async () =>
     act(async () => {
@@ -614,15 +616,15 @@ function inlineTradingHarness() {
     const node = h.node(id);
     if (!node) throw new Error('Missing ' + id);
     await act(async () => node.props.onPress());
-    // A side switch starts a fresh form with no method; pick h.method again
+    // A side switch starts a fresh form at 시장가; pick h.method again
     // through the sheet, as the user has to.
     if ((id === 'asset-detail-buy-button' || id === 'asset-detail-sell-button') && h.method && h.node('order-type-select') && !h.orderMethodChosen())
       await h.selectOrderType(h.method);
   };
-  h.orderMethodChosen = () => h.orderType() !== '주문방식 선택하기';
-  // A replaced form (asset/account/session/return): no method and no draft.
-  h.freshForm = () => h.orderType() === '주문방식 선택하기'
-    && h.node('order-quantity-input') === undefined && h.node('order-limit-price-input') === undefined;
+  h.orderMethodChosen = () => h.orderType() === METHOD_LABEL[h.method];
+  // A replaced form (asset/account/session/return): 시장가 and no draft.
+  h.freshForm = () => h.orderType() === METHOD_LABEL.market
+    && h.node('order-quantity-input')?.props.value === '' && h.node('order-limit-price-input') === undefined;
   h.input = async (id, value) =>
     act(async () => h.node(id).props.onChangeText(value));
   // 주문방식: the field opens the sheet, a row picks the method.

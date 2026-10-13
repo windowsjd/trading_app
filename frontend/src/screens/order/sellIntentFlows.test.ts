@@ -213,9 +213,9 @@ describe('independent stop-loss / take-profit', () => {
     assert.equal(h.node('sell-condition-trigger-price').props.value, '');
     await h.input('sell-condition-trigger-price', '700');
     await h.press(buy);
-    assert.equal(h.orderType(), '주문방식 선택하기');
+    assert.equal(h.orderType(), '시장가');
     await h.press(sell);
-    assert.equal(h.orderType(), '주문방식 선택하기');
+    assert.equal(h.orderType(), '시장가');
     assert.equal(h.node('sell-condition-trigger-price') === undefined, true);
   });
 });
@@ -326,7 +326,7 @@ describe('SELL settings and the beginner learning guide', () => {
     for (const method of ['protection', 'conditional']) {
       await h.press(`order-method-${method}`);
       assert.equal(h.alerts.at(-1)?.[1], lockCopy, `${method} explains the lock`);
-      assert.equal(h.orderType(), '주문방식 선택하기', `${method} is not selected`);
+      assert.equal(h.orderType(), '시장가', `${method} is not selected`);
     }
     assert.equal(h.alerts.length, 2);
     assert.equal(h.node('sell-stop-loss-toggle') === undefined && h.node('sell-intent-submit') === undefined, true, 'no SELL setting form');

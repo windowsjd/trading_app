@@ -351,6 +351,8 @@ for (const resource of ['instruments', 'executions']) for (const role of ['user'
   const suffix = resource === 'executions' ? 'executions?limit=20&offset=0' : resource;
   h.readFailures = { [`/trading-accounts/A/futures/${suffix}`]: error };
   t.after(h.close); await h.start();
+  // History is read in the screen's 기록 view.
+  if (resource === 'executions') await h.view('history');
   const notice = h.renderer.root.findAll((node: any) => node.type.name === 'ErrorNotice').find((node: any) => node.props.error === error);
   assert.ok(notice); assert.equal(Boolean(h.node('admin-diagnostic-panel')), role === 'admin'); await expandPanels(h);
   assert.doesNotMatch(renderedText(h), forbidden);

@@ -20,11 +20,12 @@ async function main() {
     for (const width of [320,360,390,430]) for (const theme of ['light','dark']) for (const fontScale of [1,2]) for (const kind of ['open','isolated','cross','stale','empty','loading','error']) {
       await page.setViewportSize({width,height:width===320?568:844}); await page.emulateMedia({colorScheme:theme});
       await page.goto(`${base}/?kind=${kind}&fontScale=${fontScale}&account=${theme==='dark'?'B':'A'}`);
-      await page.getByText(kind==='loading'?'선물 정보를 불러오고 있습니다.':kind==='error'?'선물 정보를 불러오지 못했습니다.':'암호화폐 선물',{exact:true}).waitFor();
+      if(kind==='loading'||kind==='error') await page.getByText(kind==='loading'?'선물 정보를 불러오고 있습니다.':'선물 정보를 불러오지 못했습니다.',{exact:true}).waitFor();
+      else await page.getByTestId('futures-trade').waitFor();
       await page.evaluate(value=>window.futuresAppearance.setPreference(value),theme);
       await page.waitForFunction(value=>window.futuresAppearance.mode===value,theme);
       await page.waitForTimeout(70);
-      if(kind==='cross') { await page.getByRole('button',{name:'강제청산 기록',exact:true}).click(); await page.getByText('Mark 청산가',{exact:true}).waitFor(); }
+      if(kind==='cross') { await page.getByTestId('futures-view-history').click(); await page.getByRole('tab',{name:'강제청산 기록',exact:true}).click(); await page.getByText('Mark 청산가',{exact:true}).waitFor(); }
       const overflow=await page.evaluate(()=>[...document.querySelectorAll('div,span')].flatMap(el=>{
         const r=el.getBoundingClientRect(),s=getComputedStyle(el); if (!r.width||!r.height) return [];
         if (r.left < -1 || r.right > innerWidth+1) return [{text:el.textContent.slice(0,80),reason:'box',rect:[r.left,r.right]}];
@@ -32,14 +33,14 @@ async function main() {
       }));
       assert.deepEqual(overflow,[],`${width}/${theme}/${fontScale}/${kind}`);
       if(kind==='cross') assert.equal(await page.getByText('예상 청산가',{exact:true}).count(),0);
-      if(kind==='stale'){await page.getByRole('button',{name:'전량 종료(Close)',exact:true}).click();await page.getByTestId('futures-submit').scrollIntoViewIfNeeded();assert.notEqual(await page.getByTestId('futures-submit').getAttribute('aria-disabled'),'true');}
+      if(kind==='stale'){await page.getByRole('tab',{name:'전량 종료(Close)',exact:true}).click();await page.getByTestId('futures-submit').scrollIntoViewIfNeeded();assert.notEqual(await page.getByTestId('futures-submit').getAttribute('aria-disabled'),'true');}
       if(kind==='open'){await page.getByTestId('futures-quantity').fill('0.25');await page.getByTestId('futures-leverage').fill('100');await page.getByTestId('futures-submit').click();await page.getByText(/체결 완료/).waitFor();assert.equal(await page.evaluate(()=>window.futuresFixture.requests.length),1);}
       const label=`${width}-${theme}-${fontScale}-${kind}`; results.push(label);
-      if(width===320 && fontScale===2 && ['isolated','cross','stale','open'].includes(kind)) { await page.screenshot({path:path.join(out,label+'.png'),fullPage:true}); if(kind==='cross') { await page.getByText('Mark 청산가',{exact:true}).scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-history-viewport.png')}); } await page.getByText('암호화폐 선물',{exact:true}).scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-viewport.png')}); }
+      if(width===320 && fontScale===2 && ['isolated','cross','stale','open'].includes(kind)) { await page.screenshot({path:path.join(out,label+'.png'),fullPage:true}); if(kind==='cross') { await page.getByText('Mark 청산가',{exact:true}).scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-history-viewport.png')}); } await page.evaluate(()=>scrollTo(0,0)); await page.getByTestId('futures-trade').scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-viewport.png')}); }
     }
     for(const mode of ['REDUCE_ONLY','DISABLED']) {
       await page.goto(`${base}/?kind=cross&mode=${mode}`); await page.getByTestId('futures-submit').waitFor();
-      await page.getByRole('button',{name:'전량 종료(Close)',exact:true}).click();
+      await page.getByRole('tab',{name:'전량 종료(Close)',exact:true}).click();
       assert.equal((await page.getByTestId('futures-submit').getAttribute('aria-disabled'))==='true',mode==='DISABLED');
     }
     await page.setViewportSize({width:320,height:568});

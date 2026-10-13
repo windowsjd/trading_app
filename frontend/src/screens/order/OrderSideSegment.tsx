@@ -10,7 +10,8 @@ import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 export type OrderSide = 'buy' | 'sell';
 
 const SIDES = ['buy', 'sell'] as const;
-const LABEL = { buy: '매수', sell: '매도' } as const;
+const LABEL: Record<OrderSide, string> = { buy: '매수', sell: '매도' };
+const TEST_ID: Record<OrderSide, string> = { buy: TEST_IDS.assetDetail.buyButton, sell: TEST_IDS.assetDetail.sellButton };
 const COLOR = { buy: BUY_COLOR, sell: SELL_COLOR } as const;
 const INSET = 3;
 
@@ -20,11 +21,17 @@ const INSET = 3;
  * the same selection motion as every segmented control. The sliding thumb is
  * the feedback, so a press only tints the target (no ink over the thumb).
  * Colors stay in themed Views (BUY_COLOR/SELL_COLOR), Animated wrappers carry
- * only transform and opacity.
+ * only transform and opacity. Futures reuses the track for 롱/숏 (`labels`),
+ * which take the same BUY/SELL colors as their positions.
  */
-export default function OrderSideSegment({ side, onChange }: {
+export default function OrderSideSegment({ side, onChange, labels = LABEL, testIDs = TEST_ID, testID = 'order-side-segment', disabled = false }: {
   side: OrderSide;
   onChange: (side: OrderSide) => void;
+  labels?: Record<OrderSide, string>;
+  testIDs?: Record<OrderSide, string>;
+  testID?: string;
+  /** A command in flight keeps the committed side. */
+  disabled?: boolean;
 }) {
   const reduced = useReducedMotion();
   const [trackWidth, setTrackWidth] = useState(0);
@@ -43,9 +50,9 @@ export default function OrderSideSegment({ side, onChange }: {
   const opacity = (value: OrderSide, active: boolean) => fades[value][active ? 'active' : 'resting'];
   return (
     <View
-      testID="order-side-segment"
+      testID={testID}
       accessibilityRole="tablist"
-      style={styles.track}
+      style={[styles.track, disabled && styles.disabled]}
       onLayout={(event) => {
         const width = event.nativeEvent.layout.width;
         setTrackWidth((previous) => (Math.abs(previous - width) < 0.5 ? previous : width));
@@ -72,11 +79,12 @@ export default function OrderSideSegment({ side, onChange }: {
           <ActionPressable
             key={value}
             feedback="selection"
-            testID={value === 'buy' ? TEST_IDS.assetDetail.buyButton : TEST_IDS.assetDetail.sellButton}
+            testID={testIDs[value]}
             accessibilityRole="tab"
-            accessibilityLabel={LABEL[value]}
-            accessibilityState={{ selected }}
+            accessibilityLabel={labels[value]}
+            accessibilityState={{ selected, disabled }}
             aria-selected={selected}
+            disabled={disabled}
             // Before the track is measured there is no thumb; the selected
             // segment paints its own color so no frame shows a neutral pair.
             style={[styles.segment, thumbWidth === 0 && selected && { backgroundColor: COLOR[value] }]}
@@ -86,14 +94,14 @@ export default function OrderSideSegment({ side, onChange }: {
           >
             <View style={styles.labelStack}>
               <Animated.View style={{ opacity: opacity(value, false) }}>
-                <Text style={styles.label}>{LABEL[value]}</Text>
+                <Text style={styles.label}>{labels[value]}</Text>
               </Animated.View>
               <Animated.View
                 style={[styles.activeLabel, { opacity: opacity(value, true) }]}
                 accessible={false}
                 importantForAccessibility="no-hide-descendants"
               >
-                <Text style={[styles.label, styles.labelActive]}>{LABEL[value]}</Text>
+                <Text style={[styles.label, styles.labelActive]}>{labels[value]}</Text>
               </Animated.View>
             </View>
           </ActionPressable>
@@ -111,6 +119,7 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     backgroundColor: semantic.raised,
   },
+  disabled: { opacity: 0.5 },
   thumb: {
     position: 'absolute',
     top: INSET,

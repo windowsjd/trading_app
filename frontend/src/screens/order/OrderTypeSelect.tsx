@@ -1,15 +1,15 @@
 import LearningLock from '../../features/quest/LearningLock';
 import QuestTarget from '../../features/quest/QuestTarget';
 import React from 'react';
-import { ScrollView, Text, View } from '../../theme/native';
+import { ScrollView, Text, View, useWindowDimensions } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
 import { SheetPortal } from '../../components/common/ScreenSheetHost';
 import { TEST_IDS } from '../../constants/testIds';
 import {
+  ORDER_METHOD_HINT,
   ORDER_METHOD_LABEL,
-  ORDER_METHOD_PLACEHOLDER,
   getAvailabilityLabel,
   isOrderMethodSelectable,
   type OrderMethod,
@@ -27,14 +27,21 @@ const ICON: Record<OrderMethod, { glyph: string; tone: 'success' | 'info' | 'war
   protection: { glyph: '↕', tone: 'muted' },
 };
 
+/** The hint's longest word plus the chevron, at font scale 1 (Hangul ≈ 1em). */
+const HINT_WORD_WIDTH = 4 * 11 + 4 + 9;
+
 /**
- * 주문방식: one full-width field under 매수/매도 that opens a bottom sheet
- * (reference video 1). The caller owns the method, its learning gates and the
- * draft reset; nothing is preselected, and a refused choice never changes the
- * field. A submit in flight disables the field.
+ * 주문방식: one full-width field under the side choice that opens a bottom
+ * sheet (reference video 1). The caller owns the method (every new form starts
+ * at 시장가), its learning gates and the draft reset; a refused choice never
+ * changes the field. A submit in flight disables the field.
+ *
+ * The selected method reads on the left and a small 주문방식 선택하기 on the
+ * right says it can be changed. Narrow columns and large fonts wrap the hint's
+ * two words, then move the hint under the method — never cut either.
  */
 export default function OrderTypeSelect({ method, options, disabled, open, onOpen, onClose, onSelect, learningHints }: {
-  method: OrderMethod | null;
+  method: OrderMethod;
   options: OrderMethodOption[];
   disabled: boolean;
   open: boolean;
@@ -44,24 +51,29 @@ export default function OrderTypeSelect({ method, options, disabled, open, onOpe
   /** Beginner learning locks per method, shown on the row. */
   learningHints?: Partial<Record<OrderMethod, string | null>>;
 }) {
-  const label = method ? ORDER_METHOD_LABEL[method] : ORDER_METHOD_PLACEHOLDER;
+  const { fontScale } = useWindowDimensions();
+  const label = ORDER_METHOD_LABEL[method];
   return (
     <>
       <ActionPressable
         testID={TEST_IDS.order.typeSelect}
         accessibilityRole="button"
-        accessibilityLabel={method ? `주문방식 ${label}, 변경` : ORDER_METHOD_PLACEHOLDER}
+        accessibilityLabel={`주문방식 ${label}, ${ORDER_METHOD_HINT}`}
         accessibilityHint="주문방식 목록을 엽니다"
         accessibilityState={{ disabled, expanded: open }}
         disabled={disabled}
         onPress={onOpen}
         style={[styles.field, disabled && styles.disabled]}
       >
-        <View style={styles.fieldCopy}>
-          {method ? <Text style={styles.caption}>주문방식</Text> : null}
-          <Text testID="order-type-select-value" style={[styles.fieldValue, !method && styles.placeholder]}>{label}</Text>
+        <Text testID="order-type-select-value" style={styles.fieldValue}>{label}</Text>
+        {/* The basis is one word wide, so the words wrap before the hint
+            leaves the method's line; it grows into the free space. */}
+        <View style={[styles.hint, { flexBasis: HINT_WORD_WIDTH * fontScale }]} accessible={false} importantForAccessibility="no-hide-descendants">
+          <View testID="order-type-select-hint" style={styles.hintWords}>
+            {ORDER_METHOD_HINT.split(' ').map((word) => <Text key={word} style={styles.hintText}>{word}</Text>)}
+          </View>
+          <Text style={styles.chevron}>▾</Text>
         </View>
-        <Text style={styles.chevron} accessible={false} importantForAccessibility="no">▾</Text>
       </ActionPressable>
       <SheetPortal>
         <InlineBottomSheet testID="order-method-sheet" title="주문방식" floating visible={open} onClose={onClose}>
@@ -126,10 +138,14 @@ function MethodRow({ option, selected, learningHint, onSelect }: {
 const styles = {
   field: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    // Wrapped lines pack at the top by default; keep them centred in the field.
+    alignContent: 'center',
     alignItems: 'center',
-    gap: 8,
+    columnGap: 8,
+    rowGap: 2,
     minHeight: 52,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 11,
     borderWidth: 1,
@@ -137,10 +153,10 @@ const styles = {
     backgroundColor: semantic.raised,
   },
   disabled: { opacity: 0.5 },
-  fieldCopy: { flex: 1, minWidth: 0, gap: 1 },
-  caption: { fontSize: 11, lineHeight: 15, color: semantic.muted },
-  fieldValue: { fontSize: 15, lineHeight: 21, fontWeight: '700', color: semantic.text },
-  placeholder: { fontWeight: '600', color: semantic.secondary },
+  fieldValue: { flexShrink: 1, maxWidth: '100%', fontSize: 15, lineHeight: 21, fontWeight: '700', color: semantic.text },
+  hint: { flexGrow: 1, flexShrink: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4 },
+  hintWords: { flexShrink: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', columnGap: 3 },
+  hintText: { fontSize: 11, lineHeight: 15, fontWeight: '600', color: semantic.secondary, textAlign: 'right' },
   chevron: { flexShrink: 0, fontSize: 13, lineHeight: 18, fontWeight: '600', color: semantic.secondary },
   scroll: { flexGrow: 0, flexShrink: 1 },
   list: { gap: 2, paddingBottom: 4 },
