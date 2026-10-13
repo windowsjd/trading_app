@@ -18,19 +18,50 @@ import { formatDisplayDecimal, getAssetNameDisplay } from '../../utils/format.ts
  *
  * DEDUPLICATION. One announcement per (account, order), whichever path
  * (pending order, watch, form) finds it first; refetches, reconnects and
- * replays see the same id and stay silent.
+ * replays see the same id and stay silent. A target is read by one request
+ * at a time.
+ *
+ * UNRESOLVED READS. A detail read that fails transiently proves nothing (not a
+ * fill, not a cancel), so the target is kept, not forgotten after a few tries:
+ * it is re-read with backoff (15 s doubling to 5 min) while the app is in the
+ * foreground, and once more right away when the app comes back. The memory
+ * and request cost stay bounded: at most 30 targets per account, each given
+ * up 24 h after its first failure (the order history still has the result).
  */
 export type FillOrigin = 'order' | 'conditional';
+
+export type FillTarget = { kind: 'order' | 'watch'; id: string; origin: FillOrigin };
+type Unresolved = FillTarget & { failures: number; since: number; retryAt: number };
 
 type AccountState = {
   pending: Set<string>;
   watches: Set<string>;
   origins: Map<string, FillOrigin>;
-  attempts: Map<string, number>;
+  /** Keyed like `reading`: order id, or `watch:<id>`; insertion order = oldest first. */
+  unresolved: Map<string, Unresolved>;
+  reading: Set<string>;
 };
 
-/** Transient read failures retry on later reads, never without bound. */
-export const FILL_RESOLVE_MAX_ATTEMPTS = 3;
+export const FILL_RETRY_BASE_MS = 15_000;
+export const FILL_RETRY_MAX_MS = 5 * 60_000;
+export const FILL_UNRESOLVED_MAX_AGE_MS = 24 * 60 * 60_000;
+export const FILL_UNRESOLVED_MAX = 30;
+
+/** Backoff after the n-th consecutive failure (n ≥ 1). */
+export function fillRetryDelay(failures: number) {
+  return Math.min(FILL_RETRY_BASE_MS * 2 ** Math.max(0, failures - 1), FILL_RETRY_MAX_MS);
+}
+
+/**
+ * A failed detail read worth repeating: no response, a timeout, a server or
+ * rate-limit error. A definite refusal (the order is not this account's, not
+ * found, malformed) will not change by asking again.
+ */
+export function isTransientFillReadFailure(info: { hasResponse: boolean; status: number | null }) {
+  return !info.hasResponse || info.status === null || ![400, 403, 404, 410, 422].includes(info.status);
+}
+
+const targetKey = (kind: FillTarget['kind'], id: string) => (kind === 'order' ? id : `watch:${id}`);
 
 export function createFillTracker() {
   const accounts = new Map<string, AccountState>();
@@ -38,7 +69,7 @@ export function createFillTracker() {
   const account = (accountId: string) => {
     let state = accounts.get(accountId);
     if (!state) {
-      state = { pending: new Set(), watches: new Set(), origins: new Map(), attempts: new Map() };
+      state = { pending: new Set(), watches: new Set(), origins: new Map(), unresolved: new Map(), reading: new Set() };
       accounts.set(accountId, state);
     }
     return state;
@@ -81,12 +112,62 @@ export function createFillTracker() {
     hasOpenWatches(accountId: string) {
       return (accounts.get(accountId)?.watches.size ?? 0) > 0;
     },
-    /** Counts a failed resolve; false once the bound is reached (drop it). */
-    retry(accountId: string, key: string) {
+    /** Claims the one detail read of a target; false while another is running. */
+    beginRead(accountId: string, kind: FillTarget['kind'], id: string) {
       const state = account(accountId);
-      const attempts = (state.attempts.get(key) ?? 0) + 1;
-      state.attempts.set(key, attempts);
-      return attempts < FILL_RESOLVE_MAX_ATTEMPTS;
+      const key = targetKey(kind, id);
+      if (state.reading.has(key)) return false;
+      state.reading.add(key);
+      return true;
+    },
+    endRead(accountId: string, kind: FillTarget['kind'], id: string) {
+      accounts.get(accountId)?.reading.delete(targetKey(kind, id));
+    },
+    /** The read answered (whatever the outcome): nothing left to retry. */
+    resolved(accountId: string, kind: FillTarget['kind'], id: string) {
+      accounts.get(accountId)?.unresolved.delete(targetKey(kind, id));
+    },
+    /** A transient read failure: keep the target and back off. */
+    defer(accountId: string, target: FillTarget, now: number) {
+      const state = account(accountId);
+      const key = targetKey(target.kind, target.id);
+      const previous = state.unresolved.get(key);
+      const since = previous?.since ?? now;
+      if (now - since >= FILL_UNRESOLVED_MAX_AGE_MS) {
+        state.unresolved.delete(key);
+        return;
+      }
+      const failures = (previous?.failures ?? 0) + 1;
+      state.unresolved.set(key, { ...target, failures, since, retryAt: now + fillRetryDelay(failures) });
+      // The oldest target gives way; its result stays in the order history.
+      while (state.unresolved.size > FILL_UNRESOLVED_MAX) state.unresolved.delete(state.unresolved.keys().next().value);
+    },
+    /** Unresolved targets due now and not being read; expired ones are dropped. */
+    due(accountId: string, now: number): FillTarget[] {
+      const state = accounts.get(accountId);
+      if (!state) return [];
+      const targets: FillTarget[] = [];
+      for (const [key, entry] of state.unresolved) {
+        if (now - entry.since >= FILL_UNRESOLVED_MAX_AGE_MS) state.unresolved.delete(key);
+        else if (entry.retryAt <= now && !state.reading.has(key))
+          targets.push({ kind: entry.kind, id: entry.id, origin: entry.origin });
+      }
+      return targets;
+    },
+    /** When the next unresolved target is due, or null when none waits. */
+    nextRetryAt(accountId: string): number | null {
+      const state = accounts.get(accountId);
+      let next: number | null = null;
+      for (const [key, entry] of state?.unresolved ?? []) {
+        if (state?.reading.has(key)) continue;
+        next = next === null ? entry.retryAt : Math.min(next, entry.retryAt);
+      }
+      return next;
+    },
+    /** Back in the foreground: every unresolved target is checked once now. */
+    wake(now: number) {
+      for (const state of accounts.values())
+        for (const entry of state.unresolved.values()) entry.retryAt = Math.min(entry.retryAt, now);
     },
     /** True exactly once per (account, order): the caller may announce it. */
     settle(accountId: string, orderId: string) {
@@ -95,7 +176,7 @@ export function createFillTracker() {
       settled.add(key);
       const state = accounts.get(accountId);
       state?.pending.delete(orderId);
-      state?.attempts.delete(orderId);
+      state?.unresolved.delete(orderId);
       return true;
     },
   };

@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  FILL_RESOLVE_MAX_ATTEMPTS,
+  FILL_RETRY_BASE_MS,
+  FILL_RETRY_MAX_MS,
+  FILL_UNRESOLVED_MAX,
+  FILL_UNRESOLVED_MAX_AGE_MS,
   buildFillNotice,
   createFillTracker,
   enqueueFillNotice,
+  fillRetryDelay,
   isFillWatchAccount,
+  isTransientFillReadFailure,
   type FillNotice,
 } from './fillTracker.ts';
 
@@ -76,10 +81,80 @@ describe('fill tracker set diff', () => {
     assert.equal(tracker.originOf('a', 'other'), 'order');
   });
 
-  it('bounds retries of a failing detail read', () => {
+});
+
+describe('unresolved detail reads', () => {
+  const order = (id: string) => ({ kind: 'order' as const, id, origin: 'order' as const });
+
+  it('a failed read is kept past any attempt count, re-read with a bounded backoff', () => {
     const tracker = createFillTracker();
-    const results = Array.from({ length: FILL_RESOLVE_MAX_ATTEMPTS }, () => tracker.retry('a', 'o1'));
-    assert.deepEqual(results, [true, true, false]);
+    let now = 1_000_000;
+    const delays: number[] = [];
+    for (let failure = 1; failure <= 8; failure++) {
+      tracker.defer('a', order('o1'), now);
+      const next = tracker.nextRetryAt('a');
+      assert.equal(next !== null, true, `still tracked after ${failure} failures`);
+      delays.push(next! - now);
+      assert.deepEqual(tracker.due('a', next! - 1), [], 'not before its backoff');
+      now = next!;
+      assert.deepEqual(tracker.due('a', now), [order('o1')]);
+    }
+    assert.deepEqual(delays, [15_000, 30_000, 60_000, 120_000, 240_000, 300_000, 300_000, 300_000]);
+    assert.equal(fillRetryDelay(1), FILL_RETRY_BASE_MS);
+    assert.equal(fillRetryDelay(50), FILL_RETRY_MAX_MS);
+  });
+
+  it('an answered read stops retries; one read per target at a time', () => {
+    const tracker = createFillTracker();
+    tracker.defer('a', order('o1'), 0);
+    assert.equal(tracker.beginRead('a', 'order', 'o1'), true);
+    assert.equal(tracker.beginRead('a', 'order', 'o1'), false, 'a concurrent read of the same order is skipped');
+    assert.equal(tracker.beginRead('a', 'watch', 'o1'), true, 'a watch with the same id is another target');
+    assert.deepEqual(tracker.due('a', FILL_RETRY_MAX_MS), [], 'a target being read is not due again');
+    assert.equal(tracker.nextRetryAt('a'), null);
+    tracker.endRead('a', 'order', 'o1');
+    assert.equal(tracker.nextRetryAt('a'), FILL_RETRY_BASE_MS);
+    tracker.resolved('a', 'order', 'o1');
+    assert.equal(tracker.nextRetryAt('a'), null);
+    assert.deepEqual(tracker.due('a', FILL_RETRY_MAX_MS), []);
+  });
+
+  it('coming back to the foreground makes every unresolved target due once, per account', () => {
+    const tracker = createFillTracker();
+    tracker.defer('a', order('o1'), 0);
+    tracker.defer('b', { kind: 'watch', id: 'w1', origin: 'conditional' }, 0);
+    assert.deepEqual(tracker.due('a', 1), []);
+    tracker.wake(1);
+    assert.deepEqual(tracker.due('a', 1), [order('o1')]);
+    assert.deepEqual(tracker.due('b', 1), [{ kind: 'watch', id: 'w1', origin: 'conditional' }]);
+  });
+
+  it('keeps memory and requests bounded: a per-account cap and a maximum age', () => {
+    const tracker = createFillTracker();
+    for (let i = 0; i <= FILL_UNRESOLVED_MAX; i++) tracker.defer('a', order(`o${i}`), i);
+    const due = tracker.due('a', FILL_RETRY_MAX_MS * 2).map((target) => target.id);
+    assert.equal(due.length, FILL_UNRESOLVED_MAX);
+    assert.equal(due.includes('o0'), false, 'the oldest gives way');
+    assert.equal(tracker.due('b', FILL_RETRY_MAX_MS * 2).length, 0, 'accounts never share targets');
+    tracker.defer('c', order('old'), 0);
+    tracker.defer('c', order('old'), FILL_UNRESOLVED_MAX_AGE_MS);
+    assert.equal(tracker.nextRetryAt('c'), null, 'given up a day after the first failure');
+    tracker.defer('d', order('stale'), 0);
+    assert.deepEqual(tracker.due('d', FILL_UNRESOLVED_MAX_AGE_MS), []);
+    assert.equal(tracker.nextRetryAt('d'), null);
+  });
+
+  it('only a definite refusal stops asking; transport and server errors are transient', () => {
+    assert.equal(isTransientFillReadFailure({ hasResponse: false, status: null }), true);
+    for (const status of [500, 502, 503, 408, 429, 401]) assert.equal(isTransientFillReadFailure({ hasResponse: true, status }), true, String(status));
+    for (const status of [400, 403, 404, 410, 422]) assert.equal(isTransientFillReadFailure({ hasResponse: true, status }), false, String(status));
+  });
+
+  it('a settled order leaves the unresolved targets', () => {
+    const tracker = createFillTracker();
+    tracker.defer('a', order('o1'), 0);
+    assert.equal(tracker.settle('a', 'o1'), true);
+    assert.equal(tracker.nextRetryAt('a'), null);
   });
 });
 

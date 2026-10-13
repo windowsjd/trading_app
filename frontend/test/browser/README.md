@@ -435,12 +435,17 @@ These RN Web checks do not replace Android/iOS device acceptance.
 Order methods (order UI 2nd phase) use `orderMethodBrowser.cjs` on the trading
 fixture with `?viewport=1` (a device-sized root, so bottom sheets anchor to the
 visible edge) inside the same `ScreenSheetHost` layer MainTabs provides. It
-checks 72 screens: 320/360px × Light/Dark × font scales 1/2 × the unselected
-주문방식 field, crypto/KRX BUY and KRX SELL sheets (every row reachable inside
-the sheet), Conditional BUY entry and registration, KRX LOC entry, the account's
-conditional list (`conditionalRows=1`) and the real-fill banner
-(`fillBanner=1`). Fixture switches: `conditional=enabled`, `loc=enabled`,
-`conditionalLimit=off`, `krx=1`, `longName=1`. Text cut by its box or a
+checks 224 screens: 320/360/390/430px × Light/Dark × font scales 1/2 × the
+unselected 주문방식 field, crypto/KRX BUY and KRX SELL sheets (every row
+reachable inside the sheet), Conditional BUY entry and registration, same-key
+replay answers (`conditionalResult=<state>`), KRX LOC entry, the account's
+conditional list (`conditionalRows=1` every state; `conditionalRows=many` old
+open rows behind 35 ended rows, 더 보기 and a lost cancel with
+`conditionalCancel=fail` + `alertConfirm=1`, which presses an Alert's destructive
+button) and the real-fill banner (`fillBanner=1`; `fillHistory=held|unavailable`
+answers 내역 보기 as a held/unready move). Fixture switches:
+`conditional=enabled`, `loc=enabled`, `conditionalLimit=off`, `krx=1`,
+`longName=1`. Text cut by its box or a
 clipping ancestor and sideways page scroll fail the run; the order-book ladder
 is excluded because its quantity column already overflows at 320px / 2x at
 HEAD. `BEGINNER_CHROMIUM` selects Chromium, `ORDER_METHOD_BROWSER_OUTPUT` the

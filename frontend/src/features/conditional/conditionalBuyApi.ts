@@ -99,16 +99,25 @@ export type ConditionalBuyCreateDto = {
 const path = (accountId: string, suffix = '') =>
   `/trading-accounts/${encodeURIComponent(accountId)}/conditional-buy-orders${suffix}`;
 
-/** Without `history`, the server returns only live rows (watching/triggered). */
+/**
+ * `open`: every row the owner can still cancel (watching, triggered,
+ * order_pending); `ended`: the rest. Both newest first.
+ */
+export type ConditionalBuyListState = 'open' | 'ended';
+
+/**
+ * Without `history` or `state`, the server returns only live rows
+ * (watching/triggered). `state` replaces `history` (never both).
+ */
 export async function getConditionalBuyOrders(
   accountId: string,
-  params: { history?: boolean; assetId?: string; limit?: number; offset?: number } = {},
+  params: { history?: boolean; state?: ConditionalBuyListState; assetId?: string; limit?: number; offset?: number } = {},
   signal?: AbortSignal,
 ) {
   const url = path(accountId);
   const response = await apiClient.get<ApiSuccessResponse<ConditionalBuyListDto>>(url, {
     params: {
-      ...(params.history ? { history: 'true' } : {}),
+      ...(params.state ? { state: params.state } : params.history ? { history: 'true' } : {}),
       ...(params.assetId ? { assetId: params.assetId } : {}),
       limit: params.limit ?? 30,
       offset: params.offset ?? 0,

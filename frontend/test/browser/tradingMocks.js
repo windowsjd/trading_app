@@ -62,9 +62,10 @@ const locEnabled = params.get('loc') === 'enabled';
 const conditionalRow = (id, state, extra = {}) => ({
   id, assetId: 'SUI', asset: { id: 'SUI', symbol: 'SUIUSDT', name: assets.find((a) => a.id === 'SUI').name, market: 'BINANCE', assetType: 'crypto' },
   side: 'buy', triggerCondition: 'at_or_below', triggerPrice: '0.81234567', executionType: 'limit', limitPrice: '0.80123456',
-  quantity: null, amount: '1234567.12345678', currencyCode: 'USD', status: state === 'filled' || state === 'order_pending' ? 'ordered' : state, state,
+  quantity: null, amount: '1234567.12345678', currencyCode: 'USD', status: state === 'filled' || state.startsWith('order_') ? 'ordered' : state, state,
   trigger: state === 'watching' ? null : { triggeredAt: new Date().toISOString(), snapshotId: 's', evidence: null },
-  order: state === 'filled' || state === 'order_pending' ? { orderId: 'cond-order-' + id, orderType: 'limit', status: state === 'filled' ? 'executed' : 'submitted',
+  order: state === 'filled' || state.startsWith('order_') ? { orderId: 'cond-order-' + id, orderType: 'limit',
+    status: { filled: 'executed', order_pending: 'submitted', order_canceled: 'canceled', order_rejected: 'rejected' }[state],
     quantity: '1540000.00000000', executedQuantity: null, limitPrice: '0.80123456', executedPrice: state === 'filled' ? '0.80000000' : null, grossAmount: null,
     feeAmount: null, netAmount: null, reservedAmount: '1235801.23', cancelReason: null, submittedAt: new Date().toISOString(),
     executedAt: state === 'filled' ? new Date().toISOString() : null, canceledAt: null } : null,
@@ -150,11 +151,24 @@ export const apiClient = {
     }
     if (path.endsWith('/conditional-buy-orders')) {
       const id = path.split('/')[2];
-      const rows = options.params?.history === 'true' && params.get('conditionalRows') === '1'
-        ? ['watching', 'triggered', 'order_pending', 'filled', 'failed', 'canceled'].map((s) => conditionalRow('cb-' + s, s)) : [];
+      // `conditionalRows=1`: one row per state; `many`: old open rows behind 35 newer ended rows.
+      const kind = params.get('conditionalRows');
+      const all = kind === '1'
+        ? ['watching', 'triggered', 'order_pending', 'filled', 'failed', 'canceled', 'order_canceled', 'order_rejected'].map((s) => conditionalRow('cb-' + s, s))
+        : kind === 'many'
+          ? [...Array.from({ length: 35 }, (_, i) => conditionalRow('end-' + i, ['filled', 'canceled', 'failed', 'order_canceled'][i % 4])),
+            ...['order_pending', 'triggered', 'watching'].map((s) => conditionalRow('old-' + s, s))]
+          : [];
+      const open = new Set(['watching', 'triggered', 'order_pending']);
+      const query = options.params ?? {};
+      const rows = query.state === 'open' ? all.filter((r) => open.has(r.state))
+        : query.state === 'ended' ? all.filter((r) => !open.has(r.state))
+        : query.history === 'true' ? all : all.filter((r) => r.state === 'watching' || r.state === 'triggered');
+      const offset = Number(query.offset ?? 0), limit = Number(query.limit ?? 30);
+      const page = rows.slice(offset, offset + limit);
       return response({ tradingAccountId: id, capabilities: { enabled: conditionalEnabled, canCreate: conditionalEnabled, canCancel: true,
         canUseLimit: conditionalEnabled && params.get('conditionalLimit') !== 'off', markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
-        conditionalOrders: rows, pagination: { limit: 30, offset: 0, total: rows.length, returned: rows.length, nextOffset: null } });
+        conditionalOrders: page, pagination: { limit, offset, total: rows.length, returned: page.length, nextOffset: offset + page.length < rows.length ? offset + page.length : null } });
     }
     if (path.endsWith('/order-capabilities')) {
       const id = path.split('/')[2];
@@ -268,9 +282,17 @@ export const apiClient = {
   },
   async post(path, body) {
     state.requests.push({ path, body });
+    // `conditionalResult=<state>`: the create answers as a same-key replay of a watch that moved on.
+    const result = params.get('conditionalResult');
     if (path.endsWith('/conditional-buy-orders'))
-      return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: { ...conditionalRow('cb-new', 'watching'), ...body,
+      return response({ tradingAccountId: state.accountId, duplicate: !!result, conditionalOrder: { ...conditionalRow('cb-new', result ?? 'watching'), ...body,
         assetId: body.assetId, limitPrice: body.limitPrice ?? null, quantity: body.quantity ?? null, amount: body.amount ?? null } });
+    // `conditionalCancel=fail`: the cancel lost the race (the watch already ordered).
+    const conditionalCancel = path.includes('/conditional-buy-orders/') && path.endsWith('/cancel');
+    if (conditionalCancel && params.get('conditionalCancel') === 'fail')
+      throw Object.assign(new Error('Request failed with status code 409'), { isAxiosError: true,
+        response: { status: 409, data: { success: false, error: { code: 'CONDITIONAL_BUY_ALREADY_ORDERED', message: 'raw server text' } } } });
+    if (conditionalCancel) return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: null });
     const asset = assets.find((a) => a.id === body.assetId);
     const loc = body.limitOnClose ? { market: 'KRX', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T00:00:00.000Z',
       sessionCloseAt: '2026-10-13T06:30:00.000Z', evidenceDeadlineAt: '2026-10-13T09:30:00.000Z', executionPricePolicy: 'final_regular_session_close' } : null;

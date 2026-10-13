@@ -1,5 +1,5 @@
 // Optional real RN Web check of the 주문방식 sheet, conditional/LOC forms,
-// the conditional list and the real-fill banner: screenshots at 320/360px,
+// the conditional list and the real-fill banner: screenshots at 320/360/390/430px,
 // light/dark and 1x/2x fonts, plus a clipped-text and page-overflow detector.
 // Requires external esbuild and Playwright (see README).
 const path = require('node:path');
@@ -75,7 +75,7 @@ async function run() {
   try {
     const quick = process.env.ORDER_METHOD_QUICK === '1';
     const combos = [];
-    for (const width of [320, 360]) for (const appearance of ['light', 'dark']) for (const fontScale of [1, 2]) combos.push([width, appearance, fontScale]);
+    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const fontScale of [1, 2]) combos.push([width, appearance, fontScale]);
     for (const [width, appearance, fontScale] of quick ? [[360, 'light', 1], [320, 'dark', 2]] : combos) {
       const page = await browser.newPage({ viewport: { width, height: 760 } });
       await page.addInitScript(() => localStorage.setItem('trading-app:appearance', 'system'));
@@ -137,6 +137,23 @@ async function run() {
       await page.getByTestId('conditional-registered').waitFor();
       await page.getByTestId('conditional-registered').scrollIntoViewIfNeeded();
       await shot('crypto-conditional-registered');
+      // 2b. A same-key replay answers with the watch as it is now: its state, not 감시 중.
+      for (const [result, title] of [['order_pending', '지정가 매수가 접수됐어요'], ['failed', '주문을 실행하지 못했어요']]) {
+        await go(`asset=SUI&conditional=enabled&longName=1&conditionalResult=${result}`);
+        await field().click();
+        await row('conditional').click();
+        await page.getByTestId('conditional-trigger-at_or_below').click();
+        await page.getByTestId('conditional-trigger-price').fill('0.81234567');
+        await page.getByTestId('conditional-execution-limit').click();
+        await page.getByTestId('conditional-limit-price').fill('0.80123456');
+        await page.getByTestId('conditional-size').fill('1234567.12345678');
+        await page.getByTestId('conditional-submit').click();
+        await page.getByTestId('conditional-registered').waitFor();
+        const text = await page.getByTestId('conditional-registered').innerText();
+        assert.ok(text.includes(title) && !text.includes('감시 중입니다'), `${result} replay copy (${tag})`);
+        await page.getByTestId('conditional-registered').scrollIntoViewIfNeeded();
+        await shot(`conditional-replay-${result}`);
+      }
 
       // 3. KRX BUY: four methods, LOC form with its policy notice.
       await go('krx=1&asset=SAMSUNG&loc=enabled&conditional=enabled&longName=1');
@@ -168,11 +185,39 @@ async function run() {
       await page.getByTestId('conditional-orders-list').waitFor();
       await page.getByTestId('conditional-orders-list').scrollIntoViewIfNeeded();
       await shot('conditional-list');
+      // 5b. Old open rows behind 35 newer ended rows: all open rows listed, history pages,
+      // and a cancel that lost its race shows reviewed copy (never the raw server text).
+      await go('asset=SUI&conditional=enabled&conditionalRows=many&longName=1&alertConfirm=1&conditionalCancel=fail');
+      await page.getByTestId('holdings-filter-pending').click();
+      await page.getByTestId('pending-kind-conditional').click();
+      await page.getByTestId('conditional-orders-open').waitFor();
+      const rowsIn = (section) => page.getByTestId(`conditional-orders-${section}`).locator('[data-testid^="conditional-order-"]:not([data-testid$="-state"]):not([data-testid$="-cancel"])').count();
+      assert.equal(await rowsIn('open'), 3, `old open rows listed (${tag})`);
+      await page.getByTestId('conditional-orders-more').waitFor();
+      assert.equal(await rowsIn('ended'), 30, `first history page (${tag})`);
+      await page.getByTestId('conditional-orders-open').scrollIntoViewIfNeeded();
+      await shot('conditional-open');
+      await page.getByTestId('conditional-orders-more').click();
+      await page.getByTestId('conditional-orders-more').waitFor({ state: 'detached' });
+      assert.equal(await rowsIn('ended'), 35, `all history after 더 보기 (${tag})`);
+      await page.getByTestId('conditional-order-old-watching-cancel').click();
+      await page.getByTestId('conditional-orders-cancel-error').waitFor();
+      const cancelError = await page.getByTestId('conditional-orders-cancel-error').innerText();
+      assert.ok(cancelError.includes('이미 주문이 만들어진 조건주문입니다') && !cancelError.includes('raw server text'), `cancel error copy (${tag})`);
+      await page.getByTestId('conditional-orders-cancel-error').scrollIntoViewIfNeeded();
+      await shot('conditional-cancel-error');
 
       // 6. The real-fill banner over the order screen.
       await go('krx=1&asset=SAMSUNG&fillBanner=1&longName=1');
       await page.getByTestId('order-fill-banner').waitFor();
       await shot('fill-banner');
+      // 6b. 내역 보기 held by a beginner guide: the banner stays and says why.
+      await go('krx=1&asset=SAMSUNG&fillBanner=1&longName=1&fillHistory=held');
+      await page.getByTestId('order-fill-banner-history').click();
+      await page.getByTestId('order-fill-banner-not-opened').waitFor();
+      await shot('fill-banner-held');
+      await page.waitForTimeout(4200);
+      assert.equal(await page.getByTestId('order-fill-banner-not-opened').isVisible(), true, `held banner stays past its usual time (${tag})`);
       assert.deepEqual(errors, [], `${tag} page errors`);
       await page.close();
     }

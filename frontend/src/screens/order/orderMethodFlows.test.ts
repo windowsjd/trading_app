@@ -11,6 +11,10 @@ const qty = TEST_IDS.order.quantityInput;
 const limitPrice = TEST_IDS.order.limitPriceInput;
 const submit = TEST_IDS.order.executeSubmit;
 const text = (h: any) => JSON.stringify(h.renderer.toJSON());
+/** Only the strings rendered under one host node (never the instance itself). */
+const panelText = (node: any): string => node === undefined ? '' : node.findAll((n: any) => typeof n.type === 'string')
+  .flatMap((n: any) => [n.props.children].flat().filter((child: unknown) => typeof child === 'string' || typeof child === 'number'))
+  .join(' ');
 const capabilities = (overrides: Record<string, unknown> = {}) => (id: string) => ({
   tradingAccountId: id,
   capabilities: { enabled: true, canCreate: true, canCancel: true, canUseLimit: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20, ...overrides },
@@ -113,6 +117,65 @@ describe('Conditional BUY', () => {
     await h.press('conditional-submit'); await h.flush();
     assert.deepEqual(h.requests[3].body, h.requests[2].body);
     assert.equal(h.node('conditional-registered') !== undefined, true);
+  });
+
+  it('a same-key replay shows the watch as the server has it now, never 감시 중 for a moved-on row', async (t) => {
+    const cases: Array<[Record<string, unknown>, RegExp, RegExp | null]> = [
+      [{ status: 'triggered', state: 'triggered' }, /조건이 충족되어 주문을 처리하고 있어요/, /체결됐어요/],
+      [{ status: 'ordered', state: 'order_pending', order: { orderId: 'o-1', status: 'submitted' } }, /지정가 매수가 접수됐어요\. 체결을 기다리고 있어요/, /체결됐어요/],
+      [{ status: 'ordered', state: 'filled', order: { orderId: 'o-1', status: 'executed' } }, /조건주문의 매수가 체결됐어요/, null],
+      [{ status: 'failed', state: 'failed', failureCode: 'INSUFFICIENT_BALANCE' }, /주문을 실행하지 못했어요[\s\S]*발동 시점의 잔액이 부족했어요/, null],
+      [{ status: 'canceled', state: 'canceled', terminalReason: 'season_ended' }, /취소된 조건주문이에요[\s\S]*시즌 종료로 감시가 끝났어요/, null],
+      [{ status: 'ordered', state: 'order_canceled', order: { orderId: 'o-1', status: 'canceled', cancelReason: 'user_canceled' } }, /연결된 지정가 주문이 체결 없이 끝났어요/, null],
+      [{ status: 'ordered', state: 'order_rejected', order: { orderId: 'o-1', status: 'rejected' } }, /연결된 주문이 거부됐어요/, null],
+    ];
+    for (const [result, expected, never] of cases) {
+      const h = inlineTradingHarness();
+      h.conditionalList = capabilities()('general');
+      h.method = 'conditional';
+      await h.mount();
+      try {
+        await h.press('conditional-trigger-at_or_below');
+        await h.input('conditional-trigger-price', '700');
+        await h.input('conditional-size', '10');
+        h.conditionalFailure = new Error('socket hang up');
+        await h.press('conditional-submit'); await h.flush();
+        // Meanwhile the server registered it and the watch moved on.
+        h.conditionalFailure = null;
+        h.conditionalResult = result;
+        await h.press('conditional-submit'); await h.flush();
+        assert.deepEqual(h.requests[1].body, h.requests[0].body, 'same key, same body');
+        assert.equal(h.requests.length, 2, 'never a second registration');
+        const panel = panelText(h.node('conditional-registered'));
+        assert.match(panel, expected, String(result.state));
+        assert.equal(panel.includes('감시 중입니다'), false, String(result.state));
+        if (never) assert.equal(never.test(panel), false, `${String(result.state)} is not a fill`);
+      } finally {
+        await h.close();
+      }
+    }
+  });
+
+  it('a create answered after an account switch never lands in the new account form', async (t) => {
+    const h = inlineTradingHarness();
+    h.conditionalList = capabilities()('general');
+    h.method = 'conditional';
+    await h.mount(); t.after(h.close);
+    await h.press('conditional-trigger-at_or_below');
+    await h.input('conditional-trigger-price', '700');
+    await h.input('conditional-size', '10');
+    h.conditionalGate = deferred();
+    await h.press('conditional-submit');
+    h.accountId = 'season';
+    h.routeAccountId = 'season';
+    h.conditionalList = capabilities()('season');
+    await h.update(); await h.flush();
+    h.conditionalGate.resolve();
+    await h.flush(); await h.flush();
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.requests[0].url, '/trading-accounts/general/conditional-buy-orders');
+    assert.equal(h.node('conditional-registered') === undefined, true, 'the season form shows nothing from general');
+    assert.equal(h.node('conditional-error') === undefined, true);
   });
 
   it('a definite server refusal shows its reason and drops the key', async (t) => {

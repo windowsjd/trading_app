@@ -104,7 +104,12 @@ function App() {
               navigation={navigation}
             />
           </ScreenSheetHost>
-          <OrderFillBanner notice={fillBanner} onDone={() => {}} onOpenHistory={(notice) => { state.history = notice.accountId; }} />
+          {/* `fillHistory=held|unavailable` answers 내역 보기 like a held/unready navigation. */}
+          <OrderFillBanner notice={fillBanner} onDone={() => {}} onOpenHistory={(notice) => {
+            const outcome = new URLSearchParams(location.search).get('fillHistory') ?? 'opened';
+            if (outcome === 'opened') state.history = notice.accountId;
+            return outcome;
+          }} />
         </SafeAreaProvider>
       </AppearanceProvider>
     </QueryClientProvider>

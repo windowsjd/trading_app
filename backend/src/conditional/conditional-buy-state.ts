@@ -7,6 +7,19 @@ export const liveConditionalBuy = {
   status: { in: ['watching', 'triggered'] as ('watching' | 'triggered')[] },
 };
 
+/**
+ * Read filter `state=open`: everything the owner can still cancel — a live
+ * watch, or a watch whose linked limit Order is still `submitted` (API state
+ * `order_pending`, canceled through the ordinary order cancel). `state=ended`
+ * is its complement; ended rows never become open again.
+ */
+export const openConditionalBuy: Prisma.ConditionalBuyOrderWhereInput = {
+  OR: [
+    liveConditionalBuy,
+    { status: 'ordered', order: { is: { status: 'submitted' } } },
+  ],
+};
+
 export type ConditionalBuyLifecycleReason =
   | 'user_canceled'
   | 'season_ended'

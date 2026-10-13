@@ -292,6 +292,10 @@ export const QUERY_KEYS = {
       all: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id] as const,
       list: (id: string, filters: { history: boolean; limit: number; assetId?: string }) =>
         ['tradingAccount', 'conditionalBuyOrders', id, 'list', normalizeFilterKey(filters)] as const,
+      /** Every row the owner can still cancel, all pages. */
+      open: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id, 'open', 'complete'] as const,
+      /** Ended history, paged. */
+      ended: (id: string) => ['tradingAccount', 'conditionalBuyOrders', id, 'ended'] as const,
     },
     /** Read-only server create gates (limit / LOC) for one account. */
     orderCapabilities: (id: string) => ['tradingAccount', 'orderCapabilities', id] as const,

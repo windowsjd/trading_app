@@ -95,6 +95,48 @@ export function getConditionalBuyEndReason(
   return null;
 }
 
+export type ConditionalBuyResultNotice = {
+  title: string;
+  detail: string | null;
+  /** Where the user goes next: the open list or the ended history. */
+  next: string;
+  tone: 'success' | 'progress' | 'ended' | 'error';
+};
+
+const OPEN_NEXT = '아래 대기 목록의 조건주문에서 상태를 확인하고 취소할 수 있어요.';
+const ENDED_NEXT = '아래 대기 목록의 조건주문 종료 이력에서 확인할 수 있어요.';
+
+/**
+ * The form's answer to a create, first or replayed with the same key. A
+ * replay returns the watch as it is NOW, so the copy follows the server's
+ * `state`: registered/watching, condition met, order accepted and an actual
+ * fill stay four different sentences, and an ended row never reads 감시 중.
+ */
+export function getConditionalBuyResultNotice(
+  row: Pick<ConditionalBuyOrderDto, 'state' | 'failureCode' | 'terminalReason' | 'order'>,
+): ConditionalBuyResultNotice {
+  switch (row.state) {
+    case 'watching':
+      return { title: '조건주문이 등록되었습니다. 감시 중입니다.', detail: null, next: OPEN_NEXT, tone: 'success' };
+    case 'triggered':
+      return { title: '조건이 충족되어 주문을 처리하고 있어요.', detail: '아직 체결된 것은 아니에요.', next: OPEN_NEXT, tone: 'progress' };
+    case 'order_pending':
+      return { title: '조건이 충족되어 지정가 매수가 접수됐어요. 체결을 기다리고 있어요.', detail: null, next: OPEN_NEXT, tone: 'progress' };
+    case 'filled':
+      return { title: '조건주문의 매수가 체결됐어요.', detail: null, next: ENDED_NEXT, tone: 'success' };
+    case 'failed':
+      return { title: '조건이 충족됐지만 주문을 실행하지 못했어요.', detail: getConditionalBuyEndReason(row), next: ENDED_NEXT, tone: 'error' };
+    case 'canceled':
+      return { title: '취소된 조건주문이에요.', detail: getConditionalBuyEndReason(row), next: ENDED_NEXT, tone: 'ended' };
+    case 'order_canceled':
+      return { title: '연결된 지정가 주문이 체결 없이 끝났어요.', detail: getConditionalBuyEndReason(row), next: ENDED_NEXT, tone: 'ended' };
+    case 'order_rejected':
+      return { title: '연결된 주문이 거부됐어요.', detail: null, next: ENDED_NEXT, tone: 'error' };
+    default:
+      return { title: '조건주문 상태를 확인하지 못했어요.', detail: null, next: '아래 대기 목록의 조건주문에서 상태를 확인해 주세요.', tone: 'ended' };
+  }
+}
+
 const DECIMAL = (scale: number) => new RegExp(`^\\d{1,16}(?:\\.\\d{1,${scale}})?$`, 'u');
 
 function positiveDecimal(value: string, scale: number) {

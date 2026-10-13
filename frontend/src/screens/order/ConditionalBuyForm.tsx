@@ -5,7 +5,7 @@ import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import CTAButton from '../../components/common/CTAButton';
 import SegmentedControl from '../../components/common/SegmentedControl';
-import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import ErrorNotice from '../../components/states/ErrorNotice';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import {
   createConditionalBuyOrder,
@@ -19,6 +19,7 @@ import {
   EXECUTION_TYPE_LABEL,
   TRIGGER_CONDITION_LABEL,
   getConditionalBuyDraftError,
+  getConditionalBuyResultNotice,
   isConditionAlreadyMet,
 } from '../../features/conditional/conditionalBuyDisplay';
 import { emitOrderFillEvent } from '../../features/order/fillEvents';
@@ -33,6 +34,8 @@ type LearningGate = { allowed: boolean; locked: boolean; message: string | null;
 type Request = { accountId: string; epoch: number; body: ConditionalBuyCreateDto };
 
 const CONDITIONS: ConditionalBuyTriggerCondition[] = ['at_or_above', 'at_or_below'];
+
+const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 대기 목록의 조건주문을 먼저 확인해 주세요. 같은 내용으로 다시 누르면 중복 없이 다시 확인해요.';
 
 /**
  * New Conditional BUY (KRX stocks, crypto Spot). The watch price and the
@@ -71,7 +74,8 @@ export default function ConditionalBuyForm({
   const [limitPrice, setLimitPrice] = useState('');
   const [size, setSize] = useState('');
   const [registered, setRegistered] = useState<ConditionalBuyOrderDto | null>(null);
-  const [error, setError] = useState<{ message: string; cause: unknown } | null>(null);
+  // The original error only; its public copy is mapped where it is shown.
+  const [error, setError] = useState<{ cause: unknown; uncertain: boolean } | null>(null);
   // An uncertain create keeps its exact key and body for a same-intent retry;
   // any edit makes a new intent with a new key.
   const actionRef = useRef<Request | null>(null);
@@ -107,15 +111,9 @@ export default function ConditionalBuyForm({
     onError: (cause, request) => {
       if (!isCurrent(request)) return;
       const info = getApiErrorInfo(cause);
-      const code = getApiErrorCode(cause);
       const uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
       if (!uncertain) actionRef.current = null;
-      setError({
-        cause,
-        message: uncertain
-          ? '등록 결과를 확인하지 못했어요. 대기 목록의 조건주문을 먼저 확인해 주세요. 같은 내용으로 다시 누르면 중복 없이 다시 확인해요.'
-          : getErrorMessageFromCode(code),
-      });
+      setError({ cause, uncertain });
     },
   });
   const pending = mutation.isPending;
@@ -138,6 +136,9 @@ export default function ConditionalBuyForm({
   const createBlocked = !capabilities?.canCreate ? '현재 조건주문을 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(triggerPrice.trim() || size.trim() || limitPrice.trim());
+  // A replayed create returns the watch as it is NOW (it may have triggered,
+  // ordered, filled or ended since): the server's state decides the copy.
+  const result = registered ? getConditionalBuyResultNotice(registered) : null;
 
   const submit = () => {
     if (!learning.allowed && !actionRef.current) {
@@ -286,19 +287,18 @@ export default function ConditionalBuyForm({
       ) : null}
       {typed && draftError ? <Text testID="conditional-input-error" style={styles.error}>{draftError}</Text> : null}
       {error ? (
-        <>
-          <Text testID="conditional-error" accessibilityLiveRegion="polite" style={styles.error}>{error.message}</Text>
-          <AdminDiagnosticPanel error={error.cause} />
-        </>
+        <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : getErrorMessageFromCode(getApiErrorCode(error.cause))}
+          testID="conditional-error" style={styles.error} />
       ) : null}
-      {registered ? (
-        <View testID="conditional-registered" accessibilityLiveRegion="polite" style={styles.success}>
-          <Text style={styles.successTitle}>조건주문이 등록되었습니다. 감시 중입니다.</Text>
+      {registered && result ? (
+        <View testID="conditional-registered" accessibilityLiveRegion="polite" style={RESULT_SURFACE[result.tone]}>
+          <Text testID="conditional-registered-title" style={[styles.resultTitle, RESULT_TITLE[result.tone]]}>{result.title}</Text>
+          {result.detail ? <Text testID="conditional-registered-detail" style={styles.helper}>{result.detail}</Text> : null}
           <Text style={styles.helper}>
             감시가격 {formatDisplayDecimal(registered.triggerPrice)} {currency} {TRIGGER_CONDITION_LABEL[registered.triggerCondition]} 시
             {' '}{registered.executionType === 'limit' && registered.limitPrice ? `지정가 ${formatDisplayDecimal(registered.limitPrice)} ${currency}` : '시장가'} 매수
           </Text>
-          <Text style={styles.helper}>아래 대기 목록의 조건주문에서 상태를 확인하고 취소할 수 있어요.</Text>
+          <Text style={styles.helper}>{result.next}</Text>
         </View>
       ) : null}
       <CTAButton
@@ -340,6 +340,19 @@ const styles = {
   choiceTextSelected: { color: semantic.onAccent },
   policy: { gap: 4, padding: 10, borderRadius: 10, backgroundColor: semantic.raised },
   policyLine: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
-  success: { gap: 4, padding: 10, borderRadius: 10, backgroundColor: semantic.successSurface },
-  successTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: semantic.success },
+  resultTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
+} as const;
+
+const resultSurface = { gap: 4, padding: 10, borderRadius: 10 } as const;
+const RESULT_SURFACE = {
+  success: { ...resultSurface, backgroundColor: semantic.successSurface },
+  progress: { ...resultSurface, backgroundColor: semantic.infoSurface },
+  ended: { ...resultSurface, backgroundColor: semantic.raised },
+  error: { ...resultSurface, backgroundColor: semantic.errorSurface },
+} as const;
+const RESULT_TITLE = {
+  success: { color: semantic.success },
+  progress: { color: semantic.info },
+  ended: { color: semantic.text },
+  error: { color: semantic.error },
 } as const;

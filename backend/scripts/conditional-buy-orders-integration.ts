@@ -1272,6 +1272,138 @@ async function retryAttempts() {
   });
 }
 
+/**
+ * Read filters: an old row the owner can still cancel is never hidden behind
+ * newer ended rows. `state=open` = watching/triggered/order_pending,
+ * `state=ended` = its complement; each open row keeps its own cancel path.
+ */
+async function listStates() {
+  await scenario('general', async (s) => {
+    await market(s, 'KRX');
+    await quote(s, 'KRX', '100');
+    const far = {
+      triggerCondition: 'at_or_above',
+      triggerPrice: '200',
+      executionType: 'market',
+      quantity: '1',
+    } as const;
+    const limit = {
+      triggerCondition: 'at_or_below',
+      triggerPrice: '95',
+      executionType: 'limit',
+      limitPrice: '94',
+      quantity: '3',
+    } as const;
+    // Oldest first: watching, triggered, two linked pending limit orders.
+    const watching = await register(s, far);
+    const triggered = await register(s, far);
+    await triggerAged(s, triggered, 0);
+    const filledLater = await register(s, limit);
+    const canceledLater = await register(s, limit);
+    await quote(s, 'KRX', '95');
+    for (const id of [filledLater, canceledLater])
+      assert.equal((await conditionalBuy.evaluate(id)).state, 'ordered');
+    // 32 newer ended rows push every open row off a 30-row history page.
+    for (let i = 0; i < 32; i++)
+      await conditionalBuy.cancel(
+        s.userId,
+        s.accountId,
+        await register(s, far),
+      );
+    const list = (query: Record<string, string>) =>
+      conditionalBuy.list(s.userId, s.accountId, query);
+    const ids = (page: Awaited<ReturnType<typeof list>>) =>
+      page.data.conditionalOrders.map((row) => row.id);
+    const history = await list({ history: 'true', limit: '30' });
+    for (const id of [watching, triggered, filledLater, canceledLater])
+      assert.equal(ids(history).includes(id), false);
+    let open = await list({ state: 'open', limit: '100' });
+    assert.deepEqual(
+      open.data.conditionalOrders.map((row) => [row.id, row.state]),
+      [
+        [canceledLater, 'order_pending'],
+        [filledLater, 'order_pending'],
+        [triggered, 'triggered'],
+        [watching, 'watching'],
+      ],
+    );
+    assert.equal(open.data.pagination.total, 4);
+    assert.equal(open.data.pagination.nextOffset, null);
+    const first = await list({ state: 'ended', limit: '30' });
+    const second = await list({ state: 'ended', limit: '30', offset: '30' });
+    assert.equal(first.data.pagination.total, 32);
+    assert.equal(first.data.pagination.nextOffset, 30);
+    assert.equal(second.data.pagination.nextOffset, null);
+    const ended = [...ids(first), ...ids(second)];
+    assert.equal(new Set(ended).size, 32);
+    assert.ok(ended.every((id) => !ids(open).includes(id)));
+    assert.ok(
+      [...first.data.conditionalOrders, ...second.data.conditionalOrders].every(
+        (row) => row.state === 'canceled',
+      ),
+    );
+    await rejects(
+      list({ state: 'open', history: 'true' }),
+      'INVALID_PAGINATION',
+    );
+    // Cancel paths: a linked pending order is not a watch cancel; it is the
+    // ordinary order cancel. A triggered watch is still a watch cancel.
+    await rejects(
+      conditionalBuy.cancel(s.userId, s.accountId, filledLater),
+      'CONDITIONAL_BUY_ALREADY_ORDERED',
+    );
+    const linked = (await watch(canceledLater)).orderId!;
+    await orders.cancelOrderForTradingAccount(s.userId, s.accountId, linked);
+    const canceledWatch = await conditionalBuy.cancel(
+      s.userId,
+      s.accountId,
+      triggered,
+    );
+    assert.equal(canceledWatch.data.conditionalOrder.state, 'canceled');
+    // The other linked order fills through the existing matcher.
+    await fxEvidence();
+    await quote(s, 'KRX', '93.5');
+    const summary = await matcher.matchDueLimitOrders({ now: await now() });
+    assert.equal(summary.filledPathA, 1);
+    open = await list({ state: 'open', limit: '100' });
+    assert.deepEqual(ids(open), [watching]);
+    const after = await list({ state: 'ended', limit: '100' });
+    assert.equal(after.data.pagination.total, 35);
+    const state = (id: string) =>
+      after.data.conditionalOrders.find((row) => row.id === id)?.state;
+    assert.equal(state(filledLater), 'filled');
+    assert.equal(state(canceledLater), 'order_canceled');
+    assert.equal(state(triggered), 'canceled');
+    // Flag off: the open list and its cancel keep working.
+    process.env.CONDITIONAL_BUY_ORDERS_ENABLED = 'false';
+    try {
+      open = await list({ state: 'open', limit: '100' });
+      assert.equal(open.data.capabilities.enabled, false);
+      assert.deepEqual(ids(open), [watching]);
+      await conditionalBuy.cancel(s.userId, s.accountId, watching);
+      assert.equal(
+        (await list({ state: 'open', limit: '100' })).data.pagination.total,
+        0,
+      );
+    } finally {
+      process.env.CONDITIONAL_BUY_ORDERS_ENABLED = 'true';
+    }
+    // Another user's account is the same 404 for the filtered read.
+    const other = await fixture('general');
+    try {
+      await rejects(
+        conditionalBuy.list(other.userId, s.accountId, { state: 'open' }),
+        'TRADING_ACCOUNT_NOT_FOUND',
+      );
+    } finally {
+      await release(other);
+    }
+    pass(
+      'state=open lists old watching/triggered/order_pending past 32 newer ended rows; ended is its complement',
+    );
+  });
+}
+
 async function main() {
   await db.$connect();
   try {
@@ -1299,6 +1431,7 @@ async function run() {
   await staleTrigger();
   await lifecycle();
   await flagsAndScope();
+  await listStates();
   await usStockScope();
   await beginner();
   await workerLease();

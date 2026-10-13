@@ -4,6 +4,7 @@ import {
   getConditionalBuyCancelPath,
   getConditionalBuyDraftError,
   getConditionalBuyEndReason,
+  getConditionalBuyResultNotice,
   getConditionalBuyStateLabel,
   isConditionAlreadyMet,
   isLiveConditionalBuy,
@@ -80,5 +81,36 @@ describe('Conditional BUY draft', () => {
     assert.equal(isConditionAlreadyMet('at_or_above', '71000', '71000'), true, 'equality triggers');
     assert.equal(isConditionAlreadyMet('at_or_above', '71000', null), false);
     assert.equal(isConditionAlreadyMet(null, '71000', '72000'), false);
+  });
+});
+
+describe('Conditional BUY create result (first answer or same-key replay)', () => {
+  const result = (state: string, extra: Record<string, unknown> = {}) =>
+    getConditionalBuyResultNotice({ state, failureCode: null, terminalReason: null, order: null, ...extra } as never);
+
+  it('follows the server state: registered, condition met, order accepted and filled never blur', () => {
+    assert.equal(result('watching').title, '조건주문이 등록되었습니다. 감시 중입니다.');
+    assert.equal(result('triggered').title, '조건이 충족되어 주문을 처리하고 있어요.');
+    assert.equal(result('triggered').detail, '아직 체결된 것은 아니에요.');
+    assert.equal(result('order_pending', { order: order('submitted') }).title, '조건이 충족되어 지정가 매수가 접수됐어요. 체결을 기다리고 있어요.');
+    assert.equal(result('filled', { order: order('executed') }).title, '조건주문의 매수가 체결됐어요.');
+    const titles = ['watching', 'triggered', 'order_pending', 'filled'].map((state) => result(state).title);
+    assert.equal(new Set(titles).size, 4);
+    for (const state of ['watching', 'triggered', 'order_pending'])
+      assert.equal(/체결됐|체결 완료/u.test(result(state).title), false, `${state} is not a fill`);
+  });
+
+  it('ended rows are never shown as watching and say why', () => {
+    for (const state of ['failed', 'canceled', 'order_canceled', 'order_rejected', 'filled']) {
+      assert.equal(result(state).title.includes('감시 중'), false, state);
+      assert.equal(result(state).next.includes('종료 이력'), true, state);
+    }
+    assert.equal(result('failed', { failureCode: 'INSUFFICIENT_BALANCE' }).detail, '발동 시점의 잔액이 부족했어요.');
+    assert.equal(result('failed').tone, 'error');
+    assert.equal(result('canceled', { terminalReason: 'season_ended' }).detail, '시즌 종료로 감시가 끝났어요.');
+    assert.equal(result('order_canceled', { order: { ...order('canceled'), cancelReason: 'user_canceled' } }).detail, '연결된 지정가 주문을 취소했어요.');
+    assert.equal(result('order_rejected').title, '연결된 주문이 거부됐어요.');
+    assert.equal(result('mystery').title, '조건주문 상태를 확인하지 못했어요.');
+    for (const state of ['watching', 'triggered', 'order_pending']) assert.equal(result(state).next.includes('취소'), true, state);
   });
 });

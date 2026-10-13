@@ -32,6 +32,14 @@ export const TextInput = React.forwardRef((props, ref) => {
     />
   );
 });
+// RN Web's Alert is a no-op. `?alertConfirm=1` presses the destructive button
+// so a check can follow a confirmed action; otherwise nothing is pressed.
+export const Alert = {
+  alert: (title, message, buttons = []) => {
+    if (new URLSearchParams(location.search).get('alertConfirm') !== '1') return;
+    setTimeout(() => buttons.find((button) => button.style === 'destructive')?.onPress?.(), 0);
+  },
+};
 export function useWindowDimensions() {
   return { ...Native.useWindowDimensions(), fontScale: scale };
 }

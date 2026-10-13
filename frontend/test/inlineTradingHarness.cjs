@@ -284,12 +284,14 @@ function inlineTradingHarness() {
         if (h.conditionalGate) await h.conditionalGate.promise;
         if (h.conditionalFailure) throw h.conditionalFailure;
         const asset = h.assets[body.assetId];
-        return { tradingAccountId: id, duplicate: false, conditionalOrder: {
+        // A test may answer as a replay of a watch that moved on (h.conditionalResult).
+        return { tradingAccountId: id, duplicate: !!h.conditionalResult, conditionalOrder: {
           id: `cb-${h.requests.length}`, assetId: body.assetId, asset: { id: asset.id, symbol: asset.symbol, name: asset.name, market: asset.market, assetType: asset.assetType },
           side: 'buy', triggerCondition: body.triggerCondition, triggerPrice: body.triggerPrice, executionType: body.executionType,
           limitPrice: body.limitPrice ?? null, quantity: body.quantity ?? null, amount: body.amount ?? null, currencyCode: asset.settlementCurrency,
           status: 'watching', state: 'watching', trigger: null, order: null, attemptCount: 0, lastAttemptAt: null, failureCode: null,
           terminalReason: null, createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(),
+          ...h.conditionalResult,
         } };
       },
       cancelConditionalBuyOrder: async (id, conditionalOrderId) => {

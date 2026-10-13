@@ -29,7 +29,10 @@ import {
   parseConditionalBuyBody,
   type ConditionalBuyBody,
 } from './conditional-buy-policy';
-import { liveConditionalBuy } from './conditional-buy-state';
+import {
+  liveConditionalBuy,
+  openConditionalBuy,
+} from './conditional-buy-state';
 
 const CONDITIONAL_BUY_INCLUDE = {
   asset: {
@@ -73,6 +76,8 @@ type ConditionalBuyListQuery = {
   offset?: string;
   assetId?: string;
   history?: string;
+  /** `open` | `ended`; not combined with `history`. */
+  state?: string;
 };
 
 /**
@@ -313,13 +318,22 @@ export class ConditionalBuyService {
       offset < 0 ||
       offset > 100000 ||
       (query.history !== undefined &&
-        !['true', 'false'].includes(query.history))
+        !['true', 'false'].includes(query.history)) ||
+      (query.state !== undefined &&
+        (!['open', 'ended'].includes(query.state) ||
+          query.history !== undefined))
     )
       throw createApiError('INVALID_PAGINATION', 'Invalid history query.', 400);
     const where: Prisma.ConditionalBuyOrderWhereInput = {
       tradingAccountId: accountId,
       ...(query.assetId ? { assetId: query.assetId } : {}),
-      ...(query.history === 'true' ? {} : liveConditionalBuy),
+      ...(query.state === 'open'
+        ? openConditionalBuy
+        : query.state === 'ended'
+          ? { NOT: openConditionalBuy }
+          : query.history === 'true'
+            ? {}
+            : liveConditionalBuy),
     };
     const [rows, total, clock] = await Promise.all([
       this.prisma.conditionalBuyOrder.findMany({

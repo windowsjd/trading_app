@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert, AppState, Text, View, type AppStateStatus } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import ErrorNotice from '../../components/states/ErrorNotice';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -20,12 +21,18 @@ import {
   getConditionalBuyStateLabel,
   isLiveConditionalBuy,
 } from '../../features/conditional/conditionalBuyDisplay';
+import {
+  assertEndedConditionalBuyPage,
+  getOpenConditionalBuyOrders,
+  mergeConditionalBuyLists,
+} from '../../features/conditional/conditionalBuyLists';
 import { cancelTradingAccountOrder } from '../../features/tradingAccount/api';
 import { invalidateAfterOrderCancel } from '../../features/tradingAccount/invalidation';
 import { getApiErrorCode, getErrorMessageFromCode } from '../../services/api/errorMapper';
 import { formatDisplayDecimal, formatKstDateTime, getAssetNameDisplay } from '../../utils/format';
 
-const LIST = { history: true, limit: 30 } as const;
+/** Ended history page size; the open list is always read completely. */
+const ENDED_PAGE = 30;
 
 type CancelRequest = {
   accountId: string;
@@ -40,6 +47,10 @@ type CancelRequest = {
  * cancel stay available even when new registrations are switched off. A
  * watch is canceled while watching/triggered; once it placed a limit order,
  * that ordinary order is canceled instead (the watch then reads 연결 주문 취소).
+ *
+ * Every row that can still be canceled is read completely (all pages) and
+ * shown first, so an old watch never hides behind newer ended rows; the ended
+ * history below it pages on demand. A failed read is an error, never "none".
  */
 export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonUi }: {
   accountId: string;
@@ -59,18 +70,43 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
   }, []);
   const isCurrent = (request: CancelRequest) =>
     request.accountId === scope.current.accountId && request.epoch === scope.current.epoch;
-  const [failure, setFailure] = useState<{ message: string; cause: unknown } | null>(null);
+  // The original error only; its public copy is mapped where it is shown.
+  const [failure, setFailure] = useState<{ cause: unknown } | null>(null);
 
-  const query = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.list(accountId, LIST),
-    queryFn: ({ signal }) => getConditionalBuyOrders(accountId, LIST, signal),
+  const open = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.open(accountId),
+    queryFn: ({ signal }) => getOpenConditionalBuyOrders(accountId, getConditionalBuyOrders, signal),
     refetchOnMount: 'always',
     // Poll only while something can still change state.
     refetchInterval: (state) => isFocused && appState === 'active'
-      && state.state.data?.conditionalOrders.some((row) => isLiveConditionalBuy(row) || row.state === 'order_pending')
+      && (state.state.data?.conditionalOrders.length ?? 0) > 0
       ? 4000 : false,
     refetchIntervalInBackground: false,
   });
+  const ended = useInfiniteQuery({
+    queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.ended(accountId),
+    queryFn: async ({ pageParam, signal }) => assertEndedConditionalBuyPage(
+      accountId,
+      await getConditionalBuyOrders(accountId, { state: 'ended', limit: ENDED_PAGE, offset: pageParam }, signal),
+    ),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.pagination.nextOffset ?? undefined,
+    refetchOnMount: 'always',
+    // Loaded history pages are not kept for the next visit: it starts at page 1.
+    gcTime: 0,
+  });
+  // A row that left the open set has ended: show it in the history now.
+  const openIds = useRef<Set<string> | null>(null);
+  const openData = open.data?.tradingAccountId === accountId ? open.data : undefined;
+  useEffect(() => {
+    if (!openData) return;
+    const ids = new Set(openData.conditionalOrders.map((row) => row.id));
+    const previous = openIds.current;
+    openIds.current = ids;
+    if (previous && [...previous].some((id) => !ids.has(id)))
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.ended(accountId) });
+  }, [accountId, openData, queryClient]);
+
   const cancel = useMutation({
     mutationFn: async (request: CancelRequest): Promise<unknown> => request.path.kind === 'conditional'
       ? cancelConditionalBuyOrder(request.accountId, request.row.id)
@@ -83,7 +119,8 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
     },
     onError: (cause, request) => {
       if (!isCurrent(request)) return;
-      setFailure({ cause, message: getErrorMessageFromCode(getApiErrorCode(cause)) });
+      setFailure({ cause });
+      // A cancel that lost to a trigger or a fill: show the server's state.
       void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.all(request.accountId) });
     },
   });
@@ -102,90 +139,130 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
     );
   };
 
-  const data = query.data?.tradingAccountId === accountId ? query.data : undefined;
-  if (query.isError && !data) {
+  if (open.isError && !openData) {
     return (
       <>
         <InlineEmptyState title="조건주문을 불러오지 못했습니다." message="잠시 후 다시 시도해주세요." />
-        <ActionPressable testID="conditional-orders-retry" accessibilityRole="button" style={styles.button} onPress={() => void query.refetch()}>
+        <ActionPressable testID="conditional-orders-retry" accessibilityRole="button" style={styles.button} onPress={() => void open.refetch()}>
           <Text style={styles.buttonText}>조건주문 다시 시도</Text>
         </ActionPressable>
-        <AdminDiagnosticPanel error={query.error} />
+        <AdminDiagnosticPanel error={open.error} />
       </>
     );
   }
-  if (!data) return <SectionSkeleton lines={3} />;
-  const rows = data.conditionalOrders;
+  if (!openData) return <SectionSkeleton lines={3} />;
+  const endedPages = ended.data?.pages.filter((page) => page.tradingAccountId === accountId) ?? [];
+  const rows = mergeConditionalBuyLists(openData.conditionalOrders, endedPages);
   const canceling = cancel.isPending && cancel.variables && isCurrent(cancel.variables) ? cancel.variables.row.id : null;
+  const renderRow = (row: ConditionalBuyOrderDto) => {
+    const path = getConditionalBuyCancelPath(row);
+    const name = getAssetNameDisplay(row.asset);
+    const currency = row.currencyCode;
+    const reason = getConditionalBuyEndReason(row);
+    const tone = row.state === 'filled' ? styles.success
+      : row.state === 'failed' || row.state === 'order_rejected' ? styles.error
+      : isLiveConditionalBuy(row) || row.state === 'order_pending' ? styles.live : styles.muted;
+    return (
+      <View key={row.id} testID={`conditional-order-${row.id}`} style={styles.row}>
+        <View style={styles.titleLine}>
+          <Text style={styles.name}>{name.primary}</Text>
+          <Text testID={`conditional-order-${row.id}-state`} style={[styles.state, tone]}>{getConditionalBuyStateLabel(row.state)}</Text>
+        </View>
+        <Text style={styles.label}>
+          감시가격 {formatDisplayDecimal(row.triggerPrice)} {currency} {TRIGGER_CONDITION_LABEL[row.triggerCondition] ?? ''} 시{' '}
+          {row.executionType === 'limit' && row.limitPrice
+            ? `지정가 ${formatDisplayDecimal(row.limitPrice)} ${currency}`
+            : EXECUTION_TYPE_LABEL[row.executionType] ?? ''} 매수
+        </Text>
+        <Text style={styles.label}>
+          {row.amount ? `매수 금액 ${formatDisplayDecimal(row.amount)} ${currency}` : `수량 ${formatDisplayDecimal(row.quantity)}`}
+          {' · '}등록 {formatKstDateTime(row.createdAt)}
+        </Text>
+        {row.trigger ? <Text style={styles.label}>조건 충족 {formatKstDateTime(row.trigger.triggeredAt)}</Text> : null}
+        {row.state === 'filled' && row.order ? (
+          <Text style={styles.label}>
+            체결 {formatKstDateTime(row.order.executedAt)} · 체결가 {formatDisplayDecimal(row.order.executedPrice)} {currency}
+          </Text>
+        ) : null}
+        {row.state === 'order_pending' && row.order ? (
+          <Text style={styles.label}>
+            지정가 {formatDisplayDecimal(row.order.limitPrice)} {currency} 주문 접수 · 예약금 {formatDisplayDecimal(row.order.reservedAmount)} {currency}
+          </Text>
+        ) : null}
+        {reason ? <Text style={styles.label}>{reason}</Text> : null}
+        {path ? (
+          <ActionPressable
+            testID={`conditional-order-${row.id}-cancel`}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: canceling === row.id, busy: canceling === row.id }}
+            disabled={canceling === row.id}
+            style={[styles.cancel, canceling === row.id && styles.cancelBusy]}
+            onPress={() => confirmCancel(row, path)}
+          >
+            <Text style={styles.cancelText}>
+              {canceling === row.id ? '취소 중...' : path.kind === 'conditional' ? '감시 취소' : '지정가 주문 취소'}
+            </Text>
+          </ActionPressable>
+        ) : null}
+      </View>
+    );
+  };
+  const loadingMore = ended.isFetchingNextPage;
+  // The first page or a refresh failed (a failed "more" keeps its own notice).
+  const endedFailed = ended.isError && !ended.isFetchNextPageError;
   return (
     <View style={styles.list} testID="conditional-orders-list">
-      {!data.capabilities.enabled ? (
+      {!openData.capabilities.enabled ? (
         <Text testID="conditional-orders-disabled" style={styles.notice}>
           현재 운영 상태에서는 새 조건주문을 등록할 수 없어요. 이미 등록한 조건주문은 확인하고 취소할 수 있어요.
         </Text>
       ) : null}
       {failure ? (
-        <>
-          <Text testID="conditional-orders-cancel-error" accessibilityLiveRegion="polite" style={styles.error}>{failure.message}</Text>
-          <AdminDiagnosticPanel error={failure.cause} />
-        </>
+        <ErrorNotice error={failure.cause} message={getErrorMessageFromCode(getApiErrorCode(failure.cause))}
+          testID="conditional-orders-cancel-error" style={styles.error} />
       ) : null}
-      {rows.length === 0 ? (
-        <InlineEmptyState title="조건주문이 없습니다." message="" />
-      ) : rows.map((row) => {
-        const path = getConditionalBuyCancelPath(row);
-        const name = getAssetNameDisplay(row.asset);
-        const currency = row.currencyCode;
-        const reason = getConditionalBuyEndReason(row);
-        const tone = row.state === 'filled' ? styles.success
-          : row.state === 'failed' || row.state === 'order_rejected' ? styles.error
-          : isLiveConditionalBuy(row) || row.state === 'order_pending' ? styles.live : styles.muted;
-        return (
-          <View key={row.id} testID={`conditional-order-${row.id}`} style={styles.row}>
-            <View style={styles.titleLine}>
-              <Text style={styles.name}>{name.primary}</Text>
-              <Text testID={`conditional-order-${row.id}-state`} style={[styles.state, tone]}>{getConditionalBuyStateLabel(row.state)}</Text>
-            </View>
-            <Text style={styles.label}>
-              감시가격 {formatDisplayDecimal(row.triggerPrice)} {currency} {TRIGGER_CONDITION_LABEL[row.triggerCondition] ?? ''} 시{' '}
-              {row.executionType === 'limit' && row.limitPrice
-                ? `지정가 ${formatDisplayDecimal(row.limitPrice)} ${currency}`
-                : EXECUTION_TYPE_LABEL[row.executionType] ?? ''} 매수
-            </Text>
-            <Text style={styles.label}>
-              {row.amount ? `매수 금액 ${formatDisplayDecimal(row.amount)} ${currency}` : `수량 ${formatDisplayDecimal(row.quantity)}`}
-              {' · '}등록 {formatKstDateTime(row.createdAt)}
-            </Text>
-            {row.trigger ? <Text style={styles.label}>조건 충족 {formatKstDateTime(row.trigger.triggeredAt)}</Text> : null}
-            {row.state === 'filled' && row.order ? (
-              <Text style={styles.label}>
-                체결 {formatKstDateTime(row.order.executedAt)} · 체결가 {formatDisplayDecimal(row.order.executedPrice)} {currency}
-              </Text>
-            ) : null}
-            {row.state === 'order_pending' && row.order ? (
-              <Text style={styles.label}>
-                지정가 {formatDisplayDecimal(row.order.limitPrice)} {currency} 주문 접수 · 예약금 {formatDisplayDecimal(row.order.reservedAmount)} {currency}
-              </Text>
-            ) : null}
-            {reason ? <Text style={styles.label}>{reason}</Text> : null}
-            {path ? (
-              <ActionPressable
-                testID={`conditional-order-${row.id}-cancel`}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: canceling === row.id, busy: canceling === row.id }}
-                disabled={canceling === row.id}
-                style={[styles.cancel, canceling === row.id && styles.cancelBusy]}
-                onPress={() => confirmCancel(row, path)}
-              >
-                <Text style={styles.cancelText}>
-                  {canceling === row.id ? '취소 중...' : path.kind === 'conditional' ? '감시 취소' : '지정가 주문 취소'}
-                </Text>
-              </ActionPressable>
-            ) : null}
-          </View>
-        );
-      })}
-      {data.pagination.nextOffset !== null ? <Text style={styles.label}>최근 {rows.length}건만 표시해요.</Text> : null}
+      <View style={styles.section} testID="conditional-orders-open">
+        <Text accessibilityRole="header" style={styles.sectionTitle}>진행 중 · {rows.open.length}건</Text>
+        {open.isError ? (
+          <ErrorNotice error={open.error} message="최신 상태를 확인하지 못했어요. 아래는 마지막으로 확인한 상태예요."
+            testID="conditional-orders-open-stale" style={styles.notice} />
+        ) : null}
+        {rows.open.length === 0
+          ? <InlineEmptyState title="진행 중인 조건주문이 없습니다." message="감시 중이거나 체결을 기다리는 조건주문이 여기에 표시돼요." />
+          : rows.open.map(renderRow)}
+      </View>
+      <View style={styles.section} testID="conditional-orders-ended">
+        <Text accessibilityRole="header" style={styles.sectionTitle}>종료 이력</Text>
+        {endedFailed ? (
+          <>
+            <ErrorNotice error={ended.error} message="종료 이력을 불러오지 못했습니다."
+              testID="conditional-orders-ended-error" style={styles.error} />
+            <ActionPressable testID="conditional-orders-ended-retry" accessibilityRole="button" style={styles.button} onPress={() => void ended.refetch()}>
+              <Text style={styles.buttonText}>종료 이력 다시 시도</Text>
+            </ActionPressable>
+          </>
+        ) : null}
+        {rows.ended.length > 0 ? rows.ended.map(renderRow)
+          : endedFailed ? null
+          : !ended.data ? <SectionSkeleton lines={2} />
+          : <InlineEmptyState title="종료된 조건주문이 없습니다." message="" />}
+        {ended.isFetchNextPageError ? (
+          <ErrorNotice error={ended.error} message="이전 이력을 더 불러오지 못했습니다. 다시 눌러 확인해 주세요."
+            testID="conditional-orders-more-error" style={styles.error} />
+        ) : null}
+        {ended.data && ended.hasNextPage ? (
+          <ActionPressable
+            testID="conditional-orders-more"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: loadingMore, busy: loadingMore }}
+            disabled={loadingMore}
+            style={styles.button}
+            onPress={() => { if (!ended.isFetching) void ended.fetchNextPage(); }}
+          >
+            <Text style={styles.buttonText}>{loadingMore ? '불러오는 중...' : '이전 이력 더 보기'}</Text>
+          </ActionPressable>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -193,6 +270,8 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
 // Plain objects: loaded by harnesses with minimal native mocks.
 const styles = {
   list: { gap: 10, minWidth: 0 },
+  section: { gap: 10, minWidth: 0 },
+  sectionTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700', color: semantic.text },
   notice: { fontSize: 12, lineHeight: 17, color: semantic.warning },
   error: { fontSize: 12, lineHeight: 17, color: semantic.error },
   row: {

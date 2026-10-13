@@ -26,6 +26,7 @@ export class ConditionalBuyController {
         offset: 'INVALID_PAGINATION',
         assetId: 'INVALID_CONDITIONAL_BUY',
         history: 'INVALID_PAGINATION',
+        state: 'INVALID_PAGINATION',
       }),
     )
     query: {
@@ -33,6 +34,7 @@ export class ConditionalBuyController {
       offset?: string;
       assetId?: string;
       history?: string;
+      state?: string;
     },
   ) {
     return this.service.list(req.user?.userId, id, query);

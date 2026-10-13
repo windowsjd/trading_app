@@ -105,7 +105,7 @@ All routes require the owning user; a foreign account is the existing 404.
 | Method | Path | Notes |
 | --- | --- | --- |
 | POST | `/trading-accounts/:accountId/conditional-buy-orders` | Body: `assetId`, `triggerCondition`, `triggerPrice`, `executionType`, `limitPrice` (limit only), `quantity` XOR `amount`, optional `currencyCode`, `idempotencyKey` (8–128 `[A-Za-z0-9:_-]`). Same key + same body replays (`duplicate: true`); a different body → `CONDITIONAL_IDEMPOTENCY_CONFLICT` |
-| GET | `/trading-accounts/:accountId/conditional-buy-orders` | `history=true` includes terminal rows; `assetId`; `limit` ≤ 100 (default 30), `offset` ≤ 100000. Returns `capabilities` (`enabled`, `canCreate`, `canCancel`, `canUseLimit`, `markets`, `maxLivePerAccount`) |
+| GET | `/trading-accounts/:accountId/conditional-buy-orders` | Default: live rows (`watching`/`triggered`); `history=true` includes terminal rows; `state=open` = every row the owner can still cancel (`watching`, `triggered`, `order_pending`), `state=ended` = the rest (`state` is not combined with `history` → `INVALID_PAGINATION`); `assetId`; `limit` ≤ 100 (default 30), `offset` ≤ 100000; newest first. Returns `capabilities` (`enabled`, `canCreate`, `canCancel`, `canUseLimit`, `markets`, `maxLivePerAccount`) |
 | GET | `/trading-accounts/:accountId/conditional-buy-orders/:id` | Detail |
 | POST | `/trading-accounts/:accountId/conditional-buy-orders/:id/cancel` | Idempotent for terminal rows (`duplicate: true`); `ordered` → `CONDITIONAL_BUY_ALREADY_ORDERED` |
 

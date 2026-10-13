@@ -1,4 +1,4 @@
-import React, { useCallback, useContext, useEffect, useRef } from 'react';
+import React, { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -14,6 +14,20 @@ import type { FillNotice } from './fillTracker';
 
 /** Visible time after the entrance; long enough to read the title and act. */
 export const FILL_BANNER_VISIBLE_MS = 4000;
+/** After a held 내역 보기: time to read why, end the guide and press again. */
+export const FILL_BANNER_HELD_MS = 10_000;
+
+/**
+ * What 내역 보기 did. Only `opened` moved anywhere; the banner stays (and
+ * says why) when an active beginner guide held the move or navigation is
+ * not ready yet.
+ */
+export type FillHistoryOutcome = 'opened' | 'held' | 'unavailable';
+
+const NOT_OPENED: Record<Exclude<FillHistoryOutcome, 'opened'>, string> = {
+  held: '학습 안내 중이라 거래 내역을 열지 않았어요. 안내를 종료한 뒤 다시 눌러 주세요.',
+  unavailable: '지금은 거래 내역을 열 수 없어요. 잠시 후 다시 눌러 주세요.',
+};
 const ENTER_MS = 220;
 const EXIT_MS = 180;
 const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
@@ -27,7 +41,7 @@ const easeInQuad = (t: number) => t * t;
 export default function OrderFillBanner({ notice, onDone, onOpenHistory }: {
   notice: FillNotice | null;
   onDone: () => void;
-  onOpenHistory: (notice: FillNotice) => void;
+  onOpenHistory: (notice: FillNotice) => FillHistoryOutcome;
 }) {
   // Resolved once here, not per banner: the hook starts reduced until known.
   const reduced = useReducedMotion();
@@ -40,7 +54,7 @@ function BannerFrame({ notice, reduced, onDone, onOpenHistory }: {
   notice: FillNotice;
   reduced: boolean;
   onDone: () => void;
-  onOpenHistory: (notice: FillNotice) => void;
+  onOpenHistory: (notice: FillNotice) => FillHistoryOutcome;
 }) {
   // Outside the navigators there is no inset provider; window metrics hold
   // the status bar / notch height.
@@ -63,16 +77,37 @@ function BannerFrame({ notice, reduced, onDone, onOpenHistory }: {
       .start(() => finish());
   }, [finish, native, progress, reduced]);
 
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveAfter = useCallback((ms: number) => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(leave, ms);
+  }, [leave]);
+  const [notOpened, setNotOpened] = useState<Exclude<FillHistoryOutcome, 'opened'> | null>(null);
+
   useEffect(() => {
     const message = notice.detail ? `${notice.title}. ${notice.detail}` : notice.title;
     if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility?.(message);
     if (reduced) progress.setValue(1);
     else Animated.timing(progress, { toValue: 1, duration: ENTER_MS, easing: easeOutCubic, useNativeDriver: native, isInteraction: false }).start();
-    const timer = setTimeout(leave, FILL_BANNER_VISIBLE_MS);
-    return () => clearTimeout(timer);
+    leaveAfter(FILL_BANNER_VISIBLE_MS);
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+    };
     // One run per banner; the frame is keyed by notice id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const openHistory = () => {
+    const outcome = onOpenHistory(notice);
+    if (outcome === 'opened') {
+      leave();
+      return;
+    }
+    // Nothing opened: the fill stays on screen with the reason, not dismissed.
+    setNotOpened(outcome);
+    if (Platform.OS !== 'web') AccessibilityInfo.announceForAccessibility?.(NOT_OPENED[outcome]);
+    leaveAfter(FILL_BANNER_HELD_MS);
+  };
 
   const overflow = notice.overflow ? `외 ${notice.overflow}건 체결` : null;
   const detail = [notice.detail, overflow].filter(Boolean).join(' · ') || null;
@@ -100,6 +135,7 @@ function BannerFrame({ notice, reduced, onDone, onOpenHistory }: {
             <View style={styles.copy}>
               <Text testID="order-fill-banner-title" style={styles.title}>{notice.title}</Text>
               {detail ? <Text testID="order-fill-banner-detail" style={styles.detail}>{detail}</Text> : null}
+              {notOpened ? <Text testID="order-fill-banner-not-opened" style={styles.notOpened}>{NOT_OPENED[notOpened]}</Text> : null}
             </View>
           </View>
           <ActionPressable
@@ -108,10 +144,7 @@ function BannerFrame({ notice, reduced, onDone, onOpenHistory }: {
             accessibilityLabel={`내역 보기, ${notice.title}`}
             hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
             style={styles.action}
-            onPress={() => {
-              onOpenHistory(notice);
-              leave();
-            }}
+            onPress={openHistory}
           >
             <Text style={styles.actionText}>내역 보기</Text>
           </ActionPressable>
@@ -159,6 +192,7 @@ const styles = {
   copy: { flex: 1, minWidth: 0, gap: 2 },
   title: { fontSize: 15, lineHeight: 21, fontWeight: '700', color: semantic.text },
   detail: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
+  notOpened: { fontSize: 12, lineHeight: 17, fontWeight: '600', color: semantic.warning },
   action: {
     flexShrink: 0,
     marginLeft: 'auto',
