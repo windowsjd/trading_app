@@ -232,5 +232,679 @@
     "https://www.postgresql.org/docs/16/sql-altertable.html",
     "https://www.postgresql.org/docs/16/explicit-locking.html",
     "https://www.prisma.io/docs/orm/v7/prisma-migrate/understanding-prisma-migrate/migration-histories"
-  ]
+  ],
+  "record_semantics": {
+    "legacy_root_fields": "Unchanged original test-phase snapshot before first publication; work_basis.commit=false, push=false, end_head=cc37e6ea are historical, not current Git/CI state.",
+    "publication_history": "Verified publication facts of explicitly named commits. CI head association is distinguished from the synthetic pull-request merge SHA actually checked out.",
+    "follow_up": "New limited follow-up observations; previous measured values/execution history are not overwritten. Receipt commit metadata is resolved through Git history; subsequent CI is observed only after Push."
+  },
+  "publication_history": [
+    {
+      "phase": "original_verification_publication",
+      "commit": "29e896d92ec7c645654bd7e232f8786e82d208eb",
+      "branch": "codex/migration-worker-safety-20261013",
+      "commit_created": true,
+      "pushed_to_origin": true,
+      "remote_head_confirmed_at_followup_start": "29e896d92ec7c645654bd7e232f8786e82d208eb",
+      "pr": {
+        "number": 5,
+        "url": "https://github.com/windowsjd/trading_app/pull/5",
+        "state": "open",
+        "merged": false
+      },
+      "ci_associated_head": "29e896d92ec7c645654bd7e232f8786e82d208eb",
+      "ci_checkout_merge_sha": "12db8c0ad8e69e6268332c796c961f1ba4e611c6",
+      "ci_runs": [
+        {
+          "id": 38378103460,
+          "name": "Futures release fixture",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/windowsjd/trading_app/actions/runs/38378103460"
+        },
+        {
+          "id": 38378103431,
+          "name": "CI",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/windowsjd/trading_app/actions/runs/38378103431"
+        }
+      ],
+      "ci_jobs": [
+        {
+          "id": 115231455516,
+          "name": "Frontend quality",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115231455630,
+          "name": "Core account PostgreSQL integration",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115231455639,
+          "name": "Release-critical E2E",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115231455662,
+          "name": "Limit order PostgreSQL integration",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115231455762,
+          "name": "Candle fixture integration",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115231455832,
+          "name": "Backend quality",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115231455286,
+          "name": "Futures 25 full financial fixture",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    },
+    {
+      "phase": "supplemental_diagnostic_source_publication",
+      "commit": "f7e8ec9cb6256f2c5b904083909a6cc0eccd6978",
+      "parent": "29e896d92ec7c645654bd7e232f8786e82d208eb",
+      "commit_created": true,
+      "pushed_to_origin": true,
+      "push_mode": "normal fast-forward, no force",
+      "pr": {
+        "number": 5,
+        "url": "https://github.com/windowsjd/trading_app/pull/5",
+        "state": "open",
+        "merged": false
+      },
+      "ci_associated_head": "f7e8ec9cb6256f2c5b904083909a6cc0eccd6978",
+      "ci_checkout_merge_sha": "5227af01cfe9849968b2c4a9e295995f84e688e3",
+      "ci_runs": [
+        {
+          "id": 38382642084,
+          "name": "Futures release fixture",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/windowsjd/trading_app/actions/runs/38382642084"
+        },
+        {
+          "id": 38382642095,
+          "name": "CI",
+          "status": "completed",
+          "conclusion": "success",
+          "url": "https://github.com/windowsjd/trading_app/actions/runs/38382642095"
+        }
+      ],
+      "ci_jobs": [
+        {
+          "id": 115246597217,
+          "name": "Limit order PostgreSQL integration",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115246597350,
+          "name": "Frontend quality",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115246597371,
+          "name": "Release-critical E2E",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115246597388,
+          "name": "Core account PostgreSQL integration",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115246597533,
+          "name": "Candle fixture integration",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115246597587,
+          "name": "Backend quality",
+          "status": "completed",
+          "conclusion": "success"
+        },
+        {
+          "id": 115246597081,
+          "name": "Futures 25 full financial fixture",
+          "status": "completed",
+          "conclusion": "success"
+        }
+      ]
+    }
+  ],
+  "follow_up": {
+    "date_kst": "2026-10-13",
+    "worktree": "/tmp/trading-migration-worker-safety",
+    "branch": "codex/migration-worker-safety-20261013",
+    "start_head": "29e896d92ec7c645654bd7e232f8786e82d208eb",
+    "source_verification_commit": "f7e8ec9cb6256f2c5b904083909a6cc0eccd6978",
+    "tested_script_sha256": "22f4abf3b2dce5f9259a9dcdb075de0642d16ebe3745caceedd3bff730cb46de",
+    "source_commit_scope": "Diagnostic-only test change; local checks ran before commit with this identical script content. No product/core/schema/migration change.",
+    "changed_files": [
+      "backend/scripts/conditional-buy-orders-integration.ts",
+      "backend/docs/orders-evidence-migration-runbook.md",
+      "backend/test/results/20261013-migration-worker-safety.json"
+    ],
+    "migration": {
+      "status": "PARTIAL",
+      "original_checksum": "0d859c88f7dd82102c39b151536ac0fc664237dbb659cf07e3914c99b16bb1ac",
+      "persistent_inventory_checked_at_utc": "2026-10-13T10:16:29Z",
+      "persistent_databases": [
+        {
+          "id": "dpg-da7ac0e1egvs73e2sv20-a",
+          "role": "managed primary",
+          "classification": "APPLIED",
+          "recorded": 74,
+          "differences": [],
+          "unapplied": [],
+          "target": {
+            "applied_steps_count": 1,
+            "checksum": "0d859c88f7dd82102c39b151536ac0fc664237dbb659cf07e3914c99b16bb1ac",
+            "finished_at": "2026-10-13T07:30:05.610089Z",
+            "migration_name": "20261013120000_add_conditional_sell_and_loc_sell",
+            "rolled_back_at": null,
+            "started_at": "2026-10-13T07:30:05.503438Z"
+          }
+        },
+        {
+          "id": "dpg-dattqaou01pc73agrsr0-a",
+          "role": "upgrade clone",
+          "classification": "UNAPPLIED",
+          "recorded": 55,
+          "differences": [],
+          "unapplied": [
+            "20261002120000_market_execution_result",
+            "20261006120000_add_cash_wallet_scope",
+            "20261006130000_provision_canonical_crypto_cash_wallets",
+            "20261006160000_pin_order_wallet_and_add_transfers",
+            "20261007120000_add_cross_currency_wallet_transfers",
+            "20261007180000_add_synthetic_perpetual_futures",
+            "20261007210000_add_futures_cross_risk_liquidation",
+            "20261008175900_add_futures_season_reference",
+            "20261008180000_integrate_futures_valuation_and_season_exit",
+            "20261008190000_add_futures_mark_retention",
+            "20261008200000_add_conditional_protection",
+            "20261009010000_add_futures_limit_entry",
+            "20261009120000_add_beginner_account_mode",
+            "20261009120100_add_beginner_account_owner_constraint",
+            "20261010120000_add_futures_last_price_evidence",
+            "20261011120000_beginner_quest_acknowledgements",
+            "20261012120000_add_user_inquiries",
+            "20261012180000_add_conditional_buy_and_limit_on_close",
+            "20261013120000_add_conditional_sell_and_loc_sell"
+          ]
+        }
+      ],
+      "history_failures_in_observed_databases": [],
+      "unobserved_environments": "UNKNOWN: no exhaustive environment inventory or service DATABASE_URL mapping inspected.",
+      "read_only_scope": "User-confirmed league of trading Workspace; migration history/system catalog only. No financial/user/auth rows, env values, migration execution or deployment.",
+      "orders_checks": [
+        {
+          "conname": "orders_executed_limit_amounts_check",
+          "convalidated": true,
+          "definition": "CHECK (((order_type <> 'limit'::\"OrderType\") OR (status <> 'executed'::\"OrderStatus\") OR ((executed_price IS NOT NULL) AND (gross_amount IS NOT NULL) AND (fee_amount IS NOT NULL) AND (net_amount IS NOT NULL) AND (executed_at IS NOT NULL) AND (reservation_released_at IS NOT NULL) AND ((asset_price_snapshot_id IS NOT NULL) OR (limit_order_candle_evidence_id IS NOT NULL) OR (session_close_evidence_id IS NOT NULL)))))"
+        },
+        {
+          "conname": "orders_session_close_evidence_shape",
+          "convalidated": true,
+          "definition": "CHECK (((session_close_evidence_id IS NULL) OR ((order_type = 'limit'::\"OrderType\") AND (asset_price_snapshot_id IS NULL) AND (limit_order_candle_evidence_id IS NULL))))"
+        },
+        {
+          "conname": "orders_unfilled_limit_amounts_check",
+          "convalidated": true,
+          "definition": "CHECK (((order_type <> 'limit'::\"OrderType\") OR (status <> ALL (ARRAY['submitted'::\"OrderStatus\", 'canceled'::\"OrderStatus\"])) OR ((executed_price IS NULL) AND (gross_amount IS NULL) AND (fee_amount IS NULL) AND (net_amount IS NULL) AND (executed_at IS NULL) AND (limit_order_candle_evidence_id IS NULL) AND (session_close_evidence_id IS NULL))))"
+        }
+      ],
+      "managed_primary_history_and_check_status": "PASS: applied target, checksum matches, completed validated CHECK admits LOC BUY/SELL with exclusive evidence; all 74 histories complete and checksums match.",
+      "unapplied_clone_remaining_path": "19 original migrations pending, including target. Original ACCESS EXCLUSIVE risk remains on future upgrade; no upgrade performed.",
+      "original_file_schema_history_changed": false,
+      "followup_migration_added": false,
+      "decision": "Preserve original: an applied persistent database is confirmed. Past completed locking needs no retroactive repair. Clone/new/unobserved paths require owner-approved deployment planning.",
+      "fresh_pg16": "74 originals applied; migrate status up to date; schema diff no difference; no checksum change.",
+      "upgrade_provenance": "Reuse original 73-to-74 isolated upgrade and complete-row hash/schema checks; not re-run this follow-up. Every migration/schema is unchanged, and queried persistent histories agree with local file checksums.",
+      "new_pg16_lock_probe": {
+        "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "checksum": "0d859c88f7dd82102c39b151536ac0fc664237dbb659cf07e3914c99b16bb1ac",
+        "migrationHistoryUnchanged": true,
+        "results": [
+          {
+            "path": "original-single-transaction",
+            "locks": [
+              "AccessExclusiveLock",
+              "ShareUpdateExclusiveLock"
+            ],
+            "observedTransactionMs": 453.6,
+            "read": "lock_timeout",
+            "update": "lock_timeout",
+            "insert": "lock_timeout",
+            "note": "includes three deliberate 150ms lock-timeout probes; not scan duration"
+          },
+          {
+            "path": "test-only-split-ddl-validation",
+            "locks": [
+              "ShareUpdateExclusiveLock"
+            ],
+            "validationMs": 0.24,
+            "read": "PASS",
+            "update": "PASS",
+            "insert": "PASS",
+            "invalidInsertUpdate": "rejected",
+            "definitionEqual": true
+          }
+        ]
+      },
+      "deployment_remaining": [
+        "Identify each service/logical DB and applied/failed/in-progress/checksum state",
+        "For unapplied DBs evaluate all pending DDL/FK/check locks and authorized maintenance, traffic, timeout, backup/recovery and retry plan",
+        "Do not edit applied originals, manipulate history, or claim a later migration avoids earlier locking"
+      ]
+    },
+    "buy_concurrency": {
+      "status": "PARTIAL",
+      "initial_observation": "Original early trial had only count 1/16; watch states/failure codes/clocks were not captured. Its rows were cleaned up; cause remains UNKNOWN.",
+      "original_logs_reused": [
+        "/tmp/migration-worker-buy-finance.log",
+        "/tmp/migration-worker-buy-batch-debug.log",
+        "/tmp/migration-worker-buy-debug.log",
+        "/tmp/migration-worker-pg-server.log"
+      ],
+      "historical_log_limit": "The earlier KRX ASSET_PRICE_UNAVAILABLE debug failure is separate and does not prove the crypto 16-limit cause. Lease-key unique collision near the early trial is handled by the loser branch; no saved per-watch outcome proves a causal link.",
+      "code_findings": [
+        "Worker lease limits workers, but direct evaluate also competes through account/watch locks",
+        "Trigger commits before ordinary quote/create; create re-locks watch and validates the 30-second window after lock and before final commit",
+        "Conditional deterministic key/unique order link/FK plus account fence preserve at-most-one; recordAttemptFailure ignores an already ordered row",
+        "Benign losing-worker CONDITIONAL_BUY_CHANGED was observed while all stored watches were ordered with null failure codes",
+        "Crypto trigger evidence requires registration-time/freshness/source/clock eligibility; limit quote uses limit sizing/fee/available cash and USD FX, not a new Spot execution price",
+        "Account-wide order query has no result cap; normal fixture funding permits all 16 reservations; no product defect established"
+      ],
+      "unproven_hypotheses": [
+        "Stale/future/pre-registration evidence or DB/Node clock difference/backward step",
+        "Quote/create or account/watch/reservation transaction contention, timeout or quote expiry",
+        "30-second execution window expiry or financial guard failure",
+        "Non-deterministic fixture/evidence timing; count query lacks original per-watch states"
+      ],
+      "focused_limit_repetitions": 3,
+      "full_buy_limit_case_runs": 1,
+      "total_completed_limit_cases": 4,
+      "focused_results": [
+        {
+          "round": 1,
+          "execution_type": "limit",
+          "intents": 16,
+          "elapsed_ms": 655,
+          "node_minus_db_ms": 0,
+          "trigger_evidence_age_ms": 657,
+          "min_evidence_after_registration_ms": 6,
+          "max_trigger_age_ms": 620,
+          "worker_states": [
+            {
+              "CONDITIONAL_BUY_CHANGED": 1,
+              "terminal": 15
+            },
+            null
+          ],
+          "direct_states": {
+            "ordered": 16
+          },
+          "replay_states": {
+            "terminal": 16
+          },
+          "stored_outcomes": [
+            {
+              "status": "ordered",
+              "failure_code": null,
+              "terminal_reason": null,
+              "order_status": "submitted",
+              "count": 16
+            }
+          ],
+          "financial_assertions": "PASS: unique 16 orders, matching reservations, 16 fills and ledger debits, cash/position conservation, replay/restart no duplicate"
+        },
+        {
+          "round": 2,
+          "execution_type": "limit",
+          "intents": 16,
+          "elapsed_ms": 492,
+          "node_minus_db_ms": 0,
+          "trigger_evidence_age_ms": 492,
+          "min_evidence_after_registration_ms": 5,
+          "max_trigger_age_ms": 480,
+          "worker_states": [
+            {
+              "CONDITIONAL_BUY_CHANGED": 1,
+              "terminal": 15
+            },
+            null
+          ],
+          "direct_states": {
+            "ordered": 16
+          },
+          "replay_states": {
+            "terminal": 16
+          },
+          "stored_outcomes": [
+            {
+              "status": "ordered",
+              "failure_code": null,
+              "terminal_reason": null,
+              "order_status": "submitted",
+              "count": 16
+            }
+          ],
+          "financial_assertions": "PASS: unique 16 orders, matching reservations, 16 fills and ledger debits, cash/position conservation, replay/restart no duplicate"
+        },
+        {
+          "round": 3,
+          "execution_type": "limit",
+          "intents": 16,
+          "elapsed_ms": 491,
+          "node_minus_db_ms": 0,
+          "trigger_evidence_age_ms": 492,
+          "min_evidence_after_registration_ms": 5,
+          "max_trigger_age_ms": 479,
+          "worker_states": [
+            {
+              "CONDITIONAL_BUY_CHANGED": 1,
+              "terminal": 15
+            },
+            null
+          ],
+          "direct_states": {
+            "ordered": 16
+          },
+          "replay_states": {
+            "terminal": 16
+          },
+          "stored_outcomes": [
+            {
+              "status": "ordered",
+              "failure_code": null,
+              "terminal_reason": null,
+              "order_status": "submitted",
+              "count": 16
+            }
+          ],
+          "financial_assertions": "PASS: unique 16 orders, matching reservations, 16 fills and ledger debits, cash/position conservation, replay/restart no duplicate"
+        }
+      ],
+      "full_financial_regressions": "PASS: 4 existing PostgreSQL Jest wrappers: BUY, SELL, protection/OCO, LOC; no skipped tests. BUY includes market/limit, flags, lifecycle/account/season, window/lock races, replay, restart and 16-intent cases.",
+      "product_code_changed": false,
+      "policy_30s_locks_idempotency_freshness_financial_reservations_changed": false,
+      "new_diagnostics": "Safe compact codes/statuses/relative clocks only; existing financial assertions unchanged; no IDs, prices, balances or credentials printed by added diagnostics.",
+      "worker_100_101_500_provenance": "Original traversal/restart/lease metrics reused without overwriting or running new scale tests. Worker/cursor production code unchanged; current unit and financial restart/lease regressions pass."
+    },
+    "quality": {
+      "typecheck": "PASS",
+      "build": "PASS",
+      "related_script_check_only_lint": "PASS, warnings 0",
+      "lint_accounts_check": "PASS, warnings 0",
+      "related_unit": "87 tests / 10 suites PASS, 0 skipped",
+      "postgresql_financial": "4 tests / 4 suites PASS, 0 skipped",
+      "format": "Prettier check PASS",
+      "diff_check": "PASS",
+      "bounded_executions": {
+        "migration-status": {
+          "command": [
+            "pnpm",
+            "exec",
+            "prisma",
+            "migrate",
+            "status"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.963,
+          "peak_process_group_rss_mib": 294.62,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 90.0,
+          "stopped_by_limit": null
+        },
+        "financial-regressions": {
+          "command": [
+            "pnpm",
+            "exec",
+            "jest",
+            "--runInBand",
+            "--runTestsByPath",
+            "src/conditional/conditional-buy.integration.spec.ts",
+            "src/conditional/conditional-sell.integration.spec.ts",
+            "src/conditional/conditional.integration.spec.ts",
+            "src/orders/limit-on-close.integration.spec.ts"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 171.715,
+          "peak_process_group_rss_mib": 937.54,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 600.0,
+          "stopped_by_limit": null
+        },
+        "lint-accounts": {
+          "command": [
+            "pnpm",
+            "run",
+            "lint:accounts:check"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 9.643,
+          "peak_process_group_rss_mib": 2009.56,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        },
+        "buy-limit-preflight": {
+          "command": [
+            "pnpm",
+            "exec",
+            "tsx",
+            "scripts/.followup-buy-concurrency.ts"
+          ],
+          "exit_code": 1,
+          "elapsed_seconds": 0.739,
+          "peak_process_group_rss_mib": 324.02,
+          "rss_limit_mib": 2048,
+          "time_limit_seconds": 120.0,
+          "stopped_by_limit": null
+        },
+        "build": {
+          "command": [
+            "pnpm",
+            "run",
+            "build"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 16.487,
+          "peak_process_group_rss_mib": 1960.15,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        },
+        "migration-deploy": {
+          "command": [
+            "pnpm",
+            "exec",
+            "prisma",
+            "migrate",
+            "deploy"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 2.149,
+          "peak_process_group_rss_mib": 308.67,
+          "rss_limit_mib": 2048,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        },
+        "migration-lock": {
+          "command": [
+            "pnpm",
+            "run",
+            "integration:orders-evidence-lock"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 1.065,
+          "peak_process_group_rss_mib": 238.98,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 90.0,
+          "stopped_by_limit": null
+        },
+        "buy-limit-instrumentation": {
+          "command": [
+            "pnpm",
+            "exec",
+            "tsx",
+            "scripts/.followup-buy-concurrency.ts"
+          ],
+          "exit_code": 1,
+          "elapsed_seconds": 1.165,
+          "peak_process_group_rss_mib": 467.32,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 120.0,
+          "stopped_by_limit": null
+        },
+        "typecheck-initial": {
+          "command": [
+            "pnpm",
+            "run",
+            "typecheck"
+          ],
+          "exit_code": 134,
+          "elapsed_seconds": 17.522,
+          "peak_process_group_rss_mib": 1246.88,
+          "rss_limit_mib": 2048,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        },
+        "typecheck": {
+          "command": [
+            "pnpm",
+            "run",
+            "typecheck"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 10.234,
+          "peak_process_group_rss_mib": 1811.41,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        },
+        "unit": {
+          "command": [
+            "pnpm",
+            "exec",
+            "jest",
+            "--runInBand",
+            "--runTestsByPath",
+            "src/conditional/conditional-buy-sell-worker.service.spec.ts",
+            "src/conditional/conditional-worker.service.spec.ts",
+            "src/conditional/conditional-buy-policy.spec.ts",
+            "src/conditional/conditional-buy-list.spec.ts",
+            "src/conditional/conditional-sell-policy.spec.ts",
+            "src/conditional/conditional-policy.spec.ts",
+            "src/orders/limit-on-close.policy.spec.ts",
+            "src/orders/limit-on-close-evidence.spec.ts",
+            "src/orders/limit-on-close.config.spec.ts",
+            "src/ops/ops-job-lock.service.spec.ts"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 1.547,
+          "peak_process_group_rss_mib": 414.86,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        },
+        "migration-diff": {
+          "command": [
+            "pnpm",
+            "exec",
+            "prisma",
+            "migrate",
+            "diff",
+            "--from-config-datasource",
+            "--to-schema",
+            "prisma/schema.prisma",
+            "--exit-code"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 0.851,
+          "peak_process_group_rss_mib": 300.88,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 90.0,
+          "stopped_by_limit": null
+        },
+        "buy-limit-focused": {
+          "command": [
+            "pnpm",
+            "exec",
+            "tsx",
+            "scripts/.followup-buy-concurrency.ts"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 4.265,
+          "peak_process_group_rss_mib": 580.4,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 120.0,
+          "stopped_by_limit": null
+        },
+        "lint": {
+          "command": [
+            "pnpm",
+            "exec",
+            "eslint",
+            "--no-fix",
+            "--max-warnings=0",
+            "scripts/conditional-buy-orders-integration.ts"
+          ],
+          "exit_code": 0,
+          "elapsed_seconds": 4.622,
+          "peak_process_group_rss_mib": 1260.82,
+          "rss_limit_mib": 3072,
+          "time_limit_seconds": 180.0,
+          "stopped_by_limit": null
+        }
+      },
+      "initial_verification_failures": "Startup missing opt-ins aborted before financial execution; diagnostic monotonic clock name collided with an existing service and was fixed before trigger execution; initial 1024 MiB typecheck heap exhausted, process exit verified, final typecheck/build run with 2048 MiB heap and group RSS/time limits. These are not counted as passing tests or as the old 1/16 cause."
+    },
+    "cleanup": {
+      "synthetic_users_orders_buy_sell_positions_remaining": 0,
+      "migration_history_records": 74,
+      "target_check_validated": true,
+      "test_cluster": "Stopped normally; only this follow-up cluster data/tools/socket deleted. Earlier cached binaries and other worktrees untouched."
+    },
+    "self_review": {
+      "financial_invariants": "PASS in selected tests; no product policy changes",
+      "migration_history_safety": "PASS within two observed DBs/local originals; unknown outside scope",
+      "excessive_implementation": false,
+      "deleted_skipped_or_weakened_tests": false,
+      "production_settings_or_deployments_changed": false,
+      "remaining_risks": [
+        "Unapplied/unknown DB migration lock risk",
+        "Original 1/16 cause remains unresolved"
+      ],
+      "merge_recommendation": "Conditional recommendation for this verification/diagnostic-only PR after final-head CI succeeds and owner accepts these PARTIAL results; not a blanket migration/production rollout approval."
+    },
+    "publication_record_phase": "After the supplemental diagnostic source commit was pushed and both CI workflows completed. This record is added by a later documentation-only receipt commit.",
+    "receipt_commit": {
+      "parent": "f7e8ec9cb6256f2c5b904083909a6cc0eccd6978",
+      "resolve_sha": "git log -1 --format=%H -- backend/test/results/20261013-migration-worker-safety.json",
+      "meaning": "The commit containing this follow-up publication receipt, distinct from the source/test commit above. Its own SHA cannot be embedded in its content. Verify its Push/CI against the final PR head; the final response and local .tmp/final-publication-receipt.json record that post-push observation."
+    }
+  }
 }

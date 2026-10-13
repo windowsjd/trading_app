@@ -1,8 +1,9 @@
 # Orders 종가 증거 CHECK Migration 잠금 검증과 적용 경로
 
 대상은 `20261013120000_add_conditional_sell_and_loc_sell`이다. 이 문서는
-운영 Migration 실행을 승인하지 않는다. 운영·공유 DB 적용 상태는 소유자가
-확인하기 전까지 `UNKNOWN`으로 취급한다. CI 적용 결과는 운영 적용 증거가 아니다.
+운영 Migration 실행을 승인하지 않는다. 최초 검증 당시 운영·공유 DB 적용 상태는
+`UNKNOWN`이었다. 아래 PR #5 후속 조회에서 확인한 두 Render DB만 해당 상태를
+갱신한다. 확인하지 않은 환경은 `UNKNOWN`이며 CI 적용 결과는 운영 적용 증거가 아니다.
 
 ## 잠금과 무결성
 
@@ -40,7 +41,7 @@ snapshot/candle 링크의 상호 배타성은 유지한다.
 파일 체크섬 일치를 주장하지 않는다.
 [Prisma Migration history](https://www.prisma.io/docs/orm/v7/prisma-migrate/understanding-prisma-migrate/migration-histories).
 
-파일 변경을 승인할 충분한 증거가 없는 현재 경로는 **PARTIAL**이다. 원본
+원본 변경이 안전한 미적용 환경만 존재한다는 증거가 없는 현재 경로는 **PARTIAL**이다. 원본
 Migration과 Prisma Schema를 그대로 보존하고, 분리 후보는 격리 테스트에서만
 실행한다. 신규 DB 및 원본 업그레이드의 최종 Schema는 기존 계약과 같다.
 
@@ -86,3 +87,80 @@ Worker runner는 BUY/SELL 각 100·101·500개 합성 watch를 계정당 최대 
 replay·재시작 후 주문/원장/현금/예약/보유수량을 검사한다. SELL은 10개 보유에
 16개 watch가 발동해도 총매도·예약이 보유수량을 초과하지 않아야 한다.
 테스트 후 전용 DB/클러스터를 삭제한다. 외부 거래 API·Redis·운영 DB는 필요 없다.
+
+## PR #5 후속 조회와 판단 (2026-10-13)
+
+작업 브랜치는 `codex/migration-worker-safety-20261013`이며 시작 HEAD는
+`29e896d92ec7c645654bd7e232f8786e82d208eb`이다. 기존 Worktree
+`/tmp/trading-migration-worker-safety`를 재사용했다. 모든 변경은 추가 커밋으로
+게시하며 main/다른 Worktree/기존 커밋을 변경하지 않는다.
+
+사용자가 지정한 Render `league of trading` Workspace의 두 DB에서 읽기 전용
+도구로 `_prisma_migrations`, 시스템 카탈로그와 CHECK 정의만 조회했다. 사용자
+금융 행·인증 정보·환경변수 값은 조회하지 않았으며 Migration/설정/배포를 실행하지 않았다.
+
+| 확인 대상 | 실제 상태 | 판단 |
+|---|---|---|
+| 관리 DB `dpg-da7ac0e1egvs73e2sv20-a` (PostgreSQL 17.11) | 74개 완료 이력 모두 로컬 파일 체크섬과 일치, 미완료·rollback 이력 없음. 대상은 2026-10-13 07:30:05.503438Z에 시작해 07:30:05.610089Z에 완료. 대상 CHECK와 기존 executed/unfilled CHECK가 validated이며 LOC BUY/SELL의 종가 증거 배타성 유지 | **APPLIED / 이력·CHECK PASS**. 완료된 과거 잠금을 소급 수정하지 않는다. 추가 Migration 불필요 |
+| upgrade clone `dpg-dattqaou01pc73agrsr0-a` (PostgreSQL 17.11) | 55개 완료 이력 모두 체크섬 일치, 미완료·rollback 이력 없음. 19개 미적용이며 대상 이력·Conditional SELL 테이블·종가 증거 CHECK 없음 | **UNAPPLIED**. 원본을 실행하는 업그레이드에는 기존 잠금 위험이 남음 |
+| 조회 범위 밖의 영속 DB/논리 DB | 목록에 없는 환경과 각 서비스의 실제 DATABASE_URL 연결 관계는 확인하지 않음 | **UNKNOWN**. 모든 영속 환경을 확인했다고 주장하지 않음 |
+| 조회한 두 DB의 실패·진행 중·체크섬 불일치 | 해당 이력 없음 | 발견되지 않음. 다른 환경까지 정상으로 일반화하지 않음 |
+
+Render 서비스 `trading_app`의 조회된 live 배포는
+`cf21e6884c749124fcb5360cc96c7994213dd7f5`이며 main 브랜치의 build command에
+`prisma migrate deploy`가 들어 있다. 이 배포 정보만으로 어느 DB에 연결됐는지
+추정하지 않고 위 DB별 직접 조회 결과를 사용한다. 이력의 시작/완료 간격은
+운영 요청이 차단된 시간이나 대용량 스캔 성능 측정값이 아니다.
+
+이미 적용된 DB가 확인됐으므로 원본 파일·주석·체크섬·Prisma Schema·Migration
+이력을 보존한다. 후속 Migration으로 과거 잠금이 제거됐다고 표현하지 않는다.
+미적용 clone의 업그레이드 및 신규 설치는 원본을 실행하므로 전체 판단은
+**PARTIAL**이다. 원본을 유지한 신규/업그레이드 최종 Schema 검증은 기존 결과를
+재사용하고 새 격리 PostgreSQL 16에서도 deploy/status/diff와 CHECK 잠금 검사를
+확인한다. clone/운영 DB의 실제 업그레이드는 이번 작업에 포함되지 않는다.
+
+미적용 환경을 배포하기 전 책임자는 실제 연결 DB와 이력을 확인하고, 영향을
+수용할 유지보수 구간·트래픽 관리·timeout·백업/복구·재시도 기준을 정한다.
+이 Migration뿐 아니라 앞선 미적용 Migration의 DDL/FK/검증도 함께 평가한다.
+실패/진행 중/불일치가 있으면 자동 재시도를 멈추고 실제 DDL과 이력을 조사한다.
+임의 `migrate resolve`·수동 이력 조작·검증 생략은 대응안이 아니다.
+
+## BUY 지정가 16건: 조사 범위와 남은 한계
+
+최초 실패 로그는 1/16이라는 건수만 남겼으며 당시 watch 상태/실패 코드/가격
+증거/clock 경계는 보존되지 않았다. 원본 격리 PostgreSQL 로그의 해당 시각에는
+lease key의 unique 경합이 보이지만 이는 정상적인 lease 패자 처리와 일치한다.
+그 로그만으로 최초 실패 원인이나 모든 금융 잠금 대기를 입증할 수 없다.
+
+- Worker는 live watch를 조회하고 전역 lease를 얻은 뒤 순차 평가한다. 직접
+  `evaluate()`는 그 lease를 사용하지 않으므로 두 경로의 같은 watch 경합은
+  account/lifecycle fence와 watch row lock으로 조정된다.
+- trigger는 DB `clock_timestamp()`로 기록한 뒤 트랜잭션을 끝내고 기존
+  quote→create를 호출한다. create가 account/watch를 다시 잠그고 등록 의도와
+  30초 경계를 검사하며, 주문과 watch 링크를 같은 트랜잭션에 기록한다.
+  마지막 경계 검사 실패는 주문/예약/원장을 함께 rollback한다.
+- deterministic idempotency key와 unique/FK는 재실행의 중복 주문을 막는다.
+  경합에서 패한 호출의 `CONDITIONAL_BUY_CHANGED`가 있더라도 watch가 이미
+  `ordered`면 실패 기록이 그 성공을 덮어쓰지 않는다.
+- crypto의 조건 발동은 등록 이후의 적격 Spot 가격을 요구한다. stale/future
+  증거 또는 Node/DB 시각 차이·시각 역행은 후보지만 최초 기록으로 입증되지
+  않았다. 지정가 주문 등록은 limit/fee/가용 현금 예약 코어를 사용하며,
+  시장가 체결의 Spot 가격 선택과 구분한다. USD quote의 FX 증거도 별도 확인한다.
+- quote/create 경합, 금융 transaction 오류·timeout, 가용 현금 실패, 30초 초과,
+  fixture/조회 범위 문제도 조사했다. 최초 조회는 account의 전체 주문을 읽었고
+  생성된 fixture의 정상자금으로 16건을 예약할 수 있다. 현재 코드/회귀로
+  실패 가설을 구분하지만 당시 상태가 없으므로 하나로 확정하지 않는다.
+
+기존 16건 테스트의 금융 단언은 그대로 유지하며 진단만 추가했다. 두 Worker,
+직접 평가, replay의 반환 상태와 watch별 상태·실패 코드·종료 사유·attempt 수·
+등록/증거/발동/시도 경과·일반 주문 상태를 작은 문자열로 기록한다. account/order
+ID, 가격, 현금, 인증 정보나 큰 Prisma 객체는 출력하지 않는다. 성공한 watch의
+상태와 단순 평가 반환 코드를 구분하며, 정상 `submitted` 주문을 `executed`로
+잘못 해석하지 않는다.
+
+후속 격리 재현은 기존 16건 지정가 사례를 3회만 실행하고 기존 전체 BUY 회귀의
+동일 사례를 추가로 확인한다. 별도 대규모 부하나 500건 측정을 추가하지 않는다.
+전체 자식 프로세스 그룹의 RSS와 경과시간을 제한하며 실패 시 원인·종료·정리를
+먼저 확인한다. 실제 실행 결과와 이전 결과/게시 상태는
+`backend/test/results/20261013-migration-worker-safety.json`의 후속 기록을 따른다.
+비재현과 금융 단언 통과만으로 최초 원인까지 해결됐다고 주장하지 않는다.
