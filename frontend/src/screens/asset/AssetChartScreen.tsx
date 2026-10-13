@@ -19,6 +19,11 @@ import {
   type AssetChartTimeframe,
 } from '../../features/asset/api';
 import { useAssetCandle } from '../../features/asset/useAssetCandle';
+import {
+  isTrialPriceSource,
+  trialCandleNotice,
+  TRIAL_PRICE_NOTICE,
+} from '../../features/asset/trialDataSource';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
@@ -91,10 +96,10 @@ export function AssetMarketChart({
     queryFn: () => getAssetDetail(assetId),
     enabled: isFocused,
   });
-  // The selected tab's request window. Only the 4h tab differs by market
-  // (KRX/crypto: the long-range 4h store, US: 30 days); it waits for the asset
-  // type instead of caching a wrong window, and falls back to the tab's own
-  // window if the detail cannot load.
+  // The selected tab's request window. Only the 4h tab differs from the base
+  // list (the long-range 96-session/96-day window for every market); it waits
+  // for the asset type instead of caching a wrong window, and falls back to
+  // the tab's own window if the detail cannot load.
   const requestTimeframe =
     resolveAssetChartTimeframe(
       selectedTimeframe,
@@ -294,6 +299,16 @@ export function AssetMarketChart({
       {candleLiveEnabled && latestCandle?.delayed ? (
         <Text style={styles.notice}>
           미국 캔들은 KIS 지연 체결 피드를 사용합니다.
+        </Text>
+      ) : null}
+      {isTrialPriceSource(displayPrice.priceSource) ? (
+        <Text testID="asset-trial-price-notice" style={styles.notice}>
+          {TRIAL_PRICE_NOTICE}
+        </Text>
+      ) : null}
+      {trialCandleNotice(candlesQuery.data?.source) ? (
+        <Text testID="asset-trial-candle-notice" style={styles.notice}>
+          {trialCandleNotice(candlesQuery.data?.source)}
         </Text>
       ) : null}
       <View

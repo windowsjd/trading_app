@@ -57,6 +57,8 @@ describe('asset candle synthetic fanout harness', () => {
         pendingCandles: new Map(),
         orderBookSubscriptions: new Map(),
         pendingOrderBooks: new Map(),
+        estimatedQuoteSubscriptions: new Map(),
+        pendingEstimatedQuotes: new Map(),
       });
     }
 

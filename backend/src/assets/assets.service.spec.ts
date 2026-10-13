@@ -2757,4 +2757,178 @@ describe('AssetsService', () => {
       );
     });
   });
+
+  describe('ephemeral display prices (Tiingo trial)', () => {
+    const TIINGO_SOURCE = 'tiingo_equity_reference_price';
+    const usAsset = asset({
+      id: 'aapl',
+      symbol: 'AAPL',
+      market: 'NAS',
+      assetType: AssetType.us_stock,
+      currencyCode: CurrencyCode.USD,
+    });
+    const available = () => {
+      const effectiveAt = new Date(Date.now() - 2_000);
+      const capturedAt = new Date(Date.now() - 1_500);
+      return {
+        state: 'available' as const,
+        price: '247.61',
+        effectiveAt,
+        capturedAt,
+        sourceName: TIINGO_SOURCE,
+        origin: 'ws' as const,
+        decision: {
+          selectedSourceType: 'provider_api' as const,
+          selectedSourceName: TIINGO_SOURCE,
+          selectedSnapshotId: null,
+          selectedEffectiveAt: effectiveAt,
+          selectedCapturedAt: capturedAt,
+          fallbackUsed: false,
+          fallbackReason: null,
+          rejectedProviderReason: null,
+          freshnessAgeSeconds: 1,
+        },
+      };
+    };
+    const createEphemeral = (
+      resolve: jest.Mock,
+      redis?: { get: jest.Mock; eval: jest.Mock },
+    ) => {
+      const prisma = createPrisma();
+      const displayPrices = {
+        resolve,
+        isEphemeralSourceName: (name: string | null | undefined) =>
+          name === TIINGO_SOURCE,
+      };
+      const service = new AssetsService(
+        prisma as never,
+        undefined,
+        new DailyChangeRateService(
+          new MarketCandlesRepository(prisma as never),
+        ),
+        redis as never,
+        displayPrices as never,
+      );
+      return { prisma, service, displayPrices };
+    };
+
+    it('serves the Tiingo price with no stored row id, converted by the selected FX', async () => {
+      const { prisma, service } = createEphemeral(
+        jest.fn().mockResolvedValue(available()),
+      );
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue(
+        freshUsdKrwProviderSnapshots(),
+      );
+      const response = await service.getAsset('user-1', 'aapl');
+      expect(response.data.asset.price).toMatchObject({
+        state: 'available',
+        currentPrice: '247.61000000',
+        priceCurrency: CurrencyCode.USD,
+        assetPriceSnapshotId: null,
+        priceKrwState: 'available',
+        priceKrw: '346654.00000000',
+        priceSource: {
+          sourceType: 'provider_api',
+          sourceName: TIINGO_SOURCE,
+          snapshotId: null,
+          fallbackUsed: false,
+        },
+      });
+      // No stored provider candidates and no admin_manual fallback are read.
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+      expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+      expectNoAssetWrites(prisma);
+    });
+
+    it('reports unavailable instead of falling back to KIS or admin prices', async () => {
+      const { prisma, service } = createEphemeral(
+        jest.fn().mockResolvedValue({
+          state: 'unavailable',
+          code: 'TIINGO_REFERENCE_PRICE_MISSING',
+          failureStage: 'tiingo_reference_price',
+          evidence: { provider: 'tiingo', fallback: 'none' },
+        }),
+      );
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset);
+      prisma.assetPriceSnapshot.findFirst.mockResolvedValue(
+        priceSnapshot('manual-aapl', '100', CurrencyCode.USD),
+      );
+      const response = await service.getAssetPrice('user-1', 'aapl');
+      expect(response.data).toMatchObject({
+        state: 'unavailable',
+        currentPrice: null,
+        reason: 'ASSET_PRICE_UNAVAILABLE',
+      });
+      expect(prisma.assetPriceSnapshot.findFirst).not.toHaveBeenCalled();
+      expect(prisma.assetPriceSnapshot.findMany).not.toHaveBeenCalled();
+    });
+
+    it('keeps the stored policy for assets the display source does not manage', async () => {
+      const { prisma, service } = createEphemeral(
+        jest.fn().mockResolvedValue(null),
+      );
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset);
+      prisma.assetPriceSnapshot.findMany.mockResolvedValue([
+        providerPriceSnapshot(
+          'kis-aapl',
+          'kis_us_delayed_trade',
+          '240',
+          CurrencyCode.USD,
+        ),
+      ]);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue(
+        freshUsdKrwProviderSnapshots(),
+      );
+      const response = await service.getAssetPrice('user-1', 'aapl');
+      expect(prisma.assetPriceSnapshot.findMany).toHaveBeenCalled();
+      expect(
+        response.data.state === 'available'
+          ? response.data.priceSource?.sourceName
+          : null,
+      ).not.toBe(TIINGO_SOURCE);
+    });
+
+    it('never writes a sort snapshot that holds a trial price to Redis', async () => {
+      const previous = process.env.REDIS_URL;
+      process.env.REDIS_URL = 'redis://fixture.invalid';
+      const redis = { get: jest.fn().mockResolvedValue(null), eval: jest.fn() };
+      try {
+        const resolve = jest.fn((target: { symbol: string }) =>
+          Promise.resolve(target.symbol === 'AAPL' ? available() : null),
+        );
+        const { prisma, service } = createEphemeral(resolve, redis);
+        prisma.asset.findMany.mockResolvedValue([
+          usAsset,
+          asset({ id: 'k1', symbol: 'K1' }),
+        ]);
+        prisma.fxRateSnapshot.findMany.mockResolvedValue(
+          freshUsdKrwProviderSnapshots(),
+        );
+        const page = (
+          await service.getAssets('user-1', { sortBy: 'turnover', limit: '1' })
+        ).data;
+        expect(page.sortSnapshot).toEqual(expect.any(String));
+        expect(redis.eval).not.toHaveBeenCalled();
+        // Local continuity still works for the next page on this instance.
+        const next = (
+          await service.getAssets('user-1', {
+            sortBy: 'turnover',
+            limit: '1',
+            offset: '1',
+            sortSnapshot: page.sortSnapshot,
+          })
+        ).data;
+        expect(next.assets).toHaveLength(1);
+        // The turnover evidence lookup never queries a null snapshot id.
+        for (const call of prisma.assetPriceSnapshot.findMany.mock.calls as [
+          { where?: { id?: { in?: unknown[] } } },
+        ][])
+          expect(call[0].where?.id?.in ?? []).not.toContain(null);
+      } finally {
+        if (previous === undefined) delete process.env.REDIS_URL;
+        else process.env.REDIS_URL = previous;
+      }
+    });
+  });
 });

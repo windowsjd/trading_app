@@ -385,4 +385,44 @@ describe('AppService candle readiness', () => {
       });
     });
   });
+
+  it('publishes the Tiingo trial status without changing readiness', async () => {
+    delete process.env.REDIS_URL;
+    process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+    process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+    try {
+      const tiingo = {
+        getStatus: jest.fn().mockReturnValue({
+          provider: 'tiingo',
+          state: 'enabled',
+          persistence: 'disabled',
+          lastFailure: { stage: 'rest', code: 'TIINGO_UNAUTHORIZED', at: null },
+        }),
+      };
+      const service = new AppService(
+        {
+          $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+        } as never,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        tiingo as never,
+      );
+      const result = await service.getReadiness();
+      expect(result.data.status).toBe('ready');
+      expect(result.data.reasons).toEqual([]);
+      expect(result.data.tiingo).toMatchObject({
+        provider: 'tiingo',
+        persistence: 'disabled',
+      });
+    } finally {
+      delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+    }
+  });
 });

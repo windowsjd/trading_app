@@ -150,6 +150,8 @@ function createTradingUiHarness(screenName) {
     '../../features/wallet/api': {},
     '../../features/asset/useAssetTicker': { useAssetTicker: () => ({ latestTicker: h.ticker, isStale: h.tickerStale, showReconnectBanner: h.reconnect }) },
     '../../features/asset/useAssetOrderBook': { useAssetOrderBook: (options) => { h.orderBookOptions = options; return h.orderBookState ?? { latestOrderBook: null, statusMessage: '호가 정보를 불러오는 중입니다.' }; } },
+    '../../features/asset/useAssetEstimatedQuote': { useAssetEstimatedQuote: (options) => { h.estimatedQuoteOptions = options; return h.estimatedQuoteState ?? { latestEstimate: null, supported: false, statusMessage: null }; } },
+    '../../features/asset/AssetEstimatedQuoteCard': { default: 'AssetEstimatedQuoteCard', __esModule: true },
     '../../features/asset/useAssetCandle': { useAssetCandle: (options) => { h.liveCandleOptions = options; return {}; } },
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
     '../../features/wallet/useFxRateUpdates': { useFxRateUpdates: () => {} },

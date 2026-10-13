@@ -133,10 +133,10 @@ test('15m shows the last 3 days from the request clock', () => {
   );
 });
 
-test('KRX stocks and crypto read the long-range 4h window; US stocks keep 30 days', () => {
+test('KRX stocks, US stocks and crypto read the long-range 4h window', () => {
   const fourHour = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '4h');
   assert.ok(fourHour);
-  for (const assetType of ['domestic_stock', 'crypto']) {
+  for (const assetType of ['domestic_stock', 'us_stock', 'crypto']) {
     assert.deepEqual(resolveAssetChartTimeframe(fourHour, assetType), {
       label: '4h',
       interval: '4h',
@@ -144,7 +144,6 @@ test('KRX stocks and crypto read the long-range 4h window; US stocks keep 30 day
       limit: 600,
     });
   }
-  assert.equal(resolveAssetChartTimeframe(fourHour, 'us_stock'), fourHour);
   // Unknown asset type: wait instead of fetching (and caching) a wrong window.
   assert.equal(resolveAssetChartTimeframe(fourHour, undefined), null);
   // Every other tab is identical for every market.

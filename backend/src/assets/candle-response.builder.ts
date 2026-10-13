@@ -18,6 +18,7 @@ import type {
   AssetCandlesResponse,
   CandlePayload,
   ParsedAssetCandlesQuery,
+  TiingoCandleSource,
 } from './asset-candles.service';
 
 export type PersistedResponseCandle = {
@@ -132,6 +133,42 @@ export class CandleResponseBuilder {
           marketCode,
           requestedCount: query.limit,
           returnedCount: candles.length,
+        },
+      },
+    };
+  }
+
+  /** Tiingo trial rows: same candle payload, explicit non-persisted source. */
+  buildTiingo(
+    asset: AssetCandlesAsset,
+    query: ParsedAssetCandlesQuery,
+    rows: readonly PersistedResponseCandle[],
+    source: Omit<
+      TiingoCandleSource,
+      | 'provider'
+      | 'marketCode'
+      | 'requestedCount'
+      | 'returnedCount'
+      | 'persisted'
+    >,
+  ): AssetCandlesResponse {
+    const candles = rows.map((row) => this.toPayload(row, asset.assetType));
+    return {
+      success: true,
+      data: {
+        ...this.base(asset, query, candles),
+        source: {
+          provider: 'tiingo',
+          dataset: source.dataset,
+          marketCode: asset.market,
+          requestedCount: query.limit,
+          returnedCount: candles.length,
+          persisted: false,
+          priceAdjustment: source.priceAdjustment,
+          coverage: source.coverage,
+          requestedSessions: source.requestedSessions,
+          coveredSessions: source.coveredSessions,
+          currentCandleTime: source.currentCandleTime,
         },
       },
     };

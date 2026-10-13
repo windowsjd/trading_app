@@ -64,6 +64,11 @@ import {
   type MarketOrderBookTarget,
 } from '../providers/market-order-book-subscription.service';
 import type { OrderBookEvent } from '../providers/order-book.types';
+import { MarketDisplayPriceService } from '../providers/market-display-price.service';
+import {
+  MarketEstimatedQuoteService,
+  type AssetEstimatedQuoteEvent,
+} from '../providers/market-estimated-quote.service';
 
 type OrderBookSubscription = {
   target: MarketOrderBookTarget | null;
@@ -93,6 +98,9 @@ type ClientState = {
   // Includes validations in flight, bounding concurrent subscribe requests.
   orderBookSubscriptions: Map<string, OrderBookSubscription>;
   pendingOrderBooks: Map<string, OrderBookEvent>;
+  // Estimated (statistical) quotes are a separate channel from order books.
+  estimatedQuoteSubscriptions: Map<string, { ready: boolean }>;
+  pendingEstimatedQuotes: Map<string, AssetEstimatedQuoteEvent>;
 };
 
 type SubscriptionMessage = {
@@ -117,6 +125,7 @@ const DEFAULT_CANDLE_BACKPRESSURE_BYTES = 1_048_576;
  */
 const MAX_PENDING_TICKERS_PER_CLIENT = 64;
 const MAX_ORDER_BOOK_SUBSCRIPTIONS = 20;
+const MAX_ESTIMATED_QUOTE_SUBSCRIPTIONS = 20;
 
 @Injectable()
 @WebSocketGateway({
@@ -152,6 +161,7 @@ export class AssetTickerGateway
   private unsubscribeLiveCandleStatus: (() => void) | null = null;
   private unsubscribeProviderPrices: (() => void) | null = null;
   private unsubscribeOrderBooks: (() => void) | null = null;
+  private unsubscribeEstimatedQuotes: (() => void) | null = null;
   private backpressureTimer: NodeJS.Timeout | null = null;
   private liveCandlePubSubStatus: LiveCandlePubSubStatus = 'disabled';
   // Debug/health counters for ticker delivery (see getTickerFanoutMetrics).
@@ -177,6 +187,9 @@ export class AssetTickerGateway
     @Optional() private readonly orderBookPubSub?: OrderBookPubSubService,
     @Optional()
     private readonly orderBooks?: MarketOrderBookSubscriptionService,
+    @Optional() private readonly displayPrices?: MarketDisplayPriceService,
+    @Optional()
+    private readonly estimatedQuotes?: MarketEstimatedQuoteService,
   ) {}
 
   onModuleInit() {
@@ -210,11 +223,16 @@ export class AssetTickerGateway
       this.flushPendingTickers();
       this.flushPendingFxRateUpdates();
       this.flushPendingOrderBooks();
+      this.flushPendingEstimatedQuotes();
     }, CANDLE_BACKPRESSURE_FLUSH_MS);
     this.backpressureTimer.unref?.();
     this.unsubscribeOrderBooks =
       this.orderBookPubSub?.subscribe((event) => this.pushOrderBook(event)) ??
       null;
+    this.unsubscribeEstimatedQuotes =
+      this.estimatedQuotes?.subscribe((event) =>
+        this.pushEstimatedQuote(event),
+      ) ?? null;
   }
 
   onModuleDestroy() {
@@ -233,9 +251,13 @@ export class AssetTickerGateway
     this.unsubscribeProviderPrices = null;
     this.unsubscribeOrderBooks?.();
     this.unsubscribeOrderBooks = null;
+    this.unsubscribeEstimatedQuotes?.();
+    this.unsubscribeEstimatedQuotes = null;
     for (const state of this.clients.values()) {
       state.orderBookSubscriptions.clear();
       state.pendingOrderBooks.clear();
+      state.estimatedQuoteSubscriptions.clear();
+      state.pendingEstimatedQuotes.clear();
     }
     if (this.backpressureTimer) clearInterval(this.backpressureTimer);
     this.backpressureTimer = null;
@@ -257,6 +279,8 @@ export class AssetTickerGateway
       pendingTickers: new Map(),
       orderBookSubscriptions: new Map(),
       pendingOrderBooks: new Map(),
+      estimatedQuoteSubscriptions: new Map(),
+      pendingEstimatedQuotes: new Map(),
     });
     client.on('message', (data: RawData) => {
       const rawMessage = (
@@ -287,6 +311,8 @@ export class AssetTickerGateway
     const state = this.clients.get(client);
     state?.orderBookSubscriptions.clear();
     state?.pendingOrderBooks.clear();
+    state?.estimatedQuoteSubscriptions.clear();
+    state?.pendingEstimatedQuotes.clear();
     if (state) this.pendingSubscriptions.delete(state);
     this.clients.delete(client);
   }
@@ -346,10 +372,13 @@ export class AssetTickerGateway
     }
 
     if (typeof message.assetId !== 'string' || message.assetId.trim() === '') {
-      if (message.channel === 'asset_order_book') {
+      if (
+        message.channel === 'asset_order_book' ||
+        message.channel === 'asset_estimated_quote'
+      ) {
         this.sendJson(client, {
           type: 'subscription_error',
-          channel: 'asset_order_book',
+          channel: message.channel,
           assetId: typeof message.assetId === 'string' ? message.assetId : null,
           code: 'INVALID_SUBSCRIPTION',
         });
@@ -362,6 +391,15 @@ export class AssetTickerGateway
     const assetId = message.assetId.trim();
     if (message.channel === 'asset_order_book') {
       await this.handleOrderBookSubscription(client, state, message, assetId);
+      return;
+    }
+    if (message.channel === 'asset_estimated_quote') {
+      await this.handleEstimatedQuoteSubscription(
+        client,
+        state,
+        message,
+        assetId,
+      );
       return;
     }
     if (message.channel === 'asset_candle') {
@@ -535,6 +573,132 @@ export class AssetTickerGateway
         continue;
       }
       this.flushClientOrderBooks(client, state);
+    }
+  }
+
+  /**
+   * Estimated best bid/ask (provider statistical estimate, e.g. Tiingo
+   * thresholdLevel 4). Deliberately NOT the order-book ladder: the server
+   * owns the supported universe and an unsupported asset gets
+   * UNSUPPORTED_ASSET, exactly like `asset_order_book`.
+   */
+  private async handleEstimatedQuoteSubscription(
+    client: WebSocket,
+    state: ClientState,
+    message: SubscriptionMessage,
+    assetId: string,
+  ): Promise<void> {
+    const error = (code: string) =>
+      this.sendJson(client, {
+        type: 'subscription_error',
+        channel: 'asset_estimated_quote',
+        assetId,
+        code,
+      });
+    if (message.type === 'unsubscribe') {
+      state.estimatedQuoteSubscriptions.delete(assetId);
+      state.pendingEstimatedQuotes.delete(assetId);
+      this.sendJson(client, {
+        type: 'unsubscribed',
+        channel: 'asset_estimated_quote',
+        assetId,
+      });
+      return;
+    }
+    if (message.type !== 'subscribe' || assetId.length > 80) {
+      error('INVALID_SUBSCRIPTION');
+      return;
+    }
+    const existing = state.estimatedQuoteSubscriptions.get(assetId);
+    if (existing) {
+      if (existing.ready)
+        this.sendJson(client, {
+          type: 'subscribed',
+          channel: 'asset_estimated_quote',
+          assetId,
+        });
+      return;
+    }
+    if (
+      state.estimatedQuoteSubscriptions.size >=
+      MAX_ESTIMATED_QUOTE_SUBSCRIPTIONS
+    ) {
+      error('SUBSCRIPTION_LIMIT');
+      return;
+    }
+    const subscription = { ready: false };
+    state.estimatedQuoteSubscriptions.set(assetId, subscription);
+    const stillSubscribed = () =>
+      this.clients.get(client) === state &&
+      state.estimatedQuoteSubscriptions.get(assetId) === subscription;
+    try {
+      const target = await this.estimatedQuotes?.loadTarget(assetId);
+      if (!stillSubscribed()) return;
+      if (!target) {
+        state.estimatedQuoteSubscriptions.delete(assetId);
+        error('UNSUPPORTED_ASSET');
+        return;
+      }
+      subscription.ready = true;
+      this.sendJson(client, {
+        type: 'subscribed',
+        channel: 'asset_estimated_quote',
+        assetId,
+      });
+      const current = await this.estimatedQuotes?.getCurrent(assetId);
+      if (current && stillSubscribed()) {
+        state.pendingEstimatedQuotes.set(assetId, current);
+        this.flushClientEstimatedQuotes(client, state);
+      }
+    } catch {
+      if (!stillSubscribed()) return;
+      state.estimatedQuoteSubscriptions.delete(assetId);
+      error('ESTIMATED_QUOTE_UNAVAILABLE');
+    }
+  }
+
+  private pushEstimatedQuote(event: AssetEstimatedQuoteEvent): void {
+    for (const [client, state] of this.clients) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      if (!state.estimatedQuoteSubscriptions.get(event.assetId)?.ready)
+        continue;
+      // Latest-only: a slow socket skips to the newest estimate.
+      state.pendingEstimatedQuotes.set(event.assetId, event);
+      this.flushClientEstimatedQuotes(client, state);
+    }
+  }
+
+  private flushClientEstimatedQuotes(
+    client: WebSocket,
+    state: ClientState,
+  ): void {
+    for (const [assetId, event] of state.pendingEstimatedQuotes) {
+      if (!state.estimatedQuoteSubscriptions.get(assetId)?.ready) {
+        state.pendingEstimatedQuotes.delete(assetId);
+        continue;
+      }
+      if (
+        client.bufferedAmount >
+        (this.liveCandleConfig?.websocketBackpressureBytes ??
+          DEFAULT_CANDLE_BACKPRESSURE_BYTES)
+      )
+        return;
+      if (!this.sendJson(client, event)) return;
+      state.pendingEstimatedQuotes.delete(assetId);
+    }
+  }
+
+  private flushPendingEstimatedQuotes(): void {
+    for (const [client, state] of this.clients) {
+      if (state.pendingEstimatedQuotes.size === 0) continue;
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      this.flushClientEstimatedQuotes(client, state);
     }
   }
 
@@ -1122,6 +1286,16 @@ export class AssetTickerGateway
         workflow: 'assets_with_price',
       });
       if (!eligibility.eligible) return null;
+      // An ephemeral display source (Tiingo trial) replaces — never mixes
+      // with — the stored provider for the assets it manages.
+      const displaySourceNames =
+        (await this.displayPrices?.displaySourceNames({
+          id: metadata.assetId,
+          symbol: metadata.symbol,
+          market: metadata.market,
+          assetType: metadata.assetType,
+          priceCurrency: metadata.priceCurrency,
+        })) ?? eligibility.sourceNames;
       const candidate = {
         id: '',
         sourceType: 'provider_api',
@@ -1138,7 +1312,7 @@ export class AssetTickerGateway
         asset: metadata,
         workflow: 'assets_with_price',
         candidates: [candidate],
-        expectedSourceNames: eligibility.sourceNames,
+        expectedSourceNames: displaySourceNames,
         now,
         freshnessThresholdSeconds: eligibility.freshnessThresholdSeconds,
         isPositiveValue: () =>
@@ -1368,6 +1542,15 @@ function snapshotTickerKey(ticker: {
   assetPriceSnapshotId: string | null;
   marketStatus?: string;
   changeRate?: string | null;
+  priceEffectiveAt?: string | null;
+  priceLocal?: string | null;
 }): string | null {
-  return `${ticker.marketStatus ?? ''}:${ticker.assetPriceSnapshotId ?? 'unavailable'}:${ticker.changeRate ?? 'unavailable'}`;
+  // An ephemeral (memory-only) price has no stored row id; its provider time
+  // and value identify it so the poll path still sees a new observation.
+  const priceKey =
+    ticker.assetPriceSnapshotId ??
+    (ticker.priceEffectiveAt
+      ? `ephemeral:${ticker.priceEffectiveAt}:${ticker.priceLocal ?? ''}`
+      : 'unavailable');
+  return `${ticker.marketStatus ?? ''}:${priceKey}:${ticker.changeRate ?? 'unavailable'}`;
 }

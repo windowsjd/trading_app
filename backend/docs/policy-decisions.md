@@ -18,10 +18,18 @@
 - 완료된 4시간봉을 5분봉과 독립적으로 180달력일 보관한다(5분봉 35일, 1d/1w, 15m/30m/1h 정책은 유지).
 - 국내주식(KRX): KOSCOM 과거 10분봉을 거래일별로 검증한 뒤 09:00–13:00 / 13:00–15:30 버킷으로 합성한다. 같은 날짜 `trdDd` 일봉과 O/H/L/C가 정확히 일치하지 않거나, 필수 행 누락·격자 이탈·중복 충돌·직전 세션 반복이면 저장하지 않고 보류한다. 날짜 귀속 근거는 같은 공급자 일봉 교차 일치뿐이며 독립 증명이 아니다.
 - 암호화폐 Spot: Binance Spot 기본 4시간봉. 선물: Binance USDⓈ-M 계약 4시간봉(계약 거래가격)을 `FuturesInstrument`별 별도 테이블에 저장한다. Spot과 선물 캔들은 서로 대체·결합·노출하지 않는다.
-- 표시 창 `range=96d`: KRX 96개 완료 거래일 + 당일, 암호화폐·선물 96일. 미국주식 4시간봉은 30일 유지.
+- 표시 창 `range=96d`: KRX·미국주식 96개 완료 거래일 + 당일(각 거래소 달력), 암호화폐·선물 96일. 미국주식은 장기 4시간봉 저장이 없으므로 저장 5m 집계(≈30일) 또는 Tiingo 체험 경로의 실제 봉만 표시한다(2026-10-14 변경, 이전: 미국 30일 유지).
 - 진행 중인 봉은 기존 실시간 경로(Spot/KRX 5분봉 집계, 선물은 잠정 저장 봉)로만 표시하고, 완료 봉과 같은 시각으로 중복 표시하지 않는다.
 - 체결·TP/SL(Futures Last), UPNL·청산(Futures Mark), Spot·국내주식 가격 기준은 변경하지 않는다. 4시간봉 종가는 어떤 금융 가격으로도 쓰지 않는다.
 - 최초 백필은 운영자 명령(`candle:long-backfill`)으로만, 지속 수집은 기본 비활성 플래그로만 시작한다. 세부: [long-range-4h-candles.md](long-range-4h-candles.md).
+
+## Tiingo 미국주식 체험 통합 (2026-10-14, current)
+
+- Tiingo는 허용 목록(최대 5, 테스트 AAPL) 미국주식의 **표시 시세·캔들·추정 호가**에만 쓴다. 주문 견적·체결·평가·랭킹·정산은 `kis_us_delayed_trade` 저장 스냅샷을 유지한다. 근거: 체험 데이터로 금융 원장을 만들지 않는다.
+- 체험 데이터는 메모리 전용이다. PostgreSQL·Redis key/Pub/Sub·파일·로그 원문에 남기지 않고, Redis 정렬 목록 snapshot도 저장하지 않는다. 근거: Tiingo ToS §1.6(a) 저장 제한.
+- 관리 대상 종목의 표시 가격이 Tiingo에 없으면 unavailable이다. KIS·admin_manual로 대체하지 않는다. 근거: 출처가 섞이면 체험 평가 결과를 신뢰할 수 없다.
+- 추정 호가(통계 추정 1단계)는 `asset_estimated_quote` 별도 채널이며 10호가(`asset_order_book`)로 취급하지 않는다. 근거: 실제 주문장이 아니다.
+- 기본 비활성, `TIINGO_TRIAL_MODE=false`(영속 모드) 거부, 운영 환경은 명시 opt-in 없이는 거부. 세부: [tiingo-us-equity-trial.md](tiingo-us-equity-trial.md).
 
 ## 금융 valuation 의미 (2026-10-05, current)
 

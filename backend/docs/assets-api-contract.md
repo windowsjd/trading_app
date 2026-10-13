@@ -323,7 +323,8 @@ Trading note policy:
 - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - `15m`, `30m`, `1h`, `4h` are aggregated at read time from the STORED `5m`
   feed (35-day retention), never from a separate stored table — except
-  `range=96d` (4h only, KRX stocks and crypto), which serves the stored
+  `range=96d` (4h only; KRX stocks and crypto read stored history; US stocks
+  have no stored 4h history and get their 5m-aggregated window), which serves the stored
   COMPLETED 4h history (Spot native klines / KRX verified KOSCOM 10-minute
   history, 180-day retention) plus the 5m-aggregated recent buckets, one
   source per bucket and never the same `time` twice
@@ -346,10 +347,11 @@ Trading note policy:
     window the `15m` chart tab requests; `14d` is what `30m` and `1h` request;
     `30d` is what the US-stock `4h` tab requests.
   - `96d` (2026-10-13) is the long-range 4h window: `interval` must be `4h`
-    (default when omitted); crypto = rolling 96 x 24h; KRX stocks = the 96th
-    previous real KRX session open up to now (96 completed sessions + today).
-    US stocks answer 400 `ASSET_CANDLES_INVALID_RANGE` (their 4h tab keeps
-    `30d`).
+    (default when omitted); crypto = rolling 96 x 24h; stocks = the 96th
+    previous real exchange session open up to now (96 completed sessions +
+    today) on the KRX or US calendar. US stocks were added 2026-10-14 (they
+    previously answered 400); only real candles are returned, so a short
+    history is a shorter chart.
   - `prev_open` / `prev2_open` anchor at the previous (or second previous) real
     market session open, `season` at the current season start.
   - Every interval is allowed for every other range; unknown values are
@@ -360,7 +362,7 @@ Trading note policy:
   - Values greater than `1000` (the Binance single-call cap) are clamped to
     `1000`; per-provider caps clamp lower when a provider call is made. The
     chart tabs send `288` (`3d`/`15m`), `672` (`14d`/`30m`), `336` (`14d`/`1h`),
-    `600` (`96d`/`4h`, KRX and crypto) and `200` (`30d`/`4h`, US stocks), and a
+    `600` (`96d`/`4h`, every market), and a
     database answer echoes the requested value in `source.requestedCount`.
 - `date` optional `YYYY-MM-DD`.
   - When present for crypto, Binance receives UTC `startTime` at that date's start and `endTime` at that date's end unless `to` is provided.
@@ -538,3 +540,19 @@ queries, payloads or credentials. The connection remains available for retry;
 other clients and their subscriptions are preserved. Ticker/candle validation
 in flight cannot register a subscription after unsubscribe or disconnect.
 Existing candle-overlay stale and order-book unavailable contracts remain intact.
+
+## Tiingo trial (US equities, 2026-10-14)
+
+Additive, default OFF ([tiingo-us-equity-trial.md](tiingo-us-equity-trial.md)):
+
+- For an allow-listed US equity, asset reads and `asset_ticker` use the
+  memory-only Tiingo reference price: `priceSource.sourceName =
+  tiingo_equity_reference_price`, `assetPriceSnapshotId = null` (no stored
+  row). There is no KIS/admin fallback; an unavailable price is
+  `ASSET_PRICE_UNAVAILABLE`.
+- Its candles answer with `source.provider = 'tiingo'` and the additive fields
+  `dataset`, `marketCode`, `persisted:false`, `priceAdjustment`, `coverage`,
+  `requestedSessions`, `coveredSessions`, `currentCandleTime`. A provider
+  failure with nothing to return is 503 `ASSET_CANDLES_PROVIDER_UNAVAILABLE`.
+- Estimated best bid/ask: `/api/v1/ws` channel `asset_estimated_quote`
+  (see the trial document); never the `asset_order_book` ladder.

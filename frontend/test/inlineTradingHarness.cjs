@@ -382,6 +382,7 @@ function inlineTradingHarness() {
                 ? { asset: h.assets[id], priceErrors: h.priceErrors }
                 : {
                     interval: options.queryKey[4],
+                    ...(h.candleSource ? { source: h.candleSource } : {}),
                     candles: h.candlesByKey?.[`${id}:${options.queryKey[4]}`] ?? [
                       {
                         time: '2026-09-19T00:00:00Z',
@@ -483,6 +484,13 @@ function inlineTradingHarness() {
         };
       },
     },
+    '../../features/asset/useAssetEstimatedQuote': {
+      useAssetEstimatedQuote: (options) => {
+        h.estimatedQuoteOptions = options;
+        return h.estimatedQuoteState ?? { latestEstimate: null, supported: false, statusMessage: null };
+      },
+    },
+    '../../features/asset/AssetEstimatedQuoteCard': { default: 'AssetEstimatedQuoteCard', __esModule: true },
     '../../features/asset/useAssetCandle': {
       useAssetCandle: (options) => {
         h.candleOptions = options;

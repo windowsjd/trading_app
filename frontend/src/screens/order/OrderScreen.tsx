@@ -31,6 +31,12 @@ import {
 import { supportsLiveOrderBook } from '../../features/asset/assetOrderBookPolicy';
 import { useAssetOrderBook } from '../../features/asset/useAssetOrderBook';
 import AssetOrderLadder from '../../features/asset/AssetOrderLadder';
+import { useAssetEstimatedQuote } from '../../features/asset/useAssetEstimatedQuote';
+import AssetEstimatedQuoteCard from '../../features/asset/AssetEstimatedQuoteCard';
+import {
+  isTrialPriceSource,
+  TRIAL_ORDER_NOTICE,
+} from '../../features/asset/trialDataSource';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import AccountHoldings from '../asset/AccountHoldings';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -142,6 +148,22 @@ export function OrderTradingScreen({
     wsUrl: wsUrl ?? '',
     enabled: liveOrderBookEnabled && isFocused,
   });
+  // US equities may have a provider's ESTIMATED best bid/ask (separate from
+  // the order-book ladder). The server decides support; unsupported assets
+  // answer UNSUPPORTED_ASSET and nothing is rendered.
+  const estimatedQuoteEnabled =
+    detailQuery.data?.asset.assetType === 'us_stock' &&
+    detailQuery.data.asset.isActive;
+  const {
+    latestEstimate,
+    supported: estimateSupported,
+    statusMessage: estimateStatus,
+    runtime: estimateRuntime,
+  } = useAssetEstimatedQuote({
+    assetId,
+    wsUrl: wsUrl ?? '',
+    enabled: estimatedQuoteEnabled && isFocused,
+  });
   if (detailQuery.isLoading)
     return <FullPageLoading message="종목 정보를 불러오는 중입니다." />;
   if (detailQuery.isError || !detailQuery.data)
@@ -188,6 +210,11 @@ export function OrderTradingScreen({
       <Text style={styles.price} selectable>
         {priceText}
       </Text>
+      {isTrialPriceSource(displayPrice.priceSource) ? (
+        <Text testID="asset-trial-price-notice" style={styles.trialNotice}>
+          {TRIAL_ORDER_NOTICE}
+        </Text>
+      ) : null}
       {displayPrice.priceLocal === null || (converted && !krwAvailable) ? (
         <AdminDiagnosticPanel
           diagnostic={
@@ -379,7 +406,23 @@ export function OrderTradingScreen({
                   ) : null}
                 </>
               ) : (
-                <View style={styles.stockPrice}>{currentPrice}</View>
+                <View style={styles.stockPrice}>
+                  {currentPrice}
+                  {estimateSupported ? (
+                    <AssetEstimatedQuoteCard
+                      estimate={
+                        latestEstimate?.assetId === assetId
+                          ? latestEstimate
+                          : null
+                      }
+                      statusMessage={estimateStatus}
+                      marketOpen={asset.marketStatus === 'open'}
+                    />
+                  ) : null}
+                  {isAdmin && estimateSupported && estimateStatus ? (
+                    <AdminDiagnosticPanel runtime={estimateRuntime} />
+                  ) : null}
+                </View>
               )}
             </View>
           </View>
@@ -473,4 +516,5 @@ const styles = StyleSheet.create({
   },
   stockPrice: { flex: 1, justifyContent: 'center', minHeight: 280 },
   bannerText: { fontSize: 12, color: semantic.warning },
+  trialNotice: { fontSize: 10, color: semantic.warning },
 });

@@ -67,6 +67,30 @@ function sentFrames(socket: FakeSocket): Array<Record<string, unknown>> {
 }
 
 describe("RealtimeSocketManager", () => {
+  it('routes estimated quotes on their own channel, never to the order book', async () => {
+    const manager = createManager();
+    const estimate = collect(); const otherAsset = collect(); const book = collect();
+    const offEstimate = manager.subscribe({ channel: 'asset_estimated_quote', assetId: 'aapl' }, estimate.listener);
+    const offOther = manager.subscribe({ channel: 'asset_estimated_quote', assetId: 'msft' }, otherAsset.listener);
+    const offBook = manager.subscribe({ channel: 'asset_order_book', assetId: 'aapl' }, book.listener);
+    await delay(5); const socket = FakeSocket.instances[0]; socket.open();
+    assert.deepEqual(
+      sentFrames(socket).filter(f => f.channel === 'asset_estimated_quote').map(f => [f.type, f.assetId]),
+      [['subscribe', 'aapl'], ['subscribe', 'msft']],
+    );
+    socket.receive({ type: 'subscribed', channel: 'asset_estimated_quote', assetId: 'aapl' });
+    socket.receive({ type: 'asset_estimated_quote', assetId: 'aapl', bid: { price: '1', size: '1' } });
+    socket.receive({ type: 'asset_estimated_quote', bid: { price: '1', size: '1' } });
+    socket.receive({ type: 'subscription_error', channel: 'asset_estimated_quote', assetId: 'msft', code: 'UNSUPPORTED_ASSET' });
+    assert.equal(estimate.events.filter(e => e.kind === 'message' && e.payload.type === 'asset_estimated_quote').length, 1);
+    assert.equal(otherAsset.events.filter(e => e.kind === 'message' && e.payload.type === 'asset_estimated_quote').length, 0);
+    assert.ok(otherAsset.events.some(e => e.kind === 'message' && e.payload.code === 'UNSUPPORTED_ASSET'));
+    assert.equal(book.events.filter(e => e.kind === 'message').length, 0);
+    offEstimate();
+    assert.ok(sentFrames(socket).some(f => f.type === 'unsubscribe' && f.channel === 'asset_estimated_quote' && f.assetId === 'aapl'));
+    offOther(); offBook(); assert.equal(socket.closed.length, 1);
+  });
+
   it('shares and restores reference-counted order book subscriptions without disturbing ticker/candle', async () => {
     const manager = createManager();
     const book = collect(); const other = collect(); const ticker = collect(); const candle = collect();

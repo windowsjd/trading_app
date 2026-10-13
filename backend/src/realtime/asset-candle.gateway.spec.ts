@@ -214,6 +214,8 @@ function register(
     pendingCandles: new Map(),
     orderBookSubscriptions: new Map(),
     pendingOrderBooks: new Map(),
+    estimatedQuoteSubscriptions: new Map(),
+    pendingEstimatedQuotes: new Map(),
   });
 }
 

@@ -31,6 +31,36 @@ const krxStock = params.get('krx') === '1' ? [{
   price: { state: 'available', currentPrice: '70000', priceCurrency: 'KRW', priceKrwState: 'available', priceKrw: '70000', changeRate: '0.43',
     priceCapturedAt: new Date().toISOString(), priceEffectiveAt: new Date().toISOString() },
 }] : [];
+// `?us=1` adds one open US equity served by the Tiingo trial path. Synthetic
+// display values only (never provider data). `?usAsk=none` drops the ask side,
+// `?usLong=1` uses long numbers, `?usClosed=1` closes the market.
+const usLong = params.get('usLong') === '1';
+const usStock = params.get('us') === '1' ? [{
+  id: 'AAPL', assetType: 'us_stock', symbol: 'AAPL', market: 'NAS', name: 'Apple Inc.',
+  priceCurrency: 'USD', settlementCurrency: 'USD', displayPriceDecimals: null, isActive: true,
+  marketStatus: params.get('usClosed') === '1' ? 'closed' : 'open', tradable: true,
+  price: { state: 'available', currentPrice: usLong ? '12345.12345600' : '247.61000000', priceCurrency: 'USD',
+    priceKrwState: 'available', priceKrw: '346654.00000000', changeRate: null,
+    priceCapturedAt: new Date().toISOString(), priceEffectiveAt: new Date().toISOString(), assetPriceSnapshotId: null,
+    priceSource: { sourceType: 'provider_api', sourceName: 'tiingo_equity_reference_price', snapshotId: null,
+      effectiveAt: new Date().toISOString(), capturedAt: new Date().toISOString(), fallbackUsed: false,
+      fallbackReason: null, rejectedProviderReason: null, freshnessAgeSeconds: 1 } },
+}] : [];
+export function useAssetEstimatedQuote({ assetId, enabled }) {
+  const supported = enabled && usStock.some((asset) => asset.id === assetId);
+  if (!supported) return { latestEstimate: null, supported: false, statusMessage: null, runtime: {} };
+  const now = new Date().toISOString();
+  return {
+    latestEstimate: {
+      assetId, kind: 'estimated_liquidity', provider: 'tiingo', priceCurrency: 'USD', quantityUnit: 'share',
+      bid: usLong ? { price: '12345.123456', size: '123456789' } : { price: '247.45', size: '300' },
+      ask: params.get('usAsk') === 'none' ? { price: null, size: null }
+        : usLong ? { price: '12345.987654', size: '987654321' } : { price: '247.55', size: '200' },
+      spread: '0.0004', referencePrice: '247.5', effectiveAt: now, capturedAt: now,
+    },
+    supported: true, statusMessage: null, runtime: {},
+  };
+}
 export const assets = Object.entries(prices).map(
   ([base, [name, price, decimals]]) => ({
     id: base,
@@ -56,7 +86,7 @@ export const assets = Object.entries(prices).map(
       priceEffectiveAt: new Date().toISOString(),
     },
   }),
-).concat(krxStock);
+).concat(krxStock).concat(usStock);
 const conditionalEnabled = params.get('conditional') === 'enabled';
 const locEnabled = params.get('loc') === 'enabled';
 const conditionalRow = (id, state, extra = {}) => ({
@@ -256,6 +286,11 @@ export const apiClient = {
         return response({
           range: u.searchParams.get('range'),
           interval: u.searchParams.get('interval'),
+          ...(asset.assetType === 'us_stock' ? { source: {
+            provider: 'tiingo', dataset: 'equity_intraday', marketCode: 'NAS', persisted: false,
+            priceAdjustment: 'raw', coverage: 'partial', requestedSessions: 96, coveredSessions: 30,
+            currentCandleTime: new Date(Date.UTC(2026, 8, 1, 0, 239 * 5)).toISOString(),
+          } } : {}),
           candles: Array.from({ length: params.has('emptyCandles') ? 0 : 240 }, (_, i) => ({
             time: new Date(Date.UTC(2026, 8, 1, 0, i * 5)).toISOString(),
             open: String(base * (0.9 + i * 0.0005)),

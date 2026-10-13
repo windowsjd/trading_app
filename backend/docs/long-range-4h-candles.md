@@ -20,8 +20,13 @@ Evidence for the KRX source: [KOSCOM 10-minute history live check](../../docs/in
 - 5m retention stays 35 days; 15m/30m/1h stay read-time aggregates; 1d/1w are
   unchanged and never pruned. 180-day retention is a ceiling, not a promise
   that 180 days were collected: only confirmed history is shown.
-- US stocks keep the 30-day 4h window: `range=96d` is rejected for `us_stock`
-  (400 `ASSET_CANDLES_INVALID_RANGE`), and the app keeps sending `30d`/200.
+- US stocks (2026-10-14): `range=96d` is accepted with the US session
+  definition (96 completed US sessions + today). There is no stored US 4h
+  history, so the stored path answers with the 5m-aggregated window
+  (≈ 30 days, `database_partial`); the Tiingo trial path aggregates real Tiingo
+  5m bars over the whole window ([tiingo-us-equity-trial.md](tiingo-us-equity-trial.md)).
+  Deploy the backend before an app build that sends US `96d` (an older backend
+  answers 400).
 - `range=96d` accepts only `interval=4h`; the request `limit` stays ≤ 1000
   (the app sends 600).
 

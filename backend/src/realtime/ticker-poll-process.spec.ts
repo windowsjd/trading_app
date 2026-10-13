@@ -40,6 +40,7 @@ gateway.clients.set({ readyState: 1, bufferedAmount: 0, send() {} }, {
   subscriptions: new Map([['asset-A', null]]), pendingTickers: new Map(),
   candleSubscriptions: new Map(), pendingCandles: new Map(),
   orderBookSubscriptions: new Map(), pendingOrderBooks: new Map(),
+  estimatedQuoteSubscriptions: new Map(), pendingEstimatedQuotes: new Map(),
 });
 const deadline = setTimeout(() => { gateway.onModuleDestroy(); process.exitCode = 2; }, 2000);
 gateway.onModuleInit();

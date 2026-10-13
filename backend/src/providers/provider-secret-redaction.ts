@@ -17,6 +17,7 @@ export function collectProviderSecretsFromEnv(
     env.KOSCOM_API_KEY,
     env.KIS_APP_KEY,
     env.KIS_APP_SECRET,
+    env.TIINGO_API_TOKEN,
   ].filter((value): value is string => Boolean(value && value.trim()));
 }
 

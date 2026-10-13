@@ -49,6 +49,16 @@ import { OrderBookPubSubService } from './order-book-pubsub.service';
 import { MarketPriceEventService } from './market-price-event.service';
 import { MarketOrderBookSubscriptionService } from './market-order-book-subscription.service';
 import { UsdKrwRefreshService } from './usd-krw-refresh.service';
+import { TiingoConfigService } from './tiingo/tiingo.config';
+import { TiingoRestClient } from './tiingo/tiingo-rest.client';
+import { TiingoMarketDataStore } from './tiingo/tiingo-market-data.store';
+import { TiingoAssetMapService } from './tiingo/tiingo-asset-map.service';
+import { TiingoStreamService } from './tiingo/tiingo-stream.service';
+import { TiingoQuoteService } from './tiingo/tiingo-quote.service';
+import { TiingoCandleService } from './tiingo/tiingo-candle.service';
+import { TiingoDiagnosticsService } from './tiingo/tiingo-diagnostics.service';
+import { MarketDisplayPriceService } from './market-display-price.service';
+import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
 
 @Module({
   imports: [PrismaModule, RedisModule],
@@ -122,6 +132,17 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     KisWebSocketStreamingService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
+    // Tiingo US-equity trial: display-only, memory-only (see tiingo.config.ts).
+    TiingoConfigService,
+    TiingoRestClient,
+    TiingoMarketDataStore,
+    TiingoAssetMapService,
+    TiingoStreamService,
+    TiingoQuoteService,
+    TiingoCandleService,
+    TiingoDiagnosticsService,
+    MarketDisplayPriceService,
+    MarketEstimatedQuoteService,
   ],
   exports: [
     KoscomConfigService,
@@ -166,6 +187,11 @@ import { UsdKrwRefreshService } from './usd-krw-refresh.service';
     KisRequestCoordinatorService,
     ProviderTargetResolverService,
     MarketSnapshotHealthService,
+    TiingoQuoteService,
+    TiingoCandleService,
+    TiingoDiagnosticsService,
+    MarketDisplayPriceService,
+    MarketEstimatedQuoteService,
   ],
 })
 export class ProvidersModule {}

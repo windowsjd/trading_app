@@ -29,6 +29,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CandleServingService } from './candle-serving.service';
 import { CandleResponseBuilder } from './candle-response.builder';
 import {
+  TiingoCandleIntervalError,
+  TiingoCandleReaderService,
+  TiingoCandleUnavailableError,
+} from './tiingo-candle-reader.service';
+import type { TiingoAssetTarget } from '../providers/tiingo/tiingo-asset-map.service';
+import { tiingoFailureCode } from '../providers/tiingo/tiingo.errors';
+import {
   recordAdminDiagnosticEvent,
   setAdminDiagnosticContext,
 } from '../common/admin-diagnostics';
@@ -45,9 +52,10 @@ export type AssetCandlesQuery = {
 // 'prev_open'  = previous real market-session open → now
 // 'prev2_open' = second previous real market-session open → now
 // '3d'/'7d'/'14d'/'30d'/'1y' = rolling N days → now
-// '96d' = long-range 4h window (4h only; KRX stocks and crypto only):
-//         KRX = 96th previous real KRX session open → now (96 completed
-//         sessions + today), crypto = rolling 96 × 24h → now.
+// '96d' = long-range 4h window (4h only):
+//         stocks = 96th previous real exchange session open → now (96
+//         completed sessions + today; KRX and US calendars), crypto =
+//         rolling 96 × 24h → now.
 // Exported (type-only) so the candle response cache can key on and store the
 // exact HTTP response shape without duplicating these definitions. This does
 // not change the response shape or the provider call flow.
@@ -195,8 +203,28 @@ export type AssetCandlesResponse = {
           // the effective single-call request can return, i.e. older candles
           // were cut off and the latest candles were preserved.
           truncated?: boolean;
-        };
+        }
+      | TiingoCandleSource;
   };
+};
+
+/**
+ * Tiingo trial candles (memory-only, never stored). `coverage` reports how
+ * much of the requested window real data covered; `currentCandleTime` names
+ * the in-progress candle (if any) so it is never mistaken for a closed one.
+ */
+export type TiingoCandleSource = {
+  provider: 'tiingo';
+  dataset: 'equity_intraday' | 'eod';
+  marketCode: string;
+  requestedCount: number;
+  returnedCount: number;
+  persisted: false;
+  priceAdjustment: 'raw' | 'split_dividend_adjusted';
+  coverage: 'complete' | 'partial' | 'empty';
+  requestedSessions: number;
+  coveredSessions: number;
+  currentCandleTime: string | null;
 };
 
 // Provider-specific per-request row caps. Our request `limit` is clamped to
@@ -259,7 +287,7 @@ const ROLLING_RANGE_DURATION_MS: Record<RollingCandleRange, number> = {
   '14d': 14 * DAY_MS,
   '30d': 30 * DAY_MS,
   '1y': 365 * DAY_MS,
-  // Crypto only; KRX resolves '96d' by sessions (resolveRangeWindow).
+  // Crypto only; stocks resolve '96d' by sessions (resolveRangeWindow).
   '96d': 96 * DAY_MS,
 };
 
@@ -363,6 +391,8 @@ export class AssetCandlesService {
     private readonly serving: CandleServingService,
     private readonly responses: CandleResponseBuilder,
     @Optional() private readonly koscomReader?: KoscomCandleReaderService,
+    // Tiingo trial (memory-only) candles for allow-listed US equities.
+    @Optional() private readonly tiingoReader?: TiingoCandleReaderService,
   ) {}
 
   async getAssetCandles(
@@ -433,6 +463,15 @@ export class AssetCandlesService {
       },
     );
 
+    const tiingoTarget = await this.tiingoReader?.targetFor(asset);
+    if (tiingoTarget && this.tiingoReader)
+      return this.readTiingo(
+        this.tiingoReader,
+        asset,
+        tiingoTarget,
+        parsedQuery,
+      );
+
     try {
       return await this.serving.serve(asset, parsedQuery, () =>
         this.loadLegacy(asset, parsedQuery),
@@ -477,6 +516,80 @@ export class AssetCandlesService {
       }
 
       throw error;
+    }
+  }
+
+  /**
+   * Tiingo trial path: answered from memory, never through the Redis response
+   * cache, the PostgreSQL candle store or a KIS fallback. A provider failure
+   * with nothing to serve is a 503, not a KIS-sourced chart.
+   */
+  private async readTiingo(
+    reader: TiingoCandleReaderService,
+    asset: AssetCandlesAsset,
+    target: TiingoAssetTarget,
+    query: ParsedAssetCandlesQuery,
+  ): Promise<AssetCandlesResponse> {
+    setAdminDiagnosticContext({
+      failureStage: 'tiingo_candle_read',
+      evidence: {
+        provider: 'tiingo',
+        persisted: false,
+        expectedStoredFeed: 'none_ephemeral_trial',
+      },
+      nextInvestigation: [
+        'backend/src/assets/tiingo-candle-reader.service.ts',
+        'backend/src/providers/tiingo/tiingo-candle.service.ts',
+        'GET /readiness → data.tiingo',
+      ],
+    });
+    try {
+      const result = await reader.read(asset, target, query);
+      const source = result.response.data.source;
+      recordAdminDiagnosticEvent(
+        'info',
+        'TIINGO_CANDLE_READ',
+        `Tiingo candle read completed for ${asset.symbol}.`,
+        {
+          returnedCount: source.returnedCount,
+          coverage: source.provider === 'tiingo' ? source.coverage : null,
+          stopCode: result.stopCode,
+          droppedIncompleteBuckets: result.droppedIncompleteBuckets,
+        },
+      );
+      return result.response;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      if (error instanceof TiingoCandleIntervalError) {
+        this.throwApiError(
+          HttpStatus.BAD_REQUEST,
+          'ASSET_CANDLES_INVALID_INTERVAL',
+          CANDLE_INTERVAL_ERROR_MESSAGE,
+        );
+      }
+      const providerErrorCode =
+        error instanceof TiingoCandleUnavailableError
+          ? error.stopCode
+          : tiingoFailureCode(error);
+      setAdminDiagnosticContext({
+        failureStage: 'tiingo_candle_fetch',
+        evidence: {
+          provider: 'tiingo',
+          providerErrorCode,
+          fallbackResult: 'UNAVAILABLE',
+        },
+      });
+      recordAdminDiagnosticEvent(
+        'error',
+        'CANDLE_PROVIDER_FAILED',
+        'tiingo candle provider request failed.',
+        { providerErrorCode },
+      );
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+        'Tiingo candle provider is unavailable.',
+      );
     }
   }
 
@@ -1034,18 +1147,11 @@ export class AssetCandlesService {
           ? US_EASTERN_TIME_ZONE
           : UTC_TIME_ZONE;
     const range = this.parseRange(query.range);
-    if (
-      range === LONG_FOUR_HOUR_RANGE &&
-      asset.assetType !== AssetType.domestic_stock &&
-      asset.assetType !== AssetType.crypto
-    ) {
-      // US stocks keep their existing chart windows (no long-range 4h store).
-      this.throwApiError(
-        HttpStatus.BAD_REQUEST,
-        'ASSET_CANDLES_INVALID_RANGE',
-        'range 96d is available for KRX stocks and crypto only.',
-      );
-    }
+    // `96d` is served for every asset type (2026-10-14): KRX and US stocks by
+    // real exchange sessions, crypto by rolling days. US stocks have no
+    // stored 4h history, so a stored-feed answer is the 5m-aggregated window
+    // it already holds (served as database_partial); the Tiingo trial path
+    // aggregates real Tiingo 5m bars over the whole window.
     const rangeProvided = this.parseOptionalText(query.range) !== undefined;
     const legacyDateProvided = this.parseOptionalText(query.date) !== undefined;
     const legacyToProvided = this.parseOptionalText(query.to) !== undefined;
@@ -1294,7 +1400,8 @@ export class AssetCandlesService {
       range === LONG_FOUR_HOUR_RANGE &&
       asset.assetType !== AssetType.crypto
     ) {
-      // KRX: the 96 most recent real sessions before today, plus today.
+      // Stocks (KRX/US): the 96 most recent real sessions before today, plus
+      // today, on the asset's own exchange calendar.
       return {
         startAt: this.resolveMarketOpenAnchor(
           asset,

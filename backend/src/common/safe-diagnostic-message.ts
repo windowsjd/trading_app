@@ -247,6 +247,7 @@ const SAFE_MESSAGES = new Set<string>([
   'Invalid user status.',
   'Invalid wallet transfer reference.',
   'KIS candle provider is unavailable.',
+  'Tiingo candle provider is unavailable.',
   'KIS returned an error for candle data.',
   'KRX market is closed.',
   'Ledger order reference is missing or inconsistent.',

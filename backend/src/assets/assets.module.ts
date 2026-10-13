@@ -1,4 +1,5 @@
 import { KoscomCandleReaderService } from './koscom-candle-reader.service';
+import { TiingoCandleReaderService } from './tiingo-candle-reader.service';
 import { readKoscomConfig } from '../providers/koscom/koscom.config';
 import { Logger, Module } from '@nestjs/common';
 import { RedisModule } from '../redis/redis.module';
@@ -66,6 +67,7 @@ import { readMarketCandleRetentionConfig } from './market-candle-retention.confi
   controllers: [AssetsController, FuturesCandlesController],
   providers: [
     KoscomCandleReaderService,
+    TiingoCandleReaderService,
     AssetsService,
     DailyChangeRateService,
     MarketSessionOverrideCacheInvalidatorService,

@@ -649,6 +649,8 @@ describe('AssetTickerGateway', () => {
       pendingTickers: new Map<string, Record<string, unknown>>(),
       orderBookSubscriptions: new Map(),
       pendingOrderBooks: new Map(),
+      estimatedQuoteSubscriptions: new Map(),
+      pendingEstimatedQuotes: new Map(),
     };
     (
       gateway as unknown as {

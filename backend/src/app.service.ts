@@ -25,6 +25,7 @@ import { LiveCandlePubSubService } from './realtime/live-candle-pubsub.service';
 import { RedisService } from './redis/redis.service';
 import { readRedisConfig } from './redis/redis.config';
 import { readKoscomConfig } from './providers/koscom/koscom.config';
+import { TiingoDiagnosticsService } from './providers/tiingo/tiingo-diagnostics.service';
 
 /**
  * Structured readiness reasons for the operator market-session override
@@ -65,6 +66,8 @@ export class AppService {
     @Optional()
     @Inject(TICKER_FANOUT_METRICS)
     private readonly assetTickerGateway?: TickerFanoutMetricsSource,
+    @Optional()
+    private readonly tiingoDiagnostics?: TiingoDiagnosticsService,
   ) {}
 
   getHealth() {
@@ -266,6 +269,9 @@ export class AppService {
           this.kisWebSocketStreamingService?.getStatus() ?? null,
         binanceWebSocketStreaming:
           this.binanceWebSocketStreamingService?.getStatus() ?? null,
+        // Tiingo US-equity trial (informational; never changes status).
+        // Codes, counters and timestamps only — no prices or credentials.
+        tiingo: this.tiingoDiagnostics?.getStatus(now) ?? null,
         liveCandle: {
           enabled: liveEnabled,
           pubSub,

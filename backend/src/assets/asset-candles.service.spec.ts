@@ -39,6 +39,10 @@ import { ProviderHttpError } from '../providers/provider.types';
 import { AssetCandlesService } from './asset-candles.service';
 import type { ParsedAssetCandlesQuery } from './asset-candles.service';
 import { CandleResponseBuilder } from './candle-response.builder';
+import {
+  TiingoCandleIntervalError,
+  TiingoCandleUnavailableError,
+} from './tiingo-candle-reader.service';
 import type {
   KoscomClient,
   KoscomResponse,
@@ -1728,24 +1732,45 @@ describe('AssetCandlesService', () => {
       ).toBeGreaterThan(130 * 86_400_000);
     });
 
-    it('keeps US stock chart windows unchanged by rejecting 96d', async () => {
+    it('anchors US stocks at the 96th previous real US session open (2026-10-14 policy)', async () => {
       const { prisma, kisQuoteClient, service, serving } = createService();
-      prisma.asset.findUnique.mockResolvedValueOnce(
-        asset({
-          id: 'asset-us-96d',
-          symbol: 'AAPL',
-          market: 'NAS',
-          assetType: AssetType.us_stock,
-          currencyCode: CurrencyCode.USD,
-        }),
+      const us = asset({
+        id: 'asset-us-96d',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      });
+      prisma.asset.findUnique.mockResolvedValueOnce(us);
+      // This harness's serving mock answers through the legacy loader.
+      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: { rt_cd: '0', output2: [] },
+      });
+      await service.getAssetCandles('user-1', 'asset-us-96d', {
+        range: '96d',
+        limit: '600',
+      });
+      const parsed = (
+        serving.serve.mock.calls[0] as unknown[]
+      )[1] as ParsedAssetCandlesQuery;
+      const anchor = findPreviousMarketSession(
+        us,
+        new Date('2026-06-19T03:00:00.000Z'),
+        96,
       );
-      await expectApiError(
-        service.getAssetCandles('user-1', 'asset-us-96d', { range: '96d' }),
-        400,
-        'ASSET_CANDLES_INVALID_RANGE',
+      expect(anchor).not.toBeNull();
+      expect(anchor!.market).toBe('US');
+      expect(parsed.interval).toBe('4h');
+      expect((parsed.rangeStartAt as Date).toISOString()).toBe(
+        anchor!.openTime.toISOString(),
       );
-      expect(serving.serve).not.toHaveBeenCalled();
-      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+      // Sessions, not calendar days: weekends/holidays stretch the span.
+      expect(
+        (parsed.rangeEndAt as Date).getTime() -
+          (parsed.rangeStartAt as Date).getTime(),
+      ).toBeGreaterThan(130 * 86_400_000);
     });
 
     it('allows only the 4h interval on 96d', async () => {
@@ -2476,5 +2501,149 @@ describe('AssetCandlesService', () => {
       expect(JSON.stringify(response)).not.toContain('access_token');
       expect(JSON.stringify(response)).not.toContain('raw payload');
     }
+  });
+  describe('Tiingo trial candles (memory-only path)', () => {
+    const usAsset = () =>
+      asset({
+        id: 'asset-aapl-tiingo',
+        symbol: 'AAPL',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      });
+    const tiingoResponse = {
+      success: true,
+      data: {
+        state: 'available',
+        candles: [],
+        source: {
+          provider: 'tiingo',
+          dataset: 'equity_intraday',
+          marketCode: 'NAS',
+          requestedCount: 600,
+          returnedCount: 0,
+          persisted: false,
+          priceAdjustment: 'raw',
+          coverage: 'partial',
+          requestedSessions: 96,
+          coveredSessions: 30,
+          currentCandleTime: null,
+        },
+      },
+    };
+    const withReader = (reader: { targetFor: jest.Mock; read: jest.Mock }) => {
+      const base = createService();
+      const service = new AssetCandlesService(
+        base.prisma as never,
+        base.kisAuthClient as never,
+        base.kisQuoteClient as never,
+        base.binancePublicClient as never,
+        base.serving as never,
+        new CandleResponseBuilder(),
+        undefined,
+        reader as never,
+      );
+      return { ...base, service };
+    };
+    const TARGET = {
+      assetId: 'asset-aapl-tiingo',
+      symbol: 'AAPL',
+      market: 'NAS',
+      ticker: 'aapl',
+    };
+
+    it('answers managed assets without the Redis/DB serving path or KIS', async () => {
+      const reader = {
+        targetFor: jest.fn().mockResolvedValue(TARGET),
+        read: jest.fn().mockResolvedValue({
+          response: tiingoResponse,
+          stopCode: null,
+          droppedIncompleteBuckets: 0,
+        }),
+      };
+      const { prisma, service, serving, kisQuoteClient } = withReader(reader);
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset());
+      const response = await service.getAssetCandles(
+        'user-1',
+        'asset-aapl-tiingo',
+        {
+          range: '96d',
+          interval: '4h',
+          limit: '600',
+        },
+      );
+      expect(response).toBe(tiingoResponse);
+      expect(serving.serve).not.toHaveBeenCalled();
+      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+      const parsed = (
+        reader.read.mock.calls[0] as unknown[]
+      )[2] as ParsedAssetCandlesQuery;
+      expect(parsed).toMatchObject({
+        range: '96d',
+        interval: '4h',
+        limit: 600,
+      });
+    });
+
+    it('maps a Tiingo failure with nothing to serve to a 503 (no KIS fallback)', async () => {
+      const reader = {
+        targetFor: jest.fn().mockResolvedValue(TARGET),
+        read: jest
+          .fn()
+          .mockRejectedValue(
+            new TiingoCandleUnavailableError('TIINGO_UNAUTHORIZED'),
+          ),
+      };
+      const { prisma, service, serving, kisQuoteClient } = withReader(reader);
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset());
+      const body = (await expectApiError(
+        service.getAssetCandles('user-1', 'asset-aapl-tiingo', {
+          range: '1d',
+          interval: '5m',
+        }),
+        503,
+        'ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+      )) as { error: { message: string } };
+      expect(body.error.message).not.toContain('KIS');
+      expect(serving.serve).not.toHaveBeenCalled();
+      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+    });
+
+    it('rejects an interval the trial path does not serve', async () => {
+      const reader = {
+        targetFor: jest.fn().mockResolvedValue(TARGET),
+        read: jest.fn().mockRejectedValue(new TiingoCandleIntervalError()),
+      };
+      const { prisma, service } = withReader(reader);
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset());
+      await expectApiError(
+        service.getAssetCandles('user-1', 'asset-aapl-tiingo', {
+          range: '1d',
+          interval: '1m',
+        }),
+        400,
+        'ASSET_CANDLES_INVALID_INTERVAL',
+      );
+    });
+
+    it('leaves unmanaged assets on the existing serving path', async () => {
+      const reader = {
+        targetFor: jest.fn().mockResolvedValue(null),
+        read: jest.fn(),
+      };
+      const { prisma, service, serving, kisQuoteClient } = withReader(reader);
+      prisma.asset.findUnique.mockResolvedValueOnce(usAsset());
+      kisQuoteClient.getMarketDataByExplicitPath.mockResolvedValueOnce({
+        state: 'available',
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: { rt_cd: '0', output2: [] },
+      });
+      await service.getAssetCandles('user-1', 'asset-aapl-tiingo', {
+        range: '30d',
+        interval: '4h',
+      });
+      expect(serving.serve).toHaveBeenCalledTimes(1);
+      expect(reader.read).not.toHaveBeenCalled();
+    });
   });
 });

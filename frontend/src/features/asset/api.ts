@@ -80,13 +80,22 @@ export interface AssetCandleDto {
 }
 
 export interface AssetCandlesSourceDto {
-  provider?: 'kis' | 'binance' | 'koscom' | 'mixed';
+  provider?: 'kis' | 'binance' | 'koscom' | 'mixed' | 'tiingo';
   sourceProviders?: string[];
   requestedCount?: number;
   returnedCount?: number;
   // Binance only: true when the requested window exceeded one klines call and
   // older candles were cut off.
   truncated?: boolean;
+  // Tiingo trial only (memory-only candles; never stored on the server).
+  dataset?: 'equity_intraday' | 'eod';
+  persisted?: boolean;
+  priceAdjustment?: 'raw' | 'split_dividend_adjusted';
+  coverage?: 'complete' | 'partial' | 'empty';
+  requestedSessions?: number;
+  coveredSessions?: number;
+  /** The in-progress candle (not yet final), if the response includes one. */
+  currentCandleTime?: IsoDateTimeString | null;
 }
 
 export interface AssetCandlesDto {

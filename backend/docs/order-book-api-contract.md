@@ -1,5 +1,9 @@
 # Display-only realtime order books
 
+> US-equity *estimated* best bid/ask (Tiingo trial) is a separate channel,
+> `asset_estimated_quote` — see [tiingo-us-equity-trial.md](tiingo-us-equity-trial.md).
+> It is not part of this ladder contract and `asset_order_book` is unchanged.
+
 This implements the requested Binance Spot partial depth integration. It does
 not change order execution, ticker prices, candles, currencies or persistence.
 

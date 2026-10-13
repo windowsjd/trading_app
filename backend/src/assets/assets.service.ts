@@ -40,6 +40,10 @@ import {
   type PublicSourceMetadata,
 } from '../providers/source-metadata.presenter';
 import { BinanceSymbolMetadataService } from '../providers/binance/binance-symbol-metadata.service';
+import {
+  MarketDisplayPriceService,
+  type EphemeralDisplayPrice,
+} from '../providers/market-display-price.service';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
@@ -110,7 +114,8 @@ type AssetRecord = {
 };
 
 type AssetPriceSnapshotRecord = {
-  id: string;
+  /** Null for an ephemeral (memory-only) display price: no stored row exists. */
+  id: string | null;
   price: Prisma.Decimal;
   priceKrw: Prisma.Decimal | null;
   currencyCode: CurrencyCode;
@@ -170,7 +175,7 @@ export type AssetPricePayload =
       priceCurrency: CurrencyCode;
       priceKrwState: 'available';
       priceKrw: string;
-      assetPriceSnapshotId: string;
+      assetPriceSnapshotId: string | null;
       priceEffectiveAt: string;
       priceCapturedAt: string;
       priceSource: PublicSourceMetadata | null;
@@ -184,7 +189,7 @@ export type AssetPricePayload =
       priceKrwState: 'unavailable';
       priceKrwReason: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
       priceKrwMessage: string;
-      assetPriceSnapshotId: string;
+      assetPriceSnapshotId: string | null;
       priceEffectiveAt: string;
       priceCapturedAt: string;
       priceSource: PublicSourceMetadata | null;
@@ -289,7 +294,7 @@ type AssetPriceResponse = {
         priceKrwReason?: 'FX_RATE_UNAVAILABLE' | 'FX_RATE_STALE';
         priceKrwMessage?: string;
         changeRate: string | null;
-        assetPriceSnapshotId: string;
+        assetPriceSnapshotId: string | null;
         priceEffectiveAt: string;
         priceCapturedAt: string;
         freshnessAgeSeconds: number;
@@ -351,6 +356,9 @@ export class AssetsService {
     @Optional()
     private readonly dailyChangeRate?: DailyChangeRateService,
     @Optional() private readonly redis?: RedisService,
+    // Display-only routing for ephemeral (memory-only) provider prices such
+    // as the Tiingo trial. Absent or not managing an asset = stored policy.
+    @Optional() private readonly displayPrices?: MarketDisplayPriceService,
   ) {}
 
   async getAssets(
@@ -504,7 +512,7 @@ export class AssetsService {
       new Date(valuationAt),
     );
     const ids = priced.assets.flatMap((asset) =>
-      asset.price?.state === 'available'
+      asset.price?.state === 'available' && asset.price.assetPriceSnapshotId
         ? [asset.price.assetPriceSnapshotId]
         : [],
     );
@@ -523,7 +531,7 @@ export class AssetsService {
     const assets = priced.assets.map((asset) => ({
       ...asset,
       ...readAssetListTurnover(
-        asset.price?.state === 'available'
+        asset.price?.state === 'available' && asset.price.assetPriceSnapshotId
           ? byId.get(asset.price.assetPriceSnapshotId)
           : undefined,
       ),
@@ -547,7 +555,16 @@ export class AssetsService {
       })),
     };
     this.rememberSortedSnapshot(snapshot);
-    if (this.redis && process.env.REDIS_URL) {
+    // Ephemeral provider prices (Tiingo trial) must never be written to Redis
+    // keys: such a snapshot stays process-local only.
+    const containsEphemeralPrice = assets.some(
+      (asset) =>
+        asset.price?.state === 'available' &&
+        this.displayPrices?.isEphemeralSourceName(
+          asset.price.priceSource?.sourceName,
+        ),
+    );
+    if (this.redis && process.env.REDIS_URL && !containsEphemeralPrice) {
       try {
         await this.redis.eval(
           STORE_ASSET_SORT_SNAPSHOT,
@@ -1038,13 +1055,14 @@ export class AssetsService {
           },
           domain: 'MARKET_DATA',
           operation: 'ASSET_PRICE_READ',
-          failureStage: 'asset_price_selection',
+          failureStage: failureContext?.failureStage ?? 'asset_price_selection',
           entities: {
             ...failureContext?.entities,
             assetId: asset.id,
             symbol: asset.symbol,
           },
           nextInvestigation: [
+            ...(failureContext?.nextInvestigation ?? []),
             'backend/src/assets/assets.service.ts',
             'backend/src/providers/source-eligibility.policy.ts',
           ],
@@ -1179,6 +1197,18 @@ export class AssetsService {
     snapshot: AssetPriceSnapshotRecord | null;
     failureContext?: DiagnosticContextUpdate;
   }> {
+    const ephemeral = await this.displayPrices?.resolve(
+      {
+        id: asset.id,
+        symbol: asset.symbol,
+        market: asset.market,
+        assetType: asset.assetType,
+        priceCurrency: this.getAssetPriceCurrency(asset),
+      },
+      valuationAt,
+    );
+    if (ephemeral) return this.ephemeralSnapshot(asset, ephemeral);
+
     const providerEligibility = resolveAssetProviderEligibility({
       workflow: 'assets_with_price',
       asset: {
@@ -1317,6 +1347,53 @@ export class AssetsService {
           selectedCapturedAt: fallbackSnapshot.capturedAt,
           providerDecision: providerSelection.decision,
         }),
+      },
+    };
+  }
+
+  /**
+   * Ephemeral display price (Tiingo trial). There is deliberately NO stored
+   * provider or admin_manual fallback for these assets: an unavailable trial
+   * price is reported as unavailable, never replaced by another source.
+   */
+  private ephemeralSnapshot(
+    asset: AssetRecord,
+    ephemeral: EphemeralDisplayPrice,
+  ): {
+    snapshot: AssetPriceSnapshotRecord | null;
+    failureContext?: DiagnosticContextUpdate;
+  } {
+    if (ephemeral.state === 'available') {
+      return {
+        snapshot: {
+          id: null,
+          price: new Prisma.Decimal(ephemeral.price),
+          priceKrw: null,
+          currencyCode: CurrencyCode.USD,
+          sourceType: AssetPriceSourceType.provider_api,
+          sourceName: ephemeral.sourceName,
+          effectiveAt: ephemeral.effectiveAt,
+          capturedAt: ephemeral.capturedAt,
+          sourceDecision: ephemeral.decision,
+        },
+      };
+    }
+    recordAdminDiagnosticEvent(
+      'warn',
+      'ASSET_PRICE_SELECTION_REJECTED',
+      `No ephemeral display price was available for asset ${asset.id}.`,
+      { rejectedReason: ephemeral.code },
+    );
+    return {
+      snapshot: null,
+      failureContext: {
+        failureStage: ephemeral.failureStage,
+        entities: { assetId: asset.id, symbol: asset.symbol },
+        evidence: { ...ephemeral.evidence, unavailableCode: ephemeral.code },
+        nextInvestigation: [
+          'backend/src/providers/tiingo/tiingo-quote.service.ts',
+          'GET /readiness → data.tiingo',
+        ],
       },
     };
   }

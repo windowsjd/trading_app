@@ -22,11 +22,16 @@ export type RealtimeChannel =
   | 'asset_ticker'
   | 'asset_candle'
   | 'asset_order_book'
+  | 'asset_estimated_quote'
   | 'fx_rate';
 
 export type RealtimeSubscriptionSpec =
   | {
-      channel: 'asset_ticker' | 'asset_candle' | 'asset_order_book';
+      channel:
+        | 'asset_ticker'
+        | 'asset_candle'
+        | 'asset_order_book'
+        | 'asset_estimated_quote';
       assetId: string;
       interval?: string;
       pair?: never;
@@ -403,6 +408,12 @@ export class RealtimeSocketManager {
       }
       return;
     }
+    if (payload.type === 'asset_estimated_quote') {
+      if (typeof payload.assetId === 'string' && payload.assetId) {
+        this.emitToMatches('asset_estimated_quote', payload, false);
+      }
+      return;
+    }
     if (payload.type === 'fx_rate_updated') {
       this.emitToMatches('fx_rate', payload, true);
       return;
@@ -411,6 +422,7 @@ export class RealtimeSocketManager {
       payload.channel === 'asset_ticker' ||
       payload.channel === 'asset_candle' ||
       payload.channel === 'asset_order_book' ||
+      payload.channel === 'asset_estimated_quote' ||
       payload.channel === 'fx_rate'
     ) {
       this.emitToMatches(payload.channel, payload, false);
