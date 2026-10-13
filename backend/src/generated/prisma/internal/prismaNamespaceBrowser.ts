@@ -70,6 +70,7 @@ export const ModelName = {
   MarketCandleSyncState: 'MarketCandleSyncState',
   MarketSessionOverride: 'MarketSessionOverride',
   FuturesInstrument: 'FuturesInstrument',
+  FuturesMarketCandle: 'FuturesMarketCandle',
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
@@ -482,6 +483,29 @@ export const FuturesInstrumentScalarFieldEnum = {
 } as const
 
 export type FuturesInstrumentScalarFieldEnum = (typeof FuturesInstrumentScalarFieldEnum)[keyof typeof FuturesInstrumentScalarFieldEnum]
+
+
+export const FuturesMarketCandleScalarFieldEnum = {
+  id: 'id',
+  futuresInstrumentId: 'futuresInstrumentId',
+  interval: 'interval',
+  contractSymbol: 'contractSymbol',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  open: 'open',
+  high: 'high',
+  low: 'low',
+  close: 'close',
+  volume: 'volume',
+  amount: 'amount',
+  isClosed: 'isClosed',
+  sourceProvider: 'sourceProvider',
+  sourceUpdatedAt: 'sourceUpdatedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesMarketCandleScalarFieldEnum = (typeof FuturesMarketCandleScalarFieldEnum)[keyof typeof FuturesMarketCandleScalarFieldEnum]
 
 
 export const FuturesPositionScalarFieldEnum = {

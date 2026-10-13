@@ -504,6 +504,7 @@ const CANDLE_RANGES = new Set([
   'prev2_open',
   '1y',
   'season',
+  '96d',
 ]);
 const CANDLE_INTERVALS = new Set([
   '1m',

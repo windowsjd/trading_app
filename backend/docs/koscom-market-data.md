@@ -14,6 +14,8 @@ The domestic provider is KOSCOM; US KIS and Binance retain their transports and 
 
 Reuse PostgreSQL `market_candles`, existing locks/checkpoints, five-minute builder and higher-interval aggregation. Preserve closed KIS rows during overlapping KOSCOM imports; never relabel historical rows. Intraday requests use documented one-minute windows of at most 100 rows, with no invented continuation token or guaranteed historical retention. Missing constituent minutes cannot produce a complete five-minute candle.
 
+Long-range KRX 4h history (2026-10-13) uses the 10-minute history cycle (`inddCycleTpCd=600`, one request per completed calendar session, END-labelled rows). It is stored only after per-session verification against the dated `trdDd` daily bar (exact O/H/L/C), never split into 5-minute rows, and never requested for non-trading dates (a holiday request returned the previous session unchanged). Contract, budgets and verification rules: [long-range-4h-candles.md](long-range-4h-candles.md); live evidence: `docs/investigations/2026-10-13-koscom-10m-date-quota/report.md`.
+
 History supports D/W; weekly provider dates identify the last trading day and must be normalized to the existing week boundary. KOSCOM documents no adjusted-price request flag. Preserve existing adjusted KIS history and expose provider provenance; corporate-action continuity and provider adjustment semantics require live verification before rollout.
 
 The supplied v3 specification is the implementation contract. Additional field semantics were checked against the official [realtime documentation](https://koscom.gitbook.io/open-api/api/marketv3/stocks/stocksa) and [closed/history documentation](https://koscom.gitbook.io/open-api/api/marketv3/stocks/closeda). Actual authentication, response shapes, history availability and rate limits remain unverified without a user-provided key.
@@ -51,7 +53,7 @@ Existing candle serving, backfill/reconcile jobs and `/api/v1/assets/:assetId/ca
 | `stocks/{code}/price`, `orderbook` | Single-symbol KONEX fallback; no assumed KONEX batch support |
 | `closed/{market}/lists` | Cached mapping of existing active assets; only positive list membership is accepted; another market’s list failure does not disable proven symbols |
 | `closed/{market}/{code}/master` | Validated adapter method for inspection; not an extra per-poll request |
-| `stocks/{code}/intraday` | 1-minute feed, current KST date only, HHMM request windows ≤95 minutes and response ≤100 rows |
+| `stocks/{code}/intraday` | 1-minute feed, current KST date only, HHMM request windows ≤95 minutes and response ≤100 rows; 10-minute cycle (`600`) for one whole completed session per request (long-range 4h, live-verified 96–97 sessions back) |
 | `closed/{market}/{code}/history` | D/W with date-window paging, max 100 rows per request; completed-session close recovery |
 | `closeprice` | Deliberately unused: documented result has no trading date; recovery uses dated history |
 | M history, all-market lists/ohlclists/quotelists, indices | Not called; existing app does not require these features |

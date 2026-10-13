@@ -1,6 +1,7 @@
 import { tradingSessions } from '../test/support/trading-session-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { performance as monotonicClock } from 'node:perf_hooks';
 import {
   db,
   fixture,
@@ -1404,6 +1405,159 @@ async function listStates() {
   });
 }
 
+/** 16 nearby triggers, using the existing order/reservation/settlement core. */
+async function smallConcurrentBatch(executionType: 'market' | 'limit') {
+  await scenario('general', async (s) => {
+    await market(s, 'BINANCE');
+    await quote(s, 'BINANCE', '100');
+    const ids: string[] = [];
+    for (let i = 0; i < 16; i++)
+      ids.push(
+        await register(s, {
+          triggerCondition: 'at_or_above',
+          triggerPrice: '102',
+          executionType,
+          ...(executionType === 'limit' ? { limitPrice: '101' } : {}),
+          amount: '10',
+        }),
+      );
+    const before = await wallet(s, 'BINANCE');
+    const triggerPrice = await quote(s, 'BINANCE', '102');
+    const startedAt = monotonicClock.now();
+    const workers = [0, 1].map(
+      () =>
+        new ConditionalBuyWorker(
+          db,
+          new OpsJobLockService(db),
+          new OpsJobRunService(db),
+          conditionalBuy,
+        ),
+    );
+    const firstPass = await Promise.all([
+      ...workers.map((worker) => worker.tick()),
+      ...ids.map((id) => conditionalBuy.evaluate(id)),
+    ]);
+    const replay = await Promise.all(
+      ids.map((id) => conditionalBuy.evaluate(id)),
+    );
+    const rows = await db.order.findMany({
+      where: { tradingAccountId: s.accountId },
+    });
+    const outcomes = await db.conditionalBuyOrder.findMany({
+      where: { tradingAccountId: s.accountId },
+      select: {
+        id: true,
+        status: true,
+        failureCode: true,
+        terminalReason: true,
+        attemptCount: true,
+        createdAt: true,
+        triggeredAt: true,
+        lastAttemptAt: true,
+        order: { select: { status: true } },
+      },
+    });
+    const observedAt = await now();
+    // Counts, codes and relative clocks only: no account/order IDs, prices,
+    // wallet amounts, credentials or large Prisma objects in failure output.
+    const diagnostics = JSON.stringify({
+      executionType,
+      elapsedMs: Math.round(monotonicClock.now() - startedAt),
+      nodeMinusDbMs: Date.now() - observedAt.getTime(),
+      triggerEvidenceAgeMs:
+        observedAt.getTime() - triggerPrice.capturedAt.getTime(),
+      workerStates: firstPass.slice(0, workers.length),
+      directStates: firstPass.slice(workers.length),
+      replayStates: replay,
+      watches: ids.map((id, index) => {
+        const row = outcomes.find((item) => item.id === id);
+        return {
+          index,
+          status: row?.status ?? 'missing',
+          failureCode: row?.failureCode ?? null,
+          terminalReason: row?.terminalReason ?? null,
+          attempts: row?.attemptCount ?? null,
+          evidenceAfterRegistrationMs: row
+            ? triggerPrice.effectiveAt.getTime() - row.createdAt.getTime()
+            : null,
+          triggerAgeMs: row?.triggeredAt
+            ? observedAt.getTime() - row.triggeredAt.getTime()
+            : null,
+          lastAttemptAgeMs: row?.lastAttemptAt
+            ? observedAt.getTime() - row.lastAttemptAt.getTime()
+            : null,
+          orderStatus: row?.order?.status ?? null,
+        };
+      }),
+    });
+    console.log(`Conditional BUY batch evidence ${diagnostics}`);
+    assert.equal(rows.length, 16, diagnostics);
+    assert.equal(new Set(rows.map((row) => row.id)).size, 16);
+    for (const id of ids)
+      assert.equal((await watch(id)).status, 'ordered', diagnostics);
+    if (executionType === 'limit') {
+      assert.equal(rows.filter((row) => row.status === 'submitted').length, 16);
+      const pending = await wallet(s, 'BINANCE');
+      assert.equal(pending.balance, before.balance);
+      assert.equal(
+        pending.reserved,
+        rows
+          .reduce(
+            (sum, row) => sum.add(row.reservedAmount ?? 0),
+            new Prisma.Decimal(0),
+          )
+          .toFixed(8),
+      );
+      await quote(s, 'BINANCE', '100');
+      assert.equal(
+        (await matcher.matchDueLimitOrders({ now: await now() })).filledPathA,
+        16,
+      );
+    }
+    await new ConditionalBuyWorker(
+      db,
+      new OpsJobLockService(db),
+      new OpsJobRunService(db),
+      conditionalBuy,
+    ).tick();
+    const executed = await db.order.findMany({
+      where: { tradingAccountId: s.accountId, status: 'executed' },
+    });
+    assert.equal(executed.length, 16);
+    assert.equal(await ledgerCount(s), 16);
+    const after = await wallet(s, 'BINANCE');
+    assert.equal(after.reserved, '0.00000000');
+    assert.equal(
+      new Prisma.Decimal(before.balance).sub(after.balance).toFixed(8),
+      executed
+        .reduce(
+          (sum, row) => sum.add(row.netAmount ?? 0),
+          new Prisma.Decimal(0),
+        )
+        .toFixed(8),
+    );
+    const position = await db.position.findFirstOrThrow({
+      where: {
+        tradingAccountId: s.accountId,
+        assetId: s.instruments[0].asset.id,
+      },
+    });
+    assert.equal(
+      position.quantity.toFixed(8),
+      executed
+        .reduce(
+          (sum, row) => sum.add(row.executedQuantity ?? row.quantity),
+          new Prisma.Decimal(0),
+        )
+        .toFixed(8),
+    );
+    assert.equal(await orderCount(s), 16);
+    pass(
+      `16 ${executionType} triggers + two workers + replay/restart: unique orders, cash/reservation/holding conserved`,
+    );
+  });
+}
+
 async function main() {
   await db.$connect();
   try {
@@ -1435,6 +1589,8 @@ async function run() {
   await usStockScope();
   await beginner();
   await workerLease();
+  await smallConcurrentBatch('market');
+  await smallConcurrentBatch('limit');
   await executionWindow('market');
   await executionWindow('limit');
   await windowRaces();

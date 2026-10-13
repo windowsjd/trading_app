@@ -162,6 +162,74 @@ export type FuturesHistory = {
   executions?: FuturesExecution[];
   liquidations?: FuturesLiquidation[];
 };
+/** One Binance USDⓈ-M contract 4h candle (contract trade price, not Mark). */
+export type FuturesCandle = {
+  time: string;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  amount: string;
+  /** True only for the bucket containing "now" (not final yet). */
+  provisional: boolean;
+};
+export type FuturesCandles = {
+  state: "available" | "empty";
+  instrument: {
+    id: string;
+    symbol: string;
+    name: string;
+    productType: string;
+    settlementCurrency: string;
+    isActive: boolean;
+    displayPriceDecimals: number;
+  };
+  priceBasis: "contract_last_trade";
+  range: "96d";
+  interval: "4h";
+  candles: FuturesCandle[];
+  source: {
+    provider: "binance_usdm";
+    endpoint: string;
+    symbol: string;
+    contractType: "PERPETUAL";
+    requestedCount: number;
+    returnedCount: number;
+    provisionalUpdatedAt: string | null;
+  };
+};
+/** 96 days × 6 closed contract buckets + the current one, under the 1000 cap. */
+export const FUTURES_CHART_WINDOW = {
+  interval: "4h",
+  range: "96d",
+  limit: 600,
+} as const;
+/**
+ * Contract chart of one FuturesInstrument. Market data, not account data: the
+ * route is not account-scoped and the response carries no account fields, so
+ * every trading account shares one cache entry per instrument.
+ */
+export async function getFuturesInstrumentCandles(
+  instrumentId: string,
+  signal?: AbortSignal,
+): Promise<FuturesCandles> {
+  const query = new URLSearchParams({
+    interval: FUTURES_CHART_WINDOW.interval,
+    range: FUTURES_CHART_WINDOW.range,
+    limit: String(FUTURES_CHART_WINDOW.limit),
+  });
+  const response = await apiClient.get<{ success: true; data: FuturesCandles }>(
+    `/futures/instruments/${encodeURIComponent(instrumentId)}/candles?${query.toString()}`,
+    { signal },
+  );
+  const data = response.data.data;
+  // Never show another contract's candles under this instrument.
+  if (data.instrument.id !== instrumentId) {
+    throw new Error("FUTURES_CHART_INSTRUMENT_MISMATCH");
+  }
+  return data;
+}
 const path = (id: string, suffix: string) =>
   `/trading-accounts/${encodeURIComponent(id)}/futures/${suffix}`;
 async function read<T>(

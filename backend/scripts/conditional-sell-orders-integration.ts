@@ -1593,6 +1593,85 @@ async function workerDuplicates() {
   });
 }
 
+/** 16 nearby triggers share one holding; reservations and fills remain bounded. */
+async function smallConcurrentBatch(executionType: 'market' | 'limit') {
+  await sellScenario('general', 'BINANCE', '10', async (s) => {
+    const ids: string[] = [];
+    for (let i = 0; i < 16; i++)
+      ids.push(
+        await condition(s, {
+          triggerCondition: 'at_or_below',
+          triggerPrice: '95',
+          quantity: '1',
+          executionType,
+          ...(executionType === 'limit' ? { limitPrice: '96' } : {}),
+        }),
+      );
+    await quote(s, 'BINANCE', '94');
+    const workers = [0, 1].map(
+      () =>
+        new ConditionalSellWorker(
+          db,
+          new OpsJobLockService(db),
+          new OpsJobRunService(db),
+          conditionalSell,
+        ),
+    );
+    await Promise.all([
+      ...workers.map((worker) => worker.tick()),
+      ...ids.map((id) => conditionalSell.evaluate(id)),
+    ]);
+    await Promise.all(ids.map((id) => conditionalSell.evaluate(id)));
+    let result = await invariants(s);
+    if (executionType === 'limit') {
+      assert.equal(result.submitted.length, 10);
+      assert.equal(result.position.quantity.toFixed(8), '10.00000000');
+      assert.equal(result.position.reservedQuantity.toFixed(8), '10.00000000');
+      await quote(s, 'BINANCE', '97');
+      assert.equal(
+        (await matcher.matchDueLimitOrders({ now: await now() })).filledPathA,
+        10,
+      );
+      result = await invariants(s);
+    }
+    assert.equal(result.executed.length, 10);
+    assert.equal(result.position.quantity.toFixed(8), '0.00000000');
+    assert.equal(result.position.reservedQuantity.toFixed(8), '0.00000000');
+    assert.equal(
+      new Set(
+        result.intents.filter((row) => row.orderId).map((row) => row.orderId),
+      ).size,
+      10,
+    );
+    assert.equal(
+      result.intents.filter(
+        (row) => row.status === 'watching' || row.status === 'triggered',
+      ).length,
+      0,
+    );
+    assert.equal(
+      result.intents.filter((row) => row.status === 'ordered').length,
+      10,
+    );
+    assert.equal(
+      result.intents.filter(
+        (row) => row.status === 'failed' || row.status === 'canceled',
+      ).length,
+      6,
+    );
+    await new ConditionalSellWorker(
+      db,
+      new OpsJobLockService(db),
+      new OpsJobRunService(db),
+      conditionalSell,
+    ).tick();
+    assert.equal((await invariants(s)).executed.length, 10);
+    pass(
+      `16 ${executionType} triggers + two workers + replay/restart: 10 held, at most 10 sold, reservations and ledger conserved`,
+    );
+  });
+}
+
 /** A15: concurrent registrations on one holding all succeed (>100%) up to the cap. */
 async function concurrentRegistrations() {
   await sellScenario('general', 'KRX', '10', async (s) => {
@@ -2292,6 +2371,8 @@ async function run() {
   await limitFillFlattens();
   await idempotency();
   await workerDuplicates();
+  await smallConcurrentBatch('market');
+  await smallConcurrentBatch('limit');
   await concurrentRegistrations();
   await flags();
   await evidenceAndSession();

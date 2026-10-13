@@ -6,11 +6,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT } from './market-candle-retention.constants';
 export { MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT } from './market-candle-retention.constants';
 
-// Storage-supported intervals for this phase. Aggregated intervals
-// (15m/30m/1h/4h) are derived from 5m in a later phase and are not
-// persisted here; extending this list also requires replacing the
+// Storage-supported intervals. 15m/30m/1h are always read-time aggregates of
+// 5m. '4h' rows are the long-range COMPLETED 4h history (Binance Spot native
+// klines, KRX built from verified KOSCOM 10-minute history) kept for the
+// 180-day 4h window; the current/recent 4h buckets are still aggregated from
+// 5m at read time. Extending this list also requires replacing the
 // market_candles_interval_check DB constraint in a new migration.
-export const MARKET_CANDLE_INTERVALS = ['5m', '1d', '1w'] as const;
+export const MARKET_CANDLE_INTERVALS = ['5m', '4h', '1d', '1w'] as const;
+
+/** Intervals whose closed rows are pruned by the retention job. */
+export const MARKET_CANDLE_RETAINED_INTERVALS = ['5m', '4h'] as const;
+export type MarketCandleRetainedInterval =
+  (typeof MARKET_CANDLE_RETAINED_INTERVALS)[number];
 
 export type MarketCandleInterval = (typeof MARKET_CANDLE_INTERVALS)[number];
 
@@ -62,7 +69,7 @@ export type MarketCandleDeleteClosedBeforeParams = {
 
 export type MarketCandleDeleteClosedBeforeBatchParams = {
   cutoff: Date;
-  interval: '5m';
+  interval: MarketCandleRetainedInterval;
   limit: number;
 };
 
@@ -255,7 +262,8 @@ export class MarketCandlesRepository {
   }
 
   /**
-   * Deletes at most `limit` oldest closed 5m rows. The CTE selection is
+   * Deletes at most `limit` oldest closed rows of one retained interval (5m or
+   * the long-range 4h history; 1d/1w are never pruned). The CTE selection is
    * deterministic and uses row locks with SKIP LOCKED so concurrent workers
    * cannot select the same rows. Retention callers still use the Ops DB lock
    * to keep one logical owner across batches.
@@ -264,9 +272,14 @@ export class MarketCandlesRepository {
     params: MarketCandleDeleteClosedBeforeBatchParams,
   ): Promise<number> {
     const cutoff = this.requireValidDate(params.cutoff, 'cutoff');
-    if (params.interval !== '5m') {
+    if (
+      !(MARKET_CANDLE_RETAINED_INTERVALS as readonly string[]).includes(
+        params.interval,
+      )
+    ) {
+      // @diagnosticSurface internal: Programmer-guard for the retention job; it records a fixed Ops failure, never public copy.
       throw new MarketCandleValidationError(
-        'deleteClosedBeforeBatch only supports the 5m interval.',
+        'deleteClosedBeforeBatch only supports the 5m and 4h intervals.',
       );
     }
     if (

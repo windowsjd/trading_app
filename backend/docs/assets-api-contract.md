@@ -313,7 +313,7 @@ Trading note policy:
 - Returns chart-compatible candles for existing assets without mutating DB rows.
 - `domestic_stock` uses KOSCOM v3 with preserved PostgreSQL KIS history; see [KOSCOM contract](koscom-market-data.md). Source metadata can be `koscom`, `kis`, or `mixed`; chart intervals and Decimal fields are preserved.
 - `us_stock` keeps the existing KIS overseas candle behavior.
-- `crypto` uses Binance Spot `GET /api/v3/klines` only. Binance Futures `/fapi/v1/klines` and authenticated Binance APIs are not used.
+- `crypto` uses Binance Spot `GET /api/v3/klines` only. Binance Futures `/fapi/v1/klines` and authenticated Binance APIs are never used for these Spot candles; USDⓈ-M contract klines are served only by the separate futures chart route `GET /api/v1/futures/instruments/:instrumentId/candles` ([long-range-4h-candles.md](long-range-4h-candles.md)).
 - Crypto candles are display-only and are not used for orders, quotes, valuation, ranking, settlement, scheduler jobs, `asset_price_snapshots`, or `fx_rate_snapshots`.
 - Crypto symbol normalization uses the asset symbol: `BTC` -> `BTCUSDT`, `ETH` -> `ETHUSDT`, existing `BTCUSDT` stays unchanged, and `BTC/USD`, `BTC-USD`, or `BTC_USD` normalize to `BTCUSDT`.
 - Binance USDT quote pairs are treated as USD-equivalent market data under the current MVP policy.
@@ -322,7 +322,12 @@ Trading note policy:
 - 그 외 interval은 validation error로 처리한다.
 - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - `15m`, `30m`, `1h`, `4h` are aggregated at read time from the STORED `5m`
-  feed (35-day retention), never from a separate stored table. Until that
+  feed (35-day retention), never from a separate stored table — except
+  `range=96d` (4h only, KRX stocks and crypto), which serves the stored
+  COMPLETED 4h history (Spot native klines / KRX verified KOSCOM 10-minute
+  history, 180-day retention) plus the 5m-aggregated recent buckets, one
+  source per bucket and never the same `time` twice
+  ([long-range-4h-candles.md](long-range-4h-candles.md)). Until that
   baseline is seeded for the requested window the endpoint answers
   `ASSET_CANDLES_BASELINE_NOT_READY` (503) instead of returning a truncated
   provider-direct page; clients show a "preparing" state and retry. See
@@ -335,23 +340,28 @@ Trading note policy:
   - Allowed for all asset candle types: `1m`, `5m`, `15m`, `30m`, `1h`, `4h`, `1d`, `1w`.
 - `range` optional. Default is `1d`.
   - Allowed: `1d`, `3d`, `7d`, `14d`, `30d`, `prev_open`, `prev2_open`, `1y`,
-    `season`.
+    `season`, `96d`.
   - `1d` / `3d` / `7d` / `14d` / `30d` / `1y` are rolling windows: exactly
     N x 24h before the request clock up to the request clock. `3d` is the
     window the `15m` chart tab requests; `14d` is what `30m` and `1h` request;
-    `30d` is what `4h` requests.
+    `30d` is what the US-stock `4h` tab requests.
+  - `96d` (2026-10-13) is the long-range 4h window: `interval` must be `4h`
+    (default when omitted); crypto = rolling 96 x 24h; KRX stocks = the 96th
+    previous real KRX session open up to now (96 completed sessions + today).
+    US stocks answer 400 `ASSET_CANDLES_INVALID_RANGE` (their 4h tab keeps
+    `30d`).
   - `prev_open` / `prev2_open` anchor at the previous (or second previous) real
     market session open, `season` at the current season start.
-  - Every interval is allowed for every range; unknown values are
+  - Every interval is allowed for every other range; unknown values are
     `ASSET_CANDLES_INVALID_RANGE`.
 - `limit` optional.
   - Default: `100`.
   - Must be a positive integer.
   - Values greater than `1000` (the Binance single-call cap) are clamped to
     `1000`; per-provider caps clamp lower when a provider call is made. The
-    chart tabs send `288` (`3d`/`15m`), `672` (`14d`/`30m`), `336` (`14d`/`1h`)
-    and `200` (`30d`/`4h`), and a database answer echoes the requested value in
-    `source.requestedCount`.
+    chart tabs send `288` (`3d`/`15m`), `672` (`14d`/`30m`), `336` (`14d`/`1h`),
+    `600` (`96d`/`4h`, KRX and crypto) and `200` (`30d`/`4h`, US stocks), and a
+    database answer echoes the requested value in `source.requestedCount`.
 - `date` optional `YYYY-MM-DD`.
   - When present for crypto, Binance receives UTC `startTime` at that date's start and `endTime` at that date's end unless `to` is provided.
 - `to` optional `HHmmss` or ISO datetime.

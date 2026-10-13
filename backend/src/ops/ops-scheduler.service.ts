@@ -48,6 +48,8 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private limitOrderMatchingInterval: NodeJS.Timeout | null = null;
   /** Prevents same-process tick overlap of the candle sync job (see below). */
   private marketCandleSyncInFlight = false;
+  private marketCandleLongSyncInFlight = false;
+  private futuresCandleSyncInFlight = false;
   private cryptoReconciliationInFlight = false;
   private cryptoReconciliationAttemptAt: number | undefined;
   /** Guards against a slow matching cycle overlapping the next dedicated tick. */
@@ -279,6 +281,15 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       if (reconciliation) results.push(reconciliation);
     }
 
+    // Cheap (one small klines call per instrument) and minute-cadenced, so it
+    // runs before the potentially long 5m/1d/1w sweep below.
+    const futuresCandles = await this.runFuturesCandleSyncIfDue(
+      now,
+      baseInput,
+      config,
+    );
+    if (futuresCandles) results.push(futuresCandles);
+
     // Last on purpose: a candle sync sweep can take minutes on a cold store
     // and must not delay the cheap snapshot/season jobs of the same tick.
     const candleSync = await this.runMarketCandleSyncIfDue(
@@ -288,7 +299,103 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     );
     if (candleSync) results.push(candleSync);
 
+    // After the 1d upkeep: KRX long-range verification reuses the dated
+    // `koscom_history` daily bars that sweep stores (no duplicate KOSCOM call).
+    const longSync = await this.runMarketCandleLongSyncIfDue(
+      now,
+      baseInput,
+      config,
+    );
+    if (longSync) results.push(longSync);
+
     return results;
+  }
+
+  /**
+   * Incremental long-range completed-4h upkeep (Spot native 4h, KRX verified
+   * KOSCOM 10-minute history). Interval-gated like `market_candle_sync`: a
+   * failed run waits for the next interval instead of retrying every tick.
+   * The KRX part skips itself while the regular session is open.
+   */
+  async runMarketCandleLongSyncIfDue(
+    now: Date,
+    baseInput: OpsJobRunnerInput,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    if (!config.marketCandleLongSync.enabled) return undefined;
+    if (this.marketCandleLongSyncInFlight) return undefined;
+    this.marketCandleLongSyncInFlight = true;
+    try {
+      if (
+        !(await this.isIntervalDue(
+          OpsJobName.market_candle_long_sync,
+          now,
+          config.marketCandleLongSync.intervalSeconds,
+        ))
+      ) {
+        return undefined;
+      }
+      try {
+        return await this.runner.runMarketCandleLongSyncJob({
+          ...baseInput,
+          mode: 'incremental',
+          markets: config.marketCandleLongSync.markets,
+          now: now.toISOString(),
+        });
+      } catch {
+        // Recorded on the run row; the next interval retries missing buckets.
+        return undefined;
+      }
+    } finally {
+      this.marketCandleLongSyncInFlight = false;
+    }
+  }
+
+  /**
+   * USDⓈ-M contract 4h upkeep, including the open (provisional) bucket the
+   * futures chart shows. Independent of Futures Last/Mark ingestion.
+   */
+  async runFuturesCandleSyncIfDue(
+    now: Date,
+    baseInput: OpsJobRunnerInput,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    if (!config.futuresCandleSync.enabled) return undefined;
+    if (this.futuresCandleSyncInFlight) return undefined;
+    this.futuresCandleSyncInFlight = true;
+    try {
+      if (
+        !(await this.isIntervalDue(
+          OpsJobName.futures_candle_sync,
+          now,
+          config.futuresCandleSync.intervalSeconds,
+        ))
+      ) {
+        return undefined;
+      }
+      try {
+        return await this.runner.runFuturesCandleSyncJob({
+          ...baseInput,
+          mode: 'incremental',
+          now: now.toISOString(),
+        });
+      } catch {
+        return undefined;
+      }
+    } finally {
+      this.futuresCandleSyncInFlight = false;
+    }
+  }
+
+  private async isIntervalDue(
+    jobName: OpsJobName,
+    now: Date,
+    intervalSeconds: number,
+  ): Promise<boolean> {
+    const latestRun = await this.runService.findLatestRunForJob(jobName);
+    if (!latestRun) return true;
+    const lastRunAt = latestRun.finishedAt ?? latestRun.startedAt;
+    return now.getTime() - lastRunAt.getTime() >= intervalSeconds * 1000;
   }
 
   /**

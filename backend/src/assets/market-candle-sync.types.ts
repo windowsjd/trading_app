@@ -6,7 +6,9 @@ import type {
 import type { MarketCandleInterval } from './market-candles.repository';
 
 // A "feed" is one persisted interval of one asset (5m, 1d, or 1w).
-export type MarketCandleFeed = MarketCandleInterval;
+// The checkpointed feeds (5m/1d/1w). The stored long-range '4h' history is
+// maintained by MarketCandleLongSyncService, never by this checkpointed sync.
+export type MarketCandleFeed = Exclude<MarketCandleInterval, '4h'>;
 
 export const MARKET_CANDLE_SYNC_FEEDS: readonly MarketCandleFeed[] = [
   '5m',

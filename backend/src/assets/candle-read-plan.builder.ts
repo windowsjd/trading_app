@@ -10,14 +10,14 @@ import {
   CANDLE_SERVING_CONFIG,
   type CandleServingConfig,
 } from './candle-serving.config';
-import type { MarketCandleInterval } from './market-candles.repository';
+import type { MarketCandleFeed } from './market-candle-sync.types';
 
 export type CandleReadPlan = {
   assetId: string;
   assetType: AssetType;
   market: string;
   targetInterval: CandleInterval;
-  sourceInterval: MarketCandleInterval | null;
+  sourceInterval: MarketCandleFeed | null;
   requestedRange: { from: Date; to: Date };
   sourceRange: { from: Date; to: Date };
   limit: number;
@@ -26,6 +26,15 @@ export type CandleReadPlan = {
   requiresAggregation: boolean;
   managedByPersistence: boolean;
   outOfPolicyReason: string | null;
+  /**
+   * Long-range 4h (`range=96d`): stored COMPLETED '4h' rows answer the whole
+   * requested window, while the stored 5m feed is aggregated only over
+   * `recentRange` (the existing 30-day 4h window) for the current bucket and
+   * for buckets that have no stored completed row yet. `sourceRange` is the
+   * padded 5m read of that recent window, so coverage, freshness and
+   * on-demand refresh keep their existing 5m semantics. Null otherwise.
+   */
+  history?: { interval: '4h'; recentRange: { from: Date; to: Date } } | null;
 };
 
 const AGGREGATED_INTERVALS = new Set<CandleInterval>([
@@ -35,6 +44,9 @@ const AGGREGATED_INTERVALS = new Set<CandleInterval>([
   '4h',
 ]);
 const SOURCE_PADDING_MS = 4 * 60 * 60_000;
+// The 5m-aggregated part of a long-range 4h read: the same 30-day window the
+// regular 4h chart reads (30d + 4h padding stays inside the 35-day 5m store).
+const LONG_FOUR_HOUR_RECENT_WINDOW_MS = 30 * 24 * 60 * 60_000;
 
 @Injectable()
 export class CandleReadPlanBuilder {
@@ -50,9 +62,25 @@ export class CandleReadPlanBuilder {
     const requestedRange = this.resolveRequestedRange(asset, query);
     const requiresAggregation = AGGREGATED_INTERVALS.has(query.interval);
     const sourceInterval = this.resolveSourceInterval(query.interval);
+    const history =
+      query.range === '96d' && query.interval === '4h'
+        ? {
+            interval: '4h' as const,
+            recentRange: {
+              from: new Date(
+                Math.max(
+                  requestedRange.from.getTime(),
+                  requestedRange.to.getTime() - LONG_FOUR_HOUR_RECENT_WINDOW_MS,
+                ),
+              ),
+              to: requestedRange.to,
+            },
+          }
+        : null;
+    const aggregatedFrom = history?.recentRange.from ?? requestedRange.from;
     const sourceRange = {
       from: new Date(
-        requestedRange.from.getTime() -
+        aggregatedFrom.getTime() -
           (requiresAggregation ? SOURCE_PADDING_MS : 0),
       ),
       to: requestedRange.to,
@@ -87,12 +115,13 @@ export class CandleReadPlanBuilder {
       requiresAggregation,
       managedByPersistence: outOfPolicyReason === null,
       outOfPolicyReason,
+      history,
     };
   }
 
   private resolveSourceInterval(
     interval: CandleInterval,
-  ): MarketCandleInterval | null {
+  ): MarketCandleFeed | null {
     if (interval === '1m') return null;
     if (interval === '1d' || interval === '1w') return interval;
     return '5m';

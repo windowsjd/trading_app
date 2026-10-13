@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it } from 'node:test';
-import { ASSET_CHART_TIMEFRAMES, DEFAULT_ASSET_CHART_TIMEFRAME } from '../../features/asset/chartTimeframes.ts';
+import { ASSET_CHART_TIMEFRAMES, DEFAULT_ASSET_CHART_TIMEFRAME, resolveAssetChartTimeframe } from '../../features/asset/chartTimeframes.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 
 const require = createRequire(import.meta.url);
@@ -41,8 +41,12 @@ describe('chart timeframe selector', () => {
       const tree = h.render();
       assert.strictEqual(elements(tree, 'ChartTimeframeSelector')[0].props.selectedTimeframe, timeframe);
       const query = h.queries.find((option: any) => option.queryKey[0] === 'asset' && option.queryKey[1] === 'candles');
+      // KRX (this fixture) and crypto read the long-range 4h window; every
+      // other tab requests exactly its own policy window.
+      const window = resolveAssetChartTimeframe(timeframe, h.asset.assetType) ?? timeframe;
+      assert.equal(window.range, timeframe.interval === '4h' ? '96d' : timeframe.range);
       assert.deepEqual(query.queryKey, QUERY_KEYS.asset.candles(h.asset.id, {
-        interval: timeframe.interval, range: timeframe.range, limit: timeframe.limit,
+        interval: window.interval, range: window.range, limit: window.limit,
       }));
       assert.equal(h.liveCandleOptions.interval, timeframe.interval);
       assert.equal(elements(tree, 'CandlestickChart')[0].props.viewportResetKey, `${h.asset.id}:${timeframe.interval}`);
@@ -137,8 +141,10 @@ describe('chart timeframe selector', () => {
       const start = screen.indexOf(`${call}(assetId, {`);
       assert.ok(start > 0);
       const args = screen.slice(start, screen.indexOf('}', start));
-      for (const key of ['range', 'interval', 'limit']) assert.ok(args.includes(`${key}: selectedTimeframe.${key}`));
+      for (const key of ['range', 'interval', 'limit']) assert.ok(args.includes(`${key}: chartWindow.${key}`));
     }
+    // The request window is the selected tab resolved per market (4h only).
+    assert.match(screen, /resolveAssetChartTimeframe\(\s+selectedTimeframe,\s+detailQuery\.data\?\.asset\?\.assetType,/);
     assert.match(screen, /useAssetCandle\(\{\s+assetId,\s+interval: selectedTimeframe.interval/);
     assert.ok(screen.includes('mergeAssetCandleSnapshot('));
     assert.ok(screen.includes('viewportResetKey={`${assetId}:${selectedTimeframe.interval}`}'));

@@ -1,7 +1,7 @@
 import React from 'react';
 export const NavigationContext = React.createContext(undefined);
 import { conditionalFixture } from '../conditionalFixtures.cjs';
-import { futuresFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, futuresCandlesFixture } from '../futuresFixtures.cjs';
 import { getTradingAccountCapabilities } from '../../src/features/tradingAccount/capabilities';
 const params = new URLSearchParams(location.search);
 const pendingSpot = params.has('pending') && !['futures-only', 'none'].includes(params.get('pendingKind'));
@@ -171,6 +171,8 @@ export function useAssetOrderBook({ assetId }) {
 const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
   async get(path, options = {}) {
+    // Contract 4h chart (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
     if(path.endsWith('/protections')) {
       const protection = params.get('protection');
       if(protection==='error') throw new Error('protection fixture unavailable');

@@ -4,14 +4,28 @@ export const BINANCE_CANDLE_SOURCE = 'binance_klines';
 // /api/v3/klines caps a single response at 1000 rows.
 export const BINANCE_KLINES_MAX_LIMIT = 1000;
 
-export type BinanceCandleInterval = '5m' | '1d' | '1w';
+// '4h' is the long-range completed-history interval (Spot native klines and
+// USDⓈ-M contract klines); 5m/1d/1w are the checkpointed Spot feeds.
+export type BinanceCandleInterval = '5m' | '4h' | '1d' | '1w';
 
 export const BINANCE_CANDLE_INTERVAL_MS: Record<BinanceCandleInterval, number> =
   {
     '5m': 5 * 60_000,
+    '4h': 4 * 60 * 60_000,
     '1d': 24 * 60 * 60_000,
     '1w': 7 * 24 * 60 * 60_000,
   };
+
+/** The kline transport a BinanceCandleIngestionService instance pages over. */
+export type BinanceKlinesSource = {
+  fetchKlines(input: {
+    symbol: string;
+    interval: string;
+    limit: number;
+    startTime?: number;
+    endTime?: number;
+  }): Promise<{ response: unknown; receivedAt: Date }>;
+};
 
 export type BinanceCandlePageInput = {
   symbol: string;

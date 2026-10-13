@@ -32,6 +32,7 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
+import { findPreviousMarketSession } from '../orders/market-calendar.policy';
 import { HttpException } from '@nestjs/common';
 import { AssetType, CurrencyCode, Prisma } from '../generated/prisma/client';
 import { ProviderHttpError } from '../providers/provider.types';
@@ -1659,6 +1660,117 @@ describe('AssetCandlesService', () => {
         'ASSET_CANDLES_INVALID_RANGE',
       )) as { error: { message: string } };
       expect(envelope.error.message).toContain('14d');
+    });
+  });
+
+  describe('96d long-range 4h window', () => {
+    it('gives crypto a rolling 96 × 24h window with 4h as the default interval', async () => {
+      const { prisma, binancePublicClient, service, serving } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-btc-96d',
+          symbol: 'BTC',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      binancePublicClient.fetchKlines.mockResolvedValueOnce({
+        receivedAt: new Date('2026-06-19T03:00:01.000Z'),
+        response: [],
+      });
+      await service.getAssetCandles('user-1', 'asset-btc-96d', {
+        range: '96d',
+        limit: '600',
+      });
+      const parsed = (
+        serving.serve.mock.calls[0] as unknown[]
+      )[1] as ParsedAssetCandlesQuery;
+      expect(parsed.interval).toBe('4h');
+      expect(parsed.limit).toBe(600);
+      expect(
+        (parsed.rangeEndAt as Date).getTime() -
+          (parsed.rangeStartAt as Date).getTime(),
+      ).toBe(96 * 86_400_000);
+    });
+
+    it('anchors KRX at the 96th previous real session open (sessions, not calendar days)', async () => {
+      const { prisma, service, serving } = createService();
+      const domestic = asset({
+        id: 'asset-krx-96d',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      });
+      prisma.asset.findUnique.mockResolvedValueOnce(domestic);
+      await service.getAssetCandles('user-1', 'asset-krx-96d', {
+        range: '96d',
+        interval: '4h',
+        limit: '600',
+      });
+      const parsed = (
+        serving.serve.mock.calls[0] as unknown[]
+      )[1] as ParsedAssetCandlesQuery;
+      const anchor = findPreviousMarketSession(
+        domestic,
+        new Date('2026-06-19T03:00:00.000Z'),
+        96,
+      );
+      expect(anchor).not.toBeNull();
+      expect((parsed.rangeStartAt as Date).toISOString()).toBe(
+        anchor!.openTime.toISOString(),
+      );
+      // 96 sessions span far more than 96 calendar days of weekends/holidays.
+      expect(
+        (parsed.rangeEndAt as Date).getTime() -
+          (parsed.rangeStartAt as Date).getTime(),
+      ).toBeGreaterThan(130 * 86_400_000);
+    });
+
+    it('keeps US stock chart windows unchanged by rejecting 96d', async () => {
+      const { prisma, kisQuoteClient, service, serving } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-us-96d',
+          symbol: 'AAPL',
+          market: 'NAS',
+          assetType: AssetType.us_stock,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      await expectApiError(
+        service.getAssetCandles('user-1', 'asset-us-96d', { range: '96d' }),
+        400,
+        'ASSET_CANDLES_INVALID_RANGE',
+      );
+      expect(serving.serve).not.toHaveBeenCalled();
+      expect(kisQuoteClient.getMarketDataByExplicitPath).not.toHaveBeenCalled();
+    });
+
+    it('allows only the 4h interval on 96d', async () => {
+      const { prisma, service, serving } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(
+        asset({
+          id: 'asset-btc-96d-1h',
+          symbol: 'BTC',
+          market: 'BINANCE',
+          assetType: AssetType.crypto,
+          currencyCode: CurrencyCode.USD,
+        }),
+      );
+      const envelope = (await expectApiError(
+        service.getAssetCandles('user-1', 'asset-btc-96d-1h', {
+          range: '96d',
+          interval: '1h',
+        }),
+        400,
+        'ASSET_CANDLES_INVALID_INTERVAL',
+      )) as { error: { message: string } };
+      expect(envelope.error.message).toBe(
+        'interval 4h is the only interval supported for range 96d.',
+      );
+      expect(serving.serve).not.toHaveBeenCalled();
     });
   });
 

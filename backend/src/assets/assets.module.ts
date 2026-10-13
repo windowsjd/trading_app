@@ -51,6 +51,11 @@ import {
   readMarketCandleReconciliationConfig,
 } from './market-candle-reconciliation.config';
 import { MarketCandleReconciliationService } from './market-candle-reconciliation.service';
+import { FuturesMarketCandlesRepository } from './market-candle-futures.repository';
+import { FuturesCandlesService } from './market-candle-futures.service';
+import { FuturesCandlesController } from './market-candle-futures.controller';
+import { MarketCandleLongSyncService } from './market-candle-long-sync.service';
+import { readMarketCandleRetentionConfig } from './market-candle-retention.config';
 
 // AssetCandlesCacheService is provided (via factory so Nest supplies its default
 // env-derived config) and exported for a later serving step to inject. It is
@@ -58,7 +63,7 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
 // flow and the candles endpoint are unchanged in this step.
 @Module({
   imports: [ProvidersModule, RedisModule, MarketSessionOverrideModule],
-  controllers: [AssetsController],
+  controllers: [AssetsController, FuturesCandlesController],
   providers: [
     KoscomCandleReaderService,
     AssetsService,
@@ -66,12 +71,23 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
     MarketSessionOverrideCacheInvalidatorService,
     AssetCandlesService,
     MarketCandlesRepository,
+    FuturesMarketCandlesRepository,
+    FuturesCandlesService,
     {
       provide: MarketCandleRetentionService,
-      useFactory: (repository: MarketCandlesRepository) =>
-        new MarketCandleRetentionService(repository),
-      inject: [MarketCandlesRepository],
+      useFactory: (
+        repository: MarketCandlesRepository,
+        futuresRepository: FuturesMarketCandlesRepository,
+      ) =>
+        new MarketCandleRetentionService(
+          repository,
+          readMarketCandleRetentionConfig(),
+          undefined,
+          futuresRepository,
+        ),
+      inject: [MarketCandlesRepository, FuturesMarketCandlesRepository],
     },
+    MarketCandleLongSyncService,
     MarketCandleIngestionService,
     MarketCandleAggregationService,
     MarketCandleBackfillLockService,
@@ -140,6 +156,8 @@ import { MarketCandleReconciliationService } from './market-candle-reconciliatio
   exports: [
     AssetsService,
     MarketCandlesRepository,
+    FuturesMarketCandlesRepository,
+    MarketCandleLongSyncService,
     MarketCandleRetentionService,
     MarketCandleIngestionService,
     MarketCandleAggregationService,

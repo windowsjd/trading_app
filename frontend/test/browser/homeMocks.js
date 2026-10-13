@@ -1,6 +1,6 @@
 // Test transport only. Production Home, account provider, cache, selection
 // storage, API wrappers, appearance and AccountSwitcher all run unchanged.
-import { futuresFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, futuresCandlesFixture } from '../futuresFixtures.cjs';
 const params = new URLSearchParams(location.search);
 const long = params.get('long') === '1';
 const variant = params.get('state');
@@ -38,6 +38,8 @@ export const useRootNavigation = () => navigation;
 const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
   async get(path, config) {
+    // Contract 4h chart (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
     transport.requests.push(path);
     if (path.startsWith('/assets?')) {
       const query = new URL(path, location.origin).searchParams;

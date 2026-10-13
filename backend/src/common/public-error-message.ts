@@ -100,6 +100,7 @@ const PUBLIC_MESSAGES = new Set<string>([
   'Futures collateral information could not be verified.',
   'Futures wallet information could not be verified.',
   'Futures instrument was not found.',
+  'Futures chart supports interval 4h, range 96d and a limit from 1 to 1000.',
   'Futures trading is disabled.',
   'This Futures instrument is not yet available for new trades.',
   'Leverage is fixed for the open position lifetime.',

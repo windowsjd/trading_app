@@ -1,7 +1,7 @@
 // Fixture HTTP and navigation only; account ownership, permissions at the API
 // boundary, query lifecycle, Decimal formatting and production RN UI run intact.
 import { apiClient as homeClient, transport as homeTransport } from './homeMocks';
-import { futuresFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, futuresCandlesFixture } from '../futuresFixtures.cjs';
 import { conditionalFixture } from '../conditionalFixtures.cjs';
 const params = new URLSearchParams(location.search);
 const kind = params.get('kind') ?? 'mixed';
@@ -55,6 +55,8 @@ async function before(domain, path) {
 }
 export const apiClient = {
   async get(path, config) {
+    // Contract 4h chart (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
     if (path.includes('/season-summary')) {
       await before('friend', path);
       const own = futures('season-account').positions;

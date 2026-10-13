@@ -60,6 +60,20 @@ close retains a closed lifetime row and its cumulative realized PnL; reopening
 creates a new row and may choose any valid leverage/direction. A SQL partial unique
 index permits only one open position per account/instrument.
 
+### Contract chart (market data, 2026-10-13)
+
+`GET /api/v1/futures/instruments/:instrumentId/candles?interval=4h&range=96d&limit=600`
+is NOT under `/trading-accounts/:accountId`: it returns market data of one
+`FuturesInstrument` (Binance USDⓈ-M contract trade-price 4h klines,
+`priceBasis: "contract_last_trade"`), carries no account, position or
+permission field, and is shared by every trading account. It never reads Spot
+candles of the underlying asset and never serves Mark/Index series; Futures
+Last (fills, TP/SL) and Mark (UPNL, risk, liquidation) are unchanged. Only
+`4h`/`96d`/limit 1–1000 are accepted (400 `FUTURES_CANDLES_INVALID_QUERY`);
+unknown or non-catalog instruments are 404 `FUTURES_INSTRUMENT_NOT_FOUND`. The
+bucket containing "now" is returned with `provisional: true`. Contract,
+storage and collection: [long-range-4h-candles.md](long-range-4h-candles.md).
+
 ## Arithmetic and collateral
 
 Prisma Decimal is authoritative, with a local 60-digit calculation context.

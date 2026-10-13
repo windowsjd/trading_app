@@ -19,6 +19,8 @@ import type {
 export {
   ASSET_CHART_TIMEFRAMES,
   DEFAULT_ASSET_CHART_TIMEFRAME,
+  LONG_RANGE_FOUR_HOUR_TIMEFRAME,
+  resolveAssetChartTimeframe,
 } from './chartTimeframes';
 export type {
   AssetCandleInterval,
