@@ -442,4 +442,144 @@ describe('RankingRefreshService', () => {
       );
     });
   });
+
+  // rankingDate is the Korea (Asia/Seoul) date of capturedAt: the key changes
+  // at KST midnight, while capturedAt itself stays the absolute UTC instant.
+  describe('KST ranking business date', () => {
+    const octoberSeason = (prisma: ReturnType<typeof createPrisma>) => {
+      const startAt = new Date('2026-10-01T00:00:00.000Z');
+      const endAt = new Date('2026-10-31T00:00:00.000Z');
+      prisma.season.findUnique.mockResolvedValue({
+        id: 'season-1',
+        status: SeasonStatus.active,
+        startAt,
+        endAt,
+      });
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          id: 'season-1',
+          status: SeasonStatus.active,
+          start_at: startAt,
+          end_at: endAt,
+        },
+      ]);
+    };
+
+    it.each([
+      ['2026-10-13T14:59:59.000Z', '2026-10-13'],
+      ['2026-10-13T15:00:00.000Z', '2026-10-14'],
+      ['2026-10-13T23:59:59.000Z', '2026-10-14'],
+      ['2026-10-14T00:00:00.000Z', '2026-10-14'],
+      ['2026-10-14T14:59:59.000Z', '2026-10-14'],
+      ['2026-10-14T15:00:00.000Z', '2026-10-15'],
+    ])(
+      'replaces the set of a refresh captured at %s under rankingDate %s',
+      async (instant, expected) => {
+        const prisma = createPrisma();
+        octoberSeason(prisma);
+        prisma.seasonRanking.deleteMany.mockResolvedValue({ count: 0 });
+        const service = new RankingRefreshService(prisma as never, {} as never);
+
+        const result = await service.refreshCurrentRankingForSeason(
+          'season-1',
+          { capturedAt: new Date(instant), createEquitySnapshots: false },
+        );
+
+        const key = {
+          seasonId: 'season-1',
+          rankType: SeasonRankingType.daily,
+          rankingDate: new Date(`${expected}T00:00:00.000Z`),
+        };
+        expect(result).toEqual({
+          skipped: false,
+          rankingsCreated: 0,
+          rankingDate: expected,
+        });
+        // The verified-then-replaced set is the KST-dated one.
+        expect(prisma.seasonRanking.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({ where: key }),
+        );
+        expect(prisma.seasonRanking.deleteMany).toHaveBeenCalledWith({
+          where: key,
+        });
+      },
+    );
+
+    it('publishes rows under the KST date while capturedAt stays the absolute instant', async () => {
+      const prisma = createPrisma();
+      octoberSeason(prisma);
+      prisma.seasonParticipant.findMany.mockResolvedValue([
+        {
+          id: 'sp-1',
+          seasonId: 'season-1',
+          userId: 'user-1',
+          participantStatus: ParticipantStatus.active,
+          tradingAccountId: 'account-of-sp-1',
+          tradingAccount: {
+            id: 'account-of-sp-1',
+            mode: 'season',
+            status: 'active',
+            userId: 'user-1',
+            seasonParticipant: { id: 'sp-1' },
+          },
+          initialCapitalKrw: new Decimal('1000000'),
+          totalFillCount: 0,
+        },
+      ]);
+      prisma.seasonParticipant.update.mockResolvedValue({ id: 'sp-1' });
+      prisma.equitySnapshot.findMany.mockResolvedValue([]);
+      prisma.seasonRanking.deleteMany.mockResolvedValue({ count: 0 });
+      const valuation = {
+        calculateTradingAccountValuation: jest.fn().mockResolvedValue({
+          seasonParticipantId: 'sp-1',
+          tradingAccountId: 'account-of-sp-1',
+          totalAssetKrw: '1000000.00000000',
+          returnRate: '0.00000000',
+          krwCash: '1000000.00000000',
+          usdCashKrw: '0.00000000',
+          domesticStockValueKrw: '0.00000000',
+          usStockValueKrw: '0.00000000',
+          cryptoValueKrw: '0.00000000',
+        }),
+      };
+      const service = new RankingRefreshService(
+        prisma as never,
+        valuation as never,
+      );
+      // KST 2026-10-14 00:00, still 2026-10-13 in UTC.
+      const at = new Date('2026-10-13T15:00:00.000Z');
+
+      const result = await service.refreshCurrentRankingForSeason('season-1', {
+        capturedAt: at,
+        createEquitySnapshots: true,
+      });
+
+      expect(result).toEqual({
+        skipped: false,
+        rankingsCreated: 1,
+        rankingDate: '2026-10-14',
+      });
+      expect(prisma.seasonRanking.createMany).toHaveBeenCalledTimes(1);
+      const [publication] = prisma.seasonRanking.createMany.mock.calls[0] as [
+        { data: Array<{ rankingDate: Date; capturedAt: Date }> },
+      ];
+      expect(publication.data.length).toBe(1);
+      expect(publication.data[0].rankingDate.toISOString()).toBe(
+        '2026-10-14T00:00:00.000Z',
+      );
+      expect(publication.data[0].capturedAt.toISOString()).toBe(
+        '2026-10-13T15:00:00.000Z',
+      );
+      // The valuation instant and the equity snapshot timestamp are untouched.
+      const [snapshots] = prisma.equitySnapshot.createMany.mock.calls[0] as [
+        { data: Array<{ capturedAt: Date }> },
+      ];
+      expect(snapshots.data[0].capturedAt.toISOString()).toBe(
+        '2026-10-13T15:00:00.000Z',
+      );
+      const [, valuationAt] = valuation.calculateTradingAccountValuation.mock
+        .calls[0] as [string, Date];
+      expect(valuationAt.toISOString()).toBe('2026-10-13T15:00:00.000Z');
+    });
+  });
 });

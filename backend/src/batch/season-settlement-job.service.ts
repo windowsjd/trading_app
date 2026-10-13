@@ -251,6 +251,12 @@ export class SeasonSettlementJobService {
       );
     }
 
+    // Before any work, dry runs included: never a second final set (KST policy).
+    await this.assertNoFinalRankingOnOtherDate(
+      this.prisma,
+      seasonId,
+      settlementDate,
+    );
     const existingFinalRankings = await this.findExistingFinalRankingRows(
       this.prisma,
       seasonId,
@@ -921,6 +927,13 @@ export class SeasonSettlementJobService {
       );
       this.assertSettlementAccountLinks(input.seasonId, accountParticipants);
 
+      // Re-checked under the lock: a run for another date may have written
+      // final rows without settling the season since the pre-lock check.
+      await this.assertNoFinalRankingOnOtherDate(
+        tx,
+        input.seasonId,
+        input.settlementDate,
+      );
       const existingRows = await this.findExistingFinalRankingRows(
         tx,
         input.seasonId,
@@ -1442,6 +1455,37 @@ export class SeasonSettlementJobService {
         : 'Existing final rankings were reused; final tiers were assigned before settling.';
 
     return input.result;
+  }
+
+  /**
+   * A season has ONE final ranking. New ones are dated with the Korea date of
+   * `Season.endAt`; a season ranked or settled earlier under another date
+   * (such as the UTC date used before the KST ranking-date policy) keeps that
+   * date. A run for a different date must never add a second final set beside
+   * it, so it fails closed and names the existing date to rerun with.
+   */
+  private async assertNoFinalRankingOnOtherDate(
+    client: PrismaService | Prisma.TransactionClient,
+    seasonId: string,
+    settlementDate: Date,
+  ): Promise<void> {
+    const other = await client.seasonRanking.findFirst({
+      where: {
+        seasonId,
+        rankType: FINAL_RANK_TYPE,
+        rankingDate: { not: settlementDate },
+      },
+      orderBy: [{ rankingDate: 'asc' }],
+      select: { rankingDate: true },
+    });
+    if (other) {
+      const existingDate = this.formatDateOnly(other.rankingDate);
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RANKING_DATE_MISMATCH',
+        `Season ${seasonId} already has a final ranking for rankingDate ${existingDate}; settlementDate ${this.formatDateOnly(settlementDate)} would create a second one. Run settlement with settlementDate ${existingDate}.`,
+      );
+    }
   }
 
   private async findExistingFinalRankingRows(

@@ -220,6 +220,7 @@ Season settlement policy:
 - If no settlement-date snapshots exist and final rankings do not already exist, settlement fails with `NO_FINAL_SNAPSHOTS_AVAILABLE`.
 - Eligible participants are `active`, `finished`, and `rewarded`. If any eligible participant is missing a settlement-date snapshot and final rankings do not already exist, settlement fails with `MISSING_FINAL_SNAPSHOTS`.
 - Final ranking rows use `rankType=final`, `rankingDate=settlementDate`, and `capturedAt` from the batch run start time.
+- The scheduled settlement passes `settlementDate` = the Korea (Asia/Seoul) date of `Season.endAt`; a manual `--settlement-date` is used exactly as given. A season has one final ranking: if final rows already exist under a different date (for example the UTC date used before 2026-10-14), settlement fails with `FINAL_RANKING_DATE_MISMATCH` (409) before any write, dry runs included — rerun with that existing date.
 - Existing final ranking rows are never overwritten, deleted, recreated, or upserted. If final rows already exist while the season is still `ended`, the job leaves them as-is and only transitions the season status to `settled`.
 - New final ranking writes and the season status transition run in one Prisma transaction to avoid partial final result creation.
 - Ranking uses `totalAssetKrw desc`, then `userId asc`, then `seasonParticipantId asc`.

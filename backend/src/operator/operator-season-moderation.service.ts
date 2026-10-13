@@ -21,6 +21,7 @@ import {
   assertExistingRankingRowScopeWritable,
   requireSeasonRankingAccountScope,
 } from '../ranking/season-ranking-scope';
+import { toKstRankingDate } from '../ranking/ranking-date.policy';
 import { SeasonTradingAccountLinkIntegrityError } from '../seasons/season-trading-account-link';
 import { OperatorAuditService } from './operator-audit.service';
 import type { OperatorRequestContext } from './operator-account-management.service';
@@ -682,9 +683,11 @@ export class OperatorSeasonModerationService {
         client,
         input.participant.seasonId,
       ));
+    // An existing final set keeps its own date; a first final row takes the
+    // final ranking date settlement uses — the Korea date of Season.endAt.
     const rankingDate =
       rankingMetadata?.rankingDate ??
-      this.toDateOnly(input.participant.season.endAt);
+      toKstRankingDate(input.participant.season.endAt);
     const capturedAt = rankingMetadata?.capturedAt ?? new Date();
 
     // Operator rank corrections are still ranking WRITES, so they carry the
@@ -1047,10 +1050,6 @@ export class OperatorSeasonModerationService {
 
   private isUniqueConstraintError(error: unknown): boolean {
     return (error as { code?: unknown }).code === 'P2002';
-  }
-
-  private toDateOnly(date: Date) {
-    return new Date(`${date.toISOString().slice(0, 10)}T00:00:00.000Z`);
   }
 
   private formatDateOnly(date: Date) {

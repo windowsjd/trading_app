@@ -2217,6 +2217,50 @@ describe('OpsJobRunnerService', () => {
     });
   });
 
+  it('settles each ended season under the Korea date of its end instant', async () => {
+    const f = createService();
+    f.lockService.acquireLock.mockResolvedValue({
+      acquired: true,
+      lockKey: 'season_settlement:ended',
+      ownerId: 'owner',
+    });
+    f.runService.createRunning.mockResolvedValue({ id: 'run-1', startedAt });
+    f.runService.recordSucceeded.mockResolvedValue({
+      serialized: serializedRun({ jobName: OpsJobName.season_settlement }),
+    });
+    f.prisma.season.findMany.mockResolvedValue([
+      // KST 2026-10-14 01:00 — the UTC date would still be 2026-10-13.
+      { id: 'season-a', endAt: new Date('2026-10-13T16:00:00.000Z') },
+      // KST 2026-10-13 23:59:59 — the last second of that Korea date.
+      { id: 'season-b', endAt: new Date('2026-10-13T14:59:59.000Z') },
+    ]);
+    f.seasonSettlementJobService.run.mockResolvedValue({
+      data: { run: { id: 'batch-1', status: 'succeeded' } },
+    });
+
+    const result = await f.service.runSeasonSettlementJob({
+      now: '2026-10-14T00:00:00.000Z',
+    });
+
+    expect(result.success).toBe(true);
+    expect(f.seasonSettlementJobService.run).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        seasonId: 'season-a',
+        settlementDate: '2026-10-14',
+        idempotencyKey:
+          'season-settlement:season-a:2026-10-14:2026-10-14T00:00:00.000Z',
+      }),
+    );
+    expect(f.seasonSettlementJobService.run).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        seasonId: 'season-b',
+        settlementDate: '2026-10-13',
+      }),
+    );
+  });
+
   describe('lease ownership', () => {
     beforeEach(() => {
       jest.useFakeTimers().setSystemTime(new Date('2026-09-23T12:00:00.000Z'));

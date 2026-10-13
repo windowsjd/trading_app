@@ -146,6 +146,10 @@ a general conflict still rolls back its companion EquitySnapshot transaction.
 Scheduled writers check the actual capture date in `SCHEDULER_TIMEZONE`
 (default `Asia/Seoul`); work crossing midnight is deferred to the next tick,
 never stamped onto yesterday. Missing historical dates are never backfilled.
+Season ranking dates do not follow `SCHEDULER_TIMEZONE`: the live ranking's
+`rankingDate` and the scheduled settlement's `settlementDate` are always the
+Asia/Seoul date (see policy-decisions). Keep the default `Asia/Seoul` so daily
+snapshot dates and ranking dates share one meaning.
 
 With S selected active seasons and no missing snapshots, the daily dispatch
 per tick performs S + 2 read queries: general preflight, active season lookup,

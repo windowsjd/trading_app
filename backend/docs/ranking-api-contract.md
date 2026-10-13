@@ -27,6 +27,7 @@ not rewritten. [F3 details](futures-f3-contract.md).
 - Amount values are strings.
 - Timestamps are UTC ISO strings.
 - Dates use `YYYY-MM-DD`.
+- `rankingDate` is a Korea (Asia/Seoul) business date, independent of `SCHEDULER_TIMEZONE`: a daily set is keyed by the KST date of its `capturedAt`, a final set by the KST date of `Season.endAt` (since 2026-10-14). Rows written earlier keep the UTC date they were stored under. `capturedAt` stays a UTC instant.
 - Responses keep the existing `success/data` or `success/error` structure.
 - `season_participants.currentRank` is not used as source of truth.
 - Ranking values remain KRW-based.

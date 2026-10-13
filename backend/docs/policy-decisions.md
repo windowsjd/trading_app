@@ -31,6 +31,13 @@
 - 추정 호가(통계 추정 1단계)는 `asset_estimated_quote` 별도 채널이며 10호가(`asset_order_book`)로 취급하지 않는다. 근거: 실제 주문장이 아니다.
 - 기본 비활성, `TIINGO_TRIAL_MODE=false`(영속 모드) 거부, 운영 환경은 명시 opt-in 없이는 거부. 세부: [tiingo-us-equity-trial.md](tiingo-us-equity-trial.md).
 
+## 시즌 랭킹 업무 날짜 KST (2026-10-14, current)
+
+- 시즌 랭킹 `rankingDate`는 항상 Asia/Seoul 날짜다. 실시간 랭킹은 `capturedAt`의 KST 날짜, 최종 랭킹(자동 정산 `settlementDate`, 최종 랭킹이 없을 때의 운영자 최종 순위 보정)은 `Season.endAt`의 KST 날짜를 쓴다. 근거: 랭킹 날짜가 KST 오전 9시가 아니라 자정에 바뀌고, KST 기준 일별 스냅샷과 같은 날짜 의미를 가져야 한다.
+- 날짜 키만 KST다. `capturedAt`·`Season.startAt/endAt`·주문/시세/평가 시각은 UTC 절대시각 그대로 저장하며 9시간을 더하지 않는다. `YYYY-MM-DD`로 받은 수동 배치·API 날짜는 다시 변환하지 않는다. 근거: 날짜 전용(`@db.Date`) 값과 timestamp를 섞지 않는다.
+- 랭킹 날짜 시간대는 `SCHEDULER_TIMEZONE`과 무관하게 고정한다. 다른 스케줄러 작업의 시간대 정책은 바꾸지 않는다. 근거: 환경변수로 랭킹 날짜 의미가 바뀌면 안 된다.
+- 시즌의 최종 랭킹은 하나다. 다른 날짜(전환 이전 UTC 날짜 등)의 최종 랭킹이 이미 있으면 정산은 쓰기 전에 `FINAL_RANKING_DATE_MISMATCH`(409)로 중단하고, 운영자가 기존 날짜로 재실행한다. 기존 UTC 날짜 행은 수정·재해석·삭제하지 않는다. 근거: 날짜 정책 전환으로 같은 참가자에게 모순된 최종 결과가 생기면 안 된다.
+
 ## 금융 valuation 의미 (2026-10-05, current)
 
 - F3.1: Season 사용자 Futures open/increase/reduce/close는 실제 commit마다 기존 totalFillCount를 1회 증가시킨다. Replay/rollback/청산/최종 강제정산은 제외한다. 근거: 사용자 Spot/Futures 체결이 동일한 경쟁 tie-break 의미를 가져야 한다.

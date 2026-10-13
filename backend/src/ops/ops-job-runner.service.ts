@@ -33,6 +33,7 @@ import {
   type ProviderTargets,
 } from '../providers/provider-target-resolver.service';
 import { RankingRefreshService } from '../ranking/ranking-refresh.service';
+import { formatKstRankingDate } from '../ranking/ranking-date.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   getOpsSchedulerConfig,
@@ -595,7 +596,8 @@ export class OpsJobRunnerService {
           if (!context.isLockOwned()) {
             throw new Error('Ops job lock ownership was lost.');
           }
-          const settlementDate = this.formatDateOnly(season.endAt);
+          // Final ranking date = Korea date of the (unchanged, UTC) end instant.
+          const settlementDate = formatKstRankingDate(season.endAt);
           const batchResponse = await this.seasonSettlementJobService.run({
             seasonId: season.id,
             settlementDate,
@@ -1785,10 +1787,6 @@ export class OpsJobRunnerService {
 
     const date = new Date(text);
     return Number.isNaN(date.getTime()) ? undefined : date;
-  }
-
-  private formatDateOnly(date: Date) {
-    return date.toISOString().slice(0, 10);
   }
 }
 

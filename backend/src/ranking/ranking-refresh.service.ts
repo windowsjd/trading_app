@@ -30,6 +30,7 @@ import {
 } from './season-ranking-scope';
 import { lockSeasonForWrite } from './season-write-lock';
 import { isCurrentRankingSuperseded } from './current-ranking-generation';
+import { toKstRankingDate } from './ranking-date.policy';
 import {
   insertCurrentRankingRows,
   insertMissingScheduledEquitySnapshots,
@@ -215,7 +216,7 @@ export class RankingRefreshService {
       if (participants.length === 0) {
         return await this.replaceCurrentRankings({
           seasonId,
-          rankingDate: this.toDateOnly(capturedAt),
+          rankingDate: toKstRankingDate(capturedAt),
           capturedAt,
           valuations: [],
           createEquitySnapshots,
@@ -306,7 +307,7 @@ export class RankingRefreshService {
 
       return await this.replaceCurrentRankings({
         seasonId,
-        rankingDate: this.toDateOnly(capturedAt),
+        rankingDate: toKstRankingDate(capturedAt),
         capturedAt,
         valuations,
         createEquitySnapshots,
@@ -629,10 +630,6 @@ export class RankingRefreshService {
       rankingsCreated: rows.length,
       rankingDate: input.rankingDate.toISOString().slice(0, 10),
     };
-  }
-
-  private toDateOnly(date: Date) {
-    return new Date(`${date.toISOString().slice(0, 10)}T00:00:00.000Z`);
   }
 }
 

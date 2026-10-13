@@ -97,6 +97,7 @@ import {
   resolveRankingScopeExitCode,
   auditRankingAndSettlement,
 } from './scripts/lib/repair-ranking-scope';
+import { formatKstRankingDate } from './src/ranking/ranking-date.policy';
 
 const prisma = new PrismaService();
 const valuation = new PortfolioValuationService(prisma);
@@ -232,7 +233,7 @@ async function createSeasonWithParticipants(options) {
   return { seasonId: season.id, participants, startAt, endAt };
 }
 
-async function createDailySnapshot(participant, snapshotDate, totalAssetKrw, returnRate) {
+async function createDailySnapshot(participant, snapshotDate, totalAssetKrw, returnRate, capturedAt) {
   return prisma.dailyPortfolioSnapshot.create({
     data: {
       tradingAccountId: participant.accountId,
@@ -244,7 +245,7 @@ async function createDailySnapshot(participant, snapshotDate, totalAssetKrw, ret
       assetValueKrw: '0',
       realizedPnlKrw: '0',
       unrealizedPnlKrw: '0',
-      capturedAt: new Date(snapshotDate.getTime() + 10_000),
+      capturedAt: capturedAt ?? new Date(snapshotDate.getTime() + 10_000),
     },
     select: { id: true },
   });
@@ -1557,6 +1558,201 @@ async function testFinalTierChecksEveryAccount() {
   console.log('  [8e] final tier checks every season account ok');
 }
 
+// ===========================================================================
+// 13) KST ranking business date: rankingDate is the Asia/Seoul date of the
+//     refresh instant (KST midnight is the boundary, UTC midnight is not),
+//     PostgreSQL stores exactly that calendar day, and capturedAt stays the
+//     absolute instant.
+// ===========================================================================
+async function rankingDatesStored(seasonId, rankType) {
+  const rows = await prisma.$queryRawUnsafe(
+    'SELECT ranking_date::text AS "rankingDate", min(captured_at) AS "capturedAt", ' +
+      'count(*)::int AS "rows" FROM season_rankings ' +
+      'WHERE season_id = $1 AND rank_type::text = $2 ' +
+      'GROUP BY ranking_date ORDER BY ranking_date',
+    seasonId,
+    rankType,
+  );
+  return rows.map((row) => [
+    row.rankingDate,
+    row.capturedAt.toISOString(),
+    row.rows,
+  ]);
+}
+
+async function testKstRealtimeRankingDate() {
+  const fixture = await createSeasonWithParticipants({
+    participantCount: 2,
+    status: 'active',
+    startAt: new Date('2026-10-12T00:00:00.000Z'),
+    endAt: new Date(Date.now() + 3_600_000),
+  });
+  const refreshes = [
+    ['2026-10-12T14:59:59.000Z', '2026-10-12'],
+    ['2026-10-12T15:00:00.000Z', '2026-10-13'], // KST midnight
+    ['2026-10-12T23:59:59.000Z', '2026-10-13'],
+    ['2026-10-13T00:00:00.000Z', '2026-10-13'], // UTC midnight: same date
+    ['2026-10-13T14:59:59.000Z', '2026-10-13'],
+    ['2026-10-13T15:00:00.000Z', '2026-10-14'], // next KST midnight
+  ];
+  for (const [instant, expected] of refreshes) {
+    const capturedAt = new Date(instant);
+    // Live valuation needs a USD/KRW rate effective at that instant.
+    const fx = await prisma.fxRateSnapshot.create({
+      data: {
+        baseCurrency: 'USD',
+        quoteCurrency: 'KRW',
+        rate: '1350.00000000',
+        sourceType: 'admin_manual',
+        sourceName: 'ranking-scope-integration',
+        effectiveAt: new Date(capturedAt.getTime() - 30_000),
+        capturedAt: new Date(capturedAt.getTime() - 30_000),
+      },
+      select: { id: true },
+    });
+    createdFxSnapshotIds.push(fx.id);
+    const result = await refresh.refreshCurrentRankingForSeason(
+      fixture.seasonId,
+      { capturedAt, createEquitySnapshots: false },
+    );
+    assert.equal(result.skipped, false, instant + ' skipped: ' + result.reason);
+    assert.equal(result.rankingDate, expected, 'rankingDate of ' + instant);
+  }
+
+  // As PostgreSQL stored it (DATE text, no JS decoding): one set per Korea
+  // date, each the last refresh of that date, captured at the real instant.
+  assert.deepEqual(await rankingDatesStored(fixture.seasonId, 'daily'), [
+    ['2026-10-12', '2026-10-12T14:59:59.000Z', 2],
+    ['2026-10-13', '2026-10-13T14:59:59.000Z', 2],
+    ['2026-10-14', '2026-10-13T15:00:00.000Z', 2],
+  ]);
+  // Prisma reads the @db.Date back as the same calendar day (no day shift).
+  const decoded = await prisma.seasonRanking.findMany({
+    where: { seasonId: fixture.seasonId, rankType: 'daily' },
+    distinct: ['rankingDate'],
+    orderBy: { rankingDate: 'asc' },
+    select: { rankingDate: true },
+  });
+  assert.deepEqual(
+    decoded.map((row) => row.rankingDate.toISOString()),
+    [
+      '2026-10-12T00:00:00.000Z',
+      '2026-10-13T00:00:00.000Z',
+      '2026-10-14T00:00:00.000Z',
+    ],
+  );
+
+  console.log('  [13] KST realtime ranking date ok');
+}
+
+// ===========================================================================
+// 14) KST final ranking date + transition guard: settlement under the Korea
+//     date of endAt; a season whose final ranking already exists under the
+//     legacy UTC date never receives a second final set.
+// ===========================================================================
+async function testKstFinalRankingDate() {
+  // KST 2026-08-08 01:00 — its UTC date is still 2026-08-07.
+  const endAt = new Date('2026-08-07T16:00:00.000Z');
+  const kstDate = formatKstRankingDate(endAt);
+  const utcDate = endAt.toISOString().slice(0, 10);
+  assert.equal(kstDate, '2026-08-08');
+  assert.equal(utcDate, '2026-08-07');
+  // The daily snapshot of a Korea date is captured just after KST midnight,
+  // i.e. before this season's end instant.
+  const kstDayCapture = new Date('2026-08-07T15:00:10.000Z');
+
+  // New policy: the scheduler's settlementDate is the Korea date.
+  const fresh = await createSeasonWithParticipants({
+    participantCount: 2,
+    status: 'ended',
+    startAt: new Date('2026-08-01T00:00:00.000Z'),
+    endAt,
+  });
+  await createDailySnapshot(fresh.participants[0], dateOnly(kstDate), '12000000', '20', kstDayCapture);
+  await createDailySnapshot(fresh.participants[1], dateOnly(kstDate), '11000000', '10', kstDayCapture);
+  const settled = await runJob(settlementJob, {
+    seasonId: fresh.seasonId,
+    settlementDate: kstDate,
+  });
+  assert.equal(settled.data.run.status, 'succeeded');
+  const freshFinal = await rankingDatesStored(fresh.seasonId, 'final');
+  assert.equal(freshFinal.length, 1);
+  assert.equal(freshFinal[0][0], kstDate);
+  assert.equal(freshFinal[0][2], 2);
+  // Final tier assignment finds the final ranking under the same date only.
+  const tiers = await runJob(finalTierJob, {
+    seasonId: fresh.seasonId,
+    rankingDate: kstDate,
+  });
+  assert.equal(tiers.data.run.status, 'succeeded');
+  await expectCode(
+    runJob(finalTierJob, { seasonId: fresh.seasonId, rankingDate: utcDate }),
+    'FINAL_RANKING_UNAVAILABLE',
+  );
+
+  // Transition: an ENDED season already holding a final ranking under the
+  // legacy UTC date (e.g. written before the KST policy).
+  const legacy = await createSeasonWithParticipants({
+    participantCount: 2,
+    status: 'ended',
+    startAt: new Date('2026-08-01T00:00:00.000Z'),
+    endAt,
+  });
+  await prisma.seasonRanking.createMany({
+    data: legacy.participants.map((participant, index) => ({
+      seasonId: legacy.seasonId,
+      seasonParticipantId: participant.id,
+      tradingAccountId: participant.accountId,
+      rankType: 'final',
+      rank: index + 1,
+      totalAssetKrw: index === 0 ? '12000000' : '11000000',
+      returnRate: index === 0 ? '20' : '10',
+      rankingDate: dateOnly(utcDate),
+      capturedAt: endAt,
+    })),
+  });
+  // Even with complete data for the Korea date, the KST run must not compute
+  // a second, contradictory final ranking.
+  await createDailySnapshot(legacy.participants[0], dateOnly(kstDate), '9000000', '-10', kstDayCapture);
+  await createDailySnapshot(legacy.participants[1], dateOnly(kstDate), '13000000', '30', kstDayCapture);
+  await expectCode(
+    runJob(settlementJob, { seasonId: legacy.seasonId, settlementDate: kstDate }),
+    'FINAL_RANKING_DATE_MISMATCH',
+  );
+  assert.deepEqual(await rankingDatesStored(legacy.seasonId, 'final'), [
+    [utcDate, endAt.toISOString(), 2],
+  ]);
+  const unchanged = await prisma.season.findUniqueOrThrow({
+    where: { id: legacy.seasonId },
+    select: { status: true },
+  });
+  assert.equal(unchanged.status, 'ended');
+
+  // Settling with the existing date reuses that final ranking as before.
+  const reused = await runJob(settlementJob, {
+    seasonId: legacy.seasonId,
+    settlementDate: utcDate,
+  });
+  assert.equal(reused.data.run.status, 'succeeded');
+  assert.deepEqual(await rankingDatesStored(legacy.seasonId, 'final'), [
+    [utcDate, endAt.toISOString(), 2],
+  ]);
+  const ranks = await prisma.seasonParticipant.findMany({
+    where: { seasonId: legacy.seasonId },
+    orderBy: { finalRank: 'asc' },
+    select: { id: true, finalRank: true },
+  });
+  assert.deepEqual(
+    ranks.map((row) => [row.id, row.finalRank]),
+    [
+      [legacy.participants[0].id, 1],
+      [legacy.participants[1].id, 2],
+    ],
+  );
+
+  console.log('  [14] KST final ranking date and transition guard ok');
+}
+
 async function cleanup() {
   // Order matters: ranking rows and snapshots reference participants and
   // accounts with onDelete: Restrict.
@@ -1609,6 +1805,8 @@ async function main() {
     await testRefreshDoesNotDeleteDamagedRankings();
     await testSettledWithoutFinalRanking();
     await testFinalTierChecksEveryAccount();
+    await testKstRealtimeRankingDate();
+    await testKstFinalRankingDate();
     console.log('season ranking scope ok');
   } finally {
     await cleanup();

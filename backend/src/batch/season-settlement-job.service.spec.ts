@@ -1252,6 +1252,118 @@ describe('SeasonSettlementJobService', () => {
       expect(result.season.updated).toBe(true);
     });
   });
+
+  // Final ranking dates moved from the UTC to the Korea date of Season.endAt.
+  // A season already ranked/settled under another date keeps its single final
+  // ranking: a run for a different date fails closed instead of adding a
+  // second, contradictory final set.
+  describe('final ranking date transition (UTC → KST)', () => {
+    const legacyDate = new Date('2026-05-20T00:00:00.000Z');
+    const expectDateMismatch = (promise: Promise<unknown>) =>
+      expect(promise).rejects.toMatchObject({
+        status: HttpStatus.CONFLICT,
+        response: { error: { code: 'FINAL_RANKING_DATE_MISMATCH' } },
+      });
+
+    it('refuses an ended season whose final ranking exists under another date', async () => {
+      const { service, prisma, futuresFinal } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [snapshot('sp-1', 'user-1', '1000.00000000')]);
+      prisma.seasonRanking.findFirst.mockResolvedValue({
+        rankingDate: legacyDate,
+      });
+
+      await expectDateMismatch(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      );
+
+      expect(prisma.seasonRanking.findFirst).toHaveBeenCalledWith({
+        where: {
+          seasonId: 'season-1',
+          rankType: SeasonRankingType.final,
+          rankingDate: { not: settlementDateValue },
+        },
+        orderBy: [{ rankingDate: 'asc' }],
+        select: { rankingDate: true },
+      });
+      // Nothing was valued, settled or written.
+      expect(futuresFinal.settleSeason).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.equitySnapshot.create).not.toHaveBeenCalled();
+    });
+
+    it('refuses the same mismatch on a dry run', async () => {
+      const { service, prisma, futuresFinal } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      prisma.seasonRanking.findFirst.mockResolvedValue({
+        rankingDate: legacyDate,
+      });
+
+      await expectDateMismatch(
+        service.run({ seasonId: 'season-1', settlementDate, dryRun: true }),
+      );
+      expect(futuresFinal.settleSeason).not.toHaveBeenCalled();
+    });
+
+    it('reports a settled season with its final ranking under another date as a date mismatch', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.settled);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      prisma.seasonRanking.findFirst.mockResolvedValue({
+        rankingDate: legacyDate,
+      });
+
+      await expectDateMismatch(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      );
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('re-checks under the season lock before writing a final ranking', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [snapshot('sp-1', 'user-1', '1000.00000000')]);
+      prisma.__tx.seasonRanking.findMany.mockResolvedValue([]);
+      // Another-date rows appeared after the pre-lock check passed.
+      prisma.__tx.seasonRanking.findFirst.mockResolvedValue({
+        rankingDate: legacyDate,
+      });
+
+      await expectDateMismatch(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      );
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.equitySnapshot.create).not.toHaveBeenCalled();
+      expect(prisma.__tx.season.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('still reuses a final ranking under the requested date', async () => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.settled);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, [
+        existingRanking('ranking-1', 'sp-1', 'user-1', 1),
+      ]);
+      prisma.__tx.season.updateMany.mockResolvedValue({ count: 1 });
+
+      const result = await runAndGetResult(service, {
+        seasonId: 'season-1',
+        settlementDate,
+      });
+
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      expect(result.finalRankings.existing).toBe(1);
+    });
+  });
 });
 
 function createService(portfolioValuationService?: {
@@ -1259,20 +1371,22 @@ function createService(portfolioValuationService?: {
 }) {
   const prisma = createPrismaMock();
   const batchService = createBatchServiceMock(BATCH_STARTED_AT);
+  const futuresFinal = {
+    settleSeason: jest.fn().mockResolvedValue(new Map()),
+    assertNoOpen: jest.fn().mockResolvedValue(undefined),
+  };
   const service = new SeasonSettlementJobService(
     batchService as never,
     prisma as never,
     portfolioValuationService as never,
-    {
-      settleSeason: jest.fn().mockResolvedValue(new Map()),
-      assertNoOpen: jest.fn().mockResolvedValue(undefined),
-    } as never,
+    futuresFinal as never,
   );
 
   return {
     service,
     prisma,
     batchService,
+    futuresFinal,
   };
 }
 
@@ -1363,6 +1477,8 @@ function createPrismaMock() {
       update: jest.fn(async () => ({ id: 'final-snapshot' })),
     },
     seasonRanking: {
+      // No final ranking under another date (KST date transition guard).
+      findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn(),
       create: jest.fn(),
       count: jest.fn(),
@@ -1391,6 +1507,7 @@ function createPrismaMock() {
       deleteMany: jest.fn(),
     },
     seasonRanking: {
+      findFirst: jest.fn().mockResolvedValue(null),
       findMany: jest.fn(),
       create: jest.fn(),
       createMany: jest.fn(),

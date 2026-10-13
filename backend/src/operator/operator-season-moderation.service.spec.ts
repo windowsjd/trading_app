@@ -49,6 +49,7 @@ import {
   OperatorAuditResult,
   ParticipantStatus,
   Prisma,
+  SeasonRankingType,
   SeasonStatus,
   UserRole,
 } from '../generated/prisma/client';
@@ -715,6 +716,55 @@ describe('OperatorSeasonModerationService', () => {
           }),
         }),
       }),
+    );
+  });
+
+  it('dates a first final ranking row with the Korea date of the season end', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant({
+      season: {
+        id: 'season-1',
+        status: SeasonStatus.ended,
+        // KST 2026-06-21 01:00 — the UTC date would still be 2026-06-20.
+        endAt: new Date('2026-06-20T16:00:00.000Z'),
+      },
+    });
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    // No final row for the participant or the season, and no rank conflict.
+    prisma.seasonRanking.findFirst.mockResolvedValue(null);
+    prisma.seasonRanking.create.mockResolvedValueOnce({ id: 'ranking-new' });
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      currentRank: 2,
+      finalRank: 2,
+      resultCorrectedAt: now,
+      resultCorrectedReason: 'manual_review_adjustment',
+      resultCorrectedByUserId: actor.userId,
+      updatedAt: now,
+    });
+
+    await service.correctFinalResult(actor, 'season-1', 'sp-1', {
+      finalRank: 2,
+      reason: 'manual_review_adjustment',
+    });
+
+    const kstEndDate = new Date('2026-06-21T00:00:00.000Z');
+    // The rank-conflict check and the new row both use the Korea date.
+    const lookups = prisma.seasonRanking.findFirst.mock.calls as Array<
+      [{ where: { rankType?: string; rank?: number; rankingDate?: Date } }]
+    >;
+    const conflictCheck = lookups.find(([args]) => args.where.rank === 2);
+    expect(conflictCheck?.[0].where.rankType).toBe(SeasonRankingType.final);
+    expect(conflictCheck?.[0].where.rankingDate?.toISOString()).toBe(
+      kstEndDate.toISOString(),
+    );
+    expect(prisma.seasonRanking.create).toHaveBeenCalledTimes(1);
+    const [created] = prisma.seasonRanking.create.mock.calls[0] as [
+      { data: { rankType: string; rankingDate: Date } },
+    ];
+    expect(created.data.rankType).toBe(SeasonRankingType.final);
+    expect(created.data.rankingDate.toISOString()).toBe(
+      kstEndDate.toISOString(),
     );
   });
 
