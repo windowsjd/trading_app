@@ -113,7 +113,14 @@ is ≤ N, default 20000), `--min-call-interval-ms N` (KRX pacing, default
   `ops_job_runs` row (`trigger=manual_script`) whose `resultJson` lists per
   series: expected/missing, rows written, provider calls, held sessions with
   reasons, pending sessions, error codes, and the lowest observed KOSCOM
-  daily remainder. SIGINT/SIGTERM stop after the current provider call.
+  daily remainder. SIGINT/SIGTERM stop after the current provider call;
+  repeated signals do not cut the cleanup short.
+- The command renews its Ops lock like the Ops runner: a refused, failed or
+  late renewal stops the work and records `OPS_JOB_LOCK_LOST`, and the lock is
+  released even when the run row cannot be created. It exits 1 with a failed
+  run row (`MARKET_CANDLE_LONG_BACKFILL_FAILED` / `…_CANCELED` /
+  `OPS_JOB_LOCK_LOST`) when the run outcome below is failed or the run was
+  stopped, and exits 1 without a run row when the Ops lock is held elsewhere.
 
 ### Scheduled upkeep (opt-in)
 
@@ -125,6 +132,24 @@ is ≤ N, default 20000), `--min-call-interval-ms N` (KRX pacing, default
 Retention of the 4h history runs inside the existing `market_candle_retention`
 job after the unchanged 5m prune (its own 180-day cutoff; `resultJson`
 `fourHour` / `futuresFourHour`).
+
+### Run outcome
+
+Each sync summary carries `runFailed`; the Ops runner records the scheduled
+job from it, and the backfill command its run row and exit code.
+
+| Outcome | Series record | Run |
+| --- | --- | --- |
+| Series lock not acquired (`LOCK_UNAVAILABLE`, `LOCK_BUSY`) | `failed` | failed |
+| Provider/storage error, malformed or stalled page, `LOCK_LOST`, cancel (`INTERRUPTED`) | `failed`, or `partial` with `rowsWritten` + `errorCode` when rows were written | failed |
+| Run canceled (operator stop, lease lost) | `stopReason=canceled` | failed |
+| Call cap, quota reserve, open KRX session, calendar gap | `errorCode=null`, `stopReason` set | succeeded |
+| Held / pending KRX sessions | `held[]` / `pending[]` with reasons | succeeded |
+| Deliberate skip (`INVALID_*_SYMBOL`, `INSTRUMENT_*`, `CONTRACT_UNVERIFIED`) | `skipped` | succeeded |
+
+`totals.failed` counts series that ended with an error (partial ones
+included); `totals.notStarted` counts targets left untouched because the run
+stopped. A failed scheduled run waits a full interval before the next one.
 
 ### Provider budgets
 
@@ -180,7 +205,8 @@ never stored and is retried by later runs (or explicitly by backfill).
 2. Migration `20261013200000_add_long_range_four_hour_candles`: adds two
    `OpsJobName` values, widens `market_candles_interval_check` to include
    `4h` (NOT VALID + VALIDATE), creates `futures_market_candles` and its
-   identity trigger. Additive; no existing row changes.
+   identity trigger. Additive; no existing row changes. See "Applying the
+   migration" below before the first `main` deploy.
 3. Deploy the backend with all new flags off BEFORE releasing the app build:
    an older backend answers the app's `range=96d` with 400 and has no futures
    chart route (the chart then shows its error state). Before any backfill the
@@ -198,6 +224,55 @@ never stored and is retried by later runs (or explicitly by backfill).
    (BTC) and a futures-only contract (HYPE); `ops_job_runs` results;
    Binance `X-MBX-USED-WEIGHT-1M` and KOSCOM remaining counts stay well within
    budget; Futures Last/Mark readiness unchanged.
+
+### Applying the migration
+
+Measured 2026-10-14 on disposable local PostgreSQL 16 databases only; no
+persistent database was read or changed.
+
+- **State is unknown.** Whether any persistent database has already applied
+  this file is not confirmed. Before the first `main` deploy, the owner of
+  each persistent database reads `_prisma_migrations` (read-only). Do not edit
+  or split the file: its checksum must stay stable once any database has
+  applied it.
+- **Order.** It is the last migration. A database that has not yet applied
+  `20261013120000_add_conditional_sell_and_loc_sell` (e.g. the upgrade clone,
+  19 pending on 2026-10-13) runs that one first. That migration wraps its DDL
+  and CHECK validation in an explicit `BEGIN … COMMIT` and holds ACCESS
+  EXCLUSIVE on `orders` through the scan (`orders-evidence-migration-runbook.md`);
+  plan the maintenance window around it.
+- **Locks of this file.** It has no explicit transaction, and Prisma 7.6
+  `migrate deploy` runs each statement in its own transaction
+  (`txid_current()` differs per statement; an explicit `BEGIN … COMMIT` block
+  is honoured). `VALIDATE CONSTRAINT` therefore holds only SHARE UPDATE
+  EXCLUSIVE: on a 6M-row (2.5 GB) `market_candles` copy, reads and writes kept
+  ≤ 5 ms latency through the ~0.3 s scan (3 runs). `DROP`/`ADD CONSTRAINT …
+  NOT VALID` and the new foreign key still take brief ACCESS EXCLUSIVE /
+  SHARE ROW EXCLUSIVE locks. They wait behind any long transaction on
+  `market_candles` or `futures_instruments`, and newer queries queue behind
+  them.
+- **Bounded wait.** Prisma honours a session `lock_timeout` in the connection
+  string, e.g. `…&options=-c%20lock_timeout%3D2000`; the deploy then fails
+  fast with `55P03` (P3018) instead of queueing. Use it only on a dedicated
+  migrate command; the serving `DATABASE_URL` stays unchanged.
+- **Partial failure.** Statements before the failing one stay committed and
+  the migration row stays unfinished (P3018), which blocks later deploys.
+  Inspect first: the `_prisma_migrations` row, the two `OpsJobName` values,
+  `pg_get_constraintdef` of `market_candles_interval_check`, and whether
+  `futures_market_candles` exists. If only the enum values were added (the
+  usual lock-timeout case), run
+  `prisma migrate resolve --rolled-back 20261013200000_add_long_range_four_hour_candles`
+  and deploy again; the `ADD VALUE IF NOT EXISTS` statements make this rerun
+  safe (verified). If it failed later, first restore what this file touches to
+  its previous shape — `market_candles_interval_check` as
+  `CHECK ("interval" IN ('5m', '1d', '1w'))` and no `futures_market_candles`
+  table, trigger or function (still empty at that point) — because the file's
+  `DROP CONSTRAINT` has no `IF EXISTS`. Never hand-edit history to skip it.
+- **Render.** A `main` push without `[skip render]` runs `prisma migrate deploy`
+  in the build. Deploy with both 4h scheduler flags off (the defaults) and
+  outside the KRX session. Afterwards confirm that
+  `market_candles_interval_check` is validated and `futures_market_candles`
+  exists before any backfill.
 
 Rollback: turn the two scheduler flags off (collection stops; reads keep
 serving stored history). The app can be rolled back without the migration:

@@ -164,3 +164,20 @@ ID, 가격, 현금, 인증 정보나 큰 Prisma 객체는 출력하지 않는다
 먼저 확인한다. 실제 실행 결과와 이전 결과/게시 상태는
 `backend/test/results/20261013-migration-worker-safety.json`의 후속 기록을 따른다.
 비재현과 금융 단언 통과만으로 최초 원인까지 해결됐다고 주장하지 않는다.
+
+## 이후 Migration과의 적용 순서 (2026-10-14)
+
+통합 브랜치에는 이 Migration 뒤에 `20261013200000_add_long_range_four_hour_candles`가
+있다(로컬 Migration 75개). 위 관리 DB의 74개 이력 대조는 당시 기록이며 갱신하지 않는다.
+
+- 미적용 DB의 `migrate deploy`는 이 Migration을 먼저, 4시간봉 Migration을 다음에 실행한다.
+  잠금 위험이 큰 쪽은 명시적 `BEGIN`–`COMMIT`으로 `orders`의 ACCESS EXCLUSIVE를 VALIDATE까지
+  유지하는 이 Migration이다.
+- 격리 PostgreSQL 16에서 Prisma 7.6이 Migration 파일의 각 문장을 별도 트랜잭션으로 실행하고,
+  명시적 `BEGIN`–`COMMIT` 블록은 하나의 트랜잭션으로 유지함을 `txid_current()` 비교로 확인했다.
+  따라서 이 문서의 잠금 판단은 그대로 유효하다. 명시적 트랜잭션이 없는 4시간봉 Migration의
+  VALIDATE는 SHARE UPDATE EXCLUSIVE만 사용하며, 600만 행 사본에서 조회·쓰기 지연은 5ms 이하였다.
+  잠금 대기 상한, 중간 실패 복구와 Render 배포 조건은 `long-range-4h-candles.md`의
+  "Applying the migration"을 따른다.
+- `integration:orders-evidence-lock`은 `_prisma_migrations` 행 수와 Migration 디렉터리 수가
+  같아야 하므로, 4시간봉 Migration까지 배포한 격리 DB에서 실행한다(75개로 통과, 2026-10-13).
