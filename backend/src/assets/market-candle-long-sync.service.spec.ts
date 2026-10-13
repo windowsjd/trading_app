@@ -337,6 +337,10 @@ describe('MarketCandleLongSyncService — KRX (KOSCOM 10-minute history)', () =>
     });
     expect(first.stopReason).toBe('call_cap');
     expect(first.series[0].status).toBe('partial');
+    // A planned budget stop is not a failure: no error code, run not failed.
+    expect(first.series[0].errorCode).toBeNull();
+    expect(first.totals.failed).toBe(0);
+    expect(first.runFailed).toBe(false);
     expect(h.repository.rows.size).toBe(80); // 40 sessions × 2 buckets
     h.koscom.fetchDomesticTenMinuteSession.mockClear();
     const second = await h.service.syncKrx({
@@ -367,6 +371,8 @@ describe('MarketCandleLongSyncService — KRX (KOSCOM 10-minute history)', () =>
     });
     expect(summary.stopReason).toBe('quota_reserve');
     expect(summary.observedRemainingDaily).toBe(19_999);
+    expect(summary.totals.failed).toBe(0);
+    expect(summary.runFailed).toBe(false);
     // Only the first (daily) call went out before the reserve was observed.
     expect(h.koscom.fetchDomesticTenMinuteSession).not.toHaveBeenCalled();
   });
@@ -404,6 +410,9 @@ describe('MarketCandleLongSyncService — KRX (KOSCOM 10-minute history)', () =>
     ]);
     expect(summary.series[0].rowsWritten).toBe(4);
     expect(summary.series[0].status).toBe('partial');
+    // A held session is a data outcome, not a failed run.
+    expect(summary.series[0].errorCode).toBeNull();
+    expect(summary.runFailed).toBe(false);
   });
 
   it('keeps incremental runs off the daily endpoint: missing dated bars stay pending at zero calls', async () => {
@@ -491,6 +500,7 @@ describe('MarketCandleLongSyncService — KRX (KOSCOM 10-minute history)', () =>
       now: new Date('2026-10-13T02:00:00.000Z'),
     });
     expect(open.stopReason).toBe('krx_session_open');
+    expect(open.runFailed).toBe(false);
     expect(h.prisma.asset.findMany).not.toHaveBeenCalled();
 
     const limited = createService();
@@ -509,6 +519,11 @@ describe('MarketCandleLongSyncService — KRX (KOSCOM 10-minute history)', () =>
     });
     expect(summary.stopReason).toBe('provider_unavailable');
     expect(summary.series.length).toBe(1);
+    expect(summary.series[0].status).toBe('failed');
+    expect(summary.series[0].errorCode).toBe('KOSCOM_RATE_LIMITED');
+    expect(summary.totals.failed).toBe(1);
+    expect(summary.totals.notStarted).toBe(1);
+    expect(summary.runFailed).toBe(true);
     expect(limited.koscom.fetchDomesticTenMinuteSession).toHaveBeenCalledTimes(
       1,
     );
@@ -633,6 +648,9 @@ describe('MarketCandleLongSyncService — Binance Spot and USDⓈ-M', () => {
     );
     expect(bySymbol.ETHUSDT.status).toBe('skipped');
     expect(bySymbol.ETHUSDT.errorCode).toBe('CONTRACT_UNVERIFIED');
+    // A deliberate skip is not a failure.
+    expect(summary.totals.failed).toBe(0);
+    expect(summary.runFailed).toBe(false);
     expect(bySymbol.BTCUSDT.rowsWritten).toBe(577);
     expect(bySymbol.HYPEUSDT.rowsWritten).toBe(577);
     const rows = [...h.futuresRepository.rows.values()];
@@ -651,5 +669,152 @@ describe('MarketCandleLongSyncService — Binance Spot and USDⓈ-M', () => {
     // Contract data never lands in the Spot store.
     expect(h.repository.upsertMany).not.toHaveBeenCalled();
     expect(h.spotCandles.fetchKlinesPage).not.toHaveBeenCalled();
+  });
+});
+
+describe('MarketCandleLongSyncService — run outcome', () => {
+  const krxAsset = { id: 'krx-1', symbol: '005930', market: 'KRX' };
+  // 2026-10-12 16:20 KST (see the KRX suite above).
+  const krxNow = new Date('2026-10-12T07:20:00.000Z');
+  const spotNow = new Date('2026-10-13T10:30:00.000Z');
+
+  function closedSpotPage(from: Date, buckets: number, stopReason: string) {
+    const candles = Array.from({ length: buckets }, (_, i) => {
+      const openMs = from.getTime() + i * FOUR_HOURS_MS;
+      return {
+        openTime: new Date(openMs),
+        closeTime: new Date(openMs + FOUR_HOURS_MS),
+        open: new Prisma.Decimal(100),
+        high: new Prisma.Decimal(102),
+        low: new Prisma.Decimal(98),
+        close: new Prisma.Decimal(101),
+        volume: new Prisma.Decimal(5),
+        amount: new Prisma.Decimal(500),
+        isClosed: true,
+        sourceUpdatedAt: spotNow,
+      };
+    });
+    return { candles, nextCursor: null, stopReason };
+  }
+
+  it.each([
+    ['unavailable', 'LOCK_UNAVAILABLE'],
+    ['busy', 'LOCK_BUSY'],
+  ] as const)(
+    'fails a series whose lock is %s instead of skipping it',
+    async (reason, code) => {
+      const h = createService();
+      h.prisma.asset.findMany.mockResolvedValue([
+        { id: 'btc-spot', symbol: 'BTCUSDT' },
+      ]);
+      h.locks.acquire.mockResolvedValue({ acquired: false, reason });
+      const summary = await h.service.syncSpot({
+        mode: 'backfill',
+        now: spotNow,
+      });
+      expect(summary.series[0].status).toBe('failed');
+      expect(summary.series[0].errorCode).toBe(code);
+      expect(summary.totals.failed).toBe(1);
+      expect(summary.runFailed).toBe(true);
+      expect(h.spotCandles.fetchKlinesPage).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps the written range of a Spot series that ends on a malformed page and fails the run', async () => {
+    const h = createService();
+    h.prisma.asset.findMany.mockResolvedValue([
+      { id: 'btc-spot', symbol: 'BTCUSDT' },
+    ]);
+    h.spotCandles.fetchKlinesPage.mockImplementation((input: { from: Date }) =>
+      Promise.resolve(closedSpotPage(input.from, 10, 'malformed_response')),
+    );
+    const summary = await h.service.syncSpot({
+      mode: 'backfill',
+      now: spotNow,
+    });
+    expect(summary.series[0].status).toBe('partial');
+    expect(summary.series[0].rowsWritten).toBe(10);
+    expect(summary.series[0].errorCode).toBe('PROVIDER_MALFORMED_RESPONSE');
+    expect(summary.totals.failed).toBe(1);
+    expect(summary.runFailed).toBe(true);
+  });
+
+  it('fails a KRX series refused on its daily references and leaves the rest not started', async () => {
+    const h = createService();
+    h.prisma.asset.findMany.mockResolvedValue([
+      krxAsset,
+      { ...krxAsset, id: 'krx-2', symbol: '000660' },
+    ]);
+    h.koscom.fetchPeriodPage.mockRejectedValue(
+      new KoscomError('KOSCOM_AUTH_FAILED'),
+    );
+    const summary = await h.service.syncKrx({
+      mode: 'backfill',
+      now: krxNow,
+      sessions: 3,
+      krx: { minCallIntervalMs: 0 },
+    });
+    expect(summary.stopReason).toBe('provider_unavailable');
+    expect(summary.series.length).toBe(1);
+    expect(summary.series[0].status).toBe('failed');
+    expect(summary.series[0].errorCode).toBe('KOSCOM_AUTH_FAILED');
+    expect(summary.totals.notStarted).toBe(1);
+    expect(summary.runFailed).toBe(true);
+    expect(h.koscom.fetchDomesticTenMinuteSession).not.toHaveBeenCalled();
+  });
+
+  it('fails the run on a KOSCOM HTTP failure even after other sessions were verified', async () => {
+    const h = createService();
+    h.prisma.asset.findMany.mockResolvedValue([krxAsset]);
+    const verified =
+      h.koscom.fetchDomesticTenMinuteSession.getMockImplementation();
+    h.koscom.fetchDomesticTenMinuteSession.mockImplementation(
+      (input: { date: string }) =>
+        input.date === '20261012'
+          ? Promise.reject(new KoscomError('KOSCOM_HTTP_FAILED', true))
+          : verified!(input),
+    );
+    const summary = await h.service.syncKrx({
+      mode: 'backfill',
+      now: krxNow,
+      sessions: 3,
+      krx: { minCallIntervalMs: 0 },
+    });
+    expect(summary.series[0].status).toBe('partial');
+    expect(summary.series[0].rowsWritten).toBe(4);
+    expect(summary.series[0].pending.length).toBe(1);
+    expect(summary.series[0].pending[0].reason).toBe('KOSCOM_HTTP_FAILED');
+    expect(summary.series[0].errorCode).toBe('KOSCOM_HTTP_FAILED');
+    expect(summary.totals.failed).toBe(1);
+    expect(summary.runFailed).toBe(true);
+  });
+
+  it('marks a KRX series interrupted and fails the run when it is canceled mid-series', async () => {
+    const h = createService();
+    h.prisma.asset.findMany.mockResolvedValue([krxAsset]);
+    const controller = new AbortController();
+    const verified =
+      h.koscom.fetchDomesticTenMinuteSession.getMockImplementation();
+    let calls = 0;
+    h.koscom.fetchDomesticTenMinuteSession.mockImplementation(
+      (input: { date: string }) => {
+        calls += 1;
+        if (calls === 2) controller.abort();
+        return verified!(input);
+      },
+    );
+    const summary = await h.service.syncKrx({
+      mode: 'backfill',
+      now: krxNow,
+      sessions: 5,
+      krx: { minCallIntervalMs: 0 },
+      signal: controller.signal,
+    });
+    expect(summary.stopReason).toBe('canceled');
+    expect(summary.series[0].status).toBe('partial');
+    expect(summary.series[0].rowsWritten).toBe(4);
+    expect(summary.series[0].errorCode).toBe('INTERRUPTED');
+    expect(summary.totals.failed).toBe(1);
+    expect(summary.runFailed).toBe(true);
   });
 });

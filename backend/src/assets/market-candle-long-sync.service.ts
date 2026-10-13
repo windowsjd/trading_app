@@ -186,9 +186,20 @@ export type LongCandleSyncSummary = {
     providerCalls: number;
     held: number;
     pending: number;
+    /** Series that ended with an error, including partially written ones. */
     failed: number;
+    /** Target series never attempted because the run stopped first. */
+    notStarted: number;
   };
   stopReason: LongCandleStopReason | null;
+  /**
+   * The outcome the Ops runner and the backfill command record: true when a
+   * series ended with an error (lock not acquired or lost, provider or storage
+   * failure) or the run was canceled. Planned stops (call cap, quota reserve,
+   * open session, calendar gap), held/pending sessions and deliberate skips
+   * are not failures.
+   */
+  runFailed: boolean;
   /** Lowest KOSCOM X-RateLimit-Remaining-Day seen during the run (KRX only). */
   observedRemainingDaily?: number | null;
 };
@@ -273,12 +284,15 @@ export class MarketCandleLongSyncService {
       if (this.stopped(context)) break;
       series.push(await this.syncSpotAsset(asset, window, context));
     }
-    return this.summary('spot', input, context, startedAt, series, {
-      from: window.from,
-      to: window.closedTo,
-      unit: 'days',
-      size: days,
-    });
+    return this.summary(
+      'spot',
+      input,
+      context,
+      startedAt,
+      series,
+      { from: window.from, to: window.closedTo, unit: 'days', size: days },
+      assets.length,
+    );
   }
 
   private async syncSpotAsset(
@@ -466,12 +480,15 @@ export class MarketCandleLongSyncService {
         ),
       );
     }
-    return this.summary('futures', input, context, startedAt, series, {
-      from: window.from,
-      to: window.closedTo,
-      unit: 'days',
-      size: days,
-    });
+    return this.summary(
+      'futures',
+      input,
+      context,
+      startedAt,
+      series,
+      { from: window.from, to: window.closedTo, unit: 'days', size: days },
+      instruments.length,
+    );
   }
 
   private async syncFuturesInstrument(
@@ -603,13 +620,22 @@ export class MarketCandleLongSyncService {
     const finish = (
       series: LongCandleSeriesResult[],
       sessions: MarketSessionWindow[],
+      targets = series.length,
     ) => ({
-      ...this.summary('krx', input, context, startedAt, series, {
-        from: sessions[0]?.openTime ?? null,
-        to: sessions.at(-1)?.closeTime ?? null,
-        unit: 'sessions' as const,
-        size: sessionsWanted,
-      }),
+      ...this.summary(
+        'krx',
+        input,
+        context,
+        startedAt,
+        series,
+        {
+          from: sessions[0]?.openTime ?? null,
+          to: sessions.at(-1)?.closeTime ?? null,
+          unit: 'sessions' as const,
+          size: sessionsWanted,
+        },
+        targets,
+      ),
       observedRemainingDaily: context.observedRemaining,
     });
 
@@ -649,7 +675,7 @@ export class MarketCandleLongSyncService {
         await this.syncKrxAsset(asset, sessions, context, fetchMissingDaily),
       );
     }
-    return finish(series, sessions);
+    return finish(series, sessions, assets.length);
   }
 
   private async syncKrxAsset(
@@ -745,7 +771,8 @@ export class MarketCandleLongSyncService {
               context.stopReason = context.signal?.aborted
                 ? 'canceled'
                 : 'provider_unavailable';
-              return { ...result, status: 'partial', errorCode: code };
+              // Daily references come first: no session was written yet.
+              return { ...result, status: 'failed', errorCode: code };
             }
             // Without dated daily bars nothing below can be verified; the
             // affected sessions simply stay pending.
@@ -855,6 +882,14 @@ export class MarketCandleLongSyncService {
         );
       }
       if (result.rowsWritten > 0) await this.invalidateAsset(asset.id);
+      if (
+        errorCode === null &&
+        context.stopReason === 'canceled' &&
+        verifiedSessions < missing.length
+      ) {
+        // Same code as an interrupted crypto series: the rest was not visited.
+        errorCode = 'INTERRUPTED';
+      }
       let status: LongCandleSeriesStatus = 'partial';
       if (verifiedSessions === missing.length) status = 'synced';
       else if (
@@ -965,9 +1000,12 @@ export class MarketCandleLongSyncService {
       renewSeconds: LOCK_RENEW_SECONDS,
     });
     if (!acquired.acquired) {
+      // Like market_candle_sync: no mutual exclusion means nothing was synced.
+      // Scheduled runs and the backfill command already share one Ops job
+      // lock, so a busy series lock signals a stale or foreign writer.
       return {
         ...result,
-        status: 'skipped',
+        status: 'failed',
         errorCode:
           acquired.reason === 'busy' ? 'LOCK_BUSY' : 'LOCK_UNAVAILABLE',
       };
@@ -1081,7 +1119,9 @@ export class MarketCandleLongSyncService {
       unit: 'days' | 'sessions';
       size: number;
     },
+    targets: number,
   ): LongCandleSyncSummary {
+    const failed = series.filter(seriesFailed).length;
     return {
       market,
       mode: input.mode,
@@ -1101,11 +1141,25 @@ export class MarketCandleLongSyncService {
         providerCalls: series.reduce((sum, s) => sum + s.providerCalls, 0),
         held: series.reduce((sum, s) => sum + s.held.length, 0),
         pending: series.reduce((sum, s) => sum + s.pending.length, 0),
-        failed: series.filter((s) => s.status === 'failed').length,
+        failed,
+        notStarted: Math.max(0, targets - series.length),
       },
       stopReason: context.stopReason,
+      runFailed: failed > 0 || context.stopReason === 'canceled',
     };
   }
+}
+
+/**
+ * A series failed when it ended with an error, even after writing some rows
+ * (status 'partial' keeps the written range visible). A 'skipped' series with
+ * a code (invalid symbol, unverified contract, …) was deliberately left out.
+ */
+function seriesFailed(series: LongCandleSeriesResult): boolean {
+  return (
+    series.status === 'failed' ||
+    (series.status !== 'skipped' && series.errorCode !== null)
+  );
 }
 
 // ------------------------------------------------------------- helpers --

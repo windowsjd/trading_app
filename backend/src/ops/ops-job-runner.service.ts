@@ -762,8 +762,9 @@ export class OpsJobRunnerService {
    * (KOSCOM 10-minute history verified against the dated daily bar). The
    * scheduler runs mode=incremental; the operator backfill command shares the
    * same job lock so the two never overlap. Held KRX sessions (unverifiable
-   * dates) are data-quality outcomes recorded in the result, not failures;
-   * only provider/storage failures fail the run.
+   * dates) and planned stops are outcomes recorded in the result, not
+   * failures; a series lock not acquired or lost, a provider/storage failure
+   * or a canceled run fails it (`runFailed`), even after a partial write.
    */
   async runMarketCandleLongSyncJob(
     input: MarketCandleLongSyncOpsJobInput = {},
@@ -793,7 +794,7 @@ export class OpsJobRunnerService {
           signal: context.signal,
         });
         const failed = Object.values(results).some(
-          (summary) => summary.totals.failed > 0,
+          (summary) => summary.runFailed,
         );
         if (failed) {
           this.throwProviderJobFailed(
@@ -843,7 +844,7 @@ export class OpsJobRunnerService {
           dryRun: false,
           signal: context.signal,
         });
-        if (summary.totals.failed > 0) {
+        if (summary.runFailed) {
           this.throwProviderJobFailed(
             'FUTURES_CANDLE_SYNC_FAILED',
             'Futures 4h candle sync finished with failed instruments.',

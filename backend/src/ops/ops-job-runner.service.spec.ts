@@ -976,7 +976,11 @@ describe('OpsJobRunnerService', () => {
     },
   );
 
-  const longSummary = (market: string, failed = 0) => ({
+  const longSummary = (
+    market: string,
+    failed = 0,
+    stopReason: string | null = null,
+  ) => ({
     market,
     mode: 'incremental',
     dryRun: false,
@@ -991,8 +995,11 @@ describe('OpsJobRunnerService', () => {
       held: 1,
       pending: 0,
       failed,
+      notStarted: 0,
     },
-    stopReason: null,
+    stopReason,
+    // Mirrors MarketCandleLongSyncService's run verdict.
+    runFailed: failed > 0 || stopReason === 'canceled',
   });
 
   it('runs the long-range 4h job under its shared lock and keeps held KRX sessions a data outcome', async () => {
@@ -1068,6 +1075,75 @@ describe('OpsJobRunnerService', () => {
       expect.anything(),
       expect.objectContaining({ errorCode: 'FUTURES_CANDLE_SYNC_FAILED' }),
     );
+  });
+
+  it('records the long-range job as failed when a market run was canceled with no failed series', async () => {
+    const f = createService();
+    f.lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_long_sync',
+      ownerId: 'owner',
+      expiresAt: new Date('2026-10-13T08:10:00.000Z'),
+    });
+    f.runService.createRunning.mockResolvedValueOnce({
+      id: 'long-run',
+      startedAt,
+    });
+    f.runService.recordFailed.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_long_sync,
+      }),
+    });
+    f.marketCandleLongSyncService.syncSpot.mockResolvedValueOnce(
+      longSummary('spot'),
+    );
+    f.marketCandleLongSyncService.syncKrx.mockResolvedValueOnce(
+      longSummary('krx', 0, 'canceled'),
+    );
+
+    const response = await f.service.runMarketCandleLongSyncJob({
+      trigger: OpsJobTrigger.test,
+      now: '2026-10-13T08:00:00.000Z',
+    });
+
+    expect(response.success).toBe(false);
+    expect(f.runService.recordSucceeded).not.toHaveBeenCalled();
+    const [, failure] = f.runService.recordFailed.mock.calls[0] as unknown as [
+      unknown,
+      { errorCode: string },
+    ];
+    expect(failure.errorCode).toBe('MARKET_CANDLE_LONG_SYNC_FAILED');
+    expect(f.lockService.releaseLock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the long-range job succeeded on a planned call-cap stop', async () => {
+    const f = createService();
+    f.lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_long_sync',
+      ownerId: 'owner',
+      expiresAt: new Date('2026-10-13T08:10:00.000Z'),
+    });
+    f.runService.createRunning.mockResolvedValueOnce({
+      id: 'long-run',
+      startedAt,
+    });
+    f.runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_long_sync,
+      }),
+    });
+    f.marketCandleLongSyncService.syncKrx.mockResolvedValueOnce(
+      longSummary('krx', 0, 'call_cap'),
+    );
+
+    await f.service.runMarketCandleLongSyncJob({
+      trigger: OpsJobTrigger.test,
+      markets: ['krx'],
+    });
+
+    expect(f.runService.recordSucceeded).toHaveBeenCalledTimes(1);
+    expect(f.runService.recordFailed).not.toHaveBeenCalled();
   });
 
   it('rejects an unknown long-range market before any provider work', async () => {
