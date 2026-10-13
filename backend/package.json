@@ -26,6 +26,8 @@
     "futures:price-readiness": "tsx scripts/futures-price-readiness.ts",
     "smoke:candle-fixture": "tsx scripts/candle-release-fixture-smoke.ts",
     "integration:limit-order-idempotent-replay": "tsx scripts/limit-order-idempotent-replay-integration.ts",
+    "integration:conditional-worker-scan": "tsx scripts/conditional-worker-scan-integration.ts",
+    "integration:orders-evidence-lock": "tsx scripts/orders-evidence-lock-integration.ts",
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",
     "smoke:binance-fixed-universe": "tsx scripts/binance-fixed-universe-smoke.ts",
     "smoke:candle-report": "tsx scripts/candle-live-smoke-report.ts",

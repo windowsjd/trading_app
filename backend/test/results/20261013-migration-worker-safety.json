@@ -1,0 +1,236 @@
+{
+  "date_kst": "2026-10-13",
+  "work_basis": {
+    "requested_main": "cf21e6884c749124fcb5360cc96c7994213dd7f5",
+    "start_head": "cc37e6ea20c801c3bba39aa1b233f5ef530ab944",
+    "end_head": "cc37e6ea20c801c3bba39aa1b233f5ef530ab944",
+    "start_origin_main": "cc37e6ea20c801c3bba39aa1b233f5ef530ab944",
+    "branch": "codex/migration-worker-safety-20261013",
+    "worktree": "/tmp/trading-migration-worker-safety",
+    "start_working_tree": "clean",
+    "commit": false,
+    "push": false,
+    "original_workspace_changed": false,
+    "uncommitted_changes_preserved": true,
+    "changed_files": [
+      "backend/package.json",
+      "backend/scripts/conditional-buy-orders-integration.ts",
+      "backend/scripts/conditional-sell-orders-integration.ts",
+      "backend/scripts/conditional-worker-scan-integration.ts",
+      "backend/scripts/orders-evidence-lock-integration.ts",
+      "backend/src/conditional/conditional-buy-sell-worker.service.spec.ts",
+      "backend/docs/orders-evidence-migration-runbook.md",
+      "backend/test/results/20261013-migration-worker-safety.json"
+    ],
+    "parallel_worktrees": "Existing worktrees left untouched; fix/binance-rest-weight-observability had pre-existing backend changes; no agents delegated.",
+    "end_github_main": "cc37e6ea20c801c3bba39aa1b233f5ef530ab944"
+  },
+  "migration": {
+    "status": "PARTIAL",
+    "persistent_environment_application_state": "UNKNOWN",
+    "original_file_changed": false,
+    "schema_changed": false,
+    "followup_migration_added": false,
+    "history_manipulated": false,
+    "original_checksum": "0d859c88f7dd82102c39b151536ac0fc664237dbb659cf07e3914c99b16bb1ac",
+    "risk": "DROP/ADD ACCESS EXCLUSIVE is retained through validation until COMMIT, contrary to the original comment.",
+    "decision": "Preserve recorded migration; validate transaction separation only in disposable probe schema and document deployment-specific routes.",
+    "remaining_path": "Fresh and unapplied persistent databases still execute the original locking migration. A later migration cannot avoid that earlier lock.",
+    "deployment_prerequisite": "Authorized environment owners must establish actual applied/failed/in-progress state and checksums. Never infer production state from CI.",
+    "postgresql_16": {
+      "fresh": {
+        "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "checksum": "0d859c88f7dd82102c39b151536ac0fc664237dbb659cf07e3914c99b16bb1ac",
+        "migrationHistoryUnchanged": true,
+        "results": [
+          {
+            "path": "original-single-transaction",
+            "locks": ["AccessExclusiveLock", "ShareUpdateExclusiveLock"],
+            "observedTransactionMs": 455.48,
+            "read": "lock_timeout",
+            "update": "lock_timeout",
+            "insert": "lock_timeout",
+            "note": "includes three deliberate 150ms lock-timeout probes; not scan duration"
+          },
+          {
+            "path": "test-only-split-ddl-validation",
+            "locks": ["ShareUpdateExclusiveLock"],
+            "validationMs": 0.22,
+            "read": "PASS",
+            "update": "PASS",
+            "insert": "PASS",
+            "invalidInsertUpdate": "rejected",
+            "definitionEqual": true
+          }
+        ]
+      },
+      "upgrade": {
+        "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "checksum": "0d859c88f7dd82102c39b151536ac0fc664237dbb659cf07e3914c99b16bb1ac",
+        "migrationHistoryUnchanged": true,
+        "results": [
+          {
+            "path": "original-single-transaction",
+            "locks": ["AccessExclusiveLock", "ShareUpdateExclusiveLock"],
+            "observedTransactionMs": 460.44,
+            "read": "lock_timeout",
+            "update": "lock_timeout",
+            "insert": "lock_timeout",
+            "note": "includes three deliberate 150ms lock-timeout probes; not scan duration"
+          },
+          {
+            "path": "test-only-split-ddl-validation",
+            "locks": ["ShareUpdateExclusiveLock"],
+            "validationMs": 0.19,
+            "read": "PASS",
+            "update": "PASS",
+            "insert": "PASS",
+            "invalidInsertUpdate": "rejected",
+            "definitionEqual": true
+          }
+        ]
+      }
+    },
+    "fresh_install": "74 original migrations applied; status up to date; diff no difference; repeat deploy no pending migrations.",
+    "upgrade": "73 original migrations via a temporary Prisma config, synthetic existing LOC BUY and market orders, then original migration 74. Complete row JSON hashes match before/after; all 74 checksums match; status up to date; diff no difference; repeat deploy no-op.",
+    "constraint_tests": [
+      "previous BUY-only rule rejects LOC SELL",
+      "new rule admits LOC BUY and SELL",
+      "market + close evidence INSERT/UPDATE rejected",
+      "snapshot or candle + close evidence INSERT/UPDATE rejected",
+      "NOT VALID already protects new writes",
+      "concurrent write cannot pass through uncommitted DROP/ADD",
+      "original and split CHECK definitions equal after validation",
+      "existing synthetic evidence and monetary rows preserved"
+    ],
+    "lock_measurement_limit": "Small probe table; transaction deliberately held after actual VALIDATE to observe retained locks. Reported original transaction duration includes three forced 150ms timeouts, not table scan time. No production or large-table scan measured."
+  },
+  "worker": {
+    "normal_traversal_status": "PASS",
+    "metrics": [
+      {
+        "worker": "BUY",
+        "count": 100,
+        "evaluated": 100,
+        "traversalMs": 726.78,
+        "batchMs": [725.38],
+        "batchEvaluations": [100],
+        "errors": 0,
+        "missing": 0,
+        "duplicateEvaluations": 0,
+        "financialExecutions": 0
+      },
+      {
+        "worker": "BUY",
+        "count": 101,
+        "evaluated": 101,
+        "traversalMs": 1027.07,
+        "batchMs": [662.26, 11.38],
+        "batchEvaluations": [100, 1],
+        "errors": 0,
+        "missing": 0,
+        "duplicateEvaluations": 0,
+        "financialExecutions": 0
+      },
+      {
+        "worker": "BUY",
+        "count": 500,
+        "evaluated": 500,
+        "traversalMs": 4636.29,
+        "batchMs": [606.39, 623.07, 596.35, 631.24, 616.88],
+        "batchEvaluations": [100, 100, 100, 100, 100],
+        "errors": 0,
+        "missing": 0,
+        "duplicateEvaluations": 0,
+        "financialExecutions": 0
+      },
+      {
+        "worker": "SELL",
+        "count": 100,
+        "evaluated": 100,
+        "traversalMs": 608.69,
+        "batchMs": [607.56],
+        "batchEvaluations": [100],
+        "errors": 0,
+        "missing": 0,
+        "duplicateEvaluations": 0,
+        "financialExecutions": 0
+      },
+      {
+        "worker": "SELL",
+        "count": 101,
+        "evaluated": 101,
+        "traversalMs": 1018.12,
+        "batchMs": [659.58, 10.23],
+        "batchEvaluations": [100, 1],
+        "errors": 0,
+        "missing": 0,
+        "duplicateEvaluations": 0,
+        "financialExecutions": 0
+      },
+      {
+        "worker": "SELL",
+        "count": 500,
+        "evaluated": 500,
+        "traversalMs": 4661.14,
+        "batchMs": [613.46, 620.52, 647.37, 631.74, 636.27],
+        "batchEvaluations": [100, 100, 100, 100, 100],
+        "errors": 0,
+        "missing": 0,
+        "duplicateEvaluations": 0,
+        "financialExecutions": 0
+      }
+    ],
+    "measurement": "Actual PostgreSQL findMany, OpsJobLock renewals, and ConditionalBuy/SellService.evaluate; non-triggering fresh fixture evidence. Direct ticks paced one second apart, starting immediately; fixture setup and timer startup delay excluded. No SLA assumed.",
+    "maximum_live_per_synthetic_account": 20,
+    "unique_id_coverage": "Every expected ID present exactly once per measured traversal.",
+    "cursor_restart": "PASS: 100/101/500 wrap and fresh instance starts at first ID.",
+    "lease": "PASS: actual DB contention makes loser evaluate zero; old owner cannot extend/release replacement lease. In-batch loss/retry and overlapping tick guard covered by unit tests.",
+    "terminal_and_disabled_cleanup": "PASS: disabled monitoring still cancels suspended account watches; terminal IDs excluded next scan.",
+    "expected_reevaluation": "Wrap/restart deliberately evaluate live IDs again. An interrupted final batch <=100 resets the cursor and can re-evaluate its processed prefix after lease recovery (unit test: 101 evaluations for 100 unique IDs). No duplicate financial execution observed.",
+    "bottleneck_candidate": "Per-watch sequential account/watch transaction and per-watch DB lease renewal; batch times roughly 0.60-0.73s here. No optimization performed."
+  },
+  "financial": {
+    "final_existing_suites": "PASS: BUY, SELL, protection/OCO, LOC; four existing Jest PostgreSQL integration wrappers passed in 166.924s.",
+    "small_batch": "BUY/SELL market and limit: 16 nearby intents with two workers and direct evaluations started together. Replay/restart afterward. Additional three isolated repetitions per worker/execution type passed (12 cases).",
+    "buy_invariants": "16 unique orders and 16 ledger debits; wallet decrease equals executed net amounts; submitted limit reservations match reserved cash, then zero after fill; holding equals executed quantities.",
+    "sell_invariants": "10 units held against 16 one-unit intents; exactly 10 unique fills, 6 failed/canceled intents, no remaining live intent, holdings/reservations zero; existing invariants verify ledger and cash conservation.",
+    "confidence_status": "PARTIAL",
+    "unresolved_observation": "One early full BUY run observed only 1/16 limit orders created. That trial predated the added compact status/failure-code assertion message; its root cause is UNKNOWN. The focused limit reproduction, final full suites and three focused repetitions passed. Do not treat the initial observation as proven fixed or as a confirmed product defect. No financial invariant violation observed; retain the reproducible assertion and investigate if it recurs."
+  },
+  "quality": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "new_tests_and_buy_script_check_only_lint": "PASS",
+    "backend_lint_accounts_check": "PASS",
+    "modified_sell_script_full_lint": "PARTIAL: 11 existing no-unnecessary-type-assertion errors; exact line/column/rule/message comparison identical before/after; no lint gate disabled.",
+    "format": "PASS",
+    "unit": "81 tests / 10 suites passed, including 18 new worker tests. DB wrappers are run separately with explicit opt-ins, not counted as skipped passes.",
+    "git_diff_check": "PASS",
+    "self_review": "No production worker/core/schema/migration edits; no deleted/skipped/weakened tests; new assertions use counts, booleans, small strings; no complex object failure printing.",
+    "environment_corrections": [
+      "Docker unavailable; unpacked cached PostgreSQL 16.15 binaries into a new /tmp cluster.",
+      "Initial database inherited Asia/Seoul TimeZone; Prisma raw DB clock was nine hours ahead of Node. Recreated/verified UTC database for final tests. No price-source/freshness policy bypass.",
+      "Initial global lock_timeout 2s interrupted existing deliberate ~2.5s race waits; after process exit and disposable DB cleanup, used bounded 10s DB lock_timeout and 30s statement_timeout. Lock probe keeps its own 150ms/3s limits."
+    ]
+  },
+  "final_assessment": {
+    "migration_lock_risk": "PARTIAL",
+    "migration_history_safety": "PARTIAL (local original/checksums PASS; persistent applied state UNKNOWN)",
+    "buy_worker_traversal": "PASS",
+    "sell_worker_traversal": "PASS",
+    "financial_integrity": "PARTIAL (final invariants PASS; early incomplete limit trigger unresolved)",
+    "existing_function_regression": "PASS within the four selected financial suites",
+    "excessive_code_change": "PASS (verification/fixtures/runbook only)"
+  },
+  "cleanup": {
+    "fixture_rows": "PASS: users/orders/BUY/SELL/positions/probe schemas all zero in the final financial/scan DB. Upgrade DB retained its two original synthetic orders with identical full-row hashes until disposal.",
+    "test_cluster": "PASS: dedicated PostgreSQL stopped and /tmp data/tools directories removed; both disposable databases deleted with the cluster.",
+    "temporary_runner_files": "PASS: removed all temporary debug/repetition runners and predecessor Prisma config/migration copy."
+  },
+  "sources": [
+    "https://www.postgresql.org/docs/16/sql-altertable.html",
+    "https://www.postgresql.org/docs/16/explicit-locking.html",
+    "https://www.prisma.io/docs/orm/v7/prisma-migrate/understanding-prisma-migrate/migration-histories"
+  ]
+}

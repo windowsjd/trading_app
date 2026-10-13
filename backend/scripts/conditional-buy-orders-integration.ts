@@ -1404,6 +1404,112 @@ async function listStates() {
   });
 }
 
+/** 16 nearby triggers, using the existing order/reservation/settlement core. */
+async function smallConcurrentBatch(executionType: 'market' | 'limit') {
+  await scenario('general', async (s) => {
+    await market(s, 'BINANCE');
+    await quote(s, 'BINANCE', '100');
+    const ids: string[] = [];
+    for (let i = 0; i < 16; i++)
+      ids.push(
+        await register(s, {
+          triggerCondition: 'at_or_above',
+          triggerPrice: '102',
+          executionType,
+          ...(executionType === 'limit' ? { limitPrice: '101' } : {}),
+          amount: '10',
+        }),
+      );
+    const before = await wallet(s, 'BINANCE');
+    await quote(s, 'BINANCE', '102');
+    const workers = [0, 1].map(
+      () =>
+        new ConditionalBuyWorker(
+          db,
+          new OpsJobLockService(db),
+          new OpsJobRunService(db),
+          conditionalBuy,
+        ),
+    );
+    await Promise.all([
+      ...workers.map((worker) => worker.tick()),
+      ...ids.map((id) => conditionalBuy.evaluate(id)),
+    ]);
+    await Promise.all(ids.map((id) => conditionalBuy.evaluate(id)));
+    const rows = await db.order.findMany({
+      where: { tradingAccountId: s.accountId },
+    });
+    const outcomes = await db.conditionalBuyOrder.groupBy({
+      by: ['status', 'failureCode', 'terminalReason'],
+      where: { tradingAccountId: s.accountId },
+      _count: true,
+    });
+    assert.equal(rows.length, 16, JSON.stringify(outcomes));
+    assert.equal(new Set(rows.map((row) => row.id)).size, 16);
+    for (const id of ids) assert.equal((await watch(id)).status, 'ordered');
+    if (executionType === 'limit') {
+      assert.equal(rows.filter((row) => row.status === 'submitted').length, 16);
+      const pending = await wallet(s, 'BINANCE');
+      assert.equal(pending.balance, before.balance);
+      assert.equal(
+        pending.reserved,
+        rows
+          .reduce(
+            (sum, row) => sum.add(row.reservedAmount ?? 0),
+            new Prisma.Decimal(0),
+          )
+          .toFixed(8),
+      );
+      await quote(s, 'BINANCE', '100');
+      assert.equal(
+        (await matcher.matchDueLimitOrders({ now: await now() })).filledPathA,
+        16,
+      );
+    }
+    await new ConditionalBuyWorker(
+      db,
+      new OpsJobLockService(db),
+      new OpsJobRunService(db),
+      conditionalBuy,
+    ).tick();
+    const executed = await db.order.findMany({
+      where: { tradingAccountId: s.accountId, status: 'executed' },
+    });
+    assert.equal(executed.length, 16);
+    assert.equal(await ledgerCount(s), 16);
+    const after = await wallet(s, 'BINANCE');
+    assert.equal(after.reserved, '0.00000000');
+    assert.equal(
+      new Prisma.Decimal(before.balance).sub(after.balance).toFixed(8),
+      executed
+        .reduce(
+          (sum, row) => sum.add(row.netAmount ?? 0),
+          new Prisma.Decimal(0),
+        )
+        .toFixed(8),
+    );
+    const position = await db.position.findFirstOrThrow({
+      where: {
+        tradingAccountId: s.accountId,
+        assetId: s.instruments[0].asset.id,
+      },
+    });
+    assert.equal(
+      position.quantity.toFixed(8),
+      executed
+        .reduce(
+          (sum, row) => sum.add(row.executedQuantity ?? row.quantity),
+          new Prisma.Decimal(0),
+        )
+        .toFixed(8),
+    );
+    assert.equal(await orderCount(s), 16);
+    pass(
+      `16 ${executionType} triggers + two workers + replay/restart: unique orders, cash/reservation/holding conserved`,
+    );
+  });
+}
+
 async function main() {
   await db.$connect();
   try {
@@ -1435,6 +1541,8 @@ async function run() {
   await usStockScope();
   await beginner();
   await workerLease();
+  await smallConcurrentBatch('market');
+  await smallConcurrentBatch('limit');
   await executionWindow('market');
   await executionWindow('limit');
   await windowRaces();
