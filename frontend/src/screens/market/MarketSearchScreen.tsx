@@ -11,7 +11,9 @@ import { getScreenContentStyle } from '../../theme/screenLayout';
 import { buildWsUrl } from '../../constants/env';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import MarketAssetRow from '../../features/market/MarketAssetRow';
-import React, { useCallback, useMemo, useState } from 'react';
+import { useWatchlist } from '../../features/watchlist/useWatchlist';
+import WatchlistNotice from '../../features/watchlist/WatchlistNotice';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -34,6 +36,8 @@ import WhaleLoader from '../../components/states/WhaleLoader';
 type Props = NativeStackScreenProps<MarketStackParamList, 'MarketSearch'>;
 
 export default function MarketSearchScreen({ navigation, route }: Props) {
+  const watchlist = useWatchlist();
+  const refreshWatchlist = watchlist.refresh;
   const [sort, setSort] = useState<MarketSort>(route.params?.sort ?? 'turnover_desc');
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [assetType, setAssetType] = useState<MarketSearchScope>('all');
@@ -52,11 +56,14 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     () => { refreshSort.current = false; });
 
   const assetIds = useMemo(() => items.map((item) => item.id), [items]);
-  const { tickersByAssetId, staleAssetIds } = useMarketTickers({
+  const { tickersByAssetId, staleAssetIds, connectionState } = useMarketTickers({
     assetIds,
     wsUrl: wsUrl ?? '',
     enabled: !!wsUrl,
   });
+  useEffect(() => {
+    if (connectionState === 'connected') void refreshWatchlist();
+  }, [connectionState, refreshWatchlist]);
 
   const openAsset = useCallback((assetId: string) => {
     if (route.params?.returnToAsset) navigation.popTo('AssetDetail', { assetId });
@@ -142,6 +149,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
             <View style={{ alignItems: 'flex-end' }}>
               <MarketSortControl value={sort} onChange={setSort} />
             </View>
+            <WatchlistNotice state={watchlist} />
 
             {hasPriceErrors ? (
               <View style={styles.inlineWarning}>
@@ -174,7 +182,9 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
         }
         renderItem={({ item }) => (
           <MarketAssetRow item={item} ticker={tickersByAssetId.get(item.id)}
-            isStale={staleAssetIds.has(item.id)} onPress={openAsset} />
+            isStale={staleAssetIds.has(item.id)} onPress={openAsset}
+            watchlist={{ registered: watchlist.items ? watchlist.registeredIds.has(item.id) : undefined,
+              pending: watchlist.pendingIds.has(item.id), disabled: !watchlist.ready, onChange: watchlist.change }} />
         )}
         ListFooterComponent={
           searchQuery.isFetchNextPageError ? (

@@ -3,6 +3,10 @@
 // prefixes stay intact for existing mutation invalidation and session teardown.
 export const QUERY_KEYS = {
   me: ['me'] as const,
+  watchlist: {
+    list: (userId: string) => ['watchlist', userId] as const,
+    mutation: (userId: string, generation: number) => ['watchlist', userId, 'set', generation] as const,
+  },
   inquiries: { mine: ['inquiries', 'me'] as const },
   friends: {
     all: ['friends'] as const,

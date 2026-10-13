@@ -64,6 +64,7 @@ export const ModelName = {
   SeasonReward: 'SeasonReward',
   RewardFulfillmentRequest: 'RewardFulfillmentRequest',
   Asset: 'Asset',
+  WatchlistEntry: 'WatchlistEntry',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   MarketCandle: 'MarketCandle',
@@ -355,6 +356,15 @@ export const AssetScalarFieldEnum = {
 } as const
 
 export type AssetScalarFieldEnum = (typeof AssetScalarFieldEnum)[keyof typeof AssetScalarFieldEnum]
+
+
+export const WatchlistEntryScalarFieldEnum = {
+  userId: 'userId',
+  assetId: 'assetId',
+  createdAt: 'createdAt'
+} as const
+
+export type WatchlistEntryScalarFieldEnum = (typeof WatchlistEntryScalarFieldEnum)[keyof typeof WatchlistEntryScalarFieldEnum]
 
 
 export const AssetPriceSnapshotScalarFieldEnum = {

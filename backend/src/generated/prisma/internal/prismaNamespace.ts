@@ -397,6 +397,7 @@ export const ModelName = {
   SeasonReward: 'SeasonReward',
   RewardFulfillmentRequest: 'RewardFulfillmentRequest',
   Asset: 'Asset',
+  WatchlistEntry: 'WatchlistEntry',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
   MarketCandle: 'MarketCandle',
@@ -456,7 +457,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "watchlistEntry" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1419,6 +1420,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AssetCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AssetCountAggregateOutputType> | number
+        }
+      }
+    }
+    WatchlistEntry: {
+      payload: Prisma.$WatchlistEntryPayload<ExtArgs>
+      fields: Prisma.WatchlistEntryFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.WatchlistEntryFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.WatchlistEntryFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>
+        }
+        findFirst: {
+          args: Prisma.WatchlistEntryFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.WatchlistEntryFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>
+        }
+        findMany: {
+          args: Prisma.WatchlistEntryFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>[]
+        }
+        create: {
+          args: Prisma.WatchlistEntryCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>
+        }
+        createMany: {
+          args: Prisma.WatchlistEntryCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.WatchlistEntryCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>[]
+        }
+        delete: {
+          args: Prisma.WatchlistEntryDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>
+        }
+        update: {
+          args: Prisma.WatchlistEntryUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>
+        }
+        deleteMany: {
+          args: Prisma.WatchlistEntryDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.WatchlistEntryUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.WatchlistEntryUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>[]
+        }
+        upsert: {
+          args: Prisma.WatchlistEntryUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$WatchlistEntryPayload>
+        }
+        aggregate: {
+          args: Prisma.WatchlistEntryAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateWatchlistEntry>
+        }
+        groupBy: {
+          args: Prisma.WatchlistEntryGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WatchlistEntryGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.WatchlistEntryCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.WatchlistEntryCountAggregateOutputType> | number
         }
       }
     }
@@ -4948,6 +5023,15 @@ export const AssetScalarFieldEnum = {
 export type AssetScalarFieldEnum = (typeof AssetScalarFieldEnum)[keyof typeof AssetScalarFieldEnum]
 
 
+export const WatchlistEntryScalarFieldEnum = {
+  userId: 'userId',
+  assetId: 'assetId',
+  createdAt: 'createdAt'
+} as const
+
+export type WatchlistEntryScalarFieldEnum = (typeof WatchlistEntryScalarFieldEnum)[keyof typeof WatchlistEntryScalarFieldEnum]
+
+
 export const AssetPriceSnapshotScalarFieldEnum = {
   id: 'id',
   assetId: 'assetId',
@@ -6863,6 +6947,7 @@ export type GlobalOmitConfig = {
   seasonReward?: Prisma.SeasonRewardOmit
   rewardFulfillmentRequest?: Prisma.RewardFulfillmentRequestOmit
   asset?: Prisma.AssetOmit
+  watchlistEntry?: Prisma.WatchlistEntryOmit
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
   assetOrderbookSnapshot?: Prisma.AssetOrderbookSnapshotOmit
   marketCandle?: Prisma.MarketCandleOmit

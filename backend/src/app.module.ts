@@ -1,6 +1,7 @@
 import { FriendsModule } from './friends/friends.module';
 import { ConditionalModule } from './conditional/conditional.module';
 import { Module } from '@nestjs/common';
+import { WatchlistModule } from './watchlist/watchlist.module';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -33,6 +34,7 @@ import { WalletsModule } from './wallets/wallets.module';
 
 @Module({
   imports: [
+    WatchlistModule,
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env.local', '.env.development', '.env'],

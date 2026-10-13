@@ -33,6 +33,8 @@ import {
 } from '../../features/market/api';
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
+import { useWatchlist } from '../../features/watchlist/useWatchlist';
+import WatchlistNotice from '../../features/watchlist/WatchlistNotice';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -64,6 +66,8 @@ export default function MarketScreen({ navigation, route }: Props) {
   }, [route?.params?.assetType, navigation]);
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
   const futuresMarket = selectedTab === 'crypto' && cryptoProduct === 'futures';
+  const watchlist = useWatchlist(!futuresMarket);
+  const refreshWatchlist = watchlist.refresh;
   useTradingGuideFacts({ screen: 'market', accountId: guide?.active?.accountId ?? '', assetType: selectedTab });
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
@@ -124,12 +128,16 @@ export default function MarketScreen({ navigation, route }: Props) {
   // Live overlay: the currently loaded rows subscribe on the app's shared
   // socket. Changing tab releases the previous tab's rows; loading another page
   // only adds the new ids.
-  const { tickersByAssetId, showReconnectBanner, staleAssetIds, subscriptionErrorAssetIds, runtime: tickerRuntime } =
+  const { tickersByAssetId, showReconnectBanner, staleAssetIds, subscriptionErrorAssetIds, runtime: tickerRuntime, connectionState } =
     useMarketTickers({
       assetIds,
       wsUrl: wsUrl ?? '',
       enabled: !!wsUrl && !futuresMarket,
     });
+
+  useEffect(() => {
+    if (connectionState === 'connected') void refreshWatchlist();
+  }, [connectionState, refreshWatchlist]);
 
   const openAsset = useCallback(
     (assetId: string) => navigation.navigate('AssetDetail', { assetId }),
@@ -156,7 +164,12 @@ export default function MarketScreen({ navigation, route }: Props) {
           void marketQuery.refetch();
         }}
         diagnosticError={marketQuery.error}
-      />
+      >
+        <ActionPressable accessibilityRole="button" testID="watchlist-entry"
+          style={styles.searchEntry} onPress={() => navigation.navigate('Watchlist', { assetType: selectedTab })}>
+          <Text style={styles.searchEntryText}>관심종목 보기</Text>
+        </ActionPressable>
+      </ErrorState>
     );
   }
 
@@ -199,6 +212,12 @@ export default function MarketScreen({ navigation, route }: Props) {
               <Text style={styles.searchEntryText}>종목명 또는 심볼 검색</Text>
             </ActionPressable>
 
+            <ActionPressable testID="watchlist-entry" accessibilityRole="button"
+              style={styles.searchEntry} onPress={() => navigation.navigate('Watchlist', { assetType: selectedTab })}>
+              <Text style={styles.searchEntryText}>관심종목 보기</Text>
+            </ActionPressable>
+            <WatchlistNotice state={watchlist} />
+
             <View style={styles.toolbar}>
               <Text testID="market-session-summary" style={styles.sessionSummary}>
                 {getMarketSessionLabel(selectedTab, items, tickersByAssetId)}
@@ -238,6 +257,8 @@ export default function MarketScreen({ navigation, route }: Props) {
             isStale={staleAssetIds.has(item.id)}
             priceError={priceErrorsByAssetId.get(item.id)}
             onPress={openAsset}
+            watchlist={{ registered: watchlist.items ? watchlist.registeredIds.has(item.id) : undefined,
+              pending: watchlist.pendingIds.has(item.id), disabled: !watchlist.ready, onChange: watchlist.change }}
           />
         )}
         ListFooterComponent={

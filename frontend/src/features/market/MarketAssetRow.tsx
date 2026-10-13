@@ -14,6 +14,7 @@ import { getMarketChangeDisplay, getMarketException } from './marketPresentation
 import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
+import WatchlistButton, { type WatchlistButtonProps } from '../watchlist/WatchlistButton';
 
 type Props = {
   /** REST baseline row — never rebuilt when some other asset ticks. */
@@ -24,6 +25,7 @@ type Props = {
   isStale?: boolean;
   priceError?: AssetPriceErrorDto;
   onPress: (assetId: string) => void;
+  watchlist?: Omit<WatchlistButtonProps, 'assetId' | 'name'>;
 };
 
 /**
@@ -40,6 +42,7 @@ function MarketAssetRowComponent({
   isStale,
   priceError,
   onPress,
+  watchlist,
 }: Props) {
   const displayItem = useMemo(
     () => mergeMarketAssetTicker(item, ticker ?? undefined),
@@ -52,6 +55,7 @@ function MarketAssetRowComponent({
 
   return (
     <View>
+      <View style={styles.rowGroup}>
       <ActionPressable
         testID={TEST_IDS.market.item(item.id)}
         style={styles.itemRow}
@@ -79,6 +83,8 @@ function MarketAssetRowComponent({
           {exception ? <Text style={styles.exception}>{exception}</Text> : null}
         </View>
       </ActionPressable>
+      {watchlist ? <WatchlistButton {...watchlist} assetId={item.id} name={item.name} /> : null}
+      </View>
       {priceError && displayItem.price?.state !== 'available' ? (
         <AdminDiagnosticPanel diagnostic={priceError.diagnostic} />
       ) : null}
@@ -95,12 +101,18 @@ export const MarketAssetRow = React.memo(
     (previous.ticker ?? null) === (next.ticker ?? null) &&
     previous.isStale === next.isStale &&
     previous.priceError === next.priceError &&
-    previous.onPress === next.onPress,
+    previous.onPress === next.onPress &&
+    previous.watchlist?.registered === next.watchlist?.registered &&
+    previous.watchlist?.pending === next.watchlist?.pending &&
+    previous.watchlist?.disabled === next.watchlist?.disabled &&
+    previous.watchlist?.onChange === next.watchlist?.onChange,
 );
 
 const styles = StyleSheet.create({
+  rowGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   identity: { flexGrow: 1, flexShrink: 1, flexBasis: 110, minWidth: 0 },
   itemRow: {
+    flex: 1, minWidth: 0,
     paddingHorizontal: 12, marginBottom: 8, borderRadius: 12,
     backgroundColor: semantic.surface,
     flexDirection: 'row',

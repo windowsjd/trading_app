@@ -10,6 +10,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`
    - `docs/assets-api-contract.md`
+   - `docs/watchlist-api-contract.md` — User-owned Spot preferences, idempotent PUT/DELETE and the 50-item limit
    - `docs/home-api-contract.md`
    - `docs/ranking-api-contract.md`
    - `docs/wallets-api-contract.md`

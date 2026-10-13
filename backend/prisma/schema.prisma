@@ -343,6 +343,7 @@ model User {
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
   rewardFulfillmentsCanceled  RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
   inquiries                   Inquiry[]
+  watchlist                   WatchlistEntry[]
 
   @@map("users")
 }
@@ -705,11 +706,25 @@ model Asset {
   conditionalBuyOrders     ConditionalBuyOrder[]
   limitOnCloseOrders       LimitOnCloseOrder[]
   sessionCloseEvidences    SessionClosePriceEvidence[]
+  watchlist               WatchlistEntry[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
   @@index([isActive])
   @@map("assets")
+}
+
+/// User preference shared across all Trading Accounts. Asset is the metadata authority.
+model WatchlistEntry {
+  userId    String   @map("user_id")
+  assetId   String   @map("asset_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([userId, assetId])
+  @@index([userId, createdAt(sort: Desc), assetId])
+  @@map("watchlist_entries")
 }
 
 model AssetPriceSnapshot {

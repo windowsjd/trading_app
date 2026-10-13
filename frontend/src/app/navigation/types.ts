@@ -31,6 +31,7 @@ export type WalletStackParamList = {
 export type MarketStackParamList = {
   Futures: { accountId: string; instrumentId?: string };
   Market: { assetType?: import('../../features/market/api').AssetType } | undefined;
+  Watchlist: { assetType: import('../../features/market/api').AssetType };
   MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
   AssetDetail: { assetId: string };
   /**

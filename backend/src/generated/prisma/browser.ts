@@ -84,6 +84,11 @@ export type RewardFulfillmentRequest = Prisma.RewardFulfillmentRequestModel
  */
 export type Asset = Prisma.AssetModel
 /**
+ * Model WatchlistEntry
+ * User preference shared across all Trading Accounts. Asset is the metadata authority.
+ */
+export type WatchlistEntry = Prisma.WatchlistEntryModel
+/**
  * Model AssetPriceSnapshot
  * 
  */

@@ -243,6 +243,7 @@ export type AssetWhereInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderListRelationFilter
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderListRelationFilter
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceListRelationFilter
+  watchlist?: Prisma.WatchlistEntryListRelationFilter
 }
 
 export type AssetOrderByWithRelationInput = {
@@ -270,6 +271,7 @@ export type AssetOrderByWithRelationInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderOrderByRelationAggregateInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderOrderByRelationAggregateInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceOrderByRelationAggregateInput
+  watchlist?: Prisma.WatchlistEntryOrderByRelationAggregateInput
 }
 
 export type AssetWhereUniqueInput = Prisma.AtLeast<{
@@ -301,6 +303,7 @@ export type AssetWhereUniqueInput = Prisma.AtLeast<{
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderListRelationFilter
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderListRelationFilter
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceListRelationFilter
+  watchlist?: Prisma.WatchlistEntryListRelationFilter
 }, "id" | "market_symbol">
 
 export type AssetOrderByWithAggregationInput = {
@@ -362,6 +365,7 @@ export type AssetCreateInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateInput = {
@@ -389,6 +393,7 @@ export type AssetUncheckedCreateInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUpdateInput = {
@@ -416,6 +421,7 @@ export type AssetUpdateInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateInput = {
@@ -443,6 +449,7 @@ export type AssetUncheckedUpdateInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateManyInput = {
@@ -550,6 +557,20 @@ export type EnumCurrencyCodeFieldUpdateOperationsInput = {
 
 export type EnumAssetTypeFieldUpdateOperationsInput = {
   set?: $Enums.AssetType
+}
+
+export type AssetCreateNestedOneWithoutWatchlistInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutWatchlistInput, Prisma.AssetUncheckedCreateWithoutWatchlistInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutWatchlistInput
+  connect?: Prisma.AssetWhereUniqueInput
+}
+
+export type AssetUpdateOneRequiredWithoutWatchlistNestedInput = {
+  create?: Prisma.XOR<Prisma.AssetCreateWithoutWatchlistInput, Prisma.AssetUncheckedCreateWithoutWatchlistInput>
+  connectOrCreate?: Prisma.AssetCreateOrConnectWithoutWatchlistInput
+  upsert?: Prisma.AssetUpsertWithoutWatchlistInput
+  connect?: Prisma.AssetWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutWatchlistInput, Prisma.AssetUpdateWithoutWatchlistInput>, Prisma.AssetUncheckedUpdateWithoutWatchlistInput>
 }
 
 export type AssetCreateNestedOneWithoutPriceSnapshotsInput = {
@@ -736,6 +757,130 @@ export type AssetUpdateOneRequiredWithoutLimitOrderCandleEvidenceNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.AssetUpdateToOneWithWhereWithoutLimitOrderCandleEvidenceInput, Prisma.AssetUpdateWithoutLimitOrderCandleEvidenceInput>, Prisma.AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput>
 }
 
+export type AssetCreateWithoutWatchlistInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutAssetInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceCreateNestedManyWithoutAssetInput
+  futuresInstruments?: Prisma.FuturesInstrumentCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
+  sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+}
+
+export type AssetUncheckedCreateWithoutWatchlistInput = {
+  id?: string
+  symbol: string
+  name: string
+  market: string
+  currencyCode: $Enums.CurrencyCode
+  priceCurrency?: $Enums.CurrencyCode
+  settlementCurrency?: $Enums.CurrencyCode
+  assetType: $Enums.AssetType
+  isActive?: boolean
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedCreateNestedManyWithoutAssetInput
+  marketCandles?: Prisma.MarketCandleUncheckedCreateNestedManyWithoutAssetInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedCreateNestedManyWithoutAssetInput
+  positions?: Prisma.PositionUncheckedCreateNestedManyWithoutAssetInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutAssetInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutAssetInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  futuresInstruments?: Prisma.FuturesInstrumentUncheckedCreateNestedManyWithoutUnderlyingAssetInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
+  sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+}
+
+export type AssetCreateOrConnectWithoutWatchlistInput = {
+  where: Prisma.AssetWhereUniqueInput
+  create: Prisma.XOR<Prisma.AssetCreateWithoutWatchlistInput, Prisma.AssetUncheckedCreateWithoutWatchlistInput>
+}
+
+export type AssetUpsertWithoutWatchlistInput = {
+  update: Prisma.XOR<Prisma.AssetUpdateWithoutWatchlistInput, Prisma.AssetUncheckedUpdateWithoutWatchlistInput>
+  create: Prisma.XOR<Prisma.AssetCreateWithoutWatchlistInput, Prisma.AssetUncheckedCreateWithoutWatchlistInput>
+  where?: Prisma.AssetWhereInput
+}
+
+export type AssetUpdateToOneWithWhereWithoutWatchlistInput = {
+  where?: Prisma.AssetWhereInput
+  data: Prisma.XOR<Prisma.AssetUpdateWithoutWatchlistInput, Prisma.AssetUncheckedUpdateWithoutWatchlistInput>
+}
+
+export type AssetUpdateWithoutWatchlistInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutAssetNestedInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUpdateManyWithoutAssetNestedInput
+  futuresInstruments?: Prisma.FuturesInstrumentUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
+  sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+}
+
+export type AssetUncheckedUpdateWithoutWatchlistInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  market?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  priceCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  assetType?: Prisma.EnumAssetTypeFieldUpdateOperationsInput | $Enums.AssetType
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  priceSnapshots?: Prisma.AssetPriceSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  orderbookSnapshots?: Prisma.AssetOrderbookSnapshotUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandles?: Prisma.MarketCandleUncheckedUpdateManyWithoutAssetNestedInput
+  marketCandleSyncStates?: Prisma.MarketCandleSyncStateUncheckedUpdateManyWithoutAssetNestedInput
+  positions?: Prisma.PositionUncheckedUpdateManyWithoutAssetNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutAssetNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutAssetNestedInput
+  limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  futuresInstruments?: Prisma.FuturesInstrumentUncheckedUpdateManyWithoutUnderlyingAssetNestedInput
+  protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
+  conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
+  limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
+  sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+}
+
 export type AssetCreateWithoutPriceSnapshotsInput = {
   id?: string
   symbol: string
@@ -760,6 +905,7 @@ export type AssetCreateWithoutPriceSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
@@ -786,6 +932,7 @@ export type AssetUncheckedCreateWithoutPriceSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPriceSnapshotsInput = {
@@ -828,6 +975,7 @@ export type AssetUpdateWithoutPriceSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
@@ -854,6 +1002,7 @@ export type AssetUncheckedUpdateWithoutPriceSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutOrderbookSnapshotsInput = {
@@ -880,6 +1029,7 @@ export type AssetCreateWithoutOrderbookSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
@@ -906,6 +1056,7 @@ export type AssetUncheckedCreateWithoutOrderbookSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutOrderbookSnapshotsInput = {
@@ -948,6 +1099,7 @@ export type AssetUpdateWithoutOrderbookSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
@@ -974,6 +1126,7 @@ export type AssetUncheckedUpdateWithoutOrderbookSnapshotsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutMarketCandlesInput = {
@@ -1000,6 +1153,7 @@ export type AssetCreateWithoutMarketCandlesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutMarketCandlesInput = {
@@ -1026,6 +1180,7 @@ export type AssetUncheckedCreateWithoutMarketCandlesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutMarketCandlesInput = {
@@ -1068,6 +1223,7 @@ export type AssetUpdateWithoutMarketCandlesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
@@ -1094,6 +1250,7 @@ export type AssetUncheckedUpdateWithoutMarketCandlesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutMarketCandleSyncStatesInput = {
@@ -1120,6 +1277,7 @@ export type AssetCreateWithoutMarketCandleSyncStatesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
@@ -1146,6 +1304,7 @@ export type AssetUncheckedCreateWithoutMarketCandleSyncStatesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutMarketCandleSyncStatesInput = {
@@ -1188,6 +1347,7 @@ export type AssetUpdateWithoutMarketCandleSyncStatesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
@@ -1214,6 +1374,7 @@ export type AssetUncheckedUpdateWithoutMarketCandleSyncStatesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutFuturesInstrumentsInput = {
@@ -1240,6 +1401,7 @@ export type AssetCreateWithoutFuturesInstrumentsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutFuturesInstrumentsInput = {
@@ -1266,6 +1428,7 @@ export type AssetUncheckedCreateWithoutFuturesInstrumentsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutFuturesInstrumentsInput = {
@@ -1308,6 +1471,7 @@ export type AssetUpdateWithoutFuturesInstrumentsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutFuturesInstrumentsInput = {
@@ -1334,6 +1498,7 @@ export type AssetUncheckedUpdateWithoutFuturesInstrumentsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutProtectionGroupsInput = {
@@ -1360,6 +1525,7 @@ export type AssetCreateWithoutProtectionGroupsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutProtectionGroupsInput = {
@@ -1386,6 +1552,7 @@ export type AssetUncheckedCreateWithoutProtectionGroupsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutProtectionGroupsInput = {
@@ -1428,6 +1595,7 @@ export type AssetUpdateWithoutProtectionGroupsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutProtectionGroupsInput = {
@@ -1454,6 +1622,7 @@ export type AssetUncheckedUpdateWithoutProtectionGroupsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutPositionsInput = {
@@ -1480,6 +1649,7 @@ export type AssetCreateWithoutPositionsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutPositionsInput = {
@@ -1506,6 +1676,7 @@ export type AssetUncheckedCreateWithoutPositionsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutPositionsInput = {
@@ -1548,6 +1719,7 @@ export type AssetUpdateWithoutPositionsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutPositionsInput = {
@@ -1574,6 +1746,7 @@ export type AssetUncheckedUpdateWithoutPositionsInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutOrdersInput = {
@@ -1600,6 +1773,7 @@ export type AssetCreateWithoutOrdersInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutOrdersInput = {
@@ -1626,6 +1800,7 @@ export type AssetUncheckedCreateWithoutOrdersInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutOrdersInput = {
@@ -1668,6 +1843,7 @@ export type AssetUpdateWithoutOrdersInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutOrdersInput = {
@@ -1694,6 +1870,7 @@ export type AssetUncheckedUpdateWithoutOrdersInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutConditionalBuyOrdersInput = {
@@ -1720,6 +1897,7 @@ export type AssetCreateWithoutConditionalBuyOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutConditionalBuyOrdersInput = {
@@ -1746,6 +1924,7 @@ export type AssetUncheckedCreateWithoutConditionalBuyOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutConditionalBuyOrdersInput = {
@@ -1788,6 +1967,7 @@ export type AssetUpdateWithoutConditionalBuyOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutConditionalBuyOrdersInput = {
@@ -1814,6 +1994,7 @@ export type AssetUncheckedUpdateWithoutConditionalBuyOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutLimitOnCloseOrdersInput = {
@@ -1840,6 +2021,7 @@ export type AssetCreateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutLimitOnCloseOrdersInput = {
@@ -1866,6 +2048,7 @@ export type AssetUncheckedCreateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutLimitOnCloseOrdersInput = {
@@ -1908,6 +2091,7 @@ export type AssetUpdateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutLimitOnCloseOrdersInput = {
@@ -1934,6 +2118,7 @@ export type AssetUncheckedUpdateWithoutLimitOnCloseOrdersInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutSessionCloseEvidencesInput = {
@@ -1960,6 +2145,7 @@ export type AssetCreateWithoutSessionCloseEvidencesInput = {
   protectionGroups?: Prisma.ProtectionGroupCreateNestedManyWithoutAssetInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutSessionCloseEvidencesInput = {
@@ -1986,6 +2172,7 @@ export type AssetUncheckedCreateWithoutSessionCloseEvidencesInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedCreateNestedManyWithoutAssetInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutSessionCloseEvidencesInput = {
@@ -2028,6 +2215,7 @@ export type AssetUpdateWithoutSessionCloseEvidencesInput = {
   protectionGroups?: Prisma.ProtectionGroupUpdateManyWithoutAssetNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutSessionCloseEvidencesInput = {
@@ -2054,6 +2242,7 @@ export type AssetUncheckedUpdateWithoutSessionCloseEvidencesInput = {
   protectionGroups?: Prisma.ProtectionGroupUncheckedUpdateManyWithoutAssetNestedInput
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutQuotesInput = {
@@ -2080,6 +2269,7 @@ export type AssetCreateWithoutQuotesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutQuotesInput = {
@@ -2106,6 +2296,7 @@ export type AssetUncheckedCreateWithoutQuotesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutQuotesInput = {
@@ -2148,6 +2339,7 @@ export type AssetUpdateWithoutQuotesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutQuotesInput = {
@@ -2174,6 +2366,7 @@ export type AssetUncheckedUpdateWithoutQuotesInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetCreateWithoutLimitOrderCandleEvidenceInput = {
@@ -2200,6 +2393,7 @@ export type AssetCreateWithoutLimitOrderCandleEvidenceInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryCreateNestedManyWithoutAssetInput
 }
 
 export type AssetUncheckedCreateWithoutLimitOrderCandleEvidenceInput = {
@@ -2226,6 +2420,7 @@ export type AssetUncheckedCreateWithoutLimitOrderCandleEvidenceInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedCreateNestedManyWithoutAssetInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedCreateNestedManyWithoutAssetInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedCreateNestedManyWithoutAssetInput
+  watchlist?: Prisma.WatchlistEntryUncheckedCreateNestedManyWithoutAssetInput
 }
 
 export type AssetCreateOrConnectWithoutLimitOrderCandleEvidenceInput = {
@@ -2268,6 +2463,7 @@ export type AssetUpdateWithoutLimitOrderCandleEvidenceInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUpdateManyWithoutAssetNestedInput
 }
 
 export type AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput = {
@@ -2294,6 +2490,7 @@ export type AssetUncheckedUpdateWithoutLimitOrderCandleEvidenceInput = {
   conditionalBuyOrders?: Prisma.ConditionalBuyOrderUncheckedUpdateManyWithoutAssetNestedInput
   limitOnCloseOrders?: Prisma.LimitOnCloseOrderUncheckedUpdateManyWithoutAssetNestedInput
   sessionCloseEvidences?: Prisma.SessionClosePriceEvidenceUncheckedUpdateManyWithoutAssetNestedInput
+  watchlist?: Prisma.WatchlistEntryUncheckedUpdateManyWithoutAssetNestedInput
 }
 
 
@@ -2315,6 +2512,7 @@ export type AssetCountOutputType = {
   conditionalBuyOrders: number
   limitOnCloseOrders: number
   sessionCloseEvidences: number
+  watchlist: number
 }
 
 export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2331,6 +2529,7 @@ export type AssetCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   conditionalBuyOrders?: boolean | AssetCountOutputTypeCountConditionalBuyOrdersArgs
   limitOnCloseOrders?: boolean | AssetCountOutputTypeCountLimitOnCloseOrdersArgs
   sessionCloseEvidences?: boolean | AssetCountOutputTypeCountSessionCloseEvidencesArgs
+  watchlist?: boolean | AssetCountOutputTypeCountWatchlistArgs
 }
 
 /**
@@ -2434,6 +2633,13 @@ export type AssetCountOutputTypeCountSessionCloseEvidencesArgs<ExtArgs extends r
   where?: Prisma.SessionClosePriceEvidenceWhereInput
 }
 
+/**
+ * AssetCountOutputType without action
+ */
+export type AssetCountOutputTypeCountWatchlistArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.WatchlistEntryWhereInput
+}
+
 
 export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2460,6 +2666,7 @@ export type AssetSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   conditionalBuyOrders?: boolean | Prisma.Asset$conditionalBuyOrdersArgs<ExtArgs>
   limitOnCloseOrders?: boolean | Prisma.Asset$limitOnCloseOrdersArgs<ExtArgs>
   sessionCloseEvidences?: boolean | Prisma.Asset$sessionCloseEvidencesArgs<ExtArgs>
+  watchlist?: boolean | Prisma.Asset$watchlistArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["asset"]>
 
@@ -2520,6 +2727,7 @@ export type AssetInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   conditionalBuyOrders?: boolean | Prisma.Asset$conditionalBuyOrdersArgs<ExtArgs>
   limitOnCloseOrders?: boolean | Prisma.Asset$limitOnCloseOrdersArgs<ExtArgs>
   sessionCloseEvidences?: boolean | Prisma.Asset$sessionCloseEvidencesArgs<ExtArgs>
+  watchlist?: boolean | Prisma.Asset$watchlistArgs<ExtArgs>
   _count?: boolean | Prisma.AssetCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type AssetIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -2541,6 +2749,7 @@ export type $AssetPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     conditionalBuyOrders: Prisma.$ConditionalBuyOrderPayload<ExtArgs>[]
     limitOnCloseOrders: Prisma.$LimitOnCloseOrderPayload<ExtArgs>[]
     sessionCloseEvidences: Prisma.$SessionClosePriceEvidencePayload<ExtArgs>[]
+    watchlist: Prisma.$WatchlistEntryPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2961,6 +3170,7 @@ export interface Prisma__AssetClient<T, Null = never, ExtArgs extends runtime.Ty
   conditionalBuyOrders<T extends Prisma.Asset$conditionalBuyOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$conditionalBuyOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ConditionalBuyOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   limitOnCloseOrders<T extends Prisma.Asset$limitOnCloseOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$limitOnCloseOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LimitOnCloseOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   sessionCloseEvidences<T extends Prisma.Asset$sessionCloseEvidencesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$sessionCloseEvidencesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$SessionClosePriceEvidencePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  watchlist<T extends Prisma.Asset$watchlistArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Asset$watchlistArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WatchlistEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3703,6 +3913,30 @@ export type Asset$sessionCloseEvidencesArgs<ExtArgs extends runtime.Types.Extens
   take?: number
   skip?: number
   distinct?: Prisma.SessionClosePriceEvidenceScalarFieldEnum | Prisma.SessionClosePriceEvidenceScalarFieldEnum[]
+}
+
+/**
+ * Asset.watchlist
+ */
+export type Asset$watchlistArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the WatchlistEntry
+   */
+  select?: Prisma.WatchlistEntrySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the WatchlistEntry
+   */
+  omit?: Prisma.WatchlistEntryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.WatchlistEntryInclude<ExtArgs> | null
+  where?: Prisma.WatchlistEntryWhereInput
+  orderBy?: Prisma.WatchlistEntryOrderByWithRelationInput | Prisma.WatchlistEntryOrderByWithRelationInput[]
+  cursor?: Prisma.WatchlistEntryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.WatchlistEntryScalarFieldEnum | Prisma.WatchlistEntryScalarFieldEnum[]
 }
 
 /**

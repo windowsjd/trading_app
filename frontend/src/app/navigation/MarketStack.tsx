@@ -10,6 +10,7 @@ import { questNavigationRouter } from '../../features/quest/questNavigationGuard
 
 import type { MarketStackParamList } from './types';
 import MarketScreen from '../../screens/market/MarketScreen';
+import WatchlistScreen from '../../screens/market/WatchlistScreen';
 import MarketSearchScreen from '../../screens/market/MarketSearchScreen';
 import AssetDetailScreen from '../../screens/asset/AssetDetailScreen';
 import OrderScreen from '../../screens/order/OrderScreen';
@@ -30,6 +31,7 @@ export default function MarketStack() {
         component={MarketSearchScreen}
         options={{ title: '종목 검색' }}
       />
+      <Stack.Screen name="Watchlist" component={WatchlistScreen} options={{ title: '관심종목' }} />
       {/* The trading screens' titles take the tab headers' heavy theme font:
           same family, color and size, only bolder. */}
       <Stack.Screen

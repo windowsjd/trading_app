@@ -3,6 +3,10 @@ import { createRequire } from 'node:module';
 import { it } from 'node:test';
 import type { GetAssetsParams } from './api.ts';
 const require = createRequire(import.meta.url);
+const watchlistBoundary = {
+  '../../features/watchlist/useWatchlist': { useWatchlist: () => ({ ready: true, items: [], registeredIds: new Set(), pendingIds: new Set(), change() {}, refresh: async () => {}, query: {} }) },
+  '../../features/watchlist/WatchlistNotice': { default: 'WatchlistNotice', __esModule: true },
+};
 const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
 const {
   interactionHarness,
@@ -42,6 +46,7 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
       },
     };
     const Screen = h.load(`src/screens/market/${screen}.tsx`, {
+      ...watchlistBoundary,
       './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
       '../../features/market/MarketSortControl': {
         __esModule: true,
@@ -161,6 +166,7 @@ it('Market consumes repeated Home category intents and preserves subsequent manu
   h.native.FlatList = props => React.createElement('FlatList', props, props.ListHeaderComponent);
   const categories: string[] = [];
   const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+    ...watchlistBoundary,
     './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
     '@tanstack/react-query': { useInfiniteQuery: options => {
       categories.push(options.queryKey[2]);

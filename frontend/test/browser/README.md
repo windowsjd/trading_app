@@ -451,3 +451,22 @@ is excluded because its quantity column already overflows at 320px / 2x at
 HEAD. `BEGINNER_CHROMIUM` selects Chromium, `ORDER_METHOD_BROWSER_OUTPUT` the
 screenshots/report.json (default `/tmp/trading-order-method-browser`),
 `ORDER_METHOD_QUICK=1` two combinations only.
+
+User Spot watchlist uses `watchlistBrowser.cjs`, `watchlistFixture.jsx` and
+`watchlistMocks.js` with production market/search/watchlist components and the
+real React Query hook. Run from `frontend/` with external esbuild/Playwright on
+`NODE_PATH`:
+
+```sh
+NODE_PATH=/path/to/browser-tools/node_modules node test/browser/watchlistBrowser.cjs
+```
+
+It checks 96 layouts (320/360/390/430px × Light/Dark × font scale 1/2 ×
+market/search/watchlist and watchlist loading/empty/error), actual non-whitespace
+glyph bounds, horizontal overflow and 48px watchlist targets. Interactions check
+one PUT for a double touch, shared market/search selection, explicit DELETE and
+separate detail navigation. External HTTP is blocked. A Korean system font is
+required for meaningful Korean glyph measurement; `FONTCONFIG_FILE` may point
+at a test-only font configuration on minimal Linux installations.
+`WATCHLIST_BROWSER_OUTPUT` selects screenshots/report.json (default
+`/tmp/trading-watchlist-browser`). Native Android/iOS acceptance remains separate.
