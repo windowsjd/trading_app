@@ -63,6 +63,26 @@ export function callAuction(buys: Quote[], sells: Quote[]) {
   // These fixtures have one clear result. Do not invent exchange tie-breaking rules.
   return { candidates, result: best.length === 1 ? best[0] : null };
 }
+export function openingBuyOrder(
+  limitPrice: number,
+  quantity: number,
+  buys: Quote[],
+  sells: Quote[],
+) {
+  const auction = callAuction([...buys, { price: limitPrice, quantity }], sells);
+  // Same-price partial fills depend on time priority, which this example does not simulate.
+  if (!auction.result || limitPrice === auction.result.price)
+    return { auction, status: 'undetermined' as const };
+  if (limitPrice < auction.result.price)
+    return { auction, status: 'unfilled' as const };
+  return {
+    auction,
+    status: 'filled' as const,
+    price: auction.result.price,
+    quantity,
+    saved: (limitPrice - auction.result.price) * quantity,
+  };
+}
 export function sessionOhlc(trades: SessionTrade[], extended: boolean) {
   const records = trades.filter(
     (trade) =>
