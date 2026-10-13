@@ -15,7 +15,9 @@ describe('Long-range 4h candle storage PostgreSQL smoke', () => {
         timeout: 120_000,
       });
       if (prepare.status !== 0) {
-        throw new Error(`Long candle migrate deploy failed:\n${prepare.stderr}`);
+        throw new Error(
+          `Long candle migrate deploy failed:\n${prepare.stderr}`,
+        );
       }
       const result = spawnSync(pnpm(), ['exec', 'tsx', '-e', RUNNER], {
         cwd: process.cwd(),
