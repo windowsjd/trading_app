@@ -1,0 +1,684 @@
+{
+  "status": "PASS",
+  "layouts": 96,
+  "interactions": [
+    "double touch single PUT",
+    "market/search shared state",
+    "explicit DELETE",
+    "separate detail navigation"
+  ],
+  "results": [
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 320,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 360,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 390,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "light",
+      "width": 430,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 320,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 360,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 390,
+      "fontScale": 2
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 1,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 1
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 1
+    },
+    {
+      "screen": "Market",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "MarketSearch",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 2,
+      "clipped": []
+    },
+    {
+      "screen": "Watchlist",
+      "state": "empty",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "error",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 2
+    },
+    {
+      "screen": "Watchlist",
+      "state": "loading",
+      "appearance": "dark",
+      "width": 430,
+      "fontScale": 2
+    }
+  ]
+}
