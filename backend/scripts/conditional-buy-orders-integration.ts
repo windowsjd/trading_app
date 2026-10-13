@@ -1,6 +1,7 @@
 import { tradingSessions } from '../test/support/trading-session-fixture';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { performance as monotonicClock } from 'node:perf_hooks';
 import {
   db,
   fixture,
@@ -1421,7 +1422,8 @@ async function smallConcurrentBatch(executionType: 'market' | 'limit') {
         }),
       );
     const before = await wallet(s, 'BINANCE');
-    await quote(s, 'BINANCE', '102');
+    const triggerPrice = await quote(s, 'BINANCE', '102');
+    const startedAt = monotonicClock.now();
     const workers = [0, 1].map(
       () =>
         new ConditionalBuyWorker(
@@ -1431,22 +1433,68 @@ async function smallConcurrentBatch(executionType: 'market' | 'limit') {
           conditionalBuy,
         ),
     );
-    await Promise.all([
+    const firstPass = await Promise.all([
       ...workers.map((worker) => worker.tick()),
       ...ids.map((id) => conditionalBuy.evaluate(id)),
     ]);
-    await Promise.all(ids.map((id) => conditionalBuy.evaluate(id)));
+    const replay = await Promise.all(
+      ids.map((id) => conditionalBuy.evaluate(id)),
+    );
     const rows = await db.order.findMany({
       where: { tradingAccountId: s.accountId },
     });
-    const outcomes = await db.conditionalBuyOrder.groupBy({
-      by: ['status', 'failureCode', 'terminalReason'],
+    const outcomes = await db.conditionalBuyOrder.findMany({
       where: { tradingAccountId: s.accountId },
-      _count: true,
+      select: {
+        id: true,
+        status: true,
+        failureCode: true,
+        terminalReason: true,
+        attemptCount: true,
+        createdAt: true,
+        triggeredAt: true,
+        lastAttemptAt: true,
+        order: { select: { status: true } },
+      },
     });
-    assert.equal(rows.length, 16, JSON.stringify(outcomes));
+    const observedAt = await now();
+    // Counts, codes and relative clocks only: no account/order IDs, prices,
+    // wallet amounts, credentials or large Prisma objects in failure output.
+    const diagnostics = JSON.stringify({
+      executionType,
+      elapsedMs: Math.round(monotonicClock.now() - startedAt),
+      nodeMinusDbMs: Date.now() - observedAt.getTime(),
+      triggerEvidenceAgeMs:
+        observedAt.getTime() - triggerPrice.capturedAt.getTime(),
+      workerStates: firstPass.slice(0, workers.length),
+      directStates: firstPass.slice(workers.length),
+      replayStates: replay,
+      watches: ids.map((id, index) => {
+        const row = outcomes.find((item) => item.id === id);
+        return {
+          index,
+          status: row?.status ?? 'missing',
+          failureCode: row?.failureCode ?? null,
+          terminalReason: row?.terminalReason ?? null,
+          attempts: row?.attemptCount ?? null,
+          evidenceAfterRegistrationMs: row
+            ? triggerPrice.effectiveAt.getTime() - row.createdAt.getTime()
+            : null,
+          triggerAgeMs: row?.triggeredAt
+            ? observedAt.getTime() - row.triggeredAt.getTime()
+            : null,
+          lastAttemptAgeMs: row?.lastAttemptAt
+            ? observedAt.getTime() - row.lastAttemptAt.getTime()
+            : null,
+          orderStatus: row?.order?.status ?? null,
+        };
+      }),
+    });
+    console.log(`Conditional BUY batch evidence ${diagnostics}`);
+    assert.equal(rows.length, 16, diagnostics);
     assert.equal(new Set(rows.map((row) => row.id)).size, 16);
-    for (const id of ids) assert.equal((await watch(id)).status, 'ordered');
+    for (const id of ids)
+      assert.equal((await watch(id)).status, 'ordered', diagnostics);
     if (executionType === 'limit') {
       assert.equal(rows.filter((row) => row.status === 'submitted').length, 16);
       const pending = await wallet(s, 'BINANCE');
