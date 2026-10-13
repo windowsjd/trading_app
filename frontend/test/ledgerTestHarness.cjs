@@ -15,7 +15,7 @@ class StillValue {
   removeListener() {}
   interpolate(config) { return { value: this, ...config }; }
 }
-const stillAnimated = { Value: StillValue, View: 'AnimatedView', timing: () => ({ start() {}, stop() {} }), loop: () => ({ start() {}, stop() {} }) };
+const stillAnimated = { Value: StillValue, View: 'AnimatedView', timing: () => ({ start() {}, stop() {} }), spring: () => ({ start() {}, stop() {} }), loop: () => ({ start() {}, stop() {} }) };
 const withNativeDefaults = (native) => native && (!native.Animated || !native.Platform)
   ? { Platform: { OS: 'android' }, ...native, Animated: native.Animated ?? stillAnimated }
   : native;

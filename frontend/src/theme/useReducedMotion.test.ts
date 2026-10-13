@@ -94,3 +94,38 @@ test('failed native preference read retains static feedback policy', async () =>
   assert.equal(current, true);
   act(() => renderer.unmount());
 });
+
+test('one OS read and subscription serve every component; later mounts render the known value at once', async () => {
+  let reads = 0, subscriptions = 0, removed = 0;
+  let answer = false;
+  const { useReducedMotion } = load(resolve('src/theme/useReducedMotion.ts'), {
+    'react-native': { Platform: { OS: 'android' }, AccessibilityInfo: {
+      isReduceMotionEnabled: async () => { reads++; return answer; },
+      addEventListener: () => { subscriptions++; return { remove: () => removed++ }; },
+    } },
+  });
+  const firstRender: Record<string, boolean> = {}, latest: Record<string, boolean> = {};
+  function Probe({ name }: { name: string }) {
+    const reduced = useReducedMotion();
+    if (!(name in firstRender)) firstRender[name] = reduced;
+    latest[name] = reduced;
+    return null;
+  }
+  let first: any, second: any;
+  await act(async () => { first = create(React.createElement(Probe, { name: 'first' })); });
+  assert.equal(firstRender.first, true, 'unknown before the first read');
+  await act(async () => { second = create(React.createElement(React.Fragment, null,
+    ...['row-1', 'row-2', 'row-3'].map(name => React.createElement(Probe, { key: name, name })))); });
+  assert.deepEqual([firstRender['row-1'], firstRender['row-2'], firstRender['row-3']], [false, false, false], 'no second render to learn it');
+  assert.deepEqual([reads, subscriptions], [1, 1]);
+  act(() => second.unmount());
+  assert.equal(removed, 0, 'still in use');
+  act(() => first.unmount());
+  assert.equal(removed, 1);
+  // Next use re-reads the OS and follows a changed answer.
+  answer = true;
+  let third: any;
+  await act(async () => { third = create(React.createElement(Probe, { name: 'third' })); });
+  assert.deepEqual([reads, latest.third], [2, true]);
+  act(() => third.unmount());
+});

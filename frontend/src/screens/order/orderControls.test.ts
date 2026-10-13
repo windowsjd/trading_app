@@ -57,18 +57,41 @@ describe('buy/sell segmented control', () => {
   it('slides the thumb, and a quick second change continues from the current point to the final side', () => {
     const s = segmentHarness();
     s.layout(206);
+    const thumbX = () => flatten(s.thumb().props.style).transform[0].translateX;
+    const measured = thumbX();
     s.setSide('sell');
     s.setSide('buy');
     const [first, second] = s.h.animations;
     assert.deepEqual([first.options.toValue, second.options.toValue], [1, 0]);
-    // The shared selection motion (reference video 2), same as every segmented control.
-    assert.equal(first.options.duration, 140);
+    // The shared selection spring, same as every segmented control.
+    const { selectionMotion } = s.h.load('src/components/common/SegmentedControl.tsx');
+    assert.deepEqual([first.type, first.options.stiffness, first.options.damping], ['spring', selectionMotion.stiffness, selectionMotion.damping]);
+    assert.equal(first.options.overshootClamping, true);
     assert.equal(first.options.useNativeDriver, true);
     assert.equal(first.value.animation === first, false, 'the first run was stopped');
+    assert.equal(thumbX() === measured, true, 're-renders keep one native interpolation node');
     s.h.finish();
     assert.equal(second.value.value, 0);
     assert.equal(s.node(buy).props.accessibilityState.selected, true);
     assert.equal(s.node(sell).props.accessibilityState.selected, false);
+  });
+
+  it('a press tints only its target: no ink over the moving thumb, no measurement, no extra clock', (t) => {
+    const h = interactionHarness('android');
+    const Segment = h.load('src/screens/order/OrderSideSegment.tsx', {
+      '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
+    }).default;
+    const renderer = h.render(React.createElement(Segment, { side: 'buy', onChange() {} }));
+    t.after(() => act(() => renderer.unmount()));
+    const target = () => renderer.root.findAll((n: any) => n.type === 'Pressable' && n.props.testID === sell)[0];
+    const press = { nativeEvent: { pageX: 150, pageY: 20, locationX: 40, locationY: 20 } };
+    act(() => target().props.onPressIn(press));
+    const tint = () => target().findAll((n: any) => n.type === 'View' && n.props.pointerEvents === 'none' && !n.props.onLayout)[0];
+    assert.equal(flatten(tint().props.style).opacity > 0, true, 'the pressed side is tinted at once');
+    assert.equal(target().findAll((n: any) => typeof n.props.onLayout === 'function' && n.props.accessibilityElementsHidden === true).length, 0, 'no ink layer');
+    assert.equal(h.animations.length, 0); assert.equal(h.measures.length, 0);
+    act(() => target().props.onPressOut(press));
+    assert.equal(flatten(tint().props.style).opacity, 0);
   });
 
   it('Reduced Motion moves the thumb without an animation', () => {
@@ -90,8 +113,8 @@ describe('order panel side change', () => {
     await h.input(TEST_IDS.order.quantityInput, '1');
     h.animations.length = 0;
     await h.press(sell);
-    // The form fade starts in the press handler; the thumb follows the committed side.
-    assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.duration]), [[1, 180], [1, 140]]);
+    // The form fade starts in the press handler; the thumb springs to the committed side.
+    assert.deepEqual(h.animations.map((a: any) => [a.toValue, a.spring ? 'spring' : a.duration]), [[1, 180], [1, 'spring']]);
     // The new side starts with no method and no draft.
     assert.equal(h.freshForm(), true);
     assert.equal(h.node(TEST_IDS.order.executeSubmit).props.label, '매도');

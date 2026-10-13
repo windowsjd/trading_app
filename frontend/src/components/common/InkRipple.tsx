@@ -1,4 +1,4 @@
-import React, { useCallback, useRef } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   Animated,
   Easing,
@@ -78,12 +78,17 @@ export function InkRippleLayer({ ripple, color, opacity, style }: {
   opacity: number;
   style?: StyleProp<ViewStyle>;
 }) {
+  // The pressed state re-renders this layer as the ink starts; keep one native node.
+  const fade = useMemo(
+    () => ripple.fade.interpolate({ inputRange: [0, 1], outputRange: [0, opacity], extrapolate: 'clamp' }),
+    [opacity, ripple.fade],
+  );
   return (
     <View pointerEvents="none" accessible={false} accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants" onLayout={ripple.onLayout} style={[styles.clip, style]}>
       <Animated.View pointerEvents="none" style={[styles.ink, {
         backgroundColor: color,
-        opacity: ripple.fade.interpolate({ inputRange: [0, 1], outputRange: [0, opacity], extrapolate: 'clamp' }),
+        opacity: fade,
         transform: [{ translateX: ripple.x }, { translateY: ripple.y }, { scale: ripple.spread }],
       }]} />
     </View>

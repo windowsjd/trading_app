@@ -244,6 +244,14 @@ function inlineTradingHarness() {
         },
         stop: () => {},
       }),
+      spring: (value, options) => ({
+        start: (callback) => {
+          value.setValue(options.toValue);
+          h.animations.push({ ...options, spring: true });
+          callback?.({ finished: true });
+        },
+        stop: () => {},
+      }),
     },
     useWindowDimensions: () => h.dimensions,
   };

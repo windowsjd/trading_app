@@ -56,6 +56,7 @@ function createTradingUiHarness(screenName) {
       Value: class { constructor(value) { this.value = value; } setValue(value) { this.value = value; } interpolate(config) { return { value: this, ...config }; } },
       View: 'AnimatedView',
       timing: (value, options) => ({ start: callback => { value.setValue(options.toValue); callback?.({ finished: true }); }, stop: () => {} }),
+      spring: (value, options) => ({ start: callback => { value.setValue(options.toValue); callback?.({ finished: true }); }, stop: () => {} }),
       // A loading loop never completes; it is recorded, not run.
       loop: () => ({ start: () => {}, stop: () => {} }),
     },

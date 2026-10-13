@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { primaryGradient, resolveSemanticColor, resolveSemanticStyle, type ActionGradient } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
 import { useReducedMotion } from '../../theme/useReducedMotion';
@@ -85,6 +85,8 @@ function ButtonSurface({ children, pressed, enabled, reduced, ink, tone, style, 
   style: ViewStyle; gradient?: ActionGradient;
 }) {
   const progress = useRef(new Animated.Value(0)).current;
+  // Press and release re-render this surface; one node keeps the native graph.
+  const scale = useMemo(() => progress.interpolate({ inputRange: [0, 1], outputRange: [1, buttonFeedback.scale], extrapolate: 'clamp' }), [progress]);
   useEffect(() => {
     if (reduced || !enabled) { progress.setValue(0); return; }
     const animation = Animated.timing(progress, {
@@ -102,7 +104,7 @@ function ButtonSurface({ children, pressed, enabled, reduced, ink, tone, style, 
   const palette = getRipplePalette(typeof color === 'number' ? color : null, tone);
   return (
     <Animated.View pointerEvents="none" style={[styles.buttonSurface, style, {
-      transform: [{ scale: reduced || !enabled ? 1 : progress.interpolate({ inputRange: [0, 1], outputRange: [1, buttonFeedback.scale], extrapolate: 'clamp' }) }],
+      transform: [{ scale: reduced || !enabled ? 1 : scale }],
     }]}>
       {gradient ? <PrimaryButtonBackground shape={shape} gradient={gradient} /> : null}
       {enabled ? <InkRippleLayer ripple={ink} color={palette.rippleColor} opacity={palette.rippleOpacity} style={[styles.clip, shape]} /> : null}

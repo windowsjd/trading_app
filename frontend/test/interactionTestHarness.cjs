@@ -20,6 +20,15 @@ function interactionHarness(platform = 'android') {
     stopAnimation() { this.animation?.stop(); }
     interpolate(config) { return { value: this, ...config }; }
   }
+  function run(type, value, options) {
+    const animation = {
+      type, value, options,
+      start: (callback) => { value.stopAnimation(); value.animation = animation; animation.callback = callback; h.animations.push(animation); },
+      stop: () => { value.animation = null; animation.callback?.({ finished: false }); },
+      finish: () => { if (value.animation !== animation) return; value.animation = null; value.setValue(options.toValue); animation.callback?.({ finished: true }); },
+    };
+    return animation;
+  }
   function Pressable({ children, style, onPressIn, onPressOut, onPress, disabled, ...props }) {
     const [pressed, setPressed] = React.useState(false);
     return React.createElement('Pressable', {
@@ -39,15 +48,7 @@ function interactionHarness(platform = 'android') {
       return (0xff000000 | parseInt(hex.length === 3 ? [...hex].map((c) => c + c).join('') : hex, 16)) >>> 0;
     },
     useWindowDimensions: () => h.dimensions,
-    Animated: { Value, View: 'AnimatedView', loop: (animation) => ({ start: () => { h.loops.push(animation); }, stop: () => {} }), timing: (value, options) => {
-      const animation = {
-        value, options,
-        start: (callback) => { value.stopAnimation(); value.animation = animation; animation.callback = callback; h.animations.push(animation); },
-        stop: () => { value.animation = null; animation.callback?.({ finished: false }); },
-        finish: () => { if (value.animation !== animation) return; value.animation = null; value.setValue(options.toValue); animation.callback?.({ finished: true }); },
-      };
-      return animation;
-    } },
+    Animated: { Value, View: 'AnimatedView', loop: (animation) => ({ start: () => { h.loops.push(animation); }, stop: () => {} }), timing: (value, options) => run('timing', value, options), spring: (value, options) => run('spring', value, options) },
   };
   h.dimensions = { width: 320, height: 568, fontScale: 2 };
   h.insets = { top: 24, bottom: 34 };

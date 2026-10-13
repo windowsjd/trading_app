@@ -1,9 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from '../../theme/native';
+import React, { useMemo, useState } from 'react';
+import { Animated, StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from '../../components/common/ActionPressable';
-import { selectionEasing, selectionMotion } from '../../components/common/SegmentedControl';
+import { useSelectionMotion } from '../../components/common/SegmentedControl';
 import { TEST_IDS } from '../../constants/testIds';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 
@@ -13,12 +13,12 @@ const SIDES = ['buy', 'sell'] as const;
 const LABEL = { buy: '매수', sell: '매도' } as const;
 const COLOR = { buy: BUY_COLOR, sell: SELL_COLOR } as const;
 const INSET = 3;
-/** The same selection motion as every segmented control (reference video 2). */
-export const SIDE_SEGMENT_DURATION = selectionMotion.duration;
 
 /**
  * One track for 매수/매도. The selected side is owned by the caller and changes
- * immediately; only the colored thumb and label colors follow it visually.
+ * immediately; only the colored thumb and label colors follow it visually, on
+ * the same selection motion as every segmented control. The sliding thumb is
+ * the feedback, so a press only tints the target (no ink over the thumb).
  * Colors stay in themed Views (BUY_COLOR/SELL_COLOR), Animated wrappers carry
  * only transform and opacity.
  */
@@ -28,36 +28,19 @@ export default function OrderSideSegment({ side, onChange }: {
 }) {
   const reduced = useReducedMotion();
   const [trackWidth, setTrackWidth] = useState(0);
-  const progress = useRef(new Animated.Value(side === 'sell' ? 1 : 0)).current;
-  const shownSide = useRef(side);
-  useEffect(() => {
-    const target = side === 'sell' ? 1 : 0;
-    // Only an actual side change moves; mount and a resolved motion
-    // preference land on the target directly.
-    const changed = shownSide.current !== side;
-    shownSide.current = side;
-    if (reduced || !changed) {
-      progress.setValue(target);
-      return;
-    }
-    // A rapid second tap stops this run and continues from the current point.
-    const animation = Animated.timing(progress, {
-      toValue: target,
-      duration: SIDE_SEGMENT_DURATION,
-      easing: selectionEasing,
-      useNativeDriver: Platform.OS !== 'web',
-      isInteraction: false,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [progress, reduced, side]);
+  const progress = useSelectionMotion(side === 'sell' ? 1 : 0, reduced);
 
   const thumbWidth = Math.max(0, (trackWidth - INSET * 2) / 2);
-  const opacity = (value: OrderSide, active: boolean) =>
-    progress.interpolate({
-      inputRange: [0, 1],
-      outputRange: (value === 'buy') === active ? [1, 0] : [0, 1],
-    });
+  const translateX = useMemo(
+    () => progress.interpolate({ inputRange: [0, 1], outputRange: [0, thumbWidth] }),
+    [progress, thumbWidth],
+  );
+  // Label and thumb fills cross-fade on the thumb's own clock.
+  const fades = useMemo(() => {
+    const fade = (outputRange: number[]) => progress.interpolate({ inputRange: [0, 1], outputRange });
+    return { buy: { active: fade([1, 0]), resting: fade([0, 1]) }, sell: { active: fade([0, 1]), resting: fade([1, 0]) } };
+  }, [progress]);
+  const opacity = (value: OrderSide, active: boolean) => fades[value][active ? 'active' : 'resting'];
   return (
     <View
       testID="order-side-segment"
@@ -73,9 +56,7 @@ export default function OrderSideSegment({ side, onChange }: {
           pointerEvents="none"
           style={[styles.thumb, {
             width: thumbWidth,
-            transform: [{
-              translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [0, thumbWidth] }),
-            }],
+            transform: [{ translateX }],
           }]}
         >
           {SIDES.map((value) => (
@@ -90,6 +71,7 @@ export default function OrderSideSegment({ side, onChange }: {
         return (
           <ActionPressable
             key={value}
+            feedback="selection"
             testID={value === 'buy' ? TEST_IDS.assetDetail.buyButton : TEST_IDS.assetDetail.sellButton}
             accessibilityRole="tab"
             accessibilityLabel={LABEL[value]}

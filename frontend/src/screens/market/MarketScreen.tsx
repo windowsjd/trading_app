@@ -34,7 +34,6 @@ import {
 import { MarketAssetRow } from '../../features/market/MarketAssetRow';
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 
-import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -143,23 +142,9 @@ export default function MarketScreen({ navigation, route }: Props) {
     return 'market_ready';
   }, [marketQuery.isLoading, marketQuery.isError, marketQuery.data, items.length]);
 
-  if (!futuresMarket && viewState === 'market_loading') {
-    return <FullPageLoading message="종목 목록을 불러오는 중입니다." />;
-  }
-
-  if (!futuresMarket && viewState === 'market_error') {
-    return (
-      <ErrorState
-        title="종목 목록을 불러오지 못했습니다."
-        message="잠시 후 다시 시도해주세요."
-        onRetry={() => {
-          void marketQuery.refetch();
-        }}
-        diagnosticError={marketQuery.error}
-      />
-    );
-  }
-
+  // The market/product segments stay mounted while a market loads or fails, so
+  // a first visit slides like a cached one. The list shows only the selected
+  // market's own state: no other market's rows are ever kept on screen.
   return (
     <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <View ref={questGuideTarget('market-viewport')} collapsable={false} style={{ flex: 1 }}>
@@ -225,12 +210,26 @@ export default function MarketScreen({ navigation, route }: Props) {
             </>}
           </View>
         }
-        ListEmptyComponent={futuresMarket ? null :
+        ListEmptyComponent={futuresMarket ? null : viewState === 'market_loading' ? (
+          <View testID="market-list-loading" style={styles.listLoading}>
+            <WhaleLoader size={56} />
+            <Text style={styles.listLoadingText}>종목 목록을 불러오는 중입니다.</Text>
+          </View>
+        ) : viewState === 'market_error' ? (
+          <ErrorState
+            title="종목 목록을 불러오지 못했습니다."
+            message="잠시 후 다시 시도해주세요."
+            onRetry={() => {
+              void marketQuery.refetch();
+            }}
+            diagnosticError={marketQuery.error}
+          />
+        ) : (
           <EmptyState
             title="표시할 종목이 없습니다."
             message="현재 조건에서 조회 가능한 종목이 없습니다."
           />
-        }
+        )}
         renderItem={({ item }) => (
           <MarketAssetRow
             item={item}
@@ -300,4 +299,6 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', columnGap: 8, rowGap: 0 },
   sessionSummary: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 12, lineHeight: 18, color: semantic.secondary },
   footerLoader: { paddingVertical: 16 },
+  listLoading: { alignItems: 'center', padding: 24, gap: 14 },
+  listLoadingText: { fontSize: 14, color: semantic.secondary, textAlign: 'center' },
 });

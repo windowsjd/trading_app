@@ -155,6 +155,20 @@ describe('ActionPressable touch feedback', () => {
     });
   }
 
+  it('press and release keep one native scale and ink node (no graph rebuilt as feedback starts)', (t) => {
+    const h = interactionHarness();
+    const renderer = h.render(React.createElement(h.ActionPressable, { primary: true, onPress() {}, style: { minHeight: 48, borderRadius: 12 } }));
+    t.after(() => act(() => renderer.unmount()));
+    layoutInk(renderer, 180, 48);
+    const button = () => renderer.root.findByType('Pressable');
+    const scale = () => flatten(renderer.root.findAllByType('AnimatedView')[0].props.style).transform[0].scale;
+    const before = { scale: scale(), ink: ink(renderer).opacity };
+    act(() => button().props.onPressIn(event));
+    assert.equal(scale() === before.scale && ink(renderer).opacity === before.ink, true, 'pressed');
+    act(() => button().props.onPressOut(event));
+    assert.equal(scale() === before.scale && ink(renderer).opacity === before.ink, true, 'released');
+  });
+
   it('trade-executing buttons use a subtler ink of the same color', () => {
     for (const color of [0xffd1110b, 0xff0a5ac2, 0xff326fe5]) {
       const normal = getRipplePalette(color), subtle = getRipplePalette(color, 'subtle');

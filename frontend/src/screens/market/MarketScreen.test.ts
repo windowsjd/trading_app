@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
+import { createRequire } from 'node:module';
 
 function read(sourcePath: string) {
   return readFileSync(path.join(process.cwd(), 'src', sourcePath), 'utf8');
@@ -64,4 +65,106 @@ it('uses the shared socket for market and search session transitions without per
   assert.match(detailChart, /applyTickerMarketState/u);
   assert.match(detailChart, /latestTicker: ticker/u);
   assert.doesNotMatch(detailChart, /refetchInterval/u);
+});
+
+describe('MarketScreen market switching', () => {
+  const require = createRequire(import.meta.url);
+  const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
+  const row = (assetType: string, id: string) => ({ id, assetType });
+  const ready = (assetType: string) => ({ data: { pages: [{ assets: [row(assetType, `${assetType}-1`), row(assetType, `${assetType}-2`)] }] }, isLoading: false, isError: false });
+
+  function marketHarness() {
+    const h = interactionHarness();
+    h.native.SafeAreaView = 'SafeAreaView';
+    // Renders the header, then the rows or the empty/loading/error slot.
+    h.native.FlatList = (props: any) => React.createElement('FlatList', { testID: props.testID }, props.ListHeaderComponent,
+      props.data.length ? props.data.map((item: any) => React.createElement(React.Fragment, { key: props.keyExtractor(item) }, props.renderItem({ item }))) : props.ListEmptyComponent);
+    const results: Record<string, any> = {};
+    const keys: string[] = [], refetches: string[] = [], subscribed: string[][] = [];
+    const Screen = h.load('src/screens/market/MarketScreen.tsx', {
+      './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
+      '@tanstack/react-query': { useInfiniteQuery: (options: any) => {
+        const assetType = options.queryKey[2];
+        keys.push(assetType);
+        // A market never fetched before is pending; each key owns its result.
+        return { isFetching: false, refetch: async () => { refetches.push(assetType); }, ...(results[assetType] ?? { data: undefined, isLoading: true, isError: false }) };
+      } },
+      '../../features/market/api': { getAssets: async () => {} },
+      '../../features/market/MarketSortControl': { default: 'SortControl', __esModule: true },
+      '../../features/market/MarketAssetRow': { MarketAssetRow: 'AssetRow' },
+      '../../features/market/marketPresentation': { getMarketSessionLabel: () => '' },
+      '../../features/market/useMarketTickers': { useMarketTickers: ({ assetIds }: any) => {
+        subscribed.push(assetIds);
+        return { tickersByAssetId: new Map(), staleAssetIds: new Set() };
+      } },
+      '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => false },
+      '../../constants/env': { buildWsUrl: () => null },
+      ...Object.fromEntries(['ErrorState', 'EmptyState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
+    }).default;
+    let rerender: () => void = () => {};
+    function Fixture() {
+      const [, setTick] = React.useState(0);
+      rerender = () => setTick((tick: number) => tick + 1);
+      const navigation = React.useMemo(() => ({ navigate() {}, setParams() {} }), []);
+      return React.createElement(Screen, { navigation, route: { params: {} } });
+    }
+    results.domestic_stock = ready('domestic_stock');
+    const renderer = h.render(React.createElement(Fixture));
+    const find = (predicate: (n: any) => boolean) => renderer.root.findAll(predicate);
+    return {
+      h, results, keys, refetches, subscribed, renderer,
+      refresh: () => act(() => rerender()),
+      tab: (id: string) => act(() => find((n: any) => n.type === 'Pressable' && n.props.testID === id)[0].props.onPress()),
+      selected: (id: string) => find((n: any) => n.type === 'Pressable' && n.props.testID === id)[0].props.accessibilityState.selected,
+      has: (id: string) => find((n: any) => typeof n.type === 'string' && n.props.testID === id).length > 0,
+      rows: () => find((n: any) => n.type === 'AssetRow').map((n: any) => n.props.item.id),
+      errors: () => find((n: any) => n.type === 'ErrorState'),
+      slides: () => h.animations.filter((a: any) => a.type === 'spring').map((a: any) => a.options.toValue),
+    };
+  }
+
+  it('a first visit keeps the market tabs mounted and slides, showing only the new market\'s loading state', (t) => {
+    const m = marketHarness();
+    t.after(() => act(() => m.renderer.unmount()));
+    assert.deepEqual(m.rows(), ['domestic_stock-1', 'domestic_stock-2']);
+    m.tab('market-tab-us');
+    assert.equal(m.keys.at(-1), 'us_stock');
+    assert.equal(m.has('market-tabs'), true, 'the segment is not replaced by a full-page loader');
+    assert.deepEqual(m.slides(), [1], 'the pill slides on a first visit (a remount would land without motion)');
+    assert.equal(m.selected('market-tab-us'), true);
+    assert.equal(m.has('market-list-loading'), true);
+    assert.deepEqual(m.rows(), [], 'the previous market\'s rows are never shown under the new tab');
+    assert.deepEqual(m.subscribed.at(-1), [], 'live prices are released with the rows');
+    m.results.us_stock = ready('us_stock');
+    m.refresh();
+    assert.equal(m.has('market-list-loading'), false);
+    assert.deepEqual(m.rows(), ['us_stock-1', 'us_stock-2']);
+    assert.deepEqual(m.subscribed.at(-1), ['us_stock-1', 'us_stock-2']);
+    assert.deepEqual(m.slides(), [1], 'data arrival does not move the pill again');
+  });
+
+  it('rapid switches end on the last market; a late answer never replaces it and errors retry in place', (t) => {
+    const m = marketHarness();
+    t.after(() => act(() => m.renderer.unmount()));
+    m.tab('market-tab-us');
+    m.tab('market-tab-crypto');
+    assert.deepEqual(m.slides(), [1, 2]);
+    assert.equal(m.keys.at(-1), 'crypto');
+    assert.equal(m.has('crypto-product'), true);
+    m.results.us_stock = ready('us_stock');
+    m.refresh();
+    assert.deepEqual(m.rows(), [], 'a late answer for an earlier tab is not shown');
+    assert.equal(m.has('market-list-loading'), true);
+    m.results.crypto = { data: undefined, isLoading: false, isError: true, error: new Error('fixture') };
+    m.refresh();
+    assert.equal(m.errors().length, 1);
+    assert.equal(m.errors()[0].props.title, '종목 목록을 불러오지 못했습니다.');
+    assert.equal(m.has('market-tabs') && m.has('crypto-product'), true, 'selection stays usable beside the error');
+    act(() => m.errors()[0].props.onRetry());
+    assert.deepEqual(m.refetches, ['crypto']);
+    m.tab('market-tab-domestic');
+    assert.deepEqual(m.slides(), [1, 2, 0]);
+    assert.deepEqual(m.rows(), ['domestic_stock-1', 'domestic_stock-2'], 'a cached market shows at once');
+    assert.equal(m.errors().length, 0);
+  });
 });

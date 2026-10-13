@@ -75,7 +75,11 @@ function segmented(platform = 'android') {
 
 describe('SegmentedControl', () => {
   const options = [{ key: 'a', label: '국내주식', testID: 'seg-a' }, { key: 'b', label: '미국주식', testID: 'seg-b' }, { key: 'c', label: '암호화폐', testID: 'seg-c' }];
-  it('keeps the pill and the selected label in sync with the caller, sliding on the shared motion', (t) => {
+  const track = (renderer: any, width: number) => act(() => renderer.root.findAll((n: any) => n.props.testID === 'seg' && typeof n.type === 'string')[0]
+    .props.onLayout({ nativeEvent: { layout: { width } } }));
+  it('keeps the pill and the selected label in sync with the caller, sliding on one native spring', (t) => {
+    let now = 1000;
+    t.mock.method(performance, 'now', () => now);
     const { h, Segmented, module } = segmented();
     const changes: string[] = [];
     const render = (value: string) => React.createElement(Segmented, { testID: 'seg', value, options, onChange: (key: string) => changes.push(key) });
@@ -91,21 +95,98 @@ describe('SegmentedControl', () => {
     act(() => node('seg-b').props.onPress());
     assert.deepEqual(changes, ['b']);
     assert.equal(node('seg-a').props.accessibilityState.selected, true, 'the caller owns the value');
-    act(() => renderer.root.findAll((n: any) => n.props.testID === 'seg' && typeof n.type === 'string')[0].props.onLayout({ nativeEvent: { layout: { width: 306 } } }));
+    track(renderer, 306);
     const pill = () => renderer.root.findAll((n: any) => n.props.testID === 'seg-indicator')[0];
+    const translate = () => flatten(pill().props.style).transform[0].translateX;
     assert.equal(flatten(pill().props.style).width, 100);
     assert.equal(h.animations.length, 0, 'mount does not animate');
-    act(() => renderer.update(render('c')));
+    const measured = translate();
     act(() => renderer.update(render('b')));
+    now += 40;
+    act(() => renderer.update(render('c')));
     const [first, second] = h.animations;
-    assert.deepEqual([first.options.toValue, second.options.toValue], [2, 1]);
-    assert.equal(first.options.duration, module.selectionMotion.duration);
-    assert.equal(first.value.animation === first, false, 'a rapid second change continues from the current point');
-    assert.deepEqual(flatten(pill().props.style).transform[0].translateX.outputRange, [0, 300]);
+    assert.deepEqual([first.type, second.type], ['spring', 'spring']);
+    assert.deepEqual([first.options.toValue, second.options.toValue], [1, 2]);
+    const { stiffness, damping, mass, push } = module.selectionMotion;
+    assert.equal(damping, 2 * Math.sqrt(stiffness * mass), 'critically damped: no bounce');
+    assert.deepEqual([first.options.stiffness, first.options.damping, first.options.mass], [stiffness, damping, mass]);
+    assert.equal(first.options.overshootClamping, true);
+    assert.equal(first.options.useNativeDriver, true); assert.equal(first.options.isInteraction, false);
+    assert.equal(first.options.velocity, push, 'a light push toward the next segment');
+    assert.equal(first.value.animation === first, false, 'a rapid second change stops the first run');
+    // The second run leaves from the first run's point with its momentum: no stall.
+    const run = module.selectionState({ from: 0, to: 1, velocity: push, at: 0 }, 0.04);
+    assert.equal(second.options.velocity, module.selectionLaunchVelocity(run.position, run.velocity, 2));
+    assert.equal(second.options.velocity > push * (2 - run.position), true, 'faster than a fresh start');
+    assert.equal(translate() === measured, true, 're-renders keep one native interpolation node');
+    assert.deepEqual(translate().outputRange, [0, 300]);
     h.finish();
-    assert.equal(second.value.value, 1);
-    assert.equal(node('seg-b').props.accessibilityState.selected, true);
-    assert.equal(module.selectionEasing(0.22) > 0.5 && module.selectionEasing(0.67) > 0.95, true, 'reference: ~50% then ~96%');
+    assert.equal(second.value.value, 2);
+    assert.equal(node('seg-c').props.accessibilityState.selected, true);
+  });
+
+  it('reverses mid-slide from its momentum without passing the new target', (t) => {
+    let now = 1000;
+    t.mock.method(performance, 'now', () => now);
+    const { h, Segmented, module } = segmented();
+    const render = (value: string) => React.createElement(Segmented, { testID: 'seg', value, options, onChange() {} });
+    const renderer = h.render(render('a'));
+    t.after(() => act(() => renderer.unmount()));
+    act(() => renderer.update(render('c')));
+    now += 40;
+    act(() => renderer.update(render('a')));
+    const [, back] = h.animations;
+    assert.equal(back.options.toValue, 0);
+    const from = module.selectionState({ from: 0, to: 2, velocity: module.selectionMotion.push * 2, at: 0 }, 0.04);
+    const reversal = { from: from.position, to: 0, velocity: back.options.velocity, at: 0 };
+    let farthest = from.position, nearest = Infinity;
+    for (let ms = 0; ms <= 400; ms += 4) {
+      const { position } = module.selectionState(reversal, ms / 1000);
+      farthest = Math.max(farthest, position); nearest = Math.min(nearest, position);
+    }
+    assert.equal(farthest - from.position < 0.05, true, `momentum carries it on only briefly (${farthest - from.position})`);
+    assert.equal(nearest >= 0, true, 'never past the new target');
+    assert.equal(module.selectionState(reversal, 0.25).position < 0.05 * from.position, true, 'arrives within 250ms');
+  });
+
+  it('starts at once, settles in about 170ms and never overshoots for any momentum', () => {
+    const { module } = segmented();
+    const at = (ms: number) => module.selectionState({ from: 0, to: 1, velocity: module.selectionMotion.push, at: 0 }, ms / 1000).position;
+    assert.equal(at(1000 / 60) > 0.1 && at(1000 / 60) < 0.3, true, 'the first 60Hz frame moves, without the old one-frame jump');
+    assert.equal(at(167) >= 0.94 && at(250) >= 0.99, true);
+    for (let ms = 4; ms <= 500; ms += 4) assert.equal(at(ms) >= at(ms - 4) && at(ms) <= 1, true, `monotonic at ${ms}ms`);
+    let worst = 0;
+    for (let position = -2; position <= 2; position += 0.25) {
+      for (let velocity = -80; velocity <= 80; velocity += 5) {
+        for (const to of [0, 1, 2]) {
+          if (position === to) continue;
+          const run = { from: position, to, velocity: module.selectionLaunchVelocity(position, velocity, to), at: 0 };
+          for (let ms = 0; ms <= 600; ms += 3) worst = Math.max(worst, (module.selectionState(run, ms / 1000).position - to) * Math.sign(to - position));
+        }
+      }
+    }
+    assert.equal(worst <= 1e-9, true, `overshoot ${worst}`);
+  });
+
+  it('a refused choice never moves the pill; unmounting mid-slide stops it and a remount lands on the value', (t) => {
+    const { h, Segmented } = segmented();
+    // A guarded caller (learning lock) ignores the request.
+    const render = (value: string) => React.createElement(Segmented, { testID: 'seg', value, options, onChange() {} });
+    let renderer = h.render(render('a'));
+    const node = (id: string) => renderer.root.findAll((n: any) => n.props.testID === id && n.type === 'Pressable')[0];
+    act(() => node('seg-b').props.onPress());
+    assert.equal(h.animations.length, 0);
+    assert.equal(node('seg-a').props.accessibilityState.selected, true);
+    act(() => renderer.update(render('b')));
+    const [slide] = h.animations;
+    act(() => renderer.unmount());
+    assert.equal(slide.value.animation === null, true, 'no run outlives its control');
+    renderer = h.render(render('c'));
+    t.after(() => act(() => renderer.unmount()));
+    track(renderer, 306);
+    assert.equal(h.animations.length, 1, 'a remount lands without a slide');
+    const pill = renderer.root.findAll((n: any) => n.props.testID === 'seg-indicator')[0];
+    assert.equal(flatten(pill.props.style).transform[0].translateX.value.value, 2);
   });
 
   it('Reduced Motion jumps; disabled options refuse input; compact keeps a 44dp target', (t) => {

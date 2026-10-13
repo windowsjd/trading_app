@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Platform, StyleSheet, Text, View, type StyleProp, type ViewStyle } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { useAppearance } from '../../theme/appearance';
@@ -6,15 +6,82 @@ import { useReducedMotion } from '../../theme/useReducedMotion';
 import ActionPressable from './ActionPressable';
 
 /**
- * Reference video 2: the pill covers half its travel in the first frame and
- * settles in ~130ms. Ease-out cubic over 140ms measured 47/81/96% at
- * 33/67/100ms on web (reference 50/82/96%). Shared with the 매수/매도
- * segment so every selection moves alike.
+ * The selection slide is a critically damped spring, shared with the 매수/매도
+ * segment. Android replays a native `timing` from a 60fps table without
+ * interpolation (uneven steps at 90/120Hz) and skips ahead after a busy frame;
+ * a native spring is integrated on the device's own frame clock and resumes
+ * after a dropped frame. A light push starts it on the first frame without the
+ * old jump: 20/37/64/80/94% at 17/33/67/100/167ms, never past the target.
  */
-export const selectionMotion = { duration: 140 } as const;
-/** Ease-out cubic (identical to Easing.out(Easing.cubic)). */
-export const selectionEasing = (progress: number) => 1 - (1 - progress) ** 3;
+export const selectionMotion = { stiffness: 576, damping: 48, mass: 1, push: 12 } as const;
+const OMEGA = Math.sqrt(selectionMotion.stiffness / selectionMotion.mass);
 const INSET = 3;
+
+/** One launched slide, in segment units and units per second. */
+export type SelectionRun = { from: number; to: number; velocity: number; at: number };
+
+/** Where a launched slide is after `seconds` (the spring's closed form). */
+export function selectionState(run: SelectionRun, seconds: number) {
+  const t = Math.max(0, seconds);
+  const decay = Math.exp(-OMEGA * t);
+  const distance = run.to - run.from;
+  return {
+    position: run.to - decay * (distance + (OMEGA * distance - run.velocity) * t),
+    velocity: decay * (run.velocity * (1 - OMEGA * t) + OMEGA * OMEGA * distance * t),
+  };
+}
+
+/**
+ * Launch speed toward `to`: the current momentum plus the push, capped so a
+ * critically damped spring cannot pass the target (or swing far away from it).
+ */
+export function selectionLaunchVelocity(position: number, velocity: number, to: number) {
+  const distance = to - position;
+  const limit = OMEGA * Math.abs(distance);
+  return Math.min(limit, Math.max(-limit, velocity + selectionMotion.push * distance));
+}
+
+/**
+ * The indicator follows `position`. Mount, an unchanged position and Reduced
+ * Motion land directly; a change mid-slide starts from the current point with
+ * its current velocity, so a rapid second tap neither stalls nor jumps back.
+ */
+export function useSelectionMotion(position: number, reduced: boolean) {
+  const progress = useRef(new Animated.Value(position)).current;
+  const shown = useRef(position);
+  const run = useRef<SelectionRun | null>(null);
+  useEffect(() => {
+    const from = shown.current;
+    shown.current = position;
+    if (reduced || from === position) {
+      run.current = null;
+      progress.setValue(position);
+      return;
+    }
+    // Monotonic: a wall-clock step must not invent momentum.
+    const at = performance.now();
+    // A long-finished run has settled at its target with no velocity.
+    const current = run.current ? selectionState(run.current, (at - run.current.at) / 1000) : { position: from, velocity: 0 };
+    const velocity = selectionLaunchVelocity(current.position, current.velocity, position);
+    run.current = { from: current.position, to: position, velocity, at };
+    const animation = Animated.spring(progress, {
+      toValue: position,
+      stiffness: selectionMotion.stiffness,
+      damping: selectionMotion.damping,
+      mass: selectionMotion.mass,
+      velocity,
+      overshootClamping: true,
+      // Segment units: about 0.2pt and 2pt/s on a phone-width segment.
+      restDisplacementThreshold: 0.002,
+      restSpeedThreshold: 0.02,
+      useNativeDriver: Platform.OS !== 'web',
+      isInteraction: false,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [position, progress, reduced]);
+  return progress;
+}
 
 export type SegmentOption<K extends string> = {
   key: K;
@@ -47,29 +114,16 @@ export default function SegmentedControl<K extends string>({ options, value, onC
   const { mode } = useAppearance();
   const [trackWidth, setTrackWidth] = useState(0);
   const index = Math.max(0, options.findIndex(option => option.key === value));
-  const progress = useRef(new Animated.Value(index)).current;
-  const shown = useRef(index);
-  useEffect(() => {
-    // Only an actual change moves; mount and a resolved motion preference land directly.
-    const changed = shown.current !== index;
-    shown.current = index;
-    if (reduced || !changed) {
-      progress.setValue(index);
-      return;
-    }
-    const animation = Animated.timing(progress, {
-      toValue: index,
-      duration: selectionMotion.duration,
-      easing: selectionEasing,
-      useNativeDriver: Platform.OS !== 'web',
-      isInteraction: false,
-    });
-    animation.start();
-    return () => animation.stop();
-  }, [index, progress, reduced]);
+  const progress = useSelectionMotion(index, reduced);
 
   const count = Math.max(options.length, 1);
   const thumbWidth = Math.max(0, (trackWidth - INSET * 2) / count);
+  // One node per geometry: a parent re-render (live prices) mid-slide must not
+  // rebuild the native animated graph.
+  const translateX = useMemo(
+    () => progress.interpolate({ inputRange: [0, count], outputRange: [0, thumbWidth * count] }),
+    [count, progress, thumbWidth],
+  );
   const thumbColor = mode === 'dark' ? semantic.border : semantic.surface;
   return (
     <View testID={testID} accessibilityRole="tablist" accessibilityLabel={accessibilityLabel} style={[styles.track, style]}
@@ -80,7 +134,7 @@ export default function SegmentedControl<K extends string>({ options, value, onC
       {thumbWidth > 0 ? (
         <Animated.View pointerEvents="none" testID={testID ? `${testID}-indicator` : undefined} style={[styles.thumb, {
           width: thumbWidth,
-          transform: [{ translateX: progress.interpolate({ inputRange: [0, count], outputRange: [0, thumbWidth * count] }) }],
+          transform: [{ translateX }],
         }]}>
           <View style={[styles.thumbFill, { backgroundColor: thumbColor }]} />
         </Animated.View>

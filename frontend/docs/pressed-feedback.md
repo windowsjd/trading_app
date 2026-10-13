@@ -5,6 +5,46 @@
 시작색, 흰 foreground, 수평 방향, 버튼 geometry와 press feedback은 유지한다.
 하단 탭은 시작색 `#326FE5`를 계속 사용하며 Secondary/금융색 정책은 변경하지 않는다.
 
+## 2026-10-13 모바일 선택 이동·터치 피드백 보완
+
+증상: Web은 부드럽지만 모바일에서 세그먼트 이동·터치 반응이 뻑뻑함. 시작 `main` = `origin/main` = `cf21e688`.
+
+확인한 원인 (RN 0.83 소스 기준)
+- Android의 native `Animated.timing`은 JS가 60fps로 미리 계산한 프레임 표에서 `Math.round(경과ms/16.67)` 프레임을
+  골라 쓰고 보간하지 않는다(`FrameBasedAnimationDriver`). 90/120Hz에서는 같은 값이 2~3프레임 반복되고
+  (140ms ease-out cubic 모델: 120Hz `0·0·33·58·58·58·76·76%`), UI 스레드가 막힌 뒤에는 시간 기준으로 건너뛴다.
+  iOS는 프레임 사이를 선형 보간하고 Web은 rAF마다 곡선을 계산한다. native spring은 두 플랫폼 모두 실제 프레임
+  시간으로 적분하고, 한 프레임이 64ms를 넘게 막혀도 그만큼만 진행한다.
+- Market: 처음 조회하는 시장은 화면 전체를 `FullPageLoading`으로 교체해 세그먼트가 언마운트됐다
+  (HEAD Web 실측: 지시자 37프레임 소실 후 630ms에 목적지에 나타남, 이동 없음).
+- `useReducedMotion`이 컴포넌트마다 native 비동기 조회·구독을 하고 첫 렌더는 `true`라, 목록 행·버튼이 마운트마다
+  두 번 렌더되고 갓 마운트된 컨트롤의 첫 터치는 정지 tint였다.
+- 렌더마다 `interpolate()`로 새 Animated 노드를 만들어 시세 갱신·press마다 native graph를 다시 연결했다.
+- 매수/매도 세그먼트는 기본 잉크 물결이 움직이는 색 thumb 위에 겹쳤다.
+- 아닌 것: Fabric의 `measure`는 JSI로 동기 호출된다(행 잉크 지연 없음). 매수/매도 폼 페이드와 thumb 시작은
+  같은 JS task에서 flush된다.
+
+정책
+- 선택 이동(`useSelectionMotion`, SegmentedControl·OrderSideSegment 공유): 임계감쇠 spring(stiffness 576,
+  damping 48, mass 1), 출발 push 12 segment/s, overshootClamping. 17/33/67/100/167/250ms에 20/37/64/80/94/99%.
+  연속 선택은 native 현재 위치에서 현재 속도(닫힌 해, monotonic `performance.now`)를 이어 받고, 목표를 넘지 않게
+  속도 상한(ω·거리)을 둔다. 라벨은 즉시 전환(매수/매도는 thumb 시계의 cross-fade 유지). Reduced Motion은 즉시 이동.
+- 매수/매도: `feedback="selection"` 정적 tint. 폼 remount·초기화 시점과 0.35→1 180ms 페이드는 그대로.
+- 일반 버튼·행: 수치(0.97, 90/150ms, 잉크 240/130ms)와 이벤트 시점 불변. scale·잉크 opacity 노드는 고정.
+- Market: 시장/상품 세그먼트·검색·정렬 header는 유지하고 로딩(고래+기존 문구)/오류(재시도)/빈 목록은 목록 영역에
+  표시한다. 목록은 선택한 시장 query key의 data만 쓰므로 다른 시장 행이 남지 않는다. 실시간 구독은 보이는 행만.
+- `useReducedMotion`: 앱 전체 1회 조회·1구독(`useSyncExternalStore`), 이후 마운트는 알려진 값으로 첫 렌더.
+  미확인·조회 실패는 계속 reduced.
+
+검증: frontend 전체 `npm test`, typecheck, lint 두 종. 새 테스트(spring/속도 승계/역방향/무overshoot,
+거부된 선택·언마운트, Market 첫 방문·연속 전환·늦은 응답·오류 재시도, 공유 OS 설정, 고정 노드)는 HEAD 소스에서
+실패함을 확인했다. RN-Web(HEAD 대비): Market 첫 방문 지시자 소실 37→0프레임, 역방향 최대 프레임 이동 62→40px,
+매수/매도 25→18px, Reduced Motion 중간 프레임 0. Market 상태 72화면(320/360/390/430 × 글꼴 1/1.5/2 ×
+라이트/다크 × 로딩/오류/빈 목록) 잘림·겹침·가로 스크롤 0, 탭 높이 ≥44. Web 수치는 native 프레임 시간이 아니다.
+
+NOT_RUN: Android/iOS 실기기·에뮬레이터(adb/emulator/xcrun 없음). 90/120Hz 기기에서 Market·매수/매도 전환과
+연속 탭, 무거운 폼 remount 중 끊김, iOS에서 중단 직후 1프레임 되돌림 여부를 같은 기기로 HEAD와 비교해야 한다.
+
 ## 2026-10-12 가이드 매수 실습 버튼 정책 변경
 
 사용자 확정 요구로 아래 2026-10-04 '제외: 방향별 금융 연습' 중 **가이드 체험의 매수 주문 버튼**은 일반 Primary
