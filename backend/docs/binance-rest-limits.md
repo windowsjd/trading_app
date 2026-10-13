@@ -40,6 +40,11 @@ unknown routes reserve 80.
 Futures `/fapi/v1/klines` follows the official LIMIT tiers: below 100 = 1,
 100..499 = 2, 500..1000 = 5, 1001..1500 = 10; omitted LIMIT defaults to 500.
 Invalid or duplicate LIMIT parameters retain the conservative weight 80.
+Long-range 4h upkeep (2026-10-13) uses Spot `/api/v3/klines` interval `4h`
+(≤ 1000 rows, weight 2) and USDⓈ-M `/fapi/v1/klines` interval `4h` (499-row
+backfill pages = 2, upkeep `limit<100` = 1), strictly sequentially with
+≥ 150 ms between its own calls so Futures Last/Mark recovery keeps a slot
+([long-range-4h-candles.md](long-range-4h-candles.md)).
 This conservative budget is preventive, not a declaration of Binance's actual
 IP capacity. `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE` can set 20..600; it must be
 identical across instances. Observed used weight can exhaust the local budget

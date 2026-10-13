@@ -70,6 +70,51 @@ describe('MarketCandleRetentionService', () => {
     ).resolves.toMatchObject({ deletedCount: 1, batchCount: 1 });
   });
 
+  it('prunes the long-range 4h history with its own 180-day cutoff after the 5m prune', async () => {
+    const repository = {
+      deleteClosedBeforeBatch: jest.fn(
+        (params: { interval: string; cutoff: Date }) =>
+          Promise.resolve(params.interval === '4h' ? 3 : 0),
+      ),
+    };
+    const futures = {
+      deleteClosedBeforeBatch: jest.fn().mockResolvedValue(2),
+    };
+    const service = new MarketCandleRetentionService(
+      repository as unknown as MarketCandlesRepository,
+      { retentionDays: 35, batchSize: 5000, maxBatches: 1000 },
+      jest.fn().mockResolvedValue(undefined),
+      futures,
+    );
+    const result = await service.run({ now });
+    expect(result.cutoff).toEqual(new Date('2026-06-06T00:00:00.000Z'));
+    expect(result.deletedCount).toBe(0);
+    expect(result.fourHour).toEqual({
+      cutoff: new Date('2026-01-12T00:00:00.000Z'),
+      retentionDays: 180,
+      deletedCount: 3,
+      batchCount: 1,
+    });
+    expect(result.futuresFourHour).toMatchObject({ deletedCount: 2 });
+    const intervals = repository.deleteClosedBeforeBatch.mock.calls.map(
+      (call) => call[0].interval,
+    );
+    // 1d/1w are never pruned; 5m keeps its own 35-day cutoff.
+    expect(intervals).toEqual(['5m', '4h']);
+    expect(futures.deleteClosedBeforeBatch).toHaveBeenCalledWith({
+      cutoff: new Date('2026-01-12T00:00:00.000Z'),
+      interval: '4h',
+      limit: 5000,
+    });
+  });
+
+  it('refuses a 4h retention shorter than the 96-session KRX window', async () => {
+    const { service } = create([0]);
+    await expect(
+      service.run({ now, fourHourRetentionDays: 120 }),
+    ).rejects.toThrow('4h retention must be an integer of at least 150 days.');
+  });
+
   it('stops before another batch when the Ops lock is lost', async () => {
     let owned = true;
     const { service } = create([2, 1]);

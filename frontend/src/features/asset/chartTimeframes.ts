@@ -10,10 +10,15 @@
 //   - '30d'        = rolling 30 days → now
 //   - '1y'         = rolling 365 days → now (Binance max window; KIS returns
 //                    whatever its retention allows)
+//   - '96d'        = long-range 4h window (4h only, KRX stocks and crypto):
+//                    KRX = the 96 most recent completed sessions + today,
+//                    crypto = rolling 96 × 24h → now
 //
-// 15m/30m/1h/4h are aggregated by the backend from the stored 5m feed (35-day
+// 15m/30m/1h are aggregated by the backend from the stored 5m feed (35-day
 // retention), so their windows are bounded by that retention, not by a
-// provider page size.
+// provider page size. The 4h tab of KRX stocks and crypto reads the stored
+// COMPLETED 4h history (180-day retention) plus the live 5m-aggregated recent
+// buckets; US stocks keep the 30-day 4h window.
 //
 // 1m was removed from the chart on purpose: KIS same-day minute data is capped
 // at 30 rows, which cannot draw a meaningful 1m chart. The backend still
@@ -28,7 +33,8 @@ export type AssetCandleRange =
   | 'prev_open'
   | 'prev2_open'
   | '1y'
-  | 'season';
+  | 'season'
+  | '96d';
 
 export type AssetCandleInterval =
   | '5m'
@@ -70,3 +76,34 @@ export const ASSET_CHART_TIMEFRAMES: AssetChartTimeframe[] = [
 ];
 
 export const DEFAULT_ASSET_CHART_TIMEFRAME = ASSET_CHART_TIMEFRAMES[0];
+
+// KRX: ≤ 96 sessions × 2 + today's 2 = 194; crypto: 96 × 6 = 576 closed + the
+// current bucket = 577. One limit covers both and stays under the 1000 cap.
+export const LONG_RANGE_FOUR_HOUR_TIMEFRAME: AssetChartTimeframe = {
+  label: '4h',
+  interval: '4h',
+  range: '96d',
+  limit: 600,
+};
+
+const LONG_RANGE_ASSET_TYPES: ReadonlySet<string> = new Set([
+  'domestic_stock',
+  'crypto',
+]);
+
+/**
+ * The request window for a selected tab. Only the 4h tab differs by market:
+ * KRX stocks and crypto use the long-range window, US stocks keep the 30-day
+ * window unchanged. Returns null while the asset type is still unknown so the
+ * caller waits instead of fetching (and caching) the wrong window.
+ */
+export function resolveAssetChartTimeframe(
+  timeframe: AssetChartTimeframe,
+  assetType: string | null | undefined,
+): AssetChartTimeframe | null {
+  if (timeframe.interval !== '4h') return timeframe;
+  if (!assetType) return null;
+  return LONG_RANGE_ASSET_TYPES.has(assetType)
+    ? LONG_RANGE_FOUR_HOUR_TIMEFRAME
+    : timeframe;
+}

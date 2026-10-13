@@ -16,6 +16,8 @@ jest.mock('../generated/prisma/client', () => ({
     market_candle_retention: 'market_candle_retention',
     market_candle_sync: 'market_candle_sync',
     market_candle_reconciliation: 'market_candle_reconciliation',
+    market_candle_long_sync: 'market_candle_long_sync',
+    futures_candle_sync: 'futures_candle_sync',
     limit_order_matcher: 'limit_order_matcher',
     limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
     limit_order_matching: 'limit_order_matching',
@@ -49,6 +51,12 @@ jest.mock('../generated/prisma/client', () => ({
   },
 }));
 
+jest.mock('../assets/market-candle-long-sync.service', () => ({
+  MarketCandleLongSyncService: class MarketCandleLongSyncService {},
+  LongCandleSyncInputError: class LongCandleSyncInputError extends Error {},
+  MARKET_CANDLE_LONG_SYNC_LOCK_KEY: 'market_candle_long_sync',
+  FUTURES_CANDLE_SYNC_LOCK_KEY: 'futures_candle_sync',
+}));
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
 }));
@@ -186,6 +194,11 @@ describe('OpsJobRunnerService', () => {
       reconcile: jest.fn(),
     };
     const limitOrderMatchingService = { matchDueLimitOrders: jest.fn() };
+    const marketCandleLongSyncService = {
+      syncSpot: jest.fn(),
+      syncKrx: jest.fn(),
+      syncFutures: jest.fn(),
+    };
     const prisma = {
       tradingAccount: {
         findFirst: jest.fn().mockResolvedValue({ id: 'account-1' }),
@@ -249,7 +262,9 @@ describe('OpsJobRunnerService', () => {
         generalDailySnapshotJobService as never,
         marketCandleReconciliationService as never,
         limitOrderMatchingService as never,
+        marketCandleLongSyncService as never,
       ),
+      marketCandleLongSyncService,
     };
   };
 
@@ -961,6 +976,109 @@ describe('OpsJobRunnerService', () => {
     },
   );
 
+  const longSummary = (market: string, failed = 0) => ({
+    market,
+    mode: 'incremental',
+    dryRun: false,
+    window: { from: null, to: null, unit: 'days', size: 2 },
+    startedAt: '2026-10-13T08:00:00.000Z',
+    finishedAt: '2026-10-13T08:00:01.000Z',
+    series: [],
+    totals: {
+      series: 1,
+      rowsWritten: 2,
+      providerCalls: 1,
+      held: 1,
+      pending: 0,
+      failed,
+    },
+    stopReason: null,
+  });
+
+  it('runs the long-range 4h job under its shared lock and keeps held KRX sessions a data outcome', async () => {
+    const f = createService();
+    f.lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_long_sync',
+      ownerId: 'owner',
+      expiresAt: new Date('2026-10-13T08:10:00.000Z'),
+    });
+    f.runService.createRunning.mockResolvedValueOnce({
+      id: 'long-run',
+      startedAt,
+    });
+    f.runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_long_sync,
+      }),
+    });
+    f.marketCandleLongSyncService.syncSpot.mockResolvedValueOnce(
+      longSummary('spot'),
+    );
+    f.marketCandleLongSyncService.syncKrx.mockResolvedValueOnce(
+      longSummary('krx'),
+    );
+
+    await f.service.runMarketCandleLongSyncJob({
+      trigger: OpsJobTrigger.test,
+      now: '2026-10-13T08:00:00.000Z',
+    });
+
+    expect(f.lockService.acquireLock).toHaveBeenCalledWith(
+      expect.objectContaining({ lockKey: 'market_candle_long_sync' }),
+    );
+    expect(f.marketCandleLongSyncService.syncSpot).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'incremental', dryRun: false }),
+    );
+    expect(f.marketCandleLongSyncService.syncFutures).not.toHaveBeenCalled();
+    const [, recorded] = f.runService.recordSucceeded.mock
+      .calls[0] as unknown as [
+      unknown,
+      { resultJson: Record<string, { market: string }> },
+    ];
+    expect(Object.keys(recorded.resultJson)).toEqual(['spot', 'krx']);
+    expect(recorded.resultJson.krx.market).toBe('krx');
+  });
+
+  it('records the futures candle job as failed when an instrument failed', async () => {
+    const f = createService();
+    f.lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'futures_candle_sync',
+      ownerId: 'owner',
+      expiresAt: new Date('2026-10-13T08:10:00.000Z'),
+    });
+    f.runService.createRunning.mockResolvedValueOnce({
+      id: 'futures-run',
+      startedAt,
+    });
+    f.runService.recordFailed.mockResolvedValueOnce({
+      serialized: serializedRun({ jobName: OpsJobName.futures_candle_sync }),
+    });
+    f.marketCandleLongSyncService.syncFutures.mockResolvedValueOnce(
+      longSummary('futures', 1),
+    );
+
+    await f.service
+      .runFuturesCandleSyncJob({ trigger: OpsJobTrigger.test })
+      .catch(() => undefined);
+
+    expect(f.marketCandleLongSyncService.syncSpot).not.toHaveBeenCalled();
+    expect(f.runService.recordFailed).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ errorCode: 'FUTURES_CANDLE_SYNC_FAILED' }),
+    );
+  });
+
+  it('rejects an unknown long-range market before any provider work', async () => {
+    const f = createService();
+    await expect(
+      f.service.runMarketCandleLongSyncJob({ markets: ['us'] }),
+    ).rejects.toBeDefined();
+    expect(f.lockService.acquireLock).not.toHaveBeenCalled();
+    expect(f.marketCandleLongSyncService.syncKrx).not.toHaveBeenCalled();
+  });
+
   it('runs retention through the shared lock/run path and records its result', async () => {
     const { lockService, runService, marketCandleRetentionService, service } =
       createService();
@@ -979,6 +1097,13 @@ describe('OpsJobRunnerService', () => {
       retentionDays: 35,
       deletedCount: 12,
       batchCount: 2,
+      fourHour: {
+        cutoff: new Date('2026-01-12T00:00:00.000Z'),
+        retentionDays: 180,
+        deletedCount: 4,
+        batchCount: 1,
+      },
+      futuresFourHour: null,
       startedAt: new Date('2026-07-11T00:00:00.000Z'),
       finishedAt: new Date('2026-07-11T00:00:01.000Z'),
     });
@@ -1002,6 +1127,13 @@ describe('OpsJobRunnerService', () => {
           cutoff: '2026-06-06T00:00:00.000Z',
           deletedCount: 12,
           batchCount: 2,
+          fourHour: {
+            cutoff: '2026-01-12T00:00:00.000Z',
+            retentionDays: 180,
+            deletedCount: 4,
+            batchCount: 1,
+          },
+          futuresFourHour: null,
         }),
       }),
     );

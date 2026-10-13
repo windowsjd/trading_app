@@ -403,6 +403,7 @@ export const ModelName = {
   MarketCandleSyncState: 'MarketCandleSyncState',
   MarketSessionOverride: 'MarketSessionOverride',
   FuturesInstrument: 'FuturesInstrument',
+  FuturesMarketCandle: 'FuturesMarketCandle',
   FuturesPosition: 'FuturesPosition',
   FuturesExecution: 'FuturesExecution',
   FuturesExecuteRequest: 'FuturesExecuteRequest',
@@ -457,7 +458,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "conditionalSellOrder" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "conditionalSellOrder" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1864,6 +1865,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.FuturesInstrumentCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.FuturesInstrumentCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesMarketCandle: {
+      payload: Prisma.$FuturesMarketCandlePayload<ExtArgs>
+      fields: Prisma.FuturesMarketCandleFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesMarketCandleFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesMarketCandleFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesMarketCandleFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesMarketCandleFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>
+        }
+        findMany: {
+          args: Prisma.FuturesMarketCandleFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>[]
+        }
+        create: {
+          args: Prisma.FuturesMarketCandleCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>
+        }
+        createMany: {
+          args: Prisma.FuturesMarketCandleCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesMarketCandleCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesMarketCandleDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>
+        }
+        update: {
+          args: Prisma.FuturesMarketCandleUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesMarketCandleDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesMarketCandleUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesMarketCandleUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesMarketCandleUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesMarketCandlePayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesMarketCandleAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesMarketCandle>
+        }
+        groupBy: {
+          args: Prisma.FuturesMarketCandleGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesMarketCandleGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesMarketCandleCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesMarketCandleCountAggregateOutputType> | number
         }
       }
     }
@@ -5149,6 +5224,29 @@ export const FuturesInstrumentScalarFieldEnum = {
 export type FuturesInstrumentScalarFieldEnum = (typeof FuturesInstrumentScalarFieldEnum)[keyof typeof FuturesInstrumentScalarFieldEnum]
 
 
+export const FuturesMarketCandleScalarFieldEnum = {
+  id: 'id',
+  futuresInstrumentId: 'futuresInstrumentId',
+  interval: 'interval',
+  contractSymbol: 'contractSymbol',
+  openTime: 'openTime',
+  closeTime: 'closeTime',
+  open: 'open',
+  high: 'high',
+  low: 'low',
+  close: 'close',
+  volume: 'volume',
+  amount: 'amount',
+  isClosed: 'isClosed',
+  sourceProvider: 'sourceProvider',
+  sourceUpdatedAt: 'sourceUpdatedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesMarketCandleScalarFieldEnum = (typeof FuturesMarketCandleScalarFieldEnum)[keyof typeof FuturesMarketCandleScalarFieldEnum]
+
+
 export const FuturesPositionScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -7020,6 +7118,7 @@ export type GlobalOmitConfig = {
   marketCandleSyncState?: Prisma.MarketCandleSyncStateOmit
   marketSessionOverride?: Prisma.MarketSessionOverrideOmit
   futuresInstrument?: Prisma.FuturesInstrumentOmit
+  futuresMarketCandle?: Prisma.FuturesMarketCandleOmit
   futuresPosition?: Prisma.FuturesPositionOmit
   futuresExecution?: Prisma.FuturesExecutionOmit
   futuresExecuteRequest?: Prisma.FuturesExecuteRequestOmit

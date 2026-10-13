@@ -1,5 +1,5 @@
 import { conditionalFixture } from '../conditionalFixtures.cjs';
-import { futuresFixture, accounts } from '../futuresFixtures.cjs';
+import { futuresFixture, accounts, futuresCandlesFixture } from '../futuresFixtures.cjs';
 const params = new URLSearchParams(location.search);
 export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED' };
 export const useIsFocused = () => true;
@@ -12,6 +12,8 @@ export const StackActions = { push: (...payload) => ({ type: 'PUSH', payload }),
 export const useTradingAccount = () => ({ accounts, selectedAccountId: state.accountId, isLoading: false });
 export const apiClient = {
   async get(path) {
+    // Contract 4h chart (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
     if(path.endsWith('/protections')) {
       const protection = params.get('protection');
       if(protection==='error') throw new Error('protection fixture unavailable');

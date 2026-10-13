@@ -43,6 +43,24 @@ export type OpsSchedulerConfig = {
     intervalSeconds: number;
     assetIds?: string[];
   };
+  /**
+   * Long-range COMPLETED 4h upkeep (`market_candle_long_sync`): Binance Spot
+   * native 4h and KRX 4h from verified KOSCOM 10-minute history. Opt-in; the
+   * initial backfill is a separate operator command, never automatic.
+   */
+  marketCandleLongSync: {
+    enabled: boolean;
+    intervalSeconds: number;
+    markets: ('spot' | 'krx')[];
+  };
+  /**
+   * USDⓈ-M contract 4h upkeep (`futures_candle_sync`), including the open
+   * (provisional) bucket. Opt-in; Futures Last/Mark ingestion is unaffected.
+   */
+  futuresCandleSync: {
+    enabled: boolean;
+    intervalSeconds: number;
+  };
   marketCandleReconciliation: MarketCandleReconciliationConfig;
   /** Dedicated (non-tick) interval for the limit-order matching job. */
   limitOrderMatchingIntervalMs: number;
@@ -70,6 +88,9 @@ const DEFAULT_KIS_PRICE_INGESTION_MODE: KisPriceIngestionMode =
 const DEFAULT_RETENTION_HOUR = 4;
 const DEFAULT_RETENTION_MINUTE = 0;
 const DEFAULT_MARKET_CANDLE_SYNC_INTERVAL_SECONDS = 600;
+const DEFAULT_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS = 900;
+const DEFAULT_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS = 60;
+const LONG_SYNC_MARKETS = ['spot', 'krx'] as const;
 
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -154,6 +175,33 @@ export function getOpsSchedulerConfig(
   const marketCandleSyncAssetIds = parseOptionalCommaSeparatedEnv(
     env.SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS,
   );
+  const marketCandleLongSyncEnabled = parseStrictBooleanEnv(
+    env.SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED,
+    false,
+    'SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED',
+  );
+  const marketCandleLongSyncIntervalSeconds = parseStrictIntegerEnv(
+    env.SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS,
+    DEFAULT_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS,
+    'SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS',
+    60,
+    86_400,
+  );
+  const marketCandleLongSyncMarkets = parseLongSyncMarkets(
+    env.SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS,
+  );
+  const futuresCandleSyncEnabled = parseStrictBooleanEnv(
+    env.SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED,
+    false,
+    'SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED',
+  );
+  const futuresCandleSyncIntervalSeconds = parseStrictIntegerEnv(
+    env.SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS,
+    DEFAULT_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS,
+    'SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS',
+    30,
+    3_600,
+  );
 
   return {
     enabled:
@@ -167,6 +215,8 @@ export function getOpsSchedulerConfig(
       providerKisEnabled ||
       retentionEnabled ||
       marketCandleSyncEnabled ||
+      marketCandleLongSyncEnabled ||
+      futuresCandleSyncEnabled ||
       marketCandleReconciliation.enabled ||
       limitOrderMatching.matchingEnabled,
     timezone: parseTextEnv(env.SCHEDULER_TIMEZONE, DEFAULT_TIMEZONE),
@@ -206,6 +256,9 @@ export function getOpsSchedulerConfig(
       [OpsJobName.market_candle_sync]: marketCandleSyncEnabled,
       [OpsJobName.market_candle_reconciliation]:
         marketCandleReconciliation.enabled,
+      // Long-range completed 4h upkeep (opt-in, interval-scheduled).
+      [OpsJobName.market_candle_long_sync]: marketCandleLongSyncEnabled,
+      [OpsJobName.futures_candle_sync]: futuresCandleSyncEnabled,
       // Scheduler-driven limit-order matching (paths A/B). Runs on its own
       // dedicated interval, not the shared tick — see OpsSchedulerService.
       [OpsJobName.limit_order_matching]: limitOrderMatching.matchingEnabled,
@@ -246,6 +299,15 @@ export function getOpsSchedulerConfig(
       enabled: marketCandleSyncEnabled,
       intervalSeconds: marketCandleSyncIntervalSeconds,
       assetIds: marketCandleSyncAssetIds,
+    },
+    marketCandleLongSync: {
+      enabled: marketCandleLongSyncEnabled,
+      intervalSeconds: marketCandleLongSyncIntervalSeconds,
+      markets: marketCandleLongSyncMarkets,
+    },
+    futuresCandleSync: {
+      enabled: futuresCandleSyncEnabled,
+      intervalSeconds: futuresCandleSyncIntervalSeconds,
     },
     marketCandleReconciliation,
     limitOrderMatchingIntervalMs: limitOrderMatching.intervalMs,
@@ -390,6 +452,31 @@ function parseTextEnv(value: string | undefined, fallback: string) {
   }
 
   return value.trim();
+}
+
+function parseLongSyncMarkets(value: string | undefined): ('spot' | 'krx')[] {
+  const raw = value?.trim();
+  if (!raw) return [...LONG_SYNC_MARKETS];
+  const markets = [
+    ...new Set(
+      raw
+        .split(',')
+        .map((item) => item.trim().toLowerCase())
+        .filter((item) => item.length > 0),
+    ),
+  ];
+  if (
+    markets.length === 0 ||
+    markets.some(
+      (market) => !(LONG_SYNC_MARKETS as readonly string[]).includes(market),
+    )
+  ) {
+    // @diagnosticSurface internal: Scheduler configuration guard; the message names only the public env key.
+    throw new OpsConfigError(
+      'SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS must be a comma list of spot, krx.',
+    );
+  }
+  return markets as ('spot' | 'krx')[];
 }
 
 function parseOptionalCommaSeparatedEnv(

@@ -189,10 +189,23 @@ against the right edge with empty slots on the left. Prices on the chart use
 
 Timeframe windows (`features/asset/chartTimeframes.ts`): `5m` uses
 `prev_open`, `15m` uses `3d` (limit 288 — the market-open anchor gave stocks
-barely a session and a half), `30m` and `1h` use `14d` (limit 672 / 336), `4h`
-uses `30d` (limit 200), `1d`/`1w` use `1y`. The backend aggregates 15m–4h from its stored
-5m feed (35-day retention); the limits are the crypto 24/7 upper bounds, so
-stocks legitimately return fewer candles. While that stored baseline is still
+barely a session and a half), `30m` and `1h` use `14d` (limit 672 / 336), `1d`/`1w`
+use `1y`. `4h` depends on the market (`resolveAssetChartTimeframe`): KRX stocks
+and crypto use the long-range `96d` window (limit 600 — 96 KRX sessions or 96
+crypto days plus the current bucket), served from the backend's stored completed
+4h history; US stocks keep `30d` (limit 200). The 4h request waits for the asset
+type instead of caching the wrong window. The backend aggregates 15m–1h (and the
+current/recent 4h buckets) from its stored 5m feed (35-day retention); the limits
+are the crypto 24/7 upper bounds, so stocks legitimately return fewer candles.
+
+The Futures screen shows the selected contract's 4h chart
+(`screens/futures/FuturesCandleChart.tsx`) from
+`GET /futures/instruments/:id/candles` — Binance USDⓈ-M contract trade-price
+klines, never the underlying's Spot candles and never Mark. The query key
+`['futuresMarket','candles', instrumentId, '96d', '4h', 600]` holds no trading
+account (market data), the component is keyed by instrument so a contract
+switch never shows the previous contract, and the last bucket is labelled as
+provisional. While that stored baseline is still
 being seeded the API answers `ASSET_CANDLES_BASELINE_NOT_READY` and the detail
 screen shows "차트 데이터를 준비 중입니다." with the existing retry button.
 Every OTHER candle failure now reads as a failure — `describeCandleError`

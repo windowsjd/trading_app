@@ -96,6 +96,41 @@ describe('KOSCOM v3 client', () => {
       s: '005930',
     });
   });
+  it('records the daily quota headers of a successful response without exposing them elsewhere', async () => {
+    const h = harness();
+    expect(h.client.getLastObservedRateLimit()).toBeNull();
+    global.fetch = jest.fn().mockResolvedValue(
+      new Response(
+        '{"jsonrpc":"2.0","result":{"isuSrtCd":"005930","hisLists":[]}}',
+        {
+          headers: {
+            'X-RateLimit-Limit-Day': '50000',
+            'X-RateLimit-Remaining-Day': '33540',
+          },
+        },
+      ),
+    );
+    await h.client.get('/v3/market/realtime/kospi/stocks/005930/intraday', {
+      inddCycleTpCd: '600',
+    });
+    const observed = h.client.getLastObservedRateLimit();
+    expect(observed?.limitDay).toBe(50000);
+    expect(observed?.remainingDay).toBe(33540);
+    global.fetch = jest.fn().mockResolvedValue(
+      new Response(
+        '{"jsonrpc":"2.0","result":{"isuSrtCd":"005930","hisLists":[]}}',
+        {
+          headers: { 'X-RateLimit-Remaining-Day': 'n/a' },
+        },
+      ),
+    );
+    await h.client.get('/v3/market/realtime/kospi/stocks/005930/intraday', {
+      inddCycleTpCd: '60',
+    });
+    // A non-numeric header is not an observation; the last one is kept.
+    expect(h.client.getLastObservedRateLimit()?.remainingDay).toBe(33540);
+  });
+
   it('constructs v3 query authentication and single-flights an identical request', async () => {
     const h = harness();
     global.fetch = jest

@@ -26,6 +26,25 @@ import { KoscomError } from './koscom.config';
 import { KoscomMarketMapService } from './koscom-market-map.service';
 import { koscomTime, koscomDecimal, koscomText } from './koscom-normalizer';
 
+/** One END-labelled KOSCOM 10-minute row: `label` closes [label-10m, label). */
+export type KoscomTenMinuteRow = {
+  label: Date;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume: string;
+  amount: string;
+};
+
+export type KoscomTenMinuteSessionPage = {
+  rows: KoscomTenMinuteRow[];
+  /** Rows whose time/OHLCV could not be parsed (the caller holds the day). */
+  invalidRows: number;
+  providerReturnedRows: number;
+  receivedAt: Date;
+};
+
 /** Translate at the provider boundary; retain existing calendar/Decimal builders. */
 @Injectable()
 export class KoscomCandleAdapter {
@@ -239,6 +258,97 @@ export class KoscomCandleAdapter {
       stopReason,
       oldestOpenTime: ordered.length ? new Date(ordered[0][0]) : null,
       latestOpenTime: ordered.length ? new Date(ordered.at(-1)![0]) : null,
+    };
+  }
+
+  /**
+   * One KRX session of KOSCOM 10-minute history (`inddCycleTpCd=600`).
+   *
+   * Live-verified 2026-10-13 (docs/investigations/2026-10-13-koscom-10m-date-quota):
+   * one request returns the whole regular session (39 rows, 09:10…15:20 plus
+   * the 15:30 closing-auction row), also 96–97 sessions back. Rows carry no
+   * date and a holiday request returned the PREVIOUS session unchanged, so this
+   * method only translates the response: the caller must ask for calendar
+   * sessions only and must verify the rows against the dated daily bar before
+   * trusting them. Row-level parse failures are counted, never repaired.
+   */
+  async fetchDomesticTenMinuteSession(input: {
+    asset: { symbol: string; marketCode: string };
+    /** Exchange-local trading date, YYYYMMDD. */
+    date: string;
+    /** Exchange-local session bounds, HHmm. */
+    openHHmm: string;
+    closeHHmm: string;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  }): Promise<KoscomTenMinuteSessionPage> {
+    if (
+      !/^\d{8}$/.test(input.date) ||
+      !/^\d{4}$/.test(input.openHHmm) ||
+      !/^\d{4}$/.test(input.closeHHmm) ||
+      input.openHHmm >= input.closeHHmm
+    )
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_INVALID_DATE_RANGE',
+      );
+    const bounded = createBoundedAbortSignal(
+      input.signal,
+      input.timeoutMs ?? 15000,
+    );
+    let response: KoscomResponse;
+    try {
+      const market = await this.markets.resolve(
+        input.asset.symbol,
+        input.asset.marketCode === 'J' ? 'KRX' : input.asset.marketCode,
+        bounded.signal,
+      );
+      response = await this.client.get(
+        `/v3/market/realtime/${market}/stocks/${input.asset.symbol}/intraday`,
+        {
+          inddCycleTpCd: '600',
+          inqStrtDd: input.date,
+          strtTm: input.openHHmm,
+          endTm: input.closeHHmm,
+        },
+        bounded.signal,
+      );
+    } finally {
+      bounded.clear();
+    }
+    const result = response.result;
+    if (
+      result.isuSrtCd !== input.asset.symbol ||
+      !Array.isArray(result.hisLists) ||
+      result.hisLists.length > 100
+    )
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_MALFORMED_CANDLES',
+      );
+    if (result.trdDd !== undefined && result.trdDd !== input.date)
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_CANDLE_DATE_MISMATCH',
+      );
+    const rows: KoscomTenMinuteRow[] = [];
+    let invalidRows = 0;
+    for (const item of result.hisLists) {
+      try {
+        const row = koscomRecord(item);
+        const label = koscomTime(input.date, row.inddTm);
+        if (label.getTime() % 60000 !== 0)
+          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+            'KOSCOM_INVALID_TIME',
+          );
+        rows.push({ label, ...ohlcv(row, true) });
+      } catch {
+        invalidRows++;
+      }
+    }
+    rows.sort((a, b) => a.label.getTime() - b.label.getTime());
+    return {
+      rows,
+      invalidRows,
+      providerReturnedRows: result.hisLists.length,
+      receivedAt: response.receivedAt,
     };
   }
 

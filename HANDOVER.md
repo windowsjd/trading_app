@@ -10,6 +10,15 @@
 
 ---
 
+## 2026-10-13 장기 4시간봉 수집·표시·보관 개편 (KRX·Spot·USDⓈ-M 선물)
+
+- 목적: KRX 96거래일 / 암호화폐·선물 96일 4시간봉을 신뢰 가능한 출처로 제공하고, 완료 4h를 5분봉(35일)과 독립적으로 180일 보관. 기준 문서: `backend/docs/long-range-4h-candles.md`.
+- 저장: KRX(KOSCOM 10분봉, 세션별 일봉 OHLC 정확 일치 검증)와 Spot(Binance 기본 4h)은 `market_candles` `interval='4h'`. 선물 계약 kline은 `futures_market_candles`(FuturesInstrument 키, 계약 심볼 식별 트리거) — Spot과 같은 기초자산을 공유해도 충돌·대체 없음. 마이그레이션 `20261013200000_add_long_range_four_hour_candles`(additive).
+- 조회: `range=96d`(4h 전용, KRX·암호화폐만, 미국주식 400). 저장 완료 4h + 최근 30일 5분봉 집계(진행 봉·미저장 버킷만), 버킷당 단일 출처. 선물 차트 `GET /api/v1/futures/instruments/:id/candles`(계정 무관, DB 전용).
+- 수집: 최초 백필은 `pnpm candle:long-backfill`(기본 dry-run), 지속 수집은 `market_candle_long_sync`/`futures_candle_sync` 플래그(기본 off). 저장 행이 진행 기록이라 재실행 시 누락분만 조회. KRX는 정규장 중 거부·호출 상한·관측 잔여량 예비분에서 중단.
+- 불변: Futures Last(체결·TP/SL)/Mark(UPNL·청산)/Spot·국내주식 가격 기준과 Last/Mark 수집·보관은 변경 없음. 4h 종가는 금융 가격으로 쓰지 않음.
+- 주의: 앱 빌드보다 백엔드를 먼저 배포(구 백엔드는 `96d`에 400). KOSCOM 날짜 귀속은 같은 공급자 일봉 교차 일치뿐(독립 증명 아님), END 라벨 의미·97거래일 이전 제공 범위·한도 적용 단위·장중 신선도는 미검증. 실측 반영: `docs/investigations/2026-10-13-koscom-10m-date-quota/report.md` §4–5.
+
 ## 2026-10-13 Trading Class 3차 현물 매도 주문 통합 (조건 매도·독립 손절/익절·KRX LOC SELL)
 
 - **기능 구현 의도:** "설정은 독립적으로 허용하고, 실행은 실제 보유수량과 예약수량에 따라 제한한다."

@@ -4,6 +4,7 @@ import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
 import QuestTarget from '../../features/quest/QuestTarget';
 import FuturesLimitEntryForm from './FuturesLimitEntryForm';
+import FuturesCandleChart from './FuturesCandleChart';
 import PendingOrders from '../asset/PendingOrders';
 import React, { useEffect, useRef, useState } from "react";
 import ProtectionPanel from "../../features/conditional/ProtectionPanel";
@@ -550,6 +551,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.
                 </Text>
               ) : null}
+              <FuturesCandleChart
+                key={instrument.id}
+                instrumentId={instrument.id}
+                displayPriceDecimals={instrument.underlying.displayPriceDecimals}
+                currentPrice={referenceFresh && reference ? reference : null}
+              />
               {position ? (
                 <>
                   <Text style={styles.muted}>

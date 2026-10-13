@@ -591,7 +591,7 @@ It only creates and deletes keys under a random-UUID asset namespace and never f
 
 ### Market candle retention
 
-The future 4-hour chart serves a 30-day display window. The internal source policy keeps 5-minute candles for 35 days by default, leaving a five-day safety margin. Retention deletes only rows satisfying all of `interval='5m'`, `is_closed=true`, and `open_time < cutoff`. Open 5m candles, daily candles, weekly candles, and rows exactly at the cutoff are preserved.
+The internal source policy keeps 5-minute candles for 35 days by default (the regular 30-day 4h window plus a five-day margin). The 5m prune deletes only rows satisfying all of `interval='5m'`, `is_closed=true`, and `open_time < cutoff`. The completed long-range 4h history (`market_candles` `interval='4h'` and `futures_market_candles`) is then pruned independently with its own cutoff, `MARKET_CANDLE_4H_RETENTION_DAYS` (default 180, minimum 150; see `docs/long-range-4h-candles.md`). Open candles, daily candles, weekly candles, and rows exactly at a cutoff are preserved.
 
 Retention uses deterministic bounded PostgreSQL batches (default 5,000 rows), yields between full batches, and is idempotent after partial failure. The existing `(interval, open_time)` and `(is_closed, open_time)` indexes support candidate selection; no speculative index was added.
 
@@ -651,7 +651,7 @@ Providers per asset type and feed:
 | us_stock       | KIS `inquire-time-itemchartprice` NMIN=5 (2-2 service) | KIS `dailyprice` (`HHDFS76240000`)                   | `kis_overseas_minute` / `kis_overseas_period` |
 | crypto         | Binance Spot `GET /api/v3/klines`                      | Binance Spot `GET /api/v3/klines`                    | `binance_klines`                              |
 
-Storage policy: only `5m`, `1d`, and `1w` are persisted (5m ≈ 35 days, 1d ≈ 1 year/max ~400 rows, 1w ≈ 1 year/max ~60 rows). `1m` is never stored; `15m`/`30m`/`1h`/`4h` are derived from stored 5m at read time and never stored. Daily/weekly candles store provider-native rows — they are never rebuilt from 5m data.
+Storage policy: this checkpointed sync persists only `5m`, `1d`, and `1w` (5m ≈ 35 days, 1d ≈ 1 year/max ~400 rows, 1w ≈ 1 year/max ~60 rows). `1m` is never stored; `15m`/`30m`/`1h` and the current/recent `4h` buckets are derived from stored 5m at read time. The completed long-range 4h history is a separate store maintained by `MarketCandleLongSyncService` (`docs/long-range-4h-candles.md`), never by this sync. Daily/weekly candles store provider-native rows — they are never rebuilt from 5m data.
 
 KIS daily/weekly specifics:
 

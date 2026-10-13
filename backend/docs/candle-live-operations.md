@@ -4,7 +4,7 @@ This document describes candle pipeline unit 3-3/3-4. All HTTP and WebSocket pat
 
 ## Data ownership and flow
 
-PostgreSQL stores canonical closed `5m`, provider-native `1d`, and provider-native `1w` rows. Redis stores the current provisional 5-minute state, the provider-shard owner lease, a bounded dedupe key per provider event, the finalization index, and Pub/Sub fanout. REST is the initialization/repair/final-consistency path. WebSocket carries low-latency current snapshots and never writes every trade to PostgreSQL.
+PostgreSQL stores canonical closed `5m`, provider-native `1d`, and provider-native `1w` rows, plus the long-range COMPLETED `4h` history (2026-10-13, [long-range-4h-candles.md](long-range-4h-candles.md)). Redis stores the current provisional 5-minute state, the provider-shard owner lease, a bounded dedupe key per provider event, the finalization index, and Pub/Sub fanout. REST is the initialization/repair/final-consistency path. WebSocket carries low-latency current snapshots and never writes every trade to PostgreSQL.
 
 ```text
 provider WebSocket -> typed parser/normalizer -> owner-checked Redis Lua
@@ -23,7 +23,7 @@ provider REST repair -> canonical PostgreSQL correction
                      -> cache invalidation/live-state cleanup
 ```
 
-The persisted intervals remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`, and `4h` snapshots combine closed PostgreSQL 5-minute rows with the Redis live 5-minute row through `MarketCandleAggregationService`; they are never stored. Provider-native daily/weekly rows are not replaced by 5-minute synthesis.
+The checkpointed feeds remain `5m`, `1d`, and `1w`. Current `15m`, `30m`, `1h`, and `4h` snapshots combine closed PostgreSQL 5-minute rows with the Redis live 5-minute row through `MarketCandleAggregationService`; 15m/30m/1h are never stored. COMPLETED 4h buckets are additionally kept as long-range history (Binance Spot native 4h klines and KRX 4h verified from KOSCOM 10-minute history in `market_candles` `interval='4h'`; Binance USDⓈ-M contract klines in `futures_market_candles`), retained 180 days independently of 5m — never derived from or written back into the 5m feed. Provider-native daily/weekly rows are not replaced by 5-minute synthesis.
 
 ## Provider feeds
 
@@ -259,7 +259,8 @@ coverage evidence still fails.
 | `15m` | `3d` | 288 | aggregated from stored `5m` | rolling 3 days |
 | `30m` | `14d` | 672 | aggregated from stored `5m` | rolling 14 days |
 | `1h` | `14d` | 336 | aggregated from stored `5m` | rolling 14 days |
-| `4h` | `30d` | 200 | aggregated from stored `5m` | rolling 30 days |
+| `4h` (KRX, crypto) | `96d` | 600 | stored completed `4h` + recent buckets aggregated from stored `5m` | 96 KRX sessions / rolling 96 days |
+| `4h` (US) | `30d` | 200 | aggregated from stored `5m` | rolling 30 days |
 | `1d` | `1y` | 400 | stored `1d` | rolling 365 days |
 | `1w` | `1y` | 60 | stored `1w` | rolling 365 days |
 
@@ -268,7 +269,11 @@ holds the 3-day, 14-day and 30-day windows including the 4h source padding
 (`30d + 4h < 35d`), so those requests stay `managedByPersistence=true`. The
 `15m`/`30m`/`1h` limits are the crypto (24/7) upper bounds — 3 × 96, 14 × 48
 and 14 × 24; stocks legitimately return fewer because they only trade during
-the regular session. No 15m/30m/1h/4h table exists and none should be added.
+the regular session. No 15m/30m/1h table exists and none should be added. The
+long-range 4h window (`96d`) reads the stored completed 4h history for the
+whole window and aggregates 5m only over the regular 30-day 4h window (current
+bucket and buckets without a stored row); see
+[long-range-4h-candles.md](long-range-4h-candles.md).
 
 `15m` uses the rolling `3d` window rather than the `prev_open` market-open
 anchor: `prev_open` gave stocks roughly one and a half sessions, which is too

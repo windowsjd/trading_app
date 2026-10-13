@@ -13,6 +13,16 @@
 > `tradingAccountId` 하나다. 아래 작업 7·8의 nullable scope와 dual-write 설명은
 > 당시 rolling migration 결정 이력이며, 현행 계약으로 해석하지 않는다.
 
+## 장기 4시간봉 (2026-10-13, current)
+
+- 완료된 4시간봉을 5분봉과 독립적으로 180달력일 보관한다(5분봉 35일, 1d/1w, 15m/30m/1h 정책은 유지).
+- 국내주식(KRX): KOSCOM 과거 10분봉을 거래일별로 검증한 뒤 09:00–13:00 / 13:00–15:30 버킷으로 합성한다. 같은 날짜 `trdDd` 일봉과 O/H/L/C가 정확히 일치하지 않거나, 필수 행 누락·격자 이탈·중복 충돌·직전 세션 반복이면 저장하지 않고 보류한다. 날짜 귀속 근거는 같은 공급자 일봉 교차 일치뿐이며 독립 증명이 아니다.
+- 암호화폐 Spot: Binance Spot 기본 4시간봉. 선물: Binance USDⓈ-M 계약 4시간봉(계약 거래가격)을 `FuturesInstrument`별 별도 테이블에 저장한다. Spot과 선물 캔들은 서로 대체·결합·노출하지 않는다.
+- 표시 창 `range=96d`: KRX 96개 완료 거래일 + 당일, 암호화폐·선물 96일. 미국주식 4시간봉은 30일 유지.
+- 진행 중인 봉은 기존 실시간 경로(Spot/KRX 5분봉 집계, 선물은 잠정 저장 봉)로만 표시하고, 완료 봉과 같은 시각으로 중복 표시하지 않는다.
+- 체결·TP/SL(Futures Last), UPNL·청산(Futures Mark), Spot·국내주식 가격 기준은 변경하지 않는다. 4시간봉 종가는 어떤 금융 가격으로도 쓰지 않는다.
+- 최초 백필은 운영자 명령(`candle:long-backfill`)으로만, 지속 수집은 기본 비활성 플래그로만 시작한다. 세부: [long-range-4h-candles.md](long-range-4h-candles.md).
+
 ## 금융 valuation 의미 (2026-10-05, current)
 
 - F3.1: Season 사용자 Futures open/increase/reduce/close는 실제 commit마다 기존 totalFillCount를 1회 증가시킨다. Replay/rollback/청산/최종 강제정산은 제외한다. 근거: 사용자 Spot/Futures 체결이 동일한 경쟁 tie-break 의미를 가져야 한다.

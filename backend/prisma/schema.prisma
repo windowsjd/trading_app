@@ -273,6 +273,8 @@ enum OpsJobName {
   conditional_buy_orders
   limit_on_close_settlement
   conditional_sell_orders
+  market_candle_long_sync
+  futures_candle_sync
 }
 
 enum MarketCandleSyncMode {
@@ -778,6 +780,8 @@ model MarketCandle {
   // ("5m", "1d", "1w") start with a digit and cannot be enum identifiers, and
   // later aggregation intervals (15m/30m/1h/4h) must be addable without an
   // ALTER TYPE migration. The allowlist is enforced by MarketCandlesRepository.
+  // "4h" rows are the long-range completed 4h history (Spot native klines,
+  // KRX verified KOSCOM 10-minute history), retained separately from 5m.
   interval        String
   // Candle window is [openTime, closeTime); both are UTC instants.
   openTime        DateTime @map("open_time") @db.Timestamptz(3)
@@ -910,9 +914,45 @@ model FuturesInstrument {
   seasonPrices      FuturesSeasonPrice[]
   seasonCloses      FuturesSeasonClose[]
   limitOrders       FuturesLimitOrder[]
+  marketCandles     FuturesMarketCandle[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
+}
+
+// Binance USDⓈ-M PERPETUAL contract klines (contract trade price, not Mark or
+// Index) for one FuturesInstrument. Kept apart from market_candles on purpose:
+// a FuturesInstrument shares its Spot underlying Asset, so
+// (assetId, interval, openTime) cannot tell a Spot candle from a contract
+// candle. Chart data only: never read by Spot charts, order matching, TP/SL,
+// valuation or liquidation. contractSymbol must equal the instrument's
+// underlying symbol (identity trigger in the migration).
+model FuturesMarketCandle {
+  id                  String   @id @default(uuid())
+  futuresInstrumentId String   @map("futures_instrument_id")
+  interval            String
+  contractSymbol      String   @map("contract_symbol")
+  // Candle window is [openTime, closeTime); both are UTC instants.
+  openTime            DateTime @map("open_time") @db.Timestamptz(3)
+  closeTime           DateTime @map("close_time") @db.Timestamptz(3)
+  open                Decimal  @db.Decimal(24, 8)
+  high                Decimal  @db.Decimal(24, 8)
+  low                 Decimal  @db.Decimal(24, 8)
+  close               Decimal  @db.Decimal(24, 8)
+  volume              Decimal  @db.Decimal(24, 8)
+  // Quote-asset volume (kline field 7).
+  amount              Decimal? @db.Decimal(24, 8)
+  isClosed            Boolean  @map("is_closed")
+  sourceProvider      String   @map("source_provider")
+  sourceUpdatedAt     DateTime @map("source_updated_at") @db.Timestamptz(3)
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  futuresInstrument FuturesInstrument @relation(fields: [futuresInstrumentId], references: [id], onDelete: Restrict)
+
+  @@unique([futuresInstrumentId, interval, openTime])
+  @@index([interval, openTime])
+  @@map("futures_market_candles")
 }
 
 // One row per lifetime. SQL partial unique permits only one OPEN lifetime per

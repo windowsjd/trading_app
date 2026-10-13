@@ -3,7 +3,7 @@ const { create, act } = require('react-test-renderer');
 const query = require('@tanstack/react-query');
 const { resolve } = require('node:path');
 const { load } = require('./ledgerTestHarness.cjs');
-const { futuresFixture, accounts } = require('./futuresFixtures.cjs');
+const { futuresFixture, futuresCandlesFixture, accounts } = require('./futuresFixtures.cjs');
 const { deferred } = require('./walletTransferHarness.cjs');
 const { conditionalFixture } = require('./conditionalFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -19,6 +19,13 @@ function futuresHarness(options = {}) {
         if (h.readGate) await h.readGate.promise;
         if (h.readFailure) throw h.readFailure;
         if (h.readFailures?.[path]) throw h.readFailures[path];
+        // Contract chart (market data, not account-scoped): /futures/instruments/:id/candles
+        if (path.startsWith('/futures/instruments/') && path.includes('/candles')) {
+          const instrumentId = decodeURIComponent(path.split('/')[3]);
+          h.candleReads ??= []; h.candleReads.push(instrumentId);
+          if (h.candleFailure) throw h.candleFailure;
+          return { data: { success: true, data: h.futuresCandles?.(instrumentId) ?? futuresCandlesFixture(instrumentId) } };
+        }
         const f = futuresFixture(h.wrongScope ?? id, h.options);
         if (path.includes('limit-orders')) return { data: { data: { tradingAccountId: h.wrongScope ?? id, orders: h.pendingEntries ?? [], pagination: { limit: 100, offset: 0, total: h.pendingEntries?.length ?? 0, returned: h.pendingEntries?.length ?? 0, nextOffset: null } } } };
         const key = path.includes('instruments') ? 'catalog' : path.includes('positions') ? 'positions' : path.includes('executions') ? 'executions' : path.includes('liquidations') ? 'liquidations' : 'final';
@@ -53,6 +60,7 @@ function futuresHarness(options = {}) {
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts, selectedAccountId: h.accountId, isLoading: false, ...h.accountState }) },
     '../../services/api/sessionOwnership': { getSessionGeneration: () => h.session, isCurrentSession: owner => owner === h.session },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+    '../../components/charts/CandlestickChart': { default: 'CandlestickChart', __esModule: true },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
   };
   if (options.diagnostics) {
@@ -78,4 +86,4 @@ function futuresHarness(options = {}) {
   h.close = async () => { await act(async () => h.renderer.unmount()); client.clear(); };
   return h;
 }
-module.exports = { futuresHarness, deferred };
+module.exports = { futuresHarness, futuresCandlesFixture, deferred };

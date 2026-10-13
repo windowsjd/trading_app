@@ -14,6 +14,8 @@ jest.mock('../generated/prisma/client', () => ({
     market_candle_reconciliation: 'market_candle_reconciliation',
     limit_order_matcher: 'limit_order_matcher',
     limit_order_candle_reconciliation: 'limit_order_candle_reconciliation',
+    market_candle_long_sync: 'market_candle_long_sync',
+    futures_candle_sync: 'futures_candle_sync',
   },
   OpsJobRunStatus: {
     running: 'running',
@@ -50,6 +52,12 @@ jest.mock('../providers/market-snapshot-health.service', () => ({
 }));
 jest.mock('../assets/market-candle-retention.service', () => ({
   MarketCandleRetentionService: class MarketCandleRetentionService {},
+}));
+jest.mock('../assets/market-candle-long-sync.service', () => ({
+  MarketCandleLongSyncService: class MarketCandleLongSyncService {},
+  LongCandleSyncInputError: class LongCandleSyncInputError extends Error {},
+  MARKET_CANDLE_LONG_SYNC_LOCK_KEY: 'market_candle_long_sync',
+  FUTURES_CANDLE_SYNC_LOCK_KEY: 'futures_candle_sync',
 }));
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
@@ -96,6 +104,10 @@ describe('OpsSchedulerService', () => {
         .fn()
         .mockResolvedValue({ success: true }),
       runMarketCandleSyncJob: jest.fn().mockResolvedValue({ success: true }),
+      runMarketCandleLongSyncJob: jest
+        .fn()
+        .mockResolvedValue({ success: true }),
+      runFuturesCandleSyncJob: jest.fn().mockResolvedValue({ success: true }),
       runMarketCandleReconciliationJob: jest
         .fn()
         .mockResolvedValue({ success: true }),
@@ -238,6 +250,54 @@ describe('OpsSchedulerService', () => {
     // Past the interval: due again.
     await service.runEnabledJobs(new Date('2026-07-10T03:11:30.000Z'));
     expect(runner.runMarketCandleSyncJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('never starts the long-range 4h jobs without their own flags', async () => {
+    process.env.SCHEDULER_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    const { runner, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+
+    expect(runner.runMarketCandleLongSyncJob).not.toHaveBeenCalled();
+    expect(runner.runFuturesCandleSyncJob).not.toHaveBeenCalled();
+  });
+
+  it('runs the long-range 4h and futures candle jobs on their own intervals', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED = 'true';
+    process.env.SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS = 'krx';
+    process.env.SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED = 'true';
+    const { runner, runService, service } = createService();
+
+    await service.runEnabledJobs(new Date('2026-07-10T08:00:00.000Z'));
+    expect(runner.runMarketCandleLongSyncJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'incremental',
+        markets: ['krx'],
+        requestedBy: 'scheduler',
+      }),
+    );
+    expect(runner.runFuturesCandleSyncJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'incremental',
+        requestedBy: 'scheduler',
+      }),
+    );
+
+    // 30 s after the last finished runs: neither 900 s nor 60 s has elapsed.
+    runService.findLatestRunForJob.mockResolvedValue({
+      status: OpsJobRunStatus.succeeded,
+      startedAt: new Date('2026-07-10T08:00:00.000Z'),
+      finishedAt: new Date('2026-07-10T08:00:05.000Z'),
+    });
+    await service.runEnabledJobs(new Date('2026-07-10T08:00:35.000Z'));
+    expect(runner.runMarketCandleLongSyncJob).toHaveBeenCalledTimes(1);
+    expect(runner.runFuturesCandleSyncJob).toHaveBeenCalledTimes(1);
+
+    // 70 s later only the minute-cadenced futures job is due again.
+    await service.runEnabledJobs(new Date('2026-07-10T08:01:15.000Z'));
+    expect(runner.runMarketCandleLongSyncJob).toHaveBeenCalledTimes(1);
+    expect(runner.runFuturesCandleSyncJob).toHaveBeenCalledTimes(2);
   });
 
   it('passes the configured asset allowlist to the candle sync job', async () => {
