@@ -428,6 +428,9 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.match(h.text('closed-market-my-result'), /10,100원을 냈다면.*체결되지 않았을/);
     assert.match(h.text('closed-market-open-candle'), /전 거래일 · 정규장 종가 10,000원.*밤사이 · 예제 속 체결 없음.*09:00 · 시가 10,200원/s);
     assert.match(h.text('closed-market-3'), /체결되는 주문은 같은 시가.*같은 가격에서는 접수 순서에 따라 일부만 체결될 수/s);
+    // The core example itself separates the exchange auction from the app's simulated fills.
+    assert.match(h.text('closed-market-3'), /이 체결은 실제 거래소의 개장 방식입니다\. Trading Class의 모의투자 주문은 개장 단일가를 거치지 않습니다\./);
+    h.order('closed-market-my-result', 'closed-market-finish');
     for (const index of [0, 2])
       assert.equal(h.find(`closed-market-open-candle-body-${index}`) !== undefined, true);
     assert.equal(h.find('closed-market-open-candle-body-1') === undefined, true);
@@ -454,6 +457,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     assert.match(h.text('closed-market-candidates'), /10,200원: 매수 80주 · 매도 80주 → 80주 ← 시가/);
     assert.match(h.text('closed-market-my-result'), /내 주문: 체결되지 않음.*시가 10,200원.*낸 가격 10,100원/s);
     assert.match(h.text('closed-market-my-result'), /10,300원을 냈다면 10,200원에 체결/);
+    assert.match(h.text('closed-market-3'), /Trading Class의 모의투자 주문은 개장 단일가를 거치지 않습니다/);
     const syllables = (h.prose().match(/[가-힣]/g) ?? []).length;
     assert.ok(syllables <= 700, `${syllables} Hangul syllables in lesson prose`);
     t.diagnostic(`10,100-won path: ${syllables} Hangul syllables, including shared Basis text`);
@@ -486,6 +490,7 @@ describe('new guide chapters preserve downward learning flow', () => {
         assert.match(h.text('closed-market-more-text'), /야간 가상 예약은 거래소 접수가 아닙니다/);
         assert.match(h.text('closed-market-more-text'), /예약주문의 접수 시간과 처리 방식은 이용하는 증권사에서 확인/);
         assert.match(h.text('closed-market-more-text'), /정규장과 별도의 시간외 거래.*0건은 개장 단일가 체결만/s);
+        assert.match(h.text('closed-market-more-text'), /Trading Class에서 장이 닫혀 있을 때 낸 지정가 매수는 다음 정규장을 기다립니다.*시세가 지정가에 닿으면 체결.*그 시세 또는 지정가.*경쟁하는 개장 단일가는 없습니다/s);
       }
       assert.equal(h.text('closed-market-1'), close);
       assert.equal(h.text('closed-market-2'), night);
