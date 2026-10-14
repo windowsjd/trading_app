@@ -1,0 +1,9 @@
+## selftest (synthetic: LIQ5 5/s, MID1 1/s, THIN05 0.5/s, THIN02 0.2/s)
+| symbol | rows | ER 3s | ER 6s (worse/better phase) | ΔER 6s | cycles with no row |
+|---|---:|---:|---:|---:|---:|
+| THIN02 | 3554 | 80.45% | 72.32% / 72.43% | 8.14%p | 1001 |
+| THIN05 | 5975 | 98.04% | 94.66% / 94.82% | 3.37%p | 1001 |
+| MID1 | 7379 | 99.96% | 99.53% / 99.56% | 0.43%p | 0 |
+| LIQ5 | 7799 | 100.00% | 100.00% / 100.00% | 0.00%p | 0 |
+direct 6 s simulation (even polls): {'LIQ5': '100.00%', 'MID1': '99.56%', 'THIN02': '72.33%', 'THIN05': '94.66%'}
+max |replayed - direct| over symbols (matching phase): 0.01%p. Residual comes only from cycles in which no symbol of the batch stored a row.

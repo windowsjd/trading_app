@@ -1,3 +1,4 @@
+## 1. Sessions per month
 2026-01 21 8130
 2026-02 17 6630
 2026-03 21 8190
@@ -23,4 +24,35 @@
 2027-11 22 8580
 2027-12 21 8190
 max sessions/month 22 min 17
-special {'2026-01-02': ('100000', '153000'), '2026-11-19': ('100000', '163000'), '2027-01-04': ('100000', '153000'), '2027-11-18': ('100000', '163000')}
+special {'2025-01-02': ('100000', '153000'), '2025-11-13': ('100000', '163000'), '2026-01-02': ('100000', '153000'), '2026-11-19': ('100000', '163000'), '2027-01-04': ('100000', '153000'), '2027-11-18': ('100000', '163000')}
+sessions per year {2025: 242, 2026: 244, 2027: 244}
+
+## 2. Source span of the session-counted chart windows (prevN_open semantics)
+| interval | N | 4h padding | span min (days) | span max (days, viewing day) | trading days in 2026 with span > 35d |
+|---|---:|---|---:|---|---:|
+| 5m | 3 | 0h | 3.58 | 12.62 (2025-10-14) | 0 |
+| 15m | 6 | 4h | 8.75 | 17.79 (2025-10-13) | 0 |
+| 30m | 12 | 4h | 16.75 | 25.79 (2025-10-27) | 0 |
+| 1h | 24 | 4h | 32.75 | 41.79 (2027-10-21) | 178 |
+| 4h | 96 | 4h | 137.79 | 152.79 (2026-03-03) | 244 |
+| 1d | 576 | 0h | 857.62 | 867.62 (2027-06-10) | 0 |
+
+## 3. 5m retention / managed range needed for the 1h (24) window
+  worst source span 41.79 days -> retention and maxManagedFiveMinuteRangeMs >= 42 days
+  35d: INSUFFICIENT
+  40d: INSUFFICIENT
+  45d: OK
+  50d: OK
+  retention 35d keeps at most 26 sessions -> 1976 required 5m rows/stock (76 per regular session)
+  retention 45d keeps at most 34 sessions -> 2584 required 5m rows/stock (76 per regular session)
+
+## 4. 1d window (prev576_open) reach-back and calendar years it needs
+  2026-10-15: datasets give 432 previous sessions; 144 more must come from years before 2025 (no dataset in repo -> app fails closed)
+  2027-01-04: datasets give 486 previous sessions; 90 more must come from years before 2025 (no dataset in repo -> app fails closed)
+  2027-06-30: oldest session 2025-02-19 (861 calendar days back, inside datasets)
+  2027-12-30: oldest session 2025-08-20 (862 calendar days back, inside datasets)
+  first viewing day whose 576 previous sessions all lie inside the datasets: 2027-05-18 (until then years before 2025 are required)
+
+## 5. Sessions in any rolling window (if the monthly cap were rolling, not calendar-month)
+  30-day window: max 22 sessions (from 2027-11-25)
+  31-day window: max 23 sessions (from 2027-11-24)

@@ -1,7 +1,7 @@
 N=100 batches by KOSPI/KOSDAQ split: {'100/0': 5, '85/15': 6, '80/20': 5, '70/30': 6, '61/39': 6, '60/40': 5, '50/50': 6, '40/60': 5}
 current 15 (12 KOSPI/3 KOSDAQ, KIND): 2 batches
 
-## Calls
+## 1. Calls — v1 reference scenarios (unchanged)
 
 ### S0 production as recorded, 3s cycle (upper)
 | N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
@@ -35,45 +35,13 @@ current 15 (12 KOSPI/3 KOSDAQ, KIND): 2 batches
 | 50 | 3–4 | 18,823–22,762 | 38%–46% | 500,881 | 50% |
 | 100 | 5–6 | 33,696–37,635 | 67%–75% | 828,071 | 83% |
 
-### R recommended (price 5s, 1m per 5m bucket, in-progress 1d/1w composed from 5m)
+### R v1 recommendation (price 5s, 1m per 5m bucket)
 | N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
 |---:|---:|---:|---:|---:|---:|
 | 15 | 1–2 | 6,022–10,702 | 12%–21% | 235,556 | 24% |
 | 25 | 2–3 | 11,589–16,269 | 23%–33% | 358,026 | 36% |
 | 50 | 3–4 | 18,486–23,166 | 37%–46% | 509,760 | 51% |
 | 100 | 5–6 | 32,280–36,960 | 65%–74% | 813,228 | 81% |
-
-### R variant price 6s
-| N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
-|---:|---:|---:|---:|---:|---:|
-| 15 | 1–2 | 5,242–9,142 | 10%–18% | 201,236 | 20% |
-| 25 | 2–3 | 10,029–13,929 | 20%–28% | 306,546 | 31% |
-| 50 | 3–4 | 16,146–20,046 | 32%–40% | 441,120 | 44% |
-| 100 | 5–6 | 28,380–32,280 | 57%–65% | 710,268 | 71% |
-
-### R variant price 4s + 1m per 10m
-| N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
-|---:|---:|---:|---:|---:|---:|
-| 15 | 1–2 | 6,596–12,446 | 13%–25% | 273,909 | 27% |
-| 25 | 2–3 | 12,934–18,784 | 26%–38% | 413,367 | 41% |
-| 50 | 3–4 | 20,007–25,857 | 40%–52% | 568,962 | 57% |
-| 100 | 5–6 | 34,152–40,002 | 68%–80% | 880,152 | 88% |
-
-### R variant price 5s + hourly in-progress 1d call
-| N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
-|---:|---:|---:|---:|---:|---:|
-| 15 | 1–2 | 6,127–10,807 | 12%–22% | 237,866 | 24% |
-| 25 | 2–3 | 11,764–16,444 | 24%–33% | 361,876 | 36% |
-| 50 | 3–4 | 18,836–23,516 | 38%–47% | 517,460 | 52% |
-| 100 | 5–6 | 32,980–37,660 | 66%–75% | 828,628 | 83% |
-
-### R variant price 5s + 1m every 3m
-| N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
-|---:|---:|---:|---:|---:|---:|
-| 15 | 1–2 | 6,818–11,498 | 14%–23% | 253,060 | 25% |
-| 25 | 2–3 | 12,915–17,595 | 26%–35% | 387,198 | 39% |
-| 50 | 3–4 | 21,138–25,818 | 42%–52% | 568,104 | 57% |
-| 100 | 5–6 | 37,584–42,264 | 75%–85% | 929,916 | 93% |
 
 ### S4 minimal (price 8s, candles after close only)
 | N | batch | trading-day calls | of 50k/day | worst month | of 1M/month |
@@ -83,139 +51,170 @@ current 15 (12 KOSPI/3 KOSDAQ, KIND): 2 batches
 | 50 | 3–4 | 9,292–12,217 | 19%–24% | 268,882 | 27% |
 | 100 | 5–6 | 15,647–18,572 | 31%–37% | 408,692 | 41% |
 
-#### S1 N=15 batches=2
-  price                                 15,600 / non-trading       0
-  orderbook                             15,600 / non-trading       0
-  minute_refresh_1/min                   6,000 / non-trading       0
-  sync_5m(09:00-24:00)                   2,466 / non-trading       0
-  sync_1d(24/7)                          2,160 / non-trading   2,160
-  sync_1w(24/7)                          2,160 / non-trading   2,160
-  krx_reconciliation                        90 / non-trading       0
-  long_4h                                   15 / non-trading       0
-  loc_evidence                              30 / non-trading       0
-  lists                                     12 / non-trading      12
-  retry_1pct                               441 / non-trading      43
-  TOTAL                                 44,574 / non-trading   4,375  month 1,020,013
+## 2. Calls — v2 final design F
 
-#### R  N=15 batches=2
-  price_5s                               9,360 / non-trading       0
-  1m_per_5m_bucket                       1,185 / non-trading       0
-  post_close_repair_cap                     45 / non-trading       0
-  1d_after_close(+10% retry)                16 / non-trading       0
-  1w_after_close                            15 / non-trading       0
-  long_4h                                   15 / non-trading       0
-  loc_evidence(max 2/stock)                 30 / non-trading       0
-  lists                                     12 / non-trading      12
-  candle_retry                              24 / non-trading       0
-  TOTAL                                 10,702 / non-trading      12  month 235,556
+### F, price 5s, 1w weekly on: normal and bounded-worst day (6 batches = conservative)
+| N | batches | normal day | of 50k | worst day (b=hi) | of 50k | month normal (b=hi) | of 1M | rolling 31d (23 sessions) | of 1M |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 15 | 1–2 | 5,955–10,635 | 12%–21% | 11,750 | 24% | 234,076 | 23% | 244,699 | 24% |
+| 25 | 2–3 | 11,477–16,157 | 23%–32% | 17,909 | 36% | 355,557 | 36% | 371,701 | 37% |
+| 50 | 3–4 | 18,261–22,941 | 37%–46% | 26,285 | 53% | 504,818 | 50% | 527,747 | 53% |
+| 100 | 5–6 | 31,830–36,510 | 64%–73% | 43,037 | 86% | 803,339 | 80% | 839,838 | 84% |
 
-#### R  N=15 batches=1
-  price_5s                               4,680 / non-trading       0
-  1m_per_5m_bucket                       1,185 / non-trading       0
-  post_close_repair_cap                     45 / non-trading       0
-  1d_after_close(+10% retry)                16 / non-trading       0
-  1w_after_close                            15 / non-trading       0
-  long_4h                                   15 / non-trading       0
-  loc_evidence(max 2/stock)                 30 / non-trading       0
-  lists                                     12 / non-trading      12
-  candle_retry                              24 / non-trading       0
-  TOTAL                                  6,022 / non-trading      12  month 132,596
+### F, price 6s, 1w weekly on: normal and bounded-worst day (6 batches = conservative)
+| N | batches | normal day | of 50k | worst day (b=hi) | of 50k | month normal (b=hi) | of 1M | rolling 31d (23 sessions) | of 1M |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 15 | 1–2 | 5,175–9,075 | 10%–18% | 10,190 | 20% | 199,756 | 20% | 208,819 | 21% |
+| 25 | 2–3 | 9,917–13,817 | 20%–28% | 15,569 | 31% | 304,077 | 30% | 317,881 | 32% |
+| 50 | 3–4 | 15,921–19,821 | 32%–40% | 23,165 | 46% | 436,178 | 44% | 455,987 | 46% |
+| 100 | 5–6 | 27,930–31,830 | 56%–64% | 38,357 | 77% | 700,379 | 70% | 732,198 | 73% |
 
-#### S1 N=100 batches=6
-  price                                 46,800 / non-trading       0
-  orderbook                             46,800 / non-trading       0
-  minute_refresh_1/min                  40,000 / non-trading       0
-  sync_5m(09:00-24:00)                  16,440 / non-trading       0
-  sync_1d(24/7)                         14,400 / non-trading  14,400
-  sync_1w(24/7)                         14,400 / non-trading  14,400
-  krx_reconciliation                       600 / non-trading       0
-  long_4h                                  100 / non-trading       0
-  loc_evidence                             200 / non-trading       0
-  lists                                     12 / non-trading      12
-  retry_1pct                             1,798 / non-trading     288
-  TOTAL                                181,550 / non-trading  29,100  month 4,255,991
+### F, price 5s, 1w weekly off: normal and bounded-worst day (6 batches = conservative)
+| N | batches | normal day | of 50k | worst day (b=hi) | of 50k | month normal (b=hi) | of 1M | rolling 31d (23 sessions) | of 1M |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 15 | 1–2 | 5,952–10,632 | 12%–21% | 11,747 | 23% | 234,010 | 23% | 244,629 | 24% |
+| 25 | 2–3 | 11,472–16,152 | 23%–32% | 17,903 | 36% | 355,446 | 36% | 371,585 | 37% |
+| 50 | 3–4 | 18,251–22,931 | 37%–46% | 26,273 | 53% | 504,595 | 50% | 527,514 | 53% |
+| 100 | 5–6 | 31,810–36,490 | 64%–73% | 43,013 | 86% | 802,895 | 80% | 839,373 | 84% |
 
-#### R  N=100 batches=6
-  price_5s                              28,080 / non-trading       0
-  1m_per_5m_bucket                       7,900 / non-trading       0
-  post_close_repair_cap                    300 / non-trading       0
-  1d_after_close(+10% retry)               110 / non-trading       0
-  1w_after_close                           100 / non-trading       0
-  long_4h                                  100 / non-trading       0
-  loc_evidence(max 2/stock)                200 / non-trading       0
-  lists                                     12 / non-trading      12
-  candle_retry                             158 / non-trading       0
-  TOTAL                                 36,960 / non-trading      12  month 813,228
+### F, price 4s, 1w weekly on: normal and bounded-worst day (6 batches = conservative)
+| N | batches | normal day | of 50k | worst day (b=hi) | of 50k | month normal (b=hi) | of 1M | rolling 31d (23 sessions) | of 1M |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 15 | 1–2 | 7,125–12,975 | 14%–26% | 14,090 | 28% | 285,556 | 29% | 298,519 | 30% |
+| 25 | 2–3 | 13,817–19,667 | 28%–39% | 21,419 | 43% | 432,777 | 43% | 452,431 | 45% |
+| 50 | 3–4 | 21,771–27,621 | 44%–55% | 30,965 | 62% | 607,778 | 61% | 635,387 | 64% |
+| 100 | 5–6 | 37,680–43,530 | 75%–87% | 50,057 | 100% | 957,779 | 96% | 1,001,298 | 100% |
 
-#### R  N=100 batches=5
-  price_5s                              23,400 / non-trading       0
-  1m_per_5m_bucket                       7,900 / non-trading       0
-  post_close_repair_cap                    300 / non-trading       0
-  1d_after_close(+10% retry)               110 / non-trading       0
-  1w_after_close                           100 / non-trading       0
-  long_4h                                  100 / non-trading       0
-  loc_evidence(max 2/stock)                200 / non-trading       0
-  lists                                     12 / non-trading      12
-  candle_retry                             158 / non-trading       0
-  TOTAL                                 32,280 / non-trading      12  month 710,268
+### F, price 3s, 1w weekly on: normal and bounded-worst day (6 batches = conservative)
+| N | batches | normal day | of 50k | worst day (b=hi) | of 50k | month normal (b=hi) | of 1M | rolling 31d (23 sessions) | of 1M |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 15 | 1–2 | 9,075–16,875 | 18%–34% | 17,990 | 36% | 371,356 | 37% | 388,219 | 39% |
+| 25 | 2–3 | 17,717–25,517 | 35%–51% | 27,269 | 55% | 561,477 | 56% | 586,981 | 59% |
+| 50 | 3–4 | 27,621–35,421 | 55%–71% | 38,765 | 78% | 779,378 | 78% | 814,787 | 81% |
+| 100 | 5–6 | 47,430–55,230 | 95%–110% | 61,757 | 124% | 1,215,179 | 122% | 1,270,398 | 127% |
+  1m cadence 2.5 min, N=100 b=6 5s: 44,388/day (89%), month 976,655 (98%)
+  1m cadence 10 min, N=100 b=6 5s: 32,571/day (65%), month 716,681 (72%)
 
-## User-driven on-demand ceiling (current managed serving, 60 s freshness)
-  N=15: 5m session ceiling 8,775/day, 1d+1w ceiling 43,200/day
-  N=100: 5m session ceiling 58,500/day, 1d+1w ceiling 288,000/day
+#### F N=100 b=6 5s normal
+  P1 price 5s                                 28,080 / non-trading     0
+  P1 market lists                                 12 / non-trading    12
+  P2 1d post-close                               111 / non-trading     0
+  P2 LOC evidence                                202 / non-trading     0
+  P2 recoverClose (cap 3/stock)                    0 / non-trading     0
+  P3 1m per completed 5m bucket                7,979 / non-trading     0
+  P3 same-day gap repair (cap 300)                 5 / non-trading     0
+  P4 4h long sync                                101 / non-trading     0
+  P4 1w weekly (until app drops tab)              20 / non-trading     0
+  TOTAL                                       36,510 / non-trading    12  month 803,339
 
-### Execute-freshness (liquid stock): share of time fresh
-| schedule (worst gap) | L=0.5s | L=1s | L=2s | L=3s | L=4s | L=5s |
-|---|---:|---:|---:|---:|---:|---:|
-| fixed 3s, J=1s (4s) | 100% | 100% | 100% | 100% | 100% | 100% |
-| fixed 5s, J=1.5s (6.5s) | 100% | 100% | 100% | 100% | 92% | 77% |
-| fixed 6s, J=1.5s (7.5s) | 100% | 100% | 100% | 93% | 80% | 67% |
-| sleep-after 6s, D=1.5+J=1.5 (9s) | 100% | 100% | 89% | 78% | 67% | 56% |
-| fixed 8s, J=1.5s (9.5s) | 100% | 95% | 84% | 74% | 63% | 53% |
-| fixed 10s, J=1.5s (11.5s) | 83% | 78% | 70% | 61% | 52% | 43% |
-  max tolerable lag for 100% freshness: T + J + L <= 10 s -> {'3s': 6, '5s': 3.5, '6s': 2.5, '8s': 0.5}
+#### F N=100 b=6 5s bounded worst
+  P1 price 5s                                 28,080 / non-trading     0
+  P1 market lists                                173 / non-trading   173
+  P2 1d post-close                               360 / non-trading     0
+  P2 LOC evidence                              3,960 / non-trading     0
+  P2 recoverClose (cap 3/stock)                  360 / non-trading     0
+  P3 1m per completed 5m bucket                9,480 / non-trading     0
+  P3 same-day gap repair (cap 300)               360 / non-trading     0
+  P4 4h long sync                                240 / non-trading     0
+  P4 1w weekly (until app drops tab)              24 / non-trading     0
+  TOTAL                                       43,037 / non-trading   173  month 948,365
 
-## Throughput during the session (avg starts/s, share of 5/s, max mean latency for 2 slots)
-  S1 N=15 b=2: 1.71/s = 34% of spacing; 2 slots saturate when mean latency > 1.17s
-  S1 N=100 b=6: 6.49/s = 130% of spacing; 2 slots saturate when mean latency > 0.31s
-  S2 N=15 b=2: 0.42/s = 8% of spacing; 2 slots saturate when mean latency > 4.72s
-  S2 N=100 b=6: 1.59/s = 32% of spacing; 2 slots saturate when mean latency > 1.26s
-  R N=15 b=2: 0.45/s = 9% of spacing; 2 slots saturate when mean latency > 4.43s
-  R N=100 b=6: 1.54/s = 31% of spacing; 2 slots saturate when mean latency > 1.30s
-  S1 N=100 1st 20 s after each minute: demand 9.0/s vs 5/s cap
+#### F N=100 b=5 5s normal
+  P1 price 5s                                 23,400 / non-trading     0
+  P1 market lists                                 12 / non-trading    12
+  P2 1d post-close                               111 / non-trading     0
+  P2 LOC evidence                                202 / non-trading     0
+  P2 recoverClose (cap 3/stock)                    0 / non-trading     0
+  P3 1m per completed 5m bucket                7,979 / non-trading     0
+  P3 same-day gap repair (cap 300)                 5 / non-trading     0
+  P4 4h long sync                                101 / non-trading     0
+  P4 1w weekly (until app drops tab)              20 / non-trading     0
+  TOTAL                                       31,830 / non-trading    12  month 700,379
 
-## Price-cycle duration D (6 batches, 2 slots, 0.3 s persist/batch)
-  mean latency 0.15s -> D = 1.4s (5 batches: 1.3s)
-  mean latency 0.3s -> D = 1.8s (5 batches: 1.8s)
-  mean latency 0.6s -> D = 2.7s (5 batches: 2.7s)
-  mean latency 1.0s -> D = 3.9s (5 batches: 3.9s)
-  mean latency 1.5s -> D = 5.4s (5 batches: 5.4s)
+#### F N=15 b=2 5s normal
+  P1 price 5s                                  9,360 / non-trading     0
+  P1 market lists                                 12 / non-trading    12
+  P2 1d post-close                                17 / non-trading     0
+  P2 LOC evidence                                 30 / non-trading     0
+  P2 recoverClose (cap 3/stock)                    0 / non-trading     0
+  P3 1m per completed 5m bucket                1,197 / non-trading     0
+  P3 same-day gap repair (cap 300)                 1 / non-trading     0
+  P4 4h long sync                                 15 / non-trading     0
+  P4 1w weekly (until app drops tab)               3 / non-trading     0
+  TOTAL                                       10,635 / non-trading    12  month 234,076
 
-## Batches by split for N=25/50 (KONEX excluded)
-  N=25: {'0/25': 2, '5/20': 2, '10/15': 2, '15/10': 2, '20/5': 2, '25/0': 2}
-  N=50: {'0/50': 3, '5/45': 4, '10/40': 3, '15/35': 3, '20/30': 3, '25/25': 4, '30/20': 3, '35/15': 3, '40/10': 3, '45/5': 4, '50/0': 3}
+  upper bound: every session a worst day, N=100 b=6 5s: 948,365 (95%) -> the governor must cap the month, not only the day
 
-## DB rows/day and size (price row 0.4-2.0 KB, book row 0.9-3.0 KB incl. indexes; unmeasured)
-  S0 15@3s                   price rows   111,150  book rows   117,000  146-560 MB/day
-  S0 100@3s                  price rows   741,000  book rows   780,000  975-3,732 MB/day
-  S0 100@6s                  price rows   370,500  book rows   390,000  488-1,866 MB/day
-  R 100@5s                   price rows   444,600  book rows         0  174-868 MB/day
-  R 100@5s slim 0.35-0.6KB   price rows   444,600  book rows         0  152-261 MB/day
-  sync-state rows/day if KRX in 10-min sync (N=15): 6,480
-  sync-state rows/day if KRX in 10-min sync (N=100): 43,200
-  5m candle rows/day N=100: 7,600; 4h rows/day: 200
+## 3. Budget governor (soft 90% for P3/P4 after reserving P1+P2, hard 98%)
+ a) bounded worst day, N=100 b=6 5s, with a 10,000-call backfill requested:
+  demand P1 28,253, P2 4,680, P3 9,840, P4 264 + backfill 10,000 = 53,037
+  admitted P1+P2 32,933 (hard cap 49,000), P3 9,840, P4 2,227 -> 45,000 (90%); shed 8,037
+ b) normal day, N=100 b=6 5s, same backfill:
+  demand P1 28,092, P2 313, P3 7,984, P4 121 + backfill 10,000 = 46,510
+  admitted P1+P2 28,405 (hard cap 49,000), P3 7,984, P4 8,611 -> 45,000 (90%); shed 1,510
+ c) monthly pressure: 600,000 used with 10 sessions left -> daily allowance 38,000 vs P1+P2 normal 28,405
 
-## One-off backfill for 15 -> 100 (85 new stocks)
-  4h(97 sessions) 8,245, 1d 255, 1w 85, total 8,585
-  optional verified 5m 10 sessions: 4,250 (requires a past-date 1m path)
-  weekday night (R@100 on that quota day): headroom at 85% of daily cap = 5,540
-  weekend quota day: headroom at 85% of daily cap = 42,488
+## 4. One-off backfill (15 -> 100: 85 new stocks; 1d extended to 576 sessions for all 100)
+  1d 576 sessions: 700; 4h 97 sessions: 8,245 (new) / 9,700 (all 100, if never run); 1w: 85; total 9,030–10,485
+  optional 5m history for 25 sessions (needs a dated past 1m path): 10,625
+  weekend quota day room at 85% of the cap: 42,488; weekday room after F@100 b=6 normal: 5,990
 
-## Largest universe within 80% of the worst-month cap (recommended shape)
+## 5. Throughput and price-cycle duration
+  F N=100 b=6 5s: price 1.20/s + 1m burst 1.67/s = 2.87/s (57% of the 5 starts/s spacing)
+  F N=100 b=6 6s: price 1.00/s + 1m burst 1.67/s = 2.67/s (53% of the 5 starts/s spacing)
+  F N=100 b=5 5s: price 1.00/s + 1m burst 1.67/s = 2.67/s (53% of the 5 starts/s spacing)
+  F N=15 b=2 5s: price 0.40/s + 1m burst 0.25/s = 0.65/s (13% of the 5 starts/s spacing)
+  v1 S1 N=100 b=6: 6.49/s = 130% of spacing; 2 slots saturate above 0.31s mean latency
+  v1 S2 N=100 b=6: 1.59/s = 32% of spacing; 2 slots saturate above 1.26s mean latency
+  v1 R N=100 b=6: 1.54/s = 31% of spacing; 2 slots saturate above 1.30s mean latency
+  D = one price cycle (0.3 s persist/batch); price slots c:
+    latency 0.15s: b=6 c=2 1.4s | b=6 c=3 1.4s | b=5 c=2 1.3s
+    latency 0.3s: b=6 c=2 1.8s | b=6 c=3 1.6s | b=5 c=2 1.8s
+    latency 0.6s: b=6 c=2 2.7s | b=6 c=3 1.9s | b=5 c=2 2.7s
+    latency 1.0s: b=6 c=2 3.9s | b=6 c=3 2.6s | b=5 c=2 3.9s
+    latency 1.5s: b=6 c=2 5.4s | b=6 c=3 3.6s | b=5 c=2 5.4s
+  keep D <= T-1s at T=5s: mean latency <= 1.03s (c=2) / 1.69s (c=3), 6 batches
+  keep D <= T-1s at T=6s: mean latency <= 1.36s (c=2) / 2.20s (c=3), 6 batches
+  keep D <= T-1s at T=3s with 2 batches (N<=50 keeps 3 s): mean latency <= 1.49s (c=2) / 1.49s (c=4)
+  keep D <= T-1s at T=3s with 3 batches (N<=50 keeps 3 s): mean latency <= 0.69s (c=2) / 1.29s (c=4)
+  keep D <= T-1s at T=3s with 4 batches (N<=50 keeps 3 s): mean latency <= 0.69s (c=2) / 1.09s (c=4)
+
+## 6. Execute-freshness projection (Monte Carlo, one session per cell)
+  trades ~ Poisson(rate); feed latency ~ lognormal; jitter U(0,0.5s); response 0.3s.
+  S_p99 = p99(capturedAt - effectiveAt) of stored rows at 3s, the statistic GPT measured
+  (2026-10-14: Samsung 1.66 s, Kia 3.54 s). ER = share of session time execute-eligible.
+| trades/s | feed latency p50/p99 | S_p99 @3s | ER 3s | ER 4s | ER 5s | ER 6s | ER 5s, 2% skipped cycles |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 5 | 0.3/1.0 s | 1.42s | 100.00% | 100.00% | 100.00% | 100.00% | 99.75% |
+| 5 | 0.6/2.5 s | 2.69s | 100.00% | 100.00% | 100.00% | 99.99% | 99.60% |
+| 1 | 0.3/1.0 s | 3.20s | 99.97% | 99.93% | 99.83% | 99.61% | 99.16% |
+| 1 | 0.6/2.5 s | 3.65s | 99.95% | 99.83% | 99.71% | 99.27% | 98.90% |
+| 0.5 | 0.3/1.0 s | 3.42s | 98.12% | 97.46% | 96.51% | 95.16% | 95.67% |
+| 0.5 | 0.6/2.5 s | 3.94s | 97.61% | 96.78% | 95.76% | 93.72% | 94.69% |
+| 0.2 | 0.3/1.0 s | 3.57s | 81.20% | 78.84% | 76.41% | 73.49% | 75.44% |
+| 0.2 | 0.6/2.5 s | 4.17s | 79.54% | 76.97% | 74.53% | 70.99% | 73.60% |
+
+## 7. DB growth (row sizes unmeasured: price 0.4-2.0 KB, slim 0.35-0.6 KB, book 0.9-3.0 KB incl. indexes)
+  headroom used for "days": 2.6 GB (GPT: 10 GB disk, ~7.40 GB used; observation time not recorded)
+| case | price rows/day | book rows/day | MB/trading day | trading days to fill headroom | GB per 22-session month |
+|---|---:|---:|---:|---:|---:|
+| S0 now: N=15, 3s, price+book, full raw | 111,150 | 117,000 | 146–560 | 5–18 | 3.1–12.0 |
+| stage 1: N=15, 3s, book off, slim raw | 111,150 | 0 | 38–65 | 41–70 | 0.8–1.4 |
+| F N=25, 3s, slim raw | 185,250 | 0 | 63–109 | 25–42 | 1.4–2.3 |
+| F N=50, 3s, slim raw | 370,500 | 0 | 127–217 | 12–21 | 2.7–4.7 |
+| F N=100, 5s, full raw (no slimming) | 444,600 | 0 | 174–868 | 3–15 | 3.7–18.7 |
+| F N=100, 5s, slim raw | 444,600 | 0 | 152–261 | 10–18 | 3.3–5.6 |
+| F N=100, 6s, slim raw | 370,500 | 0 | 127–217 | 12–21 | 2.7–4.7 |
+  sync-state rows/day N=15: F before compaction ~1,215, after daily compaction ~30; v1-style 10-min sync incl. KRX 6,480
+  sync-state rows/day N=100: F before compaction ~8,100, after daily compaction ~200; v1-style 10-min sync incl. KRX 43,200
+  5m candle rows/day N=100: 7,600; 45-day retention holds <= 258,400; 4h 200/day; 1d 100/day
+
+## 8. Largest universe within 80% of the worst-month cap (F normal, 1w weekly on)
 | price T | 1m cadence | N_max best split | N_max worst split | month at N=100 best/worst |
 |---|---|---:|---:|---:|
-| 4s | 5m | 80 | 80 | 84% / 97% |
-| 4s | 10m | 100 | 81 | 75% / 88% |
-| 5s | 5m | 100 | 93 | 71% / 81% |
-| 5s | 10m | 120 | 101 | 62% / 73% |
-| 6s | 5m | 120 | 102 | 62% / 71% |
-| 6s | 10m | 140 | 121 | 54% / 62% |
+| 4s | 5m | 84 | 81 | 83% / 96% |
+| 4s | 10m | 100 | 81 | 74% / 87% |
+| 5s | 5m | 100 | 98 | 70% / 80% |
+| 5s | 10m | 120 | 101 | 61% / 72% |
+| 6s | 5m | 120 | 107 | 61% / 70% |
+| 6s | 10m | 140 | 121 | 53% / 61% |
