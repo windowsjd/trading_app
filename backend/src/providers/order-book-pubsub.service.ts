@@ -7,9 +7,15 @@ import {
 import IORedis from 'ioredis';
 import { readRedisConfig } from '../redis/redis.config';
 import { RedisService } from '../redis/redis.service';
+import {
+  parseFuturesOrderBookEvent,
+  type FuturesOrderBookEvent,
+} from '../futures/futures-market-data';
 import { parseOrderBookEvent, type OrderBookEvent } from './order-book.types';
 
 export const ORDER_BOOK_CHANNEL = 'market:order-book:v1';
+/** USDⓈ-M books travel on their own channel: never interchangeable with Spot. */
+export const FUTURES_ORDER_BOOK_CHANNEL = 'market:futures-order-book:v1';
 
 /** Transient cross-instance fanout, independent of the live-candle feature gate. */
 @Injectable()
@@ -17,7 +23,11 @@ export class OrderBookPubSubService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OrderBookPubSubService.name);
   private client: IORedis | null = null;
   private readonly listeners = new Set<(event: OrderBookEvent) => void>();
+  private readonly futuresListeners = new Set<
+    (event: FuturesOrderBookEvent) => void
+  >();
   private publishUnavailable = false;
+  private futuresPublishUnavailable = false;
 
   constructor(private readonly redis: RedisService) {}
 
@@ -35,13 +45,21 @@ export class OrderBookPubSubService implements OnModuleInit, OnModuleDestroy {
     });
     this.client = client;
     client.on('ready', () => {
-      void client.subscribe(ORDER_BOOK_CHANNEL).catch(() => {});
+      void client
+        .subscribe(ORDER_BOOK_CHANNEL, FUTURES_ORDER_BOOK_CHANNEL)
+        .catch(() => {});
     });
     client.on('message', (channel: string, message: string) => {
-      if (channel !== ORDER_BOOK_CHANNEL) return;
-      const event = parseOrderBookEvent(message);
+      if (channel === ORDER_BOOK_CHANNEL) {
+        const event = parseOrderBookEvent(message);
+        if (!event) return;
+        for (const listener of this.listeners) listener(event);
+        return;
+      }
+      if (channel !== FUTURES_ORDER_BOOK_CHANNEL) return;
+      const event = parseFuturesOrderBookEvent(message);
       if (!event) return;
-      for (const listener of this.listeners) listener(event);
+      for (const listener of this.futuresListeners) listener(event);
     });
     client.on('error', () => {});
     void client.connect().catch(() => {});
@@ -51,6 +69,13 @@ export class OrderBookPubSubService implements OnModuleInit, OnModuleDestroy {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
+    };
+  }
+
+  subscribeFutures(listener: (event: FuturesOrderBookEvent) => void) {
+    this.futuresListeners.add(listener);
+    return () => {
+      this.futuresListeners.delete(listener);
     };
   }
 
@@ -67,13 +92,30 @@ export class OrderBookPubSubService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  async publishFutures(event: FuturesOrderBookEvent): Promise<boolean> {
+    try {
+      await this.redis.publish(
+        FUTURES_ORDER_BOOK_CHANNEL,
+        JSON.stringify(event),
+      );
+      this.futuresPublishUnavailable = false;
+      return true;
+    } catch {
+      if (!this.futuresPublishUnavailable)
+        this.logger.warn('FUTURES_ORDER_BOOK_PUBLISH_FAILED');
+      this.futuresPublishUnavailable = true;
+      return false;
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
     const client = this.client;
     this.client = null;
     this.listeners.clear();
+    this.futuresListeners.clear();
     if (!client) return;
     try {
-      await client.unsubscribe(ORDER_BOOK_CHANNEL);
+      await client.unsubscribe(ORDER_BOOK_CHANNEL, FUTURES_ORDER_BOOK_CHANNEL);
       await client.quit();
     } catch {
       client.disconnect();

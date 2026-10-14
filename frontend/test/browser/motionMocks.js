@@ -1,7 +1,7 @@
 // Deterministic, read-only transport. Never imported by the application.
 import { apiClient as rootClient, transport, useMarketTickers } from './rootTabsMocks';
-import { apiClient as tradingClient, assets, useAssetTicker, useAssetCandle, useAssetOrderBook } from './tradingMocks';
-export { transport, useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook };
+import { apiClient as tradingClient, assets, useAssetTicker, useAssetCandle, useAssetOrderBook, useFuturesOrderBook } from './tradingMocks';
+export { transport, useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook, useFuturesOrderBook };
 export const getRequestGeneration = () => 0;
 export const timing = { delay: 0, requests: [] };
 const response = data => ({ data: { success: true, data } });

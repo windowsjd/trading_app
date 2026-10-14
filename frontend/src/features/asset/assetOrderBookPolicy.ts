@@ -41,13 +41,19 @@ function label(value: unknown): value is string {
 
 /** Malformed live data never becomes an apparently valid partial snapshot. */
 export function parseAssetOrderBook(value: unknown, assetId: string): AssetOrderBook | null {
-  if (!record(value) || value.type !== 'asset_order_book' || value.assetId !== assetId ||
-    !label(value.priceUnit) || !label(value.quantityUnit) ||
+  if (!record(value) || value.type !== 'asset_order_book' || value.assetId !== assetId) return null;
+  return parseOrderBookSnapshot(value, assetId);
+}
+
+/** Ladder fields shared by Spot and USDⓈ-M books; the caller has already
+ * checked the message type and its own identity (asset or instrument). */
+export function parseOrderBookSnapshot(value: Record<string, unknown>, id: string): AssetOrderBook | null {
+  if (!label(value.priceUnit) || !label(value.quantityUnit) ||
     (value.marketLabel !== undefined && !label(value.marketLabel)) ||
     !levels(value.asks) || !levels(value.bids) || !time(value.capturedAt) ||
     (value.effectiveAt != null && !time(value.effectiveAt))) return null;
   return normalizeOrderBook({
-    assetId, priceUnit: value.priceUnit, quantityUnit: value.quantityUnit,
+    assetId: id, priceUnit: value.priceUnit, quantityUnit: value.quantityUnit,
     ...(label(value.marketLabel) ? { marketLabel: value.marketLabel } : {}),
     asks: value.asks, bids: value.bids,
     capturedAt: value.capturedAt, effectiveAt: time(value.effectiveAt) ? value.effectiveAt : null,

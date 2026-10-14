@@ -231,6 +231,37 @@ fixture('Binance REST shared Redis fixture (all HTTP is mocked)', () => {
     await coordinator.complete(next, 'success');
   });
 
+  // An unlisted route reserves 80: 7 fit the default 600, 15 fit 1200.
+  it.each([
+    ['unset', 7],
+    ['1200', 15],
+  ] as const)(
+    'admits exactly the configured per-minute budget (%s)',
+    async (budget, admitted) => {
+      if (budget === 'unset')
+        delete process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
+      else process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = budget;
+      // Keep every call inside one Redis minute window.
+      const intoMinute = Date.now() % 60_000;
+      if (intoMinute > 50_000)
+        await new Promise((resolve) =>
+          setTimeout(resolve, 60_500 - intoMinute),
+        );
+      const fetch = jest
+        .spyOn(global, 'fetch')
+        .mockImplementation(() => Promise.resolve(success()));
+      const client = new ProviderHttpClient(redis);
+      const unlisted = 'https://fixture.invalid/api/v3/unlisted';
+      for (let i = 0; i < admitted; i++)
+        await client.getJson(unlisted, options);
+      await expect(client.getJson(unlisted, options)).rejects.toMatchObject({
+        code: 'PROVIDER_RATE_LIMITED',
+      });
+      expect(fetch).toHaveBeenCalledTimes(admitted);
+    },
+    20_000,
+  );
+
   it('reserves request weight atomically and uses observed IP weight', async () => {
     process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = '20';
     const fetch = jest

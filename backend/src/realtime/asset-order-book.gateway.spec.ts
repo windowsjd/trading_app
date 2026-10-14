@@ -19,6 +19,7 @@ import { BinanceRealtimePriceEventBus } from '../providers/binance/binance-realt
 import { MarketPriceEventService } from '../providers/market-price-event.service';
 import { KisRealtimePriceEventBus } from '../providers/kis/kis-realtime-price-event-bus.service';
 import type { OrderBookEvent } from '../providers/order-book.types';
+import type { FuturesOrderBookEvent } from '../futures/futures-market-data';
 import { MarketOrderBookSubscriptionService } from '../providers/market-order-book-subscription.service';
 
 const target = { assetId: 'btc', symbol: 'BTCUSDT', baseAsset: 'BTC' };
@@ -62,9 +63,48 @@ const request = (assetId = 'btc', type = 'subscribe') => ({
   assetId,
 });
 
+const verifiedInstrument = () => ({
+  id: 'instrument-btc',
+  underlyingAssetId: 'btc',
+  isActive: true,
+  productType: 'synthetic_perpetual',
+  settlementCurrency: 'USD',
+  markVerifiedAt: new Date(Date.now() - 60_000),
+  markContractJson: {
+    symbol: 'BTCUSDT',
+    pair: 'BTCUSDT',
+    baseAsset: 'BTC',
+    contractType: 'PERPETUAL',
+    status: 'TRADING',
+    quoteAsset: 'USDT',
+    marginAsset: 'USDT',
+    underlyingType: 'COIN',
+  },
+  underlyingAsset: {
+    symbol: 'BTCUSDT',
+    isActive: true,
+    assetType: 'crypto',
+    market: 'BINANCE',
+    currencyCode: 'USD',
+    priceCurrency: 'USD',
+    settlementCurrency: 'USD',
+  },
+});
+
 function setup() {
   let receive: (event: OrderBookEvent) => void = () => {};
+  let receiveFutures: (event: FuturesOrderBookEvent) => void = () => {};
   const off = jest.fn();
+  const offFutures = jest.fn();
+  const instruments = {
+    findUnique: jest
+      .fn()
+      .mockImplementation(({ where }: { where: { id: string } }) =>
+        Promise.resolve(
+          where.id === 'instrument-btc' ? verifiedInstrument() : null,
+        ),
+      ),
+  };
   const books = {
     loadTargets: jest.fn().mockResolvedValue(
       new Map([
@@ -98,8 +138,15 @@ function setup() {
         receive = listener;
         return off;
       },
+      subscribeFutures: (listener: typeof receiveFutures) => {
+        receiveFutures = listener;
+        return offFutures;
+      },
     } as never,
-    new MarketOrderBookSubscriptionService(books as never),
+    new MarketOrderBookSubscriptionService(
+      books as never,
+      { futuresInstrument: instruments } as never,
+    ),
   );
   gateway.onModuleInit();
   const internals = gateway as unknown as {
@@ -116,9 +163,24 @@ function setup() {
   return {
     gateway,
     books,
+    instruments,
     off,
+    offFutures,
     internals,
+    futures: (socket: Client) =>
+      (
+        gateway as unknown as {
+          futuresOrderBooks: WeakMap<
+            object,
+            {
+              subscriptions: Map<string, unknown>;
+              pending: Map<string, FuturesOrderBookEvent>;
+            }
+          >;
+        }
+      ).futuresOrderBooks.get(internals.clients.get(socket)!),
     push: (event: OrderBookEvent) => receive(event),
+    pushFutures: (event: FuturesOrderBookEvent) => receiveFutures(event),
     connect: (socket: Client) =>
       gateway.handleConnection(
         socket as never,
@@ -312,6 +374,176 @@ describe('asset_order_book app WebSocket', () => {
       await h.connect(socket);
       await h.send(socket, request());
       expect(messages(socket).at(-1)?.code).toBe('ORDER_BOOK_UNAVAILABLE');
+    } finally {
+      h.gateway.onModuleDestroy();
+    }
+  });
+});
+
+function futuresEvent(
+  sequence = '1',
+  instrumentId = 'instrument-btc',
+  quantityUnit = 'BTC',
+): FuturesOrderBookEvent {
+  return {
+    type: 'futures_order_book',
+    sequence,
+    book: {
+      instrumentId,
+      symbol: 'BTCUSDT',
+      priceUnit: 'USDT',
+      quantityUnit,
+      marketLabel: 'BTC / USDT 무기한',
+      asks: [{ price: '62000.50000000', quantity: '1.250' }],
+      bids: [{ price: '62000.10000000', quantity: '0.500' }],
+      capturedAt: '2026-10-14T00:00:00.000Z',
+      effectiveAt: '2026-10-14T00:00:00.000Z',
+    },
+  };
+}
+const futuresRequest = (
+  instrumentId: unknown = 'instrument-btc',
+  type = 'subscribe',
+) => ({
+  type,
+  channel: 'futures_order_book',
+  instrumentId,
+});
+
+describe('futures_order_book app WebSocket', () => {
+  afterEach(() => jest.useRealTimers());
+
+  it.each([null, '', 123, 'x'.repeat(81)])(
+    'returns a channel-specific error for invalid instrumentId %j',
+    async (instrumentId) => {
+      const h = setup();
+      const socket = client();
+      try {
+        await h.connect(socket);
+        await h.send(socket, futuresRequest(instrumentId));
+        expect(messages(socket).at(-1)).toMatchObject({
+          type: 'subscription_error',
+          channel: 'futures_order_book',
+          code: 'INVALID_SUBSCRIPTION',
+        });
+        expect(h.instruments.findUnique).not.toHaveBeenCalled();
+      } finally {
+        h.gateway.onModuleDestroy();
+      }
+    },
+  );
+
+  it('delivers contract books only to that instrument, never across Spot/Futures', async () => {
+    const h = setup();
+    const futures = client();
+    const spot = client();
+    try {
+      await h.connect(futures);
+      await h.connect(spot);
+      await h.send(futures, futuresRequest());
+      await h.send(spot, request('btc'));
+      expect(messages(futures)).toEqual([
+        {
+          type: 'subscribed',
+          channel: 'futures_order_book',
+          instrumentId: 'instrument-btc',
+        },
+      ]);
+      h.pushFutures(futuresEvent('7'));
+      expect(messages(futures).at(-1)).toEqual({
+        type: 'futures_order_book',
+        ...futuresEvent('7').book,
+      });
+      expect(messages(futures).at(-1)).not.toHaveProperty('sequence');
+      // The underlying Spot book never reaches the contract subscriber, and
+      // the contract book never reaches the Spot subscriber of 'btc'.
+      h.push(snapshot('8'));
+      expect(messages(futures)).toHaveLength(2);
+      expect(messages(spot).map((m) => m.type)).toEqual([
+        'subscribed',
+        'asset_order_book',
+      ]);
+      // Repeated/older sequences and mismatched units are dropped.
+      h.pushFutures(futuresEvent('7'));
+      h.pushFutures(futuresEvent('6'));
+      h.pushFutures(futuresEvent('9', 'instrument-btc', 'ETH'));
+      expect(messages(futures)).toHaveLength(2);
+    } finally {
+      h.gateway.onModuleDestroy();
+      expect(h.offFutures).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('refuses unknown contracts and fails closed when lookup is unavailable', async () => {
+    const h = setup();
+    const socket = client();
+    try {
+      await h.connect(socket);
+      await h.send(socket, futuresRequest('instrument-unknown'));
+      expect(messages(socket).at(-1)).toMatchObject({
+        type: 'subscription_error',
+        channel: 'futures_order_book',
+        instrumentId: 'instrument-unknown',
+        code: 'UNSUPPORTED_INSTRUMENT',
+      });
+      expect(h.futures(socket)?.subscriptions.size).toBe(0);
+      h.instruments.findUnique.mockRejectedValueOnce(new Error('db down'));
+      await h.send(socket, futuresRequest());
+      expect(messages(socket).at(-1)?.code).toBe('ORDER_BOOK_UNAVAILABLE');
+      expect(h.futures(socket)?.subscriptions.size).toBe(0);
+    } finally {
+      h.gateway.onModuleDestroy();
+    }
+  });
+
+  it('coalesces latest-only under backpressure and cleans up on unsubscribe/disconnect', async () => {
+    jest.useFakeTimers();
+    const h = setup();
+    const socket = client();
+    try {
+      await h.connect(socket);
+      await h.send(socket, futuresRequest());
+      const books = h.futures(socket)!;
+      socket.bufferedAmount = 100;
+      for (let i = 1; i <= 30; i++) h.pushFutures(futuresEvent(String(i)));
+      expect(books.pending.size).toBe(1);
+      expect(books.pending.get('instrument-btc')?.sequence).toBe('30');
+      expect(messages(socket)).toHaveLength(1);
+      socket.bufferedAmount = 0;
+      jest.advanceTimersByTime(100);
+      expect(messages(socket)).toHaveLength(2);
+      expect(books.pending.size).toBe(0);
+      socket.bufferedAmount = 100;
+      h.pushFutures(futuresEvent('31'));
+      await h.send(socket, futuresRequest('instrument-btc', 'unsubscribe'));
+      expect(messages(socket).at(-1)).toEqual({
+        type: 'unsubscribed',
+        channel: 'futures_order_book',
+        instrumentId: 'instrument-btc',
+      });
+      expect(books.pending.size).toBe(0);
+      expect(books.subscriptions.size).toBe(0);
+      h.gateway.handleDisconnect(socket as never);
+      expect(h.internals.clients.size).toBe(0);
+    } finally {
+      h.gateway.onModuleDestroy();
+    }
+  });
+
+  it('bounds concurrent contract subscriptions per client', async () => {
+    const h = setup();
+    const socket = client();
+    h.instruments.findUnique.mockReturnValue(new Promise(() => {}));
+    try {
+      await h.connect(socket);
+      void Promise.all(
+        Array.from({ length: 21 }, (_, i) =>
+          h.send(socket, futuresRequest(`instrument-${i}`)),
+        ),
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(h.instruments.findUnique).toHaveBeenCalledTimes(20);
+      expect(messages(socket).at(-1)?.code).toBe('SUBSCRIPTION_LIMIT');
     } finally {
       h.gateway.onModuleDestroy();
     }

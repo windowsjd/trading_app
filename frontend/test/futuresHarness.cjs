@@ -8,7 +8,7 @@ const { deferred } = require('./walletTransferHarness.cjs');
 const { conditionalFixture } = require('./conditionalFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 function futuresHarness(options = {}) {
-  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], options, session: 1 };
+  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], orderBookRequests: [], options, session: 1 };
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = client.invalidateQueries.bind(client);
   client.invalidateQueries = config => { h.invalidations.push(config?.queryKey ?? []); return invalidate(config); };
@@ -29,6 +29,8 @@ function futuresHarness(options = {}) {
         const f = futuresFixture(h.wrongScope ?? id, h.options);
         if (path.includes('limit-orders')) return { data: { data: { tradingAccountId: h.wrongScope ?? id, orders: h.pendingEntries ?? [], pagination: { limit: 100, offset: 0, total: h.pendingEntries?.length ?? 0, returned: h.pendingEntries?.length ?? 0, nextOffset: null } } } };
         const key = path.includes('instruments') ? 'catalog' : path.includes('positions') ? 'positions' : path.includes('executions') ? 'executions' : path.includes('liquidations') ? 'liquidations' : 'final';
+        // Market list tests replace the catalog's contracts (24h statistics etc.).
+        if (key === 'catalog' && h.catalogInstruments) return { data: { success: true, data: { ...f.catalog, instruments: h.catalogInstruments(f.catalog.instruments[0]) } } };
         return { data: { success: true, data: f[key] } };
       },
       post: async (path, body) => {
@@ -64,6 +66,13 @@ function futuresHarness(options = {}) {
     '../../services/api/sessionOwnership': { getSessionGeneration: () => h.session, isCurrentSession: owner => owner === h.session },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     '../../components/charts/CandlestickChart': { default: 'CandlestickChart', __esModule: true },
+    // Contract ladder: screens observe the subscription request and render
+    // whatever book state a test sets (no socket in unit tests).
+    '../../constants/env': { buildWsUrl: () => 'wss://app.example/api/v1/ws' },
+    '../../features/futures/useFuturesOrderBook': { useFuturesOrderBook: (request) => {
+      h.orderBookRequests.push(request);
+      return h.orderBookState ?? { latestOrderBook: null, statusMessage: '호가 정보를 불러오는 중입니다.' };
+    } },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
   };
   if (options.diagnostics) {
@@ -75,7 +84,10 @@ function futuresHarness(options = {}) {
     client.setQueryData(['me'], me);
   }
   const screen = load(resolve(__dirname, options.screen === 'market' ? '../src/screens/market/FuturesMarketList.tsx' : '../src/screens/futures/FuturesScreen.tsx'), mocks).default;
-  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: { accountId: h.routeAccountId, instrumentId: options.instrumentId } }, navigation: { navigate: (...args) => h.navigation.push(args) }, onSelect: (...args) => h.navigation.push(args) }));
+  // The market list's sort/refresh are owned by MarketScreen; tests drive them.
+  h.sort = 'turnover_desc'; h.refreshVersion = 0;
+  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: { accountId: h.routeAccountId, instrumentId: options.instrumentId } }, navigation: { navigate: (...args) => h.navigation.push(args) }, onSelect: (...args) => h.navigation.push(args),
+    sort: h.sort, onSortChange: sort => { h.sort = sort; }, refreshVersion: h.refreshVersion }));
   h.flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); }); };
   h.start = async () => { await act(async () => { h.renderer = create(tree()); }); await h.flush(); };
   h.update = async () => { await act(async () => h.renderer.update(tree())); await h.flush(); };

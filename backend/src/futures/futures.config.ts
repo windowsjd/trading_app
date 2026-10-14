@@ -45,10 +45,23 @@ export function futuresLastPriceConfig(env: NodeJS.ProcessEnv = process.env) {
     ),
   };
 }
+/** Display-only order book and 24h statistics streams (no REST, no finance
+ * authority). They follow Futures Last ingestion unless set explicitly. */
+export function futuresMarketDataConfig(env: NodeJS.ProcessEnv = process.env) {
+  return {
+    streaming: parseLimitOrderEnabled(
+      env.FUTURES_MARKET_DATA_STREAMING_ENABLED ??
+        env.FUTURES_LAST_PRICE_INGESTION_ENABLED ??
+        env.FUTURES_MARK_INGESTION_ENABLED,
+      'FUTURES_MARKET_DATA_STREAMING_ENABLED',
+    ),
+  };
+}
 export function validateFuturesConfig(env: NodeJS.ProcessEnv = process.env) {
   const mode = futuresTradingMode(env);
   const risk = futuresRiskConfig(env);
   const last = futuresLastPriceConfig(env);
+  futuresMarketDataConfig(env);
   if (mode === 'ENABLED' && (!risk.enabled || !risk.ingestion))
     throw new Error(
       'FUTURES_TRADING_MODE ENABLED requires FUTURES_RISK_ENGINE_ENABLED and FUTURES_MARK_INGESTION_ENABLED',

@@ -53,7 +53,7 @@ async function build() {
           b.onResolve(
             {
               filter:
-                /(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useMarketTickers)$/,
+                /(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook|useMarketTickers)$/,
             },
             () => ({ path: mocks }),
           );

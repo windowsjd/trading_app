@@ -7,6 +7,12 @@ const LEASES = 'provider:{binance-rest}:leases';
 const MAX_WAIT_MS = 7 * 86_400_000;
 const STATE_TTL_MS = MAX_WAIT_MS + 86_400_000;
 export const BINANCE_REST_MAX_CONCURRENCY = 2;
+/** Used when the variable is unset; production opts into more explicitly. */
+export const BINANCE_REST_DEFAULT_WEIGHT_BUDGET = 600;
+/** Application ceiling for Spot + USDⓈ-M together. Binance limits each
+ * product per IP separately (Spot 6000, USDⓈ-M 2400 weight/min), so even a
+ * budget spent entirely on one product stays at half of its own limit. */
+export const BINANCE_REST_MAX_WEIGHT_BUDGET = 1200;
 
 // All time and admission decisions are atomic and use the Redis server clock.
 const ACQUIRE = `
@@ -66,16 +72,20 @@ export class BinanceRestCoordinator {
   private pendingRestriction: { deadline: number; status: number } | undefined;
 
   constructor(private readonly redis: RedisService) {
-    const raw = process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE ?? '600';
+    const raw =
+      process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE ??
+      String(BINANCE_REST_DEFAULT_WEIGHT_BUDGET);
     const budget = Number(raw);
     if (
       !/^\d+$/u.test(raw) ||
       !Number.isInteger(budget) ||
       budget < 20 ||
-      budget > 600
+      budget > BINANCE_REST_MAX_WEIGHT_BUDGET
     ) {
       // @diagnosticSurface internal: Invalid local budget is caught by ingestion/Ops boundaries; the message contains only the public configuration key and range.
-      throw new Error('BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE must be 20..600.');
+      throw new Error(
+        'BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE must be 20..1200.',
+      );
     }
     this.budget = budget;
   }

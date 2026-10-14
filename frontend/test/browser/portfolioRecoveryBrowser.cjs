@@ -12,7 +12,7 @@ async function run() {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
       b.onResolve({ filter: /services\/api\/client$/ }, () => ({ path: path.join(__dirname, 'portfolioRecoveryMocks.js') }));
       b.onResolve({ filter: /useMarketTickers$/ }, () => ({ path: path.join(__dirname, 'portfolioRecoveryMocks.js') }));
-      b.onResolve({ filter: /(useAssetTicker|useAssetCandle|useAssetOrderBook)$/ }, () => ({ path: path.join(__dirname, 'tradingMocks.js') }));
+      b.onResolve({ filter: /(useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook)$/ }, () => ({ path: path.join(__dirname, 'tradingMocks.js') }));
     } }], logLevel: 'warning' });
   const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', req.url.startsWith('/bundle.js') ? 'text/javascript' : 'text/html');

@@ -1,5 +1,5 @@
 import { conditionalFixture } from '../conditionalFixtures.cjs';
-import { futuresFixture, accounts, futuresCandlesFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, accounts, futuresCandlesFixture, futuresOrderBookFixture } from '../futuresFixtures.cjs';
 const params = new URLSearchParams(location.search);
 export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED' };
 export const useIsFocused = () => true;
@@ -9,6 +9,8 @@ export const createNavigationContainerRef = () => ({ isReady: () => false, navig
   getCurrentRoute: () => undefined, getRootState: () => undefined, addListener: () => () => {} });
 export const StackActions = { push: (...payload) => ({ type: 'PUSH', payload }), pop: (count) => ({ type: 'POP', payload: { count } }),
   popToTop: () => ({ type: 'POP_TO_TOP' }), replace: (...payload) => ({ type: 'REPLACE', payload }) };
+// USDⓈ-M ladder transport (`?futuresBook=loading|stale|large`).
+export const useFuturesOrderBook = ({ instrumentId }) => futuresOrderBookFixture(instrumentId, params.get('futuresBook') ?? 'book');
 export const useTradingAccount = () => ({ accounts, selectedAccountId: state.accountId, isLoading: false });
 export const apiClient = {
   async get(path) {

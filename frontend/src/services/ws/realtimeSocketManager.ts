@@ -23,6 +23,7 @@ export type RealtimeChannel =
   | 'asset_candle'
   | 'asset_order_book'
   | 'asset_estimated_quote'
+  | 'futures_order_book'
   | 'fx_rate';
 
 export type RealtimeSubscriptionSpec =
@@ -35,12 +36,22 @@ export type RealtimeSubscriptionSpec =
       assetId: string;
       interval?: string;
       pair?: never;
+      instrumentId?: never;
+    }
+  | {
+      // A USDⓈ-M contract book is keyed by instrument, never by asset.
+      channel: 'futures_order_book';
+      instrumentId: string;
+      assetId?: never;
+      interval?: never;
+      pair?: never;
     }
   | {
       channel: 'fx_rate';
       pair: 'USD/KRW';
       assetId?: never;
       interval?: never;
+      instrumentId?: never;
     };
 
 export type RealtimeSocketStatus =
@@ -68,6 +79,7 @@ type RoutedPayload = {
   type?: string;
   channel?: string;
   assetId?: string;
+  instrumentId?: string;
   interval?: string;
   pair?: string;
   code?: string;
@@ -100,7 +112,7 @@ type SubscriptionEntry = {
 };
 
 function subscriptionKey(spec: RealtimeSubscriptionSpec): string {
-  return `${spec.channel}|${spec.assetId ?? spec.pair}|${spec.interval ?? ''}`;
+  return `${spec.channel}|${spec.assetId ?? spec.instrumentId ?? spec.pair}|${spec.interval ?? ''}`;
 }
 
 function appendToken(wsUrl: string, token: string | null): string {
@@ -414,6 +426,12 @@ export class RealtimeSocketManager {
       }
       return;
     }
+    if (payload.type === 'futures_order_book') {
+      if (typeof payload.instrumentId === 'string' && payload.instrumentId) {
+        this.emitToMatches('futures_order_book', payload, false);
+      }
+      return;
+    }
     if (payload.type === 'fx_rate_updated') {
       this.emitToMatches('fx_rate', payload, true);
       return;
@@ -423,6 +441,7 @@ export class RealtimeSocketManager {
       payload.channel === 'asset_candle' ||
       payload.channel === 'asset_order_book' ||
       payload.channel === 'asset_estimated_quote' ||
+      payload.channel === 'futures_order_book' ||
       payload.channel === 'fx_rate'
     ) {
       this.emitToMatches(payload.channel, payload, false);
@@ -440,7 +459,7 @@ export class RealtimeSocketManager {
   private findEntry(payload: RoutedPayload): SubscriptionEntry | undefined {
     if (typeof payload.channel !== 'string') return undefined;
     return this.subscriptions.get(
-      `${payload.channel}|${payload.assetId ?? payload.pair ?? ''}|${payload.interval ?? ''}`,
+      `${payload.channel}|${payload.assetId ?? payload.instrumentId ?? payload.pair ?? ''}|${payload.interval ?? ''}`,
     );
   }
 
@@ -453,6 +472,11 @@ export class RealtimeSocketManager {
       if (entry.spec.channel !== channel) continue;
       if (channel === 'fx_rate' && payload.pair !== entry.spec.pair) continue;
       if (payload.assetId && entry.spec.assetId !== payload.assetId) continue;
+      if (
+        payload.instrumentId &&
+        entry.spec.instrumentId !== payload.instrumentId
+      )
+        continue;
       if (
         dataMessage &&
         entry.spec.interval &&
@@ -504,6 +528,11 @@ export class RealtimeSocketManager {
     if (payload.type !== 'subscription_error' && payload.type !== 'error')
       return;
     if (payload.assetId && payload.assetId !== entry.spec.assetId) return;
+    if (
+      payload.instrumentId &&
+      payload.instrumentId !== entry.spec.instrumentId
+    )
+      return;
     if (payload.interval && payload.interval !== entry.spec.interval) return;
     if (payload.pair && payload.pair !== entry.spec.pair) return;
     entry.runtime.subscriptionError = true;
@@ -547,7 +576,9 @@ export class RealtimeSocketManager {
           channel: entry.spec.channel,
           ...(entry.spec.channel === 'fx_rate'
             ? { pair: entry.spec.pair }
-            : { assetId: entry.spec.assetId }),
+            : entry.spec.channel === 'futures_order_book'
+              ? { instrumentId: entry.spec.instrumentId }
+              : { assetId: entry.spec.assetId }),
           ...(entry.spec.interval ? { interval: entry.spec.interval } : {}),
         }),
       );

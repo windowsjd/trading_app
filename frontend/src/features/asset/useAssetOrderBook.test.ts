@@ -18,12 +18,15 @@ function setup() {
   const { useStaleRecheck } = h.load('src/features/asset/useStaleRecheck.ts', {
     './assetTickerPolicy': { STALE_RECHECK_INTERVAL_MS: 5000 },
   });
-  const { useAssetOrderBook } = h.load('src/features/asset/useAssetOrderBook.ts', {
+  const stream = h.load('src/features/asset/orderBookStream.ts', {
     './assetOrderBookPolicy': policy, './useStaleRecheck': { useStaleRecheck },
     '../../services/ws/sharedRealtimeSocket': { getRealtimeSocketManager: () => ({ subscribe: (spec: { assetId: string }, listener: (event: RealtimeSubscriptionEvent) => void) => {
       const entry = { spec, listener, released: false }; subscriptions.push(entry);
       return () => { entry.released = true; };
     } }) },
+  });
+  const { useAssetOrderBook } = h.load('src/features/asset/useAssetOrderBook.ts', {
+    './assetOrderBookPolicy': policy, './orderBookStream': stream,
   });
   let result: any;
   const renders: any[] = [];

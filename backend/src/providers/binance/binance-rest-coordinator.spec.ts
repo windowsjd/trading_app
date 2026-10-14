@@ -114,3 +114,42 @@ describe('Binance safe HTTP restriction metadata', () => {
     expect(args[3]).toBe('418');
   });
 });
+
+describe('Binance REST weight budget configuration', () => {
+  const original = process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
+  afterEach(() => {
+    if (original === undefined)
+      delete process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
+    else process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = original;
+  });
+  // The budget is ARGV[4] of the atomic admission script (index 3 here).
+  const admittedBudget = async () => {
+    const evalRedis = jest.fn().mockResolvedValue([1, 0, 0]);
+    await new BinanceRestCoordinator({ eval: evalRedis } as never).acquire(
+      'https://api.binance.com/api/v3/klines?symbol=BTCUSDT',
+      1000,
+    );
+    const calls = evalRedis.mock.calls as unknown[][];
+    return (calls[0][2] as string[])[3];
+  };
+
+  it('keeps 600 when the variable is unset', async () => {
+    delete process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
+    expect(await admittedBudget()).toBe('600');
+  });
+
+  it.each(['20', '600', '1199', '1200'])('accepts %s', async (value) => {
+    process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = value;
+    expect(await admittedBudget()).toBe(value);
+  });
+
+  it.each(['19', '0', '1201', '2400', '1e3', ' 600', '600.0', '', '-600'])(
+    'rejects %j with the public range only',
+    (value) => {
+      process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = value;
+      expect(() => new BinanceRestCoordinator({} as never)).toThrow(
+        'BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE must be 20..1200.',
+      );
+    },
+  );
+});

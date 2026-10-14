@@ -63,6 +63,8 @@ export default function MarketScreen({ navigation, route }: Props) {
   }, [route?.params?.assetType, navigation]);
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
   const futuresMarket = selectedTab === 'crypto' && cryptoProduct === 'futures';
+  // Pull-to-refresh on the 선물 list refetches and re-ranks it (Spot's sortRefresh).
+  const [futuresRefresh, setFuturesRefresh] = useState(0);
   useTradingGuideFacts({ screen: 'market', accountId: guide?.active?.accountId ?? '', assetType: selectedTab });
   const sortParams = marketSortParams(sort);
   const refreshSort = useRef(false);
@@ -92,7 +94,7 @@ export default function MarketScreen({ navigation, route }: Props) {
   });
 
   const refresh = usePullToRefresh([marketQuery],
-    () => { refreshSort.current = true; },
+    () => { refreshSort.current = true; if (futuresMarket) setFuturesRefresh((value) => value + 1); },
     () => { refreshSort.current = false; });
 
   // REST is the baseline and stays untouched: rows receive their ticker as a
@@ -176,7 +178,8 @@ export default function MarketScreen({ navigation, route }: Props) {
                   { key: 'futures', label: '선물', accessibilityLabel: '암호화폐 선물', testID: 'crypto-product-futures' },
                 ]} />
             ) : null}
-            {futuresMarket ? <FuturesMarketList onSelect={(accountId, instrumentId) => navigation.navigate('Futures', { accountId, instrumentId })} /> : <>
+            {futuresMarket ? <FuturesMarketList sort={sort} onSortChange={setSort} refreshVersion={futuresRefresh}
+              onSelect={(accountId, instrumentId) => navigation.navigate('Futures', { accountId, instrumentId })} /> : <>
             <ActionPressable
               style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch', { sort })}

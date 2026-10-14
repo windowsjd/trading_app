@@ -12,7 +12,7 @@ async function bundle(baseline) {
     define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' }, loader: { '.png': 'dataurl' }, logLevel: 'warning',
     plugins: [{ name: 'primary-fixture', setup(b) {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
-      b.onResolve({ filter: /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook)$/ }, () => ({ path: path.join(__dirname, 'motionMocks.js') }));
+      b.onResolve({ filter: /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook)$/ }, () => ({ path: path.join(__dirname, 'motionMocks.js') }));
       b.onResolve({ filter: /screens\/auth\/SplashScreen$/ }, () => ({ path: path.join(__dirname, 'navigationBootstrap.jsx') }));
       if (baseline) b.onLoad({ filter: /\/src\/.*\.(tsx|ts)$/ }, args => ({ loader: args.path.endsWith('.tsx') ? 'tsx' : 'ts',
         contents: fs.readFileSync(path.join(baselineRoot, path.relative(root, args.path)), 'utf8') }));

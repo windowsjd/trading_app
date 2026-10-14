@@ -91,6 +91,37 @@ describe("RealtimeSocketManager", () => {
     offOther(); offBook(); assert.equal(socket.closed.length, 1);
   });
 
+  it('routes USDⓈ-M contract books by instrument, never to a Spot ladder of the same underlying', async () => {
+    const manager = createManager();
+    const contract = collect(); const otherContract = collect(); const spot = collect();
+    const offContract = manager.subscribe({ channel: 'futures_order_book', instrumentId: 'inst-btc' }, contract.listener);
+    const offOther = manager.subscribe({ channel: 'futures_order_book', instrumentId: 'inst-eth' }, otherContract.listener);
+    const offSpot = manager.subscribe({ channel: 'asset_order_book', assetId: 'btc' }, spot.listener);
+    await delay(5); const first = FakeSocket.instances[0]; first.open();
+    const contractFrames = sentFrames(first).filter(f => f.channel === 'futures_order_book');
+    assert.deepEqual(contractFrames.map(f => [f.type, f.instrumentId, 'assetId' in f]),
+      [['subscribe', 'inst-btc', false], ['subscribe', 'inst-eth', false]]);
+    first.receive({ type: 'futures_order_book', instrumentId: 'inst-btc', asks: [], bids: [] });
+    first.receive({ type: 'futures_order_book', asks: [], bids: [] });
+    first.receive({ type: 'asset_order_book', assetId: 'btc', asks: [], bids: [] });
+    first.receive({ type: 'subscription_error', channel: 'futures_order_book', instrumentId: 'inst-eth', code: 'UNSUPPORTED_INSTRUMENT' });
+    const data = (events: RealtimeSubscriptionEvent[], type: string) =>
+      events.filter(e => e.kind === 'message' && e.payload.type === type).length;
+    assert.equal(data(contract.events, 'futures_order_book'), 1);
+    assert.equal(data(otherContract.events, 'futures_order_book'), 0);
+    assert.equal(data(spot.events, 'futures_order_book'), 0);
+    assert.equal(data(spot.events, 'asset_order_book'), 1);
+    assert.equal(data(contract.events, 'asset_order_book'), 0);
+    assert.equal(data(otherContract.events, 'subscription_error'), 1);
+    assert.equal(data(contract.events, 'subscription_error'), 0);
+    first.drop(); await delay(10); const second = FakeSocket.instances[1]; second.open();
+    assert.deepEqual(sentFrames(second).filter(f => f.channel === 'futures_order_book').map(f => f.instrumentId).sort(), ['inst-btc', 'inst-eth']);
+    assert.ok(contract.events.some(e => e.kind === 'restored'));
+    offContract();
+    assert.ok(sentFrames(second).some(f => f.type === 'unsubscribe' && f.channel === 'futures_order_book' && f.instrumentId === 'inst-btc'));
+    offOther(); offSpot(); assert.equal(second.closed.length, 1);
+  });
+
   it('shares and restores reference-counted order book subscriptions without disturbing ticker/candle', async () => {
     const manager = createManager();
     const book = collect(); const other = collect(); const ticker = collect(); const candle = collect();

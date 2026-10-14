@@ -4,7 +4,7 @@ import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy
 import { releaseFuturesEntryReservation } from './futures-limit-state';
 import { presentFuturesPerformance } from './futures-position-display';
 import { createApiError } from '../common/api-error';
-import { HttpStatus, Injectable } from '@nestjs/common';
+import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import {
   assertPendingChild,
   finishFuturesProtection,
@@ -37,6 +37,12 @@ import { settleFuturesCash } from './futures-settlement';
 import { FuturesPerformanceService } from './futures-performance.service';
 import { readFuturesMark } from './futures-mark';
 import { readFuturesReferencePrices } from './futures-reference-prices';
+import { FuturesMarketStatsStore } from './futures-market-stats.store';
+import {
+  currentFuturesMarketStats,
+  presentFuturesMarketStats,
+  type FuturesMarketStats,
+} from './futures-market-data';
 import {
   riskStrings,
   assertCrossSafe,
@@ -75,6 +81,7 @@ export class FuturesService {
     private readonly history: FuturesPerformanceService = new FuturesPerformanceService(
       prisma,
     ),
+    @Optional() private readonly marketStats?: FuturesMarketStatsStore,
   ) {}
 
   async execute(
@@ -680,11 +687,12 @@ export class FuturesService {
       orderBy: { id: 'asc' },
     });
     const verified = rows.filter((row) => verifiedFuturesInstrument(row, now));
-    const references = await readFuturesReferencePrices(
-      this.prisma,
-      verified,
-      now,
-    );
+    const [references, stats] = await Promise.all([
+      readFuturesReferencePrices(this.prisma, verified, now),
+      // Display only; an unreadable shared cache is "unavailable", never 0.
+      this.marketStats?.read() ??
+        Promise.resolve(new Map<string, FuturesMarketStats>()),
+    ]);
     return {
       success: true,
       data: {
@@ -695,6 +703,14 @@ export class FuturesService {
           const { mark, last: price } = references.get(row.id)!;
           return {
             ...presentFuturesInstrument(row),
+            // Rolling 24h ticker of this USDⓈ-M contract (never Spot, never
+            // derived from Mark or Last).
+            marketStats: presentFuturesMarketStats(
+              currentFuturesMarketStats(
+                stats.get(row.underlyingAsset.symbol),
+                now,
+              ),
+            ),
             markPrice: mark?.price.toFixed(8) ?? null,
             referencePrice: price?.price.toFixed(8) ?? null,
             markState: mark ? 'fresh' : 'unavailable_or_stale',

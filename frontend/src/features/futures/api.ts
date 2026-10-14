@@ -33,7 +33,27 @@ export type FuturesInstrument = {
   markCapturedAt?: string | null;
   markEvidence?: PriceTimes | null;
   referencePriceEvidence?: PriceTimes | null;
+  /** Rolling 24h ticker of this USDⓈ-M contract (display only). Unavailable
+   * carries no numbers; never a Spot figure or Mark − Last. */
+  marketStats?: FuturesMarketStats;
 };
+export type FuturesMarketStats =
+  | {
+      state: "available";
+      priceChangePercent: string;
+      quoteVolume: string;
+      windowOpenTime: string;
+      windowCloseTime: string;
+      receivedAt: string;
+    }
+  | {
+      state: "unavailable";
+      priceChangePercent: null;
+      quoteVolume: null;
+      windowOpenTime: null;
+      windowCloseTime: null;
+      receivedAt: null;
+    };
 export type FuturesPosition = {
   id: string;
   tradingAccountId: string;

@@ -75,6 +75,7 @@ import ErrorNotice from "../../components/states/ErrorNotice";
 import ErrorState from "../../components/states/ErrorState";
 import FullPageLoading from "../../components/states/FullPageLoading";
 import FuturesPositionCard from './FuturesPositionCard';
+import FuturesOrderBookCard from './FuturesOrderBookCard';
 
 export default function FuturesScreen(props: FuturesScreenProps) {
   return <BoundFuturesScreen key={`${props.route.params.accountId}:${props.route.params.instrumentId ?? ""}:${getSessionGeneration()}`} {...props} />;
@@ -495,6 +496,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 />
               </View>
             ) : null}
+            <FuturesOrderBookCard
+              key={instrument.id}
+              instrumentId={instrument.id}
+              lastPrice={referenceFresh ? price(reference, instrument) : "시세 확인 불가"}
+              active={bound && focused}
+            />
           </>
         ) : null}
         <View style={styles.tradeCard} testID="futures-trade" onLayout={event => { tradeOffset.current = event.nativeEvent.layout.y; }}>

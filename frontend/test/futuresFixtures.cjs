@@ -41,5 +41,19 @@ function futuresCandlesFixture(instrumentId, now = Date.now()) {
     source: { provider: 'binance_usdm', endpoint: '/fapi/v1/klines', symbol: 'BTCUSDT', contractType: 'PERPETUAL', requestedCount: 600, returnedCount: candles.length, provisionalUpdatedAt: new Date(now).toISOString() },
   };
 }
+// What useFuturesOrderBook returns for one contract: its own USDⓈ-M ten-level
+// ladder (display only). `variant`: 'book' | 'loading' | 'stale' | 'large'.
+function futuresOrderBookFixture(instrumentId, variant = 'book') {
+  if (variant === 'loading') return { latestOrderBook: null, statusMessage: '호가 정보를 불러오는 중입니다.' };
+  const large = variant === 'large', base = instrumentId.toUpperCase(), at = new Date().toISOString();
+  const level = (sign) => Array.from({ length: 10 }, (_, i) => ({
+    price: ((large ? 98765432.12 : 102) + sign * (i + 1) * 0.1).toFixed(2),
+    quantity: large ? '123456789.12345678' : (1.234 * (i + 1)).toFixed(3),
+  }));
+  return {
+    latestOrderBook: { assetId: instrumentId, priceUnit: 'USDT', quantityUnit: base, marketLabel: `${base} / USDT 무기한`, asks: level(1), bids: level(-1), capturedAt: at, effectiveAt: at },
+    statusMessage: variant === 'stale' ? '호가 정보가 지연되고 있습니다.' : null,
+  };
+}
 module.exports = {
-  futuresCandlesFixture, futuresFixture, accounts };
+  futuresCandlesFixture, futuresFixture, futuresOrderBookFixture, accounts };

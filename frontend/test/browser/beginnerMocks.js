@@ -2,7 +2,7 @@
 import { apiClient as existing, transport } from './motionMocks';
 import { questPayload } from '../questFixtures';
 import { tradingQuestTransport } from './tradingQuestMocks';
-export { useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook, getRequestGeneration } from './motionMocks';
+export { useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook, useFuturesOrderBook, getRequestGeneration } from './motionMocks';
 const params = new URLSearchParams(location.search);
 const legacyFlag = params.get('enabled');
 const beginner = { ...transport.accounts.find(a => a.mode === 'general'), id: 'beginner-account', mode: 'beginner' };

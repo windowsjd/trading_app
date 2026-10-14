@@ -8,7 +8,7 @@ async function main() {
   await esbuild.build({ entryPoints: [path.join(__dirname, 'futuresFixture.jsx')], outfile: path.join(out, 'bundle.js'), bundle: true, minify: true, platform: 'browser', format: 'iife', nodePaths: [path.join(root,'node_modules')], resolveExtensions: ['.web.tsx','.tsx','.web.ts','.ts','.web.js','.js','.jsx','.json'], mainFields: ['browser','module','main'], define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' }, loader: { '.png': 'dataurl' }, plugins: [{ name: 'fixtures', setup(b) {
     b.onResolve({filter:/^react-native$/},() => ({path:path.join(__dirname,'nativeWeb.jsx')}));
     b.onResolve({filter:/^@react-navigation\/(native|elements)$/},() => ({path:path.join(__dirname,'futuresMocks.js')}));
-    b.onResolve({filter:/(services\/api\/client|TradingAccountContext)$/},() => ({path:path.join(__dirname,'futuresMocks.js')}));
+    b.onResolve({filter:/(services\/api\/client|TradingAccountContext|useFuturesOrderBook)$/},() => ({path:path.join(__dirname,'futuresMocks.js')}));
   }}], logLevel:'warning' });
   fs.writeFileSync(path.join(out,'index.html'), '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/bundle.js"></script>');
   const server = http.createServer((req,res) => { const file=req.url.startsWith('/bundle.js')?'bundle.js':'index.html'; res.setHeader('Content-Type',file==='bundle.js'?'text/javascript':'text/html'); res.end(fs.readFileSync(path.join(out,file))); }).listen(0,'127.0.0.1');

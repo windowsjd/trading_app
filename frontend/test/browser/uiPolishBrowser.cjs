@@ -16,7 +16,7 @@ async function run() {
     plugins: [{ name: 'existing-fixtures', setup(b) {
       b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
       const filter = fixture === 'friends' ? /(^@react-navigation\/native$|services\/api\/client$|features\/auth\/useLogout$)/
-        : fixture === 'motion' ? /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook)$/
+        : fixture === 'motion' ? /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook)$/
         : /(services\/api\/client|navigationHooks|useMarketTickers)$/;
       b.onResolve({ filter }, () => ({ path: path.join(__dirname, `${fixture}Mocks.js`) }));
       if (fixture === 'motion') b.onResolve({ filter: /screens\/auth\/SplashScreen$/ }, () => ({ path: path.join(__dirname, 'navigationBootstrap.jsx') }));

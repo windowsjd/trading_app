@@ -11,7 +11,7 @@ async function run() {
   if (!process.env.MOTION_REUSE_BUNDLE) await esbuild.build({ entryPoints: [path.join(__dirname, 'motionFixture.jsx')], outfile: path.join(out, 'motion.js'), bundle: true, minify: true, platform: 'browser', format: 'iife', nodePaths: [path.join(root, 'node_modules')], resolveExtensions: ['.web.tsx', '.tsx', '.web.ts', '.ts', '.web.js', '.js', '.jsx', '.json'], mainFields: ['browser', 'module', 'main'], define: { global: 'globalThis', 'process.env.NODE_ENV': '"production"', __DEV__: 'false' }, loader: { '.png': 'dataurl' }, plugins: [{ name: 'motion-fixture', setup(b) {
     b.onResolve({ filter: /^react-dom\/client$/ }, () => ({ path: require.resolve('react-dom/profiling', { paths: [root] }) }));
     b.onResolve({ filter: /^react-native$/ }, () => ({ path: path.join(__dirname, 'nativeWeb.jsx') }));
-    b.onResolve({ filter: /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook)$/ }, () => ({ path: path.join(__dirname, 'motionMocks.js') }));
+    b.onResolve({ filter: /(services\/api\/client|useMarketTickers|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook)$/ }, () => ({ path: path.join(__dirname, 'motionMocks.js') }));
     b.onResolve({ filter: /screens\/auth\/SplashScreen$/ }, () => ({ path: path.join(__dirname, 'navigationBootstrap.jsx') }));
     // Instrument the real action only in this test bundle, before its handler.
     b.onLoad({ filter: /ActionPressable\.tsx$/ }, args => ({ loader: 'tsx', contents: source(args.path).replaceAll('onPress={onPress}', 'onPress={(event) => { window.motion.events.push({ stage: "T2", time: performance.now() }); onPress?.(event); }}') }));

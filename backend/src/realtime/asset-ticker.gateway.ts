@@ -60,10 +60,13 @@ import type {
 import { OrderBookPubSubService } from '../providers/order-book-pubsub.service';
 import {
   MarketOrderBookSubscriptionService,
+  matchesFuturesOrderBookTarget,
   matchesMarketOrderBookTarget,
+  type FuturesOrderBookTarget,
   type MarketOrderBookTarget,
 } from '../providers/market-order-book-subscription.service';
 import type { OrderBookEvent } from '../providers/order-book.types';
+import type { FuturesOrderBookEvent } from '../futures/futures-market-data';
 import { MarketDisplayPriceService } from '../providers/market-display-price.service';
 import {
   MarketEstimatedQuoteService,
@@ -73,6 +76,18 @@ import {
 type OrderBookSubscription = {
   target: MarketOrderBookTarget | null;
   sequence: string | null;
+};
+
+type FuturesOrderBookSubscription = {
+  target: FuturesOrderBookTarget | null;
+  sequence: string | null;
+};
+
+/** USDⓈ-M books are keyed by instrumentId and held apart from the Spot
+ * asset channels (including validations in flight). */
+type FuturesOrderBookState = {
+  subscriptions: Map<string, FuturesOrderBookSubscription>;
+  pending: Map<string, FuturesOrderBookEvent>;
 };
 
 type AccessTokenPayload = {
@@ -107,6 +122,7 @@ type SubscriptionMessage = {
   type?: unknown;
   channel?: unknown;
   assetId?: unknown;
+  instrumentId?: unknown;
   interval?: unknown;
   pair?: unknown;
 };
@@ -161,6 +177,12 @@ export class AssetTickerGateway
   private unsubscribeLiveCandleStatus: (() => void) | null = null;
   private unsubscribeProviderPrices: (() => void) | null = null;
   private unsubscribeOrderBooks: (() => void) | null = null;
+  private unsubscribeFuturesOrderBooks: (() => void) | null = null;
+  // Released with the client state; never part of the asset channels.
+  private readonly futuresOrderBooks = new WeakMap<
+    ClientState,
+    FuturesOrderBookState
+  >();
   private unsubscribeEstimatedQuotes: (() => void) | null = null;
   private backpressureTimer: NodeJS.Timeout | null = null;
   private liveCandlePubSubStatus: LiveCandlePubSubStatus = 'disabled';
@@ -223,12 +245,17 @@ export class AssetTickerGateway
       this.flushPendingTickers();
       this.flushPendingFxRateUpdates();
       this.flushPendingOrderBooks();
+      this.flushPendingFuturesOrderBooks();
       this.flushPendingEstimatedQuotes();
     }, CANDLE_BACKPRESSURE_FLUSH_MS);
     this.backpressureTimer.unref?.();
     this.unsubscribeOrderBooks =
       this.orderBookPubSub?.subscribe((event) => this.pushOrderBook(event)) ??
       null;
+    this.unsubscribeFuturesOrderBooks =
+      this.orderBookPubSub?.subscribeFutures((event) =>
+        this.pushFuturesOrderBook(event),
+      ) ?? null;
     this.unsubscribeEstimatedQuotes =
       this.estimatedQuotes?.subscribe((event) =>
         this.pushEstimatedQuote(event),
@@ -251,11 +278,14 @@ export class AssetTickerGateway
     this.unsubscribeProviderPrices = null;
     this.unsubscribeOrderBooks?.();
     this.unsubscribeOrderBooks = null;
+    this.unsubscribeFuturesOrderBooks?.();
+    this.unsubscribeFuturesOrderBooks = null;
     this.unsubscribeEstimatedQuotes?.();
     this.unsubscribeEstimatedQuotes = null;
     for (const state of this.clients.values()) {
       state.orderBookSubscriptions.clear();
       state.pendingOrderBooks.clear();
+      this.futuresOrderBooks.delete(state);
       state.estimatedQuoteSubscriptions.clear();
       state.pendingEstimatedQuotes.clear();
     }
@@ -368,6 +398,11 @@ export class AssetTickerGateway
         channel: 'fx_rate',
         pair: 'USD/KRW',
       });
+      return;
+    }
+
+    if (message.channel === 'futures_order_book') {
+      await this.handleFuturesOrderBookSubscription(client, state, message);
       return;
     }
 
@@ -573,6 +608,146 @@ export class AssetTickerGateway
         continue;
       }
       this.flushClientOrderBooks(client, state);
+    }
+  }
+
+  /** USDⓈ-M book subscription by instrumentId (display only). */
+  private async handleFuturesOrderBookSubscription(
+    client: WebSocket,
+    state: ClientState,
+    message: SubscriptionMessage,
+  ): Promise<void> {
+    const instrumentId =
+      typeof message.instrumentId === 'string'
+        ? message.instrumentId.trim()
+        : '';
+    const error = (code: string) =>
+      this.sendJson(client, {
+        type: 'subscription_error',
+        channel: 'futures_order_book',
+        instrumentId: instrumentId || null,
+        code,
+      });
+    if (!instrumentId || instrumentId.length > 80) {
+      error('INVALID_SUBSCRIPTION');
+      return;
+    }
+    let books = this.futuresOrderBooks.get(state);
+    if (!books) {
+      books = { subscriptions: new Map(), pending: new Map() };
+      this.futuresOrderBooks.set(state, books);
+    }
+    const { subscriptions, pending } = books;
+    if (message.type === 'unsubscribe') {
+      subscriptions.delete(instrumentId);
+      pending.delete(instrumentId);
+      this.sendJson(client, {
+        type: 'unsubscribed',
+        channel: 'futures_order_book',
+        instrumentId,
+      });
+      return;
+    }
+    if (message.type !== 'subscribe') {
+      error('INVALID_SUBSCRIPTION');
+      return;
+    }
+    const existing = subscriptions.get(instrumentId);
+    if (existing) {
+      if (existing.target)
+        this.sendJson(client, {
+          type: 'subscribed',
+          channel: 'futures_order_book',
+          instrumentId,
+        });
+      return;
+    }
+    if (subscriptions.size >= MAX_ORDER_BOOK_SUBSCRIPTIONS) {
+      error('SUBSCRIPTION_LIMIT');
+      return;
+    }
+    const subscription: FuturesOrderBookSubscription = {
+      target: null,
+      sequence: null,
+    };
+    subscriptions.set(instrumentId, subscription);
+    const stillSubscribed = () =>
+      this.clients.get(client) === state &&
+      subscriptions.get(instrumentId) === subscription;
+    try {
+      const target = await this.orderBooks?.loadFuturesTarget(instrumentId);
+      if (!stillSubscribed()) return;
+      if (!target || !this.orderBookPubSub) {
+        subscriptions.delete(instrumentId);
+        error('UNSUPPORTED_INSTRUMENT');
+        return;
+      }
+      subscription.target = target;
+      this.sendJson(client, {
+        type: 'subscribed',
+        channel: 'futures_order_book',
+        instrumentId,
+      });
+    } catch {
+      if (!stillSubscribed()) return;
+      subscriptions.delete(instrumentId);
+      error('ORDER_BOOK_UNAVAILABLE');
+    }
+  }
+
+  private pushFuturesOrderBook(event: FuturesOrderBookEvent): void {
+    for (const [client, state] of this.clients) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      const books = this.futuresOrderBooks.get(state);
+      const subscription = books?.subscriptions.get(event.book.instrumentId);
+      if (!books || !subscription?.target) continue;
+      // A wrongly mapped event must not cross contract boundaries.
+      if (!matchesFuturesOrderBookTarget(event.book, subscription.target))
+        continue;
+      if (
+        subscription.sequence !== null &&
+        BigInt(event.sequence) <= BigInt(subscription.sequence)
+      )
+        continue;
+      subscription.sequence = event.sequence;
+      books.pending.set(event.book.instrumentId, event);
+      this.flushClientFuturesOrderBooks(client, state);
+    }
+  }
+
+  private flushClientFuturesOrderBooks(
+    client: WebSocket,
+    state: ClientState,
+  ): void {
+    const books = this.futuresOrderBooks.get(state);
+    if (!books) return;
+    for (const [instrumentId, event] of books.pending) {
+      if (!books.subscriptions.get(instrumentId)?.target) {
+        books.pending.delete(instrumentId);
+        continue;
+      }
+      if (
+        client.bufferedAmount >
+        (this.liveCandleConfig?.websocketBackpressureBytes ??
+          DEFAULT_CANDLE_BACKPRESSURE_BYTES)
+      )
+        return;
+      if (!this.sendJson(client, { type: 'futures_order_book', ...event.book }))
+        return;
+      books.pending.delete(instrumentId);
+    }
+  }
+
+  private flushPendingFuturesOrderBooks(): void {
+    for (const [client, state] of this.clients) {
+      if (client.readyState !== WebSocket.OPEN) {
+        this.clients.delete(client);
+        continue;
+      }
+      this.flushClientFuturesOrderBooks(client, state);
     }
   }
 

@@ -16,9 +16,17 @@ import { FuturesMarkRetentionService } from './futures-mark-retention.service';
 import { FuturesLimitController } from './futures-limit.controller';
 import { FuturesLimitService } from './futures-limit.service';
 import { FuturesLimitWorker } from './futures-limit-worker.service';
+import { FuturesMarketDataIngestion } from './futures-market-data-ingestion.service';
+import { FuturesMarketStatsStore } from './futures-market-stats.store';
+import { ProvidersModule } from '../providers/providers.module';
 
 @Module({
-  imports: [TradingAccountsModule, GeneralPerformanceModule, RedisModule],
+  imports: [
+    TradingAccountsModule,
+    GeneralPerformanceModule,
+    RedisModule,
+    ProvidersModule,
+  ],
   controllers: [FuturesController, FuturesLimitController],
   exports: [FuturesService],
   providers: [
@@ -32,6 +40,8 @@ import { FuturesLimitWorker } from './futures-limit-worker.service';
     FuturesMarkRetentionService,
     FuturesLastPriceIngestion,
     FuturesLastPriceRetentionService,
+    FuturesMarketStatsStore,
+    FuturesMarketDataIngestion,
     OpsJobLockService,
     OpsJobRunService,
   ],

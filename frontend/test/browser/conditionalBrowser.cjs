@@ -8,7 +8,7 @@ async function build(kind){
  await esbuild.build({entryPoints:[path.join(__dirname,`${kind}Fixture.jsx`)],outfile:path.join(out,`${kind}.js`),bundle:true,minify:true,platform:'browser',format:'iife',nodePaths:[path.join(root,'node_modules')],resolveExtensions:['.web.tsx','.tsx','.web.ts','.ts','.web.js','.js','.jsx','.json'],mainFields:['browser','module','main'],define:{global:'globalThis','process.env.NODE_ENV':'"production"',__DEV__:'false'},loader:{'.png':'dataurl'},plugins:[{name:'isolated-boundaries',setup(b){
  b.onResolve({filter:/^react-native$/},()=>({path:path.join(__dirname,'nativeWeb.jsx')}));
  b.onResolve({filter:/^@react-navigation\/(native|elements)$/},()=>({path:mocks}));
- b.onResolve({filter:/(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useMarketTickers)$/},()=>({path:mocks}));
+ b.onResolve({filter:/(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook|useMarketTickers)$/},()=>({path:mocks}));
  }}],logLevel:'warning'});
 }
 async function overflow(page){return page.evaluate(()=>[...document.querySelectorAll('[data-testid="protection-panel"], [data-testid="attached-entry-editor"]')].flatMap(panel=>[panel,...panel.querySelectorAll('div,span,input')]).flatMap(el=>{

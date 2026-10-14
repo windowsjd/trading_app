@@ -17,7 +17,7 @@ async function bundle(name, fixture, source = root) {
       if (fixture === 'friends') b.onResolve({ filter: /(^@react-navigation\/native$|services\/api\/client$|features\/auth\/useLogout$)/ }, () => ({ path: path.join(dir, 'friendsMocks.js') }));
       else if (fixture === 'trading') {
         b.onResolve({ filter: /^@react-navigation\/(native|elements)$/ }, () => ({ path: path.join(dir, 'tradingMocks.js') }));
-        b.onResolve({ filter: /(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useMarketTickers)$/ }, () => ({ path: path.join(dir, 'tradingMocks.js') }));
+        b.onResolve({ filter: /(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook|useMarketTickers)$/ }, () => ({ path: path.join(dir, 'tradingMocks.js') }));
       } else {
         b.onResolve({ filter: /(services\/api\/client|useMarketTickers)$/ }, () => ({ path: path.join(dir, 'rootTabsMocks.js') }));
         if (fixture === 'rootTabs') b.onResolve({ filter: /navigationHooks$/ }, () => ({ path: path.join(dir, 'rootTabsMocks.js') }));

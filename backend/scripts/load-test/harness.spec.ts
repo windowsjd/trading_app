@@ -17,6 +17,10 @@ import { parseBinanceMark } from '../../src/futures/futures-mark';
 import { parseBinanceFiveMinuteKline } from '../../src/providers/binance/binance-kline.parser';
 import { parseBinanceWebSocketMessage } from '../../src/providers/binance/binance-websocket.parser';
 import { parseBinanceDepth } from '../../src/providers/binance/binance-order-book.parser';
+import {
+  parseBinanceFuturesDepth,
+  parseBinanceFuturesTicker,
+} from '../../src/futures/futures-market-data';
 import { Actor, nextScreen, random, initialScreen } from './actor';
 import { judge, type RunFacts } from './verdict';
 import { AppClient } from './client';
@@ -183,6 +187,40 @@ describe('deterministic provider transports retain real parsers', () => {
     expect(
       parseBinanceMark(f.mark, 'binance_usdm_mark_ws', 'BTCUSDT', at) !== null,
     ).toBe(true);
+  });
+  it('passes the USDⓈ-M order book and 24h ticker parsers', () => {
+    const m = make(),
+      epoch = 1700000000000,
+      f = providerFrames('BTCUSDT', 10, epoch, m),
+      at = new Date(epoch + 10 * m.replay.tickMs);
+    expect(parseBinanceFuturesDepth(f.futuresDepth).state).toBe('depth');
+    expect(parseBinanceFuturesTicker(f.futuresTicker, at).state).toBe('ticker');
+    // A Spot book (no `@500ms` stream, Spot shape) is not a futures book.
+    // Tickers share a shape, so Spot/Futures separation is by connection:
+    // display ingestion only ever connects to fstream.binance.com routes.
+    expect(parseBinanceFuturesDepth(f.book).state).toBe('other');
+  });
+  it.each([
+    [
+      'wss://fstream.binance.com/public/stream',
+      'btcusdt@depth10@500ms',
+      'futuresDepth',
+    ],
+    [
+      'wss://fstream.binance.com/market/stream',
+      'btcusdt@ticker',
+      'futuresTicker',
+    ],
+    ['wss://fstream.binance.com/market/stream', 'btcusdt@aggTrade', 'last'],
+    ['wss://fstream.binance.com/market/stream', 'btcusdt@markPrice@1s', 'mark'],
+  ])('classifies %s subscribing %s as %s', (url, stream, kind) => {
+    const replay = new Replay(make(), new Metrics());
+    const socket = replay.createSocket(url);
+    socket.send(
+      JSON.stringify({ method: 'SUBSCRIBE', params: [stream], id: 1 }),
+    );
+    expect(socket.kind).toBe(kind);
+    socket.close();
   });
   it('routes the CURRENT shared Futures URL by its subscribed stream', async () => {
     const replay = new Replay(make(), new Metrics());

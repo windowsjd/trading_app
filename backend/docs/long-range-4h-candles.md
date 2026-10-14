@@ -167,7 +167,9 @@ stopped. A failed scheduled run waits a full interval before the next one.
   `--max-calls` or the observed-remaining reserve, and spaces calls
   ≥ 1 s. A 429 sets the shared KOSCOM cooldown and stops the run.
 - **Binance**: every call goes through the shared REST coordinator (one
-  600/min weight budget and 2 slots for Spot + Futures, 418/429 back-off).
+  weight budget — default 600/min, at most 1200 — and 2 slots for Spot +
+  Futures, 418/429 back-off; 100 + 100 estimate in
+  [binance-rest-limits.md](binance-rest-limits.md)).
   Spot 4h klines cost 2 per call (≤ 1000 rows); USDⓈ-M klines cost 1 below
   100 rows and 2 below 500 (backfill pages are 499 rows). Long-range sync is
   strictly sequential with ≥ 150 ms between its calls so Futures Last/Mark REST

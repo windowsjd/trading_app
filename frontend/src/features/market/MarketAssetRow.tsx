@@ -24,6 +24,9 @@ type Props = {
   isStale?: boolean;
   priceError?: AssetPriceErrorDto;
   onPress: (assetId: string) => void;
+  /** Defaults to the Spot list ids; other lists keep their own ids. */
+  testID?: string;
+  changeTestID?: string;
 };
 
 /**
@@ -40,6 +43,8 @@ function MarketAssetRowComponent({
   isStale,
   priceError,
   onPress,
+  testID,
+  changeTestID,
 }: Props) {
   const displayItem = useMemo(
     () => mergeMarketAssetTicker(item, ticker ?? undefined),
@@ -53,7 +58,7 @@ function MarketAssetRowComponent({
   return (
     <View>
       <ActionPressable
-        testID={TEST_IDS.market.item(item.id)}
+        testID={testID ?? TEST_IDS.market.item(item.id)}
         style={styles.itemRow}
         onPress={() => onPress(item.id)}
       >
@@ -75,7 +80,7 @@ function MarketAssetRowComponent({
           >
             {getAssetPriceText(displayItem)}
           </Text>
-          <Text testID={`market-change-${item.id}`} style={[styles.helper, { color: change.color }]}>{change.text}</Text>
+          <Text testID={changeTestID ?? `market-change-${item.id}`} style={[styles.helper, { color: change.color }]}>{change.text}</Text>
           {exception ? <Text style={styles.exception}>{exception}</Text> : null}
         </View>
       </ActionPressable>
@@ -95,7 +100,9 @@ export const MarketAssetRow = React.memo(
     (previous.ticker ?? null) === (next.ticker ?? null) &&
     previous.isStale === next.isStale &&
     previous.priceError === next.priceError &&
-    previous.onPress === next.onPress,
+    previous.onPress === next.onPress &&
+    previous.testID === next.testID &&
+    previous.changeTestID === next.changeTestID,
 );
 
 const styles = StyleSheet.create({

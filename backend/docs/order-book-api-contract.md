@@ -3,6 +3,10 @@
 > US-equity *estimated* best bid/ask (Tiingo trial) is a separate channel,
 > `asset_estimated_quote` — see [tiingo-us-equity-trial.md](tiingo-us-equity-trial.md).
 > It is not part of this ladder contract and `asset_order_book` is unchanged.
+>
+> USDⓈ-M contract books use their own `futures_order_book` channel keyed by
+> `instrumentId` — see [futures-market-data-contract.md](futures-market-data-contract.md).
+> A Spot asset book is never served for a contract.
 
 This implements the requested Binance Spot partial depth integration. It does
 not change order execution, ticker prices, candles, currencies or persistence.

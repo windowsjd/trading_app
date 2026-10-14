@@ -1,7 +1,7 @@
 import React from 'react';
 export const NavigationContext = React.createContext(undefined);
 import { conditionalFixture } from '../conditionalFixtures.cjs';
-import { futuresFixture, futuresCandlesFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, futuresCandlesFixture, futuresOrderBookFixture } from '../futuresFixtures.cjs';
 import { getTradingAccountCapabilities } from '../../src/features/tradingAccount/capabilities';
 const params = new URLSearchParams(location.search);
 const pendingSpot = params.has('pending') && !['futures-only', 'none'].includes(params.get('pendingKind'));
@@ -176,6 +176,8 @@ export const useMarketTickers = () => ({
   staleAssetIds: new Set(),
   showReconnectBanner: state.stale,
 });
+// USDⓈ-M ladder transport (`?futuresBook=loading|stale|large`).
+export const useFuturesOrderBook = ({ instrumentId }) => futuresOrderBookFixture(instrumentId, params.get('futuresBook') ?? 'book');
 export function useAssetOrderBook({ assetId }) {
   const price = Number(
     assets.find((a) => a.id === assetId)?.price.currentPrice ?? 1,

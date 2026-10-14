@@ -136,13 +136,51 @@ export function providerFrames(
       r: '0',
       T: now + 3600000,
     },
+    // USDⓈ-M display streams (combined-stream envelopes, contract shapes).
+    futuresTicker: {
+      stream: `${symbol.toLowerCase()}@ticker`,
+      data: {
+        e: '24hrTicker',
+        E: now,
+        s: symbol,
+        p: '0',
+        P: '0.100',
+        w: price,
+        c: price,
+        Q: '0.1',
+        o: price,
+        h: sorted.at(-1)!,
+        l: sorted[0],
+        v: '10000',
+        q: '1000000',
+        O: now - 86_400_000,
+        C: now,
+        F: 1,
+        L: tick + 1,
+        n: tick + 1,
+      },
+    },
+    futuresDepth: {
+      stream: `${symbol.toLowerCase()}@depth10@500ms`,
+      data: {
+        e: 'depthUpdate',
+        E: now,
+        T: now,
+        s: symbol,
+        U: tick + 1,
+        u: tick + 1,
+        pu: tick,
+        b: [[price, '100']],
+        a: [[price, '100']],
+      },
+    },
   };
 }
 export class ReplaySocket extends EventEmitter {
   readyState = 0;
   streams = new Set<string>();
   constructor(
-    public kind: 'spot' | 'last' | 'mark',
+    public kind: 'spot' | 'last' | 'mark' | 'futuresTicker' | 'futuresDepth',
     private metrics: Metrics,
   ) {
     super();
@@ -159,6 +197,19 @@ export class ReplaySocket extends EventEmitter {
       p.params.some((s: string) => s.endsWith('@aggTrade'))
     )
       this.kind = 'last';
+    // Futures display sockets are classified by what they subscribe to.
+    if (
+      p.method === 'SUBSCRIBE' &&
+      this.kind !== 'spot' &&
+      p.params.some((s: string) => s.endsWith('@ticker'))
+    )
+      this.kind = 'futuresTicker';
+    if (
+      p.method === 'SUBSCRIBE' &&
+      this.kind !== 'spot' &&
+      p.params.some((s: string) => s.endsWith('@depth10@500ms'))
+    )
+      this.kind = 'futuresDepth';
     if (p.method === 'SUBSCRIBE')
       p.params.forEach((s: string) => this.streams.add(s));
     if (p.method === 'UNSUBSCRIBE')
@@ -301,6 +352,16 @@ export class Replay {
             due % this.m.replay.markEveryTicks === 0
           )
             socket.frame(frames.mark);
+          else if (
+            socket.kind === 'futuresTicker' &&
+            due % this.m.replay.tickerEveryTicks === 0
+          )
+            socket.frame(frames.futuresTicker);
+          else if (
+            socket.kind === 'futuresDepth' &&
+            due % this.m.replay.bookEveryTicks === 0
+          )
+            socket.frame(frames.futuresDepth);
         }
     }, this.m.replay.tickMs);
   }

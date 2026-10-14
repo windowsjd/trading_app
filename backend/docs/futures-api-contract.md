@@ -33,7 +33,7 @@ All routes are authenticated and account scoped under
 
 | Method/path | Contract |
 | --- | --- |
-| GET `/instruments` | Verified instruments, display precision, separate Futures Last/Mark evidence, server capabilities and evaluatedAt |
+| GET `/instruments` | Verified instruments, display precision, separate Futures Last/Mark evidence, 24h `marketStats` ([market data](futures-market-data-contract.md)), server capabilities and evaluatedAt |
 | POST `/execute` | A single idempotent Market command; no Spot quote/order lifecycle |
 | GET `/positions` | Open positions and collateral risk foundation |
 | GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |

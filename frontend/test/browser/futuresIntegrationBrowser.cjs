@@ -22,7 +22,7 @@ async function main(){
  await esbuild.build({entryPoints:[path.join(__dirname,'tradingFixture.jsx')],outfile:path.join(out,'bundle.js'),bundle:true,minify:true,platform:'browser',format:'iife',nodePaths:[path.join(root,'node_modules')],resolveExtensions:['.web.tsx','.tsx','.web.ts','.ts','.web.js','.js','.jsx','.json'],mainFields:['browser','module','main'],define:{global:'globalThis','process.env.NODE_ENV':'"production"',__DEV__:'false'},loader:{'.png':'dataurl'},plugins:[{name:'fixtures',setup(b){
  b.onResolve({filter:/^react-native$/},()=>({path:path.join(__dirname,'nativeWeb.jsx')}));
  b.onResolve({filter:/^@react-navigation\/(native|elements)$/},()=>({path:mocks}));
- b.onResolve({filter:/(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useMarketTickers)$/},()=>({path:mocks}));
+ b.onResolve({filter:/(services\/api\/client|TradingAccountContext|navigationHooks|useAssetTicker|useAssetCandle|useAssetOrderBook|useFuturesOrderBook|useMarketTickers)$/},()=>({path:mocks}));
  }}],logLevel:'warning'});
  const html='<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body,#root{height:100%;margin:0}</style><div id="root"></div><script src="/bundle.js"></script>';
  const server=http.createServer((req,res)=>{res.setHeader('Content-Type',req.url.startsWith('/bundle.js')?'text/javascript':'text/html');res.end(req.url.startsWith('/bundle.js')?fs.readFileSync(path.join(out,'bundle.js')):html);}).listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
