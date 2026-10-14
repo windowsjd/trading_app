@@ -17,17 +17,18 @@ const FIVE: RankingInsight[] = [
   { key: 'above', label: '바로 위 hana까지', value: '3,389', suffix: '원', glyph: '↑' },
   { key: 'first', label: '1위 demiant까지', value: '46,693', suffix: '원', glyph: '1' },
   { key: 'tier', label: 'Platinum 티어까지', value: '17,141', suffix: '원', glyph: 'P', tier: 'platinum' },
-  { key: 'goal', label: '본전(수익률 0%)까지', value: '44,731', suffix: '원', glyph: '0%' },
-  { key: 'change', label: '어제보다', value: '4', suffix: '계단 상승', glyph: '▲', direction: 'up' },
+  { key: 'goal', label: '본전까지', value: '44,731', suffix: '원', glyph: '0%' },
+  { key: 'change', label: '어제보다 자산', value: '+55,269', suffix: '원', glyph: '▲', direction: 'up',
+    detail: { text: '▲ 순위 4계단 상승', spoken: '순위 4계단 상승', direction: 'up' } },
 ];
 const FULL_LABEL = '순위 안내. 바로 위 hana까지 3,389원. 1위 demiant까지 46,693원. Platinum 티어까지 17,141원. '
-  + '본전(수익률 0%)까지 44,731원. 어제보다 4계단 상승.';
+  + '본전까지 44,731원. 어제보다 자산 +55,269원, 순위 4계단 상승.';
 const SHOWN = {
   above: '↑|바로 위 hana까지|3,389|원',
   first: '1|1위 demiant까지|46,693|원',
   tier: 'P|Platinum 티어까지|17,141|원',
-  goal: '0%|본전(수익률 0%)까지|44,731|원',
-  change: '▲|어제보다|4|계단 상승',
+  goal: '0%|본전까지|44,731|원',
+  change: '▲|어제보다 자산|+55,269|원|▲| 순위 4계단 상승',
 };
 // Exit 180 ms ease-in to -8, a 40 ms blank, enter 260 ms ease-out from +8 (native driver, not an interaction).
 const EXIT = ['opacity 0 180 0.25 true false', 'offset -8 180 0.25 true false'];
@@ -297,10 +298,11 @@ describe('순위 안내 슬롯: 높이와 접근성', () => {
 
   it('reads every message once from the card; moving parts, dots and the touch target are hidden', (t) => {
     const h = slotHarness(t);
-    h.render([...FIVE.slice(0, 4), { ...FIVE[4], value: '2', suffix: '계단 하락', glyph: '▼', direction: 'down' }]);
+    h.render([...FIVE.slice(0, 4), { ...FIVE[4], value: '-44,731', glyph: '▼', direction: 'down',
+      detail: { text: '▼ 순위 2계단 하락', spoken: '순위 2계단 하락', direction: 'down' } }]);
     const card = h.node('ranking-slot');
     assert.equal(card.props.accessible, true);
-    assert.equal(card.props.accessibilityLabel, FULL_LABEL.replace('4계단 상승', '2계단 하락'));
+    assert.equal(card.props.accessibilityLabel, FULL_LABEL.replace('+55,269원, 순위 4계단 상승', '-44,731원, 순위 2계단 하락'));
     const hidden = (node: any) => node.props.accessibilityElementsHidden === true
       && node.props.importantForAccessibility === 'no-hide-descendants';
     assert.equal(hidden(h.node('ranking-slot-next')), true);
@@ -319,12 +321,39 @@ describe('순위 안내 슬롯: 높이와 접근성', () => {
     const platinum = getHomeTier('platinum', 'light')!;
     assert.equal(hidden(glyph('change').circle), true);
     assert.equal(flatten(glyph('change').text.props.style).color, colors.fall);
-    assert.equal(strings(h.node('ranking-slot-measure-change')).join('|'), '▼|어제보다|2|계단 하락');
+    assert.equal(strings(h.node('ranking-slot-measure-change')).join('|'), '▼|어제보다 자산|-44,731|원|▼| 순위 2계단 하락');
     assert.equal(flatten(glyph('tier').circle.props.style).backgroundColor, platinum.palette.backgroundColor);
     assert.equal(flatten(glyph('tier').text.props.style).color, platinum.palette.color);
     assert.equal(flatten(glyph('goal').circle.props.style).backgroundColor, semantic.raised);
     h.update({ messages: FIVE });
     assert.equal(flatten(glyph('change').text.props.style).color, colors.rise);
+  });
+
+  it('어제보다: the asset change on the figure line, the rank move on a smaller hidden line with only its mark colored', (t) => {
+    const h = slotHarness(t);
+    h.render(FIVE);
+    const colors = getFinancialColors('light', 'red_blue');
+    const line = () => h.node('ranking-slot-measure-change').findAll((node: any) =>
+      typeof node.type === 'string' && node.props.testID === 'ranking-slot-detail-change')[0];
+    const mark = () => line().children[0];
+    const glyphColor = () => flatten(h.node('ranking-slot-measure-change').findAllByType('Text')[0].props.style).color;
+    assert.equal(strings(h.node('ranking-slot-measure-change')).join('|'), SHOWN.change);
+    assert.deepEqual([flatten(line().props.style).fontSize, flatten(line().props.style).color], [13, semantic.secondary]);
+    assert.deepEqual([mark().children.join(''), flatten(mark().props.style).color], ['▲', colors.rise]);
+    assert.equal(line().children[1] === ' 순위 4계단 상승', true, 'the words keep the secondary color');
+    assert.equal(line().props.accessibilityElementsHidden === true && line().props.importantForAccessibility === 'no-hide-descendants', true);
+    assert.equal(glyphColor(), colors.rise);
+    // Other messages have no second line; the card centers them in the tallest message's height.
+    assert.equal(h.has('ranking-slot-detail-above'), false);
+    assert.equal(flatten(h.node('ranking-slot-stage').props.style).justifyContent, 'center');
+
+    // Nothing moved: no direction color on the glyph, the mark or the words, and no 원.
+    h.update({ messages: [...FIVE.slice(0, 4), { key: 'change', label: '어제보다 자산', value: '변동 없음', suffix: '',
+      glyph: '–', detail: { text: '– 순위 변동 없음', spoken: '순위 변동 없음' } }] });
+    assert.equal(strings(h.node('ranking-slot-measure-change')).join('|'), '–|어제보다 자산|변동 없음|–| 순위 변동 없음');
+    assert.equal(glyphColor(), semantic.text);
+    assert.equal(flatten(mark().props.style).color === undefined, true);
+    assert.equal(h.node('ranking-slot').props.accessibilityLabel.endsWith('어제보다 자산 변동 없음, 순위 변동 없음.'), true);
   });
 
   it('source: ActionPressable only, no setInterval, no number rolling, no live region', () => {
@@ -361,7 +390,8 @@ function scenario() {
   return {
     seasonStatus: 'active', joined: true, initialCapitalKrw: '10000000.00000000' as string | undefined,
     state: 'available', myState: 'available', capturedAt: CAPTURED,
-    myRank: 31, myTotal: '9955269.00000000', myTier: 'gold', yesterdayRank: 35,
+    myRank: 31, myTotal: '9955269.00000000', myTier: 'gold',
+    yesterdaySet: true, yesterdayRank: 35, yesterdayTotal: '9900000.00000000',
     gates: new Map<string, Promise<void>>(), conflicts: new Set<string>(),
   };
 }
@@ -377,7 +407,7 @@ function answer(s: Scenario, params: URLSearchParams) {
   if (s.conflicts.has(`${offset}:${limit}:${params.get('capturedAt')}`)) throw conflict();
   const season = { ...availableRankings.season, status: s.seasonStatus };
   const pagination = { limit, offset, total: 100, returned: 0, nextOffset: null };
-  if (s.state !== 'available') {
+  if (s.state !== 'available' || (rankingDate === YESTERDAY && !s.yesterdaySet)) {
     return { state: 'unavailable', season, rankType, rankingDate: null, capturedAt: null, rankings: [],
       pagination: { ...pagination, total: 0 }, myRanking: { state: 'unavailable', reason: 'RANKING_UNAVAILABLE', message: '-' } };
   }
@@ -388,8 +418,8 @@ function answer(s: Scenario, params: URLSearchParams) {
   })).filter((row) => row.rank > offset && row.rank <= offset + limit);
   const myRanking = s.myState !== 'available'
     ? { state: s.myState, reason: s.myState === 'not_joined' ? 'SEASON_NOT_JOINED' : 'MY_RANKING_UNAVAILABLE', message: '-' }
-    : { ...availableRankings.myRanking, rank: rankingDate === YESTERDAY ? s.yesterdayRank : s.myRank, totalAssetKrw: s.myTotal,
-      rankingDate, capturedAt, ...tiers(s.myTier) };
+    : { ...availableRankings.myRanking, rank: rankingDate === YESTERDAY ? s.yesterdayRank : s.myRank,
+      totalAssetKrw: rankingDate === YESTERDAY ? s.yesterdayTotal : s.myTotal, rankingDate, capturedAt, ...tiers(s.myTier) };
   return { state: 'available', season, rankType, rankingDate, capturedAt, rankings,
     pagination: { ...pagination, returned: rankings.length }, myRanking };
 }
@@ -478,11 +508,12 @@ describe('랭킹 탭의 순위 안내 슬롯', () => {
     assert.equal(slot().props.paused, true);
   });
 
-  it('2위: reuses the publication rows (one person, shown as 1위) and reads only yesterday', async (t) => {
+  it('2위: reuses the publication rows (바로 위 and 1위 are one person, both shown) and reads only yesterday', async (t) => {
     const s = scenario();
     Object.assign(s, { myRank: 2, myTotal: '10001000.00000000', myTier: 'master' });
     const h = await screenHarness(t, s);
-    assert.equal(h.label(), '순위 안내. 1위 demiant까지 962원. 수익률 10%까지 999,000원. 어제보다 33계단 상승.');
+    assert.equal(h.label(), '순위 안내. 바로 위 demiant까지 962원. 1위 demiant까지 962원. 수익률 10%까지 999,000원. '
+      + '어제보다 자산 +101,000원, 순위 33계단 상승.');
     assert.deepEqual(h.sliceReads(), [`0/1/${YESTERDAY}/-/all/daily/season-1`]);
   });
 
@@ -504,11 +535,48 @@ describe('랭킹 탭의 순위 안내 슬롯', () => {
     release();
     await h.flush();
     assert.equal(h.label(), '순위 안내. 바로 위 hana까지 2,389원. 1위 demiant까지 45,693원. '
-      + '본전(수익률 0%)까지 43,731원. 어제보다 4계단 상승.');
+      + '본전까지 43,731원. 어제보다 자산 +56,269원, 순위 4계단 상승.');
     assert.equal(h.sliceReads().filter((read: string) => read.startsWith(`22/2/${TODAY}/${NEXT_CAPTURED}`)).length, 1, 'no retry of a 409');
     assert.equal(h.sliceReads().filter((read: string) => read.includes(YESTERDAY)).length, 1, "yesterday's set is read once");
     assert.equal(h.hosts('admin-diagnostic-panel').length, 0);
     assert.equal(h.hosts('ranking-item-demiant').length, 1, 'the list follows the new set as before');
+  });
+
+  it("without yesterday's set the slot has four messages and no 어제보다", async (t) => {
+    const h = await screenHarness(t, Object.assign(scenario(), { yesterdaySet: false }));
+    assert.equal(h.label(), '순위 안내. 바로 위 hana까지 3,389원. 1위 demiant까지 46,693원. Platinum 티어까지 17,141원. 본전까지 44,731원.');
+    assert.equal(h.hosts('ranking-slot-dot-change').length, 0);
+  });
+
+  it('logs nothing unless __DEV__ is true (release builds and tests)', async (t) => {
+    const debug = t.mock.method(console, 'debug', () => {});
+    const h = await screenHarness(t);
+    assert.equal(h.label(), FULL_LABEL);
+    assert.equal(debug.mock.callCount(), 0);
+  });
+
+  it('development builds log one line per set with every reason; a failed read is fetch_failed', async (t) => {
+    const target = globalThis as typeof globalThis & { __DEV__?: boolean };
+    const previousDev = target.__DEV__;
+    target.__DEV__ = true;
+    t.after(() => { if (previousDev === undefined) delete target.__DEV__; else target.__DEV__ = previousDev; });
+    const lines: string[] = [];
+    t.mock.method(console, 'debug', (...args: unknown[]) => { lines.push(args.join(' ')); });
+    const s = Object.assign(scenario(), { yesterdaySet: false });
+    const h = await screenHarness(t, s);
+    assert.deepEqual(lines, [`[ranking-insight] ${TODAY} ${CAPTURED} #31/100 above=ok first=ok tier=ok goal=ok change=no_previous_set`]);
+    h.focused = false;
+    await h.update();
+    assert.equal(lines.length, 1, 'the same set is not logged again');
+    s.conflicts.add(`22:2:${NEXT_CAPTURED}`);
+    Object.assign(s, { capturedAt: NEXT_CAPTURED });
+    await act(async () => {
+      await h.client.invalidateQueries({ queryKey: QUERY_KEYS.ranking.list({
+        scope: 'all', seasonId: 'season-1', rankType: 'daily', limit: 3, offset: 0 }) });
+    });
+    await h.flush();
+    assert.deepEqual(lines.slice(1),
+      [`[ranking-insight] ${TODAY} ${NEXT_CAPTURED} #31/100 above=ok first=ok tier=fetch_failed goal=ok change=no_previous_set`]);
   });
 
   it('takes no space and reads nothing when the ranking is final or over, I have not joined, or no ranking exists', async (t) => {

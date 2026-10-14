@@ -154,7 +154,8 @@ describe('ranking wire response rendering', () => {
     assert.match(html, /10%/);
     assert.match(html, /999,999/);
     // Each row is drawn as its tier's card (master is shown as Whale), never raw
-    // text; the emblem and the original card artwork stay on 내 순위 only.
+    // text; the Home emblem (its ids) and the original card artwork stay on 내
+    // 순위 only. Rows carry a small emblem under their own ranking ids.
     assert.match(html, /ranking-tier-background-whale-light/);
     assert.match(html, /ranking-tier-background-silver-light/);
     assert.equal(html.match(/data-testid="home-emblem-/g)?.length, 1, 'only my card keeps an emblem');
@@ -267,7 +268,7 @@ describe('ranking wire response rendering', () => {
     assert.doesNotMatch(html, /home-emblem-whale|home-emblem-silver|ranking-tier-background-(whale|silver)/);
   });
 
-  it('draws every row as its tier card without an emblem; unknown tiers keep the plain card', () => {
+  it('draws every row as its tier card without a Home emblem; unknown tiers keep the plain card', () => {
     const h = createHarness();
     const tiers = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'master', null, 'grandmaster'];
     h.page.rankings = tiers.map((tier, index) => ({
@@ -283,7 +284,9 @@ describe('ranking wire response rendering', () => {
     for (const [index, visual] of ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'whale'].entries()) {
       assert.equal(row(index).includes(`ranking-tier-background-${visual}-light`), true, visual);
       assert.equal(/home-emblem-|home-tier-image/.test(row(index)), false, `${visual} row has no emblem`);
-      assert.equal(row(index).includes(`aria-label="${visual === 'whale' ? 'Whale' : visual[0].toUpperCase() + visual.slice(1)} 티어, 수익률`), true);
+      // myRanking is sp-2 in this fixture: that (gold) row is mine and its label starts with 내 순위.
+      const mine = index === 2 ? '내 순위, ' : '';
+      assert.equal(row(index).includes(`aria-label="${mine}${visual === 'whale' ? 'Whale' : visual[0].toUpperCase() + visual.slice(1)} 티어, 수익률`), true);
     }
     for (const index of [6, 7]) {
       assert.equal(/ranking-tier-background-|home-emblem-|ranking-tier-slot-/.test(row(index)), false, 'no invented tier');

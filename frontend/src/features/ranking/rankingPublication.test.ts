@@ -37,7 +37,9 @@ async function setup(t, conflict = false, state = 'active') {
       myRanking: { state: 'unavailable', reason: 'RANKING_UNAVAILABLE', message: 'Ranking is unavailable.' } }),
   };
   const Screen = native.load('src/screens/ranking/RankingScreen.tsx', {
+    // The slot rotates the publication's 바로 위/1위/윗 티어 messages, so it follows AppState.
     'react-native': { ...native.native, SafeAreaView: 'SafeAreaView',
+      AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
       FlatList: ({ ListHeaderComponent, ListEmptyComponent, ListFooterComponent, data, renderItem }) =>
         React.createElement('List', null, ListHeaderComponent,
           data.length ? data.map(item => React.createElement(React.Fragment, { key: item.seasonParticipantId }, renderItem({ item }))) : ListEmptyComponent,

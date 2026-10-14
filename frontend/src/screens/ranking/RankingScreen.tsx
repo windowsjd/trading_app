@@ -46,8 +46,9 @@ import { getMe, type MeDto } from '../../features/me/api';
 import WhaleLoader from '../../components/states/WhaleLoader';
 import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
 import { useAppearance, type AppearanceMode } from '../../theme/appearance';
-import { getHomeTier } from '../home/tierPresentation';
+import { getHomeTier, type HomeTier } from '../home/tierPresentation';
 import TierCard, { tierForeground, type TierPresentation } from '../home/TierCard';
+import TierEmblem, { tierEmblemWidth } from '../home/TierEmblem';
 import RankingTierRowBackground, { RANKING_ROW_RADIUS } from './RankingTierRowBackground';
 import RankingInsightSlot from './RankingInsightSlot';
 import { getFinancialColors } from '../../theme/financialColors';
@@ -315,6 +316,7 @@ export default function RankingScreen({ navigation }: Props) {
           <RankingRow
             item={item}
             rankType={rankType}
+            mine={myRanking?.state === 'available' && item.seasonParticipantId === myRanking.seasonParticipantId}
             onPress={() =>
               navigation.navigate('UserSeasonSummary', {
                 userId: item.userId,
@@ -414,7 +416,12 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
  * Figures sit directly on the metal. Choose direction colors for the actual
  * surface (Whale is dark even in Light), keeping the user's financial palette.
  */
-function RankingFigures({ item, tier, mode }: { item: RankingItemDto; tier: TierPresentation | null; mode: AppearanceMode }) {
+function RankingFigures({ item, tier, mode, mine }: {
+  item: RankingItemDto;
+  tier: TierPresentation | null;
+  mode: AppearanceMode;
+  mine: boolean;
+}) {
   const { financialPreference } = useAppearance();
   const rate = getRecordFinancialDisplay(item.returnRate, 'rate');
   const total = `${formatKrw(item.totalAssetKrw)}원`;
@@ -430,7 +437,7 @@ function RankingFigures({ item, tier, mode }: { item: RankingItemDto; tier: Tier
     ? shadeFinancialInk(String(ink), darkSurface, tier.id === 'diamond') : ink ?? rate.color;
   return (
     <View testID={`ranking-figures-${item.userId}`} style={styles.figures}
-      accessible accessibilityLabel={`${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
+      accessible accessibilityLabel={`${mine ? '내 순위, ' : ''}${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
       <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, foreground, { color }]}>{rate.text}</Text>
       <Text testID={`ranking-total-${item.userId}`} style={[styles.totalAsset, foreground]}>{total}</Text>
     </View>
@@ -444,18 +451,41 @@ function shadeFinancialInk(hex: string, dark: boolean, diamond: boolean) {
     .toString(16).padStart(2, '0')).join('')}`;
 }
 
+const HIDDEN = {
+  accessible: false, accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true,
+} as const;
+const ROW_BORDER = 1;
+const NAME_LINE = 22;
+const ROW_EMBLEM = 18;
+// One emblem slot for every tier: the widest emblem at this size, a little
+// taller than the tallest (Whale, about 19.3), so each tier line has the same
+// height and the tier names start at the same x.
+const ROW_EMBLEM_SLOT = {
+  width: Math.ceil(Math.max(...(['bronze', 'silver', 'gold', 'platinum', 'diamond', 'whale'] satisfies HomeTier[])
+    .map((tier) => tierEmblemWidth(tier, ROW_EMBLEM)))),
+  height: 20,
+};
+// My row's ring sits on the screen, outside the card, so it never mixes with
+// the Whale/Gold rims or tints their art.
+const ME_RING = { width: 2, gap: 3, color: { light: '#B8860B', dark: '#F2C14E' } } as const;
+
 /**
  * Each row is drawn as its tier's card, redrawn for the row's wide, short
- * shape (RankingTierRowBackground); the emblem stays on 내 순위 only. Unknown
- * tiers keep the plain card.
+ * shape (RankingTierRowBackground), with a small emblem and the tier name
+ * under the nickname; the card-size emblem (and Home's emblem ids) stays on 내
+ * 순위 only. Unknown tiers keep the plain card without a tier line. My row
+ * shows a 나 chip in the slot every row keeps, and a ring around the card;
+ * neither moves any row.
  */
 function RankingRow({
   item,
   rankType,
+  mine,
   onPress,
 }: {
   item: RankingItemDto;
   rankType?: RankingRankType;
+  mine: boolean;
   onPress: () => void;
 }) {
   const { mode } = useAppearance();
@@ -463,6 +493,8 @@ function RankingRow({
   const stacked = fontScale > 1.3;
   const tier = getHomeTier(getRankingTier(item, rankType), mode);
   const foreground = tier ? tierForeground(tier, mode) : undefined;
+  // Absolute offsets start inside the border: the plain card's border is added back.
+  const ringOutset = ME_RING.gap + ME_RING.width + (tier ? 0 : ROW_BORDER);
   return (
     <ActionPressable
       testID={TEST_IDS.ranking.item(item.userId)}
@@ -470,15 +502,46 @@ function RankingRow({
       underlay={tier ? <RankingTierRowBackground tier={tier.id} mode={mode} /> : null}
       onPress={onPress}
     >
+      {mine ? (
+        <View testID="ranking-me-ring" pointerEvents="none" {...HIDDEN} style={[styles.meRing, {
+          top: -ringOutset, right: -ringOutset, bottom: -ringOutset, left: -ringOutset,
+          borderRadius: RANKING_ROW_RADIUS + ME_RING.gap + ME_RING.width, borderColor: ME_RING.color[mode],
+        }]} />
+      ) : null}
       <View style={[styles.rankLeft, stacked && styles.rankLeftStacked]}>
         <Text style={[styles.rankNumber, foreground]}>#{item.rank}</Text>
         <View style={[styles.profile, stacked && styles.rowProfileStacked]}>
-          <ProfileAvatar profileImageUrl={item.profileImageUrl} size={32} testID={`ranking-avatar-${item.userId}`} />
-          <Text style={[styles.name, foreground]}>{item.nickname}</Text>
+          <ProfileAvatar profileImageUrl={item.profileImageUrl} size={40} testID={`ranking-avatar-${item.userId}`} />
+          <View style={styles.identity}>
+            <View style={styles.nameLine}>
+              <Text style={[styles.name, foreground]}>{item.nickname}</Text>
+              {/* Every row keeps the chip's slot (invisible unless mine), so marking my row never
+                  reflows its nickname; the slot is one nickname line tall, so the chip stays on the
+                  first line. Inverted tier colors read on every tier in both modes; 내 순위 itself
+                  is in the figures' label. */}
+              <View style={[styles.meChipLine, { height: NAME_LINE * fontScale }]}>
+                <View testID={mine ? 'ranking-me-chip' : undefined} {...HIDDEN}
+                  style={[styles.meChip, mine ? { backgroundColor: tier ? tier.palette.color : semantic.text } : styles.meChipSlot]}>
+                  <Text maxFontSizeMultiplier={1.3}
+                    style={[styles.meChipText, mine && { color: tier ? tier.palette.backgroundColor : semantic.surface }]}>나</Text>
+                </View>
+              </View>
+            </View>
+            {tier ? (
+              // RankingFigures' label already names the tier.
+              <View testID={`ranking-row-tier-${item.userId}`} style={styles.tierLine} {...HIDDEN}>
+                <View style={styles.rowEmblemSlot}>
+                  <TierEmblem tier={tier.id} size={ROW_EMBLEM} testID={`ranking-row-emblem-${item.userId}`}
+                    imageTestID={`ranking-row-emblem-image-${item.userId}`} />
+                </View>
+                <Text style={[styles.tierName, foreground]}>{tier.name}</Text>
+              </View>
+            ) : null}
+          </View>
         </View>
       </View>
 
-      <RankingFigures item={item} tier={tier} mode={mode} />
+      <RankingFigures item={item} tier={tier} mode={mode} mine={mine} />
     </ActionPressable>
   );
 }
@@ -516,7 +579,7 @@ const styles = StyleSheet.create({
   helper: { fontSize: 14, color: semantic.secondary },
   settledText: { color: semantic.error, fontWeight: '700' },
   rankRow: {
-    borderWidth: 1,
+    borderWidth: ROW_BORDER,
     borderColor: semantic.border,
     borderRadius: RANKING_ROW_RADIUS,
     paddingVertical: 12,
@@ -535,13 +598,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexGrow: 1,
     flexShrink: 1,
-    // Rank, avatar and a readable name; below this the figures wrap instead.
-    flexBasis: 106,
+    // Rank, avatar, a readable name and the 나 chip's slot; below this the figures wrap instead.
+    flexBasis: 176,
     minWidth: 0,
   },
   rankNumber: { minWidth: 28, flexShrink: 0, fontSize: 20, lineHeight: 28, fontWeight: '800', textAlign: 'center', fontVariant: ['tabular-nums'] },
   rankLeftStacked: { flexBasis: '100%', flexDirection: 'column', alignItems: 'flex-start', gap: 6 },
   rowProfileStacked: { alignSelf: 'stretch', alignItems: 'flex-start' },
-  name: { flex: 1, minWidth: 0, fontSize: 15, lineHeight: 22, fontWeight: '700' },
+  identity: { flex: 1, minWidth: 0, gap: 3 },
+  nameLine: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, minWidth: 0 },
+  name: { flexShrink: 1, minWidth: 0, fontSize: 15, lineHeight: NAME_LINE, fontWeight: '700' },
+  meChipLine: { flexShrink: 0, justifyContent: 'center' },
+  meChip: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  meChipSlot: { opacity: 0 },
+  meChipText: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
+  tierLine: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
+  rowEmblemSlot: { ...ROW_EMBLEM_SLOT, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  tierName: { flexShrink: 1, minWidth: 0, fontSize: 12, lineHeight: 16, fontWeight: '600' },
+  meRing: { position: 'absolute', borderWidth: ME_RING.width },
   footerLoader: { paddingVertical: 16 },
 });

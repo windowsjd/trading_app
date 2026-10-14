@@ -24,7 +24,13 @@ export function tierEmblemWidth(tier: HomeTier, size: number) {
   return preparation[tier].displayAt160.width * (size / 160 * EMBLEM_OPTICAL_SCALE[tier]);
 }
 
-export default function TierEmblem({ tier, size }: { tier: HomeTier; size: number }) {
+export default function TierEmblem({ tier, size, testID = `home-emblem-${tier}`, imageTestID = 'home-tier-image' }: {
+  tier: HomeTier;
+  size: number;
+  /** Defaults are Home's ids; other screens (ranking rows) pass their own. */
+  testID?: string;
+  imageTestID?: string;
+}) {
   // Keep the reviewed slot, silhouette area and optical scale. New originals
   // include transparent padding: position the complete canvas around the same
   // visible silhouette without cropping/resampling pixels or correcting rims.
@@ -35,9 +41,9 @@ export default function TierEmblem({ tier, size }: { tier: HomeTier; size: numbe
   const height = layout.height * scale;
   const image = 'imageAt160' in asset ? asset.imageAt160 : { ...layout, left: 0, top: 0 };
   return (
-    <View testID={`home-emblem-${tier}`} style={{ width, height, flexShrink: 0 }}
+    <View testID={testID} style={{ width, height, flexShrink: 0 }}
       accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden pointerEvents="none">
-      <Image testID="home-tier-image" source={EMBLEMS[tier]} resizeMode="contain"
+      <Image testID={imageTestID} source={EMBLEMS[tier]} resizeMode="contain"
         style={{ position: 'absolute', left: image.left * scale, top: image.top * scale,
           width: image.width * scale, height: image.height * scale }} accessible={false} />
     </View>

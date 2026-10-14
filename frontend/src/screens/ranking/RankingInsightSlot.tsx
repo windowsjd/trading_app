@@ -202,8 +202,11 @@ function MessageRow({ message, mode, financialPreference }: {
   financialPreference?: FinancialColorPreference;
 }) {
   const tier = message.key === 'tier' ? getHomeTier(message.tier, mode) : null;
-  const direction = message.direction
-    ? getFinancialColors(mode, financialPreference)[message.direction === 'up' ? 'rise' : 'fall'] : null;
+  const colors = getFinancialColors(mode, financialPreference);
+  const ink = (direction?: 'up' | 'down') => (direction ? colors[direction === 'up' ? 'rise' : 'fall'] : null);
+  const direction = ink(message.direction);
+  const { detail } = message;
+  const detailInk = ink(detail?.direction);
   return (
     <View style={styles.row}>
       <View style={[styles.glyph, tier && { backgroundColor: tier.palette.backgroundColor }]} {...HIDDEN}>
@@ -216,8 +219,15 @@ function MessageRow({ message, mode, financialPreference }: {
         <Text style={styles.label}>{message.label}</Text>
         <Text style={styles.value}>
           {message.value}
-          <Text style={styles.suffix}>{message.suffix}</Text>
+          {message.suffix ? <Text style={styles.suffix}>{message.suffix}</Text> : null}
         </Text>
+        {detail ? (
+          // The card's label already reads it (detail.spoken). Only the leading mark is colored.
+          <Text testID={`ranking-slot-detail-${message.key}`} style={styles.detail} {...HIDDEN}>
+            <Text style={detailInk && { color: detailInk }}>{detail.text.slice(0, 1)}</Text>
+            {detail.text.slice(1)}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -257,6 +267,7 @@ const styles = StyleSheet.create({
   label: { fontSize: 13, lineHeight: 19, color: semantic.secondary },
   value: { fontSize: 20, lineHeight: 28, fontWeight: '800', fontVariant: ['tabular-nums'], color: semantic.text },
   suffix: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  detail: { fontSize: 13, lineHeight: 19, color: semantic.secondary },
   // Spans the card's full height (padding included), so it never makes the card taller.
   dots: { position: 'absolute', top: 0, bottom: 0, right: 10, width: 24, justifyContent: 'center' },
   dot: { width: 24, height: 12, alignItems: 'center', justifyContent: 'center' },

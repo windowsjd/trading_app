@@ -7,26 +7,65 @@ import type { RankingItemDto, RankingsResponseDto } from './api';
  * Rules of the ranking tab's 순위 안내 slot (between 내 순위 and the tabs).
  * No React and no network: useRankingInsights fetches the rows, these
  * functions decide what may be said about them. Every rule fails closed — a
- * message whose inputs do not line up is dropped, never approximated.
+ * message whose inputs do not line up is dropped, never approximated — and
+ * every drop has a reason (explainRankingInsights).
  */
 
 export type RankingInsightKey = 'above' | 'first' | 'tier' | 'goal' | 'change';
+/** Slot order: 바로 위, 1위, 윗 티어, 수익률 목표, 어제보다. */
+export const RANKING_INSIGHT_KEYS: readonly RankingInsightKey[] = ['above', 'first', 'tier', 'goal', 'change'];
+
+/** A smaller second line under the figure (어제보다: the rank move). */
+export interface RankingInsightDetail {
+  /** Shown; starts with its mark (`▲ 순위 1계단 상승`), and only the mark takes the direction color. */
+  text: string;
+  /** Read after the figure by screen readers: `순위 1계단 상승`. */
+  spoken: string;
+  direction?: 'up' | 'down';
+}
 
 export interface RankingInsight {
   key: RankingInsightKey;
-  /** `바로 위 hana까지`, `Platinum 티어까지`, `어제보다` */
+  /** `바로 위 hana까지`, `Platinum 티어까지`, `어제보다 자산` */
   label: string;
-  /** Static figure: `3,389`, `4` */
+  /** Static figure: `3,389`, `+55,269`, `변동 없음` */
   value: string;
-  /** `원`, `계단 상승`, `계단 하락` */
+  /** `원`; empty when the figure is a phrase (`변동 없음`). */
   suffix: string;
   /** Decorative mark in the 32px circle. */
   glyph: string;
   /** API tier of the person ahead (tier message): the glyph's palette. */
   tier?: string;
-  /** Rank direction since yesterday (change message). */
+  /** Direction of the figure (change message: my total asset since yesterday). */
   direction?: 'up' | 'down';
+  detail?: RankingInsightDetail;
 }
+
+/** Why yesterday's standing cannot be compared (previousDayStanding). */
+export type PreviousDayMiss =
+  | 'no_previous_date'
+  | 'not_read'
+  | 'no_previous_set'
+  | 'no_my_row'
+  | 'date_mismatch'
+  | 'captured_at_mismatch'
+  | 'previous_rank_invalid'
+  | 'previous_asset_invalid';
+
+/** Why a message is hidden; `ok` when it is shown. */
+export type RankingInsightReason =
+  | 'ok'
+  | 'my_rank_invalid'
+  | 'is_first'
+  | 'row_missing_or_rank_gap'
+  | 'unknown_tier'
+  | 'top_tier'
+  | 'edge_mismatch'
+  | 'amount_invalid'
+  | 'no_initial_capital'
+  | PreviousDayMiss
+  /** Only useRankingInsights knows this one: the read behind the message failed. */
+  | 'fetch_failed';
 
 export type RankingInsightRow = Pick<
   RankingItemDto,
@@ -50,6 +89,8 @@ export const RANKING_TIER_CUTOFF_RATIOS = [
 ] as const;
 
 const tierKey = (tier: string | null | undefined) => tier?.trim().toLowerCase() ?? '';
+const tierIndex = (tier: string | null | undefined) =>
+  RANKING_TIER_CUTOFF_RATIOS.findIndex((rule) => rule.tier === tierKey(tier));
 
 /** Last rank of every tier, top tier first, for `participants` ranked rows. */
 export function rankingTierLastRanks(participants: number): number[] {
@@ -59,9 +100,19 @@ export function rankingTierLastRanks(participants: number): number[] {
 
 /** Last rank of the tier directly above `tier`; null for the top tier or an unknown one. */
 export function upperTierLastRank(tier: string | null | undefined, participants: number): number | null {
-  const index = RANKING_TIER_CUTOFF_RATIOS.findIndex((rule) => rule.tier === tierKey(tier));
+  const index = tierIndex(tier);
   if (index <= 0 || !Number.isInteger(participants) || participants < 1) return null;
   return Math.max(1, Math.ceil(participants * RANKING_TIER_CUTOFF_RATIOS[index - 1].cumulativeRatio));
+}
+
+/** A finite Decimal, or null for anything unreadable. */
+function finiteDecimal(value: Decimal.Value | null | undefined): Decimal | null {
+  try {
+    const decimal = new Decimal(value ?? '');
+    return decimal.isFinite() ? decimal : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -76,6 +127,31 @@ export function wonToReach(target: Decimal.Value, current: Decimal.Value): Decim
     return null;
   }
   return gap.isFinite() && gap.greaterThan(0) ? gap.ceil() : null;
+}
+
+/**
+ * Whole won still needed to pass a person ahead: the gap rounded up (so at
+ * least 1), and 1 won on a tie — one more won lifts my return strictly above
+ * everyone level with me. Null when they hold less than I do (the ranks
+ * disagree with the amounts) or an amount is unreadable.
+ */
+export function wonToPass(target: Decimal.Value, current: Decimal.Value): Decimal | null {
+  const ahead = finiteDecimal(target);
+  const mine = finiteDecimal(current);
+  if (!ahead || !mine) return null;
+  const gap = ahead.minus(mine);
+  if (gap.lessThan(0)) return null;
+  return gap.isZero() ? new Decimal(1) : gap.ceil();
+}
+
+/**
+ * My total asset now minus then, rounded to whole won half up (a half won
+ * moves away from zero either way). Null when an amount is unreadable.
+ */
+export function wonChange(current: Decimal.Value, previous: Decimal.Value): Decimal | null {
+  const now = finiteDecimal(current);
+  const before = finiteDecimal(previous);
+  return now && before ? now.minus(before).toDecimalPlaces(0, Decimal.ROUND_HALF_UP) : null;
 }
 
 /** Return-rate goals up to +100%; past it the ladder climbs by 50 (150, 200, …). */
@@ -142,29 +218,42 @@ export function kstDateOf(instant: string | null | undefined): string | null {
   return Number.isFinite(time) ? toDateString(new Date(time + KST_OFFSET_MS)) : null;
 }
 
-/**
- * My final rank of `previousDate`, read from that date's latest daily set.
- * Sets stored before 2026-10-14 are filed under their UTC date; a set whose
- * capture time is not on the KST `previousDate` would compare another moment,
- * so it is not used.
- */
-export function previousDayRank(
-  response: RankingsResponseDto | null | undefined,
-  previousDate: string | null,
-): number | null {
-  const mine = response?.state === 'available' ? response.myRanking : null;
-  if (!previousDate || mine?.state !== 'available') return null;
-  if (mine.rankingDate !== previousDate || kstDateOf(mine.capturedAt) !== previousDate) return null;
-  return Number.isInteger(mine.rank) && mine.rank > 0 ? mine.rank : null;
+/** My last standing of a past date: rank and total asset in that date's latest daily set. */
+export interface PreviousDayStanding {
+  rank: number;
+  totalAssetKrw: string;
 }
 
-/** Steps moved since yesterday; null when unchanged or unknown. */
+/**
+ * My standing at the end of `previousDate`, read from that date's latest
+ * daily set, or why it cannot be compared. Sets stored before 2026-10-14 are
+ * filed under their UTC date; a set whose capture time is not on the KST
+ * `previousDate` would compare another moment, so it is not used.
+ */
+export function previousDayStanding(
+  response: RankingsResponseDto | null | undefined,
+  previousDate: string | null,
+): PreviousDayStanding | PreviousDayMiss {
+  if (!previousDate) return 'no_previous_date';
+  if (!response) return 'not_read';
+  if (response.state !== 'available') return 'no_previous_set';
+  const mine = response.myRanking;
+  if (mine?.state !== 'available') return 'no_my_row';
+  if (mine.rankingDate !== previousDate) return 'date_mismatch';
+  if (kstDateOf(mine.capturedAt) !== previousDate) return 'captured_at_mismatch';
+  if (!Number.isInteger(mine.rank) || mine.rank < 1) return 'previous_rank_invalid';
+  if (!finiteDecimal(mine.totalAssetKrw)) return 'previous_asset_invalid';
+  return { rank: mine.rank, totalAssetKrw: mine.totalAssetKrw };
+}
+
+/** Steps moved since yesterday (`{ steps: 0 }` when unchanged); null when a rank is unknown. */
 export function rankChange(
   todayRank: number,
   previousRank: number | null,
-): { steps: number; direction: 'up' | 'down' } | null {
+): { steps: number; direction?: 'up' | 'down' } | null {
   const valid = (rank: number | null): rank is number => rank !== null && Number.isInteger(rank) && rank > 0;
-  if (!valid(todayRank) || !valid(previousRank) || todayRank === previousRank) return null;
+  if (!valid(todayRank) || !valid(previousRank)) return null;
+  if (todayRank === previousRank) return { steps: 0 };
   return { steps: Math.abs(previousRank - todayRank), direction: todayRank < previousRank ? 'up' : 'down' };
 }
 
@@ -180,9 +269,13 @@ export interface RankingInsightInput {
   /** Rows at the upper tier's last rank `b` and at `b + 1`. */
   tierEdge: readonly [RankingInsightRow | null, RankingInsightRow | null] | null;
   initialCapitalKrw?: string | null;
-  /** My final rank yesterday (previousDayRank). */
-  previousRank: number | null;
+  /** My standing at the end of yesterday, or why there is none (previousDayStanding). */
+  previous: PreviousDayStanding | PreviousDayMiss;
 }
+
+type Me = RankingInsightInput['me'];
+/** A message, or the reason it is hidden. */
+type Decision = RankingInsight | Exclude<RankingInsightReason, 'ok'>;
 
 /**
  * The person ahead of me in the next tier up and that tier's display name.
@@ -190,93 +283,119 @@ export interface RankingInsightInput {
  * the copied policy puts it, or the policy moved and nothing is said.
  */
 function upperTierTarget(
-  me: RankingInsightInput['me'],
+  me: Me,
   participants: number,
   edge: RankingInsightInput['tierEdge'],
-): { row: RankingInsightRow; tier: string; name: string } | null {
+): { row: RankingInsightRow; tier: string; name: string } | 'unknown_tier' | 'top_tier' | 'row_missing_or_rank_gap' | 'edge_mismatch' {
+  const index = tierIndex(me.provisionalTier);
+  if (index < 0) return 'unknown_tier';
+  if (index === 0) return 'top_tier';
   const last = upperTierLastRank(me.provisionalTier, participants);
-  if (last === null || me.rank <= last || !edge) return null;
-  const [ahead, behind] = edge;
-  if (ahead?.rank !== last || behind?.rank !== last + 1 || !ahead.provisionalTier) return null;
-  if (tierKey(behind.provisionalTier) !== tierKey(me.provisionalTier)
-    || tierKey(ahead.provisionalTier) === tierKey(me.provisionalTier)) return null;
+  // My rank inside the upper tier means my tier and the copied policy disagree.
+  if (last === null || me.rank <= last) return 'edge_mismatch';
+  const [ahead, behind] = edge ?? [null, null];
+  if (ahead?.rank !== last || behind?.rank !== last + 1) return 'row_missing_or_rank_gap';
+  if (!ahead.provisionalTier || tierKey(behind.provisionalTier) !== tierKey(me.provisionalTier)
+    || tierKey(ahead.provisionalTier) === tierKey(me.provisionalTier)) return 'edge_mismatch';
   // The row's own tier: an empty tier in between is skipped, not named. Tier
   // names are the same in both appearance modes.
   const name = getHomeTier(ahead.provisionalTier, 'light')?.name;
-  return name ? { row: ahead, tier: ahead.provisionalTier, name } : null;
+  return name ? { row: ahead, tier: ahead.provisionalTier, name } : 'edge_mismatch';
 }
 
-type PersonKey = 'above' | 'first' | 'tier';
-/** One person behind several messages keeps one: 1위 > 윗 티어 > 바로 위. */
-const PERSON_PRIORITY: Record<PersonKey, number> = { first: 0, tier: 1, above: 2 };
-const SLOT_ORDER: Record<RankingInsightKey, number> = { above: 0, first: 1, tier: 2, goal: 3, change: 4 };
+function towardPerson(me: Me, key: RankingInsightKey, row: RankingInsightRow, label: string, glyph: string,
+  tier?: string): Decision {
+  const amount = wonToPass(row.totalAssetKrw, me.totalAssetKrw);
+  return amount
+    ? { key, label, value: formatKrw(amount.toFixed(0)), suffix: '원', glyph, ...(tier ? { tier } : {}) }
+    : 'amount_invalid';
+}
 
-type PersonMessage = { userId: string; order: number; priority: number; message: RankingInsight };
+const MARK = { up: '▲', down: '▼', same: '–' } as const;
+
+function changeInsight(me: Me, previous: RankingInsightInput['previous']): Decision {
+  if (typeof previous === 'string') return previous;
+  if (!finiteDecimal(previous.totalAssetKrw)) return 'previous_asset_invalid';
+  const won = wonChange(me.totalAssetKrw, previous.totalAssetKrw);
+  if (!won) return 'amount_invalid';
+  const moved = rankChange(me.rank, previous.rank);
+  if (!moved) return 'previous_rank_invalid';
+  const direction = won.greaterThan(0) ? 'up' : won.lessThan(0) ? 'down' : undefined;
+  const rank = moved.direction ? `순위 ${moved.steps}계단 ${moved.direction === 'up' ? '상승' : '하락'}` : '순위 변동 없음';
+  return {
+    key: 'change',
+    label: '어제보다 자산',
+    value: direction ? `${direction === 'up' ? '+' : '-'}${formatKrw(won.abs().toFixed(0))}` : '변동 없음',
+    suffix: direction ? '원' : '',
+    glyph: MARK[direction ?? 'same'],
+    ...(direction ? { direction } : {}),
+    detail: { text: `${MARK[moved.direction ?? 'same']} ${rank}`, spoken: rank,
+      ...(moved.direction ? { direction: moved.direction } : {}) },
+  };
+}
 
 /**
- * The slot's messages in order: 바로 위, 1위, 윗 티어, 수익률 목표, 어제보다.
- * Messages about one person merge into the highest-priority label, placed at
- * the earliest position of that group.
+ * Every message or the reason it is hidden, decided once for both
+ * buildRankingInsights and explainRankingInsights. Each message stands alone:
+ * when 바로 위, 1위 and the upper tier's edge are one person (2위, or the first
+ * rank of a tier) every one of them is still shown, with the same amount.
  */
-export function buildRankingInsights(input: RankingInsightInput): RankingInsight[] {
-  const { me, participants, first, above, tierEdge, initialCapitalKrw, previousRank } = input;
-  if (!Number.isInteger(me.rank) || me.rank < 1) return [];
-  const toward = (key: PersonKey, row: RankingInsightRow, label: string, glyph: string, tier?: string): PersonMessage | null => {
-    const amount = wonToReach(row.totalAssetKrw, me.totalAssetKrw);
-    return amount ? {
-      userId: row.userId,
-      order: SLOT_ORDER[key],
-      priority: PERSON_PRIORITY[key],
-      message: { key, label, value: formatKrw(amount.toFixed(0)), suffix: '원', glyph, ...(tier ? { tier } : {}) },
-    } : null;
-  };
-
-  const tierTarget = upperTierTarget(me, participants, tierEdge);
-  const people = [
-    above && me.rank > 1 && above.rank === me.rank - 1
-      ? toward('above', above, `바로 위 ${above.nickname}까지`, '↑') : null,
-    first && me.rank > 1 && first.rank === 1
-      ? toward('first', first, `1위 ${first.nickname}까지`, '1') : null,
-    tierTarget
-      ? toward('tier', tierTarget.row, `${tierTarget.name} 티어까지`, tierTarget.name.charAt(0), tierTarget.tier) : null,
-  ].filter((person): person is PersonMessage => person !== null);
-
-  const placed: Array<{ order: number; message: RankingInsight }> = [];
-  for (const userId of new Set(people.map((person) => person.userId))) {
-    const group = people.filter((person) => person.userId === userId);
-    placed.push({
-      order: Math.min(...group.map((person) => person.order)),
-      message: group.reduce((best, person) => (person.priority < best.priority ? person : best)).message,
-    });
+function decideRankingInsights(input: RankingInsightInput): Record<RankingInsightKey, Decision> {
+  const { me, participants, first, above, tierEdge, initialCapitalKrw, previous } = input;
+  if (!Number.isInteger(me.rank) || me.rank < 1) {
+    return { above: 'my_rank_invalid', first: 'my_rank_invalid', tier: 'my_rank_invalid', goal: 'my_rank_invalid',
+      change: 'my_rank_invalid' };
   }
-
+  const tier = upperTierTarget(me, participants, tierEdge);
   const goal = nextReturnGoal(initialCapitalKrw, me.totalAssetKrw);
-  if (goal) {
-    placed.push({ order: SLOT_ORDER.goal, message: {
-      key: 'goal',
-      label: goal.percent === 0 ? '본전(수익률 0%)까지' : `수익률 ${goal.percent}%까지`,
-      value: formatKrw(goal.amount.toFixed(0)),
-      suffix: '원',
-      glyph: goal.percent === 0 ? '0%' : '%',
-    } });
-  }
+  return {
+    above: me.rank === 1 ? 'is_first'
+      : above?.rank !== me.rank - 1 ? 'row_missing_or_rank_gap'
+        : towardPerson(me, 'above', above, `바로 위 ${above.nickname}까지`, '↑'),
+    first: me.rank === 1 ? 'is_first'
+      : first?.rank !== 1 ? 'row_missing_or_rank_gap'
+        : towardPerson(me, 'first', first, `1위 ${first.nickname}까지`, '1'),
+    tier: typeof tier === 'string' ? tier
+      : towardPerson(me, 'tier', tier.row, `${tier.name} 티어까지`, tier.name.charAt(0), tier.tier),
+    goal: !finiteDecimal(initialCapitalKrw)?.greaterThan(0) ? 'no_initial_capital'
+      : !goal ? 'amount_invalid'
+        : {
+          key: 'goal',
+          label: goal.percent === 0 ? '본전까지' : `수익률 ${goal.percent}%까지`,
+          value: formatKrw(goal.amount.toFixed(0)),
+          suffix: '원',
+          glyph: goal.percent === 0 ? '0%' : '%',
+        },
+    change: changeInsight(me, previous),
+  };
+}
 
-  const change = rankChange(me.rank, previousRank);
-  if (change) {
-    placed.push({ order: SLOT_ORDER.change, message: {
-      key: 'change',
-      label: '어제보다',
-      value: String(change.steps),
-      suffix: change.direction === 'up' ? '계단 상승' : '계단 하락',
-      glyph: change.direction === 'up' ? '▲' : '▼',
-      direction: change.direction,
-    } });
-  }
+/** The slot's messages in order: 바로 위, 1위, 윗 티어, 수익률 목표, 어제보다. */
+export function buildRankingInsights(input: RankingInsightInput): RankingInsight[] {
+  const decided = decideRankingInsights(input);
+  return RANKING_INSIGHT_KEYS.map((key) => decided[key])
+    .filter((decision): decision is RankingInsight => typeof decision !== 'string');
+}
 
-  return placed.sort((a, b) => a.order - b.order).map((entry) => entry.message);
+export type RankingInsightExplanation = Record<RankingInsightKey, { shown: boolean; reason: RankingInsightReason }>;
+
+/** Per message: shown, or why not. Same decisions as buildRankingInsights; it never changes what is shown. */
+export function explainRankingInsights(input: RankingInsightInput): RankingInsightExplanation {
+  const decided = decideRankingInsights(input);
+  const explain = (decision: Decision) =>
+    typeof decision === 'string' ? { shown: false, reason: decision } : { shown: true, reason: 'ok' as const };
+  return {
+    above: explain(decided.above),
+    first: explain(decided.first),
+    tier: explain(decided.tier),
+    goal: explain(decided.goal),
+    change: explain(decided.change),
+  };
 }
 
 /** One screen-reader sentence list for every message (the slot itself never announces rotation). */
 export function describeRankingInsights(messages: readonly RankingInsight[]): string {
-  return ['순위 안내', ...messages.map((message) => `${message.label} ${message.value}${message.suffix}`)].join('. ') + '.';
+  return ['순위 안내', ...messages.map((message) =>
+    `${message.label} ${message.value}${message.suffix}${message.detail ? `, ${message.detail.spoken}` : ''}`)]
+    .join('. ') + '.';
 }
