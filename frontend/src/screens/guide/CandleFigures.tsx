@@ -1,6 +1,7 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { Text, View } from '../../theme/native';
+import { View } from '../../theme/native';
+import { Text } from './GuideText';
 import Svg, { Line, Rect } from 'react-native-svg';
 import { candleParts, won, type Ohlc } from './lessonCalculations';
 import { lessonStyles as s } from './LessonUi';

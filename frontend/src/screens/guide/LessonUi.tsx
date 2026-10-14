@@ -5,11 +5,13 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
-  Text,
   View,
   useWindowDimensions,
 } from '../../theme/native';
+import Svg, { Path } from 'react-native-svg';
 import ActionPressable from '../../components/common/ActionPressable';
+import { useAppearance } from '../../theme/appearance';
+import { Text } from './GuideText';
 import { summarize, won, type BookFrame } from './lessonCalculations';
 
 export const lessonStyles = StyleSheet.create({
@@ -57,6 +59,23 @@ export const lessonStyles = StyleSheet.create({
   blackEdge: { borderColor: '#000000' },
   blackSelected: { backgroundColor: '#000000', borderColor: '#000000' },
   disabled: { opacity: 0.6 },
+  // Every choice keeps room for the selected mark on both sides: the label
+  // stays centered and selecting changes no size.
+  choice: { paddingHorizontal: 21 },
+  // A ring that grows with the button (at any text size) and the ✓, both in
+  // that padding; the button's own fill and edge stay as they are.
+  selectedMark: {
+    position: 'absolute',
+    top: 3,
+    bottom: 3,
+    left: 3,
+    right: 3,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: semantic.onAccent,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
   choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   comparison: { flexDirection: 'row', gap: 16, alignItems: 'flex-start' },
   stacked: { flexDirection: 'column', alignItems: 'stretch' },
@@ -269,6 +288,7 @@ export function LessonAction({
   primary?: boolean;
   tone?: 'default' | 'black';
 }) {
+  const { colors } = useAppearance();
   const black = tone === 'black';
   const gradient = primary && !secondary && selected === undefined;
   return (
@@ -282,6 +302,7 @@ export function LessonAction({
       onPress={onPress}
       style={[
         s.action,
+        selected !== undefined && s.choice,
         gradient && s.gradientAction,
         secondary && s.secondary,
         black && s.blackEdge,
@@ -290,6 +311,18 @@ export function LessonAction({
       ]}
     >
       <Text style={[s.actionText, secondary && s.secondaryText]}>{label}</Text>
+      {/* The selected option's ring and the app's ✓: shapes as well as the
+          fill. They sit in padding every option reserves, so selecting moves
+          nothing; the label and selected state carry the meaning for screen readers. */}
+      {selected ? (
+        <View testID={`${id}-selected`} pointerEvents="none" style={s.selectedMark}
+          accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>
+          <Svg width={12} height={12} viewBox="0 0 12 12">
+            <Path d="M2.5 6.5 5 9l4.5-5.5" fill="none" stroke={colors.onAccent} strokeWidth={2}
+              strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </View>
+      ) : null}
     </ActionPressable>
   );
 }

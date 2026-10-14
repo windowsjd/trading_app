@@ -11,6 +11,7 @@ import {
   candleParts,
 } from './lessonCalculations.ts';
 import { semantic } from '../../theme/tokens.ts';
+import { visibleText } from './figureText.ts';
 
 const require = createRequire(import.meta.url);
 const {
@@ -92,10 +93,14 @@ function setup(t: TestContext, screen: string) {
   t.after(() => act(() => h.renderer.unmount()));
   return h;
 }
-function textContent(node: any): string {
+function rawText(node: any): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node);
-  if (Array.isArray(node)) return node.map(textContent).join('');
-  return (node?.children ?? []).map(textContent).join('');
+  if (Array.isArray(node)) return node.map(rawText).join('');
+  return (node?.children ?? []).map(rawText).join('');
+}
+// What a reader sees (figureText's visibleText): line-break controls are not read.
+function textContent(node: any): string {
+  return visibleText(rawText(node));
 }
 function order(h: any, ...ids: string[]) {
   const nodes = h.renderer.root.findAll((node: any) => typeof node.type === 'string');

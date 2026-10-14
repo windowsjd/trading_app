@@ -30,6 +30,8 @@ import {
   type GuideChapter,
 } from './guideTopics.ts';
 import { UP_COLOR, DOWN_COLOR } from '../../components/charts/candleColors.ts';
+import { WORD_JOINER, ZERO_WIDTH_SPACE, visibleText } from './figureText.ts';
+import { semantic } from '../../theme/tokens.ts';
 
 const require = createRequire(import.meta.url);
 const {
@@ -38,12 +40,14 @@ const {
   act,
   flatten,
 } = require('../../../test/interactionTestHarness.cjs');
-const textContent = (node: any): string =>
+const rawText = (node: any): string =>
   typeof node === 'string' || typeof node === 'number'
     ? String(node)
     : (Array.isArray(node) ? node : (node?.children ?? []))
-        .map(textContent)
+        .map(rawText)
         .join('');
+// What a reader sees (figureText's visibleText): line-break controls are not read.
+const textContent = (node: any): string => visibleText(rawText(node));
 function setup(
   t: TestContext,
   chapter: GuideChapter,
@@ -839,6 +843,116 @@ describe('new guide chapters preserve downward learning flow', () => {
       const h = setup(t, id);
       for (const action of completionActions[id]) h.press(action);
       assert.doesNotMatch(h.text(), /추적오차|분배금|총수익/, id);
+      act(() => h.renderer.unmount());
+    }
+  });
+  it('keeps every figure with its unit on screen, while screen-reader labels stay plain', (t) => {
+    for (const chapter of guideChapters) {
+      const h = setup(t, chapter.id);
+      for (const action of completionActions[chapter.id]) h.press(action);
+      if (chapter.id === 'closed-market') h.press('closed-market-more');
+      const texts: string[] = h.renderer.root
+        .findAll((node: any) => node.type === 'Text')
+        .map(rawText);
+      // A digit right before its unit, a % right before 포인트 or a digit right
+      // after a range's tilde would still be a place to break inside a figure.
+      const loose = texts.filter((text) =>
+        /\d(?:%|원|주|포인트|종목|만 원|시간|건|분|시)|%포|~\d/.test(text),
+      );
+      assert.deepEqual(loose, [], chapter.id);
+      assert.equal(texts.some((text) => text.includes('\u2060')), true, chapter.id);
+      const labels: string[] = h.renderer.root
+        .findAll((node: any) => typeof node.props?.accessibilityLabel === 'string')
+        .map((node: any) => node.props.accessibilityLabel);
+      assert.equal(labels.length > 0, true, chapter.id);
+      assert.equal(
+        labels.some((label) => /[\u2060\u200B]/.test(label)),
+        false,
+        `${chapter.id} labels stay plain`,
+      );
+      act(() => h.renderer.unmount());
+    }
+  });
+  it('wraps a figure wider than its whole line at a readable place (very large text)', (t) => {
+    const h = setup(t, 'etf-pick');
+    for (const action of completionActions['etf-pick']) h.press(action);
+    const value = () => h.find('etf-pick-gap-result').findAll(
+      (node: any) => node.type === 'Text' && textContent(node) === '-0.2%포인트',
+    )[0];
+    const J = WORD_JOINER, Z = ZERO_WIDTH_SPACE;
+    assert.equal(rawText(value()), `-0.2${J}%${J}포${J}인${J}트`, 'whole before any measurement');
+    h.dimensions = { width: 320, height: 568, fontScale: 3 };
+    h.update();
+    const layout = (width: number) =>
+      act(() => value().props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width, height: 100 } } }));
+    layout(230);
+    assert.equal(rawText(value()), `-0.2%${Z}포${J}인${J}트`, 'breaks after the % only');
+    layout(400);
+    assert.equal(rawText(value()), `-0.2${J}%${J}포${J}인${J}트`, 'whole again once it fits');
+    assert.equal(textContent(value()), '-0.2%포인트');
+  });
+  it('marks only the selected choice with ✓, hidden from screen readers, also after recording', (t) => {
+    const sets: Record<GuideChapter, { before: string[]; ids: string[]; record: string }> = {
+      'closed-market': {
+        before: ['closed-market-next'],
+        ids: ['closed-market-price-10100', 'closed-market-price-10300'],
+        record: 'closed-market-order',
+      },
+      index: { before: [], ids: ['index-predict-a', 'index-predict-c'], record: 'index-predict-record' },
+      etf: {
+        before: ['etf-unit'],
+        ids: ['etf-shock-pick-a', 'etf-shock-pick-b', 'etf-shock-pick-c'],
+        record: 'etf-shock-record',
+      },
+      'etf-price': {
+        before: ['etf-price-apply'],
+        ids: ['etf-price-gap-9800', 'etf-price-gap-10000', 'etf-price-gap-10200'],
+        record: 'etf-price-record',
+      },
+      'etf-pick': { before: [], ids: ['etf-pick-spread-x', 'etf-pick-spread-y'], record: 'etf-pick-record' },
+    };
+    for (const [chapter, { before, ids, record }] of Object.entries(sets) as [GuideChapter, (typeof sets)[GuideChapter]][]) {
+      const h = setup(t, chapter);
+      for (const action of before) h.press(action);
+      const marks = (id: string) =>
+        h.find(id).findAll((node: any) => typeof node.type === 'string' && node.props.testID === `${id}-selected`);
+      const marked = () => ids.filter((id) => marks(id).length > 0);
+      const box = (id: string) => {
+        const { paddingHorizontal, paddingVertical, borderWidth } = flatten(h.find(id).props.style);
+        return [paddingHorizontal, paddingVertical, borderWidth].join('/');
+      };
+      const sizes = ids.map(box);
+      assert.deepEqual(marked(), [], `${chapter}: nothing selected yet`);
+      const [first, last] = [ids[0], ids.at(-1)!];
+      h.press(first);
+      assert.deepEqual(marked(), [first], chapter);
+      h.press(last);
+      assert.deepEqual(marked(), [last], `${chapter}: the mark follows the selection`);
+      assert.deepEqual(ids.map(box), sizes, `${chapter}: selecting changes no size`);
+      const [mark] = marks(last);
+      // Decorative: hidden from screen readers and touches, drawn as the ✓ path.
+      assert.equal(mark.props['aria-hidden'], true);
+      assert.equal(mark.props.importantForAccessibility, 'no-hide-descendants');
+      assert.equal(mark.props.accessibilityElementsHidden, true);
+      assert.equal(mark.props.pointerEvents, 'none');
+      assert.equal(mark.findAll((node: any) => node.type === 'Path').length, 1);
+      // The ring sits inside the button and is drawn in the label color on the fill.
+      const ring = flatten(mark.props.style);
+      assert.equal(ring.position, 'absolute');
+      assert.equal(ring.borderWidth >= 2, true);
+      assert.equal(ring.borderColor, semantic.onAccent);
+      assert.equal([ring.top, ring.left, ring.right, ring.bottom].every((inset) => inset >= 0), true);
+      for (const id of ids) {
+        const button = h.find(id);
+        const label = button.findAll((node: any) => node.type === 'Text')[0];
+        // Screen readers keep reading the plain label and the selected state.
+        assert.equal(textContent(label), button.props.accessibilityLabel, id);
+        assert.equal(button.props.accessibilityState.selected, id === last, id);
+      }
+      h.press(record);
+      assert.equal(h.find(last).props.disabled, true, chapter);
+      assert.deepEqual(marked(), [last], `${chapter}: the recorded choice stays marked`);
+      h.readable();
       act(() => h.renderer.unmount());
     }
   });

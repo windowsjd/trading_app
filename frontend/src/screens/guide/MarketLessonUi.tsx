@@ -1,5 +1,6 @@
 import React from 'react';
-import { Text, View } from '../../theme/native';
+import { View } from '../../theme/native';
+import { Text } from './GuideText';
 import Svg, {
   Circle,
   Line,

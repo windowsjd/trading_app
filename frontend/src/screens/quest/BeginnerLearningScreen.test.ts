@@ -9,6 +9,7 @@ const require = createRequire(import.meta.url);
 const React = require('react');
 const Renderer = require('react-test-renderer');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
+const { flatten } = require('../../../test/interactionTestHarness.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const FX_AT = '2026-10-10T01:00:00.000Z';
@@ -39,7 +40,8 @@ async function renderLearning(state: { progress: BeginnerQuests | null; isError?
     start: (...args: unknown[]) => calls.push(['start', ...args]),
   };
   const Screen = load(resolve('src/screens/quest/BeginnerLearningScreen.tsx'), {
-    'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', SafeAreaView: 'SafeAreaView', RefreshControl: 'RefreshControl', ActivityIndicator: 'ActivityIndicator', Platform: { OS: 'ios' }, StyleSheet: { create: x => x } },
+    // The guide list's Text measures its figures (guide/GuideText): window size and style flattening.
+    'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', SafeAreaView: 'SafeAreaView', RefreshControl: 'RefreshControl', ActivityIndicator: 'ActivityIndicator', Platform: { OS: 'ios' }, StyleSheet: { create: x => x, flatten }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }) },
     'react-native-svg': { default: 'Svg', Path: 'Path', Circle: 'Circle', __esModule: true },
     '../../features/quest/useBeginnerQuestProgress': { useBeginnerQuestProgress: () => quest },
     '../../features/quest/QuestGuideProvider': { useQuestGuide: () => guide },
