@@ -35,7 +35,7 @@ type Props = HomeScreenProps;
  * "which account is selected?" and hands off:
  *
  *   - no accounts  → the setup panel, which can open a general account;
- *   - general      → `GeneralAccountHome` (TWR, funding breakdown, no season UI);
+ *   - general      → `GeneralAccountHome` (cumulative-principal return, no season UI);
  *   - season       → `SeasonAccountHome` (that season's rank, tier and return).
  *
  * Both branches read account-scoped endpoints only. The season branch names its

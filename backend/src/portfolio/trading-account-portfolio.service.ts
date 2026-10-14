@@ -21,8 +21,10 @@ import {
 } from './general-history-integrity';
 import {
   compareGeneralSnapshotOrder,
+  CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD,
   MONEY_SCALE,
   RETURN_RATE_SCALE,
+  toCumulativePrincipalReturnRatePercent,
 } from './general-performance.policy';
 import { PortfolioValuationError } from './portfolio-valuation.policy';
 import { PortfolioValuationService } from './portfolio-valuation.service';
@@ -49,9 +51,17 @@ import {
  *
  * RETURN-RATE MEANING IS NEVER IMPLICIT. Every summary and every history point
  * carries `returnRateMethod`:
- *   - `time_weighted` for general accounts (TWR; external funding is neutral)
+ *   - `cumulative_principal` for general/beginner accounts: investment PnL over
+ *     the cumulative principal (opening grant + granted ad rewards) of the SAME
+ *     state — the live valuation with the ledger of the same transaction, or
+ *     the two columns of the same history row. An inflow is not profit, but it
+ *     grows the principal, so the rate may change when money arrives.
  *   - `initial_capital` for season accounts (the existing simple ratio)
  * They are different numbers and are never presented as the same thing.
+ *
+ * The stored `returnRate` column of a standalone row is the time-weighted
+ * percent (internal record, see general-performance.policy.ts). It is
+ * validated but never serialised as the representative rate here.
  *
  * GET never writes: no account, wallet, grant, claim, EquitySnapshot,
  * DailyPortfolioSnapshot, or Position is created here.
@@ -64,6 +74,10 @@ export type TradingAccountEquityQuery = {
 
 type EquityRange = '1d' | '7d' | '30d' | '90d' | '180d' | '360d' | 'all';
 
+type ReturnRateMethod =
+  | typeof CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD
+  | 'initial_capital';
+
 type EquityHistoryPoint = {
   futuresUnrealizedPnlUsd: string | null;
   futuresUnrealizedPnlKrw: string | null;
@@ -71,7 +85,7 @@ type EquityHistoryPoint = {
   snapshotDate?: string;
   totalAssetKrw: string;
   returnRate: string;
-  returnRateMethod: 'time_weighted' | 'initial_capital';
+  returnRateMethod: ReturnRateMethod;
   cumulativeExternalFundingKrw: string | null;
   investmentPnlKrw: string | null;
   snapshotReason: SnapshotReason;
@@ -305,8 +319,12 @@ export class TradingAccountPortfolioService {
               live.funding.cumulativeAdRewardKrw.toFixed(MONEY_SCALE),
             investmentPnlKrw:
               live.advance.investmentPnlKrw.toFixed(MONEY_SCALE),
-            returnRate: live.advance.returnRate.toFixed(RETURN_RATE_SCALE),
-            returnRateMethod: 'time_weighted' as const,
+            // The advance pairs THIS valuation's total with THIS transaction's
+            // ledger principal, so total, principal, PnL and rate are one state.
+            returnRate: toCumulativePrincipalReturnRatePercent(
+              live.advance,
+            ).toFixed(RETURN_RATE_SCALE),
+            returnRateMethod: CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD,
             krwCash: live.valuation.krwCash,
             usdCashKrw: live.valuation.usdCashKrw,
             assetValueKrw: live.valuation.assetValueKrw,
@@ -691,7 +709,8 @@ export class TradingAccountPortfolioService {
         timeWeightedReturnFactor: true,
       },
     });
-    if (isStandaloneAccountMode(account.mode)) {
+    const standalone = isStandaloneAccountMode(account.mode);
+    if (standalone) {
       assertGeneralDailyHistoryRows(account.id, rows);
     }
     const dates = new Set<string>();
@@ -719,7 +738,10 @@ export class TradingAccountPortfolioService {
         row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
       futuresUnrealizedPnlKrw:
         row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
-      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
+      // Season rows keep their stored initial-capital return verbatim.
+      returnRate: standalone
+        ? this.standaloneRowReturnRate(row)
+        : row.returnRate.toFixed(RETURN_RATE_SCALE),
       returnRateMethod: this.returnRateMethod(account.mode),
       cumulativeExternalFundingKrw:
         row.cumulativeExternalFundingKrw?.toFixed(MONEY_SCALE) ?? null,
@@ -727,6 +749,23 @@ export class TradingAccountPortfolioService {
       snapshotReason: SnapshotReason.scheduled,
       externalFundingAmountKrw: null,
     }));
+  }
+
+  /**
+   * Representative rate of ONE verified standalone history row, from that
+   * row's own total and its own cumulative principal — never the account's
+   * current principal, and never the stored time-weighted `returnRate`.
+   * Callers run the row integrity assertions first, so the principal column
+   * is non-null here.
+   */
+  private standaloneRowReturnRate(row: {
+    totalAssetKrw: Prisma.Decimal;
+    cumulativeExternalFundingKrw: Prisma.Decimal | null;
+  }): string {
+    return toCumulativePrincipalReturnRatePercent({
+      totalAssetKrw: row.totalAssetKrw,
+      cumulativeExternalFundingKrw: row.cumulativeExternalFundingKrw!,
+    }).toFixed(RETURN_RATE_SCALE);
   }
 
   private buildAllocation(valuation: {
@@ -800,8 +839,8 @@ export class TradingAccountPortfolioService {
         row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
       futuresUnrealizedPnlKrw:
         row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
-      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
-      returnRateMethod: 'time_weighted' as const,
+      returnRate: this.standaloneRowReturnRate(row),
+      returnRateMethod: CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD,
       // Non-null by assertGeneralEquityHistoryRows: a general history point
       // never serialises a damaged column as `null`.
       cumulativeExternalFundingKrw:
@@ -850,8 +889,8 @@ export class TradingAccountPortfolioService {
         row.futuresUnrealizedPnlUsd?.toFixed(MONEY_SCALE) ?? null,
       futuresUnrealizedPnlKrw:
         row.futuresUnrealizedPnlKrw?.toFixed(MONEY_SCALE) ?? null,
-      returnRate: row.returnRate.toFixed(RETURN_RATE_SCALE),
-      returnRateMethod: 'time_weighted' as const,
+      returnRate: this.standaloneRowReturnRate(row),
+      returnRateMethod: CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD,
       cumulativeExternalFundingKrw:
         row.cumulativeExternalFundingKrw!.toFixed(MONEY_SCALE),
       investmentPnlKrw: row.investmentPnlKrw!.toFixed(MONEY_SCALE),
@@ -920,10 +959,10 @@ export class TradingAccountPortfolioService {
     }));
   }
 
-  private returnRateMethod(mode: TradingAccountMode) {
+  private returnRateMethod(mode: TradingAccountMode): ReturnRateMethod {
     return isStandaloneAccountMode(mode)
-      ? ('time_weighted' as const)
-      : ('initial_capital' as const);
+      ? CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD
+      : 'initial_capital';
   }
 
   /** `now` is passed in, never read here: one request, one clock. */

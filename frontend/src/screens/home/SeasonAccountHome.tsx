@@ -52,7 +52,7 @@ import type { AssetType } from '../../features/market/api';
  *
  * WHAT IS NOT SHOWN
  * -----------------
- * No time-weighted return, no external-funding breakdown, no ad reward: those
+ * No cumulative-principal return, no external-funding breakdown, no ad reward: those
  * are general-mode concepts. A season account is funded once, at a fixed
  * initial capital, and its return is measured against exactly that.
  */

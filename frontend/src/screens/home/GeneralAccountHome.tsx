@@ -38,10 +38,11 @@ import type { AssetType } from '../../features/market/api';
  * 없습니다" blocked screen is exactly wrong here: nothing is missing, the user
  * is simply looking at an account that was never about a season.
  *
- * The number at the top is a TIME-WEIGHTED return, and it is labelled from the
- * RESPONSE's `returnRateMethod` rather than from the account's mode. The two
- * must agree; if they ever disagree the response is the fact, and mislabelling
- * a TWR as an initial-capital return would misstate what the number measures.
+ * The number at the top is the server's cumulative-principal return
+ * (`returnRateMethod: cumulative_principal`): investment PnL over the opening
+ * grant plus granted ad rewards. The headline just says 수익률; the daily-history
+ * gate still requires the response's method to match the account's mode, and
+ * nothing here recomputes the rate from wallet balances.
  *
  */
 

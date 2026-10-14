@@ -2,6 +2,7 @@ jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
   return {
+    AdRewardClaimStatus: { granted: 'granted', rejected: 'rejected' },
     AssetPriceSourceType: {
       admin_manual: 'admin_manual',
       official_batch: 'official_batch',
@@ -647,5 +648,488 @@ describe('extended Home calendar ranges', () => {
         })
       ).data.points,
     ).toHaveLength(23);
+  });
+});
+
+/**
+ * 일반·초보 수익률 정책 변경. The served rate is investment PnL over the
+ * cumulative principal of the SAME state. Every fixture below stores a
+ * time-weighted `returnRate` that DIFFERS from that ratio, so a regression back
+ * to serialising the stored column (or applying today's principal to an older
+ * row) fails on the numbers, not on a label.
+ */
+describe('standalone cumulative-principal return rate', () => {
+  type StandaloneMode = 'general' | 'beginner';
+
+  function standaloneHarness(mode: StandaloneMode | 'season') {
+    const account = {
+      id: `${mode}-acct`,
+      userId: 'user',
+      mode,
+      status: 'active',
+      openedAt: new Date('2026-09-01T00:00:00Z'),
+      initialCapitalKrw: d('10000000'),
+      seasonParticipant:
+        mode === 'season'
+          ? { id: 'sp-1', season: { id: 'season-1', status: 'active' } }
+          : null,
+    };
+    const client = {
+      dailyPortfolioSnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+      equitySnapshot: { findMany: jest.fn().mockResolvedValue([]) },
+      adRewardClaim: { findMany: jest.fn().mockResolvedValue([]) },
+      $transaction: jest.fn().mockImplementation((handler) => handler(client)),
+    };
+    const performance = {
+      requireContinuousPerformanceState: jest.fn().mockResolvedValue({}),
+      resolveLivePerformance: jest.fn(),
+    };
+    const service = new TradingAccountPortfolioService(
+      client as never,
+      { getOwnedAccountOrThrow: jest.fn().mockResolvedValue(account) } as never,
+      performance as never,
+      {} as never,
+    );
+    return { account, client, performance, service };
+  }
+
+  const valuation = (totalAssetKrw: string) => ({
+    totalAssetKrw,
+    krwCash: totalAssetKrw,
+    usdCashKrw: '0.00000000',
+    assetValueKrw: '0.00000000',
+    domesticStockValueKrw: '0.00000000',
+    usStockValueKrw: '0.00000000',
+    cryptoValueKrw: '0.00000000',
+    realizedPnlKrw: '0.00000000',
+    unrealizedPnlKrw: '0.00000000',
+    valuationAt: new Date('2026-10-14T00:00:00Z'),
+  });
+
+  function live(input: {
+    total: string;
+    principal: string;
+    adRewards: string;
+    storedTwrRate: string;
+    factor: string;
+  }) {
+    return {
+      valuation: valuation(input.total),
+      funding: {
+        initialFundingKrw: d('10000000'),
+        cumulativeAdRewardKrw: d(input.adRewards),
+        cumulativeExternalFundingKrw: d(input.principal),
+      },
+      latestSnapshot: {},
+      advance: {
+        totalAssetKrw: d(input.total),
+        cumulativeExternalFundingKrw: d(input.principal),
+        investmentPnlKrw: d(input.total).sub(input.principal),
+        timeWeightedReturnFactor: d(input.factor),
+        returnRate: d(input.storedTwrRate),
+      },
+    };
+  }
+
+  function performanceRow(input: {
+    id: string;
+    total: string;
+    principal: string;
+    factor: string;
+    storedTwrRate: string;
+  }) {
+    return {
+      id: input.id,
+      tradingAccountId: '',
+      totalAssetKrw: d(input.total),
+      futuresUnrealizedPnlUsd: null,
+      futuresUnrealizedPnlKrw: null,
+      returnRate: d(input.storedTwrRate),
+      cumulativeExternalFundingKrw: d(input.principal),
+      investmentPnlKrw: d(input.total).sub(input.principal),
+      timeWeightedReturnFactor: d(input.factor),
+    };
+  }
+
+  async function integrityCode(promise: Promise<unknown>) {
+    try {
+      await promise;
+    } catch (error) {
+      expect(error instanceof HttpException).toBe(true);
+      const http = error as HttpException;
+      expect(http.getStatus()).toBe(500);
+      return (http.getResponse() as { error: { code: string } }).error.code;
+    }
+    throw new Error('expected a structured integrity failure');
+  }
+
+  it.each(['general', 'beginner'] as const)(
+    '%s live summary divides investment PnL by the same-transaction principal',
+    async (mode) => {
+      const h = standaloneHarness(mode);
+      // +2,000,000 PnL, then a 2,000,000 reward: TWR would still say 20%.
+      h.performance.resolveLivePerformance.mockResolvedValue(
+        live({
+          total: '14000000',
+          principal: '12000000',
+          adRewards: '2000000',
+          storedTwrRate: '20',
+          factor: '1.2',
+        }),
+      );
+
+      const response = await h.service.getPortfolio('user', h.account.id);
+      const summary = response.data.summary!;
+
+      expect(summary.returnRate).toBe('16.66666667');
+      expect(summary.returnRateMethod).toBe('cumulative_principal');
+      expect(summary.totalAssetKrw).toBe('14000000.00000000');
+      expect(summary.cumulativeExternalFundingKrw).toBe('12000000.00000000');
+      expect(summary.initialFundingKrw).toBe('10000000.00000000');
+      expect(summary.cumulativeAdRewardKrw).toBe('2000000.00000000');
+      expect(summary.investmentPnlKrw).toBe('2000000.00000000');
+      // The live read stays ONE RepeatableRead transaction.
+      expect(h.client.$transaction).toHaveBeenCalledWith(expect.any(Function), {
+        isolationLevel: 'RepeatableRead',
+      });
+      expect(h.performance.resolveLivePerformance).toHaveBeenCalledWith(
+        expect.objectContaining({ client: h.client }),
+      );
+    },
+  );
+
+  it('reports -100% for a zero total on a positive principal', async () => {
+    const h = standaloneHarness('general');
+    h.performance.resolveLivePerformance.mockResolvedValue(
+      live({
+        total: '0',
+        principal: '10000000',
+        adRewards: '0',
+        storedTwrRate: '-100',
+        factor: '0',
+      }),
+    );
+    const response = await h.service.getPortfolio('user', h.account.id);
+    expect(response.data.summary!.returnRate).toBe('-100.00000000');
+    expect(response.data.summary!.investmentPnlKrw).toBe('-10000000.00000000');
+  });
+
+  it('fails closed instead of reporting 0% when the live principal is not positive', async () => {
+    const h = standaloneHarness('general');
+    h.performance.resolveLivePerformance.mockResolvedValue(
+      live({
+        total: '0',
+        principal: '0',
+        adRewards: '0',
+        storedTwrRate: '0',
+        factor: '1',
+      }),
+    );
+    expect(
+      await integrityCode(h.service.getPortfolio('user', h.account.id)),
+    ).toBe('GENERAL_PERFORMANCE_INTEGRITY');
+  });
+
+  it('serves each intraday point from its own row, across a reward boundary', async () => {
+    const h = standaloneHarness('general');
+    const claimId = 'claim-1';
+    const boundary = {
+      externalFundingAmountKrw: d('2000000'),
+      externalFundingReferenceType: 'ad_reward_claim',
+      externalFundingReferenceId: claimId,
+    };
+    const none = {
+      externalFundingAmountKrw: null,
+      externalFundingReferenceType: null,
+      externalFundingReferenceId: null,
+    };
+    const at = (iso: string) => ({
+      capturedAt: new Date(iso),
+      createdAt: new Date(iso),
+    });
+    const rows = [
+      {
+        ...performanceRow({
+          id: 'origin',
+          total: '10000000',
+          principal: '10000000',
+          factor: '1',
+          storedTwrRate: '0',
+        }),
+        snapshotReason: 'general_account_open',
+        externalFundingAmountKrw: d('10000000'),
+        externalFundingReferenceType: 'general_account_open',
+        externalFundingReferenceId: h.account.id,
+        ...at('2026-10-13T01:00:00Z'),
+      },
+      {
+        ...performanceRow({
+          id: 'gain',
+          total: '12000000',
+          principal: '10000000',
+          factor: '1.2',
+          storedTwrRate: '20',
+        }),
+        snapshotReason: 'order_executed',
+        ...none,
+        ...at('2026-10-13T02:00:00Z'),
+      },
+      // Listed after → before on purpose: the boundary phase decides order.
+      {
+        ...performanceRow({
+          id: 'after',
+          total: '14000000',
+          principal: '12000000',
+          factor: '1.2',
+          storedTwrRate: '20',
+        }),
+        snapshotReason: 'external_funding_after',
+        ...boundary,
+        ...at('2026-10-13T03:00:00Z'),
+      },
+      {
+        ...performanceRow({
+          id: 'before',
+          total: '12000000',
+          principal: '10000000',
+          factor: '1.2',
+          storedTwrRate: '20',
+        }),
+        snapshotReason: 'external_funding_before',
+        ...boundary,
+        ...at('2026-10-13T03:00:00Z'),
+      },
+      {
+        ...performanceRow({
+          id: 'later-trade',
+          total: '14600000',
+          principal: '12000000',
+          factor: '1.251428571428571429',
+          storedTwrRate: '25.14285714',
+        }),
+        snapshotReason: 'order_executed',
+        ...none,
+        ...at('2026-10-13T04:00:00Z'),
+      },
+    ].map((row) => ({ ...row, tradingAccountId: h.account.id }));
+    h.client.equitySnapshot.findMany.mockResolvedValue(rows);
+    h.client.adRewardClaim.findMany.mockResolvedValue([
+      {
+        id: claimId,
+        status: 'granted',
+        tradingAccountId: h.account.id,
+        rewardAmountKrw: d('2000000'),
+        walletTransactionId: 'wt-1',
+      },
+    ]);
+
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-13T12:00:00Z'));
+    try {
+      const response = await h.service.getEquity('user', h.account.id, {
+        range: '1d',
+      });
+
+      expect(response.data.returnRateMethod).toBe('cumulative_principal');
+      expect(
+        response.data.points.map((point) => [
+          point.snapshotReason,
+          point.returnRate,
+          point.investmentPnlKrw,
+          point.cumulativeExternalFundingKrw,
+          point.returnRateMethod,
+        ]),
+      ).toEqual([
+        [
+          'general_account_open',
+          '0.00000000',
+          '0.00000000',
+          '10000000.00000000',
+          'cumulative_principal',
+        ],
+        [
+          'order_executed',
+          '20.00000000',
+          '2000000.00000000',
+          '10000000.00000000',
+          'cumulative_principal',
+        ],
+        [
+          'external_funding_before',
+          '20.00000000',
+          '2000000.00000000',
+          '10000000.00000000',
+          'cumulative_principal',
+        ],
+        [
+          'external_funding_after',
+          '16.66666667',
+          '2000000.00000000',
+          '12000000.00000000',
+          'cumulative_principal',
+        ],
+        [
+          'order_executed',
+          '21.66666667',
+          '2600000.00000000',
+          '12000000.00000000',
+          'cumulative_principal',
+        ],
+      ]);
+      // The stored TWR record was read but not altered.
+      expect(
+        rows.find((row) => row.id === 'after')!.returnRate.toFixed(8),
+      ).toBe('20.00000000');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it.each(['general', 'beginner'] as const)(
+    '%s daily history uses each day’s principal, never the current one',
+    async (mode) => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-10-14T03:00:00Z'));
+      try {
+        const h = standaloneHarness(mode);
+        const day = (date: string, row: ReturnType<typeof performanceRow>) => ({
+          ...row,
+          tradingAccountId: h.account.id,
+          snapshotDate: new Date(date),
+          capturedAt: new Date(`${date}T14:59:00Z`),
+          createdAt: new Date(`${date}T14:59:00Z`),
+        });
+        // A 2,000,000 reward lands between 10-12 and 10-13.
+        const rows = [
+          day(
+            '2026-10-11',
+            performanceRow({
+              id: 'd1',
+              total: '10000000',
+              principal: '10000000',
+              factor: '1',
+              storedTwrRate: '0',
+            }),
+          ),
+          day(
+            '2026-10-12',
+            performanceRow({
+              id: 'd2',
+              total: '12000000',
+              principal: '10000000',
+              factor: '1.2',
+              storedTwrRate: '20',
+            }),
+          ),
+          day(
+            '2026-10-13',
+            performanceRow({
+              id: 'd3',
+              total: '14000000',
+              principal: '12000000',
+              factor: '1.2',
+              storedTwrRate: '20',
+            }),
+          ),
+        ];
+        h.client.dailyPortfolioSnapshot.findMany.mockResolvedValue(rows);
+
+        for (const query of [
+          { range: '7d', granularity: 'daily' },
+          // Long-range default reads the same daily table.
+          { range: '7d' },
+        ]) {
+          const response = await h.service.getEquity(
+            'user',
+            h.account.id,
+            query,
+          );
+          expect(response.data.returnRateMethod).toBe('cumulative_principal');
+          expect(
+            response.data.points.map((point) => [
+              point.returnRate,
+              point.cumulativeExternalFundingKrw,
+            ]),
+          ).toEqual([
+            ['0.00000000', '10000000.00000000'],
+            // 10-12 keeps its own 10,000,000 principal: 20%, not 0%.
+            ['20.00000000', '10000000.00000000'],
+            ['16.66666667', '12000000.00000000'],
+          ]);
+        }
+      } finally {
+        jest.useRealTimers();
+      }
+    },
+  );
+
+  it('fails closed on a history row whose principal is not positive', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-14T03:00:00Z'));
+    try {
+      const h = standaloneHarness('general');
+      // Self-consistent as a stored TWR record (0 - 0 = 0, factor 1 → 0%),
+      // but it has no principal to divide by.
+      h.client.dailyPortfolioSnapshot.findMany.mockResolvedValue([
+        {
+          ...performanceRow({
+            id: 'z',
+            total: '0',
+            principal: '0',
+            factor: '1',
+            storedTwrRate: '0',
+          }),
+          tradingAccountId: h.account.id,
+          snapshotDate: new Date('2026-10-13'),
+          capturedAt: new Date('2026-10-13T14:59:00Z'),
+        },
+      ]);
+      expect(
+        await integrityCode(
+          h.service.getEquity('user', h.account.id, {
+            range: '7d',
+            granularity: 'daily',
+          }),
+        ),
+      ).toBe('GENERAL_PERFORMANCE_INTEGRITY');
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it('keeps the season stored initial-capital return verbatim', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-10-14T03:00:00Z'));
+    try {
+      const h = standaloneHarness('season');
+      h.client.dailyPortfolioSnapshot.findMany.mockResolvedValue([
+        {
+          id: 's1',
+          tradingAccountId: h.account.id,
+          snapshotDate: new Date('2026-10-13'),
+          capturedAt: new Date('2026-10-13T14:59:00Z'),
+          totalAssetKrw: d('10350000'),
+          futuresUnrealizedPnlUsd: null,
+          futuresUnrealizedPnlKrw: null,
+          returnRate: d('3.5'),
+          cumulativeExternalFundingKrw: null,
+          investmentPnlKrw: null,
+          timeWeightedReturnFactor: null,
+        },
+      ]);
+      const response = await h.service.getEquity('user', h.account.id, {
+        range: '7d',
+        granularity: 'daily',
+      });
+      expect(response.data.returnRateMethod).toBe('initial_capital');
+      expect(response.data.points[0].returnRate).toBe('3.50000000');
+      expect(response.data.points[0].returnRateMethod).toBe('initial_capital');
+      expect(response.data.points[0].cumulativeExternalFundingKrw).toBe(null);
+      expect(
+        h.performance.requireContinuousPerformanceState,
+      ).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

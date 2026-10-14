@@ -271,8 +271,8 @@ export default function AccountSwitcher({ compact = false, home = false, childre
                   <Text style={styles.rowTitle}>일반 투자 시작하기</Text>
                   <Text style={styles.rowSubtitle}>
                     시즌과 무관하게 유지되는 일반 투자 계정을 새로 만듭니다.
-                    초기 자금 10,000,000원, 시간가중 수익률로 성과를
-                    측정합니다.
+                    초기 자금 10,000,000원, 누적 투자원금 대비 수익률로
+                    성과를 측정합니다.
                   </Text>
                   <Text style={styles.rowMeaning}>
                     매매 가능 · KRW↔USD 환전 가능

@@ -76,8 +76,8 @@ async function run() {
         await theme.background(id('home-summary-card'), appearance, appearance === 'light' ? 'raised' : 'screen');
         assert.equal(await id('home-competition').count(), 0);
         const heroText = await id('home-summary-card').textContent();
-        assert.doesNotMatch(heroText, /\(초기자본 대비\)/);
-        assert.match(heroText, mode === 'season' ? /시즌 수익률 -3\.52%/ : /시간가중 수익률 4\.82%/);
+        assert.doesNotMatch(heroText, /\(초기자본 대비\)|시즌 수익률|시간가중|누적 투자원금/);
+        assert.match(heroText, mode === 'season' ? /수익률 -3\.52%/ : /수익률 4\.82%/);
         const layout = await page.evaluate(() => {
           const node = (name) => document.querySelector(`[data-testid="${name}"]`);
           const box = (name) => {
@@ -236,7 +236,7 @@ async function run() {
     await page.waitForTimeout(50);
     assert.equal(await id('home-total-asset').textContent(), '12,530,200원');
     assert.equal(await id('home-competition').count(), 0);
-    assert.match(await id('home-summary-card').textContent(), /시간가중 수익률 4\.82%/);
+    assert.match(await id('home-summary-card').textContent(), /수익률 4\.82%/);
     assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
     assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls), []);
     await page.evaluate(() => window.fixture.appearance.setPreference('light'));
@@ -261,7 +261,7 @@ async function run() {
     assert.equal(await id('home-nickname').textContent(), '김재민');
     assert.equal(await page.getByText('환전하기', { exact: true }).count(), 0);
     const seasonHeroText = await id('home-summary-card').textContent();
-    assert.match(seasonHeroText, /시즌 수익률 -3\.52%/);
+    assert.match(seasonHeroText, /수익률 -3\.52%/);
     assert.doesNotMatch(seasonHeroText, /\(초기자본 대비\)/);
     const requests = await page.evaluate(() => window.fixture.transport.requests);
     assert.ok(requests.some((request) => request.includes('/ranking?') && request.includes('seasonId=season-1')));

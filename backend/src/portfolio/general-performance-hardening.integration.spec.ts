@@ -93,6 +93,8 @@ import { GeneralAccountPerformanceService } from './src/portfolio/general-accoun
 import { TradingAccountPortfolioService } from './src/portfolio/trading-account-portfolio.service';
 import { BatchService } from './src/batch/batch.service';
 import { GeneralDailySnapshotJobService } from './src/batch/general-daily-snapshot-job.service';
+import { FxService } from './src/fx/fx.service';
+import { Prisma } from './src/generated/prisma/client';
 
 const prisma = new PrismaService();
 const access = new TradingAccountAccessService(prisma);
@@ -112,11 +114,13 @@ const portfolio = new TradingAccountPortfolioService(
 );
 const batch = new BatchService(prisma);
 const dailyJob = new GeneralDailySnapshotJobService(batch, prisma, performance);
+const fx = new FxService(prisma, undefined, undefined, access, performance, valuation);
 
 const REWARD = '50000.00000000';
 const RUN_TAG = randomUUID();
 const createdUserIds = [];
 const createdJobKeys = [];
+const createdFxRateIds = [];
 
 // Fixed UUIDs so the before/after regression is deterministic in BOTH id
 // directions instead of depending on what randomUUID() happens to produce.
@@ -305,7 +309,7 @@ async function verifyBoundaryOrderIsUuidIndependent(beforeId, afterId, label) {
   assert.equal(
     afterSecond.data.summary.returnRate,
     '0.00000000',
-    label + ': two ad rewards must not create investment return',
+    label + ': two ad rewards on zero PnL must leave the return rate at 0%',
   );
   return { userId, accountId };
 }
@@ -976,7 +980,7 @@ async function verifyDailySnapshotJob() {
   const equity = await portfolio.getEquity(activeAcc.userId, activeAcc.accountId, {
     range: '7d',
   });
-  assert.equal(equity.data.returnRateMethod, 'time_weighted');
+  assert.equal(equity.data.returnRateMethod, 'cumulative_principal');
   assert.ok(equity.data.points.length >= 1);
   assert.equal(equity.data.points[equity.data.points.length - 1].returnRate, '0.00000000');
 
@@ -1237,9 +1241,16 @@ async function cleanup() {
     await prisma.dailyPortfolioSnapshot.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
+    await prisma.fxExecuteRequest.deleteMany({
+      where: { userId: { in: createdUserIds } },
+    });
     await prisma.walletTransaction.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
+    await prisma.exchangeTransaction.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
+    await prisma.quote.deleteMany({ where: { userId: { in: createdUserIds } } });
     await prisma.cashWallet.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
@@ -1251,6 +1262,11 @@ async function cleanup() {
     where: { userId: { in: createdUserIds } },
   });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
+  if (createdFxRateIds.length > 0) {
+    await prisma.fxRateSnapshot.deleteMany({
+      where: { id: { in: createdFxRateIds } },
+    });
+  }
 }
 
 // ==================================================================
@@ -1267,8 +1283,9 @@ async function cleanup() {
  * reported the reward as investment profit.
  *
  * What is asserted is the outcome that mattered: across a payout, investment
- * PnL and the TWR percent do not move, and the money shows up only alongside
- * the funding total that explains it.
+ * PnL does not move (so a zero-PnL account stays at 0% under the
+ * cumulative-principal rate too), and the money shows up only alongside the
+ * funding total that explains it.
  */
 async function verifyPortfolioReadIsConsistentAcrossAPayout() {
   const { userId, accountId } = await openAccount();
@@ -1295,7 +1312,7 @@ async function verifyPortfolioReadIsConsistentAcrossAPayout() {
   assert.equal(
     afterView.data.summary.returnRate,
     '0.00000000',
-    'an ad reward must never move the time-weighted return',
+    'an ad reward on zero investment PnL must leave the return rate at 0%',
   );
 
   // The GET wrote NOTHING: same row counts before and after a read.
@@ -1358,6 +1375,129 @@ async function verifyPortfolioReadIsConsistentAcrossAPayout() {
   });
 
   console.log('  consistent portfolio read across a payout ok');
+}
+
+/**
+ * 일반·초보 수익률 정책 변경 — the representative rate on a REAL ledger.
+ *
+ * A KRW→USD conversion pays a 0.1% fee, which is genuine investment PnL with
+ * no price provider involved. A reward then arrives on top of that loss:
+ * investment PnL and the stored TWR record must not move, while the served
+ * rate is re-divided by the grown principal. Every history point must carry
+ * its OWN row's ratio, and the daily row must agree with the live read of the
+ * same financial state.
+ */
+async function freshUsdKrwRate(rate, ageMs) {
+  const observedAt = new Date(Date.now() - ageMs);
+  const row = await prisma.fxRateSnapshot.create({
+    data: {
+      baseCurrency: 'USD',
+      quoteCurrency: 'KRW',
+      rate,
+      sourceType: 'provider_api',
+      sourceName: 'korea_exim_exchange_rate',
+      capturedAt: observedAt,
+      effectiveAt: observedAt,
+    },
+    select: { id: true },
+  });
+  createdFxRateIds.push(row.id);
+}
+
+function principalRate(total, principal) {
+  return new Prisma.Decimal(total)
+    .sub(principal)
+    .div(principal)
+    .mul(100)
+    .toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP)
+    .toFixed(8);
+}
+
+async function verifyRepresentativeRateFollowsThePrincipal() {
+  const { userId, accountId } = await openAccount();
+
+  // Older than the next rate by more than a WSL clock step, so the later
+  // snapshot is unambiguously the newer one.
+  await freshUsdKrwRate('1400', 5000);
+  process.env.GENERAL_FX_FEE_RATE = '0.001000';
+  const body = { fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '1400000' };
+  const quote = await fx.quoteForTradingAccount(userId, accountId, body);
+  await fx.executeForTradingAccount(userId, accountId, {
+    ...body,
+    quoteId: quote.data.quoteId,
+    idempotencyKey: randomUUID(),
+  });
+
+  const loss = (await portfolio.getPortfolio(userId, accountId)).data.summary;
+  assert.equal(loss.returnRateMethod, 'cumulative_principal');
+  assert.equal(loss.totalAssetKrw, '9998600.00000000');
+  assert.equal(loss.cumulativeExternalFundingKrw, '10000000.00000000');
+  assert.equal(loss.investmentPnlKrw, '-1400.00000000');
+  assert.equal(loss.returnRate, '-0.01400000');
+
+  await grantReward(userId, accountId);
+  const rewarded = (await portfolio.getPortfolio(userId, accountId)).data.summary;
+  assert.equal(rewarded.totalAssetKrw, '10048600.00000000');
+  assert.equal(rewarded.cumulativeExternalFundingKrw, '10050000.00000000');
+  assert.equal(rewarded.initialFundingKrw, '10000000.00000000');
+  assert.equal(rewarded.cumulativeAdRewardKrw, REWARD);
+  assert.equal(
+    rewarded.investmentPnlKrw,
+    loss.investmentPnlKrw,
+    'a reward is not investment profit',
+  );
+  // -1,400 / 10,050,000 × 100: the principal grew, the loss did not shrink.
+  assert.equal(rewarded.returnRate, '-0.01393035');
+
+  // The stored TWR record of the same payout is still neutral.
+  const pair = await boundaryRows(accountId);
+  const before = pair.find((r) => r.snapshotReason === 'external_funding_before');
+  const after = pair.find((r) => r.snapshotReason === 'external_funding_after');
+  assert.equal(after.returnRate.toFixed(8), before.returnRate.toFixed(8));
+  assert.equal(
+    after.timeWeightedReturnFactor.toFixed(18),
+    before.timeWeightedReturnFactor.toFixed(18),
+  );
+  assert.equal(after.investmentPnlKrw.toFixed(8), before.investmentPnlKrw.toFixed(8));
+
+  const history = await portfolio.getEquity(userId, accountId, { range: 'all' });
+  assert.equal(history.data.returnRateMethod, 'cumulative_principal');
+  for (const point of history.data.points) {
+    assert.equal(point.returnRateMethod, 'cumulative_principal');
+    assert.equal(
+      point.returnRate,
+      principalRate(point.totalAssetKrw, point.cumulativeExternalFundingKrw),
+      'point ' + point.snapshotReason + ' must use its own principal',
+    );
+  }
+  const servedBefore = history.data.points.find((p) => p.snapshotReason === 'external_funding_before');
+  const servedAfter = history.data.points.find((p) => p.snapshotReason === 'external_funding_after');
+  assert.equal(servedBefore.returnRate, '-0.01400000');
+  assert.equal(servedAfter.returnRate, '-0.01393035');
+  assert.equal(servedBefore.investmentPnlKrw, servedAfter.investmentPnlKrw);
+
+  // Market movement after the reward: USD cash gains on a higher rate, and
+  // the gain is measured against the CURRENT principal.
+  await freshUsdKrwRate('1500', 1000);
+  const gain = (await portfolio.getPortfolio(userId, accountId)).data.summary;
+  assert.equal(gain.cumulativeExternalFundingKrw, '10050000.00000000');
+  assert.ok(new Prisma.Decimal(gain.investmentPnlKrw).gt(0), 'expected an FX gain');
+  assert.equal(
+    gain.investmentPnlKrw,
+    new Prisma.Decimal(gain.totalAssetKrw).sub('10050000').toFixed(8),
+  );
+  assert.equal(gain.returnRate, principalRate(gain.totalAssetKrw, '10050000'));
+
+  // The daily row of this same state serves the same number as the live read.
+  const job = await runDailyJob('2026-09-06', { label: 'principal-rate' });
+  assert.equal(accountRow(job, accountId), null, 'daily job must snapshot the account');
+  const daily = await portfolio.getEquity(userId, accountId, { range: '7d' });
+  const lastDaily = daily.data.points[daily.data.points.length - 1];
+  assert.equal(lastDaily.totalAssetKrw, gain.totalAssetKrw);
+  assert.equal(lastDaily.cumulativeExternalFundingKrw, gain.cumulativeExternalFundingKrw);
+  assert.equal(lastDaily.returnRate, gain.returnRate);
+
+  console.log('  cumulative-principal rate across loss, reward and gain ok');
 }
 
 /**
@@ -1668,6 +1808,7 @@ async function main() {
     await verifySeasonDailyRowsAreUntouched();
 
     await verifyPortfolioReadIsConsistentAcrossAPayout();
+    await verifyRepresentativeRateFollowsThePrincipal();
     await verifyDailyJobWaitsForTheAccountRowLock();
     await verifyClosedDuringRunLeavesNoSnapshot();
     await verifyHistoryIntegrityIsCheckedRowByRow();

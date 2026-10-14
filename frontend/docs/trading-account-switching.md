@@ -170,7 +170,7 @@ reappears anywhere else. Mode selection is on that allowlist for exactly the
 - **일반 투자 — always offered.** With a general account (any status): use it.
   Without one: "일반 투자 계정 시작하기", which fires the explicit
   `POST /trading-accounts/general`. The card states the standing policy: 초기
-  자금 10,000,000원, 시간가중 수익률, 매매와 KRW↔USD 환전 가능.
+  자금 10,000,000원, 누적 투자원금 대비 수익률, 매매와 KRW↔USD 환전 가능.
 - **시즌 투자.** Season accounts the user is competing in ("시즌 투자
   계속하기"), or — when the current season is effectively active, the server
   says not joined, AND the owned list has no account for it — "시즌 참가하기"
@@ -356,20 +356,26 @@ log to explain an isolation failure is the same leak somewhere else.
 
 ## Mode-specific presentation
 
-Read the label from the RESPONSE's `returnRateMethod`, never from the selected
-account's mode — the two must agree, and if they disagree the response is the
-fact.
+The Home/Wallet headline is always titled **수익률** (2026-10-14); the method
+description comes from the RESPONSE's `returnRateMethod`, never from the
+selected account's mode — the two must agree, and if they disagree the response
+is the fact. The daily-history validator rejects any other pairing.
 
-|                                   | season                      | general                   |
-| --------------------------------- | --------------------------- | ------------------------- |
-| `returnRateMethod`                | `initial_capital`           | `time_weighted`           |
-| label                             | 시즌 수익률 (초기자본 대비) | 시간가중 수익률           |
-| season ranking / tier / reward UI | shown                       | never shown               |
-| external funding fields           | `null` (no such concept)    | shown, labelled as inflow |
+|                                   | season                      | general / beginner                    |
+| --------------------------------- | --------------------------- | ------------------------------------- |
+| `returnRateMethod`                | `initial_capital`           | `cumulative_principal`                |
+| headline (Home / Wallet hero)     | 수익률                      | 수익률                                |
+| method description (sheet/detail) | 시즌 수익률 (초기자본 대비) | 누적 투자원금 대비 수익률             |
+| season ranking / tier / reward UI | shown                       | never shown                           |
+| external funding fields           | `null` (no such concept)    | shown on Wallet / Portfolio, not Home |
 
-General mode additionally shows `initialFundingKrw`,
-`cumulativeExternalFundingKrw`, `cumulativeAdRewardKrw`, `investmentPnlKrw`, with
-an explicit note that external inflow is not investment profit. An unavailable
+General/beginner `returnRate` = `investmentPnlKrw ÷ cumulativeExternalFundingKrw
+× 100`, computed by the server; the client never recomputes it. Wallet shows
+누적 투자원금 and 투자 손익 under the hero (general also 최초 지급금 · 광고
+보상금); Portfolio shows 누적 투자원금, 최초 지급금, 누적 광고 보상금, 투자 손익
+with a note that an ad reward is principal, not profit. Home keeps the compact
+hero with no breakdown. `전체 > 공지사항` carries the user-facing explanation
+(`return-rate-calculation`). An unavailable
 performance figure is rendered as unknown — **never as 0%**, which is a claim
 about it.
 

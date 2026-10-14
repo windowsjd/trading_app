@@ -51,7 +51,7 @@ import { parseWalletLedgerResponse } from '../wallet/transactions';
 
 export type TradingAccountMode = 'season' | 'general' | 'beginner';
 export type TradingAccountStatus = 'active' | 'suspended' | 'closed';
-export type ReturnRateMethod = 'time_weighted' | 'initial_capital';
+export type ReturnRateMethod = 'cumulative_principal' | 'initial_capital';
 
 export interface TradingAccountSeasonDto {
   seasonId: string;
@@ -90,10 +90,12 @@ export interface TradingAccountsDto {
 }
 
 /**
- * `returnRateMethod` is REQUIRED reading, not decoration: a general account's
- * `returnRate` is a time-weighted return that already excludes ad-funded
- * inflows, and a season account's is a plain initial-capital return. Labelling
- * one with the other's meaning misstates the number.
+ * `returnRateMethod` is REQUIRED reading, not decoration: a general/beginner
+ * account's `returnRate` is investment PnL over the cumulative principal
+ * (opening grant + granted ad rewards) — a reward is not profit, but it grows
+ * the principal, so the rate may change when one arrives — and a season
+ * account's is a plain initial-capital return. Labelling one with the other's
+ * meaning misstates the number. The client never recomputes either.
  */
 export interface TradingAccountPortfolioSummaryDto {
   totalAssetKrw: MoneyString;

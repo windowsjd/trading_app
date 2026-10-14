@@ -4,6 +4,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import { createHomeHarness, elements } from '../../../test/homeTestHarness.cjs';
 import { holding } from '../../../test/positionFixture.ts';
 import { HoldingsContractError } from '../../features/tradingAccount/holdings.ts';
+import type { TradingAccountPortfolioDto } from '../../features/tradingAccount/api';
 import { primaryGradient, semantic } from '../../theme/tokens.ts';
 
 const text = (tree) => elements(tree, 'Text').flatMap((node) => node.props.children).join(' ');
@@ -30,7 +31,7 @@ describe('selected account Wallet and shared Home holdings', () => {
         assert.deepEqual(options.queryKey, QUERY_KEYS.tradingAccount.portfolioEquity(h.account.id, range, 'daily'));
         h.response = { success: true, data: {
           tradingAccountId: h.account.id, mode, state: 'empty', range, granularity: 'daily', points: [],
-          returnRateMethod: mode === 'general' ? 'time_weighted' : 'initial_capital',
+          returnRateMethod: mode === 'general' ? 'cumulative_principal' : 'initial_capital',
         } };
         await options.queryFn();
         assert.equal(h.requests.at(-1).path, `/trading-accounts/${h.account.id}/portfolio/equity`);
@@ -172,12 +173,56 @@ describe('selected account Wallet and shared Home holdings', () => {
       const { tree, branch } = h.renderWallet();
       assert.equal(branch.key, h.account.id);
       assert.doesNotMatch(text(tree), /10,001,000/);
+      assert.equal(find(tree, 'wallet-principal-summary') === undefined, true);
       assert.equal(elements(tree, 'SectionSkeleton').length, 3);
       assert.ok(h.queries.every((q) => q.queryKey.includes(h.account.id)));
       h.seed(h.account, { points: [] });
       find(h.renderWallet().tree, 'wallet-orders').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['TradeHistory', { accountId: h.account.id }]);
     }
+  });
+  it('states the cumulative principal behind a general/beginner 수익률, on Wallet only', (t) => {
+    const deepText = (node) => elements(node, 'Text').flatMap((child) => child.props.children)
+      .filter((part) => typeof part === 'string').join('');
+    const h = createHomeHarness('general'); t.after(h.close); h.seed(h.account, { points: [] });
+    let wallet = h.renderWallet().tree;
+    assert.equal(deepText(find(wallet, 'wallet-cumulative-principal')), '누적 투자원금 10,001,000원');
+    assert.equal(deepText(find(wallet, 'wallet-principal-breakdown')), '최초 지급금 10,000,000원 · 광고 보상금 1,000원');
+    assert.equal(deepText(find(wallet, 'wallet-investment-pnl')), '투자 손익 0원');
+    // Home keeps its compact hero: the same numbers are not broken down there.
+    assert.equal(find(h.render().tree, 'wallet-principal-summary') === undefined, true);
+
+    // A reward after a gain: PnL is unchanged, only the principal grew — the
+    // served rate already reflects that, and Wallet shows both basis figures.
+    const key = QUERY_KEYS.tradingAccount.portfolio(h.account.id);
+    const portfolio = h.client.getQueryData<TradingAccountPortfolioDto>(key)!;
+    h.client.setQueryData(key, { ...portfolio, summary: { ...portfolio.summary, totalAssetKrw: '14000000',
+      returnRate: '16.66666667', cumulativeExternalFundingKrw: '12000000', cumulativeAdRewardKrw: '2000000', investmentPnlKrw: '2000000' } });
+    wallet = h.renderWallet().tree;
+    assert.match(deepText(find(wallet, 'home-summary-card')), /수익률 16\.67%/);
+    assert.equal(deepText(find(wallet, 'wallet-cumulative-principal')), '누적 투자원금 12,000,000원');
+    assert.equal(deepText(find(wallet, 'wallet-principal-breakdown')), '최초 지급금 10,000,000원 · 광고 보상금 2,000,000원');
+    assert.equal(deepText(find(wallet, 'wallet-investment-pnl')), '투자 손익 2,000,000원');
+
+    // Beginner: same basis, no ad-reward line (it cannot receive rewards).
+    h.account = { ...h.account, id: 'beginner-1', mode: 'beginner' };
+    h.seed(h.account, { points: [] });
+    const beginnerKey = QUERY_KEYS.tradingAccount.portfolio(h.account.id);
+    const beginnerPortfolio = h.client.getQueryData<TradingAccountPortfolioDto>(beginnerKey)!;
+    h.client.setQueryData(beginnerKey, { ...beginnerPortfolio, summary: { ...beginnerPortfolio.summary,
+      returnRateMethod: 'cumulative_principal', totalAssetKrw: '9000000', returnRate: '-10', cumulativeExternalFundingKrw: '10000000',
+      cumulativeAdRewardKrw: '0', investmentPnlKrw: '-1000000' } });
+    wallet = h.renderWallet().tree;
+    assert.equal(deepText(find(wallet, 'wallet-cumulative-principal')), '누적 투자원금 10,000,000원');
+    assert.equal(deepText(find(wallet, 'wallet-investment-pnl')), '투자 손익 -1,000,000원');
+    assert.equal(find(wallet, 'wallet-principal-breakdown') === undefined, true);
+
+    // Season: initial-capital method, no principal concept at all.
+    h.account = { ...h.account, id: 'season-2', mode: 'season' };
+    h.seed(h.account, { points: [] });
+    wallet = h.renderWallet().tree;
+    assert.equal(find(wallet, 'wallet-principal-summary') === undefined, true);
+    assert.doesNotMatch(text(wallet), /누적 투자원금|투자 손익/);
   });
   it('an unavailable total preserves independently known cash and stale/unavailable holdings', (t) => {
     const h = createHomeHarness(); t.after(h.close); h.seed(h.account, { points: [] });

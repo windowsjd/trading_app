@@ -18,7 +18,7 @@ function failure(requestId, code = 'INTERNAL_SERVER_ERROR') {
 }
 const portfolio = id => ({ tradingAccountId: id, state: 'available', sectionErrors: [],
   summary: { totalAssetKrw: '10000000', krwCash: '1000000', usdCashKrw: '0', assetValueKrw: '9000000',
-    realizedPnlKrw: '0', unrealizedPnlKrw: '0', returnRate: '0', returnRateMethod: 'time_weighted' },
+    realizedPnlKrw: '0', unrealizedPnlKrw: '0', returnRate: '0', returnRateMethod: 'cumulative_principal' },
   allocation: { state: 'available', cashKrwValue: '1000000', domesticStockValueKrw: '9000000', usStockValueKrw: '0', cryptoValueKrw: '0' } });
 
 function financialDiagnosticsHarness(screen = 'home', { role = 'admin', mode = 'general', failures = {} } = {}) {
@@ -57,7 +57,7 @@ function financialDiagnosticsHarness(screen = 'home', { role = 'admin', mode = '
         else if (suffix === 'portfolio/equity') {
           const mode = h.accounts.find(account => account.id === id).mode;
           data = { tradingAccountId: id, mode, state: 'empty', range: params.range, granularity: params.granularity ?? 'intraday',
-            returnRateMethod: mode === 'general' ? 'time_weighted' : 'initial_capital', points: [] };
+            returnRateMethod: mode === 'general' ? 'cumulative_principal' : 'initial_capital', points: [] };
         }
         else if (suffix === 'wallets') data = { tradingAccountId: id, wallets: [] };
         else if (suffix === 'positions') {

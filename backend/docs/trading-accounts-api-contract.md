@@ -38,10 +38,11 @@ Existing general/season contracts below retain their financial policies.
   `docs/trading-account-orders-api-contract.md`. Account-scoped portfolio
   sub-resources (`portfolio`, `portfolio/equity`) are implemented (작업 7) —
   see the second half of
-  `docs/general-account-and-ad-rewards-api-contract.md`. General accounts
-  report `returnRateMethod: "time_weighted"` (TWR) and season accounts keep
-  `initial_capital`; the two are different numbers and are never presented as
-  the same thing.
+  `docs/general-account-and-ad-rewards-api-contract.md`. General and beginner
+  accounts report `returnRateMethod: "cumulative_principal"` (investment PnL ÷
+  cumulative principal; `time_weighted` before 2026-10-14) and season accounts
+  keep `initial_capital`; the two are different numbers and are never
+  presented as the same thing.
 
 ## Source Rules
 - Source of truth is `trading_accounts` (+ `season_participants`/`seasons` for

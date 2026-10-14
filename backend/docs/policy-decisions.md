@@ -13,6 +13,18 @@
 > `tradingAccountId` 하나다. 아래 작업 7·8의 nullable scope와 dual-write 설명은
 > 당시 rolling migration 결정 이력이며, 현행 계약으로 해석하지 않는다.
 
+## 일반·초보모드 대표 수익률 (2026-10-14, current)
+
+- 일반·초보모드 대표 수익률 = (총자산 − 누적 투자원금) ÷ 누적 투자원금 × 100 = 투자손익 ÷ 누적 투자원금 × 100. API `returnRateMethod`는 `cumulative_principal`이며 `time_weighted`는 더 이상 반환하지 않는다. 시즌은 `initial_capital` 그대로다.
+  근거: 사용자가 실제로 넣은 원금 대비 결과를 보여 주는 것이 제품 정책이다. 계산식·식별자·표시 문구가 같은 의미여야 한다.
+- 누적 투자원금 = 기존 외부자금 allow-list 원장 합계(최초 지급 `initial_grant` + granted 광고 보상 `ad_reward`)다. 매매대금·매도 회수·환전·지갑 이동·손익·미지급/거절 보상·출처 불명 조정은 포함하지 않는다. 새 외부자금 유형은 별도 제품 결정 전까지 포함하지 않는다.
+  근거: 원금은 검증된 원장에서만 나와야 하며, 추정하면 수익률이 조용히 왜곡된다.
+- 광고 보상은 투자이익이 아니므로 투자손익은 지급 전후 동일하지만, 분모가 커지므로 대표 수익률은 지급 순간 바뀔 수 있다. 이는 정상 동작이며 보정하지 않는다. 초보모드는 같은 산식이고 광고 보상 기능은 추가하지 않는다.
+- 저장 데이터는 바꾸지 않는다(스키마·migration·backfill 없음). 일반·초보 snapshot의 `returnRate` 컬럼과 `timeWeightedReturnFactor`는 내부 TWR 기록으로 남고 기존 무결성 검사(PnL 항등식, returnRate↔factor, 경계 쌍 중립, audit)를 그대로 받는다. 대표 수익률은 실시간은 같은 RepeatableRead 트랜잭션의 평가 총자산과 원장 원금, 이력은 **각 행 자신의** `totalAssetKrw`·`cumulativeExternalFundingKrw`에서 읽을 때 계산한다.
+  근거: 과거 TWR 값을 새 수익률로 재해석하거나 재작성하지 않고도 각 시점 원금으로 검증 가능한 값을 낼 수 있다. 운영 데이터 변경이 필요 없다.
+- 누적 투자원금이 0 이하이거나 행이 손상되면 0%로 표시하지 않고 기존 `GENERAL_PERFORMANCE_INTEGRITY` 500으로 실패한다. 원금이 양수이고 총자산 0이면 -100%다.
+- 홈 대표 수익률 제목은 모드와 무관하게 `수익률`이다(시즌 계산식은 불변). 계산 방식 설명은 계정 선택 시트·지갑·포트폴리오·공지사항(`전체 > 공지사항`)에서 한다.
+
 ## 장기 4시간봉 (2026-10-13, current)
 
 - 완료된 4시간봉을 5분봉과 독립적으로 180달력일 보관한다(5분봉 35일, 1d/1w, 15m/30m/1h 정책은 유지).
@@ -260,8 +272,8 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   근거: 반복 무상 지급은 수익률 비교 의미를 없애고, 지급일 스케줄링 상태는 유지비만 만든다.
 - 일반모드 추가 가상자금은 보상형 광고 완료 보상으로만 획득한다(광고 보상은 general 계정 한정, 서버 검증·이벤트 고유 ID·중복 지급 차단·지급+원장 단일 트랜잭션 필수). 1회 지급액·일일 한도·제공자는 운영 설정값으로 미정.
   근거: 클라이언트 신고만으로 잔액이 늘 수 있으면 가상자금이라도 원장 무결성이 무너진다.
-- 광고 보상금은 투자수익이 아니라 외부 가상자금 유입이다. 누적 투자손익 = 현재 총자산 − 누적 외부 가상자금(최초 지급 + 광고 보상 + 운영자 외부 조정)으로 계산하고, 대표 수익률은 단순 (총자산−외부자금)/외부자금 대신 외부자금 유입 시점을 구간 경계로 하는 시간가중수익률을 사용한다. 주문 체결은 ordinary advance이고 외부자금 before/after boundary를 만들지 않는다. `TradingAccount.initialCapitalKrw`와 누적 보상 컬럼에 가산하지 않고 원장 집계로만 계산한다.
-  근거: 보상 유입 자체로 수익률이 변하면 실제 투자 성과 지표가 왜곡된다.
+- 광고 보상금은 투자수익이 아니라 외부 가상자금 유입이다. 누적 투자손익 = 현재 총자산 − 누적 외부 가상자금(최초 지급 + 광고 보상 + 운영자 외부 조정)으로 계산하고, 대표 수익률은 ~~외부자금 유입 시점을 구간 경계로 하는 시간가중수익률을 사용한다~~ (2026-10-14 대체: 누적 투자원금 대비 수익률, 위 "일반·초보모드 대표 수익률" 참조. TWR은 내부 기록으로만 유지). 주문 체결은 ordinary advance이고 외부자금 before/after boundary를 만들지 않는다. `TradingAccount.initialCapitalKrw`와 누적 보상 컬럼에 가산하지 않고 원장 집계로만 계산한다.
+  근거(당시, 2026-10-14 대체): 보상 유입 자체로 수익률이 변하면 실제 투자 성과 지표가 왜곡된다.
 - 시즌 거래 가능 판정은 기존 Season.status·기간·ParticipantStatus 검증을 유지하고 TradingAccount.status(active/suspended/closed)는 공통 계정 상태로만 쓴다. backfill 매핑: registered/active→active, excluded→suspended, finished/rewarded→closed, closedAt은 확실한 종료 시각이 없으면 NULL.
   근거: 검증 체계를 한 번에 갈아끼우면 시즌 회귀 위험이 크고, 종료 시각 날조는 금융 기록 원칙에 반한다.
 
@@ -484,15 +496,15 @@ ops_job_locks lease로 관리한다. 갱신/ownership loss 경계는 Ops 계약�
   근거: unscoped snapshot은 이후 account-scoped 조회에서 통째로 보이지 않고, 그 계정 전체의 read-integrity를 fail-closed로 만든다.
 - 누적 외부 가상자금은 `initial_grant`+`general_account_open`과 `ad_reward`+`ad_reward_claim` **두 종류만** 합산하는 allow-list다. `exchange_target`·`order_sell`·`settlement`·`adjustment`·`manual_adjustment`는 외부자금이 아니며, 원장과 claim 정합성이 깨지면 일부만 합산하지 않고 fail-closed 한다.
   근거: 외부자금을 추측하면 투자손익이 조용히 왜곡되고, 그 왜곡은 수익률로 그대로 전파된다.
-- 일반모드 대표 수익률은 TWR이고 `timeWeightedReturnFactor`가 source of truth다. `returnRate`는 표시용 반올림이며 다음 factor 계산에 재사용하지 않는다. 외부자금 유입은 before/after 경계로 처리해 총자산과 누적 외부자금만 증가시키고 투자손익·factor·returnRate는 그대로 둔다. 모든 계산은 Prisma Decimal이다.
-  근거: 단순 외부자금 대비 손익률은 광고를 볼 때마다 수익률이 변해 실력과 무관해지고, 반올림된 퍼센트를 되먹이면 구간이 쌓일수록 드리프트한다.
+- (2026-10-14 대체: 대표 수익률은 누적 투자원금 대비 수익률이다. 아래 TWR 규칙은 snapshot에 저장되는 내부 TWR 기록에만 적용된다.) 일반모드 ~~대표 수익률은~~ 내부 TWR 기록은 TWR이고 `timeWeightedReturnFactor`가 source of truth다. 저장 `returnRate`는 TWR 퍼센트의 반올림이며 다음 factor 계산에 재사용하지 않는다. 외부자금 유입은 before/after 경계로 처리해 총자산과 누적 외부자금만 증가시키고 투자손익·factor·returnRate는 그대로 둔다. 모든 계산은 Prisma Decimal이다.
+  근거: (당시 대표 수익률 선택 근거는 2026-10-14 대체) 반올림된 퍼센트를 되먹이면 구간이 쌓일수록 드리프트한다.
 - 완전 손실(총자산 0) 이후 factor는 0으로 고정되고 이후 외부자금이 들어와도 -100%를 유지한다. 총자산 0에서 경계 없이 양수로 변하면 `GENERAL_PERFORMANCE_DISCONTINUITY`, 음수 총자산은 `GENERAL_PERFORMANCE_INTEGRITY`다.
   근거: 자동 재기준선은 사용자의 누적 손실을 지워 없던 일로 만든다.
 - 일반계정 최초 성과 기준점은 계정 생성 트랜잭션 안에서 함께 만든다(계정·지갑 4개·최초 지급 원장·origin snapshot 7행 원자). 기존 계정에 origin이 없으면 자동 생성하지 않고 500 `GENERAL_PERFORMANCE_NOT_INITIALIZED`이며, 복구는 명시적 backfill script로만 한다.
   근거: 기준점을 자동으로 만들면 그 시점 이전의 성과가 조용히 사라진다.
 - backfill script는 거래 행이 없고 모든 scope의 USD 현금이 0이며 총자산 = 누적 외부자금이 **증명되는** 계정에만 0% baseline을 만든다. 거래 행·부분 snapshot·claim 불일치·USD 현금·알 수 없는 credit·총자산 불일치는 보고만 하고 건너뛰며 `--force`는 없다.
   근거: 0% 기준선은 "아무 것도 벌거나 잃지 않았다"는 주장이고, 그 주장이 검증되지 않는 계정에서는 거짓이 된다.
-- account-scoped 포트폴리오·수익률 응답은 항상 `returnRateMethod`(`time_weighted` / `initial_capital`)를 함께 반환하고, 시즌 계정의 외부자금 필드는 0이 아니라 null이다. 가격·환율 부재는 기존 sectionErrors로, 정합성 손상은 구조화된 500으로 구분한다.
+- account-scoped 포트폴리오·수익률 응답은 항상 `returnRateMethod`(2026-10-14부터 `cumulative_principal` / `initial_capital`; 이전 `time_weighted`)를 함께 반환하고, 시즌 계정의 외부자금 필드는 0이 아니라 null이다. 가격·환율 부재는 기존 sectionErrors로, 정합성 손상은 구조화된 500으로 구분한다.
   근거: 의미가 다른 두 수익률을 같은 필드명으로 내보내면 프런트가 구분할 방법이 없고, 손상을 "일시적 불가"로 표시하면 아무도 고치지 않는다.
 - equity 이력 정렬과 최신 snapshot 조회는 `capturedAt` → `createdAt` → `id`로 결정적이어야 한다. before/after 쌍은 같은 `capturedAt`을 가지므로 tie-breaker 없이는 다음 구간 계산이 유입을 이중 계산할 수 있고, 커밋된 상태의 최신 snapshot이 unpaired before면 정합성 오류다.
   근거: 정렬이 흔들리면 같은 데이터에서 다른 수익률이 나온다.

@@ -18,6 +18,7 @@ import {
   GeneralPerformanceError,
   pickLatestSnapshot,
   snapshotPhaseRank,
+  toCumulativePrincipalReturnRatePercent,
   toReturnRatePercent,
   type OrderableSnapshot,
 } from './general-performance.policy';
@@ -26,7 +27,9 @@ const d = (value: string | number) => new Prisma.Decimal(value);
 
 /**
  * The central promise of 작업 7: an ad reward is virtual funding, not
- * performance. These tests pin that down numerically.
+ * performance. These tests pin that down numerically for the STORED
+ * time-weighted record. The representative cumulative-principal rate has its
+ * own block at the end of this file.
  */
 describe('general performance (TWR) policy', () => {
   describe('origin', () => {
@@ -134,7 +137,7 @@ describe('general performance (TWR) policy', () => {
     });
   });
 
-  describe('external funding is performance-neutral', () => {
+  describe('external funding is neutral to the stored TWR record', () => {
     const boundary = () =>
       buildExternalFundingBoundary({
         previous: {
@@ -516,5 +519,196 @@ describe('general performance (TWR) policy', () => {
     ])('maps factor %s to %s%%', (factor, expected) => {
       expect(toReturnRatePercent(d(factor)).toFixed(8)).toBe(expected);
     });
+  });
+});
+
+/**
+ * 일반·초보 수익률 정책 변경: the representative rate is investment PnL over the
+ * cumulative principal of the SAME state. An inflow is not profit (PnL stays),
+ * but it grows the principal, so the rate may move — the opposite of the
+ * stored TWR record's neutrality above, and both are asserted side by side.
+ */
+describe('cumulative-principal representative return rate', () => {
+  const rate = (principal: string, total: string) =>
+    toCumulativePrincipalReturnRatePercent({
+      totalAssetKrw: d(total),
+      cumulativeExternalFundingKrw: d(principal),
+    }).toFixed(8);
+
+  it.each([
+    ['10000000', '10000000', '0.00000000'],
+    ['10000000', '12000000', '20.00000000'],
+    ['10000000', '9000000', '-10.00000000'],
+    ['10000000', '0', '-100.00000000'],
+    ['12000000', '14000000', '16.66666667'],
+    ['12000000', '11000000', '-8.33333333'],
+  ])('principal %s with total %s is %s%%', (principal, total, expected) => {
+    expect(rate(principal, total)).toBe(expected);
+  });
+
+  it('rounds half-up at the 8 dp return-rate scale, never through a JS number', () => {
+    // 1 KRW over a 3 KRW principal = 33.333333333…%
+    expect(rate('3', '4')).toBe('33.33333333');
+    // ±0.01 KRW on 200,000,000 is exactly ±0.000000005%: half rounds away
+    // from zero at the 8th decimal place.
+    expect(rate('200000000', '200000000.01')).toBe('0.00000001');
+    expect(rate('200000000', '199999999.99')).toBe('-0.00000001');
+  });
+
+  it('fails closed on a non-positive principal instead of showing 0%', () => {
+    for (const principal of ['0', '-1']) {
+      expect(() => rate(principal, '10000000')).toThrow(
+        expect.objectContaining({
+          code: 'GENERAL_PERFORMANCE_INTEGRITY',
+        }) as never,
+      );
+    }
+  });
+
+  it('fails closed on a negative total or a non-finite input', () => {
+    expect(() => rate('10000000', '-1')).toThrow(GeneralPerformanceError);
+    expect(() =>
+      toCumulativePrincipalReturnRatePercent({
+        totalAssetKrw: d('NaN'),
+        cumulativeExternalFundingKrw: d('10000000'),
+      }),
+    ).toThrow(GeneralPerformanceError);
+  });
+
+  const reward = (input: {
+    total: string;
+    principal: string;
+    amount: string;
+  }) =>
+    buildExternalFundingBoundary({
+      previous: {
+        totalAssetKrw: d(input.total),
+        timeWeightedReturnFactor: d(input.total).div(input.principal),
+      },
+      totalAssetBeforeKrw: input.total,
+      cumulativeExternalFundingBeforeKrw: input.principal,
+      externalFundingAmountKrw: input.amount,
+    });
+
+  it('keeps 0% when a reward arrives with zero investment PnL', () => {
+    const { before, after } = reward({
+      total: '10000000',
+      principal: '10000000',
+      amount: '2000000',
+    });
+    expect(toCumulativePrincipalReturnRatePercent(before).toFixed(8)).toBe(
+      '0.00000000',
+    );
+    expect(toCumulativePrincipalReturnRatePercent(after).toFixed(8)).toBe(
+      '0.00000000',
+    );
+  });
+
+  it('changes the rate but not PnL when a reward follows a gain (예시 2)', () => {
+    const { before, after } = reward({
+      total: '12000000',
+      principal: '10000000',
+      amount: '2000000',
+    });
+
+    expect(before.investmentPnlKrw.toFixed(8)).toBe('2000000.00000000');
+    expect(after.investmentPnlKrw.toFixed(8)).toBe('2000000.00000000');
+    expect(after.totalAssetKrw.toFixed(8)).toBe('14000000.00000000');
+    expect(after.cumulativeExternalFundingKrw.toFixed(8)).toBe(
+      '12000000.00000000',
+    );
+    expect(toCumulativePrincipalReturnRatePercent(before).toFixed(8)).toBe(
+      '20.00000000',
+    );
+    expect(toCumulativePrincipalReturnRatePercent(after).toFixed(8)).toBe(
+      '16.66666667',
+    );
+    // The stored TWR record of the same pair is still neutral.
+    expect(after.returnRate.toFixed(8)).toBe(before.returnRate.toFixed(8));
+  });
+
+  it('changes the rate but not PnL when a reward follows a loss (예시 3)', () => {
+    const { before, after } = reward({
+      total: '9000000',
+      principal: '10000000',
+      amount: '2000000',
+    });
+
+    expect(before.investmentPnlKrw.toFixed(8)).toBe('-1000000.00000000');
+    expect(after.investmentPnlKrw.toFixed(8)).toBe('-1000000.00000000');
+    expect(toCumulativePrincipalReturnRatePercent(before).toFixed(8)).toBe(
+      '-10.00000000',
+    );
+    expect(toCumulativePrincipalReturnRatePercent(after).toFixed(8)).toBe(
+      '-8.33333333',
+    );
+  });
+
+  it('uses each state’s own principal across consecutive rewards and later trading', () => {
+    // +2,000,000 PnL, then two 1,000,000 rewards, then +600,000 more PnL.
+    let state = reward({
+      total: '12000000',
+      principal: '10000000',
+      amount: '1000000',
+    }).after;
+    expect(toCumulativePrincipalReturnRatePercent(state).toFixed(8)).toBe(
+      '18.18181818',
+    );
+
+    state = buildExternalFundingBoundary({
+      previous: state,
+      totalAssetBeforeKrw: state.totalAssetKrw.toFixed(8),
+      cumulativeExternalFundingBeforeKrw:
+        state.cumulativeExternalFundingKrw.toFixed(8),
+      externalFundingAmountKrw: '1000000',
+    }).after;
+    expect(state.investmentPnlKrw.toFixed(8)).toBe('2000000.00000000');
+    expect(toCumulativePrincipalReturnRatePercent(state).toFixed(8)).toBe(
+      '16.66666667',
+    );
+
+    const traded = advanceGeneralPerformance({
+      previous: state,
+      currentTotalAssetKrw: '14600000',
+      cumulativeExternalFundingKrw: state.cumulativeExternalFundingKrw,
+    });
+    expect(traded.investmentPnlKrw.toFixed(8)).toBe('2600000.00000000');
+    expect(toCumulativePrincipalReturnRatePercent(traded).toFixed(8)).toBe(
+      '21.66666667',
+    );
+  });
+
+  it('recovers from -100% only through the principal after funding at a zero total', () => {
+    const wiped = advanceGeneralPerformance({
+      previous: {
+        totalAssetKrw: d('10000000'),
+        timeWeightedReturnFactor: d('1'),
+      },
+      currentTotalAssetKrw: '0',
+      cumulativeExternalFundingKrw: '10000000',
+    });
+    expect(toCumulativePrincipalReturnRatePercent(wiped).toFixed(8)).toBe(
+      '-100.00000000',
+    );
+
+    const { after } = buildExternalFundingBoundary({
+      previous: wiped,
+      totalAssetBeforeKrw: '0',
+      cumulativeExternalFundingBeforeKrw: '10000000',
+      externalFundingAmountKrw: '1000000',
+    });
+    // The 10,000,000 loss is still a loss; only the principal grew.
+    expect(after.investmentPnlKrw.toFixed(8)).toBe('-10000000.00000000');
+    expect(toCumulativePrincipalReturnRatePercent(after).toFixed(8)).toBe(
+      '-90.90909091',
+    );
+  });
+
+  it('is exactly 0% at a performance origin', () => {
+    expect(
+      toCumulativePrincipalReturnRatePercent(
+        buildGeneralPerformanceOrigin('10000000'),
+      ).toFixed(8),
+    ).toBe('0.00000000');
   });
 });

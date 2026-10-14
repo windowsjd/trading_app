@@ -84,7 +84,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       assert.ok(elements(tree, 'InlineEmptyState').some((node) => node.props.title === '수익률을 계산할 수 없습니다.'));
     });
 
-    it(`${mode} Hero uses compact labels from the response method, independently of account mode`, (t) => {
+    it(`${mode} Hero names every response method 수익률, independently of account mode`, (t) => {
       const h = createHomeHarness(mode);
       t.after(h.close);
       h.seed(h.account, fixture[mode].data);
@@ -92,8 +92,8 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
       const portfolio = h.client.getQueryData<TradingAccountPortfolioDto>(key);
       assert.ok(portfolio?.summary);
       for (const [method, expected] of [
-        ['initial_capital', '시즌 수익률'],
-        ['time_weighted', '시간가중 수익률'],
+        ['initial_capital', '수익률'],
+        ['cumulative_principal', '수익률'],
       ] as const) {
         h.client.setQueryData(key, {
           ...portfolio,
@@ -108,7 +108,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
         );
         assert.ok(metric, expected);
         assert.equal(elements(metric, 'Text')[1].props.children, '-3.52%');
-        assert.doesNotMatch(texts(hero), /초기자본 대비/);
+        assert.doesNotMatch(texts(hero), /초기자본 대비|시즌 수익률|시간가중|누적 투자원금/);
       }
     });
   }
@@ -323,11 +323,12 @@ describe('general/season home API, queries, rendering and navigation integration
         assert.ok(text.includes(label), label);
       if (mode === 'general') {
         for (const label of [
-          '시간가중 수익률',
+          '수익률은 이 누적 투자원금 대비로 계산됩니다.',
         ])
           assert.ok(text.includes(label));
         assert.ok(!text.includes('현재 순위'));
-        assert.doesNotMatch(text, /자금 구성|최초 지급 자본|누적 외부 자금 유입|누적 광고 보상|투자 손익/);
+        // Home explains the basis but shows no funding breakdown amounts.
+        assert.doesNotMatch(text, /자금 구성|최초 지급 자본|누적 외부 자금 유입|누적 광고 보상|투자 손익|누적 투자원금 \d/);
       } else {
         for (const label of ['김재민', 'Silver'])
           assert.ok(text.includes(label));

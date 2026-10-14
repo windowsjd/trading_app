@@ -14,10 +14,10 @@ const beginner: TradingAccountDto = { id: 'beginner', mode: 'beginner', status: 
   createdAt: '2026-10-09T00:00:00.000Z', updatedAt: '2026-10-09T00:00:00.000Z' };
 const general = { ...beginner, id: 'general', mode: 'general' as const };
 
-it('beginner is a separately named TWR account without season or ad reward capabilities', () => {
+it('beginner is a separately named cumulative-principal account without season or ad reward capabilities', () => {
   const caps = getTradingAccountCapabilities(beginner)!;
   assert.equal(getAccountDisplay(beginner).title, '초보모드');
-  assert.equal(caps.returnRateMethod, 'time_weighted');
+  assert.equal(caps.returnRateMethod, 'cumulative_principal');
   assert.equal(caps.isGeneral, false);
   assert.equal(caps.showsSeasonUi, false);
   assert.equal(caps.canClaimAdReward, false);
@@ -38,10 +38,13 @@ it('stored beginner selection and switching to general retain distinct financial
   assert.equal(resolveAccountBinding({ accounts, boundAccountId: beginner.id, selectedAccountId: general.id, accountsLoading: false }).state, 'account_changed');
 });
 
-it('beginner daily history requires TWR semantics and rejects foreign account data', () => {
-  const data = { tradingAccountId: beginner.id, mode: 'beginner', granularity: 'daily', range: '30d', state: 'available', returnRateMethod: 'time_weighted',
-    points: [{ snapshotDate: '2026-10-09', time: '2026-10-09T01:00:00.000Z', totalAssetKrw: '10000000', returnRate: '0', returnRateMethod: 'time_weighted', snapshotReason: 'scheduled', externalFundingAmountKrw: null, cumulativeExternalFundingKrw: '10000000', investmentPnlKrw: '0' }] };
+it('beginner daily history requires cumulative-principal semantics and rejects foreign account data', () => {
+  const data = { tradingAccountId: beginner.id, mode: 'beginner', granularity: 'daily', range: '30d', state: 'available', returnRateMethod: 'cumulative_principal',
+    points: [{ snapshotDate: '2026-10-09', time: '2026-10-09T01:00:00.000Z', totalAssetKrw: '10000000', returnRate: '0', returnRateMethod: 'cumulative_principal', snapshotReason: 'scheduled', externalFundingAmountKrw: null, cumulativeExternalFundingKrw: '10000000', investmentPnlKrw: '0' }] };
   assert.equal(assertDailyEquity(data, '30d', beginner.id).points.length, 1);
   assert.throws(() => assertDailyEquity(data, '30d', general.id));
   assert.throws(() => assertDailyEquity({ ...data, returnRateMethod: 'initial_capital' }, '30d', beginner.id));
+  // A response still labelled with the retired TWR method is not this contract.
+  assert.throws(() => assertDailyEquity({ ...data, returnRateMethod: 'time_weighted',
+    points: data.points.map(point => ({ ...point, returnRateMethod: 'time_weighted' })) }, '30d', beginner.id));
 });

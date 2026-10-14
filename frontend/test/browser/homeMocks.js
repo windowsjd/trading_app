@@ -86,7 +86,7 @@ export const apiClient = {
     }
     const account = transport.accounts.find((item) => path.split('/')[2] === item.id);
     if (!account) throw new Error(`Unexpected fixture request: ${path}`);
-    const returnRateMethod = account.mode === 'season' ? 'initial_capital' : 'time_weighted';
+    const returnRateMethod = account.mode === 'season' ? 'initial_capital' : 'cumulative_principal';
     if (path.endsWith('/portfolio')) {
       if (transport.delay === account.id || variant === 'loading') await new Promise((resolve) => transport.pending.push(resolve));
       if (variant === 'portfolio-error') throw new Error('Test network error');
@@ -107,8 +107,10 @@ export const apiClient = {
           returnRate: account.mode === 'season' ? '-3.52' : '4.82', returnRateMethod,
           unrealizedPnlKrw: '-351885', realizedPnlKrw: '12000',
           krwCash: '1000000', usdCashKrw: '1000000', assetValueKrw: '7648192',
-          initialFundingKrw: '10000000', cumulativeExternalFundingKrw: '0',
-          cumulativeAdRewardKrw: '0', investmentPnlKrw: '2530200',
+          // cumulative_principal: 576,200 / 11,954,000 = 4.82%; season has no funding concept.
+          ...(account.mode === 'season'
+            ? { initialFundingKrw: null, cumulativeExternalFundingKrw: null, cumulativeAdRewardKrw: null, investmentPnlKrw: null }
+            : { initialFundingKrw: '10000000', cumulativeExternalFundingKrw: '11954000', cumulativeAdRewardKrw: '1954000', investmentPnlKrw: '576200' }),
         },
         allocation: { state: 'available', cashKrwValue: '2000000', domesticStockValueKrw: '7648192', usStockValueKrw: '0', cryptoValueKrw: '0' },
       });

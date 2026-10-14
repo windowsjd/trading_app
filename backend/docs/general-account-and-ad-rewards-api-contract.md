@@ -661,18 +661,34 @@ limit orders are enabled.
 | 누적 광고 보상금   | sum of valid `ad_reward` credits                                                                       |
 | 누적 외부 가상자금 | `initial_grant`/`general_account_open` + `ad_reward`/`ad_reward_claim` — an ALLOW-LIST, never inferred |
 | 누적 투자손익      | 현재 총자산 − 누적 외부 가상자금                                                                       |
-| 대표 수익률        | **TWR**                                                                                                |
+| 누적 투자원금      | = 누적 외부 가상자금 (verified ledger allow-list above)                                                  |
+| 대표 수익률        | **누적 투자손익 ÷ 누적 투자원금 × 100** (`returnRateMethod: "cumulative_principal"`, 2026-10-14)         |
+| 내부 TWR 기록      | `timeWeightedReturnFactor` + stored snapshot `returnRate` — audit/continuity evidence, never served     |
 
 `exchange_target`, `order_sell`, `settlement`, `adjustment`, and
 `manual_adjustment` are explicitly NOT external funding. `initialCapitalKrw`
 stays 10,000,000 and no cumulative value is cached on TradingAccount.
 
-`(현재 총자산 − 외부자금) / 외부자금` is NOT the headline return: it moves the
-moment an ad reward lands.
+Since 2026-10-14 (일반·초보 수익률 정책 변경) `(현재 총자산 − 외부자금) / 외부자금`
+IS the headline return of general and beginner accounts. An ad reward is not
+profit — investment PnL is unchanged across the payout — but it grows the
+principal, so the headline rate may change the moment it lands. Example:
+total 12,000,000 / principal 10,000,000 = +20%; after a 2,000,000 reward,
+14,000,000 / 12,000,000 → +16.66666667%, PnL +2,000,000 both times. A
+non-positive principal fails closed as `GENERAL_PERFORMANCE_INTEGRITY`; a zero
+total on a positive principal is −100%. Season accounts are unchanged.
 
-### TWR
+The representative rate is computed on read, never stored: the live summary
+from the valuation and ledger of one RepeatableRead transaction, every history
+point from its OWN row's `totalAssetKrw` and `cumulativeExternalFundingKrw`
+(never today's principal). No column, migration or backfill was added.
 
-`returnRatePercent = (timeWeightedReturnFactor - 1) × 100`; the factor is the
+### Internal TWR record
+
+The TWR below is still written and validated exactly as before, as internal
+continuity/audit evidence. It is no longer the served `returnRate`.
+
+`storedReturnRate = (timeWeightedReturnFactor - 1) × 100`; the factor is the
 source of truth and a rounded percent is never fed back into the next factor.
 
 - origin: total = funding, PnL 0, factor 1, return 0%
@@ -689,8 +705,9 @@ after.investmentPnl  = before.investmentPnl
 after.factor         = before.factor
 ```
 
-Total loss → factor 0 / −100%, and a later ad reward keeps it at −100% (money
-returns, the cumulative return does not). Value reappearing from zero with no
+Total loss → factor 0 / −100%, and a later ad reward keeps the STORED TWR
+record at −100% (the served cumulative-principal rate re-divides the unchanged
+loss by the larger principal). Value reappearing from zero with no
 boundary is `GENERAL_PERFORMANCE_DISCONTINUITY`; a negative total is
 `GENERAL_PERFORMANCE_INTEGRITY`. All arithmetic is `Prisma.Decimal`.
 
@@ -787,7 +804,9 @@ and closed alike; writes nothing.
 `returnRate`, **`returnRateMethod`**, `krwCash`, `usdCashKrw`,
 `assetValueKrw`, `realizedPnlKrw`, `unrealizedPnlKrw`, `valuedAt`.
 
-- general → `returnRateMethod: "time_weighted"`
+- general / beginner → `returnRateMethod: "cumulative_principal"`;
+  `returnRate = investmentPnlKrw ÷ cumulativeExternalFundingKrw × 100` of the
+  same response (was `"time_weighted"` before 2026-10-14)
 - season → `returnRateMethod: "initial_capital"`, existing valuation
   unchanged, and the external-funding fields are `null` (not 0 — a season
   account has no external-funding concept, and 0 would read as "none
@@ -824,7 +843,10 @@ DailyPortfolioSnapshot and fall back to EquitySnapshot when there is none.
 
 Points carry `time`, `totalAssetKrw`, `returnRate`, `returnRateMethod`,
 `cumulativeExternalFundingKrw`, `investmentPnlKrw`, `snapshotReason`,
-`externalFundingAmountKrw`. Ordering is `capturedAt` → boundary phase rank →
+`externalFundingAmountKrw`. A general/beginner point's `returnRate` is its own
+row's `investmentPnlKrw ÷ cumulativeExternalFundingKrw × 100`
+(`cumulative_principal`); across a boundary pair PnL is identical while the
+`after` rate reflects the larger principal. Ordering is `capturedAt` → boundary phase rank →
 `createdAt` → `id` ascending (see "Boundary ORDER does not come from a UUID"),
 so a before/after pair sharing one `capturedAt` and one `createdAt` always
 reads before → after regardless of which id happens to be larger.
@@ -893,9 +915,11 @@ general history point — a row that cannot produce them is damage, reported as
 Verified per row: account scope, `seasonParticipantId = null`, the three
 performance columns non-null and non-negative,
 `investmentPnl = totalAsset - cumulativeExternalFunding`,
-`returnRate = (factor - 1) × 100`, origin rows at factor 1 / return 0, ordinary
-rows with no external-funding reference columns, and boundary pairs that are
-complete and performance-neutral. `ad_reward_claim` boundaries are cross-checked
+stored `returnRate = (factor - 1) × 100` (the internal TWR record), origin rows
+at factor 1 / stored return 0, ordinary rows with no external-funding reference
+columns, and boundary pairs that are complete and neutral in the stored record
+(factor, stored percent, PnL). The served rate additionally requires a
+positive principal on every row. `ad_reward_claim` boundaries are cross-checked
 against their claims in ONE batched query per request.
 
 Legacy (pre-작업 7) unkeyed claims are NOT required to have boundaries. A

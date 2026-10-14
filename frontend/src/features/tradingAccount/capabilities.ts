@@ -1,4 +1,4 @@
-import type { TradingAccountDto } from './api';
+import type { ReturnRateMethod, TradingAccountDto } from './api';
 
 /**
  * What the SELECTED account can actually do (작업 9 §B-7 · §B-8).
@@ -41,7 +41,7 @@ export type TradingAccountCapabilities = {
   showsSeasonUi: boolean;
   tradeBlockReason: CapabilityBlockReason;
   exchangeBlockReason: CapabilityBlockReason;
-  returnRateMethod: 'time_weighted' | 'initial_capital';
+  returnRateMethod: ReturnRateMethod;
 };
 
 export const CAPABILITY_BLOCK_MESSAGE: Record<
@@ -139,7 +139,7 @@ export function getTradingAccountCapabilities(
     showsSeasonUi: isSeason,
     tradeBlockReason,
     exchangeBlockReason,
-    returnRateMethod: isSeason ? 'initial_capital' : 'time_weighted',
+    returnRateMethod: isSeason ? 'initial_capital' : 'cumulative_principal',
   };
 }
 

@@ -557,9 +557,10 @@ export default function PortfolioScreen({ navigation }: Props) {
  * A general account and a season account do not have "a return rate" in the
  * same sense, so they do not share a card:
  *
- *   - `time_weighted` excludes ad-funded external inflows from performance. The
- *     inflow is a deposit and is labelled as one; presenting it as profit is
- *     the exact misstatement the backend's TWR work exists to prevent.
+ *   - `cumulative_principal` (general/beginner) is investment PnL over the
+ *     cumulative principal: the opening grant plus granted ad rewards. A reward
+ *     is principal, labelled as such, never profit — so PnL stays put while the
+ *     rate can change with the larger principal.
  *   - `initial_capital` is the season's return against its starting capital,
  *     with no external-funding concept at all — which is why those fields come
  *     back `null` rather than 0 for a season account.
@@ -598,7 +599,7 @@ function AccountSummaryCard({
     );
   }
 
-  const isGeneral = summary.returnRateMethod === 'time_weighted';
+  const isGeneral = summary.returnRateMethod === 'cumulative_principal';
   const returnRateLabel = getReturnRateMethodLabel(summary.returnRateMethod);
 
   return (
@@ -619,20 +620,20 @@ function AccountSummaryCard({
       {isGeneral ? (
         <>
           <Text style={styles.helper}>
-            최초 지급 자본 {formatKrw(summary.initialFundingKrw)}
+            누적 투자원금 {formatKrw(summary.cumulativeExternalFundingKrw)}
           </Text>
           <Text style={styles.helper}>
-            누적 외부 유입 {formatKrw(summary.cumulativeExternalFundingKrw)}
+            최초 지급금 {formatKrw(summary.initialFundingKrw)}
           </Text>
           <Text style={styles.helper}>
-            누적 광고 보상 {formatKrw(summary.cumulativeAdRewardKrw)}
+            누적 광고 보상금 {formatKrw(summary.cumulativeAdRewardKrw)}
           </Text>
           {/* Investment PnL is the ONLY figure here that is performance. */}
           <Text style={styles.helper}>
             투자 손익 {formatKrw(summary.investmentPnlKrw)}
           </Text>
           <Text style={styles.footnote}>
-            광고 보상 등 외부 자금 유입은 투자 수익에 포함되지 않습니다.
+            수익률은 투자 손익을 누적 투자원금으로 나눈 값입니다. 광고 보상금은 투자 수익이 아니라 누적 투자원금에 더해집니다.
           </Text>
         </>
       ) : null}

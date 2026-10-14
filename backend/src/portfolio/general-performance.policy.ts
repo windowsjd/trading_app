@@ -1,26 +1,38 @@
 import { Prisma, type SnapshotReason } from '../generated/prisma/client';
 
 /**
- * Time-weighted return (TWR) for general-mode accounts — a PURE policy
- * (작업 7).
+ * Performance policy for standalone (general / beginner) accounts — PURE.
  *
- * WHY TWR AND NOT A SIMPLE RATIO
- * ------------------------------
- * General accounts receive external virtual funding after opening (rewarded
- * ads). A simple
- *     (totalAsset - cumulativeExternalFunding) / cumulativeExternalFunding
- * moves the headline return the instant money arrives — watching an ad would
- * change a user's "investment performance" without a single trade. TWR
- * removes that by chaining per-segment growth factors and treating each
- * inflow as a segment boundary that contributes a factor of exactly 1.
+ * TWO RETURN NUMBERS, TWO JOBS
+ * ----------------------------
+ * 1. The REPRESENTATIVE return rate the user sees (일반·초보 수익률 정책 변경)
+ *    is the cumulative-principal ratio:
  *
- * factor is the SOURCE OF TRUTH. returnRate is a rounded presentation of it
- * and is NEVER fed back into the next segment — rounding to 8 dp on every
- * snapshot would compound into visible drift.
+ *        (totalAsset - cumulativeExternalFunding) / cumulativeExternalFunding × 100
+ *      = investmentPnl / cumulativeExternalFunding × 100
+ *
+ *    The principal is the verified external funding ledger (opening grant +
+ *    granted ad rewards). An inflow is never profit — investment PnL does not
+ *    move — but it grows the denominator, so this rate CAN change the instant
+ *    money arrives. That is the product policy, not drift to correct.
+ *    `toCumulativePrincipalReturnRatePercent` is the one place it is computed.
+ *
+ * 2. The time-weighted factor (작업 7) stays as INTERNAL evidence. Snapshot
+ *    `returnRate` columns of standalone accounts still store `(factor - 1) ×
+ *    100`, and the integrity checks, before/after boundary pairs and the audit
+ *    script keep validating that record exactly as before. It is never
+ *    returned as the representative rate and never relabelled as one.
+ *
+ * factor is the source of truth of record 2. Its stored returnRate is a
+ * rounded presentation that is NEVER fed back into the next segment —
+ * rounding to 8 dp on every snapshot would compound into visible drift.
  *
  * Everything is Prisma.Decimal end to end. A JS number anywhere in this file
  * would silently lose precision on realistic KRW amounts.
  */
+
+/** API `returnRateMethod` of the representative standalone return rate. */
+export const CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD = 'cumulative_principal';
 
 export const TWR_FACTOR_SCALE = 18;
 /** Matches EquitySnapshot.returnRate / DailyPortfolioSnapshot.returnRate. */
@@ -61,7 +73,11 @@ export type GeneralPerformanceState = {
 };
 
 export type GeneralPerformanceAdvance = GeneralPerformanceState & {
-  /** (factor - 1) * 100, rounded to the snapshot column scale. */
+  /**
+   * The STORED time-weighted percent, (factor - 1) * 100 at the snapshot
+   * column scale. Internal record only — the representative rate is
+   * `toCumulativePrincipalReturnRatePercent`.
+   */
   returnRate: Prisma.Decimal;
 };
 
@@ -79,6 +95,52 @@ export function toReturnRatePercent(factor: Prisma.Decimal): Prisma.Decimal {
   assertFinite(factor, 'timeWeightedReturnFactor');
   return factor
     .sub(1)
+    .mul(100)
+    .toDecimalPlaces(RETURN_RATE_SCALE, Prisma.Decimal.ROUND_HALF_UP);
+}
+
+/**
+ * The representative return rate of ONE financial state: investment PnL over
+ * the cumulative principal (external funding) of that same state, at the
+ * snapshot column scale.
+ *
+ * Both inputs must describe the same instant — a live valuation with the
+ * ledger read in the same transaction, or the two columns of one stored row.
+ * Mixing a current principal into a past total is exactly the error this
+ * signature makes hard to write.
+ *
+ * A non-positive principal has no meaningful ratio. It fails closed as
+ * GENERAL_PERFORMANCE_INTEGRITY rather than rendering 0%: every legitimate
+ * standalone account holds its opening grant. A total of 0 with a positive
+ * principal is a real state and returns -100.
+ */
+export function toCumulativePrincipalReturnRatePercent(
+  state: Pick<
+    GeneralPerformanceState,
+    'totalAssetKrw' | 'cumulativeExternalFundingKrw'
+  >,
+): Prisma.Decimal {
+  const total = new Prisma.Decimal(state.totalAssetKrw);
+  const principal = new Prisma.Decimal(state.cumulativeExternalFundingKrw);
+  assertFinite(total, 'totalAssetKrw');
+  assertFinite(principal, 'cumulativeExternalFundingKrw');
+
+  if (principal.lte(0)) {
+    throw new GeneralPerformanceError(
+      generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
+      'Cumulative investment principal must be greater than zero to compute a return rate.',
+    );
+  }
+  if (total.lt(0)) {
+    throw new GeneralPerformanceError(
+      generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
+      'Total asset value cannot be negative.',
+    );
+  }
+
+  return total
+    .sub(principal)
+    .div(principal)
     .mul(100)
     .toDecimalPlaces(RETURN_RATE_SCALE, Prisma.Decimal.ROUND_HALF_UP);
 }
@@ -186,9 +248,14 @@ export function advanceGeneralPerformance(input: {
  *
  * BEFORE absorbs all market performance up to the instant of the inflow.
  * AFTER adds the money to the total and to cumulative external funding, and
- * changes NOTHING else — same investment PnL, same factor, same return rate.
- * That equality is what makes an ad reward performance-neutral, and the
- * integration tests assert it directly.
+ * changes NOTHING else in the stored record — same investment PnL, same
+ * factor, same stored time-weighted percent. The integration tests assert
+ * that equality directly.
+ *
+ * The REPRESENTATIVE rate of the two rows is a different matter: investment
+ * PnL is identical but the principal grew by the amount, so
+ * `toCumulativePrincipalReturnRatePercent(after)` legitimately differs from
+ * that of `before` whenever PnL is non-zero.
  */
 export function buildExternalFundingBoundary(input: {
   previous: Pick<

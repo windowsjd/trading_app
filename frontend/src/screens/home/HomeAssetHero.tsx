@@ -4,7 +4,6 @@ import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
 import { TEST_IDS } from '../../constants/testIds';
 import type { TradingAccountPortfolioSummaryDto, TradingAccountPortfolioDto } from '../../features/tradingAccount/api';
-import { getReturnRateMethodLabel } from '../../features/tradingAccount/accountDisplay';
 import { homeUnrealizedPnlKrw } from '../../features/tradingAccount/homePortfolio';
 import { formatKrw, formatPercent } from '../../utils/format';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
@@ -64,10 +63,10 @@ export default function HomeAssetHero({ summary, finalResult, settled = false, c
           <View style={styles.performanceRow}>
           <View style={styles.performance}>
             <Text style={styles.metric}>
-              {/* Home's season context makes the initial-capital explanation redundant. */}
-              {result.returnRateMethod === 'initial_capital'
-                ? '시즌 수익률'
-                : getReturnRateMethodLabel(result.returnRateMethod)}{' '}
+              {/* One headline name for every mode; the value is still the
+                  response's own method (cumulative principal / season
+                  initial capital), never recomputed here. */}
+              수익률{' '}
               <Text style={performanceStyle(result.returnRate)}>
                 {result.returnRate === null || result.returnRate === undefined
                   ? '알 수 없음'

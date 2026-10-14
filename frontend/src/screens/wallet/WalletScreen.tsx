@@ -20,6 +20,7 @@ import {
   getTradingAccountPortfolio, getTradingAccountWallets, getTradingAccountPositions,
   getTradingAccountEquity,
   type TradingAccountDto,
+  type TradingAccountPortfolioSummaryDto,
 } from '../../features/tradingAccount/api';
 import { getAccountHoldings } from '../../features/tradingAccount/holdings';
 import { ACCOUNT_INTEGRITY_TITLE, findAccountIntegrityFailure } from '../../features/tradingAccount/accountIntegrityGate';
@@ -27,7 +28,8 @@ import { getCapabilityBlockMessage, type TradingAccountCapabilities } from '../.
 import { getPortfolioNotice } from '../../features/tradingAccount/portfolioMessage';
 import { getWalletByIdentity } from '../../features/wallet/mapper';
 import { WALLET_GROUPS, WALLET_SCOPE_LABELS } from '../../features/wallet/walletIdentity';
-import { formatMoney } from '../../utils/format';
+import { formatKrw, formatMoney } from '../../utils/format';
+import { financial } from '../../theme/financialColors';
 import PositionAssetRow from '../../components/tradingAccount/PositionAssetRow';
 import ActionPressable from '../../components/common/ActionPressable';
 import PrimaryButtonBackground from '../../components/common/PrimaryButtonBackground';
@@ -190,7 +192,10 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             : !portfolio ? (
               <ErrorState error={portfolioQuery.error} title="총 자산을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void portfolioQuery.refetch()} />
             ) : (
-              <HomeAssetHero compactTop compactBottom summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
+              <>
+                <HomeAssetHero compactTop compactBottom summary={portfolio.summary} settled={account.season?.seasonStatus === 'settled'} unavailableMessage={notice?.message} />
+                {portfolio.summary ? principalSummary(portfolio.summary, account.mode === 'general') : null}
+              </>
             )}
           {notice ? <View>
             <Text style={styles.notice}>{notice.message}</Text>
@@ -325,6 +330,34 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   );
 }
 
+/**
+ * The basis of a general/beginner 수익률, straight from the portfolio response:
+ * investment PnL ÷ cumulative principal. Nothing is recomputed here, and a
+ * season summary (initial-capital method, null funding fields) shows nothing.
+ * Kept outside the shared Hero so Home stays free of a funding breakdown.
+ */
+function principalSummary(summary: TradingAccountPortfolioSummaryDto, showAdReward: boolean) {
+  const { cumulativeExternalFundingKrw: principal, investmentPnlKrw: pnl } = summary;
+  if (summary.returnRateMethod !== 'cumulative_principal' || principal === null || pnl === null) return null;
+  const pnlAmount = Number(pnl);
+  const pnlStyle = !Number.isFinite(pnlAmount) || pnlAmount === 0 ? undefined : pnlAmount > 0 ? styles.up : styles.down;
+  return (
+    <View testID="wallet-principal-summary" style={styles.principal}>
+      <Text testID="wallet-cumulative-principal" style={styles.principalText}>
+        누적 투자원금 {formatKrw(principal)}원
+      </Text>
+      {showAdReward && summary.initialFundingKrw !== null && summary.cumulativeAdRewardKrw !== null ? (
+        <Text testID="wallet-principal-breakdown" style={styles.principalCaption}>
+          최초 지급금 {formatKrw(summary.initialFundingKrw)}원 · 광고 보상금 {formatKrw(summary.cumulativeAdRewardKrw)}원
+        </Text>
+      ) : null}
+      <Text testID="wallet-investment-pnl" style={styles.principalText}>
+        투자 손익 <Text style={pnlStyle}>{formatKrw(pnl)}원</Text>
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
   viewport: { flex: 1 },
@@ -338,6 +371,11 @@ const styles = StyleSheet.create({
   cashValue: { flexGrow: 1, flexShrink: 1, minWidth: 0, textAlign: 'right', fontSize: 16, lineHeight: 24, fontVariant: ['tabular-nums'] },
   holdings: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: semantic.border },
   notice: { fontSize: 13, lineHeight: 20, color: semantic.warning },
+  principal: { gap: 4, minWidth: 0 },
+  principalText: { fontSize: 14, lineHeight: 22, color: semantic.secondary },
+  principalCaption: { fontSize: 13, lineHeight: 20, color: semantic.secondary },
+  up: { color: financial.rise },
+  down: { color: financial.fall },
   quickActions: { width: '100%', maxWidth: 440, alignSelf: 'center', flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   quickActionItem: { flex: 1, minWidth: 0, alignItems: 'center', gap: 8 },
   quickActionTarget: { alignSelf: 'stretch', alignItems: 'center', gap: 8 },

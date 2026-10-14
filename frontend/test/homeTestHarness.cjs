@@ -269,7 +269,7 @@ function createHomeHarness(mode = 'general') {
       assetValueKrw: '9991000',
       returnRate: '0',
       returnRateMethod:
-        account.mode === 'general' ? 'time_weighted' : 'initial_capital',
+        account.mode === 'general' ? 'cumulative_principal' : 'initial_capital',
       initialFundingKrw: '10000000',
       cumulativeExternalFundingKrw: '10001000',
       cumulativeAdRewardKrw: '1000',

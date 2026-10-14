@@ -315,14 +315,14 @@ export const apiClient = {
       ...scoped, mode: account.mode, sectionErrors: [],
       summary: {
         totalAssetKrw: '10001000', krwCash: '1000', usdCashKrw: '9000', assetValueKrw: '9991000',
-        returnRate: '1.25', returnRateMethod: 'time_weighted', initialFundingKrw: '10000000',
+        returnRate: '1.25', returnRateMethod: 'cumulative_principal', initialFundingKrw: '10000000',
         cumulativeExternalFundingKrw: '10001000', cumulativeAdRewardKrw: '1000', investmentPnlKrw: '125000',
       },
       allocation: { state: 'available', cashKrwValue: '10000', domesticStockValueKrw: '1000', usStockValueKrw: '9900000', cryptoValueKrw: '90000' },
     });
     if (path.endsWith('/portfolio/equity')) return response({
       ...scoped, state: 'empty', mode: account.mode, granularity: 'daily', range: '30d',
-      returnRateMethod: 'time_weighted', points: [],
+      returnRateMethod: 'cumulative_principal', points: [],
     });
     if (path.endsWith('/wallets'))
       return response({

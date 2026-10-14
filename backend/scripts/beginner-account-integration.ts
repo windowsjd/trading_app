@@ -177,7 +177,7 @@ async function run() {
   assert.equal(initial.data.summary?.totalAssetKrw, '10000000.00000000');
   assert.equal(initial.data.summary?.investmentPnlKrw, '0.00000000');
   assert.equal(initial.data.summary?.returnRate, '0.00000000');
-  assert.equal(initial.data.summary?.returnRateMethod, 'time_weighted');
+  assert.equal(initial.data.summary?.returnRateMethod, 'cumulative_principal');
   assert.equal(
     initial.data.summary?.cumulativeExternalFundingKrw,
     '10000000.00000000',
@@ -307,6 +307,7 @@ async function run() {
   const afterFx = await portfolio.getPortfolio(owner, beginner.id);
   assert.equal(afterFx.data.summary?.totalAssetKrw, '9998600.00000000');
   assert.equal(afterFx.data.summary?.investmentPnlKrw, '-1400.00000000');
+  // -1,400 / 10,000,000 cumulative principal (opening grant only).
   assert.equal(afterFx.data.summary?.returnRate, '-0.01400000');
   const ownUsd = await db.cashWallet.findFirstOrThrow({
     where: {
@@ -419,15 +420,16 @@ async function run() {
   const dailyRow = await db.dailyPortfolioSnapshot.findFirstOrThrow({
     where: { tradingAccountId: beginner.id },
   });
-  assert.equal(
-    dailyRow.returnRate.toFixed(8),
-    afterTransfer.data.summary?.returnRate,
-  );
   assert.equal(dailyRow.cumulativeExternalFundingKrw?.toString(), '10000000');
+  const dailyEquity = await portfolio.getEquity(owner, beginner.id, {
+    granularity: 'daily',
+  });
+  assert.equal(dailyEquity.data.points.length, 1);
+  assert.equal(dailyEquity.data.returnRateMethod, 'cumulative_principal');
+  // The daily point of this unchanged state serves the live rate.
   assert.equal(
-    (await portfolio.getEquity(owner, beginner.id, { granularity: 'daily' }))
-      .data.points.length,
-    1,
+    dailyEquity.data.points[0].returnRate,
+    afterTransfer.data.summary?.returnRate,
   );
 
   // An actual season refresh and settlement must touch only its own account.

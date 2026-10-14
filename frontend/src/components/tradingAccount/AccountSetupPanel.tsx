@@ -70,8 +70,9 @@ export default function AccountSetupPanel({
           onPress={openGeneral.start}
         />
         <Text style={styles.helper}>
-          일반 투자 계정은 시즌과 무관하게 유지되며, 시간가중 수익률로 성과를
-          확인할 수 있습니다. 매매와 KRW↔USD 환전을 사용할 수 있습니다.
+          일반 투자 계정은 시즌과 무관하게 유지되며, 누적 투자원금 대비
+          수익률로 성과를 확인할 수 있습니다. 매매와 KRW↔USD 환전을 사용할 수
+          있습니다.
         </Text>
 
         {seasonAction ? (

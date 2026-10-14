@@ -231,7 +231,7 @@ describe('query keys separate accounts structurally', () => {
 });
 
 
-it('transfer refreshes only the command account cash and ledger, without TWR or positions', async () => {
+it('transfer refreshes only the command account cash and ledger, without performance or positions', async () => {
   const { client, keys } = recorder();
   await invalidateAfterWalletTransfer(client, A);
   assert.ok(matchesAny(keys, QUERY_KEYS.tradingAccount.wallets(A)));

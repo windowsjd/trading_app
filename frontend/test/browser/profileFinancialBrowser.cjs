@@ -174,7 +174,7 @@ async function run() {
     }
     await open('home', '&account=general-account&palette=green_red');
     assert.equal(await id('home-competition').count(), 0);
-    assert.match(await id('home-summary-card').innerText(), /시간가중 수익률/);
+    assert.match(await id('home-summary-card').innerText(), /수익률/);
     assert.equal(await color(page.getByText('4.82%', { exact: true })), expected.dark.green_red[0]);
     for (const width of [320,360,390,430]) {
       await page.setViewportSize({ width, height: 844 });

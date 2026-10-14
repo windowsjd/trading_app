@@ -249,8 +249,10 @@ export async function assertGeneralHistoryBoundaryPairs(
     ) {
       fail(label, 'records a different amount on its before and after rows.');
     }
-    // An inflow is money, not performance: the factor, the percent, and the
-    // investment PnL must be IDENTICAL across the pair.
+    // An inflow is money, not performance: the factor, the STORED
+    // time-weighted percent, and the investment PnL must be IDENTICAL across
+    // the pair. (The representative cumulative-principal rate served from
+    // these rows legitimately differs — its principal grew by the amount.)
     if (
       !beforeRow.timeWeightedReturnFactor!.equals(
         afterRow.timeWeightedReturnFactor!,

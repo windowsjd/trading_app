@@ -10,6 +10,14 @@
 
 ---
 
+## 2026-10-14 일반·초보모드 수익률 계산 정책 변경 (TWR → 누적 투자원금 대비)
+
+- 시작 `main`=`origin/main`=`e5110c0f`, clean. main checkout에서 branch 없이 작업. commit·push·배포·운영 DB 변경 없음(미커밋 인계).
+- 정책: 일반·초보 대표 수익률 = (총자산 − 누적 투자원금) ÷ 누적 투자원금 × 100 = 투자손익 ÷ 누적 투자원금. 누적 투자원금 = 기존 외부자금 allow-list 원장(최초 지급 + granted 광고 보상). 광고 보상은 투자손익을 바꾸지 않지만 분모를 키워 수익률이 바뀔 수 있다(정상). 시즌 `initial_capital` 산식·랭킹·티어·정산 불변. 기준 문서: `backend/docs/policy-decisions.md` "일반·초보모드 대표 수익률", `general-account-and-ad-rewards-api-contract.md` "Performance model".
+- 구현: 저장 데이터 무변경(스키마·migration·backfill 없음). snapshot `returnRate`·`timeWeightedReturnFactor`는 내부 TWR 기록으로 계속 쓰이고 기존 무결성 검사·audit·광고 경계 쌍 중립 검사를 그대로 받는다. API(`/trading-accounts/:id/portfolio`, `/portfolio/equity`)는 `toCumulativePrincipalReturnRatePercent`로 실시간(같은 RepeatableRead tx의 평가 총자산 + 원장 원금)·이력(각 행 자신의 총자산·원금)에서 계산해 `returnRateMethod: "cumulative_principal"`로 반환. 원금 ≤ 0은 0%가 아니라 500 `GENERAL_PERFORMANCE_INTEGRITY`.
+- 프론트: DTO/capability/일별 검증기 `cumulative_principal`. 홈·지갑 히어로 제목은 모든 모드 `수익률`. 계정 시트·포트폴리오 설명 `누적 투자원금 대비 수익률`. 지갑 히어로 아래 누적 투자원금·투자 손익(일반은 최초 지급금·광고 보상금) 표시, 홈은 기존 결정대로 breakdown 없음. `전체 > 공지사항`에 `return-rate-calculation` 공지 추가.
+- 주의: 구 앱은 일별 이력 응답을 `time_weighted`로 검증하므로 새 백엔드와 구 앱 조합에서는 홈/지갑 일별 추이가 계약 오류로 막힌다(반대도 동일). 백엔드·앱을 함께 배포해야 한다. Portfolio 화면은 현재 네비게이션 진입점이 없다.
+
 ## 2026-10-13 장기 4시간봉 수집·표시·보관 개편 (KRX·Spot·USDⓈ-M 선물)
 
 - 목적: KRX 96거래일 / 암호화폐·선물 96일 4시간봉을 신뢰 가능한 출처로 제공하고, 완료 4h를 5분봉(35일)과 독립적으로 180일 보관. 기준 문서: `backend/docs/long-range-4h-candles.md`.

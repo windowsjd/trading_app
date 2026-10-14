@@ -74,7 +74,7 @@ describe('mode capabilities', () => {
 
     assert.equal(caps.showsSeasonUi, false);
     assert.equal(caps.isSeason, false);
-    assert.equal(caps.returnRateMethod, 'time_weighted');
+    assert.equal(caps.returnRateMethod, 'cumulative_principal');
   });
 
   it('allows an ad-reward claim only on an ACTIVE general account', () => {
@@ -245,11 +245,11 @@ describe('season lifecycle and participant authority', () => {
 });
 
 describe('account display never shows a raw UUID and states the return meaning', () => {
-  it('names a general account and labels its TWR', () => {
+  it('names a general account and labels its cumulative-principal return', () => {
     const display = getAccountDisplay(generalAccount());
 
     assert.equal(display.title, '일반모드');
-    assert.equal(display.returnRateLabel, '시간가중 수익률');
+    assert.equal(display.returnRateLabel, '누적 투자원금 대비 수익률');
     assert.equal(display.statusLabel, '운영 중');
   });
 
@@ -287,11 +287,14 @@ describe('account display never shows a raw UUID and states the return meaning',
   });
 
   it('labels a response returnRateMethod distinctly for the two meanings', () => {
-    const twr = getReturnRateMethodLabel('time_weighted');
+    const principal = getReturnRateMethodLabel('cumulative_principal');
     const initial = getReturnRateMethodLabel('initial_capital');
 
-    assert.notEqual(twr, initial);
-    assert.equal(twr, '시간가중 수익률');
+    assert.notEqual(principal, initial);
+    assert.equal(principal, '누적 투자원금 대비 수익률');
     assert.equal(initial, '시즌 수익률 (초기자본 대비)');
+    // The retired TWR identifier has no meaning any more: it is not labelled
+    // as either method.
+    assert.equal(getReturnRateMethodLabel('time_weighted' as never), '수익률');
   });
 });

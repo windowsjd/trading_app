@@ -93,7 +93,7 @@ export default function HomeAssetTrend({
           )}
           {general ? (
             <Text style={styles.note}>
-              총 자산에는 광고 보상 등 외부 자금이 포함됩니다. 투자 성과는 시간가중 수익률을 확인하세요.
+              총 자산에는 최초 지급금과 광고 보상 등 외부 자금이 포함됩니다. 수익률은 이 누적 투자원금 대비로 계산됩니다.
             </Text>
           ) : null}
         </View>

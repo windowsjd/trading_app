@@ -32,7 +32,7 @@ export function assertDailyEquity(
     !Array.isArray(data.points) ||
     data.state !== (data.points.length === 0 ? 'empty' : 'available') ||
     data.returnRateMethod !==
-      (data.mode !== 'season' ? 'time_weighted' : 'initial_capital')
+      (data.mode !== 'season' ? 'cumulative_principal' : 'initial_capital')
   ) {
     throw new DailyEquityContractError();
   }

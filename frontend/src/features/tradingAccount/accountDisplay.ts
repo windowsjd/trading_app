@@ -1,4 +1,4 @@
-import type { TradingAccountDto, TradingAccountStatus } from './api';
+import type { ReturnRateMethod, TradingAccountDto, TradingAccountStatus } from './api';
 
 /**
  * How an account is NAMED to a person (작업 9 §B-3).
@@ -55,8 +55,8 @@ export function getAccountDisplay(account: DisplayInput): AccountDisplay {
       subtitle: account.mode === 'beginner' ? '독립된 초보 계정' : '시즌과 무관한 상시 계정',
       statusLabel,
       statusTone,
-      // TWR: the ad-funded inflow is a deposit, not a gain, and the label says so.
-      returnRateLabel: '시간가중 수익률',
+      // How the rate is measured: an ad reward is principal, not a gain.
+      returnRateLabel: '누적 투자원금 대비 수익률',
     };
   }
 
@@ -88,9 +88,9 @@ export function getAccountDisplay(account: DisplayInput): AccountDisplay {
  * the two must agree, and if they ever do not, the response is the fact.
  */
 export function getReturnRateMethodLabel(
-  method: 'time_weighted' | 'initial_capital' | null | undefined,
+  method: ReturnRateMethod | null | undefined,
 ): string {
-  if (method === 'time_weighted') return '시간가중 수익률';
+  if (method === 'cumulative_principal') return '누적 투자원금 대비 수익률';
   if (method === 'initial_capital') return '시즌 수익률 (초기자본 대비)';
   return '수익률';
 }

@@ -124,8 +124,8 @@ linked transfer quote를 구분하지 못하므로 새 route와 함께 실행하
 - 일반모드 최초 가상자금 10,000,000 KRW 1회 지급 정책
 - 매월/정기 자동 지급을 하지 않는 정책 (grantAnchorDay·nextGrantAt류 개념 전면 폐기)
 - 보상형 광고를 통한 추가 가상자금 정책
-- 광고 보상금을 투자손익·대표 수익률에서 제외하는 원칙
-- 시간가중수익률(TWR) 적용 원칙 (구현됨)
+- 광고 보상금을 투자손익에서 제외하는 원칙(투자손익 = 총자산 − 누적 투자원금)
+- 일반·초보모드 대표 수익률 = 투자손익 ÷ 누적 투자원금 × 100 (2026-10-14, `cumulative_principal`). 시간가중수익률(TWR)은 내부 기록으로만 유지
 - TradingAccount 공통 거래계정 구조
 
 **구현됨:**
@@ -190,7 +190,7 @@ linked transfer quote를 구분하지 못하므로 새 route와 함께 실행하
     외부자금 before/after 경계 snapshot(광고 지급 트랜잭션 내 원자 처리)
   - 일반계정 생성 트랜잭션에 최초 성과 기준점 포함(현재 canonical 지갑 4개를 포함한 7행 원자)
   - account-scoped `GET .../portfolio`·`GET .../portfolio/equity`
-    (`returnRateMethod`로 TWR/초기자본 수익률 구분)
+    (`returnRateMethod`로 누적 투자원금 대비/초기자본 수익률 구분; 2026-10-14 이전에는 TWR)
   - 운영 스크립트 `trading-accounts:repair-snapshot-scope`,
     `trading-accounts:backfill-general-performance`, `audit-general` 성과 검사
     확장
@@ -350,9 +350,21 @@ AssetPriceSnapshot.priceKrw와 Position valuation cache는 canonical 금융 입�
 
 광고 보상금은 투자손익으로 취급하지 않는다. `TradingAccount.initialCapitalKrw`는 광고 보상으로 절대 변경하지 않는다.
 
-### 2.2 대표 수익률 원칙 (시간가중수익률 예정)
+### 2.2 대표 수익률 원칙 (2026-10-14 개정: 누적 투자원금 대비 수익률)
 
-다음 단순 수익률은 **일반모드 대표 수익률로 사용하지 않는다**:
+> **현행 (2026-10-14):** 일반·초보모드 대표 수익률은 아래 단순 수익률, 즉
+> `(현재 총자산 − 누적 투자원금) ÷ 누적 투자원금 × 100`이다. 누적 투자원금은
+> 검증된 원장의 최초 지급 + 지급 완료 광고 보상이다. 광고 보상은 투자손익을
+> 바꾸지 않지만 분모를 키우므로 지급 순간 수익률이 바뀔 수 있으며 이는 정상이다
+> (예: 총자산 1,200만/원금 1,000만 = +20% → 보상 200만 후 1,400만/1,200만 ≈
+> +16.67%, 투자손익은 두 경우 모두 +200만). 과거 시점은 그 행의 원금으로 계산한다.
+> 아래 TWR 경계·factor는 내부 기록으로 계속 저장·검증되지만 대표 수익률로
+> 반환하지 않는다. 세부: `general-account-and-ad-rewards-api-contract.md`
+> "Performance model", `policy-decisions.md` "일반·초보모드 대표 수익률".
+>
+> 이하 원문은 당시(작업 7 이전) 결정 기록이다.
+
+다음 단순 수익률은 **일반모드 대표 수익률로 사용하지 않는다**(2026-10-14 대체됨):
 
 ```
 (현재 총자산 − 누적 외부 가상자금) / 누적 외부 가상자금
@@ -1958,7 +1970,7 @@ query 라이브러리를 추가하지 않았다.**
   `GET /trading-accounts`, `/:id`, `/:id/portfolio`, `/:id/portfolio/equity`,
   `/:id/wallets`, `/:id/wallet-transactions`, `/:id/positions`, `/:id/orders`,
   `/:id/orders/:orderId`, `/:id/ad-rewards/eligibility|claims`.
-- mode 분리: general은 `returnRateMethod: time_weighted` 라벨과
+- mode 분리(2026-10-14 개정: general/beginner는 `cumulative_principal`, 홈 제목은 모든 모드 `수익률`): general은 당시 `returnRateMethod: time_weighted` 라벨과
   `initialFundingKrw`·`cumulativeExternalFundingKrw`·`cumulativeAdRewardKrw`·
   `investmentPnlKrw`를 표시하고 "외부 자금 유입은 투자 수익이 아니다"를 명시한다.
   season은 `initial_capital` 라벨과 기존 시즌 UI를 유지한다. 라벨은 응답의
