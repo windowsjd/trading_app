@@ -25,7 +25,7 @@ const sources: Record<GuideChapter, string> = {
   index: 'SEC 지수펀드·ETF',
   etf: 'SEC ETF, SEC 분산투자',
   'etf-price': 'SEC ETF',
-  'etf-pick': 'SEC ETF·지수펀드, Vanguard 지수 추종',
+  'etf-pick': 'SEC ETF·지수펀드·분산투자, Vanguard 지수 추종',
 };
 export default function GuideChapterScreen({
   route,

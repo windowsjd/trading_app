@@ -680,7 +680,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     );
     h.readable();
   });
-  it('compares two virtual ETFs, then shows cost as the gap from the index and a checklist', (t) => {
+  it('compares two virtual ETFs by sector spread, then shows the index gap as more than cost and a checklist', (t) => {
     const h = setup(t, 'etf-pick');
     assert.match(h.text('etf-pick-intro'), /무엇을 담았나.*무엇을 따라가나.*얼마가 드나/s);
     assert.match(h.text('etf-pick-compare'), /가상 ETF 두 개 · 실제 상품 아님 · 교육용 가정/);
@@ -688,33 +688,61 @@ describe('new guide chapters preserve downward learning flow', () => {
       h.text('etf-pick-cards'),
       /ETF X30종목 · 여러 업종 · 비용 연 0\.2%.*ETF Y5종목 · 한 업종 · 비용 연 0\.9%/s,
     );
-    assert.equal(h.find('etf-pick-shake-result') === undefined, true);
+    // The question is decidable from the cards alone: sector breadth, not future swings.
+    assert.match(
+      h.text('etf-pick-compare'),
+      /카드에 적힌 구성만 보고 답해 보세요\. 업종 분산 측면에서 더 폭넓게 구성된 ETF는 어느 쪽일까요\?/,
+    );
+    assert.equal(h.find('etf-pick-spread-result') === undefined, true);
     assert.equal(h.find('etf-pick-record').props.disabled, true);
-    h.press('etf-pick-shake-y');
-    const y = h.text('etf-pick-shake-result');
-    h.press('etf-pick-shake-x');
-    const x = h.text('etf-pick-shake-result');
+    h.press('etf-pick-spread-y');
+    const y = h.text('etf-pick-spread-result');
+    h.press('etf-pick-spread-x');
+    const x = h.text('etf-pick-spread-result');
     assert.equal(x === y, false);
-    assert.match(x, /예상이 맞았습니다/);
-    assert.doesNotMatch(y, /예상이 맞았습니다/);
+    assert.match(x, /판단이 맞았습니다\. 여러 업종에 나눠 담은 ETF X가 업종 분산 측면에서 더 폭넓게 구성되어 있습니다/);
+    assert.doesNotMatch(y, /맞았습니다/);
+    assert.match(y, /ETF Y가 아니라, 여러 업종에 나눠 담은 ETF X가 업종 분산 측면에서 더 폭넓게 구성되어 있습니다/);
     for (const text of [x, y]) {
-      assert.match(text, /ETF X는 여러 업종.*분산.*ETF Y는 한 업종에 몰려 있어.*함께 내려갑니다/s);
+      assert.match(text, /^업종 분산 비교 결과/);
+      assert.match(
+        text,
+        /여러 업종에 나눠 담으면 특정 업종에 집중된 위험을 낮출 수 있습니다\. 한 업종에만 담은 ETF Y는 그 업종의 부진에 더 직접적으로 노출됩니다/,
+      );
+      // Breadth alone promises neither a smaller loss nor smaller swings; weights and co-movement matter.
+      assert.match(
+        text,
+        /업종이 넓게 나뉘어 있다는 사실만으로 ETF X의 손실이 더 작거나 가격이 덜 움직인다고 보장되지는 않습니다/,
+      );
+      assert.match(
+        text,
+        /종목 수뿐 아니라 종목별 구성 비중과, 종목들이 서로 얼마나 비슷하게 움직이는지\(상관관계\)도 함께 봐야 합니다/,
+      );
       assert.match(
         text,
         /이름에 ETF가 붙었다는 것만으로 원금이 보장되거나 충분히 분산되는 것은 아닙니다/,
       );
-      assert.match(
+      assert.doesNotMatch(
         text,
-        /담은 종목 수가 많아도 비슷하게 움직이는 종목이면 분산 효과가 작을 수 있습니다/,
+        /흔들|함께 내려갑니다|덜 움직입니다|손실이 더 작습니다|변동성이 (더 )?낮습니다/,
       );
     }
     assert.equal(h.find('etf-pick-cost') === undefined, true);
     h.press('etf-pick-record');
-    for (const id of ['etf-pick-shake-x', 'etf-pick-shake-y', 'etf-pick-record'])
+    for (const id of ['etf-pick-spread-x', 'etf-pick-spread-y', 'etf-pick-record'])
       assert.equal(h.find(id).props.disabled, true, id);
-    assert.equal(h.text('etf-pick-shake-result'), x);
+    assert.equal(h.find('etf-pick-spread-x').props.accessibilityState.selected, true);
+    assert.equal(h.text('etf-pick-spread-result'), x);
     for (const id of ['etf-pick-gap-result', 'etf-pick-checklist', 'lesson-takeaways'])
       assert.equal(h.find(id) === undefined, true, id);
+    // Cost is one cause among several, and the button names the gap neutrally.
+    const cost = h.text('etf-pick-cost');
+    assert.match(
+      cost,
+      /이 비용은 같은 지수를 따라가는 ETF의 수익률이 지수와 달라지는 원인 중 하나입니다\. 펀드가 일부를 현금으로 들고 있거나 구성종목을 편입·조정하는 과정에서도 차이가 생길 수 있습니다/,
+    );
+    assert.doesNotMatch(cost, /그래서 같은 지수를 따라가도|연 0\.[29]%/);
+    assert.equal(h.find('etf-pick-gap').props.accessibilityLabel, '지수와 ETF 수익률 차이 보기');
     h.press('etf-pick-gap');
     const gap = h.text('etf-pick-gap-result');
     assert.match(
@@ -722,7 +750,10 @@ describe('new guide chapters preserve downward learning flow', () => {
       /지수 수익률\+10%.*ETF NAV 수익률\+9\.8%.*추적차이 \(ETF - 지수\)-0\.2%포인트/s,
     );
     assert.match(gap, /추적차이는 같은 기간 ETF 수익률에서 지수 수익률을 뺀 값입니다/);
-    assert.match(gap, /비용·현금 보유·편입 조정 효과를 합친 가정.*원인별 비중은 추정하지 않습니다/s);
+    assert.match(
+      gap,
+      /비용·현금 보유·구성종목 편입과 조정 효과를 합친 가정이며, 원인별 비중은 추정하지 않습니다\. 따라서 이 차이 전체를 비용 때문이라고 볼 수는 없습니다/,
+    );
     // The -0.2%p example is not tied to ETF X's 0.2% yearly cost.
     assert.doesNotMatch(gap, /ETF X|ETF Y|연 0\.2%|0\.9%/);
     assert.match(
@@ -737,21 +768,21 @@ describe('new guide chapters preserve downward learning flow', () => {
     for (const [i, item] of [
       '지수는 여러 자산의 움직임을 하나의 기준 숫자로 나타냅니다.',
       'ETF는 여러 자산을 담은 펀드의 지분을 거래소에서 사고팔 수 있게 만든 상품입니다.',
-      '분산은 한 종목의 위험을 줄이지만 시장 전체의 하락은 피하지 못합니다.',
+      '분산은 한 종목이나 한 업종에 집중된 위험을 낮출 수 있지만, 시장 전체의 하락은 피하지 못합니다.',
       'ETF에는 자산으로 계산한 NAV와 거래소에서 형성되는 시장가격이 있습니다.',
-      '비용 등의 영향으로 ETF 수익률은 지수와 차이가 날 수 있습니다.',
+      '비용·현금 보유·구성종목 조정 등의 영향으로 ETF 수익률은 지수와 차이가 날 수 있습니다.',
       'ETF를 고를 때는 무엇을 담았는지, 무엇을 따라가는지, 비용이 얼마인지 확인합니다.',
     ].entries())
       assert.ok(takeaways.includes(`${i + 1}. ${item}`), item);
     assert.doesNotMatch(takeaways, /7\./);
-    assert.doesNotMatch(h.text(), /추적오차/);
-    assert.equal(h.text('etf-pick-shake-result'), x);
+    assert.doesNotMatch(h.text(), /추적오차|흔들/);
+    assert.equal(h.text('etf-pick-spread-result'), x);
     h.order(
       'etf-pick-intro',
       'etf-pick-compare',
       'etf-pick-cards',
-      'etf-pick-shake-x',
-      'etf-pick-shake-result',
+      'etf-pick-spread-x',
+      'etf-pick-spread-result',
       'etf-pick-record',
       'etf-pick-cost',
       'etf-pick-gap',
@@ -776,7 +807,7 @@ describe('new guide chapters preserve downward learning flow', () => {
     index: ['index-predict-a', 'index-predict-record', 'index-apply'],
     etf: ['etf-unit', 'etf-shock-pick-a', 'etf-shock-record'],
     'etf-price': ['etf-price-apply', 'etf-price-gap-10200', 'etf-price-record'],
-    'etf-pick': ['etf-pick-shake-x', 'etf-pick-record', 'etf-pick-gap'],
+    'etf-pick': ['etf-pick-spread-x', 'etf-pick-record', 'etf-pick-gap'],
   };
   it('ends each of the first three ETF chapters with its own summary', (t) => {
     const owners = new Map<string, string>();
