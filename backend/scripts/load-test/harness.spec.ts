@@ -11,7 +11,10 @@ import { Histogram, Metrics } from './metrics';
 import { ledgerChain, fxAuditAmounts } from './audit';
 import { FxService } from '../../src/fx/fx.service';
 import { Prisma } from '../../src/generated/prisma/client';
-import { providerFrames, Replay } from './replay';
+import { DOMESTIC_MARKET, providerFrames, Replay, STOCKS } from './replay';
+import { KoscomClient } from '../../src/providers/koscom/koscom.client';
+import { readKoscomConfig } from '../../src/providers/koscom/koscom.config';
+import { KoscomMarketMapService } from '../../src/providers/koscom/koscom-market-map.service';
 import { parseBinanceAggTrade } from '../../src/futures/futures-last-price';
 import { parseBinanceMark } from '../../src/futures/futures-mark';
 import { parseBinanceFiveMinuteKline } from '../../src/providers/binance/binance-kline.parser';
@@ -264,10 +267,29 @@ describe('deterministic provider transports retain real parsers', () => {
       return body.isuLists.map((row) => row.isuSrtCd);
     };
     const kospi = await list('kospi');
-    expect(kospi.length > 0).toBe(true);
-    expect(kospi.every((symbol) => /^\d{6}$/.test(symbol))).toBe(true);
-    expect((await list('kosdaq')).length).toBe(0);
-    expect((await list('konex')).length).toBe(0);
+    const kosdaq = await list('kosdaq');
+    const konex = await list('konex');
+    expect(kospi.includes('005930')).toBe(true);
+    expect(kosdaq.includes('005930')).toBe(false);
+    expect(kosdaq.includes('086520')).toBe(true);
+    expect(kospi.includes('086520')).toBe(false);
+    expect(kosdaq).toEqual(['086520', '247540', '028300']);
+    expect(konex.length).toBe(0);
+    expect(kospi.some((symbol) => kosdaq.includes(symbol))).toBe(false);
+    // Every fixed domestic stock is listed exactly once, and nothing else is.
+    const domestic = STOCKS.filter((a) => a.assetType === 'domestic_stock').map(
+      (a) => a.symbol,
+    );
+    const listed = [...kospi, ...kosdaq, ...konex];
+    expect(domestic.length).toBe(15);
+    expect(new Set(listed).size).toBe(listed.length);
+    expect([...listed].sort()).toEqual([...domestic].sort());
+    expect(listed.every((symbol) => /^\d{6}$/.test(symbol))).toBe(true);
+    expect(
+      STOCKS.some(
+        (a) => a.assetType === 'us_stock' && listed.includes(a.symbol),
+      ),
+    ).toBe(false);
     const intraday = await replay.fetch(
       'https://oap.k-mydata.org/v3/market/realtime/kospi/stocks/005930/intraday?inddCycleTpCd=60&inqStrtDd=20261014&strtTm=1020&endTm=1027&apikey=load-test-koscom-key',
     );
@@ -278,6 +300,60 @@ describe('deterministic provider transports retain real parsers', () => {
     expect(page.jsonrpc).toBe('2.0');
     expect(page.result.isuSrtCd).toBe('005930');
     expect(page.result.hisLists.length).toBe(0);
+    expect(
+      metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
+    ).toBe(undefined);
+    await expect(
+      replay.fetch(
+        'https://oap.k-mydata.org/v3/market/closed/kosdaq/086520/history?apikey=load-test-koscom-key',
+      ),
+    ).rejects.toThrow('EXTERNAL_PROVIDER_HTTP_BLOCKED');
+    expect(
+      metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
+    ).toBe(1);
+  });
+  it('lets the KOSCOM market map tell KOSPI from KOSDAQ through replayed lists', async () => {
+    const metrics = new Metrics(),
+      replay = new Replay(make(), metrics);
+    const env = {
+      KOSCOM_API_KEY: 'load-test-koscom-key',
+      PROVIDER_INGESTION_ENABLED: 'true',
+      KOSCOM_MIN_REQUEST_INTERVAL_MS: '50',
+    };
+    const config = { getConfig: () => readKoscomConfig(env) };
+    const redis = {
+      get: () => Promise.resolve(null),
+      setNxPx: () => Promise.resolve(true),
+      setWithTtl: () => Promise.resolve(),
+    };
+    const locks = {
+      acquire: () => Promise.resolve({ status: 'acquired', lock: {} }),
+      release: () => Promise.resolve(true),
+    };
+    const map = new KoscomMarketMapService(
+      new KoscomClient(config as never, redis as never, locks as never),
+      redis as never,
+      config as never,
+    );
+    const savedFetch = globalThis.fetch;
+    globalThis.fetch = replay.fetch as typeof fetch;
+    try {
+      expect(await map.resolve('005930', 'KRX')).toBe('kospi');
+      expect(await map.resolve('086520', 'KRX')).toBe('kosdaq');
+      const domestic = STOCKS.filter((a) => a.assetType === 'domestic_stock');
+      const resolved = await Promise.all(
+        domestic.map((a) => map.resolve(a.symbol, a.market)),
+      );
+      expect(resolved).toEqual(domestic.map((a) => DOMESTIC_MARKET[a.symbol]));
+      await expect(map.resolve('086520', 'KOSPI')).rejects.toThrow(
+        'KOSCOM_MARKET_MISMATCH',
+      );
+      await expect(map.resolve('005930', 'KOSDAQ')).rejects.toThrow(
+        'KOSCOM_MARKET_MISMATCH',
+      );
+    } finally {
+      globalThis.fetch = savedFetch;
+    }
     expect(
       metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
     ).toBe(undefined);

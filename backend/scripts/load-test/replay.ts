@@ -3,12 +3,36 @@ import { EventEmitter } from 'node:events';
 import { performance } from 'node:perf_hooks';
 import { BINANCE_FIXED_ASSET_UNIVERSE } from '../../src/providers/binance/binance-fixed-asset-universe';
 import { KIS_FIXED_ASSET_UNIVERSE } from '../../src/providers/kis/kis-fixed-asset-universe';
+import type { KoscomMarket } from '../../src/providers/koscom/koscom.config';
 import type { Manifest } from './manifest';
 import { hash } from './manifest';
 import { Metrics } from './metrics';
 
 export const CRYPTO = BINANCE_FIXED_ASSET_UNIVERSE;
 export const STOCKS = KIS_FIXED_ASSET_UNIVERSE;
+/**
+ * KOSCOM list membership of every fixed domestic stock, as published in the
+ * KRX KIND 유가증권/코스닥/코넥스 상장법인목록 (checked 2026-10-14). The
+ * universe's `market: 'KRX'` names the exchange, not the list; none of these
+ * is a KONEX listing.
+ */
+export const DOMESTIC_MARKET: Readonly<Record<string, KoscomMarket>> = {
+  '005930': 'kospi',
+  '000660': 'kospi',
+  '034020': 'kospi',
+  '010140': 'kospi',
+  '042660': 'kospi',
+  '005380': 'kospi',
+  '000270': 'kospi',
+  '035420': 'kospi',
+  '035720': 'kospi',
+  '068270': 'kospi',
+  '051910': 'kospi',
+  '066570': 'kospi',
+  '086520': 'kosdaq',
+  '247540': 'kosdaq',
+  '028300': 'kosdaq',
+};
 export function contract(symbol: string) {
   return {
     symbol,
@@ -520,11 +544,9 @@ export class Replay {
       /^\/v3\/market\/closed\/(kospi|kosdaq|konex)\/lists$/.test(u.pathname)
     )
       value = {
-        isuLists: u.pathname.includes('/kospi/')
-          ? STOCKS.filter((a) => a.assetType === 'domestic_stock').map((a) => ({
-              isuSrtCd: a.symbol,
-            }))
-          : [],
+        isuLists: STOCKS.filter(
+          (a) => DOMESTIC_MARKET[a.symbol] === u.pathname.split('/')[4],
+        ).map((a) => ({ isuSrtCd: a.symbol })),
         result: {},
       };
     else if (
