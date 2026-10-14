@@ -20,7 +20,7 @@ import {
 } from '../../features/futures/conditionalEntryDisplay';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
-import { formatAssetPrice, formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
+import { formatAssetPrice, formatDisplayDecimal, formatKstDateTime, formatUsd } from '../../utils/format';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
 
 /**
@@ -118,7 +118,7 @@ function EntryRow({ row, busy, onCancel }: { row: FuturesConditionalEntry; busy:
       수량 {formatDisplayDecimal(row.quantity)} · {row.marginMode === 'cross' ? '교차' : '격리'} {row.leverage}x
     </Text>
     {row.execution ? (
-      <Text style={styles.hint}>체결 {price(row.execution.executionPrice)} · 수수료 ${formatDisplayDecimal(row.execution.feeAmount)}</Text>
+      <Text style={styles.hint}>체결 {price(row.execution.executionPrice)} · 수수료 ${formatUsd(row.execution.feeAmount)}</Text>
     ) : null}
     {row.limitOrder?.status === 'submitted' ? (
       <Text style={styles.hint}>지정가 주문 체결 대기 · 예약 담보 ${formatDisplayDecimal(row.limitOrder.reservedAmount)}</Text>

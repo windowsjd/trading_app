@@ -115,6 +115,15 @@ function subscriptionKey(spec: RealtimeSubscriptionSpec): string {
   return `${spec.channel}|${spec.assetId ?? spec.instrumentId ?? spec.pair}|${spec.interval ?? ''}`;
 }
 
+/** The wire identity field of a channel: pair (FX), instrument (USDⓈ-M) or asset. */
+function subscriptionIdentity(spec: RealtimeSubscriptionSpec) {
+  return spec.channel === 'fx_rate'
+    ? { pair: spec.pair }
+    : spec.channel === 'futures_order_book'
+      ? { instrumentId: spec.instrumentId }
+      : { assetId: spec.assetId };
+}
+
 function appendToken(wsUrl: string, token: string | null): string {
   if (!token) return wsUrl;
   const separator = wsUrl.includes('?') ? '&' : '?';
@@ -202,9 +211,7 @@ export class RealtimeSocketManager {
           payload: {
             type: 'subscribed',
             channel: entry.spec.channel,
-            ...(entry.spec.channel === 'fx_rate'
-              ? { pair: entry.spec.pair }
-              : { assetId: entry.spec.assetId }),
+            ...subscriptionIdentity(entry.spec),
             ...(entry.spec.interval ? { interval: entry.spec.interval } : {}),
           },
         });
@@ -574,11 +581,7 @@ export class RealtimeSocketManager {
         JSON.stringify({
           type,
           channel: entry.spec.channel,
-          ...(entry.spec.channel === 'fx_rate'
-            ? { pair: entry.spec.pair }
-            : entry.spec.channel === 'futures_order_book'
-              ? { instrumentId: entry.spec.instrumentId }
-              : { assetId: entry.spec.assetId }),
+          ...subscriptionIdentity(entry.spec),
           ...(entry.spec.interval ? { interval: entry.spec.interval } : {}),
         }),
       );

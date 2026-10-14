@@ -13,12 +13,31 @@ function futuresFixture(accountId = 'A', options = {}) {
   return {
     // options.futuresOnly adds HYPEUSDT: a futures-only contract whose
     // underlying has no Spot product (its own BINANCE asset row).
-    catalog: { tradingAccountId: accountId, evaluatedAt: referenceAt, capabilities, instruments: options.empty ? [] : options.futuresOnly ? [instrument, { ...instrument, id: 'hype', underlying: { assetId: 'asset-hype', symbol: 'HYPEUSDT', name: 'Hyperliquid', market: 'BINANCE', displayPriceDecimals: 3 } }] : [instrument] },
+    // options.marketList: the Market › 선물 list rows (stats, names, magnitudes).
+    catalog: { tradingAccountId: accountId, evaluatedAt: referenceAt, capabilities, instruments: options.empty ? [] : options.marketList ? marketListInstruments(instrument, referenceAt) : options.futuresOnly ? [instrument, { ...instrument, id: 'hype', underlying: { assetId: 'asset-hype', symbol: 'HYPEUSDT', name: 'Hyperliquid', market: 'BINANCE', displayPriceDecimals: 3 } }] : [instrument] },
     positions: { tradingAccountId: accountId, evaluatedAt: referenceAt, capabilities, positions: options.position ? [position] : [], collateral: { balanceAmount: '10000', totalMarginUsed: cross ? '0' : options.position ? '2' : '0', freeCollateral: options.freeCollateral !== undefined ? options.freeCollateral : options.stale && cross ? null : '9995' }, cross: { positionIds: cross ? [position.id] : [], evaluatedAt: referenceAt, markState: instrument.markState, metrics: options.stale ? null : { crossBaseCollateral: '10000', crossUnrealizedPnl: '-2', crossEquity: '9998', crossInitialMarginRequirement: '2.02', crossMaintenanceRequirement: '1.21', crossFreeCollateral: '9995.98', liquidationBuffer: '9996.79' } } },
     executions: { tradingAccountId: accountId, pagination: { limit: 20, offset: 0, total: 1, returned: 1, nextOffset: null }, executions: [{ id: 'execution', instrument, operation: 'open', direction: position.direction, quantity: '2', executionPrice: '100', realizedPnl: '0', feeAmount: '0.2', executedAt: at }] },
     liquidations: { tradingAccountId: accountId, pagination: { limit: 20, offset: 0, total: 1, returned: 1, nextOffset: null }, liquidations: [{ id: 'liquidation', marginMode: position.marginMode, realizedPnl: '-200', feeAmount: '0.2', settledFee: '0.1', settledCash: '-2', bankruptcyShortfall: '198.2', executedAt: at, closes: [{ positionId: 'old-position', instrumentId: 'btc', direction: 'long', quantity: '2', executionPrice: '0.1', markSnapshot: { symbol: 'BTCUSDT' } }] }] },
     final: { tradingAccountId: accountId, settlement: null },
   };
+}
+// Contracts with their own 24h statistics: normal, a long name, very large and
+// tiny magnitudes, statistics unavailable, and no Futures Last price.
+function marketListInstruments(instrument, at) {
+  const windowOpenTime = new Date(Date.parse(at) - 86400000).toISOString();
+  const stats = (priceChangePercent, quoteVolume) => ({ state: 'available', priceChangePercent, quoteVolume, windowOpenTime, windowCloseTime: at, receivedAt: at });
+  const unavailable = { state: 'unavailable', priceChangePercent: null, quoteVolume: null, windowOpenTime: null, windowCloseTime: null, receivedAt: null };
+  const contract = (id, symbol, name, displayPriceDecimals, referencePrice, marketStats) => ({ ...instrument, id,
+    underlying: { assetId: `asset-${id}`, symbol, name, market: 'BINANCE', displayPriceDecimals }, referencePrice, marketStats });
+  return [
+    contract('btc', 'BTCUSDT', '비트코인', 2, '112345.67', stats('-0.219', '9321217245.92')),
+    contract('eth', 'ETHUSDT', '이더리움', 2, '4123.45', stats('1.873', '6443510981.82')),
+    contract('long', 'EXAMPLEUSDT', '아주 긴 이름을 가진 무기한 선물 계약 Example Protocol Governance Token', 4, '12.3456', stats('-12.345', '1234.5678')),
+    contract('large', 'LARGEUSDT', 'Large Value Token', 2, '9876543210123456.12', stats('123456.789', '987654321012345678.12')),
+    contract('tiny', 'TINYUSDT', 'Tiny Decimal Token', 8, '0.00001234', stats('0.001', '12345.6789')),
+    contract('stats-off', 'NOSTATUSDT', '통계 미수신 계약', 3, '1.234', unavailable),
+    contract('no-last', 'NOLASTUSDT', 'Last 미수신 계약', 3, null, stats('5.5', '100')),
+  ];
 }
 const accounts = [
   { id: 'A', mode: 'general', status: 'active', season: null },
@@ -42,9 +61,10 @@ function futuresCandlesFixture(instrumentId, now = Date.now()) {
   };
 }
 // What useFuturesOrderBook returns for one contract: its own USDⓈ-M ten-level
-// ladder (display only). `variant`: 'book' | 'loading' | 'stale' | 'large'.
+// ladder (display only). `variant`: 'book' | 'loading' | 'unavailable' | 'stale' | 'large'.
 function futuresOrderBookFixture(instrumentId, variant = 'book') {
   if (variant === 'loading') return { latestOrderBook: null, statusMessage: '호가 정보를 불러오는 중입니다.' };
+  if (variant === 'unavailable') return { latestOrderBook: null, statusMessage: '호가 정보를 현재 수신할 수 없습니다.' };
   const large = variant === 'large', base = instrumentId.toUpperCase(), at = new Date().toISOString();
   const level = (sign) => Array.from({ length: 10 }, (_, i) => ({
     price: ((large ? 98765432.12 : 102) + sign * (i + 1) * 0.1).toFixed(2),

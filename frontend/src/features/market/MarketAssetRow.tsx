@@ -1,6 +1,6 @@
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet } from '../../theme/native';
+import { View, Text, StyleSheet, useWindowDimensions } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 
 import { TEST_IDS } from '../../constants/testIds';
@@ -54,6 +54,9 @@ function MarketAssetRowComponent({
   const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
+  // Large text keeps the name column readable: a short price beside it would
+  // otherwise squeeze the name and symbol into a few characters per line.
+  const { fontScale } = useWindowDimensions();
 
   return (
     <View>
@@ -62,7 +65,7 @@ function MarketAssetRowComponent({
         style={styles.itemRow}
         onPress={() => onPress(item.id)}
       >
-        <View style={styles.identity}>
+        <View style={[styles.identity, { flexBasis: IDENTITY_BASIS * fontScale }]}>
           <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
           {symbolMarketDisplay ? (
             <Text style={styles.helper}>{symbolMarketDisplay}</Text>
@@ -105,8 +108,9 @@ export const MarketAssetRow = React.memo(
     previous.changeTestID === next.changeTestID,
 );
 
+const IDENTITY_BASIS = 110;
 const styles = StyleSheet.create({
-  identity: { flexGrow: 1, flexShrink: 1, flexBasis: 110, minWidth: 0 },
+  identity: { flexGrow: 1, flexShrink: 1, flexBasis: IDENTITY_BASIS, minWidth: 0 },
   itemRow: {
     paddingHorizontal: 12, marginBottom: 8, borderRadius: 12,
     backgroundColor: semantic.surface,

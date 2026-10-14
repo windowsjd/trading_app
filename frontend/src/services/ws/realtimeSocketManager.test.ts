@@ -122,6 +122,70 @@ describe("RealtimeSocketManager", () => {
     offOther(); offSpot(); assert.equal(second.closed.length, 1);
   });
 
+  it('replays an established ACK to a late joiner with its channel identity (instrument, asset, pair)', async () => {
+    const manager = createManager();
+    const btc = collect(); const eth = collect(); const spot = collect(); const fx = collect();
+    const offBtc = manager.subscribe({ channel: 'futures_order_book', instrumentId: 'inst-btc' }, btc.listener);
+    const offEth = manager.subscribe({ channel: 'futures_order_book', instrumentId: 'inst-eth' }, eth.listener);
+    const offSpot = manager.subscribe({ channel: 'asset_order_book', assetId: 'btc' }, spot.listener);
+    const offFx = manager.subscribe({ channel: 'fx_rate', pair: 'USD/KRW' }, fx.listener);
+    await delay(5); const first = FakeSocket.instances[0]; first.open();
+    first.receive({ type: 'subscribed', channel: 'futures_order_book', instrumentId: 'inst-btc' });
+    first.receive({ type: 'subscribed', channel: 'asset_order_book', assetId: 'btc' });
+    first.receive({ type: 'subscribed', channel: 'fx_rate', pair: 'USD/KRW' });
+    const acks = (events: RealtimeSubscriptionEvent[]) => events.flatMap(e =>
+      e.kind === 'message' && e.payload.type === 'subscribed' ? [e.payload] : []);
+    const subscribeFrames = (socket: FakeSocket, channel: string) =>
+      sentFrames(socket).filter(f => f.type === 'subscribe' && f.channel === channel);
+
+    const lateBtc = collect();
+    const offLateBtc = manager.subscribe({ channel: 'futures_order_book', instrumentId: 'inst-btc' }, lateBtc.listener);
+    assert.deepEqual(acks(lateBtc.events).map(p => [p.channel, p.instrumentId, 'assetId' in p, 'pair' in p]),
+      [['futures_order_book', 'inst-btc', false, false]]);
+    // The contract was already subscribed on this socket: no second frame.
+    assert.deepEqual(subscribeFrames(first, 'futures_order_book').map(f => f.instrumentId), ['inst-btc', 'inst-eth']);
+
+    // ETH was sent but not yet ACKed: a late ETH joiner waits for the real ACK.
+    const lateEth = collect();
+    const offLateEth = manager.subscribe({ channel: 'futures_order_book', instrumentId: 'inst-eth' }, lateEth.listener);
+    assert.equal(acks(lateEth.events).length, 0);
+    assert.equal(subscribeFrames(first, 'futures_order_book').length, 2);
+    first.receive({ type: 'subscribed', channel: 'futures_order_book', instrumentId: 'inst-eth' });
+    assert.deepEqual(acks(lateEth.events).map(p => p.instrumentId), ['inst-eth']);
+    assert.deepEqual(acks(eth.events).map(p => p.instrumentId), ['inst-eth']);
+    // Neither the ETH ACK nor an ETH book reaches a BTC subscriber.
+    first.receive({ type: 'futures_order_book', instrumentId: 'inst-eth', asks: [], bids: [] });
+    assert.deepEqual(acks(lateBtc.events).map(p => p.instrumentId), ['inst-btc']);
+    assert.equal(lateBtc.events.filter(e => e.kind === 'message' && e.payload.type === 'futures_order_book').length, 0);
+    first.receive({ type: 'futures_order_book', instrumentId: 'inst-btc', asks: [], bids: [] });
+    assert.equal(lateBtc.events.filter(e => e.kind === 'message' && e.payload.type === 'futures_order_book').length, 1);
+    assert.equal(btc.events.filter(e => e.kind === 'message' && e.payload.type === 'futures_order_book').length, 1);
+
+    // Spot and FX late joiners keep their own identities.
+    const lateSpot = collect(); const lateFx = collect();
+    const offLateSpot = manager.subscribe({ channel: 'asset_order_book', assetId: 'btc' }, lateSpot.listener);
+    const offLateFx = manager.subscribe({ channel: 'fx_rate', pair: 'USD/KRW' }, lateFx.listener);
+    assert.deepEqual(acks(lateSpot.events).map(p => [p.channel, p.assetId, 'instrumentId' in p]), [['asset_order_book', 'btc', false]]);
+    assert.deepEqual(acks(lateFx.events).map(p => [p.channel, p.pair, 'assetId' in p, 'instrumentId' in p]), [['fx_rate', 'USD/KRW', false, false]]);
+    assert.equal(subscribeFrames(first, 'asset_order_book').length, 1);
+    assert.equal(subscribeFrames(first, 'fx_rate').length, 1);
+
+    // Releasing one of two BTC listeners keeps the contract; a reconnect re-sends it once.
+    offBtc();
+    assert.equal(sentFrames(first).filter(f => f.type === 'unsubscribe').length, 0);
+    first.drop(); await delay(10); const second = FakeSocket.instances[1]; second.open();
+    assert.deepEqual(subscribeFrames(second, 'futures_order_book').map(f => [f.instrumentId, 'assetId' in f]).sort(),
+      [['inst-btc', false], ['inst-eth', false]]);
+    assert.ok(lateBtc.events.some(e => e.kind === 'restored'));
+    second.receive({ type: 'subscribed', channel: 'futures_order_book', instrumentId: 'inst-btc' });
+    assert.deepEqual(acks(lateBtc.events).map(p => p.instrumentId), ['inst-btc', 'inst-btc']);
+    offLateBtc();
+    assert.deepEqual(sentFrames(second).filter(f => f.type === 'unsubscribe').map(f => [f.channel, f.instrumentId]),
+      [['futures_order_book', 'inst-btc']]);
+    offEth(); offLateEth(); offSpot(); offLateSpot(); offFx(); offLateFx();
+    assert.equal(second.closed.length, 1);
+  });
+
   it('shares and restores reference-counted order book subscriptions without disturbing ticker/candle', async () => {
     const manager = createManager();
     const book = collect(); const other = collect(); const ticker = collect(); const candle = collect();

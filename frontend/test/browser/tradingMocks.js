@@ -310,7 +310,8 @@ export const apiClient = {
     if (path.includes('/futures/conditional-entries'))
       return response(futuresConditionalFixture(state.accountId, path.includes('state=ended') ? 'ended' : 'open', params.get('conditional')));
     if(path.includes('/futures/')) {
-      const f=futuresFixture(state.accountId,{large:true});
+      // `futuresList=1`: the Market › 선물 rows with their own 24h statistics.
+      const f=futuresFixture(state.accountId,{large:true,marketList:params.get('futuresList')==='1'});
       if(path.includes('limit-orders')) return response({...scoped,orders:pendingFutures ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]})) : [],pagination});
       return response(path.includes('/instruments')?f.catalog:path.includes('/positions')?f.positions:path.includes('/executions')?f.executions:path.includes('/liquidations')?f.liquidations:f.final);
     }
