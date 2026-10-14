@@ -182,24 +182,27 @@ current 15 (12 KOSPI/3 KOSDAQ, KIND): 2 batches
 ## 6. Execute-freshness projection (Monte Carlo, one session per cell)
   trades ~ Poisson(rate); feed latency ~ lognormal; jitter U(0,0.5s); response 0.3s.
   S_p99 = p99(capturedAt - effectiveAt) of stored rows at 3s, the statistic GPT measured
-  (2026-10-14: Samsung 1.66 s, Kia 3.54 s). ER = share of session time execute-eligible.
+  (2026-10-14: Samsung 1.66 s, Kia 3.54 s). ER = share of the WHOLE session execute-eligible;
+  no prints in the closing auction (last 10 min = 2.56% of the session),
+  so every cell is capped at 97.44% (+ <= 10 s of the last print).
 | trades/s | feed latency p50/p99 | S_p99 @3s | ER 3s | ER 4s | ER 5s | ER 6s | ER 5s, 2% skipped cycles |
 |---:|---|---:|---:|---:|---:|---:|---:|
-| 5 | 0.3/1.0 s | 1.42s | 100.00% | 100.00% | 100.00% | 100.00% | 99.75% |
-| 5 | 0.6/2.5 s | 2.69s | 100.00% | 100.00% | 100.00% | 99.99% | 99.60% |
-| 1 | 0.3/1.0 s | 3.20s | 99.97% | 99.93% | 99.83% | 99.61% | 99.16% |
-| 1 | 0.6/2.5 s | 3.65s | 99.95% | 99.83% | 99.71% | 99.27% | 98.90% |
-| 0.5 | 0.3/1.0 s | 3.42s | 98.12% | 97.46% | 96.51% | 95.16% | 95.67% |
-| 0.5 | 0.6/2.5 s | 3.94s | 97.61% | 96.78% | 95.76% | 93.72% | 94.69% |
-| 0.2 | 0.3/1.0 s | 3.57s | 81.20% | 78.84% | 76.41% | 73.49% | 75.44% |
-| 0.2 | 0.6/2.5 s | 4.17s | 79.54% | 76.97% | 74.53% | 70.99% | 73.60% |
+| 5 | 0.3/1.0 s | 1.40s | 97.46% | 97.46% | 97.45% | 97.45% | 97.22% |
+| 5 | 0.6/2.5 s | 2.67s | 97.46% | 97.46% | 97.45% | 97.44% | 97.07% |
+| 1 | 0.3/1.0 s | 3.21s | 97.44% | 97.39% | 97.30% | 97.08% | 96.66% |
+| 1 | 0.6/2.5 s | 3.65s | 97.43% | 97.32% | 97.18% | 96.75% | 96.41% |
+| 0.5 | 0.3/1.0 s | 3.42s | 95.63% | 94.97% | 94.03% | 92.74% | 93.22% |
+| 0.5 | 0.6/2.5 s | 3.94s | 95.12% | 94.30% | 93.30% | 91.35% | 92.26% |
+| 0.2 | 0.3/1.0 s | 3.57s | 79.06% | 76.74% | 74.38% | 71.54% | 73.45% |
+| 0.2 | 0.6/2.5 s | 4.17s | 77.40% | 74.98% | 72.54% | 69.11% | 71.65% |
 
 ## 7. DB growth (row sizes unmeasured: price 0.4-2.0 KB, slim 0.35-0.6 KB, book 0.9-3.0 KB incl. indexes)
   headroom used for "days": 2.6 GB (GPT: 10 GB disk, ~7.40 GB used; observation time not recorded)
 | case | price rows/day | book rows/day | MB/trading day | trading days to fill headroom | GB per 22-session month |
 |---|---:|---:|---:|---:|---:|
 | S0 now: N=15, 3s, price+book, full raw | 111,150 | 117,000 | 146–560 | 5–18 | 3.1–12.0 |
-| stage 1: N=15, 3s, book off, slim raw | 111,150 | 0 | 38–65 | 41–70 | 0.8–1.4 |
+| stage 1 only (v2.1): N=15, 3s, book off, full raw | 111,150 | 0 | 43–217 | 12–61 | 0.9–4.7 |
+| stage 1 + 2a: N=15, 3s, book off, slim raw | 111,150 | 0 | 38–65 | 41–70 | 0.8–1.4 |
 | F N=25, 3s, slim raw | 185,250 | 0 | 63–109 | 25–42 | 1.4–2.3 |
 | F N=50, 3s, slim raw | 370,500 | 0 | 127–217 | 12–21 | 2.7–4.7 |
 | F N=100, 5s, full raw (no slimming) | 444,600 | 0 | 174–868 | 3–15 | 3.7–18.7 |
@@ -218,3 +221,12 @@ current 15 (12 KOSPI/3 KOSDAQ, KIND): 2 batches
 | 5s | 10m | 120 | 101 | 61% / 72% |
 | 6s | 5m | 120 | 107 | 61% / 70% |
 | 6s | 10m | 140 | 121 | 53% / 61% |
+
+## 9. Alternatives priced for the product approvals (report §13), N=100 b=6 5s normal base
+  in-progress 1d from the provider every 15 min: +2,626/day -> 39,136 (78% of 50k), month 861,111 (86%)
+  in-progress 1d from the provider every 30 min: +1,313/day -> 37,823 (76% of 50k), month 832,225 (83%)
+  forming candle every 2.5 min instead of 5: 44,388/day (89%), month 976,655 (98%)
+  keep price at 3 s for N=100 b=6: 55,230/day (110%), month 1,215,179 (122%)
+  keep price at 4 s for N=100 b=6: 43,530/day (87%), month 957,779 (96%)
+  6 s trial at N=50: price 6 s, b=4: 19,821/day (40%), month 436,178 (44%)
+  6 s trial at N=50: price 3 s, b=4: 35,421/day (71%), month 779,378 (78%)

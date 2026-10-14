@@ -1,9 +1,80 @@
-## selftest (synthetic: LIQ5 5/s, MID1 1/s, THIN05 0.5/s, THIN02 0.2/s)
-| symbol | rows | ER 3s | ER 6s (worse/better phase) | ΔER 6s | cycles with no row |
-|---|---:|---:|---:|---:|---:|
-| THIN02 | 3554 | 80.45% | 72.32% / 72.43% | 8.14%p | 1001 |
-| THIN05 | 5975 | 98.04% | 94.66% / 94.82% | 3.37%p | 1001 |
-| MID1 | 7379 | 99.96% | 99.53% / 99.56% | 0.43%p | 0 |
-| LIQ5 | 7799 | 100.00% | 100.00% / 100.00% | 0.00%p | 0 |
-direct 6 s simulation (even polls): {'LIQ5': '100.00%', 'MID1': '99.56%', 'THIN02': '72.33%', 'THIN05': '94.66%'}
-max |replayed - direct| over symbols (matching phase): 0.01%p. Residual comes only from cycles in which no symbol of the batch stored a row.
+## A. ER boundary cases (session 0..1000 s; exact value vs formula vs direct sampling at 5 ms)
+| case | expected | er() | sampled | result | note |
+|---|---:|---:|---:|---|---|
+| late first collection (first row 60.2 s after open) | 93.9800% | 93.9800% | 93.9800% | ok | v2 formula (denominator from first row) = 100.00% |
+| long collection gap mid-session (no row 300..420 s) | 88.6200% | 88.6200% | 88.6200% | ok | gap flagged: [(297.5, 420.5)] |
+| very thin symbol (1 trade / 30 s) | 25.4000% | 25.4000% | 25.4000% | ok | 300 of 334 polls stored no row |
+| last price expires (no trade after 699.2 s) | 70.8700% | 70.8700% | 70.8700% | ok |  |
+| only a previous-day carry-in row | 0.0000% | 0.0000% | 0.0000% | ok | flag NO_ELIGIBLE |
+| listed symbol without any row | 0.0000% | 0.0000% | 0.0000% | ok | flag NO_ROWS |
+| fresh pre-open carry-in + one row | 1.7600% | 1.7600% | 1.7600% | ok |  |
+| effective 2 s after captured (captured rule binds) | 0.9000% | 0.9000% | 0.9000% | ok |  |
+| row at close ignored, last span clipped at close | 0.5000% | 0.5000% | 0.5000% | ok |  |
+
+## B. Replay accuracy on a synthetic session
+  trades Poisson until the closing auction (last 600 s: none); first poll 15 s after open;
+  all polls fail in 10,000..10,060 s; batch 1 has no liquid member (many cycles store no row).
+
+### feed delay p50/p99 0.3/1.0 s
+session 23,400 s; suspected collection gaps (> 3 polls, auction excluded, from poll log): 2 spans, 78.1 s = 0.33% -> usable
+  gap 9,999.9..10,062.5 s after open (62.6 s)
+  gap 0.0..15.4 s after open (15.4 s)
+| symbol | batch | rows | ER 3s observed | continuous part | first eligible | longest ineligible | ER 6s rows-only est. ph0 / ph1 | ΔER worst | ER 6s poll-log est. ph0 / ph1 | failed / regressed polls | flags |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| LIQ5 | 0 | 7576 | 97.18% | 99.70% | 15.4 s | 590.1 s | 97.16% / 97.17% | 0.03%p | 97.17% / 97.16% | 20 / 0 | — |
+| MID1 | 0 | 7172 | 97.11% | 99.63% | 15.4 s | 591.2 s | 96.67% / 96.63% | 0.48%p | 96.68% / 96.62% | 20 / 0 | — |
+| THIN02 | 1 | 3426 | 78.02% | 80.06% | 15.5 s | 595.1 s | 70.12% / 70.11% | 7.92%p | 70.13% / 70.13% | 20 / 0 | — |
+| THIN05 | 1 | 5812 | 95.30% | 97.77% | 15.5 s | 590.3 s | 91.75% / 92.16% | 3.55%p | 91.77% / 92.16% | 20 / 0 | — |
+| VTHIN005 | 1 | 1083 | 32.98% | 33.83% | 36.9 s | 596.4 s | 27.55% / 27.85% | 5.43%p | 27.56% / 27.85% | 27 / 0 | — |
+  batch 0: 2 symbols, 20 cycles re-inserted (no member stored a row)
+  batch 1: 3 symbols, 844 cycles re-inserted (no member stored a row)
+| symbol | direct 6 s, same draws ph0 / ph1 | rows-only est. (true phase) error | poll-log est. error | regressed polls |
+|---|---:|---:|---:|---:|
+| LIQ5 | 97.17% / 97.16% | 0.012%p | 0.000%p | 0 |
+| MID1 | 96.68% / 96.62% | 0.010%p | 0.000%p | 0 |
+| THIN05 | 91.77% / 92.16% | 0.026%p | 0.000%p | 0 |
+| THIN02 | 70.13% / 70.13% | 0.020%p | 0.000%p | 0 |
+| VTHIN005 | 27.56% / 27.85% | 0.010%p | 0.000%p | 0 |
+
+  A2 size: a real 6 s poller on the same trades (own phase, jitter, delays), 20 realizations,
+  vs the poll-log estimate. The rows-only estimate differs from it by the error column above.
+| symbol | ER 3s observed | real 6 s: mean | real 6 s: sd | estimate ph0 / ph1 | two-phase mean - real mean | worse phase - real mean | max abs (one phase - one real) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| LIQ5 | 97.18% | 97.16% | 0.006%p | 97.17% / 97.16% | +0.008%p | +0.002%p | 0.029%p |
+| MID1 | 97.11% | 96.67% | 0.041%p | 96.68% / 96.62% | -0.017%p | -0.044%p | 0.121%p |
+| THIN05 | 95.30% | 92.01% | 0.146%p | 91.77% / 92.16% | -0.045%p | -0.236%p | 0.424%p |
+| THIN02 | 78.02% | 70.03% | 0.153%p | 70.13% / 70.13% | +0.102%p | +0.101%p | 0.504%p |
+| VTHIN005 | 32.98% | 27.67% | 0.145%p | 27.56% / 27.85% | +0.030%p | -0.117%p | 0.459%p |
+
+### feed delay p50/p99 0.6/2.5 s
+session 23,400 s; suspected collection gaps (> 3 polls, auction excluded, from poll log): 2 spans, 78.1 s = 0.33% -> usable
+  gap 9,999.9..10,062.5 s after open (62.6 s)
+  gap 0.0..15.4 s after open (15.4 s)
+| symbol | batch | rows | ER 3s observed | continuous part | first eligible | longest ineligible | ER 6s rows-only est. ph0 / ph1 | ΔER worst | ER 6s poll-log est. ph0 / ph1 | failed / regressed polls | flags |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| LIQ5 | 0 | 7548 | 97.18% | 99.70% | 15.4 s | 590.1 s | 97.15% / 97.17% | 0.03%p | 97.16% / 97.13% | 20 / 15 | — |
+| MID1 | 0 | 7086 | 97.08% | 99.60% | 15.4 s | 591.2 s | 96.39% / 96.28% | 0.81%p | 96.40% / 96.26% | 20 / 3 | — |
+| THIN02 | 1 | 3392 | 76.32% | 78.31% | 15.5 s | 595.1 s | 67.82% / 67.55% | 8.77%p | 67.83% / 67.57% | 20 / 0 | — |
+| THIN05 | 1 | 5717 | 94.83% | 97.28% | 15.5 s | 590.3 s | 90.46% / 90.81% | 4.36%p | 90.49% / 90.81% | 20 / 2 | — |
+| VTHIN005 | 1 | 1072 | 31.48% | 32.29% | 36.9 s | 596.4 s | 26.35% / 25.85% | 5.63%p | 26.36% / 25.85% | 27 / 0 | — |
+  batch 0: 2 symbols, 20 cycles re-inserted (no member stored a row)
+  batch 1: 3 symbols, 894 cycles re-inserted (no member stored a row)
+| symbol | direct 6 s, same draws ph0 / ph1 | rows-only est. (true phase) error | poll-log est. error | regressed polls |
+|---|---:|---:|---:|---:|
+| LIQ5 | 97.16% / 97.13% | 0.036%p | 0.000%p | 15 |
+| MID1 | 96.40% / 96.26% | 0.011%p | 0.000%p | 3 |
+| THIN05 | 90.49% / 90.81% | 0.030%p | 0.000%p | 2 |
+| THIN02 | 67.83% / 67.57% | 0.018%p | 0.000%p | 0 |
+| VTHIN005 | 26.36% / 25.85% | 0.014%p | 0.000%p | 0 |
+
+  A2 size: a real 6 s poller on the same trades (own phase, jitter, delays), 20 realizations,
+  vs the poll-log estimate. The rows-only estimate differs from it by the error column above.
+| symbol | ER 3s observed | real 6 s: mean | real 6 s: sd | estimate ph0 / ph1 | two-phase mean - real mean | worse phase - real mean | max abs (one phase - one real) |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| LIQ5 | 97.18% | 97.14% | 0.013%p | 97.16% / 97.13% | +0.006%p | -0.007%p | 0.044%p |
+| MID1 | 97.08% | 96.34% | 0.046%p | 96.40% / 96.26% | -0.004%p | -0.073%p | 0.167%p |
+| THIN05 | 94.83% | 90.72% | 0.195%p | 90.49% / 90.81% | -0.068%p | -0.226%p | 0.507%p |
+| THIN02 | 76.32% | 67.67% | 0.182%p | 67.83% / 67.57% | +0.037%p | -0.094%p | 0.448%p |
+| VTHIN005 | 31.48% | 26.29% | 0.163%p | 26.36% / 25.85% | -0.188%p | -0.444%p | 0.839%p |
+
+selftest: all boundary cases and poll-log replay checks passed

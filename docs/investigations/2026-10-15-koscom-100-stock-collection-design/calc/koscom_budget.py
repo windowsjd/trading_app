@@ -17,6 +17,12 @@ tab; no user-driven KOSCOM calls. Each day is split into a NORMAL day and a
 BOUNDED WORST day (every cap hit, 20% of non-price calls retried), and calls
 carry the cross-review priority (P1 price .. P4 optional) used by the budget
 governor. v1 scenarios (S0/S1/S2/R) are kept unchanged for comparison.
+
+v2.1 (second cross-review, 2026-10-15): §6 divides by the whole session
+(v2 divided by "session minus time before the first stored row", which
+overstated ER and understated the loss of slower polls), models the closing
+single-price auction (last 10 min, no prints) and applies the capturedAt rule
+too. §9 prices the alternatives listed for the product approvals (report §13).
 """
 from __future__ import annotations
 
@@ -36,6 +42,8 @@ BATCH = 20
 SPACING_PER_S = 1 / 0.2          # KOSCOM_MIN_REQUEST_INTERVAL_MS 200 -> 5 starts/s
 CONCURRENCY = 2                  # KOSCOM_MAX_CONCURRENCY
 EXECUTE_WINDOW_S = 10            # source-eligibility.policy.ts assetPriceExecute
+CAPTURED_LIMIT_S = 11            # floor(now - capturedAt) <= 10 s  <=>  now - capturedAt < 11 s
+AUCTION_S = 600                  # closing single-price auction: last 10 min, no prints
 TICKS = 79                       # completed-5m-bucket ticks 09:05..15:30 (78) + 1
 HEADROOM_GB = 10.0 - 7.40        # GPT observation: 10 GB disk, ~7.40 GB used
 
@@ -279,9 +287,10 @@ def lognormal_params(median, p99):
 
 def simulate_er(trades, period, lat, jitter=0.5, response=0.3, skip=0.0,
                 horizon=SESSION_S, seed=11):
-    """Share of session time in which a market order passes the 10 s KRX
-    execute rule (now - effectiveAt <= 10 s; capturedAt is never older than
-    effectiveAt, so this is the binding rule). Polls are fixed-rate with
+    """Share of the WHOLE session [0, horizon) in which a market order passes
+    the execute rules (now - effectiveAt <= 10 s and now - capturedAt < 11 s;
+    capturedAt is never older than effectiveAt here, so the first binds).
+    Time before the first stored row counts as ineligible. Polls are fixed-rate with
     uniform jitter; a poll sees trades older than its feed latency; a row is
     stored only when the trade time advances (koscom-ingestion dedupe); a
     skipped cycle stores nothing. Also returns p99 of (capturedAt -
@@ -309,12 +318,13 @@ def simulate_er(trades, period, lat, jitter=0.5, response=0.3, skip=0.0,
     ok = 0.0
     for idx, (c, e) in enumerate(rows):
         nxt = rows[idx + 1][0] if idx + 1 < len(rows) else horizon
-        ok += max(0.0, min(nxt, e + EXECUTE_WINDOW_S) - c)
+        ok += max(0.0, min(nxt, e + EXECUTE_WINDOW_S, c + CAPTURED_LIMIT_S, horizon) - max(c, e))
     staleness = sorted(c - e for c, e in rows)
-    return ok / (horizon - rows[0][0]), staleness[int(0.99 * (len(staleness) - 1))]
+    return ok / horizon, staleness[int(0.99 * (len(staleness) - 1))]
 
 
-def poisson_trades(rate, seed, horizon=SESSION_S):
+def poisson_trades(rate, seed, horizon=SESSION_S - AUCTION_S):
+    """Continuous trading only: the closing auction prints at the close."""
     rnd, t, out = random.Random(seed), 0.0, []
     while True:
         t += rnd.expovariate(rate)
@@ -407,7 +417,9 @@ if __name__ == '__main__':
     print('\n## 6. Execute-freshness projection (Monte Carlo, one session per cell)')
     print('  trades ~ Poisson(rate); feed latency ~ lognormal; jitter U(0,0.5s); response 0.3s.')
     print('  S_p99 = p99(capturedAt - effectiveAt) of stored rows at 3s, the statistic GPT measured')
-    print('  (2026-10-14: Samsung 1.66 s, Kia 3.54 s). ER = share of session time execute-eligible.')
+    print('  (2026-10-14: Samsung 1.66 s, Kia 3.54 s). ER = share of the WHOLE session execute-eligible;')
+    print(f'  no prints in the closing auction (last {AUCTION_S // 60} min = {AUCTION_S / SESSION_S:.2%} of the session),')
+    print(f'  so every cell is capped at {1 - AUCTION_S / SESSION_S:.2%} (+ <= 10 s of the last print).')
     lat_fast, lat_slow = lognormal_params(0.3, 1.0), lognormal_params(0.6, 2.5)
     print('| trades/s | feed latency p50/p99 | S_p99 @3s | ER 3s | ER 4s | ER 5s | ER 6s | ER 5s, 2% skipped cycles |')
     print('|---:|---|---:|---:|---:|---:|---:|---:|')
@@ -423,10 +435,11 @@ if __name__ == '__main__':
     print(f'  headroom used for "days": {HEADROOM_GB:.1f} GB (GPT: 10 GB disk, ~7.40 GB used; observation time not recorded)')
     print('| case | price rows/day | book rows/day | MB/trading day | trading days to fill headroom | GB per 22-session month |')
     print('|---|---:|---:|---:|---:|---:|')
-    # rollout order: stage 1 (book off, slim raw) at 15, then 25 and 50 at 3 s,
+    # rollout order (v2.1): stage 1 (book off) and 2a (slim raw) at 15, then 25 and 50 at 3 s,
     # then 100 at the cadence chosen by the ER rule (report §6.5)
     cases = (('S0 now: N=15, 3s, price+book, full raw', 15, 3.0, True, (0.4, 2.0)),
-             ('stage 1: N=15, 3s, book off, slim raw', 15, 3.0, False, (0.35, 0.6)),
+             ('stage 1 only (v2.1): N=15, 3s, book off, full raw', 15, 3.0, False, (0.4, 2.0)),
+             ('stage 1 + 2a: N=15, 3s, book off, slim raw', 15, 3.0, False, (0.35, 0.6)),
              ('F N=25, 3s, slim raw', 25, 3.0, False, (0.35, 0.6)),
              ('F N=50, 3s, slim raw', 50, 3.0, False, (0.35, 0.6)),
              ('F N=100, 5s, full raw (no slimming)', 100, 5.0, False, (0.4, 2.0)),
@@ -458,3 +471,22 @@ if __name__ == '__main__':
             a = final_design(100, lo_b, t, minute_every=every).monthly()
             z = final_design(100, hi_b, t, minute_every=every).monthly()
             print(f'| {t:g}s | {every}m | {best} | {worst} | {a / MONTHLY_CAP:.0%} / {z / MONTHLY_CAP:.0%} |')
+
+    print('\n## 9. Alternatives priced for the product approvals (report §13), N=100 b=6 5s normal base')
+    base = final_design(100, 6)
+    for every in (15, 30):
+        extra = 100 * math.ceil(SESSION_MIN / every) * 1.01      # one day-chart call per stock per refresh, 1% retry
+        day, month = base.trading + extra, base.monthly() + SESSIONS_MONTH * extra
+        print(f'  in-progress 1d from the provider every {every} min: +{fmt(extra)}/day -> {fmt(day)} '
+              f'({day / DAILY_CAP:.0%} of 50k), month {fmt(month)} ({month / MONTHLY_CAP:.0%})')
+    z = final_design(100, 6, 5.0, minute_every=2.5)
+    print(f'  forming candle every 2.5 min instead of 5: {fmt(z.trading)}/day ({z.trading / DAILY_CAP:.0%}), '
+          f'month {fmt(z.monthly())} ({z.monthly() / MONTHLY_CAP:.0%})')
+    for t in (3.0, 4.0):
+        z = final_design(100, 6, t)
+        print(f'  keep price at {t:g} s for N=100 b=6: {fmt(z.trading)}/day ({z.trading / DAILY_CAP:.0%}), '
+              f'month {fmt(z.monthly())} ({z.monthly() / MONTHLY_CAP:.0%})')
+    for n, t in ((50, 6.0), (50, 3.0)):
+        z = final_design(n, batch_range(n)[1], t)
+        print(f'  6 s trial at N={n}: price {t:g} s, b={batch_range(n)[1]}: {fmt(z.trading)}/day '
+              f'({z.trading / DAILY_CAP:.0%}), month {fmt(z.monthly())} ({z.monthly() / MONTHLY_CAP:.0%})')
