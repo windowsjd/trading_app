@@ -131,7 +131,37 @@ export function getRankingTier(
   return item?.provisionalTier ?? item?.finalTier ?? '-';
 }
 
+/**
+ * A window of the whole (`all`) leaderboard of one known daily set: the 순위
+ * 안내 slot reads single rows by rank this way. `capturedAt` pins the set;
+ * without it the latest set of `rankingDate` is read.
+ */
+export interface GetRankingSliceParams {
+  seasonId: string;
+  rankType: RankingRankType;
+  rankingDate: string;
+  capturedAt?: string | null;
+  limit: number;
+  offset: number;
+}
+
 export async function getRankings(
+  params: GetRankingsParams,
+): Promise<RankingsResponseDto> {
+  return requestRankings(params);
+}
+
+/**
+ * Same endpoint as getRankings, but its own entry point: the ranking tab's
+ * publication and list reads stay countable apart from these row lookups.
+ */
+export async function getRankingSlice(
+  params: GetRankingSliceParams,
+): Promise<RankingsResponseDto> {
+  return requestRankings({ ...params, scope: 'all' });
+}
+
+async function requestRankings(
   params: GetRankingsParams,
 ): Promise<RankingsResponseDto> {
   const limit = params.limit ?? (params.scope === 'top10' ? 10 : 50);

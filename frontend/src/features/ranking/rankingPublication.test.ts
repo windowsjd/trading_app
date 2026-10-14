@@ -30,6 +30,11 @@ async function setup(t, conflict = false, state = 'active') {
       if (params.scope === 'friends') data.rankings = [{ ...data.rankings[0], userId: 'friend-42', seasonParticipantId: 'sp-42', rank: 42 }];
       return data;
     },
+    // 순위 안내 row reads: no rows here (the slot keeps only what the publication shows).
+    getRankingSlice: async params => ({ state: 'unavailable', season: null, rankType: params.rankType,
+      rankingDate: params.rankingDate, capturedAt: null, rankings: [],
+      pagination: { limit: params.limit, offset: params.offset, total: 0, returned: 0, nextOffset: null },
+      myRanking: { state: 'unavailable', reason: 'RANKING_UNAVAILABLE', message: 'Ranking is unavailable.' } }),
   };
   const Screen = native.load('src/screens/ranking/RankingScreen.tsx', {
     'react-native': { ...native.native, SafeAreaView: 'SafeAreaView',
@@ -43,6 +48,7 @@ async function setup(t, conflict = false, state = 'active') {
     '../../features/season/api': { getCurrentSeason: async () => ({ ...publication().season, joined: true }) },
     '../../features/me/api': { getMe: async () => ({ nickname: 'me' }) },
     '../../app/navigation/navigationHooks': { useRootNavigation: () => ({ navigate() {} }) },
+    '@react-navigation/native': { useIsFocused: () => true },
   }).default;
   const renderer = native.render(React.createElement(query.QueryClientProvider, { client },
     React.createElement(Screen, { navigation: { navigate() {} } })));

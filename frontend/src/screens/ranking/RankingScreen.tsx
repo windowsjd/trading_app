@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+import { useIsFocused } from '@react-navigation/native';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { RankingScreenProps } from '../../app/navigation/types';
@@ -29,6 +30,7 @@ import {
   type RankingRankType,
   type RankingScope,
 } from '../../features/ranking/api';
+import { useRankingInsights } from '../../features/ranking/useRankingInsights';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
 import { formatKrw } from '../../utils/format';
@@ -47,6 +49,7 @@ import { useAppearance, type AppearanceMode } from '../../theme/appearance';
 import { getHomeTier } from '../home/tierPresentation';
 import TierCard, { tierForeground, type TierPresentation } from '../home/TierCard';
 import RankingTierRowBackground, { RANKING_ROW_RADIUS } from './RankingTierRowBackground';
+import RankingInsightSlot from './RankingInsightSlot';
 import { getFinancialColors } from '../../theme/financialColors';
 
 type Props = RankingScreenProps;
@@ -63,6 +66,7 @@ function getRankingItemKey(item: RankingItemDto) {
 
 export default function RankingScreen({ navigation }: Props) {
   const rootNavigation = useRootNavigation();
+  const isFocused = useIsFocused();
   const queryClient = useQueryClient();
   const meQuery = useQuery({ queryKey: QUERY_KEYS.me, queryFn: getMe, staleTime: 60_000 });
   const [selectedTab, setSelectedTab] = React.useState<RankingScope>('all');
@@ -91,6 +95,8 @@ export default function RankingScreen({ navigation }: Props) {
   const seasonId = publication?.season?.id;
   const rankingDate = publication?.rankingDate;
   const capturedAt = publication?.capturedAt;
+  // 순위 안내: always the whole daily ranking of this publication, whatever tab.
+  const insights = useRankingInsights({ publication, season: seasonQuery.data });
   const rankingQueryKey = useMemo(
     () => QUERY_KEYS.ranking.infiniteList({
       scope: selectedTab, limit: rankingLimit, offset: 0,
@@ -277,6 +283,8 @@ export default function RankingScreen({ navigation }: Props) {
               viewState={viewState}
               onJoin={() => rootNavigation.navigate('SeasonJoin')}
             />
+
+            <RankingInsightSlot messages={insights} paused={!isFocused} />
 
             <SegmentedControl testID="ranking-tabs" accessibilityLabel="랭킹 범위" value={selectedTab} onChange={setSelectedTab}
               style={styles.tabs}

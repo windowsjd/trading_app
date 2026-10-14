@@ -211,6 +211,29 @@ export const QUERY_KEYS = {
     // Single responses and InfiniteData must never occupy the same entry.
     infiniteList: (params: Parameters<typeof QUERY_KEYS.ranking.list>[0]) =>
       [...QUERY_KEYS.ranking.list(params), 'infinite'] as const,
+    /**
+     * Rows at one offset of a known set (the 순위 안내 slot). Its own entry
+     * shape, never `list`: the ranking tab tells its publication and list
+     * reads apart by key. The `ranking` prefix keeps it under `ranking.all`.
+     */
+    slice: (params: {
+      seasonId?: string | null;
+      rankType?: string;
+      rankingDate?: string | null;
+      capturedAt?: string | null;
+      offset: number;
+      limit: number;
+    }) =>
+      [
+        'ranking',
+        'slice',
+        params.seasonId ?? null,
+        params.rankType ?? 'auto',
+        params.rankingDate ?? null,
+        params.capturedAt ?? null,
+        params.offset,
+        params.limit,
+      ] as const,
     userSeasonSummary: (userId: string) =>
       ['ranking', 'user-season-summary', userId] as const,
   },
