@@ -830,6 +830,57 @@ describe('standalone cumulative-principal return rate', () => {
     ).toBe('GENERAL_PERFORMANCE_INTEGRITY');
   });
 
+  // The two policy guards are internal emitters (@diagnosticSurface internal):
+  // this pins the boundary their annotation names — structured 500 with the
+  // code kept, the unreviewed policy sentence withheld from the public body.
+  it.each([
+    ['principal is not positive', '0', '0', 'Cumulative investment principal'],
+    ['total is negative', '-1', '10000000', 'Total asset value'],
+  ])(
+    'keeps the integrity message internal when the %s',
+    async (_case, total, principal, internalText) => {
+      const h = standaloneHarness('general');
+      h.performance.resolveLivePerformance.mockResolvedValue(
+        live({
+          total,
+          principal,
+          adRewards: '0',
+          storedTwrRate: '0',
+          factor: '1',
+        }),
+      );
+      const failure: unknown = await h.service
+        .getPortfolio('user', h.account.id)
+        .then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+      expect(failure instanceof HttpException).toBe(true);
+      const internal = (failure as HttpException).getResponse() as {
+        error: { message: string };
+      };
+      expect(internal.error.message.includes(internalText)).toBe(true);
+
+      let body: { error: { code: string; message: string } } | undefined;
+      const response = {
+        status: jest.fn().mockReturnThis(),
+        json: (value: typeof body) => {
+          body = value;
+        },
+      };
+      new GlobalHttpExceptionFilter().catch(failure, {
+        switchToHttp: () => ({
+          getResponse: () => response,
+          getRequest: () => ({ user: { userId: 'user', role: 'user' } }),
+        }),
+      } as never);
+      expect(response.status.mock.calls[0][0]).toBe(500);
+      expect(body?.error.code).toBe('GENERAL_PERFORMANCE_INTEGRITY');
+      expect(body?.error.message).toBe('Internal Server Error');
+      expect(JSON.stringify(body).includes(internalText)).toBe(false);
+    },
+  );
+
   it('serves each intraday point from its own row, across a reward boundary', async () => {
     const h = standaloneHarness('general');
     const claimId = 'claim-1';

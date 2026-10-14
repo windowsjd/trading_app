@@ -126,12 +126,14 @@ export function toCumulativePrincipalReturnRatePercent(
   assertFinite(principal, 'cumulativeExternalFundingKrw');
 
   if (principal.lte(0)) {
+    // @diagnosticSurface internal: TradingAccountPortfolioService maps this through toGeneralPerformanceHttpException to a structured HTTP 500; the global filter withholds this unreviewed message.
     throw new GeneralPerformanceError(
       generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
       'Cumulative investment principal must be greater than zero to compute a return rate.',
     );
   }
   if (total.lt(0)) {
+    // @diagnosticSurface internal: TradingAccountPortfolioService maps this through toGeneralPerformanceHttpException to a structured HTTP 500; the global filter withholds this unreviewed message.
     throw new GeneralPerformanceError(
       generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
       'Total asset value cannot be negative.',

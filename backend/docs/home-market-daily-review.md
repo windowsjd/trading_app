@@ -6,11 +6,11 @@
 
 3. **가설과 실제 차이** — LineChart index 배치, equity 1d/7d/30d/all, 목록 symbol/id 정렬, DTO의 volume 부재는 맞았다. 과거 Daily wiring/enablement/seasonId/retry 문제는 이미 수정되어 있었고, 최신 runner에는 당일 누락 account/participant가 있는지 DB로 먼저 확인하는 최적화도 있었다. Binance REST뿐 아니라 WebSocket ticker에도 base volume이 저장된다. US canonical changeRate는 현행 서비스에서 unavailable일 수 있으며 계산을 새로 만들지 않았다.
 
-4. **Home 구조** — 이전 General은 Hero→자금 구성→배분/추이→보유 종목, Season은 Hero→경쟁→배분/추이→보유 종목이었다. 이제 공통으로 계정 영역→Hero→추이 disclosure→(Season 경쟁)→보유 종목이다. Home의 별도 배분 도넛을 제거하고 General 자금 구성은 보유 종목 뒤에 보존했다. Hero·TWR 표시·Avatar·계정 선택·금융 색상은 유지한다.
+4. **Home 구조** — 이전 General은 Hero→자금 구성→배분/추이→보유 종목, Season은 Hero→경쟁→배분/추이→보유 종목이었다. 이제 공통으로 계정 영역→Hero→추이 disclosure→(Season 경쟁)→보유 종목이다. Home의 별도 배분 도넛을 제거하고 General 자금 구성은 보유 종목 뒤에 보존했다. Hero·TWR 표시·Avatar·계정 선택·금융 색상은 유지한다. (2026-10-14 대체: 일반·초보 Hero는 `수익률` 제목의 누적 투자원금 대비 수익률(`cumulative_principal`)이며 TWR은 내부 기록 전용이다. `policy-decisions.md` "일반·초보모드 대표 수익률" 참고.)
 
 5. **Disclosure** — local state, 기본 접힘, 최소 44px 터치 영역, native expanded state와 web aria-expanded. 펼친 내용은 같은 컴포넌트 안에서 버튼 바로 다음에만 렌더링된다. 접힌 동안 daily query는 disabled이며 계정 key remount로 접힘/30D가 초기화된다.
 
-6. **추이 UI** — 18px/700 section heading, 작은 기간 control, 기존 semantic colors. 기존 30일 설명과 별도 최신/선택 값은 Home에서 제거했다. 일반계정의 외부 자금/TWR 설명은 정확성을 위해 차트 아래에 보존했다.
+6. **추이 UI** — 18px/700 section heading, 작은 기간 control, 기존 semantic colors. 기존 30일 설명과 별도 최신/선택 값은 Home에서 제거했다. 일반계정의 외부 자금/TWR 설명은 정확성을 위해 차트 아래에 보존했다. (2026-10-14 대체: 차트 아래 설명은 외부 자금 포함 안내와 누적 투자원금 대비 수익률 설명으로 바뀌었다.)
 
 7. **기간** — 7D/30D/90D/180D/360D, 기본 30D. API union/parser/date predicate를 확장했다. explicit daily는 KST 오늘 포함 N개 calendar date를 snapshotDate로 조회한다. account/range/daily query key를 사용하며 이전 기간 placeholder를 사용하지 않는다. 기존 1d/all 및 granularity 미지정 동작은 유지한다.
 

@@ -213,6 +213,37 @@ describe('deterministic provider transports retain real parsers', () => {
       metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
     ).toBe(1);
   });
+  it('serves the KOSCOM paths the client requests only while KRX is open', async () => {
+    const metrics = new Metrics(),
+      replay = new Replay(make(), metrics);
+    const list = async (market: string) => {
+      const response = await replay.fetch(
+        `https://oap.k-mydata.org/v3/market/closed/${market}/lists?apikey=load-test-koscom-key`,
+      );
+      const body = (await response.json()) as {
+        isuLists: Array<{ isuSrtCd: string }>;
+      };
+      return body.isuLists.map((row) => row.isuSrtCd);
+    };
+    const kospi = await list('kospi');
+    expect(kospi.length > 0).toBe(true);
+    expect(kospi.every((symbol) => /^\d{6}$/.test(symbol))).toBe(true);
+    expect((await list('kosdaq')).length).toBe(0);
+    expect((await list('konex')).length).toBe(0);
+    const intraday = await replay.fetch(
+      'https://oap.k-mydata.org/v3/market/realtime/kospi/stocks/005930/intraday?inddCycleTpCd=60&inqStrtDd=20261014&strtTm=1020&endTm=1027&apikey=load-test-koscom-key',
+    );
+    const page = (await intraday.json()) as {
+      jsonrpc: string;
+      result: { isuSrtCd: string; hisLists: unknown[] };
+    };
+    expect(page.jsonrpc).toBe('2.0');
+    expect(page.result.isuSrtCd).toBe('005930');
+    expect(page.result.hisLists.length).toBe(0);
+    expect(
+      metrics.counters['prepare:failure:EXTERNAL_PROVIDER_HTTP_BLOCKED'],
+    ).toBe(undefined);
+  });
 });
 describe('workload, histogram and exact financial checks', () => {
   it('allocates the 1000 initial states to 30/25/10/15/15/5', () => {

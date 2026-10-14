@@ -453,7 +453,10 @@ export class Replay {
       };
     else if (
       u.hostname === 'oap.k-mydata.org' &&
-      /\/stocks\/lists$/.test(u.pathname)
+      // KoscomMarketMapService's market membership list. In this fixture it is
+      // reached only while KRX is open (polling, intraday candles), so an
+      // unmatched path aborted only intraday runs.
+      /^\/v3\/market\/closed\/(kospi|kosdaq|konex)\/lists$/.test(u.pathname)
     )
       value = {
         isuLists: u.pathname.includes('/kospi/')
@@ -462,6 +465,19 @@ export class Replay {
             }))
           : [],
         result: {},
+      };
+    else if (
+      u.hostname === 'oap.k-mydata.org' &&
+      /^\/v3\/market\/realtime\/(kospi|kosdaq|konex)\/stocks\/\d{6}\/intraday$/.test(
+        u.pathname,
+      )
+    )
+      // KRX one-minute candles are not part of this financial fixture: an
+      // empty page (the adapter's `empty_page` outcome) keeps an open-market
+      // run's domestic candles as absent as they are off-hours.
+      value = {
+        jsonrpc: '2.0',
+        result: { isuSrtCd: u.pathname.split('/')[6], hisLists: [] },
       };
     else if (
       u.hostname === 'oap.k-mydata.org' &&

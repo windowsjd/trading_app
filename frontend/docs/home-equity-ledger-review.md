@@ -1,5 +1,7 @@
 홈·일별 자산 추이·원장 수량 작업 보고 (2026-09-09)
 
+> **현재 정책 안내 (2026-10-14):** 아래 5·8항의 일반 홈 TWR 안내는 이 보고서 작성 당시의 정책입니다. 현재 일반·초보모드 대표 수익률은 `cumulative_principal`, 즉 `(총자산 − 누적 투자원금) ÷ 누적 투자원금 × 100`이고 홈 제목은 모든 모드에서 `수익률`입니다. 기존 TWR은 내부 금융 기록과 무결성 검증용으로만 유지되며, 시즌은 `initial_capital` 수익률을 유지합니다. 현행 기준은 `backend/docs/policy-decisions.md`의 "일반·초보모드 대표 수익률"과 `frontend/docs/trading-account-switching.md`입니다.
+
 재개 검토 기준: 이전 구현은 현재 저장소의 `80bfe304` 커밋에 보존되어 있습니다. 재개 시 working tree는 clean이었고, 아래 1–23항은 이전 구현을 포함한 전체 작업 설명입니다. 이번에는 daily 응답 계약 오류의 fail-closed 처리와 관련 테스트를 보강했습니다. 이 실행에서는 commit/stage/push/GitHub 변경을 하지 않았습니다.
 
 1. **작업 전 General/Season 홈 차이**: 일반 홈은 portfolio·wallets·positions만 조회하고 원장/주문 내역을 제공했습니다. 시즌 홈은 배분/추이를 표시했지만 주문 내역 버튼이 없었습니다.
@@ -10,13 +12,13 @@
 
 4. **SeasonAccountHome 주문 내역**: 지갑 요약에 주문 내역 버튼을 추가했습니다. 두 홈은 같은 callback으로 `RecordOrderList({ accountId: selectedAccount.id })`에 진입합니다. 도착 화면도 소유 계정 목록에서 해당 ID를 찾고 `/api/v1/trading-accounts/:accountId/orders`를 조회합니다. active/suspended/closed 시즌의 READ 진입을 검증했습니다. 기존 seasonId 기반 기록 진입은 유지했습니다.
 
-5. **공통화/분리**: 자산 배분·추이 표시만 `HomePortfolioCharts`로 공유했습니다. query와 integrity gate는 각 홈에 유지했습니다. 일반의 TWR·최초 자본·외부 유입·광고 보상·투자 손익 안내, 시즌의 이름·상태·순위·등급·랭킹·보상은 각 모드에 남아 있습니다. `key={account.id}`로 계정 전환 시 하위 상태를 새로 만들고 계정별 query key를 사용합니다. global state나 새 라이브러리는 추가하지 않았습니다.
+5. **공통화/분리**: 자산 배분·추이 표시만 `HomePortfolioCharts`로 공유했습니다. query와 integrity gate는 각 홈에 유지했습니다. 일반의 TWR·최초 자본·외부 유입·광고 보상·투자 손익 안내(TWR 안내는 2026-10-14 대체, 상단 안내 참고), 시즌의 이름·상태·순위·등급·랭킹·보상은 각 모드에 남아 있습니다. `key={account.id}`로 계정 전환 시 하위 상태를 새로 만들고 계정별 query key를 사용합니다. global state나 새 라이브러리는 추가하지 않았습니다.
 
 6. **일반 배분 source**: 기존 account portfolio의 `allocation.cashKrwValue / domesticStockValueKrw / usStockValueKrw / cryptoValueKrw`. frontend에서 환율·보유 가치·현금·총자산을 다시 평가하지 않습니다. 도넛 중앙 총계도 backend `summary.totalAssetKrw`입니다. Number 합계/비율은 SVG 원호 배치에만 사용합니다.
 
 7. **시즌 배분 source**: 동일한 account portfolio allocation 필드입니다. 시즌의 기존 backend valuation과 초기자본 대비 수익률 계산은 그대로입니다.
 
-8. **일반 추이 source**: 기존 `/api/v1/trading-accounts/:accountId/portfolio/equity?range=30d&granularity=daily`가 DailyPortfolioSnapshot만 읽습니다. 일반계정의 RepeatableRead·계정 재확인·performance continuity·daily history integrity 검증을 유지합니다. 저장된 totalAssetKrw/TWR/funding/PnL을 재계산하지 않습니다. 총자산에는 외부 유입이 포함되므로, 일반 홈에서 투자 성과는 TWR로 확인하도록 설명합니다.
+8. **일반 추이 source**: 기존 `/api/v1/trading-accounts/:accountId/portfolio/equity?range=30d&granularity=daily`가 DailyPortfolioSnapshot만 읽습니다. 일반계정의 RepeatableRead·계정 재확인·performance continuity·daily history integrity 검증을 유지합니다. 저장된 totalAssetKrw/TWR/funding/PnL을 재계산하지 않습니다. 총자산에는 외부 유입이 포함되므로, 일반 홈에서 투자 성과는 TWR로 확인하도록 설명합니다. (2026-10-14 대체: 현재는 수익률이 누적 투자원금 대비로 계산된다고 설명합니다. 상단 안내 참고.)
 
 9. **시즌 추이 source**: 같은 명시적 daily 옵션에서 DailyPortfolioSnapshot을 사용합니다. 기존 시즌 daily writer와 기록 화면이 사용하는 공식 일별 이력입니다. 선택 account와 participant 중 어느 쪽에 연결된 행이라도 scope가 충돌하면 500 integrity 오류로 거절합니다. 시즌 수익률은 저장된 `initial_capital` 의미를 유지합니다.
 

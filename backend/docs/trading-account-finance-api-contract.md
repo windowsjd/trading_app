@@ -408,6 +408,10 @@ Asia/Seoul, using `snapshotDate` and only real DailyPortfolioSnapshot rows. Miss
 dates remain missing and short histories remain short. Existing `1d`, `7d`, `30d`,
 `all` and omitted-granularity source/fallback behavior remain compatible. GET does
 not create snapshots; account scope, TWR and initial-capital meanings are unchanged.
+(Superseded for the served general/beginner rate on 2026-10-14: each point's
+`returnRate` is now that row's cumulative-principal rate with
+`returnRateMethod: cumulative_principal`; the stored TWR stays an internal record.
+See [Performance model](general-account-and-ad-rewards-api-contract.md#performance-model).)
 
 
 ## Conditional exit integration
