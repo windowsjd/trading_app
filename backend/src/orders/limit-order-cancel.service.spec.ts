@@ -545,6 +545,18 @@ describe('LimitOrderCancelService', () => {
           cancelReason: 'participant_excluded',
         }) as never,
       });
+      // Reservation-free Futures conditional entries end under the same fence.
+      expect(prisma.futuresConditionalEntry.updateMany).toHaveBeenCalledWith({
+        where: {
+          tradingAccountId: 'trading-account-1',
+          status: { in: ['watching', 'triggered'] },
+        },
+        data: {
+          status: 'canceled',
+          terminalReason: 'participant_excluded',
+          endedAt: canceledAt,
+        },
+      });
       // No new $transaction: it joins the caller's exclusion transaction.
       expect(prisma.$transaction).not.toHaveBeenCalled();
     });

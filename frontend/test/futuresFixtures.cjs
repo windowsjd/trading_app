@@ -55,5 +55,30 @@ function futuresOrderBookFixture(instrumentId, variant = 'book') {
     statusMessage: variant === 'stale' ? '호가 정보가 지연되고 있습니다.' : null,
   };
 }
+// Futures conditional entries as the list API returns them (`?conditional=`:
+// `off` → capability off, `rows` → one row per state, else none).
+function futuresConditionalFixture(accountId, state, variant) {
+  const at = new Date().toISOString();
+  const instrument = futuresFixture(accountId).catalog.instruments[0];
+  const row = (id, patch) => ({ id, tradingAccountId: accountId, instrumentId: instrument.id, instrument,
+    direction: 'long', marginMode: 'isolated', leverage: 100, quantity: '123456789.12345678',
+    triggerCondition: 'at_or_above', triggerPrice: '1234567890123456.12345678', executionType: 'market', limitPrice: null,
+    status: 'watching', state: 'watching', trigger: null, execution: null, limitOrder: null, attemptCount: 0, lastAttemptAt: null,
+    failureCode: null, terminalReason: null, createdAt: at, endedAt: null, updatedAt: at, ...patch });
+  const triggered = { triggeredAt: at, snapshotId: 'snapshot', evidence: null };
+  const rows = variant !== 'rows' ? [] : state === 'open' ? [
+    row('watching', { instrument: { ...instrument, underlying: { ...instrument.underlying, name: '아주 긴 이름을 가진 무기한 선물 계약 Example Protocol Governance Token' } } }),
+    row('pending', { status: 'ordered', state: 'order_pending', direction: 'short', triggerCondition: 'at_or_below', executionType: 'limit',
+      limitPrice: '1234567890123456.12345678', trigger: triggered, limitOrder: { orderId: 'limit-entry', status: 'submitted',
+        limitPrice: '1234567890123456.12345678', reservedAmount: '12345678901234.12345678', executionId: null, terminalReason: null, createdAt: at, endedAt: null } }),
+  ] : [
+    row('filled', { status: 'ordered', state: 'filled', trigger: triggered, execution: { executionId: 'execution', positionId: 'position',
+      executionPrice: '1234567890123456.12345678', quantity: '123456789.12345678', feeAmount: '12345678901.12345678', executedAt: at } }),
+    row('failed', { status: 'failed', state: 'failed', trigger: triggered, failureCode: 'INSUFFICIENT_FUTURES_FREE_COLLATERAL', terminalReason: 'execution_failed', endedAt: at }),
+    row('ended', { status: 'canceled', state: 'canceled', terminalReason: 'season_ended', endedAt: at }),
+  ];
+  return { tradingAccountId: accountId, capabilities: { enabled: variant !== 'off', canCreate: variant !== 'off', maxLivePerAccount: 20 },
+    entries: rows, pagination: { limit: 100, offset: 0, total: rows.length, returned: rows.length, nextOffset: null } };
+}
 module.exports = {
-  futuresCandlesFixture, futuresFixture, futuresOrderBookFixture, accounts };
+  futuresCandlesFixture, futuresFixture, futuresOrderBookFixture, futuresConditionalFixture, accounts };

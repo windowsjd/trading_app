@@ -336,6 +336,7 @@ export const QUERY_KEYS = {
       pending: (id: string) => ['tradingAccount', 'futures', id, 'pending'] as const,
       history: (id: string, kind: 'executions' | 'liquidations', offset: number) => ['tradingAccount', 'futures', id, kind, offset] as const,
       finalSettlement: (id: string) => ['tradingAccount', 'futures', id, 'final-settlement'] as const,
+      conditionalEntries: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'futures', id, 'conditional-entries', state] as const,
     },
     /** Everything account-scoped; the logout-time clear target. */
     all: ['tradingAccount'] as const,

@@ -2,6 +2,11 @@ import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learn
 import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
+import {
+  assertFuturesConditionalEntryWindow,
+  linkFuturesConditionalEntry,
+  lockTriggeredFuturesConditionalEntry,
+} from './futures-conditional-entry-state';
 import { presentFuturesPerformance } from './futures-position-display';
 import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable, Optional } from '@nestjs/common';
@@ -90,6 +95,7 @@ export class FuturesService {
     body: FuturesExecuteBody,
     conditionalChildId?: string,
     limitEntryId?: string,
+    conditionalEntryId?: string,
   ): Promise<FuturesExecuteResult> {
     requireUser(userId);
     stage('futures_ownership', accountId);
@@ -219,6 +225,29 @@ export class FuturesService {
             'Cancel the pending entry before opening this instrument.',
           );
         if (entry) await releaseFuturesEntryReservation(tx, entry);
+        // A triggered Futures conditional entry (market execution) is locked
+        // after every existing fence and linked below in this transaction.
+        if (conditionalEntryId && request.operation !== 'open')
+          futuresError(
+            'FUTURES_CONDITIONAL_ENTRY_CHANGED',
+            'The conditional entry changed before execution.',
+          );
+        const conditional = conditionalEntryId
+          ? await lockTriggeredFuturesConditionalEntry(
+              tx,
+              conditionalEntryId,
+              accountId,
+              {
+                executionType: 'market',
+                instrumentId: request.instrumentId,
+                direction: request.direction,
+                marginMode: request.marginMode ?? 'isolated',
+                leverage: request.leverage,
+                quantity: request.quantity,
+                limitPrice: null,
+              },
+            )
+          : null;
         const executeNow = await this.dbNow(tx);
         assertFuturesOperation(request.operation);
         const lockedAccount = await this.access.getOwnedAccountOrThrow(
@@ -641,7 +670,7 @@ export class FuturesService {
               activatedAt: executeNow,
             },
           });
-        } else
+        } else {
           await tx.futuresExecuteRequest.create({
             data: {
               id: commandId,
@@ -654,6 +683,20 @@ export class FuturesService {
               createdAt: executeNow,
             },
           });
+          if (conditional) {
+            await assertFuturesConditionalEntryWindow(
+              tx,
+              conditional.triggeredAt,
+            );
+            await linkFuturesConditionalEntry(
+              tx,
+              conditional.id,
+              accountId,
+              { executionId },
+              executeNow,
+            );
+          }
+        }
         return result;
       });
     } catch (error) {

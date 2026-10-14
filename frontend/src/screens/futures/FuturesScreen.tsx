@@ -4,6 +4,11 @@ import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
 import QuestTarget from '../../features/quest/QuestTarget';
 import FuturesLimitEntryForm from './FuturesLimitEntryForm';
+import FuturesConditionalEntryForm, {
+  FuturesConditionalFields,
+  emptyFuturesConditionalDraft,
+  type FuturesConditionalDraft,
+} from './FuturesConditionalEntryForm';
 import FuturesCandleChart from './FuturesCandleChart';
 import FuturesHistory from './FuturesHistory';
 import FuturesInstrumentSheet from './FuturesInstrumentSheet';
@@ -32,6 +37,7 @@ import { resolveAccountBinding } from "../../features/tradingAccount/accountBind
 import { QUERY_KEYS } from "../../constants/queryKeys";
 import {
   executeFutures,
+  getFuturesConditionalEntries,
   getFuturesInstruments,
   getFuturesPositions,
   getFuturesFinalSettlement,
@@ -52,6 +58,7 @@ import {
 } from "../../features/futures/policy";
 import {
   DEFAULT_ORDER_METHOD,
+  getFuturesConditionalGate,
   getFuturesOrderMethodOptions,
   isOrderMethodSelectable,
   type OrderMethod,
@@ -126,6 +133,10 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [methodSheetOpen, setMethodSheetOpen] = useState(false);
   const [limitPrice, setLimitPrice] = useState("");
   const [limitBusy, setLimitBusy] = useState(false);
+  const [conditionalDraft, setConditionalDraft] = useState<FuturesConditionalDraft>(emptyFuturesConditionalDraft);
+  const [conditionalBusy, setConditionalBusy] = useState(false);
+  // The one position card whose TP/SL panel is open.
+  const [protectionPositionId, setProtectionPositionId] = useState<string | null>(null);
   const [operation, setOperation] = useState<Operation>("open");
   const [failure, setFailure] = useState<unknown>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -170,6 +181,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     queryFn: ({ signal }) => getFuturesPositions(accountId, signal),
     enabled: bound && focused,
     refetchInterval: 2000,
+    retry: false,
+  });
+  // Live conditional entries; their capabilities gate a new 조건주문.
+  const conditionalEntries = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.futures.conditionalEntries(accountId, 'open'),
+    queryFn: ({ signal }) => getFuturesConditionalEntries(accountId, 'open', signal),
+    enabled: bound && focused,
+    refetchInterval: 4000,
     retry: false,
   });
   const final = useQuery({
@@ -321,11 +340,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       markFresh,
       referenceFresh,
     );
-  // A command in flight, an unresolved result or a held limit entry keeps
-  // the contract, side and method that request was made with.
-  const locked = mutation.isPending || pendingResult || limitBusy;
+  // A command in flight, an unresolved result or a held limit/conditional
+  // entry keeps the contract, side and method that request was made with.
+  const locked = mutation.isPending || pendingResult || limitBusy || conditionalBusy;
   const choose = (id: string) => {
-    if (submitLock.current || pendingResult || limitBusy) return;
+    if (submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
     setInstrumentSheetOpen(false);
     setSelectedId(id);
     setQuantity("");
@@ -336,6 +355,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setMethod(DEFAULT_ORDER_METHOD);
     setMethodSheetOpen(false);
     setLimitPrice("");
+    setConditionalDraft(emptyFuturesConditionalDraft);
   };
   // Certain-only live check: opening or increasing needs some free collateral.
   // The margin a positive amount needs (Mark, leverage, fees) stays the
@@ -344,20 +364,26 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     !!selectedQuantity.trim() && !inputError && hasNoFreeCollateral(data.collateral.freeCollateral);
   const entryGate = learning.gate(selectedOperation === 'close' || selectedOperation === 'reduce' ? 'riskReduction' : 'allTrading');
   const advancedGate = learning.gate('allTrading');
-  const methodOptions = getFuturesOrderMethodOptions(!!position);
+  const conditionalGate = getFuturesConditionalGate({
+    isLoading: conditionalEntries.isPending,
+    isError: conditionalEntries.isError,
+    data: conditionalEntries.data?.tradingAccountId === accountId ? conditionalEntries.data : null,
+  });
+  const methodOptions = getFuturesOrderMethodOptions(!!position, conditionalGate);
   const selectedMethodOption = methodOptions.find((option) => option.method === method);
   // A method the position state no longer allows stays shown, never submits.
   const methodUnavailableReason = selectedMethodOption?.availability.state === 'unavailable'
     ? selectedMethodOption.availability.reason : null;
   const selectMethod = (next: OrderMethod) => {
     const option = methodOptions.find((item) => item.method === next);
-    if (!option || !isOrderMethodSelectable(option) || submitLock.current || pendingResult || limitBusy) return;
+    if (!option || !isOrderMethodSelectable(option) || submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
     (next === 'market' ? learning.gate('riskReduction') : advancedGate).guard(() => {
       setMethodSheetOpen(false);
       if (next === method) return;
-      // A new method never inherits the previous method's limit draft.
+      // A new method never inherits the previous method's limit or trigger draft.
       setMethod(next);
       setLimitPrice("");
+      setConditionalDraft(emptyFuturesConditionalDraft);
       setNotice(null);
     });
   };
@@ -597,16 +623,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               />
               {methodUnavailableReason ? (
                 <Text testID="futures-method-unavailable" style={styles.error}>{methodUnavailableReason}</Text>
-              ) : method === 'conditional' && position ? (
-                <ProtectionPanel
-                  accountId={accountId}
-                  assetId={instrument.underlying.assetId}
-                  domain="futures"
-                  positionId={position.id}
-                  currency="USD"
-                  onInputFocus={inputScroll.onInputFocus}
-                  onInputBlur={inputScroll.onInputBlur}
-                />
               ) : (
                 <>
                   {position ? (
@@ -617,7 +633,10 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         testID: `futures-operation-${op}`, disabled: locked,
                       }))} />
                   ) : null}
-                  <View style={styles.group}>
+                  {method === 'conditional' ? (
+                    <FuturesConditionalFields draft={conditionalDraft} onChange={setConditionalDraft} disabled={locked}
+                      onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
+                  ) : <View style={styles.group}>
                     <Text style={styles.label}>{method === 'limit' ? '진입 지정가' : '가격'} (USD)</Text>
                     {method === 'limit' ? (
                       <OrderNumberInput
@@ -635,7 +654,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     ) : (
                       <Text style={styles.marketPrice}>시장가 · 선물 Last 기준 체결</Text>
                     )}
-                  </View>
+                  </View>}
                   <View style={styles.group}>
                     <Text style={styles.label}>{selectedOperation === "close" ? "전량 종료 수량" : "거래 수량"}</Text>
                     <OrderNumberInput
@@ -654,7 +673,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   {selectedQuantity && inputError ? (
                     <Text style={styles.error}>{inputError}</Text>
                   ) : null}
-                  {collateralShort ? (
+                  {collateralShort && method !== 'conditional' ? (
                     <Text testID="futures-collateral-insufficient" accessibilityLiveRegion="polite" style={styles.error}>
                       {futuresErrorMessage('FUTURES_INSUFFICIENT_FREE_COLLATERAL')}
                     </Text>
@@ -668,6 +687,13 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       quantity={quantity} limitPrice={limitPrice}
                       allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !collateralShort && !pendingResult}
                       onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
+                  ) : method === 'conditional' ? (
+                    <FuturesConditionalEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
+                      direction={direction} marginMode={marginMode} leverage={leverage} quantity={quantity} draft={conditionalDraft}
+                      lastPrice={referenceFresh ? reference ?? null : null} displayDecimals={instrument.underlying.displayPriceDecimals}
+                      allowed={bound && focused && covered && data.capabilities.canOpen && referenceFresh && !inputError && !pendingResult
+                        && conditionalGate.state === 'ready' && conditionalGate.enabled}
+                      onBusy={setConditionalBusy} />
                   ) : (
                     <View ref={inputScroll.submitRef}>
                       <QuestTarget id="futures-submit"><CTAButton
@@ -765,19 +791,17 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                 <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={clock}
                   disabled={locked} capabilities={data.capabilities}
                   onSelect={op => {
-                    if (submitLock.current || pendingResult || limitBusy) return;
+                    if (submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
                     choose(p.instrumentId); setOperation(op);
                     focusTrade();
                   }}
-                  onProtection={() => {
-                    if (submitLock.current || pendingResult || limitBusy) return;
-                    choose(p.instrumentId); setMethod('conditional');
-                    focusTrade();
-                  }} />
+                  protectionOpen={protectionPositionId === p.id}
+                  onProtection={() => setProtectionPositionId((id) => (id === p.id ? null : p.id))}
+                  onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
               ))
             )
           ) : listView === 'pending' ? (
-            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} />
+            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} conditional />
           ) : (
             <FuturesHistory key={accountId} accountId={accountId} instruments={allInstruments} />
           )}

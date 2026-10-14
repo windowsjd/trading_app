@@ -57,11 +57,23 @@ export function futuresMarketDataConfig(env: NodeJS.ProcessEnv = process.env) {
     ),
   };
 }
+/** Futures Conditional Entry v1 (new watches and triggers only; read, cancel
+ * and lifecycle cleanup stay available). Strict true/false; omitted is false. */
+export function futuresConditionalEntryEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+) {
+  const value = env.FUTURES_CONDITIONAL_ENTRY_ENABLED ?? 'false';
+  if (!['true', 'false'].includes(value))
+    // @diagnosticSurface internal: Startup rejects invalid fixed feature configuration before serving requests.
+    throw new Error('FUTURES_CONDITIONAL_ENTRY_ENABLED must be true or false');
+  return value === 'true';
+}
 export function validateFuturesConfig(env: NodeJS.ProcessEnv = process.env) {
   const mode = futuresTradingMode(env);
   const risk = futuresRiskConfig(env);
   const last = futuresLastPriceConfig(env);
   futuresMarketDataConfig(env);
+  futuresConditionalEntryEnabled(env);
   if (mode === 'ENABLED' && (!risk.enabled || !risk.ingestion))
     throw new Error(
       'FUTURES_TRADING_MODE ENABLED requires FUTURES_RISK_ENGINE_ENABLED and FUTURES_MARK_INGESTION_ENABLED',

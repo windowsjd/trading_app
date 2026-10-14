@@ -238,6 +238,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.conditional_buy_orders]: false, // Dedicated bounded conditional BUY worker.
       [OpsJobName.limit_on_close_settlement]: false, // Dedicated bounded LOC settlement worker.
       [OpsJobName.conditional_sell_orders]: false, // Dedicated bounded SELL intent worker.
+      [OpsJobName.futures_conditional_entries]: false, // Dedicated bounded Futures conditional entry worker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

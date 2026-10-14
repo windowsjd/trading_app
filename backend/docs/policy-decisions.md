@@ -605,6 +605,25 @@ preserves financial atomicity without exchange-style fill event infrastructure.
 - 종가 증거는 KOSCOM 날짜 지정 일별 history(정확한 종목·거래일·마감 후 수신)를 마감 20분 후부터 수집하고, 5분 이상 간격으로 같은 값이 다시 관측되어야 final이다. 실시간 가격·분봉·일봉 캔들·전일 종가로 대체하지 않으며, 기한(마감 3시간) 안에 확정하지 못하면 예약을 해제하고 만료한다. 근거: 단일 응답만으로는 최종성을 증명할 수 없고, 미검증 가격으로 체결하거나 예약을 무기한 묶어 두면 안 된다.
 - 미국주식 조건주문·LOC는 데이터 제공처 확정 전까지 서버가 거부한다. 공통 market 컬럼과 세션·판정·최종성 구조만 둔다. 근거: 제공사 응답 형식을 가정한 구현은 하지 않는다.
 
+## Futures 시장 데이터·조건 진입 (2026-10-14, current)
+
+- [시장 데이터 계약](futures-market-data-contract.md): 선물 10호가와 24시간 등락률·거래대금은
+  USDⓈ-M 계약 자체 스트림(`@depth10@500ms`, `@ticker`)을 서버가 한 번만 수집해 공유한다.
+  Spot 호가·통계로 대체하지 않으며 호가 잔량은 가상 체결 유동성이 아니다.
+  근거: 표시용 시장 정보와 체결 가격 정책(Futures Last)을 분리한다.
+- [조건 진입 계약](futures-conditional-entry-contract.md): 선물 조건주문은 예약 없는 감시이며
+  검증된 Futures Last가 감시가격에 도달하면 기존 Futures 시장가 open 또는 지정가 진입 하나만
+  만든다. 근거: 금융 엔진을 복제하지 않고 기존 execution·limit entry를 유일한 체결 증거로 둔다.
+- 새 포지션 전용이다. 같은 계약에 포지션·대기 지정가 진입·다른 감시가 있으면 등록을 거부하고,
+  감시 중 포지션이 생기면 발동 시 기존 엔진의 거부로 실패한다. 근거: one-way 포지션을 의도치 않게
+  증가·감소·반전시키지 않는다.
+- 이미 충족된 조건은 등록을 거부하고 등록 이후 수신·체결된 신선한 Futures Last만 발동한다.
+  발동 후 30초·3회 안의 시세 일시 실패만 재시도하고 담보 부족 등 확정 실패는 즉시 `failed`다.
+  근거: Spot 조건주문과 같은 즉시 실행 방지·무한 재시도 금지 규칙.
+- 별도 플래그 `FUTURES_CONDITIONAL_ENTRY_ENABLED`(기본 false). 보유 포지션 TP/SL(보호주문)과 같은
+  주문 상태로 다루지 않으며 TP/SL은 포지션 카드에서 설정·관리한다.
+  근거: 신규 진입과 보유 포지션 보호를 화면과 상태에서 구분한다.
+
 ## Futures Limit Entry·Crypto Market 통합 (2026-10-08, current)
 
 - Entry는 flat 신규 전량 진입이고 account/instrument당 pending 하나다. Cross/Isolated,

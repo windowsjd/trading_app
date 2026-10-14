@@ -38,6 +38,7 @@ All routes are authenticated and account scoped under
 | GET `/positions` | Open positions and collateral risk foundation |
 | GET `/executions?limit=20&offset=0` | User Market execution history, newest first; limit 1–100 |
 | GET `/liquidations?limit=20&offset=0` | System liquidation events with all closes/Mark evidence; same bounds |
+| GET/POST `/conditional-entries`, POST `/conditional-entries/:entryId/cancel` | Futures Conditional Entry v1: reservation-free watch on Futures Last that opens one new position ([contract](futures-conditional-entry-contract.md)) |
 | GET `/final-settlement` | This account's single Season final exit, closes, pinned Futures Last (or legacy Spot) evidence and cash/shortfall; null if absent |
 
 Execute body: `instrumentId`, `operation` (`open`, `increase`, `reduce`, `close`),

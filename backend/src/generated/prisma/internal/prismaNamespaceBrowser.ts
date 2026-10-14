@@ -82,6 +82,7 @@ export const ModelName = {
   Position: 'Position',
   Order: 'Order',
   ConditionalBuyOrder: 'ConditionalBuyOrder',
+  FuturesConditionalEntry: 'FuturesConditionalEntry',
   ConditionalSellOrder: 'ConditionalSellOrder',
   LimitOnCloseOrder: 'LimitOnCloseOrder',
   SessionClosePriceEvidence: 'SessionClosePriceEvidence',
@@ -759,6 +760,39 @@ export const ConditionalBuyOrderScalarFieldEnum = {
 } as const
 
 export type ConditionalBuyOrderScalarFieldEnum = (typeof ConditionalBuyOrderScalarFieldEnum)[keyof typeof ConditionalBuyOrderScalarFieldEnum]
+
+
+export const FuturesConditionalEntryScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  direction: 'direction',
+  marginMode: 'marginMode',
+  leverage: 'leverage',
+  quantity: 'quantity',
+  triggerCondition: 'triggerCondition',
+  triggerPrice: 'triggerPrice',
+  executionType: 'executionType',
+  limitPrice: 'limitPrice',
+  status: 'status',
+  executionId: 'executionId',
+  limitOrderId: 'limitOrderId',
+  registrationSnapshotId: 'registrationSnapshotId',
+  triggerSnapshotId: 'triggerSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesConditionalEntryScalarFieldEnum = (typeof FuturesConditionalEntryScalarFieldEnum)[keyof typeof FuturesConditionalEntryScalarFieldEnum]
 
 
 export const ConditionalSellOrderScalarFieldEnum = {

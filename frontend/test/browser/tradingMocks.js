@@ -1,7 +1,7 @@
 import React from 'react';
 export const NavigationContext = React.createContext(undefined);
 import { conditionalFixture } from '../conditionalFixtures.cjs';
-import { futuresFixture, futuresCandlesFixture, futuresOrderBookFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, futuresCandlesFixture, futuresOrderBookFixture, futuresConditionalFixture } from '../futuresFixtures.cjs';
 import { getTradingAccountCapabilities } from '../../src/features/tradingAccount/capabilities';
 const params = new URLSearchParams(location.search);
 const pendingSpot = params.has('pending') && !['futures-only', 'none'].includes(params.get('pendingKind'));
@@ -307,6 +307,8 @@ export const apiClient = {
     }
     const scoped = { state: 'available', tradingAccountId: state.accountId };
     const pagination = {limit:100,offset:0,total:0,returned:0,nextOffset:null};
+    if (path.includes('/futures/conditional-entries'))
+      return response(futuresConditionalFixture(state.accountId, path.includes('state=ended') ? 'ended' : 'open', params.get('conditional')));
     if(path.includes('/futures/')) {
       const f=futuresFixture(state.accountId,{large:true});
       if(path.includes('limit-orders')) return response({...scoped,orders:pendingFutures ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]})) : [],pagination});
@@ -393,6 +395,9 @@ export const apiClient = {
     }
     if (path.includes('/conditional-sell-orders/') && path.endsWith('/cancel'))
       return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: null });
+    // Futures conditional entries: registration and cancel answer the watch.
+    if (path.includes('/futures/conditional-entries'))
+      return response({ tradingAccountId: state.accountId, duplicate: false, entry: { id: 'entry', state: path.endsWith('/cancel') ? 'canceled' : 'watching', ...body } });
     const asset = assets.find((a) => a.id === body.assetId);
     const loc = body.limitOnClose ? { market: 'KRX', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T00:00:00.000Z',
       sessionCloseAt: '2026-10-13T06:30:00.000Z', evidenceDeadlineAt: '2026-10-13T09:30:00.000Z', executionPricePolicy: 'final_regular_session_close' } : null;

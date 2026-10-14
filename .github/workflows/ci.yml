@@ -181,6 +181,9 @@ jobs:
       FUTURES_F31_DB_INTEGRATION: "1"
       CONDITIONAL_DB_INTEGRATION: "1"
       FUTURES_LIMIT_DB_INTEGRATION: "1"
+      # Futures conditional entries: watch → one market open or limit entry
+      # through the existing Futures cores; races, lifecycle and modes.
+      FUTURES_CONDITIONAL_ENTRY_DB_INTEGRATION: "1"
       # Conditional BUY watches and KRX Limit-on-Close: trigger/fill through
       # the existing order cores, final close evidence, races and lifecycle.
       CONDITIONAL_BUY_DB_INTEGRATION: "1"
@@ -246,6 +249,7 @@ jobs:
           src/conditional/conditional-sell.integration.spec.ts
           src/orders/limit-on-close.integration.spec.ts
           src/futures/futures-limit.integration.spec.ts
+          src/futures/futures-conditional-entry.integration.spec.ts
           src/futures/futures-isolated-boundary.integration.spec.ts
           src/orders/limit-order-create-race.integration.spec.ts
           src/orders/limit-order-transaction-time.integration.spec.ts

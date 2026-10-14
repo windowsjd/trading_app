@@ -1,5 +1,5 @@
 import { conditionalFixture } from '../conditionalFixtures.cjs';
-import { futuresFixture, accounts, futuresCandlesFixture, futuresOrderBookFixture } from '../futuresFixtures.cjs';
+import { futuresFixture, accounts, futuresCandlesFixture, futuresOrderBookFixture, futuresConditionalFixture } from '../futuresFixtures.cjs';
 const params = new URLSearchParams(location.search);
 export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED' };
 export const useIsFocused = () => true;
@@ -23,6 +23,14 @@ export const apiClient = {
       const id=path.split('/')[2], data=conditionalFixture(id,{enabled:!!protection&&protection!=='complete',active:protection==='active',holding:protection==='holding',complete:protection==='complete',mode:state.mode,domain:'futures'});
       return {data:{success:true,data}};
     }
+    // 대기 주문 › 조건주문 also reads the Spot watches of the account (none here).
+    if (path.includes('/conditional-buy-orders') || path.includes('/conditional-sell-orders'))
+      return { data: { success: true, data: { tradingAccountId: path.split('/')[2], conditionalOrders: [],
+        capabilities: { enabled: true, canCreate: true, canCancel: true, canUseLimit: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20,
+          condition: { enabled: true, canCreate: true, canUseLimit: true }, protection: { enabled: true, canCreate: true, canUseLimit: true } },
+        pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } } } };
+    if (path.includes('/conditional-entries'))
+      return { data: { success: true, data: futuresConditionalFixture(path.split('/')[2], path.includes('state=ended') ? 'ended' : 'open', params.get('conditional')) } };
     if (state.kind === 'loading') return new Promise(() => {});
     if (state.kind === 'error') throw new Error('fixture unavailable');
     const id = path.split('/')[2];
@@ -31,7 +39,7 @@ export const apiClient = {
     if(path.endsWith('/orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
     return { data: { success: true, data: path.includes('instruments') ? fixture.catalog : path.includes('positions') ? fixture.positions : path.includes('liquidations') ? fixture.liquidations : path.includes('executions') ? fixture.executions : fixture.final } };
   },
-  async post(path, body) { state.requests.push({ path, body }); if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture',
+  async post(path, body) { state.requests.push({ path, body }); if(path.includes('/conditional-entries')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],duplicate:false,entry:{id:'entry',state:path.endsWith('/cancel')?'canceled':'watching',...body}}}}; if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture',
     // The execution shape the screen reports (quest command included), as in test/futuresHarness.cjs.
     execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 1),
       positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.2' } } } }; },

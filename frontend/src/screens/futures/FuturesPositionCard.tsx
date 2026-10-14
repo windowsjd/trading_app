@@ -14,20 +14,26 @@ import type { FuturesPosition, FuturesCapabilities, Operation } from '../../feat
 import { futuresHolding, getFuturesPositionDisplay } from '../../features/futures/positionDisplay';
 import { formatAssetPrice, formatDisplayDecimal, formatMoneyDecimal, getFinancialDirection } from '../../utils/format';
 import CTAButton from '../../components/common/CTAButton';
+import ProtectionPanel from '../../features/conditional/ProtectionPanel';
 
 type Props = { position: FuturesPosition; accountId: string; evaluatedAt: string; now: number;
   disabled: boolean; capabilities: FuturesCapabilities; onSelect: (operation: Exclude<Operation, 'open'>) => void;
-  /** Opens this position's 조건주문 (stop-loss/take-profit) in the trade form. */
-  onProtection: () => void };
+  /** Whether this card shows its TP/SL panel (one card at a time). */
+  protectionOpen: boolean;
+  /** Opens or closes this position's TP/SL panel in the card. */
+  onProtection: () => void;
+  onInputFocus?: (input: View | null) => void; onInputBlur?: () => void };
 
 /**
  * One open futures position: what it is (contract, direction, margin mode,
  * leverage), how it performs on Mark, its size and prices, its TP/SL and
  * realized result, and the actions that select it in the trade form. A
- * liquidation price is individual to an isolated position only.
+ * liquidation price is individual to an isolated position only. TP/SL is set,
+ * changed and canceled here, in the existing protection panel of this
+ * position — never through the trade form's 조건주문 (a new-position entry).
  */
 export default function FuturesPositionCard({ position: p, accountId, evaluatedAt, now,
-  disabled, capabilities, onSelect, onProtection }: Props) {
+  disabled, capabilities, onSelect, protectionOpen, onProtection, onInputFocus, onInputBlur }: Props) {
   const { width, fontScale } = useWindowDimensions();
   const learning = useLearningAccess(accountId).gate('allTrading');
   const guide = useQuestGuide();
@@ -72,7 +78,11 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
       </> : null}
     </View>
     {isolated ? null : <Text style={styles.caption}>선물 USD 지갑의 공동 담보를 사용합니다. 교차 담보와 청산 위험은 공동 평가 영역에서 확인해주세요.</Text>}
-    <ProtectionSummary position={p} accountId={accountId} price={price} disabled={disabled} onProtection={onProtection} />
+    <ProtectionSummary position={p} accountId={accountId} price={price} disabled={disabled} open={protectionOpen} onProtection={onProtection} />
+    {protectionOpen ? (
+      <ProtectionPanel accountId={accountId} assetId={p.instrument.underlying.assetId} domain="futures" positionId={p.id}
+        currency="USD" onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
+    ) : null}
     <View style={styles.line} testID={`futures-position-${p.id}-realized`}>
       <Text style={styles.lineLabel}>누적 실현 손익 · USD</Text>
       <Text selectable style={[styles.lineValue, realizedDirection !== 'neutral' && { color: financial[realizedDirection] }]}>
@@ -90,13 +100,13 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
 }
 
 /**
- * The position's live TP/SL group at a glance (TP / SL triggers). Registering,
- * managing and cancelling stay in the trade form's 조건주문, one panel per
- * position; this line only reads the same account-scoped protection list.
+ * The position's live TP/SL group at a glance (TP / SL triggers). Its button
+ * opens this card's protection panel (register, change, cancel, history); this
+ * line only reads the same account-scoped protection list.
  */
-function ProtectionSummary({ position: p, accountId, price, disabled, onProtection }: {
+function ProtectionSummary({ position: p, accountId, price, disabled, open, onProtection }: {
   position: FuturesPosition; accountId: string; price: (value: string | null | undefined) => string;
-  disabled: boolean; onProtection: () => void;
+  disabled: boolean; open: boolean; onProtection: () => void;
 }) {
   const focused = useIsFocused();
   const assetId = p.instrument.underlying.assetId;
@@ -113,8 +123,8 @@ function ProtectionSummary({ position: p, accountId, price, disabled, onProtecti
       <Text style={styles.caption}>TP/SL · 익절 / 손절</Text>
       <Text testID={`futures-position-${p.id}-protection-status`} selectable style={styles.protectionValue}>{status}</Text>
     </View>
-    <CTAButton variant="secondary" testID={`futures-position-${p.id}-protection`} label={group ? 'TP/SL 관리' : 'TP/SL 설정'}
-      style={styles.protectionAction} state={disabled ? 'disabled' : 'enabled'} onPress={onProtection} />
+    <CTAButton variant="secondary" testID={`futures-position-${p.id}-protection`} label={open ? 'TP/SL 접기' : group ? 'TP/SL 관리' : 'TP/SL 설정'}
+      style={styles.protectionAction} state={disabled && !open ? 'disabled' : 'enabled'} onPress={onProtection} />
   </View>;
 }
 

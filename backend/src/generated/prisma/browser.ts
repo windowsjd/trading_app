@@ -174,6 +174,11 @@ export type Order = Prisma.OrderModel
  */
 export type ConditionalBuyOrder = Prisma.ConditionalBuyOrderModel
 /**
+ * Model FuturesConditionalEntry
+ * 
+ */
+export type FuturesConditionalEntry = Prisma.FuturesConditionalEntryModel
+/**
  * Model ConditionalSellOrder
  * 
  */

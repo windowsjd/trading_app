@@ -24,7 +24,7 @@ for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: detail
   }
 });
 
-test('the card TP/SL entrance opens that position\'s 조건주문: one panel manages the existing group, never a duplicate registration', async t => {
+test('the card TP/SL entrance opens that position\'s TP/SL panel in the card: one panel manages the existing group, never a duplicate registration', async t => {
   const h = futuresHarness({ position: true, protectionEnabled: true });
   h.protectionOptions = { active: true };
   await h.start(); t.after(h.close);
@@ -34,18 +34,22 @@ test('the card TP/SL entrance opens that position\'s 조건주문: one panel man
   assert.equal(h.node('futures-position-A:position-protection').props.label, 'TP/SL 관리');
   assert.equal(panels(), 0);
   await h.press('futures-position-A:position-protection');
-  assert.equal(h.orderType(), '조건주문');
+  // TP/SL is managed in the position card; the trade form keeps its method.
+  assert.equal(h.orderType(), '시장가');
   assert.equal(panels(), 1);
+  const inCard = h.node('futures-position-A:position').findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'protection-panel').length;
+  assert.equal(inCard, 1);
+  assert.equal(h.node('futures-position-A:position-protection').props.label, 'TP/SL 접기');
   assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
   assert.equal(h.renderer.root.findAllByType('CTAButton').some(n => n.props.label === '보호 조건 취소'), true);
-  assert.equal(h.node('futures-submit') === undefined, true, 'a conditional order is not a market execution');
+  assert.equal(h.node('futures-conditional-fields') === undefined, true, 'TP/SL is not a new-position 조건주문');
   assert.equal(h.requests.length, 0);
   await h.press('futures-position-A:position-protection');
-  assert.equal(panels(), 1);
+  assert.equal(panels(), 0);
   assert.equal(h.requests.length, 0);
 });
 
-test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 조건주문; flat 조건주문 and held 지정가 explain why they wait', async t => {
+test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 조건주문; flat 조건주문 is a new-position entry, held 지정가/조건주문 explain why they wait', async t => {
   const methods = (h: any) => ['market', 'limit', 'conditional', 'loc', 'protection'].filter(m => h.node(`order-method-${m}`) !== undefined);
   const flat = futuresHarness({ protectionEnabled: true });
   await flat.start(); t.after(flat.close);
@@ -53,11 +57,14 @@ test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 
   assert.equal(flat.node('order-type-select').props.accessibilityLabel, '주문방식 시장가, 주문방식 선택하기');
   await flat.press('order-type-select');
   assert.deepEqual(methods(flat), ['market', 'limit', 'conditional']);
-  assert.equal(flat.node('order-method-conditional').props.disabled, true);
-  assert.equal(flat.node('order-method-conditional-badge').props.children, '이용 불가');
+  assert.equal(flat.node('order-method-conditional').props.disabled, false);
   await flat.press('order-method-conditional');
-  assert.equal(flat.orderType(), '시장가', 'a refused choice keeps the method');
-  await flat.press('order-method-limit');
+  assert.equal(flat.orderType(), '조건주문');
+  assert.equal(flat.node('futures-conditional-trigger-price').props.value, '');
+  assert.equal(flat.node('futures-submit') === undefined, true, 'a conditional entry registers through its own form');
+  const tradeCardPanels = flat.node('futures-trade').findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'protection-panel').length;
+  assert.equal(tradeCardPanels, 0, 'a new-position 조건주문 is not position TP/SL');
+  await flat.selectMethod('limit');
   assert.equal(flat.orderType(), '지정가');
   assert.equal(flat.node('futures-limit-price').props.value, '');
   assert.equal(flat.node('futures-submit') === undefined, true, 'the limit entry submits through its own form');
@@ -67,7 +74,10 @@ test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 
   await held.press('order-type-select');
   assert.deepEqual(methods(held), ['market', 'limit', 'conditional']);
   assert.equal(held.node('order-method-limit').props.disabled, true);
-  assert.equal(held.node('order-method-conditional').props.disabled, false);
+  assert.equal(held.node('order-method-conditional').props.disabled, true);
+  assert.equal(held.node('order-method-conditional-badge').props.children, '이용 불가');
+  await held.press('order-method-conditional');
+  assert.equal(held.orderType(), '시장가', 'a refused choice keeps the method');
   await held.press('order-method-limit');
   assert.equal(held.orderType(), '시장가');
   assert.equal(held.requests.length + flat.requests.length, 0);

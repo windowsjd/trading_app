@@ -35,6 +35,11 @@ import { readFuturesMark } from './futures-mark';
 import { readFuturesLastPrice } from './futures-last-price';
 import { cancelFuturesEntriesInTransaction } from './futures-limit-state';
 import {
+  assertFuturesConditionalEntryWindow,
+  linkFuturesConditionalEntry,
+  lockTriggeredFuturesConditionalEntry,
+} from './futures-conditional-entry-state';
+import {
   futuresInstrumentInclude,
   presentFuturesInstrument,
 } from './futures.presenter';
@@ -135,7 +140,12 @@ export class FuturesLimitService {
     await tx.$queryRaw`SELECT id FROM cash_wallets WHERE trading_account_id = ${account.id} AND wallet_scope = 'crypto_futures' AND currency_code = 'USD' FOR UPDATE`;
     return this.access.getOwnedAccountOrThrow(account.userId, account.id, tx);
   }
-  async create(userId: string | undefined, accountId: string, body: unknown) {
+  async create(
+    userId: string | undefined,
+    accountId: string,
+    body: unknown,
+    conditionalEntryId?: string,
+  ) {
     const account = await this.account(userId, accountId);
     const request = parseFuturesEntry(body);
     const requestHash = conditionalHash({ accountId, ...request });
@@ -163,6 +173,24 @@ export class FuturesLimitService {
           },
         };
       }
+      // A triggered Futures conditional entry (limit execution) is locked after
+      // the existing fences and linked to the entry created below.
+      const conditional = conditionalEntryId
+        ? await lockTriggeredFuturesConditionalEntry(
+            tx,
+            conditionalEntryId,
+            accountId,
+            {
+              executionType: 'limit',
+              instrumentId: request.instrumentId,
+              direction: request.direction,
+              marginMode: request.marginMode ?? 'isolated',
+              leverage: request.leverage,
+              quantity: request.quantity,
+              limitPrice: request.limitPrice,
+            },
+          )
+        : null;
       assertFuturesOperation('open');
       const now = await this.futures.dbNow(tx);
       await this.futures.assertTradable(locked, now, tx);
@@ -265,6 +293,16 @@ export class FuturesLimitService {
           legs: request.legs,
           now,
         });
+      if (conditional) {
+        await assertFuturesConditionalEntryWindow(tx, conditional.triggeredAt);
+        await linkFuturesConditionalEntry(
+          tx,
+          conditional.id,
+          accountId,
+          { limitOrderId: order.id },
+          now,
+        );
+      }
       return {
         success: true,
         data: {

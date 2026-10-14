@@ -275,6 +275,7 @@ enum OpsJobName {
   conditional_sell_orders
   market_candle_long_sync
   futures_candle_sync
+  futures_conditional_entries
 }
 
 enum MarketCandleSyncMode {
@@ -485,6 +486,7 @@ model TradingAccount {
   futuresExecutions             FuturesExecution[]
   futuresExecuteRequests        FuturesExecuteRequest[]
   futuresLimitOrders            FuturesLimitOrder[]
+  futuresConditionalEntries     FuturesConditionalEntry[]
   futuresLiquidations           FuturesLiquidation[]
   futuresSeasonSettlement       FuturesSeasonSettlement?
   protectionGroups              ProtectionGroup[]
@@ -905,16 +907,17 @@ model FuturesInstrument {
   createdAt          DateTime           @default(now()) @map("created_at")
   updatedAt          DateTime           @updatedAt @map("updated_at")
 
-  underlyingAsset   Asset                      @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
-  positions         FuturesPosition[]
-  executions        FuturesExecution[]
-  marks             FuturesMarkSnapshot[]
-  lastPrices        FuturesLastPriceSnapshot[]
-  liquidationCloses FuturesLiquidationClose[]
-  seasonPrices      FuturesSeasonPrice[]
-  seasonCloses      FuturesSeasonClose[]
-  limitOrders       FuturesLimitOrder[]
-  marketCandles     FuturesMarketCandle[]
+  underlyingAsset    Asset                      @relation(fields: [underlyingAssetId], references: [id], onDelete: Restrict)
+  positions          FuturesPosition[]
+  executions         FuturesExecution[]
+  marks              FuturesMarkSnapshot[]
+  lastPrices         FuturesLastPriceSnapshot[]
+  liquidationCloses  FuturesLiquidationClose[]
+  seasonPrices       FuturesSeasonPrice[]
+  seasonCloses       FuturesSeasonClose[]
+  limitOrders        FuturesLimitOrder[]
+  conditionalEntries FuturesConditionalEntry[]
+  marketCandles      FuturesMarketCandle[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -1026,6 +1029,7 @@ model FuturesExecution {
   executeRequest     FuturesExecuteRequest?
   protectionChild    ProtectionChild?
   limitOrder         FuturesLimitOrder?
+  conditionalEntry   FuturesConditionalEntry?
 
   @@unique([id, tradingAccountId])
   @@index([tradingAccountId, executedAt, id])
@@ -1081,10 +1085,11 @@ model FuturesLimitOrder {
   endedAt             DateTime?         @map("ended_at")
   updatedAt           DateTime          @updatedAt @map("updated_at")
 
-  tradingAccount TradingAccount    @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  instrument     FuturesInstrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  execution      FuturesExecution? @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
-  protection     ProtectionGroup?
+  tradingAccount   TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument       FuturesInstrument        @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  execution        FuturesExecution?        @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  protection       ProtectionGroup?
+  conditionalEntry FuturesConditionalEntry?
 
   @@unique([executionId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey])
@@ -1382,6 +1387,58 @@ model ConditionalBuyOrder {
   @@index([registrationSnapshotId])
   @@index([triggerSnapshotId])
   @@map("conditional_buy_orders")
+}
+
+// Futures Conditional Entry v1 (docs/futures-conditional-entry-contract.md):
+// a watch-only NEW-position intent on Futures Last. Watching reserves nothing.
+// A trigger creates at most ONE ordinary Futures market execution or Futures
+// limit entry through the existing services; that row (never this one) is the
+// financial evidence. Shares the Conditional BUY trigger/status enums. SQL
+// CHECKs and the one-live-per-instrument partial unique index are migration only.
+model FuturesConditionalEntry {
+  id                     String                @id @default(uuid())
+  tradingAccountId       String                @map("trading_account_id")
+  instrumentId           String                @map("instrument_id")
+  direction              FuturesDirection
+  marginMode             FuturesMarginMode     @map("margin_mode")
+  leverage               Int
+  quantity               Decimal               @db.Decimal(24, 8)
+  triggerCondition       ConditionalBuyTrigger @map("trigger_condition")
+  triggerPrice           Decimal               @map("trigger_price") @db.Decimal(24, 8)
+  executionType          OrderType             @map("execution_type")
+  limitPrice             Decimal?              @map("limit_price") @db.Decimal(24, 8)
+  status                 ConditionalBuyStatus  @default(watching)
+  executionId            String?               @unique @map("execution_id")
+  limitOrderId           String?               @unique @map("limit_order_id")
+  registrationSnapshotId String                @map("registration_snapshot_id")
+  triggerSnapshotId      String?               @map("trigger_snapshot_id")
+  triggerEvidenceJson    Json?                 @map("trigger_evidence_json")
+  triggeredAt            DateTime?             @map("triggered_at")
+  attemptCount           Int                   @default(0) @map("attempt_count")
+  lastAttemptAt          DateTime?             @map("last_attempt_at")
+  failureCode            String?               @map("failure_code")
+  terminalReason         String?               @map("terminal_reason")
+  idempotencyKey         String                @map("idempotency_key")
+  requestHash            String                @map("request_hash")
+  createdAt              DateTime              @default(now()) @map("created_at")
+  endedAt                DateTime?             @map("ended_at")
+  updatedAt              DateTime              @updatedAt @map("updated_at")
+
+  tradingAccount       TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument           FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  execution            FuturesExecution?         @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  limitOrder           FuturesLimitOrder?        @relation(fields: [limitOrderId], references: [id], onDelete: Restrict)
+  registrationSnapshot FuturesLastPriceSnapshot  @relation("FuturesConditionalEntryRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
+  triggerSnapshot      FuturesLastPriceSnapshot? @relation("FuturesConditionalEntryTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+
+  @@unique([executionId, tradingAccountId])
+  @@unique([tradingAccountId, idempotencyKey])
+  @@index([status, id])
+  @@index([tradingAccountId, createdAt, id])
+  @@index([instrumentId])
+  @@index([registrationSnapshotId])
+  @@index([triggerSnapshotId])
+  @@map("futures_conditional_entries")
 }
 
 enum ConditionalSellKind {
@@ -2152,19 +2209,21 @@ enum FuturesLastPriceSource {
 // trigger and Season final price. Never Spot, Mark or Index evidence.
 // effectiveAt is the provider trade time; capturedAt is the server receipt time.
 model FuturesLastPriceSnapshot {
-  id                 String                 @id @default(uuid())
-  instrumentId       String                 @map("instrument_id")
-  symbol             String
-  providerProduct    String                 @default("binance_usdm_perpetual") @map("provider_product")
-  currencyCode       CurrencyCode           @default(USD) @map("currency_code")
-  source             FuturesLastPriceSource
-  price              Decimal                @db.Decimal(24, 8)
-  effectiveAt        DateTime               @map("effective_at")
-  capturedAt         DateTime               @map("captured_at")
-  instrument         FuturesInstrument      @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
-  executions         FuturesExecution[]
-  seasonPrices       FuturesSeasonPrice[]
-  protectionTriggers ProtectionChild[]
+  id                            String                    @id @default(uuid())
+  instrumentId                  String                    @map("instrument_id")
+  symbol                        String
+  providerProduct               String                    @default("binance_usdm_perpetual") @map("provider_product")
+  currencyCode                  CurrencyCode              @default(USD) @map("currency_code")
+  source                        FuturesLastPriceSource
+  price                         Decimal                   @db.Decimal(24, 8)
+  effectiveAt                   DateTime                  @map("effective_at")
+  capturedAt                    DateTime                  @map("captured_at")
+  instrument                    FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  executions                    FuturesExecution[]
+  seasonPrices                  FuturesSeasonPrice[]
+  protectionTriggers            ProtectionChild[]
+  conditionalEntryRegistrations FuturesConditionalEntry[] @relation("FuturesConditionalEntryRegistrationSnapshot")
+  conditionalEntryTriggers      FuturesConditionalEntry[] @relation("FuturesConditionalEntryTriggerSnapshot")
 
   @@unique([instrumentId, source, capturedAt])
   @@index([instrumentId, effectiveAt, capturedAt])

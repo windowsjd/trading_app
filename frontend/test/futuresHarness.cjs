@@ -27,6 +27,14 @@ function futuresHarness(options = {}) {
           return { data: { success: true, data: h.futuresCandles?.(instrumentId) ?? futuresCandlesFixture(instrumentId) } };
         }
         const f = futuresFixture(h.wrongScope ?? id, h.options);
+        // Futures conditional entries: capabilities + rows per state (open/ended).
+        if (path.includes('conditional-entries')) {
+          const state = path.includes('state=ended') ? 'ended' : 'open';
+          const entries = h.conditionalEntries?.[state] ?? [];
+          return { data: { success: true, data: { tradingAccountId: h.wrongScope ?? id,
+            capabilities: h.conditionalCapabilities ?? { enabled: true, canCreate: true, maxLivePerAccount: 20 }, entries,
+            pagination: { limit: 100, offset: 0, total: entries.length, returned: entries.length, nextOffset: null } } } };
+        }
         if (path.includes('limit-orders')) return { data: { data: { tradingAccountId: h.wrongScope ?? id, orders: h.pendingEntries ?? [], pagination: { limit: 100, offset: 0, total: h.pendingEntries?.length ?? 0, returned: h.pendingEntries?.length ?? 0, nextOffset: null } } } };
         const key = path.includes('instruments') ? 'catalog' : path.includes('positions') ? 'positions' : path.includes('executions') ? 'executions' : path.includes('liquidations') ? 'liquidations' : 'final';
         // Market list tests replace the catalog's contracts (24h statistics etc.).
@@ -36,6 +44,8 @@ function futuresHarness(options = {}) {
       post: async (path, body) => {
         h.requests.push({ path, body }); if (h.gate) await h.gate.promise;
         if (h.failure) throw h.failure;
+        if (path.includes('conditional-entries')) return { data: { success: true, data: { tradingAccountId: path.split('/')[2], duplicate: false,
+          entry: { id: 'entry', state: path.endsWith('/cancel') ? 'canceled' : 'watching', ...body } } } };
         return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'command', execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 37), positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.1' } } } };
       },
     } },
@@ -59,6 +69,13 @@ function futuresHarness(options = {}) {
     '@react-navigation/native': { useIsFocused: () => true }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
     '../../features/futures/api': api,
     '../../features/conditional/api': conditionalApi,
+    // 대기 주문 › 조건주문 also lists Spot watches; inert, account-scoped pages.
+    '../../features/conditional/conditionalBuyApi': { getConditionalBuyOrders: async id => ({ tradingAccountId: id,
+      capabilities: { enabled: true, canCreate: true, canCancel: true, canUseLimit: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+      conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) },
+    '../../features/conditional/conditionalSellApi': { getConditionalSellOrders: async id => ({ tradingAccountId: id,
+      capabilities: { enabled: true, condition: { enabled: true, canCreate: true, canUseLimit: true }, protection: { enabled: true, canCreate: true, canUseLimit: true }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+      conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) },
     '../../features/tradingAccount/api': { getTradingAccountOrders: async id => ({ tradingAccountId: id, orders: [], pagination: { offset: 0, limit: 100, total: 0, returned: 0, nextOffset: null } }) },
     '../../features/record/api': load(resolve(__dirname, '../src/features/record/api.ts'), { '../../services/api/client': { apiClient: {} }, './openOrder': require('../src/features/record/openOrder.ts') }),
     '../../features/futures/policy': load(resolve(__dirname, '../src/features/futures/policy.ts'), {}),

@@ -602,6 +602,32 @@ describe('SeasonSettlementJobService', () => {
     },
   );
 
+  it.each(['preflight', 'under-season-lock'])(
+    'blocks live Futures conditional entries (reservation-free) at %s',
+    async (boundary) => {
+      const { service, prisma } = createService();
+      mockSeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      mockSnapshots(prisma, [snapshot('sp-1', 'user-1', '1000.00000000')]);
+      const client = boundary === 'preflight' ? prisma : prisma.__tx;
+      client.futuresConditionalEntry.count.mockResolvedValue(1);
+      const response = await captureHttpExceptionResponse(
+        service.run({ seasonId: 'season-1', settlementDate }),
+      );
+      expect(response.error.code).toBe('OPEN_LIMIT_ORDER_RESERVATIONS');
+      expect(client.futuresConditionalEntry.count).toHaveBeenCalledWith({
+        where: {
+          status: { in: ['watching', 'triggered'] },
+          tradingAccount: { seasonParticipant: { seasonId: 'season-1' } },
+        },
+      });
+      expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+      if (boundary === 'preflight')
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
   it('ranks by returnRate desc, then userId asc, then seasonParticipantId asc', async () => {
     const { service, prisma } = createService();
     mockSeason(prisma, SeasonStatus.ended);

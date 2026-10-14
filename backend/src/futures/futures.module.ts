@@ -19,6 +19,9 @@ import { FuturesLimitWorker } from './futures-limit-worker.service';
 import { FuturesMarketDataIngestion } from './futures-market-data-ingestion.service';
 import { FuturesMarketStatsStore } from './futures-market-stats.store';
 import { ProvidersModule } from '../providers/providers.module';
+import { FuturesConditionalEntryController } from './futures-conditional-entry.controller';
+import { FuturesConditionalEntryService } from './futures-conditional-entry.service';
+import { FuturesConditionalEntryWorker } from './futures-conditional-entry-worker.service';
 
 @Module({
   imports: [
@@ -27,13 +30,19 @@ import { ProvidersModule } from '../providers/providers.module';
     RedisModule,
     ProvidersModule,
   ],
-  controllers: [FuturesController, FuturesLimitController],
+  controllers: [
+    FuturesController,
+    FuturesLimitController,
+    FuturesConditionalEntryController,
+  ],
   exports: [FuturesService],
   providers: [
     FuturesPerformanceService,
     FuturesService,
     FuturesLimitService,
     FuturesLimitWorker,
+    FuturesConditionalEntryService,
+    FuturesConditionalEntryWorker,
     FuturesLiquidationService,
     FuturesRiskWorker,
     FuturesMarkIngestion,

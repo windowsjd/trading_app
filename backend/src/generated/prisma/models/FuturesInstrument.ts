@@ -219,6 +219,7 @@ export type FuturesInstrumentWhereInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceListRelationFilter
   seasonCloses?: Prisma.FuturesSeasonCloseListRelationFilter
   limitOrders?: Prisma.FuturesLimitOrderListRelationFilter
+  conditionalEntries?: Prisma.FuturesConditionalEntryListRelationFilter
   marketCandles?: Prisma.FuturesMarketCandleListRelationFilter
 }
 
@@ -241,6 +242,7 @@ export type FuturesInstrumentOrderByWithRelationInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceOrderByRelationAggregateInput
   seasonCloses?: Prisma.FuturesSeasonCloseOrderByRelationAggregateInput
   limitOrders?: Prisma.FuturesLimitOrderOrderByRelationAggregateInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryOrderByRelationAggregateInput
   marketCandles?: Prisma.FuturesMarketCandleOrderByRelationAggregateInput
 }
 
@@ -267,6 +269,7 @@ export type FuturesInstrumentWhereUniqueInput = Prisma.AtLeast<{
   seasonPrices?: Prisma.FuturesSeasonPriceListRelationFilter
   seasonCloses?: Prisma.FuturesSeasonCloseListRelationFilter
   limitOrders?: Prisma.FuturesLimitOrderListRelationFilter
+  conditionalEntries?: Prisma.FuturesConditionalEntryListRelationFilter
   marketCandles?: Prisma.FuturesMarketCandleListRelationFilter
 }, "id" | "underlyingAssetId_productType_settlementCurrency">
 
@@ -318,6 +321,7 @@ export type FuturesInstrumentCreateInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -339,6 +343,7 @@ export type FuturesInstrumentUncheckedCreateInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -360,6 +365,7 @@ export type FuturesInstrumentUpdateInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -381,6 +387,7 @@ export type FuturesInstrumentUncheckedUpdateInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -576,6 +583,20 @@ export type FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutLimitOrdersInput, Prisma.FuturesInstrumentUpdateWithoutLimitOrdersInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutLimitOrdersInput>
 }
 
+export type FuturesInstrumentCreateNestedOneWithoutConditionalEntriesInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutConditionalEntriesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+}
+
+export type FuturesInstrumentUpdateOneRequiredWithoutConditionalEntriesNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput>
+  connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutConditionalEntriesInput
+  upsert?: Prisma.FuturesInstrumentUpsertWithoutConditionalEntriesInput
+  connect?: Prisma.FuturesInstrumentWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesInstrumentUpdateToOneWithWhereWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUpdateWithoutConditionalEntriesInput>, Prisma.FuturesInstrumentUncheckedUpdateWithoutConditionalEntriesInput>
+}
+
 export type FuturesInstrumentCreateNestedOneWithoutLastPricesInput = {
   create?: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutLastPricesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutLastPricesInput>
   connectOrCreate?: Prisma.FuturesInstrumentCreateOrConnectWithoutLastPricesInput
@@ -663,6 +684,7 @@ export type FuturesInstrumentCreateWithoutUnderlyingAssetInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -683,6 +705,7 @@ export type FuturesInstrumentUncheckedCreateWithoutUnderlyingAssetInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -745,6 +768,7 @@ export type FuturesInstrumentCreateWithoutMarketCandlesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentUncheckedCreateWithoutMarketCandlesInput = {
@@ -765,6 +789,7 @@ export type FuturesInstrumentUncheckedCreateWithoutMarketCandlesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
 }
 
 export type FuturesInstrumentCreateOrConnectWithoutMarketCandlesInput = {
@@ -801,6 +826,7 @@ export type FuturesInstrumentUpdateWithoutMarketCandlesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentUncheckedUpdateWithoutMarketCandlesInput = {
@@ -821,6 +847,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutMarketCandlesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
 }
 
 export type FuturesInstrumentCreateWithoutPositionsInput = {
@@ -840,6 +867,7 @@ export type FuturesInstrumentCreateWithoutPositionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -860,6 +888,7 @@ export type FuturesInstrumentUncheckedCreateWithoutPositionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -896,6 +925,7 @@ export type FuturesInstrumentUpdateWithoutPositionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -916,6 +946,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutPositionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -936,6 +967,7 @@ export type FuturesInstrumentCreateWithoutExecutionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -956,6 +988,7 @@ export type FuturesInstrumentUncheckedCreateWithoutExecutionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -992,6 +1025,7 @@ export type FuturesInstrumentUpdateWithoutExecutionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1012,6 +1046,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutExecutionsInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1032,6 +1067,7 @@ export type FuturesInstrumentCreateWithoutLimitOrdersInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1052,6 +1088,7 @@ export type FuturesInstrumentUncheckedCreateWithoutLimitOrdersInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1088,6 +1125,7 @@ export type FuturesInstrumentUpdateWithoutLimitOrdersInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1108,6 +1146,107 @@ export type FuturesInstrumentUncheckedUpdateWithoutLimitOrdersInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
+  marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
+}
+
+export type FuturesInstrumentCreateWithoutConditionalEntriesInput = {
+  id?: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  underlyingAsset: Prisma.AssetCreateNestedOneWithoutFuturesInstrumentsInput
+  positions?: Prisma.FuturesPositionCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotCreateNestedManyWithoutInstrumentInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
+  limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
+}
+
+export type FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput = {
+  id?: string
+  underlyingAssetId: string
+  productType?: $Enums.FuturesProductType
+  settlementCurrency?: $Enums.CurrencyCode
+  isActive?: boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  positions?: Prisma.FuturesPositionUncheckedCreateNestedManyWithoutInstrumentInput
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutInstrumentInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotUncheckedCreateNestedManyWithoutInstrumentInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
+  limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
+}
+
+export type FuturesInstrumentCreateOrConnectWithoutConditionalEntriesInput = {
+  where: Prisma.FuturesInstrumentWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput>
+}
+
+export type FuturesInstrumentUpsertWithoutConditionalEntriesInput = {
+  update: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutConditionalEntriesInput>
+  create: Prisma.XOR<Prisma.FuturesInstrumentCreateWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUncheckedCreateWithoutConditionalEntriesInput>
+  where?: Prisma.FuturesInstrumentWhereInput
+}
+
+export type FuturesInstrumentUpdateToOneWithWhereWithoutConditionalEntriesInput = {
+  where?: Prisma.FuturesInstrumentWhereInput
+  data: Prisma.XOR<Prisma.FuturesInstrumentUpdateWithoutConditionalEntriesInput, Prisma.FuturesInstrumentUncheckedUpdateWithoutConditionalEntriesInput>
+}
+
+export type FuturesInstrumentUpdateWithoutConditionalEntriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  underlyingAsset?: Prisma.AssetUpdateOneRequiredWithoutFuturesInstrumentsNestedInput
+  positions?: Prisma.FuturesPositionUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUpdateManyWithoutInstrumentNestedInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
+  limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
+}
+
+export type FuturesInstrumentUncheckedUpdateWithoutConditionalEntriesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  underlyingAssetId?: Prisma.StringFieldUpdateOperationsInput | string
+  productType?: Prisma.EnumFuturesProductTypeFieldUpdateOperationsInput | $Enums.FuturesProductType
+  settlementCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  isActive?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  markContractJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  markVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  positions?: Prisma.FuturesPositionUncheckedUpdateManyWithoutInstrumentNestedInput
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutInstrumentNestedInput
+  marks?: Prisma.FuturesMarkSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  lastPrices?: Prisma.FuturesLastPriceSnapshotUncheckedUpdateManyWithoutInstrumentNestedInput
+  liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
+  seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
+  limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1128,6 +1267,7 @@ export type FuturesInstrumentCreateWithoutLastPricesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1148,6 +1288,7 @@ export type FuturesInstrumentUncheckedCreateWithoutLastPricesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1184,6 +1325,7 @@ export type FuturesInstrumentUpdateWithoutLastPricesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1204,6 +1346,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutLastPricesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1224,6 +1367,7 @@ export type FuturesInstrumentCreateWithoutMarksInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1244,6 +1388,7 @@ export type FuturesInstrumentUncheckedCreateWithoutMarksInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1280,6 +1425,7 @@ export type FuturesInstrumentUpdateWithoutMarksInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1300,6 +1446,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutMarksInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1320,6 +1467,7 @@ export type FuturesInstrumentCreateWithoutLiquidationClosesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1340,6 +1488,7 @@ export type FuturesInstrumentUncheckedCreateWithoutLiquidationClosesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1376,6 +1525,7 @@ export type FuturesInstrumentUpdateWithoutLiquidationClosesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1396,6 +1546,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutLiquidationClosesInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1416,6 +1567,7 @@ export type FuturesInstrumentCreateWithoutSeasonPricesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1436,6 +1588,7 @@ export type FuturesInstrumentUncheckedCreateWithoutSeasonPricesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1472,6 +1625,7 @@ export type FuturesInstrumentUpdateWithoutSeasonPricesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1492,6 +1646,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutSeasonPricesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1512,6 +1667,7 @@ export type FuturesInstrumentCreateWithoutSeasonClosesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseCreateNestedManyWithoutInstrumentInput
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1532,6 +1688,7 @@ export type FuturesInstrumentUncheckedCreateWithoutSeasonClosesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedCreateNestedManyWithoutInstrumentInput
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutInstrumentInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedCreateNestedManyWithoutInstrumentInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutInstrumentInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedCreateNestedManyWithoutFuturesInstrumentInput
 }
 
@@ -1568,6 +1725,7 @@ export type FuturesInstrumentUpdateWithoutSeasonClosesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUpdateManyWithoutInstrumentNestedInput
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1588,6 +1746,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutSeasonClosesInput = {
   liquidationCloses?: Prisma.FuturesLiquidationCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1619,6 +1778,7 @@ export type FuturesInstrumentUpdateWithoutUnderlyingAssetInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1639,6 +1799,7 @@ export type FuturesInstrumentUncheckedUpdateWithoutUnderlyingAssetInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutInstrumentNestedInput
   seasonCloses?: Prisma.FuturesSeasonCloseUncheckedUpdateManyWithoutInstrumentNestedInput
   limitOrders?: Prisma.FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentNestedInput
+  conditionalEntries?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentNestedInput
   marketCandles?: Prisma.FuturesMarketCandleUncheckedUpdateManyWithoutFuturesInstrumentNestedInput
 }
 
@@ -1667,6 +1828,7 @@ export type FuturesInstrumentCountOutputType = {
   seasonPrices: number
   seasonCloses: number
   limitOrders: number
+  conditionalEntries: number
   marketCandles: number
 }
 
@@ -1679,6 +1841,7 @@ export type FuturesInstrumentCountOutputTypeSelect<ExtArgs extends runtime.Types
   seasonPrices?: boolean | FuturesInstrumentCountOutputTypeCountSeasonPricesArgs
   seasonCloses?: boolean | FuturesInstrumentCountOutputTypeCountSeasonClosesArgs
   limitOrders?: boolean | FuturesInstrumentCountOutputTypeCountLimitOrdersArgs
+  conditionalEntries?: boolean | FuturesInstrumentCountOutputTypeCountConditionalEntriesArgs
   marketCandles?: boolean | FuturesInstrumentCountOutputTypeCountMarketCandlesArgs
 }
 
@@ -1751,6 +1914,13 @@ export type FuturesInstrumentCountOutputTypeCountLimitOrdersArgs<ExtArgs extends
 /**
  * FuturesInstrumentCountOutputType without action
  */
+export type FuturesInstrumentCountOutputTypeCountConditionalEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesConditionalEntryWhereInput
+}
+
+/**
+ * FuturesInstrumentCountOutputType without action
+ */
 export type FuturesInstrumentCountOutputTypeCountMarketCandlesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.FuturesMarketCandleWhereInput
 }
@@ -1775,6 +1945,7 @@ export type FuturesInstrumentSelect<ExtArgs extends runtime.Types.Extensions.Int
   seasonPrices?: boolean | Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs>
   seasonCloses?: boolean | Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs>
   limitOrders?: boolean | Prisma.FuturesInstrument$limitOrdersArgs<ExtArgs>
+  conditionalEntries?: boolean | Prisma.FuturesInstrument$conditionalEntriesArgs<ExtArgs>
   marketCandles?: boolean | Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresInstrument"]>
@@ -1828,6 +1999,7 @@ export type FuturesInstrumentInclude<ExtArgs extends runtime.Types.Extensions.In
   seasonPrices?: boolean | Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs>
   seasonCloses?: boolean | Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs>
   limitOrders?: boolean | Prisma.FuturesInstrument$limitOrdersArgs<ExtArgs>
+  conditionalEntries?: boolean | Prisma.FuturesInstrument$conditionalEntriesArgs<ExtArgs>
   marketCandles?: boolean | Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesInstrumentCountOutputTypeDefaultArgs<ExtArgs>
 }
@@ -1850,6 +2022,7 @@ export type $FuturesInstrumentPayload<ExtArgs extends runtime.Types.Extensions.I
     seasonPrices: Prisma.$FuturesSeasonPricePayload<ExtArgs>[]
     seasonCloses: Prisma.$FuturesSeasonClosePayload<ExtArgs>[]
     limitOrders: Prisma.$FuturesLimitOrderPayload<ExtArgs>[]
+    conditionalEntries: Prisma.$FuturesConditionalEntryPayload<ExtArgs>[]
     marketCandles: Prisma.$FuturesMarketCandlePayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
@@ -2268,6 +2441,7 @@ export interface Prisma__FuturesInstrumentClient<T, Null = never, ExtArgs extend
   seasonPrices<T extends Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$seasonPricesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonPricePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   seasonCloses<T extends Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$seasonClosesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesSeasonClosePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   limitOrders<T extends Prisma.FuturesInstrument$limitOrdersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$limitOrdersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesLimitOrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  conditionalEntries<T extends Prisma.FuturesInstrument$conditionalEntriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$conditionalEntriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesConditionalEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketCandles<T extends Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesInstrument$marketCandlesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesMarketCandlePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -2897,6 +3071,30 @@ export type FuturesInstrument$limitOrdersArgs<ExtArgs extends runtime.Types.Exte
   take?: number
   skip?: number
   distinct?: Prisma.FuturesLimitOrderScalarFieldEnum | Prisma.FuturesLimitOrderScalarFieldEnum[]
+}
+
+/**
+ * FuturesInstrument.conditionalEntries
+ */
+export type FuturesInstrument$conditionalEntriesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesConditionalEntry
+   */
+  select?: Prisma.FuturesConditionalEntrySelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesConditionalEntry
+   */
+  omit?: Prisma.FuturesConditionalEntryOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesConditionalEntryInclude<ExtArgs> | null
+  where?: Prisma.FuturesConditionalEntryWhereInput
+  orderBy?: Prisma.FuturesConditionalEntryOrderByWithRelationInput | Prisma.FuturesConditionalEntryOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesConditionalEntryWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesConditionalEntryScalarFieldEnum | Prisma.FuturesConditionalEntryScalarFieldEnum[]
 }
 
 /**

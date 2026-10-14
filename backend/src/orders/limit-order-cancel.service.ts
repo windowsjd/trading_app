@@ -1,5 +1,9 @@
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { cancelFuturesEntriesInTransaction } from '../futures/futures-limit-state';
+import {
+  cancelLiveFuturesConditionalEntriesInTransaction,
+  liveFuturesConditionalEntry,
+} from '../futures/futures-conditional-entry-state';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 import { diagnosePositionMutationFailure } from './position-failure-diagnosis';
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
@@ -505,6 +509,12 @@ export class LimitOrderCancelService {
       conditionalBuyLifecycleReason(input.reason),
       input.canceledAt,
     );
+    await cancelLiveFuturesConditionalEntriesInTransaction(
+      tx,
+      input.tradingAccountId,
+      conditionalBuyLifecycleReason(input.reason),
+      input.canceledAt,
+    );
     return {
       canceledOrderCount,
       releasedReservationCount: canceledOrderCount,
@@ -766,6 +776,44 @@ export class LimitOrderCancelService {
         await cancelLiveConditionalSellsInTransaction(
           tx,
           intent.tradingAccountId,
+          'season_ended',
+          input.now,
+        );
+      });
+    }
+    // Reservation-free Futures conditional entries of ended seasons, same fence.
+    const futuresWatches = await this.prisma.futuresConditionalEntry.findMany({
+      where: {
+        ...liveFuturesConditionalEntry,
+        tradingAccount: {
+          mode: 'season',
+          seasonParticipant: {
+            season: { status: { in: ['ended', 'settled'] } },
+          },
+        },
+      },
+      distinct: ['tradingAccountId'],
+      select: {
+        tradingAccountId: true,
+        tradingAccount: {
+          select: { seasonParticipant: { select: { id: true } } },
+        },
+      },
+      orderBy: { tradingAccountId: 'asc' },
+      take: batchSize,
+    });
+    for (const watch of futuresWatches) {
+      if (input.isLockOwned && !input.isLockOwned())
+        // @diagnosticSurface internal: Existing Ops runner records lease loss and retries lifecycle cleanup.
+        throw new Error('Ops job lock ownership was lost.');
+      await this.prisma.$transaction(async (tx) => {
+        await lockSeasonTradingContext(tx, {
+          seasonParticipantId: watch.tradingAccount.seasonParticipant!.id,
+          participantWrite: true,
+        });
+        await cancelLiveFuturesConditionalEntriesInTransaction(
+          tx,
+          watch.tradingAccountId,
           'season_ended',
           input.now,
         );
@@ -1276,7 +1324,10 @@ export class LimitOrderCancelService {
 
 function conditionalBuyLifecycleReason(
   reason: LimitOrderCancelReason,
-): ConditionalBuyLifecycleReason {
+): Extract<
+  ConditionalBuyLifecycleReason,
+  'season_ended' | 'participant_excluded' | 'account_not_tradable'
+> {
   return reason === 'season_ended' || reason === 'participant_excluded'
     ? reason
     : 'account_not_tradable';

@@ -1,6 +1,7 @@
 import PendingFuturesAndProtections from './PendingFuturesAndProtections';
 import ConditionalBuyOrdersList from './ConditionalBuyOrdersList';
 import ConditionalSellOrdersList from './ConditionalSellOrdersList';
+import FuturesConditionalEntriesList from '../futures/FuturesConditionalEntriesList';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -30,8 +31,9 @@ type Props = {
   accountId: string;
   isFocused: boolean;
   seasonUi: boolean;
-  /** Spot order screen: also list this account's Conditional BUY watches and
-   * SELL intents (conditions; independent stop-loss/take-profit beside OCO). */
+  /** Order screens: also list this account's Conditional BUY watches, SELL
+   * intents (conditions; independent stop-loss/take-profit beside OCO) and
+   * Futures conditional entries. */
   conditional?: boolean;
 };
 
@@ -51,6 +53,7 @@ export function BoundPendingOrders(props: Props) {
       : kind === 'conditional' ? <>
         <ConditionalBuyOrdersList key={`conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
         <ConditionalSellOrdersList key={`sell-condition:${props.accountId}`} accountId={props.accountId} family="condition" isFocused={props.isFocused} seasonUi={props.seasonUi} />
+        <FuturesConditionalEntriesList key={`futures-conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
       </>
       : <>
         <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />

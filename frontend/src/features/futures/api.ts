@@ -325,3 +325,71 @@ export async function cancelFuturesLimitOrder(id: string, orderId: string) {
   const response = await apiClient.post<{ success: true; data: FuturesLimitResult }>(url, {});
   return assertAccountScope(url, id, response.data.data);
 }
+
+/**
+ * Futures conditional entries (`futures/conditional-entries`): a watch on the
+ * contract's Futures Last that opens ONE new position — a market open or a
+ * Futures limit entry — when it triggers. Registering reserves nothing;
+ * `state` follows the created execution or limit entry, so a met condition is
+ * never reported as filled. Separate from position TP/SL (protections).
+ */
+export type FuturesConditionalTrigger = 'at_or_above' | 'at_or_below';
+export type FuturesConditionalExecution = 'market' | 'limit';
+export type FuturesConditionalEntryState =
+  | 'watching' | 'triggered' | 'filled' | 'order_pending' | 'order_canceled'
+  | 'order_rejected' | 'failed' | 'canceled';
+export type FuturesConditionalEntry = {
+  id: string; tradingAccountId: string; instrumentId: string; instrument: FuturesInstrument;
+  direction: Direction; marginMode: MarginMode; leverage: number; quantity: string;
+  triggerCondition: FuturesConditionalTrigger; triggerPrice: string;
+  executionType: FuturesConditionalExecution; limitPrice: string | null;
+  status: 'watching' | 'triggered' | 'ordered' | 'canceled' | 'failed';
+  state: FuturesConditionalEntryState;
+  trigger: { triggeredAt: string; snapshotId: string | null; evidence: Record<string, unknown> | null } | null;
+  execution: { executionId: string; positionId: string; executionPrice: string; quantity: string; feeAmount: string; executedAt: string } | null;
+  limitOrder: { orderId: string; status: 'submitted' | 'executed' | 'canceled' | 'rejected'; limitPrice: string; reservedAmount: string;
+    executionId: string | null; terminalReason: string | null; createdAt: string; endedAt: string | null } | null;
+  attemptCount: number; lastAttemptAt: string | null; failureCode: string | null; terminalReason: string | null;
+  createdAt: string; endedAt: string | null; updatedAt: string;
+};
+export type FuturesConditionalEntries = {
+  tradingAccountId: string;
+  capabilities: { enabled: boolean; canCreate: boolean; maxLivePerAccount: number };
+  entries: FuturesConditionalEntry[];
+  pagination: OffsetPagination;
+};
+export type FuturesConditionalEntryCommand = {
+  instrumentId: string; direction: Direction; marginMode: MarginMode; leverage: number; quantity: string;
+  triggerCondition: FuturesConditionalTrigger; triggerPrice: string;
+  executionType: FuturesConditionalExecution; limitPrice?: string; idempotencyKey: string;
+};
+export type FuturesConditionalEntryResult = { tradingAccountId: string; entry: FuturesConditionalEntry; duplicate: boolean };
+/** Ended rows: the newest page only (state history, not a ledger). */
+export const FUTURES_CONDITIONAL_ENDED_PAGE = 20;
+/** `open`: every row the owner can still cancel, read completely; `ended`: newest page. */
+export async function getFuturesConditionalEntries(id: string, state: 'open' | 'ended', signal?: AbortSignal) {
+  if (state === 'ended')
+    return read<FuturesConditionalEntries>(id, `conditional-entries?state=ended&limit=${FUTURES_CONDITIONAL_ENDED_PAGE}&offset=0`, signal);
+  const entries: FuturesConditionalEntry[] = [];
+  let offset = 0;
+  for (;;) {
+    const page = await read<FuturesConditionalEntries>(id, `conditional-entries?state=open&limit=100&offset=${offset}`, signal);
+    entries.push(...page.entries);
+    if (page.pagination.nextOffset === null) return { ...page, entries };
+    if (!Number.isSafeInteger(page.pagination.nextOffset) || page.pagination.nextOffset <= offset || page.pagination.nextOffset > 100000)
+      throw new Error('FUTURES_CONDITIONAL_PAGINATION_INVALID');
+    offset = page.pagination.nextOffset;
+  }
+}
+/** Same key + same body replays (`duplicate: true`); never a second watch. */
+export async function createFuturesConditionalEntry(id: string, command: FuturesConditionalEntryCommand) {
+  const url = path(id, 'conditional-entries');
+  const response = await apiClient.post<{ success: true; data: FuturesConditionalEntryResult }>(url, command);
+  return assertAccountScope(url, id, response.data.data);
+}
+/** Watching/triggered only; a created limit entry is canceled as a limit entry. */
+export async function cancelFuturesConditionalEntry(id: string, entryId: string) {
+  const url = path(id, `conditional-entries/${encodeURIComponent(entryId)}/cancel`);
+  const response = await apiClient.post<{ success: true; data: FuturesConditionalEntryResult }>(url, {});
+  return assertAccountScope(url, id, response.data.data);
+}

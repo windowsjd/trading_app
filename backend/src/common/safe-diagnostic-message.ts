@@ -6,6 +6,21 @@ import { STATUS_CODES } from 'node:http';
  * This catalog affects diagnostic projection, not public API codes or branching.
  */
 const SAFE_MESSAGES = new Set<string>([
+  // Fixed Futures Conditional Entry v1 product copy.
+  'Futures conditional entries are currently disabled.',
+  'Invalid Futures conditional entry.',
+  'Choose at or above, or at or below.',
+  'Market execution cannot have a limit price.',
+  'Enter positive prices with at most eight fractional digits.',
+  'Close the existing one-way position before registering a new entry.',
+  'Cancel the pending entry before registering a conditional entry.',
+  'This instrument already has a live conditional entry.',
+  'Too many live Futures conditional entries.',
+  'The current Futures Last already meets this condition.',
+  'Conditional entry not found.',
+  'The entry order was already created; manage the limit entry or position instead.',
+  'The conditional entry changed before execution.',
+  'The conditional entry trigger is too old to execute.',
   // Fixed Conditional v1 product copy; never runtime/provider prose.
   'Conditional orders are currently disabled.',
   'Futures user trading is disabled.',

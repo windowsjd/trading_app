@@ -102,13 +102,13 @@ export function getOrderMethodOptions(input: {
 
 /**
  * Futures (USDⓈ-M synthetic perpetual) offers 시장가, 지정가 and 조건주문 only:
- * never LOC or the spot SELL settings. 지정가 opens a new position (Futures
- * Limit Entry v1), so it needs a flat instrument. 조건주문 is the open
- * position's stop-loss/take-profit (Conditional Orders v1), the only futures
- * conditional engine; its create/cancel gates stay in the protection panel,
- * which keeps an existing group manageable while creation is paused.
+ * never LOC or the spot SELL settings. 지정가 (Futures Limit Entry v1) and
+ * 조건주문 (Futures Conditional Entry v1: a watch on Futures Last that opens a
+ * new LONG/SHORT) both open a NEW position, so they need a flat contract;
+ * whether a new 조건주문 may be registered is the server's capability. Position
+ * TP/SL is not an order method here: it is set from the position card.
  */
-export function getFuturesOrderMethodOptions(hasPosition: boolean): OrderMethodOption[] {
+export function getFuturesOrderMethodOptions(hasPosition: boolean, conditional: ServerGate): OrderMethodOption[] {
   return [
     option('market', hasPosition
       ? '현재 거래 가능한 가격으로 포지션 수량을 늘리거나 줄이거나 전량 종료합니다.'
@@ -116,10 +116,22 @@ export function getFuturesOrderMethodOptions(hasPosition: boolean): OrderMethodO
     option('limit', '롱은 지정가 이하, 숏은 지정가 이상에서 새 포지션에 진입합니다. 체결 전까지 담보를 예약합니다.', hasPosition
       ? { state: 'unavailable', reason: '지정가는 새 포지션 진입에만 쓸 수 있어요. 보유 포지션은 시장가로 조정해 주세요.' }
       : AVAILABLE),
-    option('conditional', '보유 포지션에 손절·익절 가격을 정해 두고, 조건 가격에 도달하면 종료합니다.', hasPosition
-      ? AVAILABLE
-      : { state: 'unavailable', reason: '보유 포지션이 있을 때 등록할 수 있어요. 지정가 진입에서는 체결 후 TP/SL을 함께 설정할 수 있어요.' }),
+    option('conditional', '선물 Last가 감시가격에 도달하면 롱·숏 새 포지션에 진입합니다. 등록할 때는 담보를 예약하지 않습니다.', hasPosition
+      ? { state: 'unavailable', reason: '조건주문은 새 포지션 진입에만 쓸 수 있어요. 보유 포지션의 손절·익절은 포지션 카드의 TP/SL에서 설정해 주세요.' }
+      : fromGate(conditional)),
   ];
+}
+
+/** Server capability → gate for a new Futures conditional entry. */
+export function getFuturesConditionalGate(
+  query: { isLoading: boolean; isError: boolean; data?: { capabilities: { enabled: boolean; canCreate: boolean } } | null },
+): ServerGate {
+  if (query.isError) return { state: 'error' };
+  if (query.isLoading || !query.data) return { state: 'loading' };
+  const { enabled, canCreate } = query.data.capabilities;
+  if (!enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 새 선물 조건주문을 등록할 수 없어요.' };
+  if (!canCreate) return { state: 'ready', enabled: false, reason: '현재 거래 상태에서는 선물 조건주문을 등록할 수 없어요.' };
+  return { state: 'ready', enabled: true };
 }
 
 export function isOrderMethodSelectable(option: OrderMethodOption) {

@@ -4,6 +4,7 @@ import {
   DEFAULT_ORDER_METHOD,
   ORDER_METHOD_HINT,
   getAvailabilityLabel,
+  getFuturesConditionalGate,
   getFuturesOrderMethodOptions,
   getConditionalBuyGate,
   getConditionalSellGate,
@@ -100,35 +101,58 @@ describe('주문방식 list per market and side', () => {
 });
 
 describe('futures 주문방식', () => {
-  const futures = (hasPosition: boolean) =>
-    getFuturesOrderMethodOptions(hasPosition).map((option) => `${option.method}:${option.availability.state}`);
+  const ready: ServerGate = { state: 'ready', enabled: true };
+  const futures = (hasPosition: boolean, gate: ServerGate = ready) =>
+    getFuturesOrderMethodOptions(hasPosition, gate).map((option) => `${option.method}:${option.availability.state}`);
 
   it('lists exactly 시장가, 지정가 and 조건주문 — never LOC or the spot SELL settings', () => {
     for (const hasPosition of [false, true]) {
-      const options = getFuturesOrderMethodOptions(hasPosition);
+      const options = getFuturesOrderMethodOptions(hasPosition, ready);
       assert.deepEqual(options.map((option) => option.label), ['시장가', '지정가', '조건주문']);
       assert.equal(options.some((option) => option.method === 'loc' || option.method === 'protection'), false);
     }
   });
 
-  it('flat: market and limit open a new position; 조건주문 waits for a position and says why', () => {
-    assert.deepEqual(futures(false), ['market:available', 'limit:available', 'conditional:unavailable']);
-    const conditional = getFuturesOrderMethodOptions(false)[2].availability;
-    assert.equal(conditional.state === 'unavailable' && /보유 포지션이 있을 때/.test(conditional.reason), true);
+  it('flat: market, limit and 조건주문 open a new position without a position held', () => {
+    assert.deepEqual(futures(false), ['market:available', 'limit:available', 'conditional:available']);
+    const conditional = getFuturesOrderMethodOptions(false, ready)[2];
+    assert.match(conditional.description, /새 포지션에 진입/);
+    assert.match(conditional.description, /담보를 예약하지 않습니다/);
+    assert.doesNotMatch(conditional.description, /손절·익절/);
   });
 
-  it('open position: market adjusts it and 조건주문 is its stop-loss/take-profit; limit is entry-only', () => {
-    assert.deepEqual(futures(true), ['market:available', 'limit:unavailable', 'conditional:available']);
-    const limit = getFuturesOrderMethodOptions(true)[1].availability;
+  it('flat 조건주문 follows the server capability: checking, error, disabled', () => {
+    assert.deepEqual(futures(false, { state: 'loading' }), ['market:available', 'limit:available', 'conditional:checking']);
+    assert.deepEqual(futures(false, { state: 'error' }), ['market:available', 'limit:available', 'conditional:unavailable']);
+    const off = getFuturesOrderMethodOptions(false, { state: 'ready', enabled: false, reason: '운영 중지' })[2].availability;
+    assert.equal(off.state === 'unavailable' && off.reason === '운영 중지', true);
+  });
+
+  it('open position: market adjusts it; limit and 조건주문 are entry-only and point TP/SL to the position card', () => {
+    assert.deepEqual(futures(true), ['market:available', 'limit:unavailable', 'conditional:unavailable']);
+    const limit = getFuturesOrderMethodOptions(true, ready)[1].availability;
     assert.equal(limit.state === 'unavailable' && /새 포지션 진입에만/.test(limit.reason), true);
-    assert.match(getFuturesOrderMethodOptions(true)[2].description, /손절·익절/);
+    const conditional = getFuturesOrderMethodOptions(true, ready)[2].availability;
+    assert.equal(conditional.state === 'unavailable' && /새 포지션 진입에만/.test(conditional.reason), true);
+    assert.equal(conditional.state === 'unavailable' && /포지션 카드의 TP\/SL/.test(conditional.reason), true);
   });
 
   it('the default method is available whether or not a position is open', () => {
     for (const hasPosition of [false, true]) {
-      const market = getFuturesOrderMethodOptions(hasPosition).find((option) => option.method === DEFAULT_ORDER_METHOD);
+      const market = getFuturesOrderMethodOptions(hasPosition, { state: 'loading' }).find((option) => option.method === DEFAULT_ORDER_METHOD);
       assert.equal(market !== undefined && isOrderMethodSelectable(market), true);
     }
+  });
+
+  it('maps the futures conditional capability to a gate', () => {
+    const query = (enabled: boolean, canCreate: boolean) => ({ isLoading: false, isError: false, data: { capabilities: { enabled, canCreate } } });
+    assert.deepEqual(getFuturesConditionalGate({ isLoading: true, isError: false }), { state: 'loading' });
+    assert.deepEqual(getFuturesConditionalGate({ isLoading: false, isError: true }), { state: 'error' });
+    assert.deepEqual(getFuturesConditionalGate(query(true, true)), { state: 'ready', enabled: true });
+    const disabled = getFuturesConditionalGate(query(false, true));
+    assert.equal(disabled.state === 'ready' && !disabled.enabled && /운영 상태/.test(disabled.reason ?? ''), true);
+    const blocked = getFuturesConditionalGate(query(true, false));
+    assert.equal(blocked.state === 'ready' && !blocked.enabled && /거래 상태/.test(blocked.reason ?? ''), true);
   });
 });
 

@@ -126,6 +126,8 @@ export class FuturesLastPriceRetentionService
             AND NOT EXISTS (SELECT 1 FROM futures_executions e WHERE e.last_price_snapshot_id = m.id)
             AND NOT EXISTS (SELECT 1 FROM futures_season_prices p WHERE p.last_price_snapshot_id = m.id)
             AND NOT EXISTS (SELECT 1 FROM protection_children c WHERE c.futures_last_price_snapshot_id = m.id)
+            AND NOT EXISTS (SELECT 1 FROM futures_conditional_entries ce WHERE ce.registration_snapshot_id = m.id)
+            AND NOT EXISTS (SELECT 1 FROM futures_conditional_entries ce WHERE ce.trigger_snapshot_id = m.id)
             AND NOT EXISTS (
               SELECT 1 FROM seasons s
               WHERE m.captured_at BETWEEN s.end_at - interval '10 seconds' AND s.end_at
