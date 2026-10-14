@@ -1,19 +1,27 @@
 # Trading UI browser regression
 
-Ranking tier rows use `NODE_PATH=/path/to/browser-tools/node_modules node
-test/browser/rankingTierBrowser.cjs`. The production RankingScreen, SVG artwork,
-theme, React Query, formatters and shared touch ink run with local HTTP fixtures.
-It checks 672 layouts (2,688 rows): six tiers plus unknown, Light/Dark,
-320/360/390/430px, font scales 1/1.5/2, normal/long nicknames and 16-digit assets,
-both financial palettes, and positive/negative/zero/unavailable returns. Raster
-glyph contrast must be >=4.5:1; text bounds/overlap, full values, background/rim
-bounds and absence of a figures plate are checked. Final tier, friends/TOP10,
-user navigation and touch ink with Reduced Motion are also exercised.
-Screenshots place the unchanged My standing card beside the ranking row.
+The ranking tab uses `NODE_PATH=/path/to/browser-tools/node_modules node
+test/browser/rankingTierBrowser.cjs`. The production RankingScreen (내 순위 on its
+tier card art, plain list rows, the 순위 안내 slot), theme, React Query, formatters
+and shared touch ink run with local HTTP fixtures. It checks 672 layouts (2,688
+rows): six tiers plus unknown, Light/Dark, 320/360/390/430px, font scales
+1/1.5/2, normal/long nicknames and 16-digit assets, both financial palettes, and
+positive/negative/zero/unavailable returns. Rows: one plain card for every tier
+(surface, border, radius, no artwork), raster glyph contrast >=4.5:1, text
+bounds/overlap, full values, the small emblem inside the card and clear of text,
+no figures plate. 내 순위: profile, 내 순위, rank, 수익률, 총자산 top to bottom on
+the left edge, the emblem beside it (above it with large text) and clear of every
+glyph, nothing clipped, full values, and figure contrast >=4.5:1 in every layout
+and on all six arts for both palettes and directions. The slot (320-430px, 1/2x)
+has no card, a steady height and its glyph on the list's edge; header blocks and
+rows never overlap. My row (나 chip,
+ring), negative controls for the row and 내 순위 detectors, final tier,
+friends/TOP10, user navigation and touch ink with Reduced Motion are also
+exercised. Screenshots place 내 순위 beside a ranking row.
 `RANKING_TIER_OUTPUT` selects artifacts; `RANKING_TIER_QUICK=1` selects the 14
 normal 390px layouts. `RANKING_TIER_BASELINE_SOURCE=/path/to/baseline/frontend`
-captures the same screen before the change (plate/contrast checks apply only to
-the current source). `RANKING_TIER_MODES`, `RANKING_TIER_WIDTHS` and
+captures the same screen before the change (plate, contrast, plain-card and 내 순위
+checks apply only to the current source). `RANKING_TIER_MODES`, `RANKING_TIER_WIDTHS` and
 `RANKING_TIER_FONTS` accept comma-separated subsets for focused checks.
 `BROWSER_EXECUTABLE_PATH`, `FONTCONFIG_FILE` and
 `LD_LIBRARY_PATH` can select an installed browser and Korean font/libraries.

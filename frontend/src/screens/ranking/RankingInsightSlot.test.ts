@@ -293,10 +293,34 @@ describe('순위 안내 슬롯: 높이와 접근성', () => {
     assert.equal(flatten(layer.props.style).opacity, 0);
     assert.equal(layer.props.importantForAccessibility, 'no-hide-descendants');
     assert.equal(layer.findAll((node: any) => typeof node.props.onLayout === 'function').length, 5);
-    assert.equal(flatten(h.node('ranking-slot').props.style).minHeight, 64);
   });
 
-  it('reads every message once from the card; moving parts, dots and the touch target are hidden', (t) => {
+  it('sits on the screen without a card, in the same box for one message or five; the dots never add height', (t) => {
+    const h = slotHarness(t);
+    const slotBox = () => flatten(h.node('ranking-slot').props.style);
+    // The stage's parent: the touch target while rotating, a plain wrapper for one message.
+    const wordsBox = () => flatten(h.node('ranking-slot-stage').parent.props.style);
+    h.render([FIVE[3]]);
+    const single = { slot: slotBox(), words: wordsBox() };
+    h.update({ messages: FIVE });
+    const rotating = { slot: slotBox(), words: wordsBox() };
+    assert.equal(h.has('ranking-slot-next'), true);
+    const decoration = ['backgroundColor', 'borderWidth', 'borderColor', 'borderRadius', 'shadowColor', 'shadowOpacity',
+      'elevation', 'minHeight', 'padding', 'paddingVertical', 'paddingHorizontal', 'paddingLeft'];
+    for (const box of [single.slot, rotating.slot]) {
+      assert.deepEqual(decoration.filter((key) => box[key] !== undefined), [], 'no card surface, frame or inset');
+    }
+    // Only the dots' room differs; the words keep the same box.
+    const { paddingRight, ...rest } = rotating.slot;
+    assert.deepEqual([single.slot.paddingRight, paddingRight, rest], [undefined, 32, single.slot]);
+    assert.deepEqual(rotating.words, single.words);
+    // The press ink gets air around the words without moving them: the margin cancels the padding.
+    assert.deepEqual([single.words.marginHorizontal, single.words.paddingHorizontal], [-8, 8]);
+    const dots = flatten(h.node('ranking-slot-dot-above').parent.props.style);
+    assert.deepEqual([dots.position, dots.top, dots.bottom, dots.right, dots.width], ['absolute', 0, 0, 0, 24]);
+  });
+
+  it('reads every message once from the slot; moving parts, dots and the touch target are hidden', (t) => {
     const h = slotHarness(t);
     h.render([...FIVE.slice(0, 4), { ...FIVE[4], value: '-44,731', glyph: '▼', direction: 'down',
       detail: { text: '▼ 순위 2계단 하락', spoken: '순위 2계단 하락', direction: 'down' } }]);

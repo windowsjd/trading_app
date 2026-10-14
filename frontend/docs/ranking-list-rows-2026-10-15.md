@@ -1,5 +1,7 @@
 # 랭킹 목록 행 A안: 티어 배지형 (2026-10-15)
 
+> **이후 변경 (2026-10-15, 시작 HEAD `38b01475`).** 목록 행의 티어 아트(`RankingTierRowBackground`)는 제거됐다. 모든 티어가 같은 일반 카드(`semantic.surface` 배경, `semantic.border` 1dp 테두리, 반지름 14)를 쓰고, 티어 줄(엠블럼·이름)은 그대로다. 글자는 티어 전경색·halo 없이 화면 색을 쓴다(티어 이름 `semantic.secondary`, 수익률은 앱 공통 상승·하락 색). `나` 칩은 모든 티어에서 `semantic.text` 채움에 `semantic.surface` 글자이고, 링 오프셋은 모든 행에서 테두리를 더한 6이다. 아래 본문은 작성 당시의 기록이다.
+
 10/13 시안 A의 요소(티어 엠블럼·이름, `나` 칩, 내 행 강조)를 기존 티어 아트 행에 얹었다. 시작 HEAD는 `141dc9be`이다.
 
 - 행: `src/screens/ranking/RankingScreen.tsx`(`RankingRow`, `RankingFigures`)

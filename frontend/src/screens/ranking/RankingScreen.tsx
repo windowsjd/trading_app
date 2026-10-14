@@ -49,9 +49,8 @@ import { useAppearance, type AppearanceMode } from '../../theme/appearance';
 import { getHomeTier, type HomeTier } from '../home/tierPresentation';
 import TierCard, { tierForeground, type TierPresentation } from '../home/TierCard';
 import TierEmblem, { tierEmblemWidth } from '../home/TierEmblem';
-import RankingTierRowBackground, { RANKING_ROW_RADIUS } from './RankingTierRowBackground';
 import RankingInsightSlot from './RankingInsightSlot';
-import { getFinancialColors } from '../../theme/financialColors';
+import { getFinancialColors, type FinancialColorPreference } from '../../theme/financialColors';
 
 type Props = RankingScreenProps;
 
@@ -376,28 +375,49 @@ function MyRankingCard({
 }
 
 /**
- * 내 순위 in the season tier card's design (Home's former card), without the
- * account change action or season name: profile, rank and tier. The return
- * rate stays in the list rows. Without a known tier it keeps the same
- * information on a plain card.
+ * 내 순위 on the season tier card (TierCard keeps the tier's art, and the
+ * emblem with the tier name on the right). The left column reads top to
+ * bottom: profile, 내 순위 with the rank, then the return rate and total assets
+ * of my ranking row, as the list shows them. Without a known tier the same
+ * column sits on a plain card.
  */
 function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extract<MyRankingDto, { state: 'available' }> | null; rankType?: RankingRankType }) {
-  const { mode } = useAppearance();
+  const { mode, financialPreference } = useAppearance();
   const { width } = useWindowDimensions();
   const tier = getHomeTier(getRankingTier(ranking, rankType), mode);
   const foreground = tier ? tierForeground(tier, mode) : undefined;
+  const { rate, total } = rankingFigureText(ranking);
+  const label = [styles.label, foreground && styles.onArtLabel, foreground];
   const content = (
-    <>
-      <Text style={[styles.label, foreground && styles.onArtLabel, foreground]}>내 순위</Text>
+    <View style={styles.standing}>
       {me ? (
         <View style={styles.profile}>
           <ProfileAvatar profileImageUrl={me.profileImageUrl} size={36} testID="ranking-my-avatar" />
           <Text style={[styles.myName, foreground]}>{me.nickname}</Text>
         </View>
       ) : null}
-      <Text testID="ranking-my-rank" style={[styles.myRank, foreground]}>{ranking ? `#${ranking.rank}` : '-'}</Text>
-      {rankType === 'final' ? <Text style={[styles.settledText, foreground && styles.onArtSettled]}>최종 랭킹 확정</Text> : null}
-    </>
+      <View>
+        <Text style={label}>내 순위</Text>
+        <Text testID="ranking-my-rank" style={[styles.myRank, foreground]}>{ranking ? `#${ranking.rank}` : '-'}</Text>
+        {rankType === 'final' ? (
+          <Text testID="ranking-my-settled" style={[styles.settledText, foreground && styles.onArtSettled,
+            // Whale's art is dark even in Light, where the error red would not read.
+            tier?.id === 'whale' && mode === 'light' && foreground]}>최종 랭킹 확정</Text>
+        ) : null}
+      </View>
+      <View testID="ranking-my-figures" style={styles.myFigures} accessible accessibilityLabel={`수익률 ${rate.text}, 총자산 ${total}`}>
+        <View style={styles.myFigure}>
+          <Text style={label}>수익률</Text>
+          <Text testID="ranking-my-return" style={[styles.myFigureValue, foreground, {
+            color: tier ? artRateColor(ranking?.returnRate, tier, mode, financialPreference) : rate.color,
+          }]}>{rate.text}</Text>
+        </View>
+        <View style={styles.myFigure}>
+          <Text style={label}>총자산</Text>
+          <Text testID="ranking-my-total" style={[styles.myFigureValue, foreground]}>{total}</Text>
+        </View>
+      </View>
+    </View>
   );
   if (!tier) {
     return <View testID="ranking-my-card" style={styles.card}>{content}</View>;
@@ -412,40 +432,47 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
   );
 }
 
+/** One ranking row's figures, in the same words on 내 순위 and in the list. */
+function rankingFigureText(ranking: Pick<RankingItemDto, 'returnRate' | 'totalAssetKrw'> | null) {
+  const won = formatKrw(ranking?.totalAssetKrw);
+  return { rate: getRecordFinancialDisplay(ranking?.returnRate, 'rate'), total: won === '-' ? '-' : `${won}원` };
+}
+
 /**
- * Figures sit directly on the metal. Choose direction colors for the actual
- * surface (Whale is dark even in Light), keeping the user's financial palette.
+ * The return rate directly on tier art. Keep the user's direction hue, chosen
+ * and shaded for the art's own luminance (Whale is dark even in Light), whose
+ * facets differ from the screen. Neutral and unavailable rates use the tier's
+ * foreground.
  */
-function RankingFigures({ item, tier, mode, mine }: {
-  item: RankingItemDto;
-  tier: TierPresentation | null;
-  mode: AppearanceMode;
-  mine: boolean;
-}) {
-  const { financialPreference } = useAppearance();
-  const rate = getRecordFinancialDisplay(item.returnRate, 'rate');
-  const total = `${formatKrw(item.totalAssetKrw)}원`;
-  const foreground = tier ? tierForeground(tier, mode) : undefined;
-  const darkSurface = mode === 'dark' || tier?.id === 'whale';
+function artRateColor(returnRate: string | undefined, tier: TierPresentation, mode: AppearanceMode,
+  financialPreference?: FinancialColorPreference) {
+  const sign = Number(returnRate);
+  // Unavailable (`-`) or zero.
+  if (!Number.isFinite(sign) || sign === 0) return tierForeground(tier, mode).color;
+  const darkSurface = mode === 'dark' || tier.id === 'whale';
   const direction = getFinancialColors(darkSurface ? 'dark' : 'light', financialPreference);
-  const sign = Number(item.returnRate);
-  const directional = rate.text !== '-' && sign !== 0;
-  // Tint/shade the existing hue only on artwork, whose luminance differs from
-  // the screen. Neutral and unavailable rates use the tier's normal foreground.
-  const ink = directional ? (sign > 0 ? direction.rise : direction.fall) : foreground?.color;
-  const color = tier && ink && directional
-    ? shadeFinancialInk(String(ink), darkSurface, tier.id === 'diamond') : ink ?? rate.color;
+  return shadeFinancialInk(sign > 0 ? direction.rise : direction.fall, darkSurface);
+}
+
+/**
+ * Return rate and total assets on the plain row card, in the app's financial
+ * colors. The label also names my row and the tier.
+ */
+function RankingFigures({ item, tierName, mine }: { item: RankingItemDto; tierName?: string; mine: boolean }) {
+  const { rate, total } = rankingFigureText(item);
   return (
     <View testID={`ranking-figures-${item.userId}`} style={styles.figures}
-      accessible accessibilityLabel={`${mine ? '내 순위, ' : ''}${tier ? `${tier.name} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
-      <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, foreground, { color }]}>{rate.text}</Text>
-      <Text testID={`ranking-total-${item.userId}`} style={[styles.totalAsset, foreground]}>{total}</Text>
+      accessible accessibilityLabel={`${mine ? '내 순위, ' : ''}${tierName ? `${tierName} 티어, ` : ''}수익률 ${rate.text}, 총자산 ${total}`}>
+      <Text testID={`ranking-return-${item.userId}`} style={[styles.returnValue, { color: rate.color }]}>{rate.text}</Text>
+      <Text testID={`ranking-total-${item.userId}`} style={styles.totalAsset}>{total}</Text>
     </View>
   );
 }
 
-function shadeFinancialInk(hex: string, dark: boolean, diamond: boolean) {
-  const amount = dark ? .55 : diamond ? .6 : .55;
+// Light art has mid-tone facets (Platinum's and Diamond's lower faces, where the
+// figures sit with large text): the hue needs 70% black there to keep 4.5:1.
+function shadeFinancialInk(hex: string, dark: boolean) {
+  const amount = dark ? .55 : .7;
   const target = dark ? 255 : 0;
   return `#${[1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount) + target * amount)
     .toString(16).padStart(2, '0')).join('')}`;
@@ -455,6 +482,7 @@ const HIDDEN = {
   accessible: false, accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true,
 } as const;
 const ROW_BORDER = 1;
+const ROW_RADIUS = 14;
 const NAME_LINE = 22;
 const ROW_EMBLEM = 18;
 // One emblem slot for every tier: the widest emblem at this size, a little
@@ -465,15 +493,15 @@ const ROW_EMBLEM_SLOT = {
     .map((tier) => tierEmblemWidth(tier, ROW_EMBLEM)))),
   height: 20,
 };
-// My row's ring sits on the screen, outside the card, so it never mixes with
-// the Whale/Gold rims or tints their art.
+// My row's ring sits on the screen, 3 outside the card's border. Absolute
+// offsets start inside that border, so it is added back.
 const ME_RING = { width: 2, gap: 3, color: { light: '#B8860B', dark: '#F2C14E' } } as const;
+const ME_RING_OUTSET = ME_RING.gap + ME_RING.width + ROW_BORDER;
 
 /**
- * Each row is drawn as its tier's card, redrawn for the row's wide, short
- * shape (RankingTierRowBackground), with a small emblem and the tier name
- * under the nickname; the card-size emblem (and Home's emblem ids) stays on 내
- * 순위 only. Unknown tiers keep the plain card without a tier line. My row
+ * Every row is the same plain card, whatever the tier: a small emblem and the
+ * tier name under the nickname say the tier; the card-size emblem (and Home's
+ * emblem ids) stays on 내 순위 only. Unknown tiers have no tier line. My row
  * shows a 나 chip in the slot every row keeps, and a ring around the card;
  * neither moves any row.
  */
@@ -492,38 +520,25 @@ function RankingRow({
   const { fontScale } = useWindowDimensions();
   const stacked = fontScale > 1.3;
   const tier = getHomeTier(getRankingTier(item, rankType), mode);
-  const foreground = tier ? tierForeground(tier, mode) : undefined;
-  // Absolute offsets start inside the border: the plain card's border is added back.
-  const ringOutset = ME_RING.gap + ME_RING.width + (tier ? 0 : ROW_BORDER);
   return (
-    <ActionPressable
-      testID={TEST_IDS.ranking.item(item.userId)}
-      style={[styles.rankRow, tier && { borderWidth: 0, backgroundColor: tier.palette.backgroundColor }]}
-      underlay={tier ? <RankingTierRowBackground tier={tier.id} mode={mode} /> : null}
-      onPress={onPress}
-    >
+    <ActionPressable testID={TEST_IDS.ranking.item(item.userId)} style={styles.rankRow} onPress={onPress}>
       {mine ? (
-        <View testID="ranking-me-ring" pointerEvents="none" {...HIDDEN} style={[styles.meRing, {
-          top: -ringOutset, right: -ringOutset, bottom: -ringOutset, left: -ringOutset,
-          borderRadius: RANKING_ROW_RADIUS + ME_RING.gap + ME_RING.width, borderColor: ME_RING.color[mode],
-        }]} />
+        <View testID="ranking-me-ring" pointerEvents="none" {...HIDDEN} style={[styles.meRing, { borderColor: ME_RING.color[mode] }]} />
       ) : null}
       <View style={[styles.rankLeft, stacked && styles.rankLeftStacked]}>
-        <Text style={[styles.rankNumber, foreground]}>#{item.rank}</Text>
+        <Text style={styles.rankNumber}>#{item.rank}</Text>
         <View style={[styles.profile, stacked && styles.rowProfileStacked]}>
           <ProfileAvatar profileImageUrl={item.profileImageUrl} size={40} testID={`ranking-avatar-${item.userId}`} />
           <View style={styles.identity}>
             <View style={styles.nameLine}>
-              <Text style={[styles.name, foreground]}>{item.nickname}</Text>
+              <Text style={styles.name}>{item.nickname}</Text>
               {/* Every row keeps the chip's slot (invisible unless mine), so marking my row never
                   reflows its nickname; the slot is one nickname line tall, so the chip stays on the
-                  first line. Inverted tier colors read on every tier in both modes; 내 순위 itself
-                  is in the figures' label. */}
+                  first line. 내 순위 itself is in the figures' label. */}
               <View style={[styles.meChipLine, { height: NAME_LINE * fontScale }]}>
                 <View testID={mine ? 'ranking-me-chip' : undefined} {...HIDDEN}
-                  style={[styles.meChip, mine ? { backgroundColor: tier ? tier.palette.color : semantic.text } : styles.meChipSlot]}>
-                  <Text maxFontSizeMultiplier={1.3}
-                    style={[styles.meChipText, mine && { color: tier ? tier.palette.backgroundColor : semantic.surface }]}>나</Text>
+                  style={[styles.meChip, mine ? styles.meChipMine : styles.meChipSlot]}>
+                  <Text maxFontSizeMultiplier={1.3} style={[styles.meChipText, mine && styles.meChipTextMine]}>나</Text>
                 </View>
               </View>
             </View>
@@ -534,14 +549,14 @@ function RankingRow({
                   <TierEmblem tier={tier.id} size={ROW_EMBLEM} testID={`ranking-row-emblem-${item.userId}`}
                     imageTestID={`ranking-row-emblem-image-${item.userId}`} />
                 </View>
-                <Text style={[styles.tierName, foreground]}>{tier.name}</Text>
+                <Text style={styles.tierName}>{tier.name}</Text>
               </View>
             ) : null}
           </View>
         </View>
       </View>
 
-      <RankingFigures item={item} tier={tier} mode={mode} mine={mine} />
+      <RankingFigures item={item} tierName={tier?.name} mine={mine} />
     </ActionPressable>
   );
 }
@@ -562,8 +577,15 @@ const styles = StyleSheet.create({
   myCard: { marginBottom: 12 },
   onArtLabel: { fontWeight: '700' },
   onArtSettled: { fontWeight: '800' },
+  // 내 순위's left column: profile, then the rank, then the figures, with room between the three.
+  standing: { gap: 12, minWidth: 0 },
   myName: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
   myRank: { fontSize: 32, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  myFigures: { gap: 2, minWidth: 0 },
+  // A value moves under its label only when the two cannot share the line;
+  // alone on its line it may still wrap, so it never runs into the emblem.
+  myFigure: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, minWidth: 0 },
+  myFigureValue: { flexShrink: 1, minWidth: 0, fontSize: 16, lineHeight: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
   tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
   // Only when the figures cannot fit beside the name (narrow screens at large
@@ -578,10 +600,11 @@ const styles = StyleSheet.create({
   big: { fontSize: 24, fontWeight: '700' },
   helper: { fontSize: 14, color: semantic.secondary },
   settledText: { color: semantic.error, fontWeight: '700' },
+  // Every tier: the plain card's surface, border and radius (as styles.card).
   rankRow: {
     borderWidth: ROW_BORDER,
     borderColor: semantic.border,
-    borderRadius: RANKING_ROW_RADIUS,
+    borderRadius: ROW_RADIUS,
     paddingVertical: 12,
     paddingHorizontal: 14,
     backgroundColor: semantic.surface,
@@ -610,11 +633,17 @@ const styles = StyleSheet.create({
   name: { flexShrink: 1, minWidth: 0, fontSize: 15, lineHeight: NAME_LINE, fontWeight: '700' },
   meChipLine: { flexShrink: 0, justifyContent: 'center' },
   meChip: { borderRadius: 999, paddingHorizontal: 6, paddingVertical: 1 },
+  // Inverted text colors: a solid pill on the card in both modes.
+  meChipMine: { backgroundColor: semantic.text },
   meChipSlot: { opacity: 0 },
   meChipText: { fontSize: 11, lineHeight: 14, fontWeight: '700' },
+  meChipTextMine: { color: semantic.surface },
   tierLine: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
   rowEmblemSlot: { ...ROW_EMBLEM_SLOT, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  tierName: { flexShrink: 1, minWidth: 0, fontSize: 12, lineHeight: 16, fontWeight: '600' },
-  meRing: { position: 'absolute', borderWidth: ME_RING.width },
+  tierName: { flexShrink: 1, minWidth: 0, fontSize: 12, lineHeight: 16, fontWeight: '600', color: semantic.secondary },
+  meRing: {
+    position: 'absolute', top: -ME_RING_OUTSET, right: -ME_RING_OUTSET, bottom: -ME_RING_OUTSET, left: -ME_RING_OUTSET,
+    borderWidth: ME_RING.width, borderRadius: ROW_RADIUS + ME_RING.gap + ME_RING.width,
+  },
   footerLoader: { paddingVertical: 16 },
 });

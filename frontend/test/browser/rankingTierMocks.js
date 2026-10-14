@@ -2,13 +2,16 @@ import { availableRankings } from '../../src/features/ranking/fixtures';
 const params = new URLSearchParams(location.search), tier = params.get('tier') ?? 'master';
 const long = params.get('long') === '1', rankType = params.get('final') === '1' ? 'final' : 'daily';
 const nickname = long ? '아주긴닉네임대한민국LongNickname'.repeat(3) : '트레이더';
-const rows = ['123.45', '-12.34', '0', null].map((returnRate, i) => ({ ...availableRankings.rankings[0], rank: i + 1,
-  userId: `row-${i}`, seasonParticipantId: `sp-${i}`, nickname, profileImageUrl: null,
-  totalAssetKrw: long ? '1234567890123456.00000000' : '123456789', returnRate,
+// row-2 is mine. `?myReturn=` (`none` = unavailable) and `?myTotal=` set its figures, which 내 순위 shows too.
+const myReturn = params.get('myReturn') ?? '0', myTotal = params.get('myTotal');
+const rows = ['123.45', '-12.34', myReturn === 'none' ? null : myReturn, null].map((returnRate, i) => ({
+  ...availableRankings.rankings[0], rank: i + 1, userId: `row-${i}`, seasonParticipantId: `sp-${i}`, nickname, profileImageUrl: null,
+  totalAssetKrw: i === 2 && myTotal ? myTotal : long ? '1234567890123456.00000000' : '123456789', returnRate,
   provisionalTier: rankType === 'final' ? 'bronze' : tier, finalTier: rankType === 'final' ? tier : 'silver',
 }));
-// myRanking is sp-2 (row-2 is mine); `?me=none` names a participant outside the list.
-const mine = params.get('me') === 'none' ? { seasonParticipantId: 'sp-none' } : {};
+// myRanking is sp-2 (row-2, rank 3) with that row's figures; `?me=none` names a participant outside the list.
+const mine = { rank: rows[2].rank, returnRate: rows[2].returnRate, totalAssetKrw: rows[2].totalAssetKrw,
+  ...(params.get('me') === 'none' ? { seasonParticipantId: 'sp-none' } : {}) };
 const season = { ...availableRankings.season, status: rankType === 'final' ? 'settled' : 'active', joined: true };
 export const transport = { requests: [] };
 
@@ -40,7 +43,7 @@ function slotRanking(url) {
 export const apiClient = { get: async path => {
   transport.requests.push(path);
   let data;
-  if (path === '/me') data = { id: 'self', nickname: '내 트레이더', profileImageUrl: null };
+  if (path === '/me') data = { id: 'self', nickname: long ? `내${nickname}` : '내 트레이더', profileImageUrl: null };
   else if (path === '/seasons/current') data = slot ? slotSeason : season;
   else if (path.startsWith('/ranking?') && slot) data = slotRanking(new URL(path, location.origin));
   else if (path.startsWith('/ranking?')) {

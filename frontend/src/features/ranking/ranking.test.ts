@@ -143,8 +143,10 @@ describe('ranking wire response rendering', () => {
     assert.match(html, /ranking-avatar-user-2-fallback/);
     // The list itself shows the top rankers; there is no separate podium card.
     assert.equal(/ranking-top3|ranking-top-|상위 랭커/.test(html), false, 'podium card removed');
-    // My tier card carries rank and tier only; return rates stay in the list rows.
-    assert.equal(/ranking-my-return|>수익률</.test(html), false, 'my card has no return rate');
+    // 내 순위 shows my ranking's return rate and total assets; the list rows keep theirs.
+    assert.match(html, /data-testid="ranking-my-return"[^>]*>\+9%</);
+    assert.match(html, /data-testid="ranking-my-total"[^>]*>999,998원</);
+    assert.match(html, /aria-label="수익률 \+9%, 총자산 999,998원"/);
     assert.equal(/ranking-return-user-1/.test(html) && /ranking-return-user-2/.test(html), true, 'list rows keep return rates');
     assert.equal(/ranking-total-user-1/.test(html), true, 'list rows keep total assets');
     assert.match(html, /trader-1/);
@@ -153,11 +155,13 @@ describe('ranking wire response rendering', () => {
     assert.match(html, /#2/);
     assert.match(html, /10%/);
     assert.match(html, /999,999/);
-    // Each row is drawn as its tier's card (master is shown as Whale), never raw
-    // text; the Home emblem (its ids) and the original card artwork stay on 내
-    // 순위 only. Rows carry a small emblem under their own ranking ids.
-    assert.match(html, /ranking-tier-background-whale-light/);
-    assert.match(html, /ranking-tier-background-silver-light/);
+    // Every row is the same plain card; its tier is a small emblem and name
+    // (master is shown as Whale), never raw text. The Home emblem (its ids) and
+    // the original card artwork stay on 내 순위 only.
+    assert.doesNotMatch(html, /ranking-tier-background-/);
+    assert.match(html, /data-testid="ranking-row-tier-user-1"/);
+    assert.match(html, /data-testid="ranking-row-tier-user-2"/);
+    assert.match(html, />Whale</);
     assert.equal(html.match(/data-testid="home-emblem-/g)?.length, 1, 'only my card keeps an emblem');
     assert.match(html, /home-emblem-silver/);
     assert.match(html, /home-tier-background-silver-light/);
@@ -264,11 +268,14 @@ describe('ranking wire response rendering', () => {
     const html = h.render();
     assert.match(html, /최종 랭킹 확정/);
     assert.match(html, /home-emblem-diamond/);
-    assert.equal(html.match(/data-testid="ranking-tier-background-diamond-light"/g)?.length, 2);
-    assert.doesNotMatch(html, /home-emblem-whale|home-emblem-silver|ranking-tier-background-(whale|silver)/);
+    // Both rows name the final tier on their tier line; the card caption names it too.
+    assert.equal(html.match(/data-testid="ranking-row-emblem-image-user-[12]"/g)?.length, 2);
+    assert.equal(html.match(/>Diamond</g)?.length, 3);
+    assert.match(html, /data-testid="ranking-my-return"[^>]*>\+9%</);
+    assert.doesNotMatch(html, /home-emblem-whale|home-emblem-silver|>Whale<|>Silver<|ranking-tier-background-/);
   });
 
-  it('draws every row as its tier card without a Home emblem; unknown tiers keep the plain card', () => {
+  it('draws every row as the same plain card with its tier line; unknown tiers have none, and no row has a Home emblem', () => {
     const h = createHarness();
     const tiers = ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'master', null, 'grandmaster'];
     h.page.rankings = tiers.map((tier, index) => ({
@@ -282,14 +289,14 @@ describe('ranking wire response rendering', () => {
       return html.slice(start, end === -1 ? undefined : end);
     };
     for (const [index, visual] of ['bronze', 'silver', 'gold', 'platinum', 'diamond', 'whale'].entries()) {
-      assert.equal(row(index).includes(`ranking-tier-background-${visual}-light`), true, visual);
-      assert.equal(/home-emblem-|home-tier-image/.test(row(index)), false, `${visual} row has no emblem`);
+      assert.equal(row(index).includes(`data-testid="ranking-row-tier-user-${index}"`), true, visual);
+      assert.equal(/ranking-tier-background-|home-emblem-|home-tier-image/.test(row(index)), false, `${visual} row has no art or Home emblem`);
       // myRanking is sp-2 in this fixture: that (gold) row is mine and its label starts with 내 순위.
       const mine = index === 2 ? '내 순위, ' : '';
       assert.equal(row(index).includes(`aria-label="${mine}${visual === 'whale' ? 'Whale' : visual[0].toUpperCase() + visual.slice(1)} 티어, 수익률`), true);
     }
     for (const index of [6, 7]) {
-      assert.equal(/ranking-tier-background-|home-emblem-|ranking-tier-slot-/.test(row(index)), false, 'no invented tier');
+      assert.equal(/ranking-row-tier-|ranking-tier-background-|home-emblem-/.test(row(index)), false, 'no invented tier');
       assert.equal(row(index).includes('aria-label="수익률 '), true);
     }
     // Rise/fall meaning and both figures stay on every row.

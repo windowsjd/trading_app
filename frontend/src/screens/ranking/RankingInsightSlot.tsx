@@ -39,10 +39,11 @@ const nextKey = (messages: readonly RankingInsight[], key: RankingInsightKey) =>
   messages[(messages.findIndex((message) => message.key === key) + 1) % messages.length].key;
 
 /**
- * 순위 안내 between 내 순위 and the ranking tabs. One message is shown at a
- * time and the next one replaces it every few seconds; a single message stays
- * still. Screen readers get every message at once from the card, never the
- * rotation. Amounts are plain text (no number rolling).
+ * 순위 안내 between 내 순위 and the ranking tabs, written on the screen itself
+ * (no card). One message is shown at a time and the next one replaces it
+ * every few seconds; a single message stays still. Screen readers get every
+ * message at once from the slot, never the rotation. Amounts are plain text
+ * (no number rolling).
  */
 export default function RankingInsightSlot({ messages, paused }: {
   messages: RankingInsight[];
@@ -145,7 +146,7 @@ function SlotCard({ messages, paused }: { messages: RankingInsight[]; paused: bo
     setCycle((value) => value + 1);
   }, [activeKey, messages, offset, opacity]);
 
-  // The card is as tall as its tallest message, so the list below never moves.
+  // The slot is as tall as its tallest message, so the list below never moves.
   const measure = (key: RankingInsightKey) => (event: LayoutChangeEvent) => {
     const { height } = event.nativeEvent.layout;
     setHeights((current) => (current[key] === height ? current : { ...current, [key]: height }));
@@ -173,7 +174,7 @@ function SlotCard({ messages, paused }: { messages: RankingInsight[]; paused: bo
 
   return (
     <View testID="ranking-slot" accessible accessibilityLabel={describeRankingInsights(messages)}
-      style={[styles.card, rotating && styles.cardWithDots]}>
+      style={[styles.slot, rotating && styles.slotWithDots]}>
       {rotating ? (
         <>
           <ActionPressable testID="ranking-slot-next" style={styles.touch} {...HIDDEN}
@@ -222,7 +223,7 @@ function MessageRow({ message, mode, financialPreference }: {
           {message.suffix ? <Text style={styles.suffix}>{message.suffix}</Text> : null}
         </Text>
         {detail ? (
-          // The card's label already reads it (detail.spoken). Only the leading mark is colored.
+          // The slot's label already reads it (detail.spoken). Only the leading mark is colored.
           <Text testID={`ranking-slot-detail-${message.key}`} style={styles.detail} {...HIDDEN}>
             <Text style={detailInk && { color: detailInk }}>{detail.text.slice(0, 1)}</Text>
             {detail.text.slice(1)}
@@ -234,21 +235,13 @@ function MessageRow({ message, mode, financialPreference }: {
 }
 
 const styles = StyleSheet.create({
-  // The ranking cards' surface (RankingScreen styles.card); never a tier color.
-  card: {
-    minHeight: 64,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 14,
-    backgroundColor: semantic.surface,
-    marginBottom: 12,
-  },
-  cardWithDots: { paddingRight: 44 },
-  touch: { flex: 1, minWidth: 0, justifyContent: 'center', borderRadius: 10 },
+  // No surface, border or radius: the glyph starts at the list's edge, in line
+  // with the cards above and below.
+  slot: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 12 },
+  slotWithDots: { paddingRight: 32 },
+  // The words keep a little air from the card and the tabs. The negative
+  // margin gives the press ink room around them without moving the glyph.
+  touch: { flex: 1, minWidth: 0, justifyContent: 'center', borderRadius: 12, paddingVertical: 6, paddingHorizontal: 8, marginHorizontal: -8 },
   stage: { justifyContent: 'center' },
   measureLayer: { position: 'absolute', top: 0, left: 0, right: 0, opacity: 0 },
   measureItem: { position: 'absolute', top: 0, left: 0, right: 0 },
@@ -268,8 +261,8 @@ const styles = StyleSheet.create({
   value: { fontSize: 20, lineHeight: 28, fontWeight: '800', fontVariant: ['tabular-nums'], color: semantic.text },
   suffix: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
   detail: { fontSize: 13, lineHeight: 19, color: semantic.secondary },
-  // Spans the card's full height (padding included), so it never makes the card taller.
-  dots: { position: 'absolute', top: 0, bottom: 0, right: 10, width: 24, justifyContent: 'center' },
+  // Spans the slot's full height, so it never makes the slot taller; the marks end near the list's edge.
+  dots: { position: 'absolute', top: 0, bottom: 0, right: 0, width: 24, justifyContent: 'center' },
   dot: { width: 24, height: 12, alignItems: 'center', justifyContent: 'center' },
   dotMark: { width: 6, height: 6, borderRadius: 3, backgroundColor: semantic.border },
   dotMarkActive: { backgroundColor: semantic.text },
