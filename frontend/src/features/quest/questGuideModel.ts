@@ -312,7 +312,9 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   const review = facts.practice?.limitReview;
   // Holdings are listed under the order form; without a visible holding the
   // practice quantity is prepared here with a normal market buy.
-  if (screen === 'order' && ['protection', 'marketSell'].includes(session.quest) && ['asset-holdings', 'asset-protection'].includes(step.target)
+  // The TP/SL practice is a SELL setting: without a holding the form is blocked.
+  const holdingStep = session.quest === 'protection' ? form.blocked === true : ['asset-holdings', 'asset-protection'].includes(step.target);
+  if (screen === 'order' && ['protection', 'marketSell'].includes(session.quest) && holdingStep
     && holding?.accountId === session.accountId && holding.assetId === session.assetId && holding.holdingsVisible === false) {
     return message(session, screen, 'prepare-holding', card({ title: '실습 수량 준비', body: '아래 보유종목에서 현재 종목의 보유수량과 수익률을 확인해 주세요. 보유수량이 없다면 매수를 선택해 시장가로 다시 매수한 뒤 이어서 진행할 수 있어요.' }));
   }
@@ -321,18 +323,18 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   let hint: string | null = null;
   // Only the order form's own steps depend on the chosen side and type.
   if (screen === 'order' && step.target.startsWith('order-')) {
-    const wantedSide = session.quest === 'marketSell' ? 'sell' : 'buy';
-    const wantedType = session.quest === 'limitBuy' ? 'limit' : 'market';
+    const wantedSide = session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy';
+    const wantedType = session.quest === 'limitBuy' ? 'limit' : session.quest === 'protection' ? 'protection' : 'market';
     if (form.side !== wantedSide || form.orderType !== wantedType) {
-      const label = wantedType === 'limit' ? '지정가' : '시장가';
+      const label = wantedType === 'limit' ? '지정가를' : wantedType === 'protection' ? '손절가/익절가 설정을' : '시장가를';
       // Forms start at 시장가; another practiced method is picked from 주문방식 선택하기.
       if (form.side === wantedSide && form.methodSheetOpen) {
-        return spotlight(session, screen, index, 'choose-order', [wantedType === 'limit' ? 'order-method-limit' : 'order-method-market'],
-          card({ title: '주문 방식 확인', body: `목록에서 ${label}를 선택해 주세요.` }));
+        return spotlight(session, screen, index, 'choose-order', [`order-method-${wantedType}`],
+          card({ title: '주문 방식 확인', body: `목록에서 ${label} 선택해 주세요.` }));
       }
       return spotlight(session, screen, index, 'choose-order', ['order-type'], card({ title: '주문 방식 확인', body: form.side !== wantedSide
-        ? `${wantedSide === 'buy' ? '매수' : '매도'} · ${label}를 선택해 주세요.`
-        : `주문방식 선택하기를 눌러 ${label}를 선택해 주세요.` }));
+        ? `${wantedSide === 'buy' ? '매수' : '매도'} · ${label} 선택해 주세요.`
+        : `주문방식 선택하기를 눌러 ${label} 선택해 주세요.` }));
     }
     if (step.target === 'order-input') ready = ready && form.amountValid === true;
   }
@@ -427,7 +429,7 @@ export function advanceGuide(session: GuideSession, fromStep: number): GuideSess
 /** The only commands that can complete each quest on the server. */
 export function commandMatchesQuest(quest: BeginnerQuestKey, command: QuestGuideCommand): boolean {
   if (isTradingQuest(quest)) {
-    if (quest === 'protection') return command.kind === 'protection' && command.bothLegs;
+    if (quest === 'protection') return command.kind === 'protection';
     if (quest === 'futuresLong' || quest === 'futuresShort') return command.kind === 'futures' && command.direction === (quest === 'futuresLong' ? 'long' : 'short') && command.leverage > 1;
     return command.kind === 'spot' && command.assetType === (quest === 'krStock' ? 'domestic_stock' : quest === 'usStock' ? 'us_stock' : 'crypto')
       && command.side === (quest === 'marketSell' ? 'sell' : 'buy') && command.orderType === (quest === 'limitBuy' ? 'limit' : 'market');

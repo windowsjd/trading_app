@@ -15,7 +15,7 @@ function setup() {
   const reader = new BeginnerQuestEvidence(db as unknown as QuestClient);
   return { db, reader };
 }
-it('market evidence requires actual filled quantity, matching account/market/side and strict chronology; automated exits excluded', async () => {
+it('market evidence requires actual filled quantity, matching account/market/side and strict chronology; automated exits (OCO child, SELL setting) excluded', async () => {
   const { db, reader } = setup();
   await reader.filledOrder(
     'A',
@@ -33,6 +33,7 @@ it('market evidence requires actual filled quantity, matching account/market/sid
     status: 'executed',
     executedAt: { gt: at(2) },
     protectionChild: { is: null },
+    conditionalSell: { is: null },
     OR: [
       { executedQuantity: { gt: 0 } },
       { executedQuantity: null, quantity: { gt: 0 } },
@@ -114,5 +115,151 @@ it('futures evidence ties a manual full close to its opening lifetime and exclud
     quantity: 0,
     liquidationClose: { is: null },
     seasonClose: { is: null },
+  });
+});
+
+type Query<W> = { where: W };
+describe('QUEST 04 TP/SL registration evidence', () => {
+  /** QUEST 01–03 proven at 1–4 s (holdings reviewed at 4 s); nothing later. */
+  function proven(
+    oco: { id: string; activatedAt: Date } | null,
+    setting: { id: string; createdAt: Date } | null,
+  ) {
+    const db = {
+      exchangeTransaction: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'fx', executedAt: at(1) }]),
+      },
+      walletTransfer: {
+        findMany: jest
+          .fn()
+          .mockResolvedValue([{ id: 'transfer', executedAt: at(2) }]),
+      },
+      walletTransaction: {
+        findMany: jest
+          .fn()
+          .mockImplementation(({ where }: Query<{ referenceType: string }>) =>
+            where.referenceType === 'exchange_transaction'
+              ? [
+                  leg('fx', 'exchange_source', 'debit', 'KRW', 'securities'),
+                  leg('fx', 'exchange_target', 'credit', 'USD', 'securities'),
+                ]
+              : [
+                  leg(
+                    'transfer',
+                    'wallet_transfer',
+                    'debit',
+                    'USD',
+                    'securities',
+                  ),
+                  leg(
+                    'transfer',
+                    'wallet_transfer',
+                    'credit',
+                    'USD',
+                    'crypto_spot',
+                  ),
+                ],
+          ),
+      },
+      beginnerQuestAcknowledgement: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            stepId: 'holdings_reviewed',
+            orderId: 'buy',
+            acknowledgedAt: at(4),
+          },
+        ]),
+      },
+      order: {
+        findFirst: jest
+          .fn()
+          .mockImplementation(
+            ({ where }: Query<{ side: string; orderType: string }>) =>
+              where.side === 'buy' && where.orderType === 'market'
+                ? { id: 'buy', executedAt: at(3), assetId: 'btc' }
+                : null,
+          ),
+      },
+      protectionGroup: { findFirst: jest.fn().mockResolvedValue(oco) },
+      conditionalSellOrder: { findFirst: jest.fn().mockResolvedValue(setting) },
+    };
+    return {
+      db,
+      reader: new BeginnerQuestEvidence(db as unknown as QuestClient),
+    };
+  }
+  function leg(
+    referenceId: string,
+    txType: string,
+    direction: string,
+    currencyCode: string,
+    walletScope: string,
+  ) {
+    return {
+      referenceId,
+      txType,
+      direction,
+      currencyCode,
+      wallet: { tradingAccountId: 'A', walletScope, currencyCode },
+    };
+  }
+  const step = async (reader: BeginnerQuestEvidence) => {
+    const progress = await reader.read('A', false);
+    const quest = progress.quests.find(
+      (row) => row.questId === 'common-04-protection',
+    )!;
+    return {
+      completed: quest.status === 'completed',
+      referenceId: quest.steps[0].referenceId,
+      completedAt: quest.steps[0].completedAt,
+      spotProtection: progress.learningAccess.spotProtection,
+    };
+  };
+
+  it('accepts one independent stop-loss or take-profit on the practiced asset after the review', async () => {
+    const { db, reader } = proven(null, { id: 'sl', createdAt: at(5) });
+    expect(await step(reader)).toEqual({
+      completed: true,
+      referenceId: 'sl',
+      completedAt: at(5).toISOString(),
+      spotProtection: true,
+    });
+    const [[{ where }]] = db.conditionalSellOrder.findFirst.mock.calls as [
+      [
+        Query<{
+          tradingAccountId: string;
+          assetId: string;
+          kind: unknown;
+          position: unknown;
+          createdAt: { gt: Date };
+        }>,
+      ],
+    ];
+    expect(where.tradingAccountId).toBe('A');
+    expect(where.assetId).toBe('btc');
+    expect(where.kind).toEqual({ in: ['stop_loss', 'take_profit'] });
+    expect(where.position).toEqual({
+      is: { tradingAccountId: 'A', assetId: 'btc' },
+    });
+    expect(where.createdAt.gt.getTime()).toBe(at(4).getTime());
+  });
+
+  it('keeps an earlier OCO completion and takes the earliest registration of either kind', async () => {
+    const oco = await step(
+      proven({ id: 'oco', activatedAt: at(6) }, { id: 'tp', createdAt: at(7) })
+        .reader,
+    );
+    expect([oco.completed, oco.referenceId]).toEqual([true, 'oco']);
+    const setting = await step(
+      proven({ id: 'oco', activatedAt: at(9) }, { id: 'tp', createdAt: at(7) })
+        .reader,
+    );
+    expect([setting.completed, setting.referenceId]).toEqual([true, 'tp']);
+  });
+
+  it('stays open without a qualifying registration', async () => {
+    expect((await step(proven(null, null).reader)).completed).toBe(false);
   });
 });

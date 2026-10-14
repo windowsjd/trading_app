@@ -76,10 +76,12 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
  await tab('퀘스트').click();
  assert.equal(await page.getByTestId('quest-card-futuresShort-start').getAttribute('aria-disabled'),'true');
  await buy('marketBuy','BTC');
- await start('protection');await id('holding-protection-BTC').click();
- await id('protection-take_profit-toggle').click();await page.getByLabel('익절 (Take Profit) 조건 가격',{exact:true}).fill('120');
- await id('protection-stop_loss-toggle').click();await page.getByLabel('손절 (Stop Loss) 조건 가격',{exact:true}).fill('80');
- await next();await page.getByRole('button',{name:'보호 조건 등록',exact:true}).click();await finish('protection');
+ // TP/SL is the SELL 주문방식 손절가/익절가 설정 of the practiced asset: field, sheet row,
+ // one take-profit with a share of the holding, then 확인 (one setting is enough).
+ await start('protection');await pick('protection');await id('sell-protection-form').waitFor();
+ assert.equal(await page.getByTestId('holding-protection-BTC').count(),0,'no TP/SL button on the holdings card');
+ await id('sell-take-profit-toggle').click();await id('sell-take-profit-trigger-price').fill('120');await id('sell-take-profit-ratio-50').click();
+ await next();await id('sell-intent-submit').click();await finish('protection');
  // 판매하기 on the detail, then holdings below the sell form, then the form steps.
  await start('marketSell');await id('asset-detail-open-sell-order').click();await next();await marketDefault();await next();
  await id('order-quantity-input').fill('1');await next();await next();await id('order-execute-submit').click();await finish('marketSell');

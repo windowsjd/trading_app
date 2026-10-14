@@ -26,6 +26,7 @@ import {
   conditionalSellHash,
   conditionalSellKindEnabled,
   conditionalSellWindowExpired,
+  findProtectionSettingConflict,
   independentTpSlEnabled,
   isConditionalSellMet,
   isRetryableConditionalSellFailure,
@@ -96,9 +97,11 @@ type ConditionalSellListQuery = {
 
 /**
  * SELL intents on an open Spot holding (KRX stocks, crypto Spot): a user
- * condition, an independent stop-loss and an independent take-profit. None
- * reserves quantity, so the targets of one holding may add up to more than
- * the holding. Once its eligible trigger is recorded, an intent submits ONE
+ * condition, independent stop-losses and independent take-profits. None
+ * reserves quantity; the live stop-losses (and, separately, take-profits) of
+ * a holding target at most the holding at registration, while conditions and
+ * the two families may together target more. New stop-loss/take-profit
+ * settings sell at market. Once its eligible trigger is recorded, an intent submits ONE
  * ordinary market or limit SELL through OrdersService, sized there and then
  * to min(target, holding − other orders' reservations). Lifecycle
  * authorization uses the existing Season → Account → Participant / General
@@ -198,8 +201,17 @@ export class ConditionalSellService {
           amount: null,
         });
       // Registering automation is an advanced action on a beginner account;
-      // the resulting SELL itself stays risk reduction.
-      await assertBeginnerLearningAccess(tx, account, 'allTrading');
+      // the resulting SELL itself stays risk reduction. A crypto stop-loss/
+      // take-profit is the TP/SL practice (QUEST 04), opened at the same step
+      // as the whole-position protection it replaces there; a user condition
+      // and every other market keep full trading access.
+      await assertBeginnerLearningAccess(
+        tx,
+        account,
+        input.intents[0].kind !== 'condition' && asset.assetType === 'crypto'
+          ? 'spotProtection'
+          : 'allTrading',
+      );
       const live = await tx.conditionalSellOrder.count({
         where: { tradingAccountId: accountId, ...liveConditionalSell },
       });
@@ -242,13 +254,48 @@ export class ConditionalSellService {
           'An open position is required.',
           409,
         );
-      // Each target is checked alone: several may add up to more than this.
+      // Each target is checked alone: a condition and the stop-loss and
+      // take-profit families may together add up to more than this.
       if (input.intents.some((intent) => intent.quantity.gt(position.quantity)))
         throw createApiError(
           'CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING',
           'The quantity exceeds the current holding.',
           409,
         );
+      // Within one stop-loss or take-profit family the live targets stay
+      // within the holding and use distinct prices (same fence as every
+      // registration of this account, so concurrent creates serialize here).
+      const protectionKinds = input.intents
+        .map((intent) => intent.kind)
+        .filter((kind) => kind !== 'condition');
+      if (protectionKinds.length) {
+        const conflict = findProtectionSettingConflict({
+          intents: input.intents,
+          live: await tx.conditionalSellOrder.findMany({
+            where: {
+              tradingAccountId: accountId,
+              assetId: asset.id,
+              positionId: position.id,
+              kind: { in: protectionKinds },
+              ...liveConditionalSell,
+            },
+            select: { kind: true, triggerPrice: true, quantity: true },
+          }),
+          holding: position.quantity,
+        });
+        if (conflict === 'duplicate_price')
+          throw createApiError(
+            'CONDITIONAL_SELL_DUPLICATE_PRICE',
+            'An active setting of the same kind already uses this price.',
+            409,
+          );
+        if (conflict === 'total_exceeds_holding')
+          throw createApiError(
+            'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+            'Active settings of the same kind would exceed the current holding.',
+            409,
+          );
+      }
       const price = await conditionalPrice(tx, asset, 'spot', now);
       if (!price) {
         setAdminDiagnosticContext({
@@ -442,7 +489,8 @@ export class ConditionalSellService {
           protection: {
             enabled: protectionEnabled,
             canCreate: protectionEnabled && tradable,
-            canUseLimit: protectionEnabled && canUseLimit,
+            // New stop-loss/take-profit settings execute at market only.
+            canUseLimit: false,
           },
           canCancel: true,
           markets: ['KRX', 'CRYPTO_SPOT'],

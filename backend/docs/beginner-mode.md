@@ -15,8 +15,8 @@
 | common-01-exchange | 기존 독립 KRW→USD 환전과 원장 | 없음 |
 | common-02-transfer | 기존 환전 이후 증권→현물 USD 이체와 원장 | 없음 |
 | common-03-market-buy | Q02 이후 실제 수량이 체결된 현물 crypto 시장가 BUY | 해당 주문 종목의 보유종목·수익률 확인 |
-| common-04-protection | Q03 확인 이후 같은 crypto 종목의 활성화된 TP+SL 등록 | 없음; 발동·취소 후에도 등록 증거 보존 |
-| common-05-market-sell | Q04 이후 사용자 crypto 시장가 SELL 체결 | 보호주문 자동 체결 제외 |
+| common-04-protection | Q03 확인 이후 같은 crypto 종목의 활성화된 TP+SL(OCO) 등록, 또는 독립형 손절·익절 설정(하나로 충분, 2026-10-15) 등록 중 가장 이른 것 | 없음; 발동·취소 후에도 등록 증거 보존 |
+| common-05-market-sell | Q04 이후 사용자 crypto 시장가 SELL 체결 | 보호주문·SELL 설정(조건/손절·익절)의 자동 체결 제외 |
 | common-06-limit-buy | Q05 이후 crypto 지정가 BUY 접수·예약 | 해당 주문의 사용자 취소/예약 해제 또는 실제 체결 결과 확인 |
 | market-kr-stock | Q06 이후 국내 주식 시장가 BUY 체결 | 없음 |
 | market-us-stock | Q06 이후 미국 주식 시장가 BUY 체결 | 없음 |
@@ -26,7 +26,8 @@
 GET quests는 읽기 전용이며 일관된 DB snapshot에서 증거를 조회한다.
 응답은 기존 `quests`와 별도의 `learningAccess`, `operations`를 반환한다.
 학습 권한은 진행 가능한 단계부터 허용한다: 환전 항상, 이체 Q01 완료,
-crypto 시장가 BUY Q02 완료, 현물 TP/SL Q03 완료, crypto 지정가 BUY Q05 완료,
+crypto 시장가 BUY Q02 완료, 현물 TP/SL Q03 완료(crypto의 OCO 보호와
+독립형 손절·익절 설정 등록; 매도 조건주문은 제외), crypto 지정가 BUY Q05 완료,
 그 밖의 신규 거래 Q06 완료. Q06 이후 추가 잠금은 없다.
 일반·시즌계정은 학습 검사에서 즉시 제외한다. 기존 소유권·상태·운영 플래그·
 시장시간·시세·금융 위험 검증은 그대로 적용한다. 취소·현물 SELL·선물 reduce/close는
@@ -43,6 +44,11 @@ UI 확인은 금융 체결 증거를 대신하지 않으며 GET으로 생성되�
 `LIMIT_ORDER_ENABLED`, `CONDITIONAL_ORDERS_ENABLED`, `FUTURES_TRADING_MODE`와
 각 매칭·위험 엔진 플래그는 이 작업에서 변경하지 않는다. 비활성 기능은 운영 제한으로
 안내하며 학습 미완료와 구별한다. 운영 비활성이 Q04/Q06 실습을 막을 수 있다.
+
+2026-10-15: 앱의 Q04 실습은 주문 화면 매도 주문방식 「손절가/익절가 설정」(독립형
+손절·익절)이다. 응답 `operations.conditionalOrdersEnabled`는 필드 이름을 유지한 채
+`INDEPENDENT_TP_SL_ORDERS_ENABLED`를 반영한다(퀘스트 카드의 운영 제한 안내 전용).
+이 플래그가 꺼져 있으면 새 Q04 실습은 운영 제한으로 안내된다.
 
 ## 기본 제공 정책 (2026-10-10)
 

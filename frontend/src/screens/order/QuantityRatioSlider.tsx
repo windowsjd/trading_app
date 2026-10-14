@@ -4,6 +4,8 @@ import { StyleSheet, View } from '../../theme/native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 
 export type QuantityRatioSliderProps = {
+  /** Defaults to the order form's `order-quantity-slider`. */
+  testID?: string;
   accessibilityLabel?: string;
   value: number;
   disabled: boolean;
@@ -48,7 +50,7 @@ export default function QuantityRatioSlider(props: QuantityRatioSliderProps) {
   return (
     <GestureDetector gesture={Gesture.Race(pan, tap)}>
       <View
-        testID="order-quantity-slider"
+        testID={props.testID ?? 'order-quantity-slider'}
         accessible
         accessibilityRole="adjustable"
         accessibilityLabel={props.accessibilityLabel ?? '주문 수량 비율'}

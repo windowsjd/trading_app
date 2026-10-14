@@ -123,7 +123,8 @@ describe('existing behaviour that must not regress', () => {
   it('keeps the chart and footer visible without nested scrolling', () => {
     assert.equal((detailScreenSource.match(/<ScrollView/g) ?? []).length, 0);
     assert.match(detailScreenSource, /<AssetMarketChart/);
-    assert.match(detailScreenSource, /<View style=\{styles.footer\}/);
+    // The fixed order bar pads itself by the bottom inset (tab bar hidden on detail).
+    assert.match(detailScreenSource, /<View style=\{\{ \.\.\.styles\.footer, paddingBottom: styles\.footer\.paddingBottom \+ insets\.bottom \}\}/);
   });
 
   it('keeps the timeframe selector and its viewport reset key', () => {

@@ -24,10 +24,11 @@ const futures = (short: boolean): TradingGuideStep[] => [
 ];
 export const TRADING_GUIDE_STEPS: Record<TradingQuestKey, TradingGuideStep[]> = {
   marketBuy: [market, price, buy, marketType, amount, preview, submit, holdings],
+  // Spot TP/SL is a SELL 주문방식 (손절가/익절가 설정) of the practiced asset.
   protection: [
-    { screen: 'order', target: 'asset-protection', title: '보유 현물 보호', body: '주문 화면 아래 보유종목에서 앞서 매수한 종목의 TP/SL 설정·관리를 눌러 주세요. 보유수량이 없다면 이 화면에서 정상 시장가 매수로 다시 준비할 수 있어요.' },
-    { screen: 'order', target: 'protection-editor', title: '익절과 손절', body: 'TP는 이익을 실현할 목표가격, SL은 손실을 줄이려는 가격이에요. 두 조건을 함께 입력해 주세요. 기존 보호가 있다면 취소 후 다시 등록할 수 있어요.', next: true },
-    { screen: 'order', target: 'protection-submit', title: '보호 주문 등록', body: '두 가격을 확인한 뒤 보호 조건 등록을 눌러 주세요. 등록 확정으로 완료되며 발동까지 기다리지 않아요.' },
+    { screen: 'order', target: 'order-type', title: '손절가/익절가 설정', body: '매도 화면의 주문방식 선택하기를 눌러 손절가/익절가 설정을 선택해 주세요. 보유한 현물을 정한 가격에서 자동으로 매도하도록 예약하는 방법이에요.' },
+    { screen: 'order', target: 'protection-editor', title: '익절가와 손절가', body: '익절가는 이익을 실현할 목표가격, 손절가는 손실을 줄이려는 가격이에요. 둘 중 하나 이상을 선택하고 가격과 매도 수량 비율을 정해 주세요. 가격에 도달하면 정한 수량을 시장가로 매도해요.', next: true },
+    { screen: 'order', target: 'protection-submit', title: '확인', body: '가격과 수량을 확인한 뒤 확인을 눌러 주세요. 등록이 확정되면 완료되며 발동까지 기다리지 않아요.' },
   ],
   marketSell: [
     { screen: 'asset', target: 'asset-sell', title: '판매하기', body: '판매하기를 눌러 매도 화면으로 이동해 주세요.' },

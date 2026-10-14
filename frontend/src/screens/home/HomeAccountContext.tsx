@@ -131,7 +131,8 @@ const styles = StyleSheet.create({
   nickname: { flexGrow: 1, flexShrink: 1, minWidth: 0, fontSize: 16, fontWeight: '600', lineHeight: 24 },
   tier: { alignItems: 'center', flexShrink: 0 },
   tierNameColumn: { maxWidth: '100%', flexShrink: 1, alignItems: 'center' },
-  tierName: { fontSize: 13, lineHeight: 19, fontWeight: '700', textAlign: 'center', color: semantic.secondary },
+  // The same size and weight as the 보유종목 및 포지션 heading (HomeHoldings).
+  tierName: { fontSize: 18, lineHeight: 27, fontWeight: '700', textAlign: 'center', color: semantic.text },
   neutral: { alignItems: 'center', justifyContent: 'center' },
   neutralRing: { width: '65%', height: '65%', borderRadius: 999, borderWidth: 1, borderColor: semantic.border, alignItems: 'center', justifyContent: 'center' },
   neutralMark: { fontSize: 22, color: semantic.muted },

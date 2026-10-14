@@ -101,6 +101,13 @@ export async function cancelProtection(
   return assertAccountScope(url, id, response.data.data);
 }
 
+/** The account's most recent protection groups of every status (newest 30). */
+export async function getProtectionHistory(id: string, signal?: AbortSignal) {
+  const url = path(id);
+  const response = await apiClient.get<{ data: Protections }>(url, { params: { history: 'true', limit: 30 }, signal });
+  return assertAccountScope(url, id, response.data.data);
+}
+
 export async function getPendingProtections(id: string, signal?: AbortSignal) {
   const groups: ProtectionGroup[] = [];
   let offset = 0;

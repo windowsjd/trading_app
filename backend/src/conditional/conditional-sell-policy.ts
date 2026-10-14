@@ -67,9 +67,9 @@ export function conditionalSellWindowExpired(triggeredAt: Date, now: Date) {
 
 /**
  * Transient execution outcomes that may succeed on the next worker cycle
- * inside the execution window. `INSUFFICIENT_QUANTITY` is a lost race for
- * the unreserved holding: the next attempt sizes the order again from the
- * live position. Every other code (closed market, account/Season gates,
+ * inside the execution window. `INSUFFICIENT_QUANTITY` and the guard's
+ * `CONFLICT` are a lost race for the unreserved holding: the next attempt
+ * sizes the order again from the live position. Every other code (closed market, account/Season gates,
  * protection conflicts, nothing left to sell) ends the intent at once.
  */
 const RETRYABLE_EXECUTION_CODES = new Set([
@@ -90,6 +90,10 @@ const RETRYABLE_EXECUTION_CODES = new Set([
   'ORDER_RESERVATION_CONFLICT',
   'ORDER_EXECUTION_TRANSACTION_FAILED',
   'INSUFFICIENT_QUANTITY',
+  // The market SELL guard's historical public code when only other orders'
+  // reservations made the sized quantity unavailable (or the row moved under
+  // it): the same lost race, re-sized from the live position next cycle.
+  'CONFLICT',
   'CONDITIONAL_SELL_EXECUTION_FAILED',
 ]);
 
@@ -201,6 +205,11 @@ function leg(
 ): ConditionalSellIntentInput {
   if (body.executionType !== 'market' && body.executionType !== 'limit')
     invalid('Choose Market or Limit execution.');
+  // New independent stop-loss/take-profit settings sell at market once their
+  // trigger price is reached (2026-10-15). Rows registered earlier with a
+  // limit execution keep executing, listing and canceling as before.
+  if (kind !== 'condition' && body.executionType !== 'market')
+    invalid('Stop-loss and take-profit settings execute at market.');
   if (body.executionType === 'market' && provided(body.limitPrice))
     invalid('Market execution cannot have a limit price.');
   return {
@@ -229,6 +238,50 @@ export function conditionalSellHash(input: ConditionalSellInput) {
       quantity: intent.quantity.toFixed(8),
     })),
   });
+}
+
+/**
+ * Registration rule for independent stop-loss/take-profit settings
+ * (2026-10-15), checked under the account fence against the live settings of
+ * the same holding: per kind, the live targets plus the new ones add up to at
+ * most the holding — stop-losses and take-profits are summed separately and
+ * user conditions never count — and no two live settings of one kind share a
+ * trigger price. Execution still sells only what is unreserved at that moment
+ * (resolveSellExecutionQuantity); a later sale that leaves the live targets
+ * above the remaining holding never edits or cancels them.
+ */
+export function findProtectionSettingConflict(input: {
+  intents: Array<
+    Pick<ConditionalSellIntentInput, 'kind' | 'triggerPrice' | 'quantity'>
+  >;
+  live: Array<{
+    kind: ConditionalSellKind;
+    triggerPrice: Prisma.Decimal;
+    quantity: Prisma.Decimal;
+  }>;
+  holding: Prisma.Decimal;
+}): 'duplicate_price' | 'total_exceeds_holding' | null {
+  const kinds = new Set(
+    input.intents
+      .map((intent) => intent.kind)
+      .filter((kind) => kind !== 'condition'),
+  );
+  for (const kind of kinds) {
+    const fresh = input.intents.filter((intent) => intent.kind === kind);
+    const live = input.live.filter((row) => row.kind === kind);
+    if (
+      fresh.some((intent) =>
+        live.some((row) => row.triggerPrice.eq(intent.triggerPrice)),
+      )
+    )
+      return 'duplicate_price';
+    const total = [...live, ...fresh].reduce(
+      (sum, row) => sum.add(row.quantity),
+      new Prisma.Decimal(0),
+    );
+    if (total.gt(input.holding)) return 'total_exceeds_holding';
+  }
+  return null;
 }
 
 /** at_or_above → price ≥ trigger, at_or_below → price ≤ trigger. */

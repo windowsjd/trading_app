@@ -11,6 +11,7 @@ import OrderSideSegment, { type OrderSide } from './OrderSideSegment';
 import OrderTypeSelect from './OrderTypeSelect';
 import ConditionalBuyForm from './ConditionalBuyForm';
 import SellIntentForm from './SellIntentForm';
+import SellProtectionForm from './SellProtectionForm';
 import OrderNumberInput from './OrderNumberInput';
 import {
   DEFAULT_ORDER_METHOD,
@@ -867,12 +868,15 @@ export function OrderForm({
 
   // Conditional, LOC and stop-loss/take-profit automation (either side) need
   // full trading access on a beginner account; a plain sell stays risk reduction.
+  // A crypto stop-loss/take-profit is the TP/SL practice step (QUEST 04), so it
+  // opens with that step, as on the server.
   const advancedGate = learning.gate('allTrading');
+  const protectionGate = learning.gate(asset?.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
   const tradeGate = automationForm || limitOnClose ? advancedGate
     : learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
   const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
   const methodGate = (method: OrderMethod) =>
-    method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : advancedGate;
+    method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : method === 'protection' ? protectionGate : advancedGate;
   // The ordinary submit serves market/limit/LOC.
   const canExecute =
     methodReady &&
@@ -1054,6 +1058,10 @@ export function OrderForm({
     ? selectedMethodOption.availability.reason
     : !methodReady ? '이 주문방식은 지금 이용할 수 없어요.' : null;
   const locPreview = limitOnClose ? quotedPreview?.limitOnClose ?? null : null;
+  const sellSettingBlockedReason = accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason
+    ?? (positionQuery.isLoading ? '보유 수량을 확인하는 중입니다.'
+      : positionUnavailable ? '보유 수량을 확인할 수 없어 매도 설정을 등록할 수 없습니다.'
+      : Number(positionQuantity) <= 0 ? '보유 수량이 없어 매도 설정을 등록할 수 없습니다.' : null);
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
       <QuestTarget id="order-type"><OrderTypeSelect
@@ -1068,7 +1076,7 @@ export function OrderForm({
           limit: limitGate.locked ? limitGate.message : null,
           conditional: advancedGate.locked ? advancedGate.message : null,
           loc: advancedGate.locked ? advancedGate.message : null,
-          protection: advancedGate.locked ? advancedGate.message : null,
+          protection: protectionGate.locked ? protectionGate.message : null,
         }}
       /></QuestTarget>
       {orderMethod === 'conditional' && side === 'buy' ? (
@@ -1084,22 +1092,34 @@ export function OrderForm({
           onInputBlur={onInputBlur}
         />
       ) : null}
-      {automationForm && side === 'sell' ? (
+      {orderMethod === 'conditional' && side === 'sell' ? (
         <SellIntentForm
           key={orderMethod}
-          mode={orderMethod === 'conditional' ? 'condition' : 'protection'}
           accountId={accountId}
           asset={asset}
           capabilities={sellIntentData?.capabilities ?? null}
-          blockedReason={accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason
-            ?? (positionQuery.isLoading ? '보유 수량을 확인하는 중입니다.'
-              : positionUnavailable ? '보유 수량을 확인할 수 없어 매도 설정을 등록할 수 없습니다.'
-              : Number(positionQuantity) <= 0 ? '보유 수량이 없어 매도 설정을 등록할 수 없습니다.' : null)}
+          blockedReason={sellSettingBlockedReason}
           holding={positionQuery.isLoading || positionUnavailable ? null : positionQuantity}
           available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
           reserved={positionReserved}
           currentPrice={displayPrice.priceLocal}
           learning={advancedGate}
+          onInputFocus={onInputFocus}
+          onInputBlur={onInputBlur}
+        />
+      ) : null}
+      {orderMethod === 'protection' && side === 'sell' ? (
+        <SellProtectionForm
+          accountId={accountId}
+          asset={asset}
+          capabilities={sellIntentData?.capabilities ?? null}
+          blockedReason={sellSettingBlockedReason}
+          holding={positionQuery.isLoading || positionUnavailable ? null : positionQuantity}
+          available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
+          reserved={positionReserved}
+          liveRows={sellIntentData?.conditionalOrders ?? null}
+          currentPrice={displayPrice.priceLocal}
+          learning={protectionGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
         />

@@ -106,6 +106,11 @@ export class BeginnerQuestEvidence {
       buyReview.acknowledgedAt > buy.executedAt
         ? { id: buy.id, executedAt: buyReview.acknowledgedAt }
         : null;
+    // QUEST 04: the first TP/SL registration on the practiced asset after the
+    // holdings review — a whole-position OCO group with both legs (the
+    // original practice; earlier completions keep their evidence) or an
+    // independent stop-loss or take-profit setting (one is enough; its
+    // registration, not a trigger, is the evidence).
     const protectionRow =
       holdings && buy
         ? await this.prisma.protectionGroup.findFirst({
@@ -135,9 +140,37 @@ export class BeginnerQuestEvidence {
             select: { id: true, activatedAt: true },
           })
         : null;
-    const protection = protectionRow?.activatedAt
-      ? { id: protectionRow.id, executedAt: protectionRow.activatedAt }
-      : null;
+    const settingRow =
+      holdings && buy
+        ? await this.prisma.conditionalSellOrder.findFirst({
+            where: {
+              tradingAccountId: accountId,
+              assetId: buy.assetId,
+              kind: { in: ['stop_loss', 'take_profit'] },
+              position: {
+                is: { tradingAccountId: accountId, assetId: buy.assetId },
+              },
+              createdAt: { gt: holdings.executedAt },
+            },
+            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+            select: { id: true, createdAt: true },
+          })
+        : null;
+    const protection =
+      [
+        protectionRow?.activatedAt
+          ? { id: protectionRow.id, executedAt: protectionRow.activatedAt }
+          : null,
+        settingRow
+          ? { id: settingRow.id, executedAt: settingRow.createdAt }
+          : null,
+      ]
+        .filter((row): row is Evidence => row !== null)
+        .sort(
+          (a, b) =>
+            a.executedAt.getTime() - b.executedAt.getTime() ||
+            a.id.localeCompare(b.id),
+        )[0] ?? null;
     const sell = protection
       ? await this.filledOrder(accountId, protection, 'crypto', 'sell')
       : null;
@@ -218,7 +251,9 @@ export class BeginnerQuestEvidence {
     };
   }
 
-  /** Only committed fills, including terminal ERS partial fills, never quotes. */
+  /** Only committed fills, including terminal ERS partial fills, never quotes.
+   * Orders submitted automatically by a TP/SL protection or a SELL setting
+   * are not the user's own practice. */
   async filledOrder(
     accountId: string,
     after: Evidence,
@@ -236,6 +271,7 @@ export class BeginnerQuestEvidence {
         status: 'executed',
         executedAt: { gt: after.executedAt },
         protectionChild: { is: null },
+        conditionalSell: { is: null },
         OR: [
           { executedQuantity: { gt: 0 } },
           { executedQuantity: null, quantity: { gt: 0 } },

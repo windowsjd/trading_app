@@ -25,7 +25,7 @@ export type QuestGuideTargetId =
   | 'market-viewport' | 'market-tabs' | 'market-assets' | 'market-list-header'
   | 'asset-viewport' | 'asset-price' | 'asset-buy' | 'asset-sell' | 'asset-holdings' | 'asset-protection'
   | 'protection-editor' | 'protection-submit' | 'limit-review'
-  | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-input' | 'order-preview' | 'order-submit'
+  | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-method-protection' | 'order-input' | 'order-preview' | 'order-submit'
   | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
   | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
   | 'wallet-viewport'
@@ -112,7 +112,8 @@ export type QuestGuideCommand =
   | { kind: 'fx'; accountId: string; fromCurrency: string; toCurrency: string; summary: string }
   | { kind: 'transfer'; accountId: string; source: string; destination: string; currency: string; summary: string }
   | { kind: 'spot'; accountId: string; orderId: string; assetId: string; assetType: string; side: string; orderType: string; summary: string }
-  | { kind: 'protection'; accountId: string; assetId: string; bothLegs: boolean; summary: string }
+  // A registered spot TP/SL (one stop-loss or take-profit is enough).
+  | { kind: 'protection'; accountId: string; assetId: string; summary: string }
   | { kind: 'futures'; accountId: string; positionId: string; direction: string; operation: string; leverage: number; quantityAfter: string; summary: string };
 
 type Listener = () => void;
@@ -213,7 +214,7 @@ export function getQuestGuideTarget(id: QuestGuideTargetId): QuestGuideMeasurabl
 
 export function revealQuestGuideTarget(screen: QuestGuideScreen, id: QuestGuideTargetId) {
   // Rows of the 주문방식 sheet float above the screen; scrolling it moves nothing they need.
-  if (id === 'order-method-market' || id === 'order-method-limit') return;
+  if (id === 'order-method-market' || id === 'order-method-limit' || id === 'order-method-protection') return;
   const node = getQuestGuideTarget(id);
   const reveal = reveals.get(screen);
   if (node && reveal) reveal(node);

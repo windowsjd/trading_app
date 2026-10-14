@@ -27,6 +27,13 @@ const ICON: Record<OrderMethod, { glyph: string; tone: 'success' | 'info' | 'war
   protection: { glyph: '↕', tone: 'muted' },
 };
 
+/** Sheet rows the beginner guide may point at (QUEST 03–06). */
+const GUIDE_TARGET: Partial<Record<OrderMethod, 'order-method-market' | 'order-method-limit' | 'order-method-protection'>> = {
+  market: 'order-method-market',
+  limit: 'order-method-limit',
+  protection: 'order-method-protection',
+};
+
 /** The hint's longest word plus the chevron, at font scale 1 (Hangul ≈ 1em). */
 const HINT_WORD_WIDTH = 4 * 11 + 4 + 9;
 
@@ -129,9 +136,8 @@ function MethodRow({ option, selected, learningHint, onSelect }: {
     </ActionPressable>
   );
   // The beginner guide points into the sheet at the choice it asks for.
-  return option.method === 'market' || option.method === 'limit'
-    ? <QuestTarget id={option.method === 'market' ? 'order-method-market' : 'order-method-limit'}>{row}</QuestTarget>
-    : row;
+  const target = GUIDE_TARGET[option.method];
+  return target ? <QuestTarget id={target}>{row}</QuestTarget> : row;
 }
 
 // Plain objects: the harnesses load this with minimal native mocks.

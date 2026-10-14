@@ -126,7 +126,7 @@ function openPractice(session: GuideSession) {
     // Holdings, TP/SL and limit review steps live on the order screen of that asset.
     if (TRADING_GUIDE_STEPS[session.quest][session.step]?.screen === 'order') {
       rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Order', params: {
-        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' ? 'sell' : 'buy' }, pop: true } });
+        assetId: session.assetId, accountId: session.accountId, side: session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy' }, pop: true } });
     } else {
       rootNavigationRef.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'AssetDetail', params: { assetId: session.assetId }, pop: true } });
     }

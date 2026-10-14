@@ -4,6 +4,7 @@ import { useAppearance } from '../../theme/appearance';
 
 /** The browser owns pointer capture, touch, keyboard and slider semantics. */
 export default function QuantityRatioSlider({
+  testID = 'order-quantity-slider',
   accessibilityLabel = '주문 수량 비율',
   value,
   disabled,
@@ -14,7 +15,7 @@ export default function QuantityRatioSlider({
   return (
     <input
       type="range"
-      data-testid="order-quantity-slider"
+      data-testid={testID}
       aria-label={accessibilityLabel}
       aria-valuetext={`${Math.round(value * 100)}%`}
       title={disabledReason}

@@ -180,7 +180,7 @@ export function BoundProtectionPanel({
         });
       }
       if (validScope(request)) {
-        if (request.body && domain === 'spot') request.reportQuestCommand({ kind: 'protection', accountId, assetId, bothLegs: request.body.legs.length === 2, summary: 'TP와 SL 보호 주문이 등록됐어요.' });
+        if (request.body && domain === 'spot') request.reportQuestCommand({ kind: 'protection', accountId, assetId, summary: 'TP와 SL 보호 주문이 등록됐어요.' });
         setDraft(emptyProtection());
         setUncertain(false);
         action.current = null;
@@ -235,11 +235,11 @@ export function BoundProtectionPanel({
           label={expanded ? 'TP/SL 접기' : 'TP/SL 설정·관리'} onPress={() => setExpanded(value => !value)} />
       </> : null}
       {expanded ? <>
-      <Text style={styles.hint}>
-        {domain === "futures"
-          ? "현재가 / 선물 Last 거래 기준으로 조건을 확인합니다. Mark 청산과는 별개입니다."
-          : "해당 계정의 남은 보유 수량 전체를 보호합니다."}
-      </Text>
+      {domain === "futures" ? (
+        <Text style={styles.hint}>
+          현재가 / 선물 Last 거래 기준으로 조건을 확인합니다. Mark 청산과는 별개입니다.
+        </Text>
+      ) : null}
       {active && !canCreate ? (
         <Text style={styles.hint}>
           현재 운영 상태에서는 조건 실행이 일시 중지됩니다. 보호 조건 조회와

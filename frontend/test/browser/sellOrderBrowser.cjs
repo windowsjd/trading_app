@@ -1,6 +1,6 @@
 // Optional real RN Web check of the SELL order methods (3rd order phase): the
-// 주문방식 sheet for KRX/crypto SELL, the SELL condition form, the independent
-// stop-loss/take-profit form, LOC SELL with a reduced acceptance and its
+// 주문방식 sheet for KRX/crypto SELL, the SELL condition form, the 손절가/익절가
+// 설정 form (2026-10-15: market only, share sliders), LOC SELL with a reduced acceptance and its
 // success sheet, the SELL pending lists and a stop-loss fill banner.
 // Screenshots at 320/360/390/430px, light/dark and 1x/2x fonts, with a
 // clipped-text / sideways-scroll detector and touch-target checks.
@@ -166,28 +166,42 @@ async function run() {
       assert.ok(registered.includes('감시 중입니다') && !registered.includes('체결됐어요'), `registration is not a sale (${tag})`);
       await shot('krx-sell-condition-registered');
 
-      // 3. Independent stop-loss / take-profit, own quantities (crypto, tiny decimals).
+      // 3. 손절가/익절가 설정: 익절 then 손절, each a share of the holding, market only
+      //    (crypto, tiny decimals, a large reservation elsewhere).
       await go('asset=SUI&longName=1&sell=enabled&holding=1234567.123456&reserved=1000000');
       await pick('protection');
       await page.getByTestId('sell-protection-form').waitFor();
-      await page.getByTestId('sell-stop-loss-toggle').click();
-      assert.equal(await page.getByTestId('sell-stop-loss-toggle').getAttribute('aria-checked'), 'true', `toggle state (${tag})`);
-      await page.getByTestId('sell-stop-loss-trigger-price').fill('0.00000381');
-      await page.getByTestId('sell-stop-loss-all').click();
+      assert.equal(await page.getByTestId('sell-take-profit-execution-limit').count() + await page.getByTestId('sell-stop-loss-execution-limit').count(), 0, `no execution choice (${tag})`);
+      const sections = await page.locator('[data-testid$="-section"]').evaluateAll((nodes) => nodes.map((node) => node.dataset.testid));
+      assert.deepEqual(sections, ['sell-take-profit-section', 'sell-stop-loss-section'], `익절 first (${tag})`);
       await page.getByTestId('sell-take-profit-toggle').click();
+      assert.equal(await page.getByTestId('sell-take-profit-toggle').getAttribute('aria-checked'), 'true', `toggle state (${tag})`);
       await page.getByTestId('sell-take-profit-trigger-price').fill('98765.12345678');
-      await page.getByTestId('sell-take-profit-execution-limit').click();
-      await page.getByTestId('sell-take-profit-limit-price').fill('98765.12345677');
-      await page.getByTestId('sell-take-profit-quantity').fill('0.000001');
+      await page.getByTestId('sell-take-profit-ratio-25').click();
+      await page.getByTestId('sell-stop-loss-toggle').click();
+      await page.getByTestId('sell-stop-loss-trigger-price').fill('0.00000381');
+      await page.getByTestId('sell-stop-loss-slider').fill('100');
+      const stopQuantity = await page.getByTestId('sell-stop-loss-quantity').innerText();
+      assert.ok(stopQuantity.includes('1234567.123456'), `100% is the whole holding (${tag}): ${stopQuantity}`);
+      assert.equal(await page.getByTestId('sell-stop-loss-percent').innerText(), '100%', `share shown (${tag})`);
+      assert.ok((await page.getByTestId('sell-take-profit-quantity').innerText()).includes('308641.780864'), `25% floors to 6 decimals (${tag})`);
       await page.getByTestId('sell-stop-loss-quantity-notice').waitFor();
       await page.getByTestId('sell-protection-form').scrollIntoViewIfNeeded();
       await shot('crypto-sell-protection');
       await page.getByTestId('sell-intent-submit').scrollIntoViewIfNeeded();
+      assert.equal(await page.getByTestId('sell-intent-submit').innerText(), '확인', `확인 label (${tag})`);
       await shot('crypto-sell-protection-policy');
       await page.getByTestId('sell-intent-submit').click();
       await page.getByTestId('sell-intent-registered').waitFor();
       await page.getByTestId('sell-intent-registered').scrollIntoViewIfNeeded();
       await shot('crypto-sell-protection-registered');
+      // 3b. A live whole-position OCO on the asset is explained before registration.
+      await go('asset=SUI&longName=1&sell=enabled&holding=10&protection=active');
+      await pick('protection');
+      await page.getByTestId('sell-intent-blocked').waitFor();
+      assert.ok((await page.getByTestId('sell-intent-blocked').innerText()).includes('TP/SL(OCO)'), `OCO conflict explained (${tag})`);
+      await page.getByTestId('sell-intent-blocked').scrollIntoViewIfNeeded();
+      await shot('crypto-sell-protection-oco');
 
       // 4. KRX LOC SELL: 10 asked with 6 reserved elsewhere → 4 accepted, both shown.
       await go('krx=1&asset=SAMSUNG&longName=1&locSell=enabled&holding=10&reserved=6');

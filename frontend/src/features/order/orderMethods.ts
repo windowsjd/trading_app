@@ -33,7 +33,7 @@ export const ORDER_METHOD_LABEL: Record<OrderMethod, string> = {
   limit: '지정가',
   conditional: '조건주문',
   loc: 'LOC 주문',
-  protection: '손절·익절 설정',
+  protection: '손절가/익절가 설정',
 };
 
 /**
@@ -95,7 +95,7 @@ export function getOrderMethodOptions(input: {
   if (krx || us)
     options.push(option('loc', '정규장 마감가격이 지정가격 이상이면 종가로 매도합니다.', us ? PREPARING : fromGate(input.loc)));
   if (krx || us || crypto)
-    options.push(option('protection', '손절·익절 가격과 각각의 수량을 정해 두고 매도합니다.',
+    options.push(option('protection', '익절가·손절가에 도달하면 정한 수량을 시장가로 매도합니다.',
       us ? PREPARING : fromGate(input.protection ?? { state: 'loading' })));
   return options;
 }
@@ -183,7 +183,7 @@ export function getConditionalSellGate(
   if (query.isError) return { state: 'error' };
   if (query.isLoading || !query.data) return { state: 'loading' };
   const capability = query.data.capabilities[family];
-  const name = family === 'condition' ? '조건주문' : '손절·익절';
+  const name = family === 'condition' ? '조건주문' : '손절가/익절가';
   const market = assetType === 'crypto' ? 'CRYPTO_SPOT' : assetType === 'domestic_stock' ? 'KRX' : null;
   if (!capability?.enabled) return { state: 'ready', enabled: false, reason: `현재 운영 상태에서 새 ${name} 매도를 등록할 수 없어요.` };
   if (!market || !query.data.capabilities.markets.includes(market))

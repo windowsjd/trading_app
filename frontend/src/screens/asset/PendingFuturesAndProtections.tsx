@@ -4,9 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import CTAButton from '../../components/common/CTAButton';
+import ActionPressable from '../../components/common/ActionPressable';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { getFuturesLimitOrders, cancelFuturesLimitOrder } from '../../features/futures/api';
-import { getPendingProtections, cancelProtection } from '../../features/conditional/api';
+import { getPendingProtections, getProtectionHistory, cancelProtection, type ProtectionGroup } from '../../features/conditional/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
 import { createIdempotencyKey } from '../../utils/idempotency';
@@ -77,6 +78,39 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
       <CTAButton label="보호 조건 취소" state={busy || !data.capabilities.canCancel ? 'disabled' : 'enabled'} onPress={() => void cancel(g.id)} />
     </View>)}
     {failure ? <ErrorNotice error={failure} message="취소 여부를 확인하지 못했습니다. 같은 요청으로 다시 시도해주세요." /> : null}
+    {protections ? <ProtectionHistory accountId={accountId} focused={focused} /> : null}
   </View>;
 }
-const styles = StyleSheet.create({ list: { gap: 10, minWidth: 0 }, card: { gap: 8, borderWidth: 1, borderColor: semantic.border, borderRadius: 12, padding: 14, minWidth: 0 }, name: { fontSize: 17, color: semantic.text, fontWeight: '700', flexShrink: 1 }, text: { fontSize: 14, color: semantic.text, flexShrink: 1 }, hint: { fontSize: 13, color: semantic.secondary, flexShrink: 1 } });
+
+/**
+ * Ended TP/SL (OCO) protections of the account, read only on request. New
+ * spot TP/SL settings are independent SELL settings with their own list; this
+ * keeps the whole-position protections registered earlier reviewable.
+ */
+function ProtectionHistory({ accountId, focused }: { accountId: string; focused: boolean }) {
+  const [open, setOpen] = useState(false);
+  const query = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.history(accountId), queryFn: ({ signal }) => getProtectionHistory(accountId, signal), enabled: open && focused, retry: false });
+  const ended = !query.isError && query.data?.tradingAccountId === accountId
+    ? query.data.groups.filter((g: ProtectionGroup) => g.status === 'completed' || g.status === 'canceled') : null;
+  return <View style={styles.list}>
+    <ActionPressable accessibilityRole="button" testID="protection-history-toggle" accessibilityState={{ expanded: open }} aria-expanded={open}
+      onPress={() => setOpen(value => !value)} style={styles.history}>
+      <Text style={styles.text}>{open ? '종료된 TP/SL 이력 닫기' : '종료된 TP/SL 이력 보기'}</Text>
+    </ActionPressable>
+    {open ? <View style={styles.list} testID="protection-history">
+      {query.isError ? <ErrorNotice error={query.error} message="TP/SL 이력을 불러오지 못했습니다." />
+        : !ended ? <Text style={styles.hint}>TP/SL 이력 확인 중…</Text>
+        : !ended.length ? <Text style={styles.hint}>종료된 TP/SL이 없습니다.</Text>
+        : <>
+          <Text style={styles.hint}>최근 보호 최대 30건 · 각 보호의 최근 조건 충족 최대 20건</Text>
+          {ended.map(g => <View key={g.id} style={styles.card}>
+            <Text style={styles.name}>{g.asset?.name ?? '보호 종목'} · {g.asset?.symbol ?? ''}</Text>
+            <Text style={styles.text}>{g.domain === 'spot' ? '현물' : `선물 ${g.direction === 'long' ? 'Long' : 'Short'}`} · {g.status === 'completed' ? '보호 완료' : '보호 취소'} · {(g.endedAt ?? g.createdAt).slice(0, 10)}</Text>
+            {g.legs.map(leg => <Text key={leg.id} style={styles.hint}>{leg.kind === 'stop_loss' ? '손절 SL' : '익절 TP'} · 조건 {formatDisplayDecimal(leg.triggerPrice)} {g.currencyCode}</Text>)}
+            {g.children.map(c => <Text key={c.id} style={styles.hint}>조건 충족 {formatDisplayDecimal(c.triggerEvidence.price)} · {c.status === 'filled' ? '실행됨' : c.status === 'canceled' ? '취소/교체됨' : '체결 대기'}</Text>)}
+          </View>)}
+        </>}
+    </View> : null}
+  </View>;
+}
+const styles = StyleSheet.create({ history: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, list: { gap: 10, minWidth: 0 }, card: { gap: 8, borderWidth: 1, borderColor: semantic.border, borderRadius: 12, padding: 14, minWidth: 0 }, name: { fontSize: 17, color: semantic.text, fontWeight: '700', flexShrink: 1 }, text: { fontSize: 14, color: semantic.text, flexShrink: 1 }, hint: { fontSize: 13, color: semantic.secondary, flexShrink: 1 } });

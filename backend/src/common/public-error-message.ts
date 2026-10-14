@@ -61,6 +61,10 @@ const PUBLIC_MESSAGES = new Set<string>([
   'No unreserved quantity is available to sell.',
   'Choose a condition or a stop-loss/take-profit setting.',
   'Provide a stop-loss, a take-profit, or both.',
+  // Independent stop-loss/take-profit: market only, per-kind totals (2026-10-15).
+  'Stop-loss and take-profit settings execute at market.',
+  'An active setting of the same kind already uses this price.',
+  'Active settings of the same kind would exceed the current holding.',
   'Limit-on-Close SELL orders are currently disabled.',
   'requestedQuantity is accepted only on Limit-on-Close SELL orders.',
   'requestedQuantity must be at least the order quantity.',

@@ -36,7 +36,7 @@ const ids = (h: any) =>
   h.renderer.root
     .findAll(
       (n: any) =>
-        typeof n.type === 'string' && n.props.testID?.startsWith('holding-') && !n.props.testID.startsWith('holding-protection-'),
+        typeof n.type === 'string' && n.props.testID?.startsWith('holding-'),
     )
     .map((n: any) => n.props.testID);
 const empty = (h: any) =>
@@ -45,27 +45,28 @@ const empty = (h: any) =>
     .map((n: any) => n.props.title)
     .join(' ');
 
-it('holding TP/SL creates with the card account, asset and Position; active protection opens management', async t => {
+it('holding cards have no TP/SL control; an existing spot OCO protection stays listed, cancelable and in history under 대기 목록 › TP/SL', async t => {
   const h=inlineTradingHarness(); h.holdings={general:[holding('bnb')]};
   const {conditionalFixture}=require('../../../test/conditionalFixtures.cjs');
-  h.protections=conditionalFixture('general',{domain:'spot'});
-  await h.mount(); t.after(h.close); await h.flush();
-  await h.press('holding-protection-bnb');
-  assert.equal(h.node('protection-panel') !== undefined,true);
-  await h.press('protection-stop_loss-toggle');
-  const input=h.renderer.root.findAll((n:any)=>n.type==='TextInput' && n.props.accessibilityLabel==='손절 (Stop Loss) 조건 가격')[0];
-  await act(async()=>input.props.onChangeText('500'));
-  const submit=h.renderer.root.findAll((n:any)=>n.type==='CTAButton' && n.props.label==='보호 조건 등록')[0];
-  await act(async()=>submit.props.onPress());
-  assert.equal(h.protectionRequests.length,1);
-  assert.deepEqual({...h.protectionRequests[0].body,idempotencyKey:'key'}, {domain:'spot',assetId:'bnb',positionId:'bnb',legs:[{kind:'stop_loss',triggerPrice:'500',childOrderType:'market'}],idempotencyKey:'key'});
-  assert.equal(h.protectionRequests[0].accountId,'general');
   h.protections=conditionalFixture('general',{domain:'spot',active:true});
-  await h.update();
-  assert.equal(h.node('protection-stop_loss-toggle') === undefined,true);
-  const cancel=h.renderer.root.findAll((n:any)=>n.type==='CTAButton' && n.props.label==='보호 조건 취소')[0];
-  assert.equal(!!cancel,true); await act(async()=>cancel.props.onPress());
-  assert.equal(h.protectionRequests[1].groupId,'group');
+  await h.mount(); t.after(h.close); await h.flush();
+  assert.equal(h.node('holding-bnb') !== undefined,true);
+  assert.equal(h.node('holding-protection-bnb') === undefined,true,'no TP/SL button on the card');
+  assert.equal(h.node('protection-panel') === undefined,true,'no inline TP/SL editor');
+  assert.doesNotMatch(text(h.node('account-holdings')),/TP\/SL 설정·관리|남은 보유 수량 전체를 보호/);
+  await h.press('holdings-filter-pending');await h.flush();
+  await h.press('pending-kind-protection');await h.flush();
+  assert.match(text(h.node('pending-protections')),/현물 · 포지션 보호 중/);
+  const cancel=h.renderer.root.findAll((n:any)=>n.type==='CTAButton'&&n.props.label==='보호 조건 취소')[0];
+  await act(async()=>cancel.props.onPress());
+  assert.equal(h.protectionRequests.length,1);
+  assert.deepEqual([h.protectionRequests[0].accountId,h.protectionRequests[0].groupId],['general','group']);
+  // Ended protections stay reviewable, read only on request.
+  h.protections=conditionalFixture('general',{domain:'spot',complete:true});await h.update();
+  assert.equal(h.node('protection-history') === undefined,true);
+  await h.press('protection-history-toggle');await h.flush();
+  assert.match(text(h.node('protection-history')),/현물 · 보호 완료/);
+  assert.match(text(h.node('protection-history')),/조건 충족 .* · 실행됨/);
 });
 
 it('pending separates Spot/Futures entries from active or holding Protection and honors cancellation capability', async t => {
@@ -555,7 +556,7 @@ describe('order panel side colors in the trading screen', () => {
 });
 
 describe('order screen holdings switch the order in place', () => {
-  it('a holding of another asset opens its order on the same account with fresh inputs; TP/SL stays separate', async (t) => {
+  it('a holding of another asset opens its order on the same account with fresh inputs', async (t) => {
     const h = inlineTradingHarness();
     h.holdings = { general: [holding('bnb', '2'), holding('btc', '3')] };
     await h.mount(); t.after(h.close); await h.flush();
@@ -567,8 +568,6 @@ describe('order screen holdings switch the order in place', () => {
     assert.equal(typeof other.props.onPress, 'function');
     assert.equal(other.props.accessibilityRole, 'button');
     assert.match(other.props.accessibilityHint, /주문 화면으로 전환/);
-    // The TP/SL control is its own button and never switches the asset.
-    await h.press('holding-protection-btc');
     assert.equal(h.navigation.some((entry: any) => entry[0] === 'setParams'), false);
     await act(async () => other.props.onPress());
     assert.deepEqual(h.navigation.at(-1), ['setParams', { assetId: 'btc', side: 'buy' }]);

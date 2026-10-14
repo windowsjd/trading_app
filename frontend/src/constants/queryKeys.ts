@@ -326,6 +326,7 @@ export const QUERY_KEYS = {
     protections: {
       all: (id: string) => ['tradingAccount', 'protections', id] as const,
       pending: (id: string) => ['tradingAccount', 'protections', id, 'pending'] as const,
+      history: (id: string) => ['tradingAccount', 'protections', id, 'history'] as const,
       list: (id: string, domain: 'spot' | 'futures', assetId: string, history = false) => ['tradingAccount', 'protections', id, domain, assetId, history] as const,
     },
     conditionalBuy: {

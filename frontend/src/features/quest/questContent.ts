@@ -32,8 +32,8 @@ export const QUEST_CARDS = {
     topics: ['현재가', '시장가', '매수 금액·수수료', '보유종목·수익률'], condition: '실제 매수 체결 후 보유종목과 수익률을 확인하면 완료돼요.', completed: '시장가 매수 퀘스트 완료!', result: '매수',
   },
   protection: {
-    number: 'QUEST 04', title: 'TP/SL 설정', summary: '매수한 현물에 익절(TP)과 손절(SL)을 함께 설정해요.',
-    topics: ['목표가격', '손절가격', '보호 주문', 'OCO'], condition: '앞서 매수한 종목에 TP와 SL 등록이 확정되면 완료돼요.', completed: 'TP/SL 설정 퀘스트 완료!', result: '보호 주문',
+    number: 'QUEST 04', title: 'TP/SL 설정', summary: '매수한 현물에 익절가(TP)나 손절가(SL)를 설정해 정한 수량을 자동으로 매도하도록 예약해요.',
+    topics: ['익절가', '손절가', '매도 수량 비율', '시장가 자동 매도'], condition: '앞서 매수한 종목에 익절가 또는 손절가 등록이 확정되면 완료돼요.', completed: 'TP/SL 설정 퀘스트 완료!', result: '손절가/익절가 설정',
   },
   marketSell: {
     number: 'QUEST 05', title: '암호화폐 시장가 매도', summary: '보유수량을 매도하며 실현손익과 거래 수수료를 배워요.',

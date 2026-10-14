@@ -1,6 +1,6 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { createApiError } from '../common/api-error';
-import { conditionalEnabled } from '../conditional/conditional.config';
+import { independentTpSlEnabled } from '../conditional/conditional-sell.config';
 import { futuresTradingMode } from '../futures/futures.config';
 import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
@@ -58,7 +58,9 @@ export class BeginnerQuestsService {
         ...(await new BeginnerQuestEvidence(client).read(accountId)),
         operations: {
           limitOrdersEnabled: isLimitOrderEnabled(),
-          conditionalOrdersEnabled: conditionalEnabled(),
+          // QUEST 04 practices the independent stop-loss/take-profit setting
+          // (the order screen's 손절가/익절가 설정); the field keeps its name.
+          conditionalOrdersEnabled: independentTpSlEnabled(),
           futuresTradingMode: futuresTradingMode(),
         },
       },

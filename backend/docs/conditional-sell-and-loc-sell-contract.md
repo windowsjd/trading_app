@@ -1,4 +1,13 @@
-# SELL intents (condition, independent stop-loss / take-profit) and KRX LOC SELL (2026-10-13, current)
+# SELL intents (condition, independent stop-loss / take-profit) and KRX LOC SELL (2026-10-13, current; TP/SL rules 2026-10-15)
+
+> 2026-10-15: new independent stop-loss/take-profit settings execute at
+> **market only**, the live settings of one family (stop-losses, or
+> take-profits) target at most the holding, and one family never repeats a
+> live trigger price. The app sets them from the SELL 주문방식
+> 「손절가/익절가 설정」 (the holdings-card OCO button was removed); QUEST 04
+> accepts one such setting. See "Independent stop-loss / take-profit
+> registration (2026-10-15)" below. Activation status and unverified
+> production items: [sell-automation-activation-2026-10-15.md](sell-automation-activation-2026-10-15.md).
 
 All three capabilities are server-gated and default OFF. API base remains
 `/api/v1`. Existing market/limit orders, Conditional BUY, LOC BUY, the
@@ -7,7 +16,7 @@ whole-position Spot TP/SL/OCO protection and Futures are unchanged.
 | Capability | Markets | Flag (default) |
 | --- | --- | --- |
 | SELL condition (watch → ordinary market or limit SELL) | KRX stocks, crypto Spot | `CONDITIONAL_SELL_ORDERS_ENABLED=false` |
-| Independent stop-loss / take-profit (own quantities, not OCO) | KRX stocks, crypto Spot | `INDEPENDENT_TP_SL_ORDERS_ENABLED=false` |
+| Independent stop-loss / take-profit (own quantities, market execution, not OCO) | KRX stocks, crypto Spot | `INDEPENDENT_TP_SL_ORDERS_ENABLED=false` |
 | Limit-on-Close SELL | KRX stocks | `LOC_SELL_ORDERS_ENABLED=false` (also needs `LIMIT_ORDER_ENABLED`) |
 | US stocks (all three) | refused until a quote/close data provider is approved | — |
 
@@ -49,6 +58,33 @@ and lifecycle cleanup still ends them; nothing new is created or triggered.
   earlier holding's settings. The worker re-checks the same as a safety net.
 - Prices set by the user are never changed because another order executed.
 
+### Independent stop-loss / take-profit registration (2026-10-15)
+
+- New stop-loss/take-profit legs must use `executionType: "market"`; a limit
+  leg is `400 INVALID_CONDITIONAL_SELL` ("Stop-loss and take-profit settings
+  execute at market."). The trigger price is the only price; once it is met
+  the existing market SELL core decides the fill price. Rows registered
+  earlier with a limit execution keep executing, listing and canceling.
+  `capabilities.protection.canUseLimit` is always `false`.
+- Per holding and **per family**, the targets of the live (`watching` /
+  `triggered`) settings plus the new ones must not exceed
+  `position.quantity` at registration (`409
+  CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING`). Stop-losses and take-profits are
+  summed separately (TP 20 + SL 20/30/50 on 100 is valid); user conditions
+  never count. A pair is all-or-nothing.
+- A family never has two live settings at the same trigger price (`409
+  CONDITIONAL_SELL_DUPLICATE_PRICE`; `120` and `120.0` are the same price).
+  Different prices of one family are separate settings.
+- Both checks run inside the existing account fence after the holding read,
+  so concurrent registrations of one account serialize (no new DB
+  constraint). Idempotent replays return the committed rows first.
+- The client turns a whole-percent share of today's holding into the target
+  quantity (cut down to 6 decimals, never above the holding) and sends that
+  quantity; the server stores and checks exactly it. A later larger holding
+  never grows a target; a sale that leaves the live targets above the
+  remaining holding never edits or cancels them — only new registrations are
+  bounded by the smaller holding.
+
 ## SELL settings API
 
 `/trading-accounts/:accountId/conditional-sell-orders` (owner only; a foreign
@@ -67,11 +103,15 @@ Spot limit availability for a limit execution (`CONDITIONAL_LIMIT_UNAVAILABLE`),
 tradable account/Season (`CONDITIONAL_ACCOUNT_NOT_TRADABLE`), an active Spot
 asset, KRX or crypto (`CONDITIONAL_SELL_MARKET_NOT_SUPPORTED` for US),
 the existing order input policy (whole shares for a stock limit execution),
-beginner `allTrading` access, at most 30 live settings per account
+beginner learning access (`allTrading`; a **crypto stop-loss/take-profit**
+needs `spotProtection`, the QUEST 04 step, as the OCO protection did), at most
+30 live settings per account
 (`CONDITIONAL_SELL_LIMIT_EXCEEDED`; a pair counts two), no live whole-position
 OCO protection on the asset (`PROTECTION_CONFLICT`), an open holding
 (`CONDITIONAL_SELL_POSITION_UNAVAILABLE`), each target ≤ holding
-(`CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING`), fresh eligible evidence
+(`CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING`), for stop-loss/take-profit the
+per-family total and distinct price (`CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING`,
+`CONDITIONAL_SELL_DUPLICATE_PRICE`), fresh eligible evidence
 (`CONDITIONAL_PRICE_UNAVAILABLE`) and a condition not already met
 (`CONDITIONAL_SELL_ALREADY_MET`).
 
@@ -119,7 +159,11 @@ immediately (existing price/fee/ERS/ledger/PnL/equity cores); a limit SELL is
 an ordinary submitted limit order filled later by the existing matcher
 (paths A/B) and canceled through the ordinary order cancel.
 
-Retries: transient quote/evidence races and `INSUFFICIENT_QUANTITY` retry on
+Retries: transient quote/evidence races, `INSUFFICIENT_QUANTITY` and the
+market SELL guard's `CONFLICT` (its historical public code when only other
+orders' reservations made the sized quantity unavailable — 2026-10-15; before
+this a setting that lost such a race ended `failed / execution_failed`
+instead of selling the unreserved rest) retry on
 the next cycle, at most 3 attempts inside 30 s of the trigger; anything else
 (closed market, nothing unreserved, protection conflict, account gates) ends
 the row `failed` immediately. Terminal reasons: `user_canceled`,
@@ -141,8 +185,16 @@ position, so the two models never share a holding: SELL settings are refused
 while a live OCO group protects the asset (`PROTECTION_CONFLICT`), and an OCO
 registration is refused while live SELL settings exist on it
 (`CONDITIONAL_SELL_CONFLICT`). LOC SELL keeps the existing limit-sell rule
-(`PROTECTION_CONFLICT` while OCO is live). The beginner quest still uses the
-OCO protection.
+(`PROTECTION_CONFLICT` while OCO is live). The app no longer registers new
+spot OCO protection from the holdings card (2026-10-15); a limit BUY may
+still attach one. Existing groups stay listed and cancelable under the order
+screen's 대기 목록 › TP/SL, which also shows ended groups on request
+(`GET /protections?history=true`). The order screen's 손절가/익절가 설정
+form explains a live OCO conflict before registration. QUEST 04 accepts the
+first OCO group (both legs, earlier completions unchanged) **or** the first
+independent stop-loss/take-profit registered on the practiced asset after
+the holdings review; QUEST 05 never counts an order a SELL setting or an OCO
+child submitted.
 
 ## Limit-on-Close SELL
 

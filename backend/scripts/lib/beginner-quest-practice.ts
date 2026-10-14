@@ -15,6 +15,7 @@ import { OrderReservationService } from '../../src/orders/order-reservation.serv
 import { LimitOrderCreateService } from '../../src/orders/limit-order-create.service';
 import { LimitOrderCancelService } from '../../src/orders/limit-order-cancel.service';
 import { ConditionalService } from '../../src/conditional/conditional.service';
+import { ConditionalSellService } from '../../src/conditional/conditional-sell.service';
 import { FuturesService } from '../../src/futures/futures.service';
 import { FxService } from '../../src/fx/fx.service';
 import { TradingAccountWalletTransferService } from '../../src/wallets/trading-account-wallet-transfer.service';
@@ -47,6 +48,7 @@ export function practiceServices(db: PrismaService) {
     fx: new FxService(db, undefined, undefined, access, performance, valuation),
     transfers: new TradingAccountWalletTransferService(db, access, performance),
     conditional: new ConditionalService(db, access, orders, cancel, futures),
+    conditionalSell: new ConditionalSellService(db, access, orders),
   };
 }
 
@@ -68,7 +70,10 @@ export async function practiceOrder(
   });
 }
 
-/** Callers provide fresh market/FX observations and enabled TEST flags. */
+/** Callers provide fresh market/FX observations and enabled TEST flags.
+ * QUEST 04 is practiced with the whole-position OCO protection (default, the
+ * original evidence) or with an independent stop-loss on half the holding
+ * (`protection: 'independent'`, the order screen's 손절가/익절가 설정). */
 export async function practiceFoundation(
   db: PrismaService,
   userId: string,
@@ -78,6 +83,7 @@ export async function practiceFoundation(
     stage: number,
     app: ReturnType<typeof practiceServices>,
   ) => Promise<void> = async () => {},
+  options: { protection?: 'oco' | 'independent' } = {},
 ) {
   const app = practiceServices(db);
   const progress = async () =>
@@ -130,28 +136,49 @@ export async function practiceFoundation(
   const position = await db.position.findFirstOrThrow({
     where: { tradingAccountId: accountId, assetId },
   });
-  const protectedResult = await app.conditional.create(userId, accountId, {
-    domain: 'spot',
-    assetId,
-    positionId: position.id,
-    idempotencyKey: randomUUID(),
-    legs: [
-      { kind: 'take_profit', triggerPrice: '120', childOrderType: 'market' },
-      { kind: 'stop_loss', triggerPrice: '80', childOrderType: 'market' },
-    ],
+  if (options.protection === 'independent') {
+    await app.conditionalSell.create(userId, accountId, {
+      kind: 'protection',
+      assetId,
+      stopLoss: {
+        triggerPrice: '80',
+        executionType: 'market',
+        quantity: position.quantity
+          .div(2)
+          .toDecimalPlaces(6, 1 /* ROUND_DOWN */)
+          .toFixed(6),
+      },
+      idempotencyKey: randomUUID(),
+    });
+    await check(4, app);
+  } else {
+    const protectedResult = await app.conditional.create(userId, accountId, {
+      domain: 'spot',
+      assetId,
+      positionId: position.id,
+      idempotencyKey: randomUUID(),
+      legs: [
+        { kind: 'take_profit', triggerPrice: '120', childOrderType: 'market' },
+        { kind: 'stop_loss', triggerPrice: '80', childOrderType: 'market' },
+      ],
+    });
+    await check(4, app);
+    await app.conditional.cancelGroup(
+      userId,
+      accountId,
+      (protectedResult as { data: { groupId: string } }).data.groupId,
+      { idempotencyKey: randomUUID() },
+    );
+  }
+  // Whatever an automatic exit already sold, the user sells the rest.
+  const remaining = await db.position.findFirstOrThrow({
+    where: { tradingAccountId: accountId, assetId },
   });
-  await check(4, app);
-  await app.conditional.cancelGroup(
-    userId,
-    accountId,
-    (protectedResult as { data: { groupId: string } }).data.groupId,
-    { idempotencyKey: randomUUID() },
-  );
   await practiceOrder(app, userId, accountId, {
     assetId,
     side: 'sell',
     orderType: 'market',
-    quantity: position.quantity.toFixed(8),
+    quantity: remaining.quantity.toFixed(8),
   });
   await check(5, app);
   const limit = await practiceOrder(app, userId, accountId, {
@@ -289,6 +316,7 @@ export async function cleanupLearningPractice(
     select: { fxRateSnapshotId: true },
   });
   await db.beginnerQuestAcknowledgement.deleteMany({ where });
+  await db.conditionalSellOrder.deleteMany({ where });
   await db.protectionChild.deleteMany({ where: { group: where } });
   await db.protectionLeg.deleteMany({ where: { group: where } });
   await db.protectionGroup.deleteMany({ where });

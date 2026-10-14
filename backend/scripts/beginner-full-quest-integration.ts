@@ -35,6 +35,8 @@ if (
 // Isolated subprocess fixtures only; application/default configuration is untouched.
 process.env.LIMIT_ORDER_ENABLED = 'true';
 process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+process.env.INDEPENDENT_TP_SL_ORDERS_ENABLED = 'true';
+process.env.CONDITIONAL_SELL_ORDERS_ENABLED = 'true';
 process.env.FUTURES_TRADING_MODE = 'ENABLED';
 process.env.FUTURES_RISK_ENGINE_ENABLED = 'true';
 async function rejects(work: Promise<unknown>, code: string) {
@@ -55,6 +57,8 @@ async function main() {
   await db.$connect();
   const s = await fixture('beginner', '10000', true);
   const other = await fixture('general');
+  // QUEST 04 through an independent stop-loss instead of the OCO protection.
+  const u = await fixture('beginner', '10000', true);
   const stocks: string[] = [];
   const account = { id: s.accountId, mode: 'beginner' };
   const app = practiceServices(db);
@@ -400,6 +404,83 @@ async function main() {
       (await read()).quests.every((q) => q.status === 'completed'),
       true,
     );
+    // QUEST 04 via the order screen's stop-loss/take-profit setting: crypto
+    // TP/SL opens at the TP/SL step (a user condition stays locked), one
+    // stop-loss proves the quest, and its automatic sale is not QUEST 05.
+    const uAssetId = u.instruments[0].asset.id;
+    const uRead = async () =>
+      (await app.quests.getQuestProgress(u.userId, u.accountId)).data;
+    const uFresh = async () => {
+      await fxEvidence();
+      await spotPrice(u, '100', 0, 0);
+    };
+    let settingId = '';
+    await practiceFoundation(
+      db,
+      u.userId,
+      u.accountId,
+      uAssetId,
+      async (stage, practice) => {
+        await uFresh();
+        const stopLoss = {
+          kind: 'protection',
+          assetId: uAssetId,
+          stopLoss: {
+            triggerPrice: '80',
+            executionType: 'market',
+            quantity: '0.1',
+          },
+          idempotencyKey: randomUUID(),
+        };
+        if (stage === 21)
+          await rejects(
+            practice.conditionalSell.create(u.userId, u.accountId, stopLoss),
+            'BEGINNER_FEATURE_LOCKED',
+          );
+        if (stage === 3)
+          await rejects(
+            practice.conditionalSell.create(u.userId, u.accountId, {
+              kind: 'condition',
+              assetId: uAssetId,
+              triggerCondition: 'at_or_below',
+              triggerPrice: '80',
+              executionType: 'market',
+              quantity: '0.1',
+              idempotencyKey: randomUUID(),
+            }),
+            'BEGINNER_FEATURE_LOCKED',
+          );
+        if (stage === 4) {
+          const p = await uRead();
+          assert.equal(p.quests[3].status, 'completed');
+          const row = await db.conditionalSellOrder.findFirstOrThrow({
+            where: { tradingAccountId: u.accountId, kind: 'stop_loss' },
+          });
+          settingId = row.id;
+          assert.equal(p.quests[3].steps[0].referenceId, row.id);
+          // The stop-loss fires and sells its half automatically.
+          await spotPrice(u, '79', 0, 0);
+          assert.equal(
+            (await practice.conditionalSell.evaluate(row.id)).state,
+            'ordered',
+          );
+          const after = await uRead();
+          assert.equal(after.quests[4].status, 'not_started');
+          assert.equal(after.learningAccess.cryptoLimitBuy, false);
+          await uFresh();
+        }
+        if (stage === 5)
+          assert.equal((await uRead()).quests[4].status, 'completed');
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      },
+      { protection: 'independent' },
+    );
+    assert.ok(settingId);
+    assert.equal(
+      (await uRead()).quests.slice(0, 6).every((q) => q.status === 'completed'),
+      true,
+    );
+    checks++;
     assert.equal(
       await db.beginnerQuestAcknowledgement.count({
         where: { tradingAccountId: s.accountId },
@@ -411,6 +492,14 @@ async function main() {
     );
   } finally {
     tradingSessions.reset();
+    const uWhere = { tradingAccountId: u.accountId };
+    await db.beginnerQuestAcknowledgement.deleteMany({ where: uWhere });
+    await db.conditionalSellOrder.deleteMany({ where: uWhere });
+    await db.walletTransaction.deleteMany({ where: uWhere });
+    await db.order.deleteMany({ where: uWhere });
+    await db.position.deleteMany({ where: uWhere });
+    await db.dailyPortfolioSnapshot.deleteMany({ where: uWhere });
+    await cleanup(u);
     const where = { tradingAccountId: s.accountId };
     await db.beginnerQuestAcknowledgement.deleteMany({ where });
     await db.protectionChild.deleteMany({ where: { group: where } });

@@ -31,7 +31,7 @@ function defaultSellList(id) {
   };
 }
 // The field's value per method (features/order/orderMethods ORDER_METHOD_LABEL).
-const METHOD_LABEL = { market: '시장가', limit: '지정가', conditional: '조건주문', loc: 'LOC 주문', protection: '손절·익절 설정' };
+const METHOD_LABEL = { market: '시장가', limit: '지정가', conditional: '조건주문', loc: 'LOC 주문', protection: '손절가/익절가 설정' };
 function inlineTradingHarness() {
   const h = {
     assetId: 'bnb',
@@ -644,8 +644,11 @@ function inlineTradingHarness() {
     const value = h.node('order-type-select-value');
     return value ? [value.props.children].flat().join('') : null;
   };
-  h.slide = async (percent) => act(async () =>
-    h.node('order-quantity-slider').props.onChange({ currentTarget: { valueAsNumber: percent } }));
+  // h.slide(percent) drives the order form's slider; h.slide(testID, percent) any other.
+  h.slide = async (target, value) => {
+    const [id, percent] = typeof target === 'string' ? [target, value] : ['order-quantity-slider', target];
+    return act(async () => h.node(id).props.onChange({ currentTarget: { valueAsNumber: percent } }));
+  };
   h.success = () => h.renderer.root.findByType('OrderSuccessBottomSheet').props;
   return h;
 }

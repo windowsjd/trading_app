@@ -293,11 +293,11 @@ describe('QuestGuideProvider: transfer sheet and order-screen holdings', () => {
     assert.deepEqual(h.view().targets, ['wallet-transfer']);
   });
 
-  it('protection opens the order screen of the practiced asset (holdings live under the order form)', async t => {
+  it('protection opens the SELL order screen of the practiced asset (손절가/익절가 설정 is a SELL 주문방식)', async t => {
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('protection', questProgress(3));
     assert.deepEqual(h.navigations.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Order',
-      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'buy' }, pop: true } }]);
+      params: { assetId: 'crypto-1', accountId: ACCOUNT, side: 'sell' }, pop: true } }]);
   });
 
   it('a claimed spot fill is reviewed on the order screen without navigating away', async t => {

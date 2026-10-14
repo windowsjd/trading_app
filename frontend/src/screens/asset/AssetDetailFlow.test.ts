@@ -135,6 +135,16 @@ test('320px and large text keep both order actions flexible below the chart', as
   assert.equal(h.node(TEST_IDS.assetDetail.screen).props.contentContainerStyle.flexGrow, 1);
 });
 
+test('the order bar clears the system navigation area itself (tab bar hidden here)', async (t) => {
+  const h = inlineTradingHarness();
+  await openDetail(h);
+  t.after(h.close);
+  // The harness provider reports a 34dp bottom inset (gesture bar / home indicator).
+  assert.equal(h.node('asset-order-actions').props.style.paddingBottom, 8 + 34);
+  const screen = h.renderer.root.findAll((n: any) => n.type === 'SafeAreaView')[0];
+  assert.deepEqual(screen.props.edges, ['left', 'right'], 'the bottom inset is applied once, by the order bar');
+});
+
 test('detail candle diagnostics stay admin only', async (t) => {
   const user = inlineTradingHarness();
   user.candleStale = true;

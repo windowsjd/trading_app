@@ -58,11 +58,36 @@ test('marketSell: 판매하기 on the detail, then holdings and the sell form on
   assert.equal(holdings.kind,'spotlight');if(holdings.kind==='spotlight')assert.deepEqual(holdings.targets,['asset-holdings']);
   assert.equal(followGuideFocus({...atOrder,step:3},'order').step,3);
 });
-test('protection runs on the order screen of the practiced asset',()=>{
+test('protection: the SELL 주문방식 손절가/익절가 설정 of the practiced asset, then its editor and 확인',()=>{
   const session=startGuideSession(6,account,'protection',questProgress(3))!;
   assert.equal(followGuideFocus(session,'order').step,0);
-  const view=resolveGuideView(session,'order',{wallet:null,fx:null,transfer:null,practice:{order:orderForm({assetId:session.assetId}),holdings:{screen:'holdings',accountId:account,assetId:session.assetId,holdingsVisible:true}}});
-  assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.deepEqual(view.targets,['asset-protection']);
+  const holdings={screen:'holdings' as const,accountId:account,assetId:session.assetId,holdingsVisible:true};
+  const facts=(order:Record<string,unknown>,protection:Record<string,unknown>|null=null)=>({wallet:null,fx:null,transfer:null,
+    practice:{order:orderForm({assetId:session.assetId,side:'sell',...order}),holdings,...(protection?{protection:{screen:'protection' as const,accountId:account,assetId:session.assetId,...protection}}:{})}});
+  // The sell form starts at 시장가: the field, then the sheet row.
+  const field=resolveGuideView(session,'order',facts({orderType:'market'}));
+  assert.equal(field.kind,'spotlight');
+  if(field.kind==='spotlight'){assert.deepEqual(field.targets,['order-type']);assert.match(field.card.body,/주문방식 선택하기를 눌러 손절가\/익절가 설정을 선택/);}
+  const sheet=resolveGuideView(session,'order',facts({orderType:'market',methodSheetOpen:true}));
+  if(sheet.kind==='spotlight')assert.deepEqual(sheet.targets,['order-method-protection']);else assert.fail('the sheet row is pointed at');
+  // The buy side is the wrong side for this practice.
+  const buy=resolveGuideView(session,'order',facts({side:'buy',orderType:'market'}));
+  if(buy.kind==='spotlight')assert.match(buy.card.body,/매도 · 손절가\/익절가 설정을 선택/);else assert.fail('side is explained');
+  // The chosen method mounts the editor: its readiness gates 다음, then 확인.
+  for(const ready of [false,true]){
+    const editor=resolveGuideView(session,'order',facts({orderType:'protection'},{protectionEditing:true,tpSlReady:ready}));
+    assert.equal(editor.kind,'spotlight');
+    if(editor.kind==='spotlight'){assert.deepEqual(editor.targets,['protection-editor']);assert.equal(editor.card.next,ready?'enabled':'disabled');}
+  }
+  const submit=resolveGuideView({...session,step:2},'order',facts({orderType:'protection'},{protectionEditing:true,tpSlReady:true}));
+  if(submit.kind==='spotlight')assert.deepEqual(submit.targets,['protection-submit']);else assert.fail('확인 is pointed at');
+  // Without a holding the form is blocked: prepare the practice quantity first.
+  const prepare=resolveGuideView(session,'order',{...facts({orderType:'market',blocked:true}),practice:{...facts({orderType:'market',blocked:true}).practice,holdings:{...holdings,holdingsVisible:false}}});
+  assert.equal(prepare.kind,'message');if(prepare.kind==='message')assert.equal(prepare.card.title,'실습 수량 준비');
+  // One stop-loss or take-profit is a registration; another asset is not this practice.
+  const command={kind:'protection' as const,accountId:account,assetId:session.assetId!,summary:'등록'};
+  assert.equal(claimGuideCommand(session,account,command).session?.phase,'verifying');
+  assert.equal(claimGuideCommand(session,account,{...command,assetId:'other'}).claimed,false);
 });
 test('navigation updates preserve an already advanced order step',()=>{
   const session=startGuideSession(1,account,'marketBuy',questProgress(2))!;

@@ -2,9 +2,6 @@ import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import QuestTarget from '../../features/quest/QuestTarget';
 import QuestLimitReview from '../../features/quest/QuestLimitReview';
-import { useLearningAccess } from '../../features/quest/useLearningAccess';
-import LearningLock from '../../features/quest/LearningLock';
-import ProtectionPanel from '../../features/conditional/ProtectionPanel';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
@@ -30,6 +27,8 @@ type Props = {
   account: TradingAccountDto | null;
   assetId: string;
   isFocused: boolean;
+  // Kept for callers; the holding card has no inputs since TP/SL moved to the
+  // SELL 주문방식 (손절가/익절가 설정).
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
   /** Order screen: a holding of another asset switches the order to it. */
@@ -41,8 +40,6 @@ export default function AccountHoldings({
   account,
   assetId,
   isFocused,
-  onInputFocus,
-  onInputBlur,
   onSelectAsset,
 }: Props) {
   const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('current');
@@ -130,36 +127,30 @@ export default function AccountHoldings({
         />
       ) : (
         visible.map((position) => (
-          <HoldingRow key={`${accountId}:${position.assetId}`} accountId={accountId} position={position} guideTarget={isFocused && position.assetId === assetId}
-            onSelect={onSelectAsset && position.assetId !== assetId ? () => onSelectAsset(position.assetId) : undefined}
-            onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
+          <HoldingRow key={`${accountId}:${position.assetId}`} position={position} guideTarget={isFocused && position.assetId === assetId}
+            onSelect={onSelectAsset && position.assetId !== assetId ? () => onSelectAsset(position.assetId) : undefined} />
         ))
       )}
     </View>
   );
 }
 
-function HoldingRow({ position, accountId, guideTarget, onSelect, onInputFocus, onInputBlur }: {
+/**
+ * One holding. New spot TP/SL is set from the SELL 주문방식 (손절가/익절가 설정);
+ * existing OCO protections stay viewable and cancelable under 대기 목록 › TP/SL.
+ */
+function HoldingRow({ position, guideTarget, onSelect }: {
   guideTarget: boolean;
-  position: PositionItemDto; accountId: string;
+  position: PositionItemDto;
   onSelect?: () => void;
-  onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
 }) {
-  const [protection, setProtection] = useState(false);
-  const gate = useLearningAccess(accountId).gate(position.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
-  // The summary is the item's touch surface (to the card's top edges); the
-  // TP/SL button and its inline editor stay separate controls below it.
+  // The summary is the item's touch surface (to the card's edges).
   const summary = <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} onPress={onSelect}
     style={onSelect ? styles.pressableSummary : undefined}
     accessibilityHint={onSelect ? '이 종목의 주문 화면으로 전환합니다' : undefined} />;
   return (
     <View style={styles.row} testID={`holding-${position.assetId}`}>
       {guideTarget ? <QuestTarget id="asset-holdings">{summary}</QuestTarget> : summary}
-      <QuestTarget id="asset-protection" enabled={guideTarget}><ActionPressable accessibilityRole="button" accessibilityLabel={gate.locked ? `TP/SL 설정·관리, 신규 설정 학습 제한. ${gate.message}` : 'TP/SL 설정·관리'} testID={`holding-protection-${position.assetId}`} onPress={() => setProtection(!protection)} style={styles.retry}>
-        <Text style={styles.value}>TP/SL 설정·관리</Text>{gate.locked ? <LearningLock /> : null}
-      </ActionPressable></QuestTarget>
-      {protection ? <ProtectionPanel accountId={accountId} assetId={position.assetId} positionId={position.positionId}
-        domain="spot" currency={position.currencyCode} onInputFocus={onInputFocus} onInputBlur={onInputBlur} /> : null}
     </View>
   );
 }
@@ -189,13 +180,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   pressableSummary: {
-    marginHorizontal: -14,
-    marginTop: -14,
+    margin: -14,
     paddingHorizontal: 14,
-    paddingTop: 20,
-    paddingBottom: 6,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    paddingVertical: 20,
+    borderRadius: 12,
   },
   value: {
     fontSize: 14,

@@ -655,7 +655,8 @@ async function nothingFree(kind: Market) {
 
 // ── D. Independent stop-loss / take-profit (not OCO) ──
 
-/** SL only, TP only, and both with their own quantities (sum > 100%). */
+/** SL only, TP only, and both with their own quantities (each family ≤ 100%,
+ * the two families together above it). */
 async function independentTpSl(kind: Market) {
   await sellScenario('general', kind, '10', async (s) => {
     const only = await tpSl(s, {
@@ -667,7 +668,7 @@ async function independentTpSl(kind: Market) {
     });
     assert.ok(tpOnly.takeProfit && !tpOnly.stopLoss);
     const pair = await tpSl(s, {
-      stopLoss: { triggerPrice: '95', quantity: '10' },
+      stopLoss: { triggerPrice: '95', quantity: '7' },
       takeProfit: { triggerPrice: '110', quantity: '6' },
     });
     assert.ok(pair.stopLoss && pair.takeProfit);
@@ -685,7 +686,7 @@ async function independentTpSl(kind: Market) {
     const slLive = await view(s, pair.stopLoss!);
     assert.equal(slLive.state, 'watching');
     assert.equal(slLive.triggerPrice, '95.00000000');
-    assert.equal(slLive.quantity, '10.00000000');
+    assert.equal(slLive.quantity, '7.00000000');
     assert.equal(slLive.position?.executableQuantity, '4.00000000');
     // Its price stays the user's; the drop sells the 4 really left.
     await quote(s, kind, '94');
@@ -704,7 +705,7 @@ async function independentTpSl(kind: Market) {
     assert.equal(result.position.quantity.toFixed(8), '0.00000000');
     assert.equal(result.executed.length, 2);
     pass(
-      `${kind} SL-only, TP-only, SL10+TP6: TP sells 6, SL stays armed and sells the 4 left`,
+      `${kind} SL-only, TP-only, SL7+TP6: TP sells 6, SL stays armed and sells the 4 left`,
     );
   });
   await sellScenario('season', kind, '10', async (s) => {
@@ -724,17 +725,29 @@ async function independentTpSl(kind: Market) {
   });
 }
 
-/** A limit TP waits with its reservation while the SL fires on the rest. */
+/** A limit TP registered before 2026-10-15 (new settings are market only)
+ * keeps working: it waits with its reservation while the SL fires on the rest. */
 async function pendingLimitThenOpposite(kind: Market) {
   await sellScenario('general', kind, '10', async (s) => {
+    await rejects(
+      tpSl(s, {
+        takeProfit: {
+          triggerPrice: '110',
+          quantity: '6',
+          executionType: 'limit',
+          limitPrice: '112',
+        },
+      }),
+      'INVALID_CONDITIONAL_SELL',
+    );
     const pair = await tpSl(s, {
       stopLoss: { triggerPrice: '95', quantity: '10' },
-      takeProfit: {
-        triggerPrice: '110',
-        quantity: '6',
-        executionType: 'limit',
-        limitPrice: '112',
-      },
+      takeProfit: { triggerPrice: '110', quantity: '6' },
+    });
+    // The earlier contract's limit execution, as such a row is stored.
+    await db.conditionalSellOrder.update({
+      where: { id: pair.takeProfit! },
+      data: { executionType: 'limit', limitPrice: '112' },
     });
     await quote(s, kind, '110');
     assert.equal(await evaluate(pair.takeProfit!), 'ordered');
@@ -774,7 +787,7 @@ async function pendingLimitThenOpposite(kind: Market) {
       '113.00',
     );
     pass(
-      `${kind} limit TP pending (6 reserved) + SL fires: SL sells 4, TP fills later via matcher`,
+      `${kind} earlier limit TP pending (6 reserved) + SL fires: SL sells 4, TP fills later via matcher; new limit TP refused`,
     );
   });
 }
@@ -1472,8 +1485,7 @@ async function idempotency() {
       stopLoss: { triggerPrice: '90', executionType: 'market', quantity: '4' },
       takeProfit: {
         triggerPrice: '120',
-        executionType: 'limit',
-        limitPrice: '121',
+        executionType: 'market',
         quantity: '10',
       },
     };
@@ -1717,6 +1729,216 @@ async function concurrentRegistrations() {
     pass(
       `concurrent registrations: 5×100% accepted, cap ${CONDITIONAL_SELL_MAX_LIVE_PER_ACCOUNT} live per account`,
     );
+  });
+}
+
+// ── D2. Stop-loss / take-profit families (2026-10-15 registration rules) ──
+
+/** TP 20 + SL 20/30/50 on 100: each family ≤ the holding, one price per family,
+ * market only; executions never edit the others; later registrations are
+ * bounded by the smaller holding. */
+async function tpSlFamilies(kind: Market) {
+  await sellScenario('general', kind, '100', async (s) => {
+    const tp120 = (
+      await tpSl(s, { takeProfit: { triggerPrice: '120', quantity: '20' } })
+    ).takeProfit!;
+    const sl: string[] = [];
+    for (const [triggerPrice, quantity] of [
+      ['90', '20'],
+      ['85', '30'],
+      ['80', '50'],
+    ])
+      sl.push(
+        (await tpSl(s, { stopLoss: { triggerPrice, quantity } })).stopLoss!,
+      );
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '70', quantity: '0.000001' } }),
+      'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+    );
+    await rejects(
+      tpSl(s, { takeProfit: { triggerPrice: '120.0', quantity: '1' } }),
+      'CONDITIONAL_SELL_DUPLICATE_PRICE',
+    );
+    await rejects(
+      tpSl(s, {
+        takeProfit: {
+          triggerPrice: '125',
+          quantity: '1',
+          executionType: 'limit',
+          limitPrice: '125',
+        },
+      }),
+      'INVALID_CONDITIONAL_SELL',
+    );
+    // A pair is all-or-nothing: the stop-loss half exceeds its family.
+    await rejects(
+      tpSl(s, {
+        stopLoss: { triggerPrice: '70', quantity: '1' },
+        takeProfit: { triggerPrice: '130', quantity: '80' },
+      }),
+      'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+    );
+    assert.equal(
+      await db.conditionalSellOrder.count({
+        where: { tradingAccountId: s.accountId },
+      }),
+      4,
+    );
+    const tp130 = (
+      await tpSl(s, { takeProfit: { triggerPrice: '130', quantity: '80' } })
+    ).takeProfit!;
+    // A user condition never counts toward either family.
+    await condition(s, {
+      triggerCondition: 'at_or_below',
+      triggerPrice: '60',
+      quantity: '100',
+    });
+    // TP 120 sells its 20; nothing else is edited or canceled.
+    await quote(s, kind, '120');
+    assert.equal(await evaluate(tp120), 'ordered');
+    for (const [id, price, quantity] of [
+      [sl[0], '90.00000000', '20.00000000'],
+      [sl[1], '85.00000000', '30.00000000'],
+      [sl[2], '80.00000000', '50.00000000'],
+      [tp130, '130.00000000', '80.00000000'],
+    ]) {
+      const row = await view(s, id);
+      assert.deepEqual(
+        [row.state, row.triggerPrice, row.quantity],
+        ['watching', price, quantity],
+      );
+    }
+    // New settings are now bounded by the 80 left (live SLs already 100).
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '75', quantity: '1' } }),
+      'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+    );
+    await quote(s, kind, '89');
+    assert.equal(await evaluate(sl[0]), 'ordered');
+    await quote(s, kind, '84');
+    assert.equal(await evaluate(sl[1]), 'ordered');
+    await quote(s, kind, '79');
+    assert.equal(await evaluate(sl[2]), 'ordered');
+    assert.equal(
+      (await intent(sl[2])).order?.quantity.toFixed(8),
+      '30.00000000',
+      'the last stop-loss sells only the 30 really left',
+    );
+    assert.equal((await intent(tp130)).terminalReason, 'position_closed');
+    const result = await invariants(s);
+    assert.deepEqual(
+      result.executed.map((row) => row.quantity.toFixed(0)).sort(),
+      ['20', '20', '30', '30'],
+    );
+    assert.equal(result.position.quantity.toFixed(8), '0.00000000');
+    pass(
+      `${kind} TP20 + SL20/30/50 on 100: families ≤ holding, duplicate price/limit refused, each fires on the real remainder`,
+    );
+  });
+}
+
+/** Stop-losses met together around a limit reservation: never oversold. */
+async function tpSlTogetherWithReservation(kind: Market) {
+  await sellScenario('general', kind, '100', async (s) => {
+    const limit = await limitSell(s, '30', '130');
+    const a = (
+      await tpSl(s, { stopLoss: { triggerPrice: '90', quantity: '50' } })
+    ).stopLoss!;
+    const b = (
+      await tpSl(s, { stopLoss: { triggerPrice: '85', quantity: '50' } })
+    ).stopLoss!;
+    const tp = (
+      await tpSl(s, { takeProfit: { triggerPrice: '120', quantity: '100' } })
+    ).takeProfit!;
+    await quote(s, kind, '84');
+    await Promise.allSettled([evaluate(a), evaluate(b)]);
+    await Promise.allSettled([evaluate(a), evaluate(b)]);
+    let result = await invariants(s);
+    assert.equal(
+      result.executed
+        .reduce((sum, row) => sum.add(row.quantity), D(0))
+        .toFixed(8),
+      '70.00000000',
+      'only the unreserved 70 is sold',
+    );
+    assert.equal(result.position.reservedQuantity.toFixed(8), '30.00000000');
+    assert.equal(
+      (
+        await db.order.findUniqueOrThrow({
+          where: { id: limit.data.order.orderId },
+        })
+      ).status,
+      'submitted',
+    );
+    const live = await view(s, tp);
+    assert.equal(live.state, 'watching');
+    assert.equal(live.position?.executableQuantity, null);
+    await orders.cancelOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      limit.data.order.orderId,
+    );
+    await quote(s, kind, '121');
+    assert.equal(await evaluate(tp), 'ordered');
+    assert.equal((await intent(tp)).order?.quantity.toFixed(8), '30.00000000');
+    result = await invariants(s);
+    assert.equal(result.position.quantity.toFixed(8), '0.00000000');
+    pass(
+      `${kind} SL50 + SL50 met together with 30 reserved by a limit sell: 70 sold, reservation kept; TP sells the 30 after the cancel`,
+    );
+  });
+}
+
+/** Concurrent registrations serialize on the account fence. */
+async function tpSlConcurrentRegistrations() {
+  await sellScenario('general', 'BINANCE', '100', async (s) => {
+    const totals = await Promise.allSettled(
+      ['90', '89', '88', '87', '86'].map((triggerPrice) =>
+        tpSl(s, { stopLoss: { triggerPrice, quantity: '30' } }),
+      ),
+    );
+    assert.equal(totals.filter((row) => row.status === 'fulfilled').length, 3);
+    for (const row of totals)
+      if (row.status === 'rejected')
+        assert.equal(
+          code(row.reason),
+          'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+        );
+    const prices = await Promise.allSettled(
+      [0, 1].map(() =>
+        tpSl(s, { takeProfit: { triggerPrice: '150', quantity: '10' } }),
+      ),
+    );
+    assert.deepEqual(
+      prices
+        .map((row) =>
+          row.status === 'fulfilled' ? 'created' : code(row.reason),
+        )
+        .sort(),
+      ['CONDITIONAL_SELL_DUPLICATE_PRICE', 'created'],
+    );
+    assert.equal(
+      await db.conditionalSellOrder.count({
+        where: { tradingAccountId: s.accountId, kind: 'stop_loss' },
+      }),
+      3,
+    );
+    // Small crypto quantities: the family limit is exact at 6 decimals.
+    pass(
+      'concurrent registrations: SL 5×30 on 100 → 3 accepted; same TP price twice → one',
+    );
+  });
+  await sellScenario('general', 'BINANCE', '0.000002', async (s) => {
+    await tpSl(s, { stopLoss: { triggerPrice: '90', quantity: '0.000001' } });
+    await tpSl(s, { stopLoss: { triggerPrice: '85', quantity: '0.000001' } });
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '80', quantity: '0.000001' } }),
+      'CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING',
+    );
+    await tpSl(s, {
+      takeProfit: { triggerPrice: '120', quantity: '0.000002' },
+    });
+    pass('0.000002 held: two 0.000001 stop-losses fit, a third does not');
   });
 }
 
@@ -2357,6 +2579,8 @@ async function run() {
     await existingReservation(kind);
     await nothingFree(kind);
     await independentTpSl(kind);
+    await tpSlFamilies(kind);
+    await tpSlTogetherWithReservation(kind);
     await pendingLimitThenOpposite(kind);
     await registrationRules(kind);
     await limitExecution(kind);
@@ -2374,6 +2598,7 @@ async function run() {
   await smallConcurrentBatch('market');
   await smallConcurrentBatch('limit');
   await concurrentRegistrations();
+  await tpSlConcurrentRegistrations();
   await flags();
   await evidenceAndSession();
   await lifecycle();

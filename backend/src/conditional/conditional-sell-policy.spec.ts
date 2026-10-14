@@ -16,6 +16,7 @@ import { HttpException } from '@nestjs/common';
 import { AssetType, OrderType, Prisma } from '../generated/prisma/client';
 import {
   conditionalSellHash,
+  findProtectionSettingConflict,
   isConditionalSellMet,
   isRetryableConditionalSellFailure,
   parseConditionalSellBody,
@@ -197,6 +198,34 @@ describe('parseConditionalSellBody', () => {
         },
       },
     ],
+    // New stop-loss/take-profit settings execute at market only.
+    [
+      {
+        kind: 'protection',
+        takeProfit: {
+          triggerPrice: '120',
+          executionType: 'limit',
+          limitPrice: '119',
+          quantity: '1',
+        },
+      },
+    ],
+    [
+      {
+        kind: 'protection',
+        stopLoss: {
+          triggerPrice: '90',
+          executionType: 'market',
+          quantity: '1',
+        },
+        takeProfit: {
+          triggerPrice: '120',
+          executionType: 'limit',
+          limitPrice: '121',
+          quantity: '1',
+        },
+      },
+    ],
   ])('rejects an invalid shape %#', (body) => {
     expect(code(() => parseConditionalSellBody({ ...base, ...body }))).toBe(
       'INVALID_CONDITIONAL_SELL',
@@ -251,6 +280,93 @@ describe('parseConditionalSellBody', () => {
   });
 });
 
+describe('findProtectionSettingConflict', () => {
+  const intent = (
+    kind: 'condition' | 'stop_loss' | 'take_profit',
+    triggerPrice: string,
+    quantity: string,
+  ) => ({ kind, triggerPrice: d(triggerPrice), quantity: d(quantity) });
+  const conflict = (
+    intents: ReturnType<typeof intent>[],
+    live: ReturnType<typeof intent>[],
+    holding = '100',
+  ) => findProtectionSettingConflict({ intents, live, holding: d(holding) });
+
+  it('sums each family separately up to the holding (TP 20 + SL 20/30/50 on 100)', () => {
+    expect(conflict([intent('take_profit', '120', '100')], [])).toBeNull();
+    expect(conflict([intent('stop_loss', '80', '100')], [])).toBeNull();
+    expect(
+      conflict(
+        [intent('stop_loss', '70', '50')],
+        [
+          intent('take_profit', '120', '20'),
+          intent('stop_loss', '90', '20'),
+          intent('stop_loss', '80', '30'),
+        ],
+      ),
+    ).toBeNull();
+    expect(
+      conflict(
+        [intent('stop_loss', '80', '100'), intent('take_profit', '120', '100')],
+        [],
+      ),
+    ).toBeNull();
+  });
+
+  it('refuses a family total above the holding, conditions never counted', () => {
+    expect(
+      conflict(
+        [intent('stop_loss', '70', '50.000001')],
+        [intent('stop_loss', '90', '20'), intent('stop_loss', '80', '30')],
+      ),
+    ).toBe('total_exceeds_holding');
+    expect(
+      conflict(
+        [intent('take_profit', '130', '1')],
+        [intent('take_profit', '120', '100'), intent('condition', '90', '100')],
+      ),
+    ).toBe('total_exceeds_holding');
+    expect(
+      conflict(
+        [intent('take_profit', '130', '0.5')],
+        [
+          intent('take_profit', '120', '99.5'),
+          intent('condition', '90', '100'),
+        ],
+      ),
+    ).toBeNull();
+    // A smaller holding (after an earlier sale) is the limit for new settings.
+    expect(
+      conflict(
+        [intent('stop_loss', '70', '1')],
+        [intent('stop_loss', '80', '80')],
+        '80',
+      ),
+    ).toBe('total_exceeds_holding');
+  });
+
+  it('refuses a second live setting of one family at the same price only', () => {
+    expect(
+      conflict(
+        [intent('stop_loss', '80.0', '1')],
+        [intent('stop_loss', '80', '1')],
+      ),
+    ).toBe('duplicate_price');
+    expect(
+      conflict(
+        [intent('take_profit', '80', '1')],
+        [intent('stop_loss', '80', '1')],
+      ),
+    ).toBeNull();
+    expect(
+      conflict(
+        [intent('condition', '80', '1')],
+        [intent('stop_loss', '80', '1')],
+      ),
+    ).toBeNull();
+  });
+});
+
 describe('trigger and retry policy', () => {
   it('meets at equality on both sides', () => {
     expect(isConditionalSellMet('at_or_above', d('100'), d('100'))).toBe(true);
@@ -267,6 +383,8 @@ describe('trigger and retry policy', () => {
     expect(isRetryableConditionalSellFailure('INSUFFICIENT_QUANTITY')).toBe(
       true,
     );
+    // A reserved-only shortage surfaces as the guard's historical CONFLICT.
+    expect(isRetryableConditionalSellFailure('CONFLICT')).toBe(true);
     expect(
       isRetryableConditionalSellFailure(
         'CONDITIONAL_SELL_QUANTITY_UNAVAILABLE',

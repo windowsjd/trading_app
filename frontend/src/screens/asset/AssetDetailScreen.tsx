@@ -8,7 +8,7 @@ import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts'
 import { semantic } from '../../theme/tokens';
 import React from 'react';
 import { StyleSheet, View } from '../../theme/native';
-import { SafeAreaView } from '../../theme/safeArea';
+import { SafeAreaView, useSafeAreaInsets } from '../../theme/safeArea';
 import type { AssetDetailScreenProps } from '../../app/navigation/types';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
@@ -34,6 +34,7 @@ export function AssetDetailContent({
     selectedAccount?.id === selectedAccountId ? selectedAccountId : null;
   const detail = useQuery({ queryKey: QUERY_KEYS.asset.detail(assetId), queryFn: () => getAssetDetail(assetId) });
   const learning = useLearningAccess(accountId);
+  const insets = useSafeAreaInsets();
   const buyGate = learning.gate(detail.data?.asset.assetType === 'crypto' ? 'cryptoMarketBuy' : 'allTrading');
   useTradingGuideFacts({ screen: 'asset', accountId: accountId ?? '', assetId, assetType: detail.data?.asset.assetType }, focused);
   const openOrder = (side: 'buy' | 'sell') => {
@@ -42,7 +43,11 @@ export function AssetDetailContent({
   };
 
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
+    // The tab bar is hidden on this screen (MainTabs), so the order bar is the
+    // screen's bottom edge: it pads itself by the bottom inset from the same
+    // provider the tab bar uses, instead of the native SafeAreaView bottom edge
+    // (left Android's buttons under the system navigation bar).
+    <SafeAreaView edges={['left', 'right']} style={styles.screen}>
       <View ref={questGuideTarget('asset-viewport')} collapsable={false} style={{ flex: 1 }}>
       <View style={styles.content}>
         <AssetMarketChart
@@ -57,7 +62,7 @@ export function AssetDetailContent({
           ) : null}
         />
       </View>
-      <View style={styles.footer} testID="asset-order-actions">
+      <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="asset-order-actions">
         <QuestTarget id="asset-sell" style={{ flex: 1 }}><CTAButton
           testID={TEST_IDS.assetDetail.openSellOrder}
           label="판매하기"

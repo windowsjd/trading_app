@@ -30,3 +30,33 @@ Web verification; device accessibility/gesture checks remain separate.
 
 Production partial fills will not occur until a separately validated execution
 adapter is activated on the server; the existing display book is not one.
+
+## 2026-10-15 — detail bottom bar inset, SELL 손절가/익절가 설정
+
+**Detail bottom bar.** `MainTabs` hides the tab bar while `AssetDetail` is
+focused, so 판매하기/구매하기 is the only bottom-anchored bar in the app that
+must clear the system navigation area itself (every other screen ends at the
+tab bar, which pads itself with `useSafeAreaInsets().bottom`). It relied on
+the native `SafeAreaView` bottom edge (Fabric state update inside an animated
+native-stack push), which left the buttons under Android's navigation bar.
+The bar now pads itself by `8 + insets.bottom` from the same insets context as
+the tab bar; the screen's `SafeAreaView` keeps only the left/right edges, so
+the inset is applied exactly once. Real-device checks (Android gesture /
+3-button, iOS home indicator) are still to be done; harness and RN-Web checks
+cannot reproduce a non-zero native inset.
+
+**TP/SL.** The holdings card no longer has the TP/SL 설정·관리 button or its
+inline OCO editor. New spot TP/SL is the SELL 주문방식 「손절가/익절가 설정」
+(`SellProtectionForm`): 익절가 설정 then 손절가 설정, each optional (at least
+one), a trigger price and a whole-percent share of today's holding (slider and
+25/50/75/100%) shown as the fixed order quantity (6-decimal floor), market
+execution only, and the 확인 button in the SELL color. Live settings of the
+same family and their remaining room come from the order form's live
+SELL-settings list; the server enforces the per-family total, duplicate price
+and OCO exclusion again. Existing OCO groups stay listed/cancelable under
+대기 목록 › TP/SL, with ended groups behind 종료된 TP/SL 이력 보기.
+QUEST 04 guides through this method (order-type → `order-method-protection`
+→ `protection-editor` → `protection-submit`) on the SELL order screen.
+Browser checks: `test/browser/sellOrderBrowser.cjs` (224 screens at
+320–430px, light/dark, 1x/2x) and `beginnerBrowser.cjs` with
+`FULL_QUEST_BROWSER=1`.

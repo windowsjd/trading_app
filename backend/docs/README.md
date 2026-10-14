@@ -22,6 +22,8 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/futures-f3-contract.md` — Mark valuation, final Season exit (Futures Last since 2026-10-10), UI and release procedure
    - `docs/conditional-orders-contract.md` — SL/TP Market/Limit exits, OCO and attached Spot/Futures Limit entry; default OFF
    - `docs/conditional-buy-and-loc-contract.md` — Conditional BUY watches (KRX/crypto Spot) and KRX Limit-on-Close with final close evidence; US extension contract; default OFF
+   - `docs/conditional-sell-and-loc-sell-contract.md` — SELL conditions, independent stop-loss/take-profit (market only, per-family totals since 2026-10-15) and KRX LOC SELL; default OFF
+   - `docs/sell-automation-activation-2026-10-15.md` — activation of Conditional BUY/SELL, TP/SL and LOC BUY/SELL: flags, dependencies, observed production state and the production checks NOT yet performed
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`
