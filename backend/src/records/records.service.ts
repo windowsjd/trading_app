@@ -354,6 +354,8 @@ type MySeasonRecordsResponse = {
       initialCapitalKrw: string;
       finalRank: number | null;
       finalTier: string | null;
+      /** Confirmed final-ranking eligibility; null = no rule / not settled. */
+      finalQualified: boolean | null;
       rewardGrantedAt: string | null;
       latestTotalAssetKrw: string | null;
       latestReturnRate: string | null;
@@ -380,6 +382,10 @@ type MySeasonRecordDetailResponse = {
       initialCapitalKrw: string;
       finalRank: number | null;
       finalTier: string | null;
+      /** Confirmed final-ranking eligibility; null = no rule / not settled. */
+      finalQualified: boolean | null;
+      finalTradedInstrumentCount: number | null;
+      finalRecognizedTurnoverKrw: string | null;
       rewardGrantedAt: string | null;
     } | null;
     performance: {
@@ -523,6 +529,7 @@ type UserSeasonRecordSummaryResponse = {
       currentTier: string | null;
       finalRank: number | null;
       finalTier: string | null;
+      finalQualified: boolean | null;
       rewardGranted: boolean;
       totalAssetKrw: string | null;
       returnRate: string | null;
@@ -547,6 +554,8 @@ type UserCurrentSeasonSummaryResponse = {
       rank: number | null;
       provisionalTier: string | null;
       finalTier: string | null;
+      /** Confirmed final-ranking eligibility; null = no rule / not settled. */
+      finalQualified: boolean | null;
       percentile: string | null;
       returnRate: string | null;
       totalAssetKrw: string | null;
@@ -760,6 +769,11 @@ export class RecordsService {
         currentRank: true,
         finalRank: true,
         finalTier: true,
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
         rewardGrantedAt: true,
         season: {
           select: {
@@ -808,10 +822,12 @@ export class RecordsService {
       data: {
         state: 'available',
         seasons: participants.map((participant) => {
-          const metric = this.selectBestMetric(
-            participant.seasonRankings[0],
-            participant.tradingAccount.dailyPortfolioSnapshots[0],
-          );
+          const metric =
+            this.notQualifiedFinalMetric(participant) ??
+            this.selectBestMetric(
+              participant.seasonRankings[0],
+              participant.tradingAccount.dailyPortfolioSnapshots[0],
+            );
 
           return {
             seasonId: participant.season.id,
@@ -825,6 +841,7 @@ export class RecordsService {
             ),
             finalRank: participant.finalRank,
             finalTier: participant.finalTier,
+            finalQualified: participant.finalQualified,
             rewardGrantedAt: this.formatNullableDate(
               participant.rewardGrantedAt,
             ),
@@ -1339,10 +1356,12 @@ export class RecordsService {
       };
     }
 
-    const metric = this.selectBestMetric(
-      participant.seasonRankings[0],
-      participant.tradingAccount.dailyPortfolioSnapshots[0],
-    );
+    const metric =
+      this.notQualifiedFinalMetric(participant) ??
+      this.selectBestMetric(
+        participant.seasonRankings[0],
+        participant.tradingAccount.dailyPortfolioSnapshots[0],
+      );
 
     return {
       success: true,
@@ -1355,6 +1374,7 @@ export class RecordsService {
           currentTier: null,
           finalRank: participant.finalRank,
           finalTier: participant.finalTier,
+          finalQualified: participant.finalQualified,
           rewardGranted: participant.rewardGrantedAt !== null,
           totalAssetKrw: metric
             ? this.formatDecimal(metric.totalAssetKrw, 8)
@@ -1434,6 +1454,7 @@ export class RecordsService {
             rank: null,
             provisionalTier: null,
             finalTier: null,
+            finalQualified: null,
             percentile: null,
             returnRate: null,
             totalAssetKrw: null,
@@ -1463,6 +1484,7 @@ export class RecordsService {
             rank: null,
             provisionalTier: null,
             finalTier: null,
+            finalQualified: null,
             percentile: null,
             returnRate: null,
             totalAssetKrw: null,
@@ -1476,12 +1498,18 @@ export class RecordsService {
       };
     }
 
-    const ranking = await this.findLatestPublicRanking(
-      season.id,
-      participant.id,
-      participant.tradingAccountId,
-      season.status,
-    );
+    // Settlement confirmed this participant did not qualify for the final
+    // ranking: it has no final row, and a provisional daily rank must not be
+    // shown for a finished season as if it were a standing.
+    const notQualifiedMetric = this.notQualifiedFinalMetric(participant);
+    const ranking = notQualifiedMetric
+      ? null
+      : await this.findLatestPublicRanking(
+          season.id,
+          participant.id,
+          participant.tradingAccountId,
+          season.status,
+        );
     let portfolioAccess = await readPortfolioAccess(
       this.prisma,
       authUserId,
@@ -1506,6 +1534,7 @@ export class RecordsService {
         : null;
     const metric =
       ranking ??
+      notQualifiedMetric ??
       this.selectBestMetric(
         participant.seasonRankings[0],
         participant.tradingAccount.dailyPortfolioSnapshots[0],
@@ -1587,7 +1616,9 @@ export class RecordsService {
           name: season.name,
           maxDrawdown: ranking
             ? this.formatDecimal(ranking.maxDrawdown, 8)
-            : null,
+            : notQualifiedMetric
+              ? this.formatDecimal(participant.maxDrawdown, 8)
+              : null,
           status: season.status,
           rank:
             ranking?.rank ?? participant.currentRank ?? participant.finalRank,
@@ -1600,6 +1631,7 @@ export class RecordsService {
               ? (participant.finalTier ??
                 assignRankingTier(ranking.rank, rankingTotal))
               : null,
+          finalQualified: participant.finalQualified,
           percentile:
             ranking && rankingTotal > 0
               ? this.formatDecimal(
@@ -2937,6 +2969,11 @@ export class RecordsService {
         currentRank: true,
         finalRank: true,
         finalTier: true,
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
         rewardGrantedAt: true,
         seasonRankings: {
           where: {
@@ -3158,6 +3195,9 @@ export class RecordsService {
     initialCapitalKrw: Prisma.Decimal;
     finalRank: number | null;
     finalTier: string | null;
+    finalQualified: boolean | null;
+    finalTradedInstrumentCount: number | null;
+    finalRecognizedTurnoverKrw: Prisma.Decimal | null;
     rewardGrantedAt: Date | null;
   }): NonNullable<MySeasonRecordDetailResponse['data']['participant']> {
     return {
@@ -3167,8 +3207,33 @@ export class RecordsService {
       initialCapitalKrw: this.formatDecimal(participant.initialCapitalKrw, 8),
       finalRank: participant.finalRank,
       finalTier: participant.finalTier,
+      finalQualified: participant.finalQualified,
+      finalTradedInstrumentCount: participant.finalTradedInstrumentCount,
+      finalRecognizedTurnoverKrw: this.formatNullableDecimal(
+        participant.finalRecognizedTurnoverKrw,
+        8,
+      ),
       rewardGrantedAt: this.formatNullableDate(participant.rewardGrantedAt),
     };
+  }
+
+  /**
+   * A participant settlement confirmed as NOT qualified for the final ranking
+   * (docs/season-final-ranking-eligibility.md) has no final row; its settled
+   * financial result is on the participant, written with the verdict. Record
+   * headlines use it instead of falling back to a daily snapshot.
+   */
+  private notQualifiedFinalMetric(participant: {
+    finalQualified: boolean | null;
+    totalAssetKrw: Prisma.Decimal;
+    totalReturnRate: Prisma.Decimal;
+  }): { totalAssetKrw: Prisma.Decimal; returnRate: Prisma.Decimal } | null {
+    return participant.finalQualified === false
+      ? {
+          totalAssetKrw: participant.totalAssetKrw,
+          returnRate: participant.totalReturnRate,
+        }
+      : null;
   }
 
   private isParticipantPubliclyVisible(

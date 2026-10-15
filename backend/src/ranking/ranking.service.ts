@@ -20,6 +20,14 @@ import {
   type SeasonRankingScopeRow,
 } from './season-ranking-scope';
 import { assertSeasonRankingSetScope } from './season-ranking-set-scope';
+import {
+  evaluateFinalQualification,
+  minRecognizedTurnoverKrwAtMoneyScale,
+  readSeasonTradingActivity,
+  remainingRecognizedTurnoverKrw,
+  resolveSeasonFinalQualificationCriteria,
+  type SeasonTradingActivity,
+} from './season-final-qualification';
 
 export type RankingQuery = {
   seasonId?: string;
@@ -34,12 +42,19 @@ export type RankingQuery = {
 type RankingSectionState = 'available' | 'unavailable' | 'not_joined';
 type RankingScope = 'all' | 'friends' | 'top10';
 
+export type RankingQualificationQuery = {
+  seasonId?: string;
+};
+
 type RankingSeason = {
   id: string;
   name: string;
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
+  initialCapitalKrw: Prisma.Decimal;
+  finalRankingMinTradedInstruments: number | null;
+  finalRankingMinTurnoverRatio: Prisma.Decimal | null;
 };
 
 type ParsedRankingQuery = {
@@ -96,6 +111,7 @@ type RankingParticipantVisibility = {
   tradingAccountId: string;
   participantStatus: ParticipantStatus;
   rankingHiddenAt: Date | null;
+  finalQualified: boolean | null;
 };
 
 type RankingResponse = {
@@ -149,12 +165,56 @@ type RankingResponse = {
   };
 };
 
+/**
+ * The caller's own final-ranking eligibility
+ * (docs/season-final-ranking-eligibility.md). Money is an 8-place string;
+ * `remaining*` are already floored at 0 so a client never does the arithmetic.
+ */
+type RankingQualificationResponse = {
+  success: true;
+  data: {
+    state: 'available' | 'not_applicable' | 'not_joined' | 'unavailable';
+    season: ReturnType<RankingService['formatSeason']> | null;
+    basis: 'provisional' | 'final' | null;
+    asOf: string | null;
+    criteria: {
+      minTradedInstrumentCount: number;
+      minTurnoverRatio: string;
+      minRecognizedTurnoverKrw: string;
+    } | null;
+    tradedInstrumentCount: number | null;
+    recognizedTurnoverKrw: string | null;
+    remainingTradedInstrumentCount: number | null;
+    remainingRecognizedTurnoverKrw: string | null;
+    tradedInstrumentRequirementMet: boolean | null;
+    turnoverRequirementMet: boolean | null;
+    qualified: boolean | null;
+    reason?: string;
+    message?: string;
+  };
+};
+
+const RANKABLE_PARTICIPANT_STATUSES: readonly ParticipantStatus[] = [
+  ParticipantStatus.active,
+  ParticipantStatus.finished,
+  ParticipantStatus.rewarded,
+];
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
   SeasonStatus.active,
   SeasonStatus.upcoming,
   SeasonStatus.ended,
   SeasonStatus.settled,
 ];
+const RANKING_SEASON_SELECT = {
+  id: true,
+  name: true,
+  status: true,
+  startAt: true,
+  endAt: true,
+  initialCapitalKrw: true,
+  finalRankingMinTradedInstruments: true,
+  finalRankingMinTurnoverRatio: true,
+} satisfies Prisma.SeasonSelect;
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const TOP10_LIMIT = 10;
@@ -188,6 +248,215 @@ export class RankingService {
       (tx) => this.readRankingSnapshot(tx, userId, parsedQuery),
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  /**
+   * The caller's final-ranking eligibility for a season (default: the current
+   * season, same priority as the ranking). While the season is not settled it
+   * is PROVISIONAL, measured from the caller's own fills as of now; once
+   * settled it is the verdict settlement confirmed at Season.endAt. Only this
+   * one account is read, never the season's whole trading history.
+   */
+  async getFinalQualification(
+    userId: string | undefined,
+    query: RankingQualificationQuery = {},
+  ): Promise<RankingQualificationResponse> {
+    if (!userId) {
+      this.throwApiError(
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+        'Unauthorized',
+      );
+    }
+
+    const seasonId = this.parseOptionalText(query.seasonId);
+    // Orders and Futures executions are read in one consistent snapshot.
+    return this.prisma.$transaction(
+      (tx) => this.readFinalQualification(tx, userId, seasonId),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
+  private async readFinalQualification(
+    client: Prisma.TransactionClient,
+    userId: string,
+    seasonId: string | undefined,
+  ): Promise<RankingQualificationResponse> {
+    const season = seasonId
+      ? await this.findSeasonById(seasonId, client)
+      : await this.findCurrentSeason(client);
+    if (!season) {
+      return this.qualificationFallback(
+        'unavailable',
+        null,
+        seasonId ? 'SEASON_NOT_FOUND' : 'CURRENT_SEASON_NOT_FOUND',
+        seasonId ? 'Season not found.' : 'Current season is not configured.',
+      );
+    }
+
+    const criteria = resolveSeasonFinalQualificationCriteria(season);
+    if (!criteria) {
+      return this.qualificationFallback(
+        'not_applicable',
+        season,
+        'FINAL_RANKING_QUALIFICATION_NOT_REQUIRED',
+        'This season ranks every participant without trading activity criteria.',
+      );
+    }
+
+    const participant = await client.seasonParticipant.findUnique({
+      where: {
+        seasonId_userId: {
+          seasonId: season.id,
+          userId,
+        },
+      },
+      select: {
+        id: true,
+        userId: true,
+        participantStatus: true,
+        tradingAccountId: true,
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+        tradingAccount: {
+          select: { id: true, mode: true, userId: true },
+        },
+      },
+    });
+    if (!participant) {
+      return this.qualificationFallback(
+        'not_joined',
+        season,
+        'SEASON_NOT_JOINED',
+        'Final ranking eligibility is available after joining the season.',
+      );
+    }
+    if (
+      !RANKABLE_PARTICIPANT_STATUSES.includes(participant.participantStatus)
+    ) {
+      return this.qualificationFallback(
+        'unavailable',
+        season,
+        participant.participantStatus === ParticipantStatus.excluded
+          ? 'PARTICIPANT_EXCLUDED'
+          : 'PARTICIPANT_NOT_ACTIVE',
+        'Final ranking eligibility is unavailable for this participant.',
+      );
+    }
+    if (
+      participant.tradingAccount?.id !== participant.tradingAccountId ||
+      participant.tradingAccount.mode !== 'season' ||
+      participant.tradingAccount.userId !== participant.userId
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'TRADING_ACCOUNT_LINK_INTEGRITY',
+        'The season trading account link could not be verified.',
+      );
+    }
+
+    let basis: 'provisional' | 'final';
+    let asOf: Date;
+    let activity: SeasonTradingActivity;
+    if (season.status === SeasonStatus.settled) {
+      // The confirmed verdict is the authority; it is never re-derived.
+      if (
+        participant.finalQualified === null ||
+        participant.finalTradedInstrumentCount === null ||
+        participant.finalRecognizedTurnoverKrw === null
+      ) {
+        this.throwApiError(
+          HttpStatus.INTERNAL_SERVER_ERROR,
+          'FINAL_RESULTS_INTEGRITY',
+          'The confirmed final ranking eligibility is missing.',
+        );
+      }
+      basis = 'final';
+      asOf = season.endAt;
+      activity = {
+        tradedInstrumentCount: participant.finalTradedInstrumentCount,
+        recognizedTurnoverKrw: participant.finalRecognizedTurnoverKrw,
+      };
+    } else {
+      const now = new Date();
+      basis = 'provisional';
+      asOf = now.getTime() < season.endAt.getTime() ? now : season.endAt;
+      const accounts = await readSeasonTradingActivity(client, {
+        season,
+        tradingAccountIds: [participant.tradingAccountId],
+      });
+      activity = accounts.get(participant.tradingAccountId)!;
+    }
+
+    const evaluation = evaluateFinalQualification(criteria, activity);
+    if (
+      basis === 'final' &&
+      evaluation.qualified !== participant.finalQualified
+    ) {
+      this.throwApiError(
+        HttpStatus.INTERNAL_SERVER_ERROR,
+        'FINAL_RESULTS_INTEGRITY',
+        'The confirmed final ranking eligibility could not be verified.',
+      );
+    }
+
+    return {
+      success: true,
+      data: {
+        state: 'available',
+        season: this.formatSeason(season),
+        basis,
+        asOf: asOf.toISOString(),
+        criteria: {
+          minTradedInstrumentCount: criteria.minTradedInstrumentCount,
+          minTurnoverRatio: criteria.minTurnoverRatio.toFixed(4),
+          minRecognizedTurnoverKrw:
+            minRecognizedTurnoverKrwAtMoneyScale(criteria).toFixed(8),
+        },
+        tradedInstrumentCount: evaluation.tradedInstrumentCount,
+        recognizedTurnoverKrw: evaluation.recognizedTurnoverKrw.toFixed(8),
+        remainingTradedInstrumentCount: Math.max(
+          criteria.minTradedInstrumentCount - evaluation.tradedInstrumentCount,
+          0,
+        ),
+        remainingRecognizedTurnoverKrw: remainingRecognizedTurnoverKrw(
+          criteria,
+          evaluation,
+        ).toFixed(8),
+        tradedInstrumentRequirementMet:
+          evaluation.tradedInstrumentRequirementMet,
+        turnoverRequirementMet: evaluation.turnoverRequirementMet,
+        qualified: evaluation.qualified,
+      },
+    };
+  }
+
+  private qualificationFallback(
+    state: 'not_applicable' | 'not_joined' | 'unavailable',
+    season: RankingSeason | null,
+    reason: string,
+    message: string,
+  ): RankingQualificationResponse {
+    return {
+      success: true,
+      data: {
+        state,
+        season: season ? this.formatSeason(season) : null,
+        basis: null,
+        asOf: null,
+        criteria: null,
+        tradedInstrumentCount: null,
+        recognizedTurnoverKrw: null,
+        remainingTradedInstrumentCount: null,
+        remainingRecognizedTurnoverKrw: null,
+        tradedInstrumentRequirementMet: null,
+        turnoverRequirementMet: null,
+        qualified: null,
+        reason,
+        message,
+      },
+    };
   }
 
   private async readRankingSnapshot(
@@ -239,19 +508,32 @@ export class RankingService {
     const participant = await this.findParticipant(season.id, userId, client);
 
     if (!selectedRanking) {
+      // A settled eligibility season whose confirmed final ranking is EMPTY
+      // (nobody qualified) is a normal result, not a ranking still pending.
+      const noQualifiedParticipants = await this.isConfirmedEmptyFinalRanking(
+        client,
+        season,
+        parsedQuery.rankType,
+      );
       return this.unavailableResponse({
         season,
         rankType: parsedQuery.rankType,
         rankingDate: parsedQuery.rankingDate,
         limit: parsedQuery.limit,
         offset: parsedQuery.offset,
-        reason: 'RANKING_UNAVAILABLE',
-        message: 'Ranking data is unavailable for the selected season.',
+        reason: noQualifiedParticipants
+          ? 'NO_QUALIFIED_PARTICIPANTS'
+          : 'RANKING_UNAVAILABLE',
+        message: noQualifiedParticipants
+          ? 'No participant met the season final ranking criteria.'
+          : 'Ranking data is unavailable for the selected season.',
         myRanking: participant
-          ? this.unavailableMyRanking(
-              'MY_RANKING_UNAVAILABLE',
-              'My ranking is unavailable until season rankings are generated.',
-            )
+          ? this.isNotQualifiedForFinal(participant, parsedQuery.rankType)
+            ? this.notQualifiedMyRanking()
+            : this.unavailableMyRanking(
+                'MY_RANKING_UNAVAILABLE',
+                'My ranking is unavailable until season rankings are generated.',
+              )
           : this.notJoinedMyRanking(),
       });
     }
@@ -390,12 +672,15 @@ export class RankingService {
         ),
         myRanking: participant
           ? participantRankingVisible
-            ? this.formatMyRanking(
-                myRankingRow,
-                this.formatDateOnly(selectedRanking.rankingDate),
-                parsedQuery.rankType,
-                totalParticipants,
-              )
+            ? !myRankingRow &&
+              this.isNotQualifiedForFinal(participant, parsedQuery.rankType)
+              ? this.notQualifiedMyRanking()
+              : this.formatMyRanking(
+                  myRankingRow,
+                  this.formatDateOnly(selectedRanking.rankingDate),
+                  parsedQuery.rankType,
+                  totalParticipants,
+                )
             : this.hiddenMyRanking(participant)
           : this.notJoinedMyRanking(),
       },
@@ -561,13 +846,7 @@ export class RankingService {
         where: {
           status,
         },
-        select: {
-          id: true,
-          name: true,
-          status: true,
-          startAt: true,
-          endAt: true,
-        },
+        select: RANKING_SEASON_SELECT,
         orderBy: this.getSeasonOrderBy(status),
       });
 
@@ -587,13 +866,7 @@ export class RankingService {
       where: {
         id: seasonId,
       },
-      select: {
-        id: true,
-        name: true,
-        status: true,
-        startAt: true,
-        endAt: true,
-      },
+      select: RANKING_SEASON_SELECT,
     });
   }
 
@@ -671,6 +944,7 @@ export class RankingService {
         tradingAccountId: true,
         participantStatus: true,
         rankingHiddenAt: true,
+        finalQualified: true,
       },
     });
   }
@@ -828,6 +1102,54 @@ export class RankingService {
             assignRankingTier(ranking.rank, totalParticipants))
           : null,
     };
+  }
+
+  /**
+   * Settled eligibility season, nobody qualified: settlement confirmed a
+   * verdict for its participants and none of them is `qualified`. Damage (no
+   * verdicts at all) stays the ordinary RANKING_UNAVAILABLE.
+   */
+  private async isConfirmedEmptyFinalRanking(
+    client: Prisma.TransactionClient,
+    season: RankingSeason,
+    rankType: SeasonRankingType,
+  ): Promise<boolean> {
+    if (
+      rankType !== SeasonRankingType.final ||
+      season.status !== SeasonStatus.settled ||
+      !resolveSeasonFinalQualificationCriteria(season)
+    ) {
+      return false;
+    }
+
+    const [qualifiedCount, notQualifiedCount] = await Promise.all([
+      client.seasonParticipant.count({
+        where: { seasonId: season.id, finalQualified: true },
+      }),
+      client.seasonParticipant.count({
+        where: { seasonId: season.id, finalQualified: false },
+      }),
+    ]);
+
+    return qualifiedCount === 0 && notQualifiedCount > 0;
+  }
+
+  /** Settlement stores `false` only for a participant it confirmed unqualified. */
+  private isNotQualifiedForFinal(
+    participant: RankingParticipantVisibility,
+    rankType: SeasonRankingType,
+  ): boolean {
+    return (
+      rankType === SeasonRankingType.final &&
+      participant.finalQualified === false
+    );
+  }
+
+  private notQualifiedMyRanking(): RankingResponse['data']['myRanking'] {
+    return this.unavailableMyRanking(
+      'FINAL_RANKING_NOT_QUALIFIED',
+      'My final ranking is unavailable because the season final ranking criteria were not met.',
+    );
   }
 
   private notJoinedMyRanking(): RankingResponse['data']['myRanking'] {

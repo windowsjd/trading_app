@@ -34,6 +34,8 @@ export type SeasonParticipantAvgAggregateOutputType = {
   totalFillCount: number | null
   currentRank: number | null
   finalRank: number | null
+  finalTradedInstrumentCount: number | null
+  finalRecognizedTurnoverKrw: runtime.Decimal | null
 }
 
 export type SeasonParticipantSumAggregateOutputType = {
@@ -44,6 +46,8 @@ export type SeasonParticipantSumAggregateOutputType = {
   totalFillCount: number | null
   currentRank: number | null
   finalRank: number | null
+  finalTradedInstrumentCount: number | null
+  finalRecognizedTurnoverKrw: runtime.Decimal | null
 }
 
 export type SeasonParticipantMinAggregateOutputType = {
@@ -70,6 +74,9 @@ export type SeasonParticipantMinAggregateOutputType = {
   resultCorrectedAt: Date | null
   resultCorrectedReason: string | null
   resultCorrectedByUserId: string | null
+  finalQualified: boolean | null
+  finalTradedInstrumentCount: number | null
+  finalRecognizedTurnoverKrw: runtime.Decimal | null
   tradingAccountId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -99,6 +106,9 @@ export type SeasonParticipantMaxAggregateOutputType = {
   resultCorrectedAt: Date | null
   resultCorrectedReason: string | null
   resultCorrectedByUserId: string | null
+  finalQualified: boolean | null
+  finalTradedInstrumentCount: number | null
+  finalRecognizedTurnoverKrw: runtime.Decimal | null
   tradingAccountId: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -128,6 +138,9 @@ export type SeasonParticipantCountAggregateOutputType = {
   resultCorrectedAt: number
   resultCorrectedReason: number
   resultCorrectedByUserId: number
+  finalQualified: number
+  finalTradedInstrumentCount: number
+  finalRecognizedTurnoverKrw: number
   tradingAccountId: number
   createdAt: number
   updatedAt: number
@@ -143,6 +156,8 @@ export type SeasonParticipantAvgAggregateInputType = {
   totalFillCount?: true
   currentRank?: true
   finalRank?: true
+  finalTradedInstrumentCount?: true
+  finalRecognizedTurnoverKrw?: true
 }
 
 export type SeasonParticipantSumAggregateInputType = {
@@ -153,6 +168,8 @@ export type SeasonParticipantSumAggregateInputType = {
   totalFillCount?: true
   currentRank?: true
   finalRank?: true
+  finalTradedInstrumentCount?: true
+  finalRecognizedTurnoverKrw?: true
 }
 
 export type SeasonParticipantMinAggregateInputType = {
@@ -179,6 +196,9 @@ export type SeasonParticipantMinAggregateInputType = {
   resultCorrectedAt?: true
   resultCorrectedReason?: true
   resultCorrectedByUserId?: true
+  finalQualified?: true
+  finalTradedInstrumentCount?: true
+  finalRecognizedTurnoverKrw?: true
   tradingAccountId?: true
   createdAt?: true
   updatedAt?: true
@@ -208,6 +228,9 @@ export type SeasonParticipantMaxAggregateInputType = {
   resultCorrectedAt?: true
   resultCorrectedReason?: true
   resultCorrectedByUserId?: true
+  finalQualified?: true
+  finalTradedInstrumentCount?: true
+  finalRecognizedTurnoverKrw?: true
   tradingAccountId?: true
   createdAt?: true
   updatedAt?: true
@@ -237,6 +260,9 @@ export type SeasonParticipantCountAggregateInputType = {
   resultCorrectedAt?: true
   resultCorrectedReason?: true
   resultCorrectedByUserId?: true
+  finalQualified?: true
+  finalTradedInstrumentCount?: true
+  finalRecognizedTurnoverKrw?: true
   tradingAccountId?: true
   createdAt?: true
   updatedAt?: true
@@ -353,6 +379,9 @@ export type SeasonParticipantGroupByOutputType = {
   resultCorrectedAt: Date | null
   resultCorrectedReason: string | null
   resultCorrectedByUserId: string | null
+  finalQualified: boolean | null
+  finalTradedInstrumentCount: number | null
+  finalRecognizedTurnoverKrw: runtime.Decimal | null
   tradingAccountId: string
   createdAt: Date
   updatedAt: Date
@@ -405,6 +434,9 @@ export type SeasonParticipantWhereInput = {
   resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  finalQualified?: Prisma.BoolNullableFilter<"SeasonParticipant"> | boolean | null
+  finalTradedInstrumentCount?: Prisma.IntNullableFilter<"SeasonParticipant"> | number | null
+  finalRecognizedTurnoverKrw?: Prisma.DecimalNullableFilter<"SeasonParticipant"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFilter<"SeasonParticipant"> | string
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
@@ -440,6 +472,9 @@ export type SeasonParticipantOrderByWithRelationInput = {
   resultCorrectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalQualified?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -480,6 +515,9 @@ export type SeasonParticipantWhereUniqueInput = Prisma.AtLeast<{
   resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  finalQualified?: Prisma.BoolNullableFilter<"SeasonParticipant"> | boolean | null
+  finalTradedInstrumentCount?: Prisma.IntNullableFilter<"SeasonParticipant"> | number | null
+  finalRecognizedTurnoverKrw?: Prisma.DecimalNullableFilter<"SeasonParticipant"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   season?: Prisma.XOR<Prisma.SeasonScalarRelationFilter, Prisma.SeasonWhereInput>
@@ -514,6 +552,9 @@ export type SeasonParticipantOrderByWithAggregationInput = {
   resultCorrectedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrderInput | Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalQualified?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrderInput | Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -551,6 +592,9 @@ export type SeasonParticipantScalarWhereWithAggregatesInput = {
   resultCorrectedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableWithAggregatesFilter<"SeasonParticipant"> | string | null
+  finalQualified?: Prisma.BoolNullableWithAggregatesFilter<"SeasonParticipant"> | boolean | null
+  finalTradedInstrumentCount?: Prisma.IntNullableWithAggregatesFilter<"SeasonParticipant"> | number | null
+  finalRecognizedTurnoverKrw?: Prisma.DecimalNullableWithAggregatesFilter<"SeasonParticipant"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringWithAggregatesFilter<"SeasonParticipant"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"SeasonParticipant"> | Date | string
@@ -578,6 +622,9 @@ export type SeasonParticipantCreateInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -612,6 +659,9 @@ export type SeasonParticipantUncheckedCreateInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -642,6 +692,9 @@ export type SeasonParticipantUpdateInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -676,6 +729,9 @@ export type SeasonParticipantUncheckedUpdateInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -708,6 +764,9 @@ export type SeasonParticipantCreateManyInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -735,6 +794,9 @@ export type SeasonParticipantUpdateManyMutationInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -763,6 +825,9 @@ export type SeasonParticipantUncheckedUpdateManyInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -812,6 +877,9 @@ export type SeasonParticipantCountOrderByAggregateInput = {
   resultCorrectedAt?: Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrder
+  finalQualified?: Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -825,6 +893,8 @@ export type SeasonParticipantAvgOrderByAggregateInput = {
   totalFillCount?: Prisma.SortOrder
   currentRank?: Prisma.SortOrder
   finalRank?: Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrder
 }
 
 export type SeasonParticipantMaxOrderByAggregateInput = {
@@ -851,6 +921,9 @@ export type SeasonParticipantMaxOrderByAggregateInput = {
   resultCorrectedAt?: Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrder
+  finalQualified?: Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -880,6 +953,9 @@ export type SeasonParticipantMinOrderByAggregateInput = {
   resultCorrectedAt?: Prisma.SortOrder
   resultCorrectedReason?: Prisma.SortOrder
   resultCorrectedByUserId?: Prisma.SortOrder
+  finalQualified?: Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrder
   tradingAccountId?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -893,6 +969,8 @@ export type SeasonParticipantSumOrderByAggregateInput = {
   totalFillCount?: Prisma.SortOrder
   currentRank?: Prisma.SortOrder
   finalRank?: Prisma.SortOrder
+  finalTradedInstrumentCount?: Prisma.SortOrder
+  finalRecognizedTurnoverKrw?: Prisma.SortOrder
 }
 
 export type SeasonParticipantScalarRelationFilter = {
@@ -1028,12 +1106,8 @@ export type IntFieldUpdateOperationsInput = {
   divide?: number
 }
 
-export type NullableIntFieldUpdateOperationsInput = {
-  set?: number | null
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
+export type NullableBoolFieldUpdateOperationsInput = {
+  set?: boolean | null
 }
 
 export type SeasonParticipantCreateNestedOneWithoutSeasonRewardsInput = {
@@ -1100,6 +1174,9 @@ export type SeasonParticipantCreateWithoutUserInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1132,6 +1209,9 @@ export type SeasonParticipantUncheckedCreateWithoutUserInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1193,6 +1273,9 @@ export type SeasonParticipantScalarWhereInput = {
   resultCorrectedAt?: Prisma.DateTimeNullableFilter<"SeasonParticipant"> | Date | string | null
   resultCorrectedReason?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
   resultCorrectedByUserId?: Prisma.StringNullableFilter<"SeasonParticipant"> | string | null
+  finalQualified?: Prisma.BoolNullableFilter<"SeasonParticipant"> | boolean | null
+  finalTradedInstrumentCount?: Prisma.IntNullableFilter<"SeasonParticipant"> | number | null
+  finalRecognizedTurnoverKrw?: Prisma.DecimalNullableFilter<"SeasonParticipant"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFilter<"SeasonParticipant"> | string
   createdAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"SeasonParticipant"> | Date | string
@@ -1220,6 +1303,9 @@ export type SeasonParticipantCreateWithoutTradingAccountInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1253,6 +1339,9 @@ export type SeasonParticipantUncheckedCreateWithoutTradingAccountInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonParticipantInput
@@ -1298,6 +1387,9 @@ export type SeasonParticipantUpdateWithoutTradingAccountInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1331,6 +1423,9 @@ export type SeasonParticipantUncheckedUpdateWithoutTradingAccountInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonParticipantNestedInput
@@ -1360,6 +1455,9 @@ export type SeasonParticipantCreateWithoutSeasonInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutSeasonParticipantsInput
@@ -1392,6 +1490,9 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1448,6 +1549,9 @@ export type SeasonParticipantCreateWithoutSeasonRewardsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1481,6 +1585,9 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRewardsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1526,6 +1633,9 @@ export type SeasonParticipantUpdateWithoutSeasonRewardsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1559,6 +1669,9 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRewardsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1588,6 +1701,9 @@ export type SeasonParticipantCreateWithoutRewardFulfillmentRequestsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1621,6 +1737,9 @@ export type SeasonParticipantUncheckedCreateWithoutRewardFulfillmentRequestsInpu
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1666,6 +1785,9 @@ export type SeasonParticipantUpdateWithoutRewardFulfillmentRequestsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1699,6 +1821,9 @@ export type SeasonParticipantUncheckedUpdateWithoutRewardFulfillmentRequestsInpu
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1728,6 +1853,9 @@ export type SeasonParticipantCreateWithoutSeasonRankingsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   season: Prisma.SeasonCreateNestedOneWithoutParticipantsInput
@@ -1761,6 +1889,9 @@ export type SeasonParticipantUncheckedCreateWithoutSeasonRankingsInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1806,6 +1937,9 @@ export type SeasonParticipantUpdateWithoutSeasonRankingsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1839,6 +1973,9 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonRankingsInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1869,6 +2006,9 @@ export type SeasonParticipantCreateManyUserInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1896,6 +2036,9 @@ export type SeasonParticipantUpdateWithoutUserInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   season?: Prisma.SeasonUpdateOneRequiredWithoutParticipantsNestedInput
@@ -1928,6 +2071,9 @@ export type SeasonParticipantUncheckedUpdateWithoutUserInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1959,6 +2105,9 @@ export type SeasonParticipantUncheckedUpdateManyWithoutUserInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1987,6 +2136,9 @@ export type SeasonParticipantCreateManySeasonInput = {
   resultCorrectedAt?: Date | string | null
   resultCorrectedReason?: string | null
   resultCorrectedByUserId?: string | null
+  finalQualified?: boolean | null
+  finalTradedInstrumentCount?: number | null
+  finalRecognizedTurnoverKrw?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -2014,6 +2166,9 @@ export type SeasonParticipantUpdateWithoutSeasonInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutSeasonParticipantsNestedInput
@@ -2046,6 +2201,9 @@ export type SeasonParticipantUncheckedUpdateWithoutSeasonInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2077,6 +2235,9 @@ export type SeasonParticipantUncheckedUpdateManyWithoutSeasonInput = {
   resultCorrectedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   resultCorrectedReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   resultCorrectedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  finalQualified?: Prisma.NullableBoolFieldUpdateOperationsInput | boolean | null
+  finalTradedInstrumentCount?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRecognizedTurnoverKrw?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2155,6 +2316,9 @@ export type SeasonParticipantSelect<ExtArgs extends runtime.Types.Extensions.Int
   resultCorrectedAt?: boolean
   resultCorrectedReason?: boolean
   resultCorrectedByUserId?: boolean
+  finalQualified?: boolean
+  finalTradedInstrumentCount?: boolean
+  finalRecognizedTurnoverKrw?: boolean
   tradingAccountId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -2191,6 +2355,9 @@ export type SeasonParticipantSelectCreateManyAndReturn<ExtArgs extends runtime.T
   resultCorrectedAt?: boolean
   resultCorrectedReason?: boolean
   resultCorrectedByUserId?: boolean
+  finalQualified?: boolean
+  finalTradedInstrumentCount?: boolean
+  finalRecognizedTurnoverKrw?: boolean
   tradingAccountId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -2223,6 +2390,9 @@ export type SeasonParticipantSelectUpdateManyAndReturn<ExtArgs extends runtime.T
   resultCorrectedAt?: boolean
   resultCorrectedReason?: boolean
   resultCorrectedByUserId?: boolean
+  finalQualified?: boolean
+  finalTradedInstrumentCount?: boolean
+  finalRecognizedTurnoverKrw?: boolean
   tradingAccountId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -2255,12 +2425,15 @@ export type SeasonParticipantSelectScalar = {
   resultCorrectedAt?: boolean
   resultCorrectedReason?: boolean
   resultCorrectedByUserId?: boolean
+  finalQualified?: boolean
+  finalTradedInstrumentCount?: boolean
+  finalRecognizedTurnoverKrw?: boolean
   tradingAccountId?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type SeasonParticipantOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonId" | "userId" | "joinedAt" | "participantStatus" | "initialCapitalKrw" | "totalAssetKrw" | "totalReturnRate" | "maxDrawdown" | "totalFillCount" | "currentRank" | "finalRank" | "finalTier" | "rewardGrantedAt" | "excludedAt" | "excludedReason" | "excludedByUserId" | "rankingHiddenAt" | "rankingHiddenReason" | "rankingHiddenByUserId" | "resultCorrectedAt" | "resultCorrectedReason" | "resultCorrectedByUserId" | "tradingAccountId" | "createdAt" | "updatedAt", ExtArgs["result"]["seasonParticipant"]>
+export type SeasonParticipantOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "seasonId" | "userId" | "joinedAt" | "participantStatus" | "initialCapitalKrw" | "totalAssetKrw" | "totalReturnRate" | "maxDrawdown" | "totalFillCount" | "currentRank" | "finalRank" | "finalTier" | "rewardGrantedAt" | "excludedAt" | "excludedReason" | "excludedByUserId" | "rankingHiddenAt" | "rankingHiddenReason" | "rankingHiddenByUserId" | "resultCorrectedAt" | "resultCorrectedReason" | "resultCorrectedByUserId" | "finalQualified" | "finalTradedInstrumentCount" | "finalRecognizedTurnoverKrw" | "tradingAccountId" | "createdAt" | "updatedAt", ExtArgs["result"]["seasonParticipant"]>
 export type SeasonParticipantInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   season?: boolean | Prisma.SeasonDefaultArgs<ExtArgs>
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -2315,6 +2488,16 @@ export type $SeasonParticipantPayload<ExtArgs extends runtime.Types.Extensions.I
     resultCorrectedAt: Date | null
     resultCorrectedReason: string | null
     resultCorrectedByUserId: string | null
+    /**
+     * Final-ranking eligibility confirmed by settlement at Season.endAt, written
+     * together (eligibility seasons only; NULL before settlement, on seasons
+     * without the rule, and for participants settlement does not rank).
+     * false never holds a finalRank/finalTier (SQL CHECK). It is not an
+     * exclusion: the season record and financial results are kept.
+     */
+    finalQualified: boolean | null
+    finalTradedInstrumentCount: number | null
+    finalRecognizedTurnoverKrw: runtime.Decimal | null
     tradingAccountId: string
     createdAt: Date
     updatedAt: Date
@@ -2770,6 +2953,9 @@ export interface SeasonParticipantFieldRefs {
   readonly resultCorrectedAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
   readonly resultCorrectedReason: Prisma.FieldRef<"SeasonParticipant", 'String'>
   readonly resultCorrectedByUserId: Prisma.FieldRef<"SeasonParticipant", 'String'>
+  readonly finalQualified: Prisma.FieldRef<"SeasonParticipant", 'Boolean'>
+  readonly finalTradedInstrumentCount: Prisma.FieldRef<"SeasonParticipant", 'Int'>
+  readonly finalRecognizedTurnoverKrw: Prisma.FieldRef<"SeasonParticipant", 'Decimal'>
   readonly tradingAccountId: Prisma.FieldRef<"SeasonParticipant", 'String'>
   readonly createdAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"SeasonParticipant", 'DateTime'>

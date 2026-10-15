@@ -748,6 +748,7 @@ Settled joined read model is implemented in the read-only MVP.
 - If multiple final ranking dates exist, Home selects the latest row by `rankingDate desc`, then `capturedAt desc`.
 - `totalParticipants` is counted from final ranking rows with the same `seasonId`, `rankType=final`, and selected `rankingDate`.
 - Missing final ranking returns `finalResult.state = unavailable` with `FINAL_RANKING_UNAVAILABLE`; Home does not use live valuation or participant aggregate fields as a fallback.
+- Exception (2026-10-15, [eligibility](season-final-ranking-eligibility.md)): a participant settlement confirmed as not qualified (`final_qualified = false`) returns `finalResult.state = unavailable`, `reason = FINAL_RANKING_NOT_QUALIFIED`, `qualified: false`, `rank: null`, its settled `totalAssetKrw/returnRate/maxDrawdown/totalFillCount` and `tradedInstrumentCount/recognizedTurnoverKrw`; `tier` and `reward` carry the same reason. This is a normal result, so no `sectionErrors` entry is added.
 - `finalTier` is assigned by the operator-run `final-tier-assignment` batch job from existing final rankings. Home does not calculate tiers and does not write during reads.
 - Missing `finalTier` returns `finalResult.tier.state = unavailable` with `FINAL_TIER_UNAVAILABLE`; existing `finalTier` is read only and returns `finalResult.tier.state = available`.
 - `rewardGrantedAt` is set only by the operator-run `reward-grant` marker batch job. Home does not grant rewards and does not write during reads.

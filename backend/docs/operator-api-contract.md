@@ -309,6 +309,7 @@ Success:
 Policy:
 
 - Only `ended` and `settled` seasons allow final result correction.
+- Season with a final-ranking eligibility rule: a non-null `finalRank` or `finalTier` requires the participant to be confirmed qualified by settlement (`final_qualified = true`); otherwise `409 FINAL_RANKING_QUALIFICATION_REQUIRED` and no final ranking row is created. This also refuses corrections on `ended` eligibility seasons (eligibility not yet confirmed). Clearing a tier (`finalTier: null`) is allowed ([eligibility](season-final-ranking-eligibility.md)).
 - Updates `season_participants.finalRank`, `season_participants.finalTier`, and `currentRank` when `finalRank` is supplied.
 - Updates the latest matching `season_rankings.rankType=final` row rank when present, or creates a final ranking row from current participant totals if a final row is missing and `finalRank` is supplied.
 - Rank conflicts return `FINAL_RANK_CONFLICT`; the existing unique rank policy is preserved.

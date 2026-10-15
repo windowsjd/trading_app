@@ -5044,6 +5044,8 @@ export const SeasonScalarFieldEnum = {
   tradeFeeRate: 'tradeFeeRate',
   fxFeeRate: 'fxFeeRate',
   rewardPolicyJson: 'rewardPolicyJson',
+  finalRankingMinTradedInstruments: 'finalRankingMinTradedInstruments',
+  finalRankingMinTurnoverRatio: 'finalRankingMinTurnoverRatio',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -5075,6 +5077,9 @@ export const SeasonParticipantScalarFieldEnum = {
   resultCorrectedAt: 'resultCorrectedAt',
   resultCorrectedReason: 'resultCorrectedReason',
   resultCorrectedByUserId: 'resultCorrectedByUserId',
+  finalQualified: 'finalQualified',
+  finalTradedInstrumentCount: 'finalTradedInstrumentCount',
+  finalRecognizedTurnoverKrw: 'finalRecognizedTurnoverKrw',
   tradingAccountId: 'tradingAccountId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -6428,20 +6433,6 @@ export type ListEnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<
 
 
 /**
- * Reference to a field of type 'ParticipantStatus'
- */
-export type EnumParticipantStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ParticipantStatus'>
-    
-
-
-/**
- * Reference to a field of type 'ParticipantStatus[]'
- */
-export type ListEnumParticipantStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ParticipantStatus[]'>
-    
-
-
-/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -6452,6 +6443,20 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'ParticipantStatus'
+ */
+export type EnumParticipantStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ParticipantStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'ParticipantStatus[]'
+ */
+export type ListEnumParticipantStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ParticipantStatus[]'>
     
 
 

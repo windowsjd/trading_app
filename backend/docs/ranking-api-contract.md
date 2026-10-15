@@ -335,6 +335,24 @@ BEFORE any delete and before any `participant.currentRank` update. A damaged set
 aborts the refresh with the codes above, and the damaged rows survive for the
 operator to repair. Only a clean set is replaced.
 
+## Final-ranking eligibility (2026-10-15)
+
+A season may require minimum trading activity for its FINAL ranking
+([full contract](season-final-ranking-eligibility.md)). Daily (provisional)
+rankings, tie-breaks and tier ratios are unchanged.
+
+- `rankType=final`: rows exist only for participants settlement confirmed as
+  qualified, ranked 1..N; `pagination.total`, percentile and the tier
+  denominator are over those N rows. `top10`/`friends` keep their rules.
+- `myRanking` of a participant without a final row because it did not qualify:
+  `{ "state": "unavailable", "reason": "FINAL_RANKING_NOT_QUALIFIED" }`.
+- A settled eligibility season in which nobody qualified (confirmed verdicts, no
+  final rows): `state: "unavailable"`, `reason: "NO_QUALIFIED_PARTICIPANTS"` —
+  a normal empty final result, distinct from `RANKING_UNAVAILABLE`.
+- New `GET /api/v1/ranking/qualification?seasonId=` returns the caller's own
+  eligibility (`provisional` while the season runs, `final` once settled). It
+  reads only the caller's account and never writes.
+
 ## Not Implemented
 
 - Ranking calculation in the API request path.

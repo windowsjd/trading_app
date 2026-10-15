@@ -231,6 +231,8 @@ export const SeasonScalarFieldEnum = {
   tradeFeeRate: 'tradeFeeRate',
   fxFeeRate: 'fxFeeRate',
   rewardPolicyJson: 'rewardPolicyJson',
+  finalRankingMinTradedInstruments: 'finalRankingMinTradedInstruments',
+  finalRankingMinTurnoverRatio: 'finalRankingMinTurnoverRatio',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -262,6 +264,9 @@ export const SeasonParticipantScalarFieldEnum = {
   resultCorrectedAt: 'resultCorrectedAt',
   resultCorrectedReason: 'resultCorrectedReason',
   resultCorrectedByUserId: 'resultCorrectedByUserId',
+  finalQualified: 'finalQualified',
+  finalTradedInstrumentCount: 'finalTradedInstrumentCount',
+  finalRecognizedTurnoverKrw: 'finalRecognizedTurnoverKrw',
   tradingAccountId: 'tradingAccountId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

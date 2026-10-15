@@ -6,6 +6,15 @@ import { STATUS_CODES } from 'node:http';
  * This catalog affects diagnostic projection, not public API codes or branching.
  */
 const SAFE_MESSAGES = new Set<string>([
+  // Season final-ranking eligibility evidence faults (2026-10-15).
+  'Season final ranking eligibility criteria are invalid.',
+  'An executed season fill has no execution time.',
+  'An executed season order has no positive executed amount.',
+  'An executed season order has an unsupported currency.',
+  'A USD season order has no execution-time USD/KRW evidence.',
+  'A USD season order references FX evidence that is not a positive USD/KRW rate.',
+  'A season Futures execution has no positive notional or leverage.',
+  'A season Futures execution has no USD/KRW evidence at or before its execution time.',
   // Fixed Futures Conditional Entry v1 product copy.
   'Futures conditional entries are currently disabled.',
   'Invalid Futures conditional entry.',

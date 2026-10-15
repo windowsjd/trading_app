@@ -22,6 +22,7 @@ import {
   requireSeasonRankingAccountScope,
 } from '../ranking/season-ranking-scope';
 import { toKstRankingDate } from '../ranking/ranking-date.policy';
+import { resolveSeasonFinalQualificationCriteria } from '../ranking/season-final-qualification';
 import { SeasonTradingAccountLinkIntegrityError } from '../seasons/season-trading-account-link';
 import { OperatorAuditService } from './operator-audit.service';
 import type { OperatorRequestContext } from './operator-account-management.service';
@@ -69,12 +70,16 @@ const MODERATED_PARTICIPANT_SELECT = {
   resultCorrectedAt: true,
   resultCorrectedReason: true,
   resultCorrectedByUserId: true,
+  finalQualified: true,
   updatedAt: true,
   season: {
     select: {
       id: true,
       status: true,
       endAt: true,
+      initialCapitalKrw: true,
+      finalRankingMinTradedInstruments: true,
+      finalRankingMinTurnoverRatio: true,
     },
   },
 } satisfies Prisma.SeasonParticipantSelect;
@@ -361,6 +366,11 @@ export class OperatorSeasonModerationService {
       return await this.prisma.$transaction(async (tx) => {
         const participant = await this.findParticipantOrThrow(tx, target);
         this.assertFinalResultCorrectionAllowed(participant);
+        this.assertFinalResultCorrectionQualified(
+          participant,
+          finalRank,
+          finalTier,
+        );
 
         const rankingBefore = await this.findLatestFinalRankingForParticipant(
           tx,
@@ -666,6 +676,36 @@ export class OperatorSeasonModerationService {
       HttpStatus.CONFLICT,
       'FINAL_RESULT_CORRECTION_NOT_ALLOWED',
       'Final result correction is allowed only for ended or settled seasons.',
+    );
+  }
+
+  /**
+   * Under a season eligibility rule a correction may adjust the rank or tier
+   * of a participant settlement confirmed as qualified, never grant one: a
+   * participant that did not qualify, or whose eligibility is not confirmed
+   * yet (season still `ended`), cannot be given a final rank, a tier, or the
+   * final ranking row a rank correction creates
+   * (docs/season-final-ranking-eligibility.md). Clearing a tier is allowed.
+   */
+  private assertFinalResultCorrectionQualified(
+    participant: ModeratedParticipant,
+    finalRank: number | undefined,
+    finalTier: string | null | undefined,
+  ) {
+    const grantsResult =
+      finalRank !== undefined ||
+      (finalTier !== undefined && finalTier !== null);
+    if (!grantsResult || participant.finalQualified === true) {
+      return;
+    }
+    if (!resolveSeasonFinalQualificationCriteria(participant.season)) {
+      return;
+    }
+
+    this.throwApiError(
+      HttpStatus.CONFLICT,
+      'FINAL_RANKING_QUALIFICATION_REQUIRED',
+      'Final rank and tier require a participant that met the season final ranking criteria.',
     );
   }
 

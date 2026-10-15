@@ -1392,6 +1392,165 @@ describe('SeasonSettlementJobService', () => {
   });
 });
 
+/**
+ * Final-ranking eligibility (docs/season-final-ranking-eligibility.md). The
+ * real-PostgreSQL behaviour (writes, constraints, races) is covered by
+ * scripts/season-final-qualification-integration.ts; these pin the routing.
+ */
+describe('SeasonSettlementJobService final-ranking eligibility', () => {
+  const settlementDate = '2026-05-21';
+
+  function mockEligibilitySeason(prisma: PrismaMock, status: SeasonStatus) {
+    mockSeason(prisma, status);
+    prisma.season.findUnique.mockResolvedValue({
+      id: 'season-1',
+      status,
+      startAt: new Date('2026-05-01T00:00:00.000Z'),
+      endAt: SEASON_END_AT,
+      initialCapitalKrw: new Prisma.Decimal('1000000'),
+      finalRankingMinTradedInstruments: 5,
+      finalRankingMinTurnoverRatio: new Prisma.Decimal('3'),
+    });
+  }
+
+  function withVerdicts(
+    prisma: PrismaMock,
+    verdicts: Record<string, boolean | null>,
+  ) {
+    prisma.seasonParticipant.findMany.mockResolvedValue(
+      Object.entries(verdicts).map(([id, finalQualified]) => ({
+        id,
+        userId: `user-of-${id}`,
+        totalFillCount: 0,
+        seasonId: 'season-1',
+        participantStatus: 'active',
+        finalQualified,
+        tradingAccountId: `account-of-${id}`,
+        tradingAccount: {
+          id: `account-of-${id}`,
+          mode: 'season',
+          status: 'active',
+          userId: `user-of-${id}`,
+        },
+      })),
+    );
+    accountParticipants = Object.entries(verdicts).map(
+      ([id, finalQualified]) => ({
+        ...accountParticipant(id, `user-of-${id}`),
+        finalQualified,
+      }),
+    );
+  }
+
+  it('dry-run judges every valued participant and ranks only the qualified ones', async () => {
+    const { service, prisma, futuresFinal } = createService();
+    mockEligibilitySeason(prisma, SeasonStatus.ended);
+    mockParticipants(prisma, [
+      { id: 'sp-1', userId: 'user-1' },
+      { id: 'sp-2', userId: 'user-2' },
+    ]);
+    mockExistingRankings(prisma, []);
+    mockSnapshots(prisma, [
+      snapshot('sp-1', 'user-1', '900000.00000000', '-10.00000000'),
+      snapshot('sp-2', 'user-2', '1300000.00000000', '30.00000000'),
+    ]);
+    // sp-1: five KRW instruments, exactly 300% of the initial capital.
+    prisma.order.findMany.mockImplementation(
+      (args: { where: { status?: string } }) =>
+        Promise.resolve(
+          args.where.status === 'executed'
+            ? ['a', 'b', 'c', 'd', 'e'].map((asset, index) => ({
+                id: `order-${asset}`,
+                tradingAccountId: 'account-of-sp-1',
+                assetId: `asset-${asset}`,
+                currencyCode: 'KRW',
+                grossAmount: new Prisma.Decimal(
+                  index === 0 ? '2600000' : '100000',
+                ),
+                fxRateSnapshot: null,
+              }))
+            : [],
+        ),
+    );
+    Object.assign(prisma, {
+      futuresExecution: { findMany: jest.fn().mockResolvedValue([]) },
+    });
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      settlementDate,
+      dryRun: true,
+    });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(futuresFinal.settleSeason).toHaveBeenCalledTimes(1);
+    expect(result.finalQualification.applied).toBe(true);
+    expect(result.finalQualification.minRecognizedTurnoverKrw).toBe(
+      '3000000.00000000',
+    );
+    expect(
+      `${result.finalQualification.evaluated}:${result.finalQualification.qualified}:${result.finalQualification.notQualified}`,
+    ).toBe('2:1:1');
+    expect(result.finalRankings.wouldCreate).toBe(1);
+    expect(result.finalSnapshots.wouldCreate).toBe(2);
+    // The higher return (sp-2) did not qualify: sp-1 is the only final rank.
+    expect(
+      result.topRanks
+        .map((row) => `${row.seasonParticipantId}:${row.rank}`)
+        .join(','),
+    ).toBe('sp-1:1');
+  });
+
+  it('refuses an ended eligibility season that already holds a final row', async () => {
+    const { service, prisma, futuresFinal } = createService();
+    mockEligibilitySeason(prisma, SeasonStatus.ended);
+    mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+    mockExistingRankings(prisma, [
+      existingRanking('ranking-1', 'sp-1', 'user-1', 1),
+    ]);
+
+    const response = await captureHttpExceptionResponse(
+      service.run({ seasonId: 'season-1', settlementDate }),
+    );
+
+    expect(response.error.code).toBe('FINAL_RESULTS_INTEGRITY');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(futuresFinal.settleSeason).not.toHaveBeenCalled();
+  });
+
+  it('refuses a settled eligibility season with an unconfirmed participant', async () => {
+    const { service, prisma } = createService();
+    mockEligibilitySeason(prisma, SeasonStatus.settled);
+    mockExistingRankings(prisma, []);
+    withVerdicts(prisma, { 'sp-1': false, 'sp-2': null });
+
+    const response = await captureHttpExceptionResponse(
+      service.run({ seasonId: 'season-1', settlementDate }),
+    );
+
+    expect(response.error.code).toBe('FINAL_RESULTS_INTEGRITY');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('replays a settled eligibility season whose confirmed final ranking is empty', async () => {
+    const { service, prisma } = createService();
+    mockEligibilitySeason(prisma, SeasonStatus.settled);
+    mockExistingRankings(prisma, []);
+    withVerdicts(prisma, { 'sp-1': false, 'sp-2': false });
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      settlementDate,
+    });
+
+    expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    expect(prisma.__tx.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(result.finalQualification.qualified).toBe(0);
+    expect(result.finalQualification.notQualified).toBe(2);
+    expect(result.season.updated).toBe(true);
+  });
+});
+
 function createService(portfolioValuationService?: {
   calculateTradingAccountValuation: jest.Mock;
 }) {

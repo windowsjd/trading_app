@@ -485,7 +485,11 @@ type InternalSettlement = {
     seasonId: string;
     settlementDate: Date;
     capturedAt: Date;
-    finalRows: readonly Record<string, unknown>[];
+    qualificationApplied: boolean;
+    fresh: {
+      finalRows: readonly Record<string, unknown>[];
+      unranked: readonly Record<string, unknown>[];
+    };
   }): Promise<unknown>;
 };
 /** The audit's reproduction shape: the internal final write with rows valued
@@ -522,7 +526,9 @@ function internalFinalWrite(
       seasonId: f.seasonId,
       settlementDate: new Date(`${dateOnly(f.endAt)}T00:00:00.000Z`),
       capturedAt: new Date(),
-      finalRows: rows,
+      // This season has no final-ranking eligibility rule: every row ranked.
+      qualificationApplied: false,
+      fresh: { finalRows: rows, unranked: [] },
     },
   );
 }

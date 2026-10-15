@@ -117,6 +117,13 @@ type SettledParticipant = {
   initialCapitalKrw: Prisma.Decimal;
   finalTier: string | null;
   rewardGrantedAt: Date | null;
+  finalQualified: boolean | null;
+  finalTradedInstrumentCount: number | null;
+  finalRecognizedTurnoverKrw: Prisma.Decimal | null;
+  totalAssetKrw: Prisma.Decimal;
+  totalReturnRate: Prisma.Decimal;
+  maxDrawdown: Prisma.Decimal;
+  totalFillCount: number;
 };
 
 const CURRENT_SEASON_STATUS_PRIORITY: readonly SeasonStatus[] = [
@@ -390,6 +397,13 @@ export class HomeService {
         tradingAccountId: true,
         finalTier: true,
         rewardGrantedAt: true,
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
       },
     });
 
@@ -482,6 +496,12 @@ export class HomeService {
       participant.id,
       participant.tradingAccountId,
     );
+    // Settlement confirmed this participant did not meet the season's final
+    // ranking criteria: a normal final result without rank or tier, not a
+    // ranking that is still missing (docs/season-final-ranking-eligibility.md).
+    if (!ranking && participant.finalQualified === false) {
+      return this.buildNotQualifiedFinalResult(participant, sectionErrors);
+    }
     const tier = this.buildFinalTier(participant, sectionErrors);
     const reward = this.buildRewardState(participant, sectionErrors);
 
@@ -535,6 +555,45 @@ export class HomeService {
       capturedAt: ranking.capturedAt.toISOString(),
       tier,
       reward,
+    };
+  }
+
+  private buildNotQualifiedFinalResult(
+    participant: SettledParticipant,
+    sectionErrors: SectionError[],
+  ) {
+    const reason = 'FINAL_RANKING_NOT_QUALIFIED';
+
+    return {
+      ...this.fallback(
+        'unavailable',
+        reason,
+        'The season final ranking criteria were not met; the final financial result is kept without a rank or tier.',
+      ),
+      qualified: false,
+      resultSource: 'season_participants',
+      rankType: SeasonRankingType.final,
+      rank: null,
+      totalAssetKrw: this.formatDecimal(participant.totalAssetKrw, 8),
+      returnRate: this.formatDecimal(participant.totalReturnRate, 8),
+      maxDrawdown: this.formatDecimal(participant.maxDrawdown, 8),
+      totalFillCount: participant.totalFillCount,
+      tradedInstrumentCount: participant.finalTradedInstrumentCount,
+      recognizedTurnoverKrw: participant.finalRecognizedTurnoverKrw
+        ? this.formatDecimal(participant.finalRecognizedTurnoverKrw, 8)
+        : null,
+      tier: this.fallback(
+        'unavailable',
+        reason,
+        'A final tier requires meeting the season final ranking criteria.',
+      ),
+      reward: participant.rewardGrantedAt
+        ? this.buildRewardState(participant, sectionErrors)
+        : this.fallback(
+            'unavailable',
+            reason,
+            'Final ranking rewards require meeting the season final ranking criteria.',
+          ),
     };
   }
 

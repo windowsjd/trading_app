@@ -8,7 +8,7 @@
 - Internal reward fulfillment operator/admin APIs are implemented. Fulfillment requests are queued separately from `SeasonReward` and create a `SeasonReward` only when fulfilled.
 - This contract covers in-app reward/badge/trophy history only.
 - Actual payment, points, coupon, gifticon, delivery, cash-out, and external fulfillment APIs are not implemented.
-- Reward payout completion is not a prerequisite for season `settled`; `settled` means final rank and final tier are fixed.
+- Reward payout completion is not a prerequisite for season `settled`; `settled` means final rank and final tier are fixed. Under a season final-ranking eligibility rule only qualified participants hold them; the others are settled without a rank or tier ([eligibility](season-final-ranking-eligibility.md)).
 - Reward type policy and reward catalog are future gates. `rewardCode`, `rewardName`, and `rewardValueJson` are the current extension bridge.
 
 ## Source Rules
@@ -130,6 +130,7 @@ Behavior:
 - Same `seasonParticipantId + rewardCode` request or existing `SeasonReward` returns `REWARD_FULFILLMENT_DUPLICATE`.
 - `seasonParticipantId` must belong to `seasonId`.
 - Target season must be `settled`.
+- Season with a final-ranking eligibility rule: the participant must be confirmed qualified (`final_qualified = true`) and hold a `finalRank`, otherwise `409 REWARD_QUALIFICATION_REQUIRED`. Re-checked inside the fulfill transaction (the request is then marked `failed`). Applies to every reward type, since no catalog marks a reward as rank-independent. Seasons without the rule are unchanged.
 - Target user must be `active`.
 - `rewardType` may be `internal`, `badge`, or `trophy`.
 - Reward catalog/policy validation is not performed in this gate.

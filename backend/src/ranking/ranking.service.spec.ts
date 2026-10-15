@@ -20,6 +20,9 @@ jest.mock('../generated/prisma/client', () => {
       excluded: 'excluded',
     },
     PrismaClient: class PrismaClient {},
+    // Read by the final-ranking eligibility measurement.
+    OrderStatus: { executed: 'executed' },
+    CurrencyCode: { KRW: 'KRW', USD: 'USD' },
     SeasonRankingType: {
       daily: 'daily',
       final: 'final',
@@ -359,6 +362,10 @@ describe('RankingService', () => {
         status: true,
         startAt: true,
         endAt: true,
+        // Final-ranking eligibility rule of the season (NULL = no rule).
+        initialCapitalKrw: true,
+        finalRankingMinTradedInstruments: true,
+        finalRankingMinTurnoverRatio: true,
       },
     });
     expect(prisma.seasonRanking.findFirst).toHaveBeenCalledWith(
@@ -880,6 +887,199 @@ describe('RankingService', () => {
       expect(response.data.state).toBe('unavailable');
       expect(response.data.reason).toBe('RANKING_UNAVAILABLE');
       expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+  /** Final-ranking eligibility (docs/season-final-ranking-eligibility.md). */
+  describe('final-ranking eligibility', () => {
+    const eligibilitySeason = (status: SeasonStatus) => ({
+      ...season,
+      status,
+      initialCapitalKrw: new Prisma.Decimal('1000000'),
+      finalRankingMinTradedInstruments: 5,
+      finalRankingMinTurnoverRatio: new Prisma.Decimal('3'),
+    });
+    const withReads = (prisma: ReturnType<typeof createPrisma>) =>
+      Object.assign(prisma, {
+        order: {
+          findMany: jest.fn().mockResolvedValue([]),
+          count: jest.fn().mockResolvedValue(0),
+        },
+        futuresExecution: { findMany: jest.fn().mockResolvedValue([]) },
+        $queryRaw: jest.fn().mockResolvedValue([]),
+      });
+    const participantWith = (overrides: Record<string, unknown> = {}) => ({
+      id: 'sp-2',
+      userId: 'user-2',
+      tradingAccountId: 'account-sp-2',
+      participantStatus: ParticipantStatus.finished,
+      rankingHiddenAt: null,
+      finalQualified: null,
+      finalTradedInstrumentCount: null,
+      finalRecognizedTurnoverKrw: null,
+      tradingAccount: { id: 'account-sp-2', mode: 'season', userId: 'user-2' },
+      ...overrides,
+    });
+
+    it('answers a settled season whose confirmed final ranking is empty as a normal result', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findUnique.mockResolvedValueOnce(
+        eligibilitySeason(SeasonStatus.settled),
+      );
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+        participantWith({ finalQualified: false }),
+      );
+      const count = jest
+        .fn()
+        .mockResolvedValueOnce(0) // qualified
+        .mockResolvedValueOnce(3); // confirmed not qualified
+      Object.assign(prisma.seasonParticipant, { count });
+
+      const response = await service.getRanking('user-2', {
+        seasonId: 'season-1',
+        rankType: 'final',
+      });
+
+      expect(response.data.state).toBe('unavailable');
+      expect(response.data.reason).toBe('NO_QUALIFIED_PARTICIPANTS');
+      expect(
+        'reason' in response.data.myRanking
+          ? response.data.myRanking.reason
+          : '',
+      ).toBe('FINAL_RANKING_NOT_QUALIFIED');
+      expectNoRankingWrites(prisma);
+    });
+
+    it('tells a participant without a final row that it did not qualify', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findUnique.mockResolvedValueOnce(
+        eligibilitySeason(SeasonStatus.settled),
+      );
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce({
+        rankingDate,
+        capturedAt,
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+        participantWith({ finalQualified: false }),
+      );
+      prisma.seasonRanking.count.mockResolvedValueOnce(1);
+      prisma.seasonRanking.findUnique.mockResolvedValueOnce(null);
+      mockRankingRows(prisma, [rankingRow(1)]);
+
+      const response = await service.getRanking('user-2', {
+        seasonId: 'season-1',
+        rankType: 'final',
+      });
+
+      expect(response.data.state).toBe('available');
+      expect(response.data.rankings).toHaveLength(1);
+      expect(
+        'reason' in response.data.myRanking
+          ? response.data.myRanking.reason
+          : '',
+      ).toBe('FINAL_RANKING_NOT_QUALIFIED');
+    });
+
+    it('reports a season without criteria as not applicable', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findUnique.mockResolvedValueOnce({
+        ...season,
+        initialCapitalKrw: new Prisma.Decimal('1000000'),
+        finalRankingMinTradedInstruments: null,
+        finalRankingMinTurnoverRatio: null,
+      });
+
+      const response = await service.getFinalQualification('user-2', {
+        seasonId: 'season-1',
+      });
+
+      expect(response.data.state).toBe('not_applicable');
+      expect(response.data.qualified === null).toBe(true);
+      expect(prisma.seasonParticipant.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('reports a non-participant as not joined', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findUnique.mockResolvedValueOnce(
+        eligibilitySeason(SeasonStatus.active),
+      );
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+
+      const response = await service.getFinalQualification('user-9', {
+        seasonId: 'season-1',
+      });
+
+      expect(response.data.state).toBe('not_joined');
+    });
+
+    it('measures an active season provisionally from the caller account only, without writing', async () => {
+      const { prisma, service } = createService();
+      withReads(prisma);
+      prisma.season.findUnique.mockResolvedValueOnce(
+        eligibilitySeason(SeasonStatus.active),
+      );
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+        participantWith({ participantStatus: ParticipantStatus.active }),
+      );
+
+      const response = await service.getFinalQualification('user-2', {
+        seasonId: 'season-1',
+      });
+
+      expect(response.data.state).toBe('available');
+      expect(response.data.basis).toBe('provisional');
+      expect(response.data.qualified).toBe(false);
+      expect(response.data.remainingTradedInstrumentCount).toBe(5);
+      expect(response.data.remainingRecognizedTurnoverKrw).toBe(
+        '3000000.00000000',
+      );
+      const reads = (
+        prisma as unknown as {
+          order: { findMany: jest.Mock };
+        }
+      ).order.findMany.mock.calls as Array<
+        [{ where: { tradingAccountId: { in: string[] } } }]
+      >;
+      expect(reads).toHaveLength(1);
+      expect(reads[0][0].where.tradingAccountId.in.join(',')).toBe(
+        'account-sp-2',
+      );
+      expectNoRankingWrites(prisma);
+    });
+
+    it('returns the confirmed verdict of a settled season and fails closed when it is missing', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findUnique
+        .mockResolvedValueOnce(eligibilitySeason(SeasonStatus.settled))
+        .mockResolvedValueOnce(eligibilitySeason(SeasonStatus.settled));
+      prisma.seasonParticipant.findUnique
+        .mockResolvedValueOnce(
+          participantWith({
+            finalQualified: true,
+            finalTradedInstrumentCount: 6,
+            finalRecognizedTurnoverKrw: new Prisma.Decimal('3100000'),
+          }),
+        )
+        .mockResolvedValueOnce(participantWith());
+
+      const confirmed = await service.getFinalQualification('user-2', {
+        seasonId: 'season-1',
+      });
+      expect(
+        `${confirmed.data.basis}:${confirmed.data.qualified}:${confirmed.data.tradedInstrumentCount}:${confirmed.data.recognizedTurnoverKrw}`,
+      ).toBe('final:true:6:3100000.00000000');
+      expect(confirmed.data.asOf).toBe(endAt.toISOString());
+
+      let code = 'NO_ERROR';
+      try {
+        await service.getFinalQualification('user-2', { seasonId: 'season-1' });
+      } catch (error) {
+        code = (
+          (error as HttpException).getResponse() as { error: { code: string } }
+        ).error.code;
+      }
+      expect(code).toBe('FINAL_RESULTS_INTEGRITY');
     });
   });
 });

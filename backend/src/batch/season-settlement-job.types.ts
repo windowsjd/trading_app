@@ -67,6 +67,20 @@ export type SeasonSettlementJobAccountSummary = {
   wouldClose: number;
 };
 
+/**
+ * Final-ranking eligibility (docs/season-final-ranking-eligibility.md).
+ * `applied: false` is a season without a rule: every eligible participant is
+ * ranked and the counts stay 0. `evaluated` = qualified + notQualified.
+ */
+export type SeasonSettlementJobFinalQualificationSummary = {
+  applied: boolean;
+  minTradedInstrumentCount: number | null;
+  minRecognizedTurnoverKrw: string | null;
+  evaluated: number;
+  qualified: number;
+  notQualified: number;
+};
+
 export type SeasonSettlementJobTopRank = {
   seasonParticipantId: string;
   userId: string;
@@ -92,6 +106,7 @@ export type SeasonSettlementJobResult = {
   finalSnapshots: SeasonSettlementJobFinalSnapshotSummary;
   finalRankings: SeasonSettlementJobFinalRankingSummary;
   finalTiers: SeasonSettlementJobFinalTierSummary;
+  finalQualification: SeasonSettlementJobFinalQualificationSummary;
   seasonAccounts: SeasonSettlementJobAccountSummary;
   createdFinalSnapshotIds: string[];
   updatedFinalSnapshotIds: string[];

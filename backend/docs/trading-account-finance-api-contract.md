@@ -28,6 +28,16 @@ ranking or allocation is explicitly unavailable; contradictory final evidence
 fails with `TRADING_ACCOUNT_INTEGRITY`. GET never repairs or revalues final data.
 Active Seasons and General accounts retain their existing live contract.
 
+A participant settlement confirmed as NOT meeting the season's final-ranking
+eligibility (2026-10-15, [eligibility](season-final-ranking-eligibility.md)) has
+no final ranking row. Its portfolio is still `state: available` with
+`finalResult.state: not_qualified`, `reason: FINAL_RANKING_NOT_QUALIFIED`,
+`resultSource: season_participants` (the settled participant totals), `rank: null`,
+`tier: null`, `reachedReturnAt: null`, `tradedInstrumentCount`,
+`recognizedTurnoverKrw`, `endAt` and `capturedAt` (settlement snapshot, nullable).
+Allocation comes from the latest settlement EquitySnapshot; one that disagrees with
+the settled totals fails with `TRADING_ACCOUNT_INTEGRITY`.
+
 ## Status
 
 - Implemented (2026-08-03, 작업 4):

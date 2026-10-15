@@ -509,17 +509,25 @@ model TradingAccount {
 }
 
 model Season {
-  id                String       @id @default(uuid())
-  name              String
-  status            SeasonStatus
-  startAt           DateTime     @map("start_at")
-  endAt             DateTime     @map("end_at")
-  initialCapitalKrw Decimal      @map("initial_capital_krw") @db.Decimal(24, 8)
-  tradeFeeRate      Decimal      @map("trade_fee_rate") @db.Decimal(10, 6)
-  fxFeeRate         Decimal      @map("fx_fee_rate") @db.Decimal(10, 6)
-  rewardPolicyJson  Json?        @map("reward_policy_json")
-  createdAt         DateTime     @default(now()) @map("created_at")
-  updatedAt         DateTime     @updatedAt @map("updated_at")
+  id                               String       @id @default(uuid())
+  name                             String
+  status                           SeasonStatus
+  startAt                          DateTime     @map("start_at")
+  endAt                            DateTime     @map("end_at")
+  initialCapitalKrw                Decimal      @map("initial_capital_krw") @db.Decimal(24, 8)
+  tradeFeeRate                     Decimal      @map("trade_fee_rate") @db.Decimal(10, 6)
+  fxFeeRate                        Decimal      @map("fx_fee_rate") @db.Decimal(10, 6)
+  rewardPolicyJson                 Json?        @map("reward_policy_json")
+  /// Final-ranking eligibility (docs/season-final-ranking-eligibility.md).
+  /// Both NULL = no rule: every normal participant is ranked, as before.
+  /// Both set = only participants with at least this many distinct traded
+  /// instruments AND recognized turnover >= initialCapitalKrw × ratio
+  /// (3 = 300%) enter the final ranking. SQL CHECK: both or neither, positive.
+  /// A trigger freezes them once the season has left `upcoming`.
+  finalRankingMinTradedInstruments Int?         @map("final_ranking_min_traded_instruments")
+  finalRankingMinTurnoverRatio     Decimal?     @map("final_ranking_min_turnover_ratio") @db.Decimal(10, 4)
+  createdAt                        DateTime     @default(now()) @map("created_at")
+  updatedAt                        DateTime     @updatedAt @map("updated_at")
 
   participants              SeasonParticipant[]
   seasonRankings            SeasonRanking[]
@@ -533,35 +541,43 @@ model Season {
 }
 
 model SeasonParticipant {
-  id                      String            @id @default(uuid())
-  seasonId                String            @map("season_id")
-  userId                  String            @map("user_id")
-  joinedAt                DateTime          @map("joined_at")
-  participantStatus       ParticipantStatus @default(registered) @map("participant_status")
-  initialCapitalKrw       Decimal           @map("initial_capital_krw") @db.Decimal(24, 8)
-  totalAssetKrw           Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
-  totalReturnRate         Decimal           @map("total_return_rate") @db.Decimal(12, 8)
-  maxDrawdown             Decimal           @map("max_drawdown") @db.Decimal(12, 8)
-  totalFillCount          Int               @default(0) @map("total_fill_count")
-  currentRank             Int?              @map("current_rank")
-  finalRank               Int?              @map("final_rank")
-  finalTier               String?           @map("final_tier")
-  rewardGrantedAt         DateTime?         @map("reward_granted_at")
-  excludedAt              DateTime?         @map("excluded_at")
-  excludedReason          String?           @map("excluded_reason")
-  excludedByUserId        String?           @map("excluded_by_user_id")
-  rankingHiddenAt         DateTime?         @map("ranking_hidden_at")
-  rankingHiddenReason     String?           @map("ranking_hidden_reason")
-  rankingHiddenByUserId   String?           @map("ranking_hidden_by_user_id")
-  resultCorrectedAt       DateTime?         @map("result_corrected_at")
-  resultCorrectedReason   String?           @map("result_corrected_reason")
-  resultCorrectedByUserId String?           @map("result_corrected_by_user_id")
+  id                         String            @id @default(uuid())
+  seasonId                   String            @map("season_id")
+  userId                     String            @map("user_id")
+  joinedAt                   DateTime          @map("joined_at")
+  participantStatus          ParticipantStatus @default(registered) @map("participant_status")
+  initialCapitalKrw          Decimal           @map("initial_capital_krw") @db.Decimal(24, 8)
+  totalAssetKrw              Decimal           @map("total_asset_krw") @db.Decimal(24, 8)
+  totalReturnRate            Decimal           @map("total_return_rate") @db.Decimal(12, 8)
+  maxDrawdown                Decimal           @map("max_drawdown") @db.Decimal(12, 8)
+  totalFillCount             Int               @default(0) @map("total_fill_count")
+  currentRank                Int?              @map("current_rank")
+  finalRank                  Int?              @map("final_rank")
+  finalTier                  String?           @map("final_tier")
+  rewardGrantedAt            DateTime?         @map("reward_granted_at")
+  excludedAt                 DateTime?         @map("excluded_at")
+  excludedReason             String?           @map("excluded_reason")
+  excludedByUserId           String?           @map("excluded_by_user_id")
+  rankingHiddenAt            DateTime?         @map("ranking_hidden_at")
+  rankingHiddenReason        String?           @map("ranking_hidden_reason")
+  rankingHiddenByUserId      String?           @map("ranking_hidden_by_user_id")
+  resultCorrectedAt          DateTime?         @map("result_corrected_at")
+  resultCorrectedReason      String?           @map("result_corrected_reason")
+  resultCorrectedByUserId    String?           @map("result_corrected_by_user_id")
+  /// Final-ranking eligibility confirmed by settlement at Season.endAt, written
+  /// together (eligibility seasons only; NULL before settlement, on seasons
+  /// without the rule, and for participants settlement does not rank).
+  /// false never holds a finalRank/finalTier (SQL CHECK). It is not an
+  /// exclusion: the season record and financial results are kept.
+  finalQualified             Boolean?          @map("final_qualified")
+  finalTradedInstrumentCount Int?              @map("final_traded_instrument_count")
+  finalRecognizedTurnoverKrw Decimal?          @map("final_recognized_turnover_krw") @db.Decimal(24, 8)
   // Canonical financial-account ownership link. Every season participant has
   // exactly one season-mode TradingAccount; season state remains here while
   // wallets/orders/positions/FX/snapshots are owned by that account.
-  tradingAccountId        String            @unique @map("trading_account_id")
-  createdAt               DateTime          @default(now()) @map("created_at")
-  updatedAt               DateTime          @updatedAt @map("updated_at")
+  tradingAccountId           String            @unique @map("trading_account_id")
+  createdAt                  DateTime          @default(now()) @map("created_at")
+  updatedAt                  DateTime          @updatedAt @map("updated_at")
 
   season                    Season                     @relation(fields: [seasonId], references: [id], onDelete: Cascade)
   user                      User                       @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -2,7 +2,10 @@ import { Controller, Get, Query, Req } from '@nestjs/common';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { RankingService } from './ranking.service';
-import type { RankingQuery } from './ranking.service';
+import type {
+  RankingQualificationQuery,
+  RankingQuery,
+} from './ranking.service';
 
 type AuthenticatedRequest = Request & {
   user?: {
@@ -31,6 +34,23 @@ export class RankingController {
     query: RankingQuery,
   ) {
     return this.rankingService.getRanking(this.extractUserId(request), query);
+  }
+
+  /** The caller's own final-ranking eligibility (read-only). */
+  @Get('qualification')
+  getFinalQualification(
+    @Req() request: AuthenticatedRequest,
+    @Query(
+      new ScalarQueryPipe({
+        seasonId: 'VALIDATION_ERROR',
+      } satisfies Record<keyof RankingQualificationQuery, string>),
+    )
+    query: RankingQualificationQuery,
+  ) {
+    return this.rankingService.getFinalQualification(
+      this.extractUserId(request),
+      query,
+    );
   }
 
   private extractUserId(request: AuthenticatedRequest) {

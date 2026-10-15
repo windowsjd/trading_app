@@ -10,6 +10,68 @@
 
 ---
 
+## 2026-10-15 Trading Class 시즌 최종 랭킹 참여 자격 도입 (백엔드 계약)
+
+- 시작 `main`=`origin/main`=`8191f72c`, clean. main checkout에서 branch 없이 작업. commit·push·배포·운영 DB 변경 없음(미커밋 인계).
+  기준 문서: [season-final-ranking-eligibility.md](backend/docs/season-final-ranking-eligibility.md). 랭킹 탭 경고 UI는 별도 4번 작업.
+- **기능 구현 의도:** 최종 순위·보상은 "시즌 동안 실제로 운용한 결과"여야 한다. 한두 번 거래 후 방치하거나
+  수익 직후 거래를 멈춘 계정이 끝까지 운용한 참가자보다 앞서지 않게 한다.
+  - 선물은 `명목가치 ÷ 레버리지`를 인정한다. 레버리지로 부풀린 명목가치가 아니라 투입 자본 기준으로 현물과 같은 의미로 합산하기 위해서다.
+  - 시즌 중 잠정 순위·티어는 그대로 둔다. 기준은 최종 확정 조건이고, 진행 중에는 동기부여 장치를 유지하며 남은 조건을 API로 보여준다.
+  - 자격 미달은 제재(`excluded`)가 아니다. 참가 기록·성과·`finished` 상태를 유지하고 순위만 주지 않는다.
+  - 적격자 0명이어도 금융 정산(평가·스냅샷·계정 종료)을 끝낸다. 시즌 계정이 열려 남는 것이 더 큰 무결성 문제이기 때문이다.
+- **정책:** 시즌 행의 `final_ranking_min_traded_instruments`/`final_ranking_min_turnover_ratio`로 지정한다.
+  - 둘 다 NULL이면 기준 없음이다. 기존 시즌·2099 개발 시즌 모두 해당하고 소급 적용하지 않는다.
+  - 첫 출시 시즌 값은 5종목·300%다. 최소 거래대금은 `initialCapitalKrw × 비율`로 계산하고 절대 금액은 저장하지 않는다.
+  - 기준 금액과 정확히 같으면 충족이다. 시즌이 `upcoming`을 벗어나면 기준을 바꿀 수 없다(트리거).
+- **계산:** 기간은 `[startAt, endAt)`이고, 계정 ID와 참가자 관계를 함께 걸어 다른 계정·다른 시즌의 체결이 섞이지 않게 한다.
+  - 종목 수: 현물 `assetId` + 선물 `instrumentId`. BTC 현물과 BTC 선물은 2종목이다.
+  - 현물 인정액: `executed` 주문의 실제 `grossAmount`(매수·매도, 부분 체결은 체결분만).
+  - 선물 인정액: `futures_executions`의 `notional ÷ leverage`. 강제청산과 시즌 종료 정산은 별도 테이블이라 처음부터 제외된다.
+  - 수수료·환전·미체결 주문은 계산에 들어가지 않는다.
+  - 합산은 원시 Decimal로 하고, 저장·판정은 8자리 half-up으로 한다.
+- **환율 근거:** 현물 USD 주문은 체결 시점에 고정된 `fxRateSnapshotId`(실행 시 60초 이내 provider 환율)를 쓴다. 조사 결과 누락된 USD 체결 경로는 없지만 DB 제약은 없다.
+  - 선물 체결에는 FX가 저장되지 않는다. 그래서 시즌 정산과 같은 규칙(provider 우선순위 → 승인 admin_manual)을 체결 시각에 적용하고, 그 시각까지 **수집된** 증거만 쓴다(`findUsdKrwRatesAtOrBefore`, LATERAL 인덱스 조회).
+  - FX 증거가 없거나 모순이면 미달로 처리하지 않는다. `RANKING_QUALIFICATION_*`(500)로 정산을 멈추고 아무것도 쓰지 않는다.
+  - 선물 체결 테이블에 FX 컬럼을 추가하는 방안은 체결 핫패스를 바꾸고 과거 체결에는 쓸모가 없어 채택하지 않았다.
+- **정산:** 평가 뒤 전원을 판정하고, 적격자만 기존 정렬로 1..N 순위를 매긴다. 티어 모수는 적격자 수이고 비율(4·11·23·40·70·100%)은 그대로다.
+  - 미달자도 같은 트랜잭션에서 정산 스냅샷, 확정 재무값, 판정(`final_qualified/final_traded_instrument_count/final_recognized_turnover_krw`), `finished`, 계정 종료를 받는다. `currentRank`는 NULL로 비운다.
+  - 0명이면 빈 최종 랭킹으로 정상 `settled`가 된다. 재실행·티어 잡은 저장된 판정으로 정상 빈 결과임을 검증하고, 판정이 없으면 손상으로 실패한다.
+  - 정산 중 참가자가 바뀌면 기존처럼 `SETTLEMENT_PARTICIPANTS_CHANGED`로 실패한다. `ended` 시즌에 최종 행이나 판정이 이미 있으면 `FINAL_RESULTS_INTEGRITY`.
+- **우회 차단:** 미달자·미확정 참가자에 대해 다음 경로를 막는다.
+  - 운영자 최종 결과 보정: 409 `FINAL_RANKING_QUALIFICATION_REQUIRED`. 미확정(`ended`) 시즌도 막는다.
+  - 보상 지급 생성·지급: 409 `REWARD_QUALIFICATION_REQUIRED`. 지급 트랜잭션 안에서 재확인한다. 카탈로그가 없어 모든 보상 유형에 적용한다.
+  - 관리자 CLI의 `--rank-type final`: 거부한다.
+  - 티어 잡: 최종 행 집합이 적격자 집합과 다르면 `FINAL_RESULTS_INTEGRITY`.
+  - DB: CHECK가 미달자의 순위·티어를 막는다.
+  - 감사(`repair-ranking-scope`): 정상 미달자는 오탐하지 않고, `UNQUALIFIED_PARTICIPANT_HAS_FINAL_RANKING`과 `SETTLED_SEASON_FINAL_QUALIFICATION_MISSING`을 탐지한다.
+- **API(`/api/v1`, 하위 호환 추가):**
+  - 신규 `GET /ranking/qualification`: 본인 기준. 상태는 `provisional`/`final`이고 `remaining*`·`*RequirementMet`를 제공해 프런트가 금액을 계산하지 않게 한다.
+  - `/ranking?rankType=final`: `FINAL_RANKING_NOT_QUALIFIED`(myRanking), `NO_QUALIFIED_PARTICIPANTS`(0명).
+  - 정산 계정 포트폴리오: `finalResult.state: not_qualified`와 확정 재무값·자산 비중.
+  - `/home`, 기록 4종: `finalQualified`를 추가하고, 미달자에게는 일별 잠정 순위로 대체하지 않는다.
+  - 현재 앱은 새 값을 몰라도 깨지지 않지만, 미달자에게 "최종 결과 조회 불가/랭킹 생성 대기" 문구가 보인다. 4번 작업에서 처리한다.
+- **DB:** 추가형 migration `20261015120000_add_season_final_ranking_eligibility`(컬럼 5개, NULL-safe CHECK 3개, 트리거 1개, 기존 행 변경 없음).
+  - CHECK는 처음에 NULL 비교 때문에 반쪽 설정을 통과시키는 결함이 있었다. 통합 테스트로 발견해 `IS NOT NULL`을 명시하는 방식으로 수정했다.
+  - 운영 DB에는 적용하지 않았다. Render는 main push 시 build 단계에서 migrate하므로 배포 승인 전 확인이 필요하다.
+- **기타 변경:** TC-D01 러너(`season-settlement-exclusion-race-integration.ts`)가 호출하는 내부 정산 메서드의 인자 형태가 바뀌어 맞췄다. 의미는 그대로다.
+  - 기존 테스트 기대값 보강: 랭킹·홈 select 고정값, 보상 지급 테스트의 트랜잭션 내 조회 목. 검증 의미는 바꾸지 않았다.
+- **검증:**
+  - backend typecheck/build/lint:accounts/candles lint·format, 진단 게이트 PASS, `git diff --check` clean.
+  - unit 303 suites·4,872 tests 통과(99 skip = DB 옵트인). 신규 단위: 자격 모듈 34, 정산 4, 티어 5, 랭킹 6, 운영자 4, 보상 2, 홈 1, 스키마 계약 7.
+  - e2e 407(env 없는 사본에서 `env -i`로 실행).
+  - 격리 PG16(127.0.0.1:55617, `*_test`): 신규 자격 러너 11/11, TC-D01 13/13, 코어 계정 CI 목록 24/25. 실패 1개는 `general-account-fx`의 `FX_RATE_UNAVAILABLE`로, 시각이 WSL 시계 변경 시점과 일치하고 단독 재실행에서 통과했다(환경 기인).
+  - 금융 CI 목록 25/27. 실패 2개(`futures-f3` `FUTURES_FINAL_SETTLEMENT_INTEGRITY`, `futures` F1 `FUTURES_INSTRUMENT_UNVERIFIED`)는 WSL 시계 후퇴 시각과 1초 이내로 일치했다.
+    f3는 새 DB 단독 재실행에서 통과했다(시즌 정산 잡 경로 포함). F1은 시계 변경 직후 시작한 구간에서 통과했고, 수정 전 HEAD 사본도 실행 중 시계가 바뀌면 같은 방식으로 실패했다(환경 기인).
+  - 수리·감사 도구 dry-run 0건, 빈 DB에서 migration 체인·드리프트 없음.
+- **주의/미검증:**
+  - 운영 규모 성능은 실측하지 않았다(정산은 계정 50개 배치, 선물 FX는 체결 시각별 인덱스 조회).
+  - 실제 출시 시즌 생성과 정산은 수행하지 않았다(설정 SQL은 기준 문서 §9).
+  - USD 현물 주문의 FX 고정을 강제하는 DB CHECK는 없다(코드 경로만 보장).
+  - 게이트 밖 spec lint: 기존 스펙 2개에 파일 관용구(`data: expect.objectContaining`)와 같은 `no-unsafe-assignment` 2건이 늘었다.
+    HEAD부터 포맷이 어긋난 `it.each` 블록 안에서 prettier 2건도 늘었다. 신규 파일과 운영 코드는 HEAD 대비 증가 0건이다.
+  - 4번 UI는 미구현이고, Android/iOS 실기기는 해당 없음.
+
 ## 2026-10-14 일반·초보모드 수익률 계산 정책 변경 (TWR → 누적 투자원금 대비)
 
 - 시작 `main`=`origin/main`=`e5110c0f`, clean. main checkout에서 branch 없이 작업. commit·push·배포·운영 DB 변경 없음(미커밋 인계).

@@ -473,6 +473,9 @@ export async function auditRankingAndSettlement(
     `,
   );
 
+  // A participant settlement confirmed as NOT qualified for the final ranking
+  // (final_qualified = false, eligibility seasons only) has no final row by
+  // design (docs/season-final-ranking-eligibility.md).
   await add(
     'ELIGIBLE_PARTICIPANT_FINAL_RANKING_MISSING',
     'eligible participant(s) of a settled season have no final ranking row.',
@@ -482,10 +485,37 @@ export async function auditRankingAndSettlement(
       JOIN "seasons" s ON s."id" = sp."season_id"
       WHERE s."status" = 'settled'
         AND sp."participant_status" IN ('active', 'finished', 'rewarded')
+        AND sp."final_qualified" IS NOT FALSE
         AND NOT EXISTS (
           SELECT 1 FROM "season_rankings" sr
           WHERE sr."season_participant_id" = sp."id" AND sr."rank_type" = 'final'
         )
+    `,
+  );
+
+  await add(
+    'UNQUALIFIED_PARTICIPANT_HAS_FINAL_RANKING',
+    'participant(s) that did not meet the final ranking criteria hold a final ranking row.',
+    prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "season_participants" sp
+      JOIN "season_rankings" sr ON sr."season_participant_id" = sp."id"
+      WHERE sp."final_qualified" = false
+        AND sr."rank_type" = 'final'
+    `,
+  );
+
+  await add(
+    'SETTLED_SEASON_FINAL_QUALIFICATION_MISSING',
+    'eligible participant(s) of a settled season with final ranking criteria have no confirmed eligibility.',
+    prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "season_participants" sp
+      JOIN "seasons" s ON s."id" = sp."season_id"
+      WHERE s."status" = 'settled'
+        AND s."final_ranking_min_traded_instruments" IS NOT NULL
+        AND sp."participant_status" IN ('active', 'finished', 'rewarded')
+        AND sp."final_qualified" IS NULL
     `,
   );
 

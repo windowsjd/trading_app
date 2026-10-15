@@ -833,6 +833,97 @@ describe('FinalTierAssignmentJobService', () => {
   });
 });
 
+/** Final-ranking eligibility (docs/season-final-ranking-eligibility.md). */
+describe('FinalTierAssignmentJobService final-ranking eligibility', () => {
+  const rankingDate = '2026-05-21';
+
+  function mockEligibilitySeason(prisma: PrismaMock) {
+    prisma.season.findUnique.mockResolvedValue({
+      id: 'season-1',
+      status: SeasonStatus.settled,
+      initialCapitalKrw: new Prisma.Decimal('1000000'),
+      finalRankingMinTradedInstruments: 5,
+      finalRankingMinTurnoverRatio: new Prisma.Decimal('3'),
+    });
+  }
+
+  function withVerdicts(verdicts: Record<string, boolean | null>) {
+    mockSeasonAccountParticipants(
+      Object.entries(verdicts).map(([id, finalQualified]) => ({
+        ...seasonAccountParticipant(id, `user-of-${id}`),
+        finalQualified,
+      })),
+    );
+  }
+
+  it('completes with nothing to assign when nobody qualified', async () => {
+    const { service, prisma } = createService();
+    mockEligibilitySeason(prisma);
+    prisma.seasonRanking.findMany.mockResolvedValue([]);
+    withVerdicts({ 'sp-1': false, 'sp-2': false });
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      rankingDate,
+    });
+
+    expect(result.reason).toBe('NO_QUALIFIED_PARTICIPANTS');
+    expect(result.participants.totalFinalRanked).toBe(0);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('uses the qualified participants as the tier denominator', async () => {
+    const { service, prisma } = createService();
+    mockEligibilitySeason(prisma);
+    prisma.seasonRanking.findMany.mockResolvedValue([
+      finalRanking('sp-1', 'user-of-sp-1', 1),
+      finalRanking('sp-2', 'user-of-sp-2', 2),
+    ]);
+    withVerdicts({ 'sp-1': true, 'sp-2': true, 'sp-3': false, 'sp-4': false });
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      rankingDate,
+    });
+
+    expect(
+      result.topAssignments
+        .map((row) => `${row.seasonParticipantId}:${row.finalTier}`)
+        .join(','),
+    ).toBe('sp-1:master,sp-2:silver');
+  });
+
+  it.each([
+    [
+      'a final row for a participant that did not qualify',
+      { 'sp-1': true, 'sp-2': false },
+    ],
+    [
+      'a qualified participant without a final row',
+      { 'sp-1': true, 'sp-2': true, 'sp-3': true },
+    ],
+    [
+      'an eligible participant without a verdict',
+      { 'sp-1': true, 'sp-2': null },
+    ],
+  ])('refuses %s', async (_label, verdicts) => {
+    const { service, prisma } = createService();
+    mockEligibilitySeason(prisma);
+    prisma.seasonRanking.findMany.mockResolvedValue([
+      finalRanking('sp-1', 'user-of-sp-1', 1),
+      finalRanking('sp-2', 'user-of-sp-2', 2),
+    ]);
+    withVerdicts(verdicts);
+
+    const response = await captureHttpExceptionResponse(
+      service.run({ seasonId: 'season-1', rankingDate }),
+    );
+
+    expect(response.error.code).toBe('FINAL_RESULTS_INTEGRITY');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
 function createService() {
   const prisma = createPrismaMock();
   const batchService = createBatchServiceMock(BATCH_STARTED_AT);

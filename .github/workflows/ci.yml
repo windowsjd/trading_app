@@ -321,6 +321,9 @@ jobs:
       # TC-D01: final settlement and participant exclusion serialize on the
       # season row; a stale pre-lock participant set is never published.
       SEASON_SETTLEMENT_RACE_DB_INTEGRATION: "1"
+      # Season final-ranking eligibility: only qualified participants are
+      # ranked, everyone is settled, missing FX/fill evidence fails closed.
+      SEASON_FINAL_QUALIFICATION_DB_INTEGRATION: "1"
       # Feature flags the account-scoped suites assert THROUGH; they gate
       # product behaviour, not the tests.
       LIMIT_ORDER_ENABLED: "true"
@@ -382,6 +385,7 @@ jobs:
           src/ranking/season-ranking-scope.integration.spec.ts
           src/ranking/ranking-consistency.integration.spec.ts
           src/batch/season-settlement-exclusion-race.integration.spec.ts
+          src/ranking/season-final-qualification.integration.spec.ts
           src/friends/friends.integration.spec.ts
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts

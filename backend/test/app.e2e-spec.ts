@@ -4087,6 +4087,11 @@ describe('AppController (e2e)', () => {
     ['GET /api/v1/me', 'get', '/api/v1/me'],
     ['GET /api/v1/home', 'get', '/api/v1/home'],
     ['GET /api/v1/ranking', 'get', '/api/v1/ranking'],
+    [
+      'GET /api/v1/ranking/qualification',
+      'get',
+      '/api/v1/ranking/qualification',
+    ],
     ['GET /api/v1/wallets', 'get', '/api/v1/wallets'],
     ['GET /api/v1/assets', 'get', '/api/v1/assets'],
     ['GET /api/v1/positions', 'get', '/api/v1/positions'],

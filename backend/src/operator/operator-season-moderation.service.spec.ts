@@ -809,4 +809,91 @@ describe('OperatorSeasonModerationService', () => {
       }),
     );
   });
+
+  /** Final-ranking eligibility (docs/season-final-ranking-eligibility.md). */
+  describe('final-ranking eligibility', () => {
+    const eligibilitySeason = (status: SeasonStatus) => ({
+      id: 'season-1',
+      status,
+      endAt: new Date('2026-06-20T00:00:00.000Z'),
+      initialCapitalKrw: '1000000',
+      finalRankingMinTradedInstruments: 5,
+      finalRankingMinTurnoverRatio: '3',
+    });
+
+    it.each([
+      ['a final rank', { finalRank: 1 }],
+      ['a final tier', { finalTier: 'master' }],
+    ])(
+      'refuses to give a participant that did not qualify %s',
+      async (_label, body) => {
+        const { prisma, service } = createService();
+        prisma.seasonParticipant.findFirst.mockResolvedValueOnce({
+          ...createParticipant(),
+          season: eligibilitySeason(SeasonStatus.settled),
+          finalQualified: false,
+        });
+
+        await expectErrorCode(
+          service.correctFinalResult(actor, 'season-1', 'sp-1', {
+            ...body,
+            reason: 'manual_review_adjustment',
+          }),
+          'FINAL_RANKING_QUALIFICATION_REQUIRED',
+        );
+        expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
+        expect(prisma.seasonRanking.update).not.toHaveBeenCalled();
+        expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+        expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              errorCode: 'FINAL_RANKING_QUALIFICATION_REQUIRED',
+            }),
+          }),
+        );
+      },
+    );
+
+    it('refuses a rank before settlement confirmed eligibility', async () => {
+      const { prisma, service } = createService();
+      prisma.seasonParticipant.findFirst.mockResolvedValueOnce({
+        ...createParticipant(),
+        season: eligibilitySeason(SeasonStatus.ended),
+        finalQualified: null,
+      });
+
+      await expectErrorCode(
+        service.correctFinalResult(actor, 'season-1', 'sp-1', {
+          finalRank: 1,
+          reason: 'manual_review_adjustment',
+        }),
+        'FINAL_RANKING_QUALIFICATION_REQUIRED',
+      );
+      expect(prisma.seasonRanking.create).not.toHaveBeenCalled();
+    });
+
+    it('still corrects a qualified participant', async () => {
+      const { prisma, service } = createService();
+      prisma.seasonParticipant.findFirst.mockResolvedValueOnce({
+        ...createParticipant(),
+        season: eligibilitySeason(SeasonStatus.settled),
+        finalQualified: true,
+      });
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      prisma.seasonParticipant.update.mockResolvedValueOnce({
+        ...createParticipant(),
+        finalTier: 'gold',
+        updatedAt: now,
+      });
+
+      const response = await service.correctFinalResult(
+        actor,
+        'season-1',
+        'sp-1',
+        { finalTier: 'gold', reason: 'manual_review_adjustment' },
+      );
+
+      expect(response.data.finalTier).toBe('gold');
+    });
+  });
 });

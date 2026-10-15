@@ -30,12 +30,16 @@ export type SeasonAvgAggregateOutputType = {
   initialCapitalKrw: runtime.Decimal | null
   tradeFeeRate: runtime.Decimal | null
   fxFeeRate: runtime.Decimal | null
+  finalRankingMinTradedInstruments: number | null
+  finalRankingMinTurnoverRatio: runtime.Decimal | null
 }
 
 export type SeasonSumAggregateOutputType = {
   initialCapitalKrw: runtime.Decimal | null
   tradeFeeRate: runtime.Decimal | null
   fxFeeRate: runtime.Decimal | null
+  finalRankingMinTradedInstruments: number | null
+  finalRankingMinTurnoverRatio: runtime.Decimal | null
 }
 
 export type SeasonMinAggregateOutputType = {
@@ -47,6 +51,8 @@ export type SeasonMinAggregateOutputType = {
   initialCapitalKrw: runtime.Decimal | null
   tradeFeeRate: runtime.Decimal | null
   fxFeeRate: runtime.Decimal | null
+  finalRankingMinTradedInstruments: number | null
+  finalRankingMinTurnoverRatio: runtime.Decimal | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -60,6 +66,8 @@ export type SeasonMaxAggregateOutputType = {
   initialCapitalKrw: runtime.Decimal | null
   tradeFeeRate: runtime.Decimal | null
   fxFeeRate: runtime.Decimal | null
+  finalRankingMinTradedInstruments: number | null
+  finalRankingMinTurnoverRatio: runtime.Decimal | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -74,6 +82,8 @@ export type SeasonCountAggregateOutputType = {
   tradeFeeRate: number
   fxFeeRate: number
   rewardPolicyJson: number
+  finalRankingMinTradedInstruments: number
+  finalRankingMinTurnoverRatio: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -84,12 +94,16 @@ export type SeasonAvgAggregateInputType = {
   initialCapitalKrw?: true
   tradeFeeRate?: true
   fxFeeRate?: true
+  finalRankingMinTradedInstruments?: true
+  finalRankingMinTurnoverRatio?: true
 }
 
 export type SeasonSumAggregateInputType = {
   initialCapitalKrw?: true
   tradeFeeRate?: true
   fxFeeRate?: true
+  finalRankingMinTradedInstruments?: true
+  finalRankingMinTurnoverRatio?: true
 }
 
 export type SeasonMinAggregateInputType = {
@@ -101,6 +115,8 @@ export type SeasonMinAggregateInputType = {
   initialCapitalKrw?: true
   tradeFeeRate?: true
   fxFeeRate?: true
+  finalRankingMinTradedInstruments?: true
+  finalRankingMinTurnoverRatio?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -114,6 +130,8 @@ export type SeasonMaxAggregateInputType = {
   initialCapitalKrw?: true
   tradeFeeRate?: true
   fxFeeRate?: true
+  finalRankingMinTradedInstruments?: true
+  finalRankingMinTurnoverRatio?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -128,6 +146,8 @@ export type SeasonCountAggregateInputType = {
   tradeFeeRate?: true
   fxFeeRate?: true
   rewardPolicyJson?: true
+  finalRankingMinTradedInstruments?: true
+  finalRankingMinTurnoverRatio?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -229,6 +249,8 @@ export type SeasonGroupByOutputType = {
   tradeFeeRate: runtime.Decimal
   fxFeeRate: runtime.Decimal
   rewardPolicyJson: runtime.JsonValue | null
+  finalRankingMinTradedInstruments: number | null
+  finalRankingMinTurnoverRatio: runtime.Decimal | null
   createdAt: Date
   updatedAt: Date
   _count: SeasonCountAggregateOutputType | null
@@ -266,6 +288,8 @@ export type SeasonWhereInput = {
   tradeFeeRate?: Prisma.DecimalFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.JsonNullableFilter<"Season">
+  finalRankingMinTradedInstruments?: Prisma.IntNullableFilter<"Season"> | number | null
+  finalRankingMinTurnoverRatio?: Prisma.DecimalNullableFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   participants?: Prisma.SeasonParticipantListRelationFilter
@@ -287,6 +311,8 @@ export type SeasonOrderByWithRelationInput = {
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
   rewardPolicyJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   participants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
@@ -311,6 +337,8 @@ export type SeasonWhereUniqueInput = Prisma.AtLeast<{
   tradeFeeRate?: Prisma.DecimalFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.JsonNullableFilter<"Season">
+  finalRankingMinTradedInstruments?: Prisma.IntNullableFilter<"Season"> | number | null
+  finalRankingMinTurnoverRatio?: Prisma.DecimalNullableFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"Season"> | Date | string
   participants?: Prisma.SeasonParticipantListRelationFilter
@@ -332,6 +360,8 @@ export type SeasonOrderByWithAggregationInput = {
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
   rewardPolicyJson?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrderInput | Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.SeasonCountOrderByAggregateInput
@@ -354,6 +384,8 @@ export type SeasonScalarWhereWithAggregatesInput = {
   tradeFeeRate?: Prisma.DecimalWithAggregatesFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalWithAggregatesFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.JsonNullableWithAggregatesFilter<"Season">
+  finalRankingMinTradedInstruments?: Prisma.IntNullableWithAggregatesFilter<"Season"> | number | null
+  finalRankingMinTurnoverRatio?: Prisma.DecimalNullableWithAggregatesFilter<"Season"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Season"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"Season"> | Date | string
 }
@@ -368,6 +400,8 @@ export type SeasonCreateInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -389,6 +423,8 @@ export type SeasonUncheckedCreateInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -410,6 +446,8 @@ export type SeasonUpdateInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -431,6 +469,8 @@ export type SeasonUncheckedUpdateInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -452,6 +492,8 @@ export type SeasonCreateManyInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -466,6 +508,8 @@ export type SeasonUpdateManyMutationInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -480,6 +524,8 @@ export type SeasonUncheckedUpdateManyInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -494,6 +540,8 @@ export type SeasonCountOrderByAggregateInput = {
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
   rewardPolicyJson?: Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -502,6 +550,8 @@ export type SeasonAvgOrderByAggregateInput = {
   initialCapitalKrw?: Prisma.SortOrder
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrder
 }
 
 export type SeasonMaxOrderByAggregateInput = {
@@ -513,6 +563,8 @@ export type SeasonMaxOrderByAggregateInput = {
   initialCapitalKrw?: Prisma.SortOrder
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -526,6 +578,8 @@ export type SeasonMinOrderByAggregateInput = {
   initialCapitalKrw?: Prisma.SortOrder
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -534,6 +588,8 @@ export type SeasonSumOrderByAggregateInput = {
   initialCapitalKrw?: Prisma.SortOrder
   tradeFeeRate?: Prisma.SortOrder
   fxFeeRate?: Prisma.SortOrder
+  finalRankingMinTradedInstruments?: Prisma.SortOrder
+  finalRankingMinTurnoverRatio?: Prisma.SortOrder
 }
 
 export type SeasonScalarRelationFilter = {
@@ -543,6 +599,22 @@ export type SeasonScalarRelationFilter = {
 
 export type EnumSeasonStatusFieldUpdateOperationsInput = {
   set?: $Enums.SeasonStatus
+}
+
+export type NullableIntFieldUpdateOperationsInput = {
+  set?: number | null
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
+}
+
+export type NullableDecimalFieldUpdateOperationsInput = {
+  set?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  increment?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  decrement?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  multiply?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  divide?: runtime.Decimal | runtime.DecimalJsLike | number | string
 }
 
 export type SeasonCreateNestedOneWithoutParticipantsInput = {
@@ -653,6 +725,8 @@ export type SeasonCreateWithoutParticipantsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonRankings?: Prisma.SeasonRankingCreateNestedManyWithoutSeasonInput
@@ -673,6 +747,8 @@ export type SeasonUncheckedCreateWithoutParticipantsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   seasonRankings?: Prisma.SeasonRankingUncheckedCreateNestedManyWithoutSeasonInput
@@ -709,6 +785,8 @@ export type SeasonUpdateWithoutParticipantsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonRankings?: Prisma.SeasonRankingUpdateManyWithoutSeasonNestedInput
@@ -729,6 +807,8 @@ export type SeasonUncheckedUpdateWithoutParticipantsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   seasonRankings?: Prisma.SeasonRankingUncheckedUpdateManyWithoutSeasonNestedInput
@@ -749,6 +829,8 @@ export type SeasonCreateWithoutUserBadgesInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -769,6 +851,8 @@ export type SeasonUncheckedCreateWithoutUserBadgesInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -805,6 +889,8 @@ export type SeasonUpdateWithoutUserBadgesInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -825,6 +911,8 @@ export type SeasonUncheckedUpdateWithoutUserBadgesInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -845,6 +933,8 @@ export type SeasonCreateWithoutSeasonRewardsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -865,6 +955,8 @@ export type SeasonUncheckedCreateWithoutSeasonRewardsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -901,6 +993,8 @@ export type SeasonUpdateWithoutSeasonRewardsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -921,6 +1015,8 @@ export type SeasonUncheckedUpdateWithoutSeasonRewardsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -941,6 +1037,8 @@ export type SeasonCreateWithoutRewardFulfillmentRequestsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -961,6 +1059,8 @@ export type SeasonUncheckedCreateWithoutRewardFulfillmentRequestsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -997,6 +1097,8 @@ export type SeasonUpdateWithoutRewardFulfillmentRequestsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -1017,6 +1119,8 @@ export type SeasonUncheckedUpdateWithoutRewardFulfillmentRequestsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -1037,6 +1141,8 @@ export type SeasonCreateWithoutSeasonRankingsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -1057,6 +1163,8 @@ export type SeasonUncheckedCreateWithoutSeasonRankingsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -1093,6 +1201,8 @@ export type SeasonUpdateWithoutSeasonRankingsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -1113,6 +1223,8 @@ export type SeasonUncheckedUpdateWithoutSeasonRankingsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -1133,6 +1245,8 @@ export type SeasonCreateWithoutFuturesFinalPricesInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -1153,6 +1267,8 @@ export type SeasonUncheckedCreateWithoutFuturesFinalPricesInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -1189,6 +1305,8 @@ export type SeasonUpdateWithoutFuturesFinalPricesInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -1209,6 +1327,8 @@ export type SeasonUncheckedUpdateWithoutFuturesFinalPricesInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -1229,6 +1349,8 @@ export type SeasonCreateWithoutFuturesFinalSettlementsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantCreateNestedManyWithoutSeasonInput
@@ -1249,6 +1371,8 @@ export type SeasonUncheckedCreateWithoutFuturesFinalSettlementsInput = {
   tradeFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate: runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: number | null
+  finalRankingMinTurnoverRatio?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   participants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutSeasonInput
@@ -1285,6 +1409,8 @@ export type SeasonUpdateWithoutFuturesFinalSettlementsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUpdateManyWithoutSeasonNestedInput
@@ -1305,6 +1431,8 @@ export type SeasonUncheckedUpdateWithoutFuturesFinalSettlementsInput = {
   tradeFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   fxFeeRate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   rewardPolicyJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  finalRankingMinTradedInstruments?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
+  finalRankingMinTurnoverRatio?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   participants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutSeasonNestedInput
@@ -1410,6 +1538,8 @@ export type SeasonSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   tradeFeeRate?: boolean
   fxFeeRate?: boolean
   rewardPolicyJson?: boolean
+  finalRankingMinTradedInstruments?: boolean
+  finalRankingMinTurnoverRatio?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   participants?: boolean | Prisma.Season$participantsArgs<ExtArgs>
@@ -1432,6 +1562,8 @@ export type SeasonSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   tradeFeeRate?: boolean
   fxFeeRate?: boolean
   rewardPolicyJson?: boolean
+  finalRankingMinTradedInstruments?: boolean
+  finalRankingMinTurnoverRatio?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["season"]>
@@ -1446,6 +1578,8 @@ export type SeasonSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   tradeFeeRate?: boolean
   fxFeeRate?: boolean
   rewardPolicyJson?: boolean
+  finalRankingMinTradedInstruments?: boolean
+  finalRankingMinTurnoverRatio?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }, ExtArgs["result"]["season"]>
@@ -1460,11 +1594,13 @@ export type SeasonSelectScalar = {
   tradeFeeRate?: boolean
   fxFeeRate?: boolean
   rewardPolicyJson?: boolean
+  finalRankingMinTradedInstruments?: boolean
+  finalRankingMinTurnoverRatio?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type SeasonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "status" | "startAt" | "endAt" | "initialCapitalKrw" | "tradeFeeRate" | "fxFeeRate" | "rewardPolicyJson" | "createdAt" | "updatedAt", ExtArgs["result"]["season"]>
+export type SeasonOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "status" | "startAt" | "endAt" | "initialCapitalKrw" | "tradeFeeRate" | "fxFeeRate" | "rewardPolicyJson" | "finalRankingMinTradedInstruments" | "finalRankingMinTurnoverRatio" | "createdAt" | "updatedAt", ExtArgs["result"]["season"]>
 export type SeasonInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   participants?: boolean | Prisma.Season$participantsArgs<ExtArgs>
   seasonRankings?: boolean | Prisma.Season$seasonRankingsArgs<ExtArgs>
@@ -1499,6 +1635,16 @@ export type $SeasonPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     tradeFeeRate: runtime.Decimal
     fxFeeRate: runtime.Decimal
     rewardPolicyJson: runtime.JsonValue | null
+    /**
+     * Final-ranking eligibility (docs/season-final-ranking-eligibility.md).
+     * Both NULL = no rule: every normal participant is ranked, as before.
+     * Both set = only participants with at least this many distinct traded
+     * instruments AND recognized turnover >= initialCapitalKrw × ratio
+     * (3 = 300%) enter the final ranking. SQL CHECK: both or neither, positive.
+     * A trigger freezes them once the season has left `upcoming`.
+     */
+    finalRankingMinTradedInstruments: number | null
+    finalRankingMinTurnoverRatio: runtime.Decimal | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["season"]>
@@ -1940,6 +2086,8 @@ export interface SeasonFieldRefs {
   readonly tradeFeeRate: Prisma.FieldRef<"Season", 'Decimal'>
   readonly fxFeeRate: Prisma.FieldRef<"Season", 'Decimal'>
   readonly rewardPolicyJson: Prisma.FieldRef<"Season", 'Json'>
+  readonly finalRankingMinTradedInstruments: Prisma.FieldRef<"Season", 'Int'>
+  readonly finalRankingMinTurnoverRatio: Prisma.FieldRef<"Season", 'Decimal'>
   readonly createdAt: Prisma.FieldRef<"Season", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"Season", 'DateTime'>
 }

@@ -1,4 +1,10 @@
 jest.mock('../generated/prisma/client', () => ({
+  // Decimal for the final-ranking eligibility rule of a season.
+  Prisma: {
+    Decimal: jest.requireActual<typeof import('@prisma/client/runtime/client')>(
+      '@prisma/client/runtime/client',
+    ).Decimal,
+  },
   BadgeType: {
     tier_badge: 'tier_badge',
     ranker_trophy: 'ranker_trophy',
@@ -216,6 +222,19 @@ describe('RewardFulfillmentService', () => {
     prisma.seasonReward.findUnique.mockResolvedValueOnce(
       options.existingReward ?? null,
     );
+  };
+
+  // fulfill() re-reads the target's final-ranking eligibility inside the
+  // reward transaction. These seasons carry no eligibility rule, so the
+  // existing behaviour applies unchanged.
+  const noEligibilityRuleTarget = {
+    finalQualified: null,
+    finalRank: null,
+    season: {
+      initialCapitalKrw: '10000000.00000000',
+      finalRankingMinTradedInstruments: null,
+      finalRankingMinTurnoverRatio: null,
+    },
   };
 
   const expectHttpError = async (
@@ -437,11 +456,13 @@ describe('RewardFulfillmentService', () => {
       id: 'target-user-1',
       status: UserStatus.active,
     });
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
-      id: 'participant-1',
-      seasonId: 'season-1',
-      userId: 'target-user-1',
-    });
+    prisma.seasonParticipant.findUnique
+      .mockResolvedValueOnce({
+        id: 'participant-1',
+        seasonId: 'season-1',
+        userId: 'target-user-1',
+      })
+      .mockResolvedValueOnce(noEligibilityRuleTarget);
     prisma.seasonReward.findUnique
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null);
@@ -540,11 +561,13 @@ describe('RewardFulfillmentService', () => {
       id: 'target-user-1',
       status: UserStatus.active,
     });
-    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
-      id: 'participant-1',
-      seasonId: 'season-1',
-      userId: 'target-user-1',
-    });
+    prisma.seasonParticipant.findUnique
+      .mockResolvedValueOnce({
+        id: 'participant-1',
+        seasonId: 'season-1',
+        userId: 'target-user-1',
+      })
+      .mockResolvedValueOnce(noEligibilityRuleTarget);
     prisma.seasonReward.findUnique.mockResolvedValueOnce(null);
     prisma.rewardFulfillmentRequest.updateMany.mockResolvedValueOnce({
       count: 1,
@@ -784,5 +807,84 @@ describe('RewardFulfillmentService', () => {
       HttpStatus.FORBIDDEN,
       'OPERATOR_REQUIRED',
     );
+  });
+
+  /** Final-ranking eligibility (docs/season-final-ranking-eligibility.md). */
+  describe('final-ranking eligibility', () => {
+    const eligibilityRule = {
+      initialCapitalKrw: '10000000.00000000',
+      finalRankingMinTradedInstruments: 5,
+      finalRankingMinTurnoverRatio: '3.0000',
+    };
+
+    it('refuses to queue a reward for a participant that did not qualify', async () => {
+      const { prisma, service } = createService();
+      prisma.rewardFulfillmentRequest.findUnique.mockResolvedValueOnce(null);
+      prisma.season.findUnique.mockResolvedValueOnce({
+        id: 'season-1',
+        status: SeasonStatus.settled,
+        ...eligibilityRule,
+      });
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+        id: 'participant-1',
+        seasonId: 'season-1',
+        userId: 'target-user-1',
+        finalQualified: false,
+        finalRank: null,
+        user: { id: 'target-user-1', status: UserStatus.active },
+      });
+
+      await expectHttpError(
+        service.createFulfillment(operatorActor, createBody),
+        HttpStatus.CONFLICT,
+        'REWARD_QUALIFICATION_REQUIRED',
+      );
+      expect(prisma.rewardFulfillmentRequest.create).not.toHaveBeenCalled();
+    });
+
+    it('re-checks eligibility inside the reward transaction and records the failure', async () => {
+      const { prisma, service } = createService();
+      prisma.rewardFulfillmentRequest.findUnique.mockResolvedValueOnce(
+        fulfillmentRecord(),
+      );
+      prisma.season.findUnique.mockResolvedValueOnce({
+        id: 'season-1',
+        status: SeasonStatus.settled,
+      });
+      prisma.user.findUnique.mockResolvedValueOnce({
+        id: 'target-user-1',
+        status: UserStatus.active,
+      });
+      prisma.seasonParticipant.findUnique
+        .mockResolvedValueOnce({
+          id: 'participant-1',
+          seasonId: 'season-1',
+          userId: 'target-user-1',
+        })
+        .mockResolvedValueOnce({
+          finalQualified: false,
+          finalRank: null,
+          season: eligibilityRule,
+        });
+      prisma.seasonReward.findUnique.mockResolvedValueOnce(null);
+      prisma.rewardFulfillmentRequest.updateMany.mockResolvedValueOnce({
+        count: 1,
+      });
+
+      await expectHttpError(
+        service.fulfill(operatorActor, 'fulfillment-1'),
+        HttpStatus.CONFLICT,
+        'REWARD_QUALIFICATION_REQUIRED',
+      );
+      expect(prisma.seasonReward.create).not.toHaveBeenCalled();
+      expect(prisma.rewardFulfillmentRequest.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: RewardFulfillmentStatus.failed,
+            errorCode: 'REWARD_QUALIFICATION_REQUIRED',
+          }),
+        }),
+      );
+    });
   });
 });

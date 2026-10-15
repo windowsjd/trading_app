@@ -41,6 +41,13 @@ import {
   SEASON_RANKING_SCOPE_SELECT,
 } from '../ranking/season-ranking-scope';
 import { lockSeasonForWriteOrThrow } from '../ranking/season-write-lock';
+import {
+  evaluateFinalQualification,
+  minRecognizedTurnoverKrwAtMoneyScale,
+  readSeasonTradingActivity,
+  resolveSeasonFinalQualificationCriteria,
+  type SeasonFinalQualificationCriteria,
+} from '../ranking/season-final-qualification';
 import { BatchService } from './batch.service';
 import {
   SEASON_SETTLEMENT_JOB_NAME,
@@ -73,6 +80,7 @@ type SettlementParticipant = {
   seasonId: string;
   userId: string;
   totalFillCount: number;
+  finalQualified: boolean | null;
   tradingAccountId: string;
   tradingAccount: {
     id: string;
@@ -84,7 +92,22 @@ type SettlementParticipant = {
 type SettlementSeason = {
   id: string;
   status: SeasonStatus;
+  startAt: Date;
   endAt: Date;
+  initialCapitalKrw: Prisma.Decimal;
+  finalRankingMinTradedInstruments: number | null;
+  finalRankingMinTurnoverRatio: Prisma.Decimal | null;
+};
+
+/**
+ * The eligibility one participant ends the settlement with: written beside the
+ * participant's final financial result, and the authority a replay of a
+ * settled season is checked against (docs/season-final-ranking-eligibility.md).
+ */
+type FinalQualificationEvidence = {
+  qualified: boolean;
+  tradedInstrumentCount: number;
+  recognizedTurnoverKrw: string;
 };
 
 type EquityHistoryPoint = {
@@ -112,6 +135,8 @@ type FinalValuation = Partial<FuturesValuationComponents> & {
 type FinalRankingRow = FinalValuation & {
   rank: number;
   finalTier: string;
+  /** Eligibility seasons only: the verdict that admitted this row. */
+  qualification?: FinalQualificationEvidence;
 };
 
 type ExistingFinalRankingRow = {
@@ -151,6 +176,21 @@ type SettlementFinalResultExpectation = {
   returnRate: Prisma.Decimal | string;
   maxDrawdown: Prisma.Decimal | string;
   totalFillCount: number;
+  /** First settlement of an eligibility season only. */
+  qualification?: FinalQualificationEvidence;
+};
+
+/**
+ * A participant valued at endAt that did not meet the season's eligibility
+ * rule: its financial result is final like everyone else's, but it holds no
+ * final rank, tier or ranking row.
+ */
+type SettlementUnrankedExpectation = {
+  seasonParticipantId: string;
+  totalAssetKrw: string;
+  returnRate: string;
+  maxDrawdown: string;
+  qualification: FinalQualificationEvidence;
 };
 
 /**
@@ -166,6 +206,7 @@ type SettlementAccountParticipant = {
   id: string;
   userId: string;
   participantStatus: ParticipantStatus;
+  finalQualified: boolean | null;
   tradingAccountId: string;
   tradingAccount: {
     id: string;
@@ -229,6 +270,8 @@ export class SeasonSettlementJobService {
     const season = await this.findSeasonOrThrow(seasonId);
 
     this.assertSeasonStatusAllowed(season.status);
+    // NULL = the season has no eligibility rule: everyone eligible is ranked.
+    const criteria = resolveSeasonFinalQualificationCriteria(season);
     await this.assertNoOpenLimitReservations(seasonId);
 
     const participants = await this.findEligibleParticipants(seasonId);
@@ -240,6 +283,7 @@ export class SeasonSettlementJobService {
       participantsTotal: participants.length,
       snapshotted: 0,
       missingSnapshots: participants.length,
+      criteria,
     });
 
     if (participants.length === 0) {
@@ -265,17 +309,34 @@ export class SeasonSettlementJobService {
 
     // §A-5: a settled season's results are already fixed. Anything other than
     // "a complete final ranking is present" is a data-integrity fault, NEVER a
-    // reason to compute a new one.
+    // reason to compute a new one. With an eligibility rule, "complete" means
+    // every eligible participant carries its confirmed eligibility and the
+    // ranking covers exactly the qualified ones (possibly none).
     if (season.status === SeasonStatus.settled) {
       this.assertSettledSeasonFinalResultsPresent({
         seasonId,
         settlementDateText,
         participants,
         existingFinalRankings,
+        qualificationApplied: criteria !== null,
       });
     }
 
-    if (existingFinalRankings.length > 0) {
+    // An eligibility season's final result is written only by the settlement
+    // that confirms eligibility, atomically with `settled`. A final row or a
+    // confirmed eligibility on an `ended` season came from somewhere else.
+    if (criteria && season.status === SeasonStatus.ended) {
+      this.assertNoFinalResultsBeforeQualification({
+        seasonId,
+        participants,
+        existingFinalRankings,
+      });
+    }
+
+    if (
+      existingFinalRankings.length > 0 ||
+      (criteria && season.status === SeasonStatus.settled)
+    ) {
       await this.futuresFinal.assertNoOpen(seasonId);
       return this.handleExistingFinalRankings({
         season,
@@ -283,6 +344,7 @@ export class SeasonSettlementJobService {
         settlementDateText,
         participants,
         existingFinalRankings,
+        qualificationApplied: criteria !== null,
         dryRun,
         result,
       });
@@ -323,7 +385,28 @@ export class SeasonSettlementJobService {
       );
     });
 
-    const finalRows = this.buildFinalRankingRows(finalValuations);
+    // Eligibility is measured from the season's fills, not from the final
+    // exit above (a Season final exit is never a `futures_executions` row).
+    // Every valued participant gets a verdict; only the qualified are ranked.
+    const qualification = criteria
+      ? await this.evaluateFinalQualifications({
+          season,
+          criteria,
+          participantScopes,
+        })
+      : null;
+    const isRanked = (valuation: FinalValuation) =>
+      !qualification ||
+      qualification.get(valuation.seasonParticipantId)?.qualified === true;
+    const finalRows = this.buildFinalRankingRows(
+      finalValuations.filter(isRanked),
+    ).map((row) => ({
+      ...row,
+      qualification: qualification?.get(row.seasonParticipantId),
+    }));
+    const unrankedValuations = finalValuations.filter(
+      (valuation) => !isRanked(valuation),
+    );
     result.participants.snapshotted = finalValuations.length;
     result.participants.missingSnapshots = Math.max(
       participants.length - finalValuations.length,
@@ -332,6 +415,11 @@ export class SeasonSettlementJobService {
     result.finalRankings.wouldCreate = finalRows.length;
     result.finalSnapshots.wouldCreate = finalValuations.length;
     result.finalTiers.wouldAssign = finalRows.length;
+    if (qualification) {
+      result.finalQualification.evaluated = qualification.size;
+      result.finalQualification.qualified = finalRows.length;
+      result.finalQualification.notQualified = unrankedValuations.length;
+    }
     result.topRanks = finalRows
       .slice(0, TOP_RANKS_LIMIT)
       .map((row) => this.formatFinalRankingRow(row));
@@ -367,7 +455,14 @@ export class SeasonSettlementJobService {
       seasonId,
       settlementDate,
       capturedAt,
-      finalRows,
+      qualificationApplied: criteria !== null,
+      fresh: {
+        finalRows,
+        unranked: unrankedValuations.map((valuation) => ({
+          valuation,
+          qualification: qualification!.get(valuation.seasonParticipantId)!,
+        })),
+      },
     });
 
     result.finalSnapshots.created = writeResult.createdFinalSnapshotIds.length;
@@ -386,7 +481,9 @@ export class SeasonSettlementJobService {
     result.seasonAccounts.closed = writeResult.closedTradingAccountIds.length;
     result.season.updated = writeResult.seasonUpdated;
     result.message =
-      'Season settlement completed through final ranking, final tier assignment, and season account closure. Rewards remain pending.';
+      finalRows.length === 0
+        ? 'Season settlement completed; no participant met the final ranking eligibility criteria, so the final ranking is empty. Every account was valued and closed.'
+        : 'Season settlement completed through final ranking, final tier assignment, and season account closure. Rewards remain pending.';
 
     return result;
   }
@@ -399,7 +496,11 @@ export class SeasonSettlementJobService {
       select: {
         id: true,
         status: true,
+        startAt: true,
         endAt: true,
+        initialCapitalKrw: true,
+        finalRankingMinTradedInstruments: true,
+        finalRankingMinTurnoverRatio: true,
       },
     });
 
@@ -454,6 +555,7 @@ export class SeasonSettlementJobService {
     settlementDateText: string;
     participants: readonly SettlementParticipant[];
     existingFinalRankings: readonly ExistingFinalRankingRow[];
+    qualificationApplied: boolean;
   }): void {
     const fail = (detail: string): never =>
       this.throwJobError(
@@ -462,7 +564,27 @@ export class SeasonSettlementJobService {
         `Season ${input.seasonId} is already settled but ${detail}. A settled season's final result is never recomputed from current wallets or prices; investigate and restore the final ranking instead of re-running settlement.`,
       );
 
-    if (input.existingFinalRankings.length === 0) {
+    if (input.qualificationApplied) {
+      const unconfirmed = input.participants.filter(
+        (participant) => !hasVerdict(participant),
+      );
+      if (unconfirmed.length > 0) {
+        fail(
+          `has ${unconfirmed.length} eligible participant(s) without a confirmed final ranking eligibility (first: ${unconfirmed[0].id})`,
+        );
+      }
+    }
+
+    // Who the final ranking must cover: every eligible participant or, under an
+    // eligibility rule, exactly the ones settlement confirmed as qualified —
+    // possibly none, in which case an empty final ranking IS the result.
+    const expected = input.qualificationApplied
+      ? input.participants.filter(
+          (participant) => participant.finalQualified === true,
+        )
+      : input.participants;
+
+    if (input.existingFinalRankings.length === 0 && expected.length > 0) {
       fail(
         `has no final ranking rows for rankingDate ${input.settlementDateText}`,
       );
@@ -475,26 +597,49 @@ export class SeasonSettlementJobService {
       fail('has duplicate final ranking rows for the same participant');
     }
 
-    const missing = input.participants.filter(
+    const missing = expected.filter(
       (participant) => !rankedParticipantIds.has(participant.id),
     );
     if (missing.length > 0) {
       fail(
-        `has ${missing.length} eligible participant(s) with no final ranking row (first: ${missing[0].id})`,
+        `has ${missing.length} ${input.qualificationApplied ? 'qualified' : 'eligible'} participant(s) with no final ranking row (first: ${missing[0].id})`,
       );
     }
 
-    const eligibleIds = new Set(
-      input.participants.map((participant) => participant.id),
-    );
+    const expectedIds = new Set(expected.map((participant) => participant.id));
     const extra = input.existingFinalRankings.filter(
-      (row) => !eligibleIds.has(row.seasonParticipantId),
+      (row) => !expectedIds.has(row.seasonParticipantId),
     );
     if (extra.length > 0) {
       fail(
-        `has ${extra.length} final ranking row(s) whose participant is no longer eligible (first: ${extra[0].seasonParticipantId})`,
+        `has ${extra.length} final ranking row(s) whose participant is no longer eligible${input.qualificationApplied ? ' or did not qualify' : ''} (first: ${extra[0].seasonParticipantId})`,
       );
     }
+  }
+
+  /**
+   * An eligibility season is still `ended`: nothing may have published a final
+   * rank or confirmed an eligibility yet. Final rows written by an operator
+   * correction or a ranking script before settlement would bypass the rule, and
+   * a stored verdict without `settled` is a half-applied settlement.
+   */
+  private assertNoFinalResultsBeforeQualification(input: {
+    seasonId: string;
+    participants: readonly SettlementParticipant[];
+    existingFinalRankings: readonly ExistingFinalRankingRow[];
+  }): void {
+    const confirmed = input.participants.filter((participant) =>
+      hasVerdict(participant),
+    );
+    if (input.existingFinalRankings.length === 0 && confirmed.length === 0) {
+      return;
+    }
+
+    this.throwJobError(
+      HttpStatus.CONFLICT,
+      'FINAL_RESULTS_INTEGRITY',
+      `Season ${input.seasonId} has an eligibility rule and is not settled, but already holds ${input.existingFinalRankings.length} final ranking row(s) and ${confirmed.length} confirmed eligibility verdict(s). Its final result is written only by the settlement that confirms eligibility; investigate instead of reusing them.`,
+    );
   }
 
   /** True for the structured ranking-INPUT scope faults raised by §A-1. */
@@ -644,8 +789,43 @@ export class SeasonSettlementJobService {
       select: {
         ...RANKING_PARTICIPANT_SCOPE_SELECT,
         totalFillCount: true,
+        finalQualified: true,
       },
     });
+  }
+
+  /**
+   * One verdict per participant account, measured from the season's own fills
+   * at Season.endAt. Integrity faults in the trading or FX evidence propagate
+   * as their structured 500s: a participant is never marked "not qualified"
+   * because its evidence could not be read.
+   */
+  private async evaluateFinalQualifications(input: {
+    season: SettlementSeason;
+    criteria: SeasonFinalQualificationCriteria;
+    participantScopes: ReadonlyMap<string, string>;
+  }): Promise<Map<string, FinalQualificationEvidence>> {
+    const activity = await readSeasonTradingActivity(this.prisma, {
+      season: input.season,
+      tradingAccountIds: [...input.participantScopes.values()],
+    });
+    const verdicts = new Map<string, FinalQualificationEvidence>();
+
+    for (const [participantId, tradingAccountId] of input.participantScopes) {
+      const evaluation = evaluateFinalQualification(
+        input.criteria,
+        activity.get(tradingAccountId)!,
+      );
+      verdicts.set(participantId, {
+        qualified: evaluation.qualified,
+        tradedInstrumentCount: evaluation.tradedInstrumentCount,
+        recognizedTurnoverKrw: formatMoneyScale8(
+          evaluation.recognizedTurnoverKrw,
+        ),
+      });
+    }
+
+    return verdicts;
   }
 
   private async calculateFinalValuations(input: {
@@ -891,11 +1071,16 @@ export class SeasonSettlementJobService {
    *
    *   season row FOR UPDATE → status re-check → reservation re-check →
    *   participant/account link verification → eligible-set re-check of the
-   *   pre-computed rows (TC-D01) → settlement EquitySnapshot →
-   *   final SeasonRanking (participant target + measured account) →
-   *   participant final results →
-   *   participant status transitions → season account closure →
-   *   Season.status = settled
+   *   pre-computed results (TC-D01) → settlement EquitySnapshot for EVERY
+   *   valued participant → final SeasonRanking for the ranked ones
+   *   (participant target + measured account) → participant final results and
+   *   eligibility verdicts → participant status transitions → season account
+   *   closure → Season.status = settled
+   *
+   * Under an eligibility rule the ranked participants are the qualified ones
+   * (possibly none). A participant that did not qualify still has its final
+   * valuation, settlement snapshot, status transition and account closure —
+   * eligibility decides ranking, never financial settlement.
    *
    * WHY THE PRE-TRANSACTION CHECKS ARE REPEATED HERE
    * -----------------------------------------------
@@ -908,7 +1093,15 @@ export class SeasonSettlementJobService {
     seasonId: string;
     settlementDate: Date;
     capturedAt: Date;
-    finalRows: readonly FinalRankingRow[];
+    qualificationApplied: boolean;
+    /** A first settlement. Absent = replay of an existing final result. */
+    fresh?: {
+      finalRows: readonly FinalRankingRow[];
+      unranked: ReadonlyArray<{
+        valuation: FinalValuation;
+        qualification: FinalQualificationEvidence;
+      }>;
+    };
   }): Promise<{
     createdFinalSnapshotIds: string[];
     updatedFinalSnapshotIds: string[];
@@ -954,10 +1147,13 @@ export class SeasonSettlementJobService {
             participant.participantStatus,
           ),
       );
+      const settled = season.status === SeasonStatus.settled;
 
       // §A-5 again, now under the lock: the pre-lock check read a status that
-      // another settlement run may have advanced to `settled` since.
-      if (season.status === SeasonStatus.settled && existingRows.length === 0) {
+      // another settlement run may have advanced to `settled` since. (Under an
+      // eligibility rule an empty final ranking can be the confirmed result;
+      // the replay below verifies that against the stored verdicts.)
+      if (settled && existingRows.length === 0 && !input.qualificationApplied) {
         this.throwJobError(
           HttpStatus.CONFLICT,
           'FINAL_RESULTS_INTEGRITY',
@@ -965,7 +1161,15 @@ export class SeasonSettlementJobService {
         );
       }
 
-      if (existingRows.length > 0) {
+      if (existingRows.length > 0 || (input.qualificationApplied && settled)) {
+        if (input.qualificationApplied && !settled) {
+          this.throwJobError(
+            HttpStatus.CONFLICT,
+            'FINAL_RESULTS_INTEGRITY',
+            `Season ${input.seasonId} is not settled but holds final ranking rows; under an eligibility rule only the settlement that confirms eligibility writes them.`,
+          );
+        }
+
         // Idempotent replay. The existing rows are re-verified rather than
         // trusted: assigning participant results from a mis-scoped final
         // ranking would hand one account another's placement (작업 8 §14.5).
@@ -973,7 +1177,12 @@ export class SeasonSettlementJobService {
         this.assertExistingFinalRankingSetCovers(
           input.seasonId,
           existingRows,
-          eligibleAccountParticipants,
+          input.qualificationApplied
+            ? this.confirmedQualifiedParticipants(
+                input.seasonId,
+                eligibleAccountParticipants,
+              )
+            : eligibleAccountParticipants,
         );
 
         const assigned = await this.assignFinalResultsForExistingRows(
@@ -995,6 +1204,8 @@ export class SeasonSettlementJobService {
           expectedParticipants: existingRows.length,
           accountParticipants,
           finalRankingRows: existingRows,
+          qualificationApplied: input.qualificationApplied,
+          unranked: [],
         });
 
         return {
@@ -1008,7 +1219,16 @@ export class SeasonSettlementJobService {
         };
       }
 
-      if (input.finalRows.length === 0) {
+      const fresh = input.fresh;
+      const evaluatedParticipantIds = fresh
+        ? [
+            ...fresh.finalRows.map((row) => row.seasonParticipantId),
+            ...fresh.unranked.map(
+              ({ valuation }) => valuation.seasonParticipantId,
+            ),
+          ]
+        : [];
+      if (!fresh || evaluatedParticipantIds.length === 0) {
         this.throwJobError(
           HttpStatus.CONFLICT,
           'FINAL_RANKINGS_NOT_FOUND',
@@ -1016,95 +1236,60 @@ export class SeasonSettlementJobService {
         );
       }
 
-      // TC-D01: the fresh rows were valued and ranked BEFORE this lock.
+      if (input.qualificationApplied) {
+        const confirmed = accountParticipants.filter((participant) =>
+          hasVerdict(participant),
+        );
+        if (confirmed.length > 0) {
+          this.throwJobError(
+            HttpStatus.CONFLICT,
+            'FINAL_RESULTS_INTEGRITY',
+            `Season ${input.seasonId} is not settled but ${confirmed.length} participant(s) already carry a confirmed eligibility verdict (first: ${confirmed[0].id}); a first settlement never overwrites one.`,
+          );
+        }
+      }
+
+      // TC-D01: every result was valued and judged BEFORE this lock.
       this.assertFinalRowsMatchEligibleParticipants(
         input.seasonId,
-        input.finalRows,
+        evaluatedParticipantIds,
         eligibleAccountParticipants,
       );
 
-      // Resolved for ALL ranked participants up front; a broken link aborts the
-      // settlement rather than producing a partial final ranking.
+      // Resolved for ALL valued participants up front; a broken link aborts the
+      // settlement rather than producing a partial final result.
       const rankingScopes = await resolveSeasonRankingAccountScopes(tx, {
         seasonId: input.seasonId,
-        seasonParticipantIds: input.finalRows.map(
-          (row) => row.seasonParticipantId,
-        ),
+        seasonParticipantIds: evaluatedParticipantIds,
       });
 
       const createdFinalSnapshotIds: string[] = [];
       const updatedFinalSnapshotIds: string[] = [];
       const createdFinalRankingIds: string[] = [];
       const assignedFinalTierParticipantIds: string[] = [];
-
-      for (const row of input.finalRows) {
-        const tradingAccountId = rankingScopes.get(
-          row.seasonParticipantId,
-        )!.tradingAccountId;
-
-        const existingSnapshot = await tx.equitySnapshot.findFirst({
-          where: {
-            tradingAccountId,
-            snapshotReason: SnapshotReason.settlement,
-          },
-          orderBy: [
-            { capturedAt: 'desc' },
-            { createdAt: 'desc' },
-            { id: 'asc' },
-          ],
-          select: {
-            id: true,
-            tradingAccountId: true,
-            cumulativeExternalFundingKrw: true,
-            investmentPnlKrw: true,
-            timeWeightedReturnFactor: true,
-          },
-        });
-        const snapshotData = {
-          totalAssetKrw: row.totalAssetKrw,
-          returnRate: row.returnRate,
-          krwCash: row.krwCash,
-          usdCashKrw: row.usdCashKrw,
-          domesticStockValueKrw: row.domesticStockValueKrw,
-          usStockValueKrw: row.usStockValueKrw,
-          cryptoValueKrw: row.cryptoValueKrw,
-          ...futuresSnapshotValues(row),
+      const writeSnapshot = async (
+        seasonParticipantId: string,
+        valuation: FinalValuation,
+      ) => {
+        const tradingAccountId =
+          rankingScopes.get(seasonParticipantId)!.tradingAccountId;
+        const snapshot = await this.writeSettlementSnapshot(tx, {
+          tradingAccountId,
+          valuation,
           capturedAt: input.capturedAt,
-        };
+        });
+        (snapshot.created
+          ? createdFinalSnapshotIds
+          : updatedFinalSnapshotIds
+        ).push(snapshot.id);
+        return tradingAccountId;
+      };
 
-        if (existingSnapshot) {
-          // The existing update-in-place policy is kept, but its SCOPE is
-          // verified first: overwriting a row that belongs to another account,
-          // or quietly filling a null scope through a routine settlement,
-          // would launder damage the snapshot repair exists to surface.
-          this.assertSettlementSnapshotScope(
-            existingSnapshot,
-            tradingAccountId,
-          );
-
-          await tx.equitySnapshot.update({
-            where: {
-              id: existingSnapshot.id,
-            },
-            data: snapshotData,
-            select: {
-              id: true,
-            },
-          });
-          updatedFinalSnapshotIds.push(existingSnapshot.id);
-        } else {
-          const createdSnapshot = await tx.equitySnapshot.create({
-            data: {
-              tradingAccountId,
-              ...snapshotData,
-              snapshotReason: SnapshotReason.settlement,
-            },
-            select: {
-              id: true,
-            },
-          });
-          createdFinalSnapshotIds.push(createdSnapshot.id);
-        }
+      for (const row of fresh.finalRows) {
+        const tradingAccountId = await writeSnapshot(
+          row.seasonParticipantId,
+          row,
+        );
 
         await tx.seasonParticipant.update({
           where: {
@@ -1117,6 +1302,7 @@ export class SeasonSettlementJobService {
             finalRank: row.rank,
             finalTier: row.finalTier,
             currentRank: row.rank,
+            ...this.qualificationData(row.qualification),
           },
           select: {
             id: true,
@@ -1148,6 +1334,30 @@ export class SeasonSettlementJobService {
         createdFinalRankingIds.push(createdRanking.id);
       }
 
+      // Did not qualify: the same final financial result, no rank/tier/row.
+      // currentRank is cleared too, so no reader shows the provisional rank
+      // of a finished season as if it were a standing.
+      for (const { valuation, qualification } of fresh.unranked) {
+        await writeSnapshot(valuation.seasonParticipantId, valuation);
+        await tx.seasonParticipant.update({
+          where: {
+            id: valuation.seasonParticipantId,
+          },
+          data: {
+            totalAssetKrw: valuation.totalAssetKrw,
+            totalReturnRate: valuation.returnRate,
+            maxDrawdown: valuation.maxDrawdown,
+            finalRank: null,
+            finalTier: null,
+            currentRank: null,
+            ...this.qualificationData(qualification),
+          },
+          select: {
+            id: true,
+          },
+        });
+      }
+
       const finishedParticipantIds = await this.finishActiveParticipants(
         tx,
         input.seasonId,
@@ -1159,9 +1369,17 @@ export class SeasonSettlementJobService {
       const seasonUpdated = await this.transitionSeasonToSettledIfReady(tx, {
         seasonId: input.seasonId,
         settlementDate: input.settlementDate,
-        expectedParticipants: input.finalRows.length,
+        expectedParticipants: fresh.finalRows.length,
         accountParticipants,
-        finalRankingRows: input.finalRows,
+        finalRankingRows: fresh.finalRows,
+        qualificationApplied: input.qualificationApplied,
+        unranked: fresh.unranked.map(({ valuation, qualification }) => ({
+          seasonParticipantId: valuation.seasonParticipantId,
+          totalAssetKrw: valuation.totalAssetKrw,
+          returnRate: valuation.returnRate,
+          maxDrawdown: valuation.maxDrawdown,
+          qualification,
+        })),
       });
 
       return {
@@ -1174,6 +1392,117 @@ export class SeasonSettlementJobService {
         finishedParticipantIds,
       };
     });
+  }
+
+  /**
+   * The settlement EquitySnapshot of one valued participant — ranked or not.
+   * It is the preserved final financial evidence (allocation included) the
+   * settled portfolio reads back.
+   */
+  private async writeSettlementSnapshot(
+    tx: Prisma.TransactionClient,
+    input: {
+      tradingAccountId: string;
+      valuation: FinalValuation;
+      capturedAt: Date;
+    },
+  ): Promise<{ id: string; created: boolean }> {
+    const existingSnapshot = await tx.equitySnapshot.findFirst({
+      where: {
+        tradingAccountId: input.tradingAccountId,
+        snapshotReason: SnapshotReason.settlement,
+      },
+      orderBy: [{ capturedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        tradingAccountId: true,
+        cumulativeExternalFundingKrw: true,
+        investmentPnlKrw: true,
+        timeWeightedReturnFactor: true,
+      },
+    });
+    const valuation = input.valuation;
+    const snapshotData = {
+      totalAssetKrw: valuation.totalAssetKrw,
+      returnRate: valuation.returnRate,
+      krwCash: valuation.krwCash,
+      usdCashKrw: valuation.usdCashKrw,
+      domesticStockValueKrw: valuation.domesticStockValueKrw,
+      usStockValueKrw: valuation.usStockValueKrw,
+      cryptoValueKrw: valuation.cryptoValueKrw,
+      ...futuresSnapshotValues(valuation),
+      capturedAt: input.capturedAt,
+    };
+
+    if (existingSnapshot) {
+      // The existing update-in-place policy is kept, but its SCOPE is
+      // verified first: overwriting a row that belongs to another account,
+      // or quietly filling a null scope through a routine settlement,
+      // would launder damage the snapshot repair exists to surface.
+      this.assertSettlementSnapshotScope(
+        existingSnapshot,
+        input.tradingAccountId,
+      );
+
+      await tx.equitySnapshot.update({
+        where: {
+          id: existingSnapshot.id,
+        },
+        data: snapshotData,
+        select: {
+          id: true,
+        },
+      });
+      return { id: existingSnapshot.id, created: false };
+    }
+
+    const createdSnapshot = await tx.equitySnapshot.create({
+      data: {
+        tradingAccountId: input.tradingAccountId,
+        ...snapshotData,
+        snapshotReason: SnapshotReason.settlement,
+      },
+      select: {
+        id: true,
+      },
+    });
+    return { id: createdSnapshot.id, created: true };
+  }
+
+  /** The participant columns of an eligibility verdict; none without a rule. */
+  private qualificationData(qualification?: FinalQualificationEvidence) {
+    return qualification
+      ? {
+          finalQualified: qualification.qualified,
+          finalTradedInstrumentCount: qualification.tradedInstrumentCount,
+          finalRecognizedTurnoverKrw: qualification.recognizedTurnoverKrw,
+        }
+      : {};
+  }
+
+  /**
+   * Under an eligibility rule, the participants a settled season's final
+   * ranking must cover: those settlement confirmed as qualified. Every eligible
+   * participant must carry a verdict — a missing one is damage, not "unranked".
+   */
+  private confirmedQualifiedParticipants(
+    seasonId: string,
+    eligibleParticipants: readonly SettlementAccountParticipant[],
+  ): SettlementAccountParticipant[] {
+    const unconfirmed = eligibleParticipants.filter(
+      (participant) => !hasVerdict(participant),
+    );
+    if (unconfirmed.length > 0) {
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_INTEGRITY',
+        `Season ${seasonId} is settled but ${unconfirmed.length} eligible participant(s) carry no confirmed eligibility verdict (first: ${unconfirmed[0].id}).`,
+      );
+    }
+
+    return eligibleParticipants.filter(
+      (participant) => participant.finalQualified === true,
+    );
   }
 
   // ------------------------------------------- season account lifecycle
@@ -1189,6 +1518,7 @@ export class SeasonSettlementJobService {
         id: true,
         userId: true,
         participantStatus: true,
+        finalQualified: true,
         tradingAccountId: true,
         tradingAccount: {
           select: {
@@ -1407,12 +1737,29 @@ export class SeasonSettlementJobService {
     settlementDateText: string;
     participants: readonly SettlementParticipant[];
     existingFinalRankings: readonly ExistingFinalRankingRow[];
+    qualificationApplied: boolean;
     dryRun: boolean;
     result: SeasonSettlementJobResult;
   }): Promise<SeasonSettlementJobResult> {
+    // Under an eligibility rule the ranking covers the confirmed qualified
+    // participants only (verified for settled seasons before this point).
+    const expectedRanked = input.qualificationApplied
+      ? input.participants.filter(
+          (participant) => participant.finalQualified === true,
+        ).length
+      : input.participants.length;
+    if (input.qualificationApplied) {
+      input.result.finalQualification.evaluated = input.participants.filter(
+        (participant) => hasVerdict(participant),
+      ).length;
+      input.result.finalQualification.qualified = expectedRanked;
+      input.result.finalQualification.notQualified = input.participants.filter(
+        (participant) => participant.finalQualified === false,
+      ).length;
+    }
     input.result.participants.snapshotted = input.existingFinalRankings.length;
     input.result.participants.missingSnapshots = Math.max(
-      input.participants.length - input.existingFinalRankings.length,
+      expectedRanked - input.existingFinalRankings.length,
       0,
     );
     input.result.finalRankings.existing = input.existingFinalRankings.length;
@@ -1436,7 +1783,9 @@ export class SeasonSettlementJobService {
 
     if (input.dryRun) {
       input.result.message =
-        'Final rankings already exist; dry-run did not assign tiers or update season status.';
+        input.existingFinalRankings.length === 0
+          ? 'Season is already settled with an empty final ranking because no participant met the eligibility criteria; dry-run made no change.'
+          : 'Final rankings already exist; dry-run did not assign tiers or update season status.';
       return input.result;
     }
 
@@ -1444,7 +1793,7 @@ export class SeasonSettlementJobService {
       seasonId: input.season.id,
       settlementDate: input.settlementDate,
       capturedAt: new Date(),
-      finalRows: [],
+      qualificationApplied: input.qualificationApplied,
     });
 
     input.result.finalTiers.assigned =
@@ -1593,22 +1942,24 @@ export class SeasonSettlementJobService {
    */
   private assertFinalRowsMatchEligibleParticipants(
     seasonId: string,
-    finalRows: readonly FinalRankingRow[],
+    valuedParticipantIds: readonly string[],
     eligibleParticipants: readonly SettlementAccountParticipant[],
   ): void {
-    const rankedIds = new Set(finalRows.map((row) => row.seasonParticipantId));
+    // Ranked AND unranked (did not qualify) results: under an eligibility rule
+    // a valued participant without a rank is expected, a missing one is not.
+    const rankedIds = new Set(valuedParticipantIds);
     const eligibleIds = new Set(
       eligibleParticipants.map((participant) => participant.id),
     );
-    const noLongerEligible = finalRows.filter(
-      (row) => !eligibleIds.has(row.seasonParticipantId),
+    const noLongerEligible = valuedParticipantIds.filter(
+      (participantId) => !eligibleIds.has(participantId),
     );
     const unranked = eligibleParticipants.filter(
       (participant) => !rankedIds.has(participant.id),
     );
 
     if (
-      rankedIds.size === finalRows.length &&
+      rankedIds.size === valuedParticipantIds.length &&
       noLongerEligible.length === 0 &&
       unranked.length === 0
     ) {
@@ -1619,7 +1970,7 @@ export class SeasonSettlementJobService {
       JSON.stringify({
         event: 'season_settlement_participants_changed',
         seasonId,
-        rankedCount: finalRows.length,
+        rankedCount: valuedParticipantIds.length,
         eligibleCount: eligibleParticipants.length,
         noLongerEligibleCount: noLongerEligible.length,
         unrankedCount: unranked.length,
@@ -1716,6 +2067,9 @@ export class SeasonSettlementJobService {
         currentRank: true,
         finalRank: true,
         finalTier: true,
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
       },
     });
     const storedById = new Map(stored.map((row) => [row.id, row]));
@@ -1778,11 +2132,118 @@ export class SeasonSettlementJobService {
           `finalTier=${participant.finalTier ?? 'null'} vs policy "${expectedTier}"`,
         );
       }
+      if (row.qualification) {
+        mismatches.push(
+          ...this.qualificationMismatches(participant, row.qualification),
+        );
+      }
 
       if (mismatches.length > 0) {
         fail(row.seasonParticipantId, mismatches.join(', '));
       }
     }
+  }
+
+  /**
+   * The participants that did NOT qualify are verified as strictly as the
+   * ranked ones: the final financial result they were valued at, the verdict
+   * that excluded them from the ranking, and no rank, tier or standing.
+   */
+  private async assertUnrankedParticipantResults(
+    tx: Prisma.TransactionClient,
+    input: {
+      seasonId: string;
+      unranked: readonly SettlementUnrankedExpectation[];
+    },
+  ): Promise<void> {
+    if (input.unranked.length === 0) {
+      return;
+    }
+
+    const stored = await tx.seasonParticipant.findMany({
+      where: {
+        seasonId: input.seasonId,
+        id: { in: input.unranked.map((row) => row.seasonParticipantId) },
+      },
+      select: {
+        id: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
+        maxDrawdown: true,
+        currentRank: true,
+        finalRank: true,
+        finalTier: true,
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+      },
+    });
+    const storedById = new Map(stored.map((row) => [row.id, row]));
+
+    for (const row of input.unranked) {
+      const participant = storedById.get(row.seasonParticipantId);
+      const mismatches = participant
+        ? [
+            ...(decimalEquals(participant.totalAssetKrw, row.totalAssetKrw)
+              ? []
+              : [`totalAssetKrw=${participant.totalAssetKrw.toString()}`]),
+            ...(decimalEquals(participant.totalReturnRate, row.returnRate)
+              ? []
+              : [`totalReturnRate=${participant.totalReturnRate.toString()}`]),
+            ...(decimalEquals(participant.maxDrawdown, row.maxDrawdown)
+              ? []
+              : [`maxDrawdown=${participant.maxDrawdown.toString()}`]),
+            ...(participant.currentRank === null &&
+            participant.finalRank === null &&
+            participant.finalTier === null
+              ? []
+              : ['a rank or tier although it did not qualify']),
+            ...this.qualificationMismatches(participant, row.qualification),
+          ]
+        : ['no participant row'];
+
+      if (mismatches.length > 0) {
+        this.throwJobError(
+          HttpStatus.CONFLICT,
+          'FINAL_RESULTS_INTEGRITY',
+          `Season participant ${row.seasonParticipantId} would be settled unranked with ${mismatches.join(', ')}. The whole settlement is rolled back.`,
+        );
+      }
+    }
+  }
+
+  private qualificationMismatches(
+    participant: {
+      finalQualified: boolean | null;
+      finalTradedInstrumentCount: number | null;
+      finalRecognizedTurnoverKrw: Prisma.Decimal | null;
+    },
+    expected: FinalQualificationEvidence,
+  ): string[] {
+    const mismatches: string[] = [];
+    if (participant.finalQualified !== expected.qualified) {
+      mismatches.push(
+        `finalQualified=${String(participant.finalQualified)} vs verdict ${String(expected.qualified)}`,
+      );
+    }
+    if (
+      participant.finalTradedInstrumentCount !== expected.tradedInstrumentCount
+    ) {
+      mismatches.push(
+        `finalTradedInstrumentCount=${participant.finalTradedInstrumentCount ?? 'null'} vs ${expected.tradedInstrumentCount}`,
+      );
+    }
+    if (
+      !decimalEquals(
+        participant.finalRecognizedTurnoverKrw,
+        expected.recognizedTurnoverKrw,
+      )
+    ) {
+      mismatches.push(
+        `finalRecognizedTurnoverKrw=${participant.finalRecognizedTurnoverKrw?.toString() ?? 'null'} vs ${expected.recognizedTurnoverKrw}`,
+      );
+    }
+    return mismatches;
   }
 
   private async transitionSeasonToSettledIfReady(
@@ -1793,53 +2254,84 @@ export class SeasonSettlementJobService {
       expectedParticipants: number;
       accountParticipants: readonly SettlementAccountParticipant[];
       finalRankingRows: readonly SettlementFinalResultExpectation[];
+      qualificationApplied: boolean;
+      unranked: readonly SettlementUnrankedExpectation[];
     },
   ): Promise<boolean> {
     await this.assertParticipantResultsMatchFinalRanking(tx, {
       seasonId: input.seasonId,
       finalRankingRows: input.finalRankingRows,
     });
+    await this.assertUnrankedParticipantResults(tx, {
+      seasonId: input.seasonId,
+      unranked: input.unranked,
+    });
 
     const accountIds = input.accountParticipants
       .map((participant) => participant.tradingAccountId)
       .filter((id): id is string => id !== null);
+    const eligibleWhere = {
+      seasonId: input.seasonId,
+      participantStatus: {
+        in: [...SETTLEMENT_PARTICIPANT_STATUSES],
+      },
+    };
 
-    const [finalRankingCount, missingFinalResultCount, liveAccountCount] =
-      await Promise.all([
-        tx.seasonRanking.count({
-          where: {
-            seasonId: input.seasonId,
-            rankType: FINAL_RANK_TYPE,
-            rankingDate: input.settlementDate,
-          },
-        }),
-        tx.seasonParticipant.count({
-          where: {
-            seasonId: input.seasonId,
-            participantStatus: {
-              in: [...SETTLEMENT_PARTICIPANT_STATUSES],
+    const [
+      finalRankingCount,
+      missingFinalResultCount,
+      liveAccountCount,
+      unconfirmedQualificationCount,
+      qualifiedCount,
+    ] = await Promise.all([
+      tx.seasonRanking.count({
+        where: {
+          seasonId: input.seasonId,
+          rankType: FINAL_RANK_TYPE,
+          rankingDate: input.settlementDate,
+        },
+      }),
+      // Every participant that must be ranked holds a rank and a tier: all
+      // eligible ones, or under an eligibility rule the qualified ones.
+      tx.seasonParticipant.count({
+        where: {
+          ...eligibleWhere,
+          ...(input.qualificationApplied ? { finalQualified: true } : {}),
+          OR: [{ finalRank: null }, { finalTier: null }],
+        },
+      }),
+      // §15: a settled season must have NO active/suspended linked account
+      // and no linked account without a closedAt.
+      accountIds.length === 0
+        ? Promise.resolve(0)
+        : tx.tradingAccount.count({
+            where: {
+              id: { in: accountIds },
+              OR: [
+                { status: { not: TradingAccountStatus.closed } },
+                { closedAt: null },
+              ],
             },
-            OR: [{ finalRank: null }, { finalTier: null }],
-          },
-        }),
-        // §15: a settled season must have NO active/suspended linked account
-        // and no linked account without a closedAt.
-        accountIds.length === 0
-          ? Promise.resolve(0)
-          : tx.tradingAccount.count({
-              where: {
-                id: { in: accountIds },
-                OR: [
-                  { status: { not: TradingAccountStatus.closed } },
-                  { closedAt: null },
-                ],
-              },
-            }),
-      ]);
+          }),
+      // Under an eligibility rule: no eligible participant without a verdict,
+      // and exactly one final row per qualified participant.
+      input.qualificationApplied
+        ? tx.seasonParticipant.count({
+            where: { ...eligibleWhere, finalQualified: null },
+          })
+        : Promise.resolve(0),
+      input.qualificationApplied
+        ? tx.seasonParticipant.count({
+            where: { ...eligibleWhere, finalQualified: true },
+          })
+        : Promise.resolve(input.expectedParticipants),
+    ]);
 
     if (
       finalRankingCount !== input.expectedParticipants ||
-      missingFinalResultCount !== 0
+      missingFinalResultCount !== 0 ||
+      unconfirmedQualificationCount !== 0 ||
+      qualifiedCount !== input.expectedParticipants
     ) {
       this.throwJobError(
         HttpStatus.CONFLICT,
@@ -1919,6 +2411,7 @@ export class SeasonSettlementJobService {
     participantsTotal: number;
     snapshotted: number;
     missingSnapshots: number;
+    criteria: SeasonFinalQualificationCriteria | null;
   }): SeasonSettlementJobResult {
     return {
       seasonId: input.seasonId,
@@ -1951,6 +2444,17 @@ export class SeasonSettlementJobService {
         assigned: 0,
         existing: 0,
         skipped: 0,
+      },
+      finalQualification: {
+        applied: input.criteria !== null,
+        minTradedInstrumentCount:
+          input.criteria?.minTradedInstrumentCount ?? null,
+        minRecognizedTurnoverKrw: input.criteria
+          ? minRecognizedTurnoverKrwAtMoneyScale(input.criteria).toFixed(8)
+          : null,
+        evaluated: 0,
+        qualified: 0,
+        notQualified: 0,
       },
       seasonAccounts: {
         linked: 0,
@@ -2084,6 +2588,11 @@ export class SeasonSettlementJobService {
       status,
     );
   }
+}
+
+/** A stored eligibility verdict; anything but a boolean is "no verdict". */
+function hasVerdict(participant: { finalQualified?: boolean | null }): boolean {
+  return typeof participant.finalQualified === 'boolean';
 }
 
 /**

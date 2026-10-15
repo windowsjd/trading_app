@@ -12,6 +12,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/assets-api-contract.md`
    - `docs/home-api-contract.md`
    - `docs/ranking-api-contract.md`
+   - `docs/season-final-ranking-eligibility.md` — season final-ranking eligibility (min distinct instruments + turnover vs initial capital): calculation, FX evidence, settlement, `GET /ranking/qualification`, DB guards
    - `docs/wallets-api-contract.md`
    - `docs/wallet-transfers-api-contract.md` — Spot cash provenance, internal USD transfers and atomic Securities FX + Crypto transfer
    - `docs/positions-api-contract.md`

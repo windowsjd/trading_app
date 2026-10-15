@@ -20,6 +20,10 @@ import { OperatorAuditService } from '../operator/operator-audit.service';
 import type { OperatorRequestContext } from '../operator/operator-account-management.service';
 import { hasOperatorRole } from '../operator/operator.guard';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  resolveSeasonFinalQualificationCriteria,
+  type SeasonFinalQualificationCriteriaSource,
+} from '../ranking/season-final-qualification';
 
 export type RewardFulfillmentQuery = {
   status?: string;
@@ -331,6 +335,9 @@ export class RewardFulfillmentService {
           select: {
             id: true,
             status: true,
+            initialCapitalKrw: true,
+            finalRankingMinTradedInstruments: true,
+            finalRankingMinTurnoverRatio: true,
           },
         });
 
@@ -358,6 +365,8 @@ export class RewardFulfillmentService {
             id: true,
             seasonId: true,
             userId: true,
+            finalQualified: true,
+            finalRank: true,
             user: {
               select: {
                 id: true,
@@ -390,6 +399,8 @@ export class RewardFulfillmentService {
             'Reward target user must be active.',
           );
         }
+
+        this.assertRewardQualified(season, participant);
 
         await this.assertNoDuplicateReward(
           tx as Pick<
@@ -608,6 +619,31 @@ export class RewardFulfillmentService {
             'Reward fulfillment cannot be fulfilled from its current status.',
           );
         }
+
+        // Re-checked inside the reward transaction, not only at request time:
+        // the confirmed eligibility is what entitles the reward.
+        const target = await tx.seasonParticipant.findUnique({
+          where: { id: request.seasonParticipantId },
+          select: {
+            finalQualified: true,
+            finalRank: true,
+            season: {
+              select: {
+                initialCapitalKrw: true,
+                finalRankingMinTradedInstruments: true,
+                finalRankingMinTurnoverRatio: true,
+              },
+            },
+          },
+        });
+        if (!target) {
+          this.throwApiError(
+            HttpStatus.NOT_FOUND,
+            'SEASON_PARTICIPANT_NOT_FOUND',
+            'Season participant not found.',
+          );
+        }
+        this.assertRewardQualified(target.season, target);
 
         const existingReward = await tx.seasonReward.findUnique({
           where: {
@@ -984,6 +1020,32 @@ export class RewardFulfillmentService {
     }
 
     return null;
+  }
+
+  /**
+   * Under a season eligibility rule a season reward needs a confirmed final
+   * rank. Season rewards are final-ranking/tier rewards (there is no reward
+   * catalog that could mark one as a participation reward), so an operator
+   * request never reaches a participant that did not qualify
+   * (docs/season-final-ranking-eligibility.md). Seasons without the rule keep
+   * the existing behaviour.
+   */
+  private assertRewardQualified(
+    season: SeasonFinalQualificationCriteriaSource,
+    participant: { finalQualified: boolean | null; finalRank: number | null },
+  ): void {
+    if (!resolveSeasonFinalQualificationCriteria(season)) {
+      return;
+    }
+    if (participant.finalQualified === true && participant.finalRank !== null) {
+      return;
+    }
+
+    this.throwApiError(
+      HttpStatus.CONFLICT,
+      'REWARD_QUALIFICATION_REQUIRED',
+      'Season rewards require a participant that met the final ranking criteria.',
+    );
   }
 
   private async assertNoDuplicateReward(

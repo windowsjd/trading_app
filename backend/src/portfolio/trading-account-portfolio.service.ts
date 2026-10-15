@@ -520,6 +520,14 @@ export class TradingAccountPortfolioService {
       },
     });
     if (ranking) assertSeasonRankingScope(ranking);
+    if (!ranking) {
+      // No final row is a normal result when settlement confirmed that the
+      // participant did not meet the season's final-ranking criteria.
+      const notQualified = await this.findNotQualifiedFinalResult(participant);
+      if (notQualified) {
+        return this.getSettledNotQualifiedPortfolio(account, notQualified);
+      }
+    }
     const snapshot = ranking
       ? await this.prisma.equitySnapshot.findFirst({
           where: {
@@ -657,6 +665,166 @@ export class TradingAccountPortfolioService {
               usStockValueKrw: ZERO_MONEY,
               cryptoValueKrw: ZERO_MONEY,
               reason,
+            },
+        sectionErrors,
+      },
+    };
+  }
+
+  private async findNotQualifiedFinalResult(participant: { id: string }) {
+    const result = await this.prisma.seasonParticipant.findUnique({
+      where: { id: participant.id },
+      select: {
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
+      },
+    });
+    return result?.finalQualified === false ? result : null;
+  }
+
+  /**
+   * Settled, did not qualify (docs/season-final-ranking-eligibility.md): the
+   * final financial result is as final as anyone's — settlement valued the
+   * account at Season.endAt and stored it on the participant beside the
+   * verdict — but there is no rank and no tier. The settlement snapshot of the
+   * same transaction supplies the allocation and must agree with it.
+   */
+  private async getSettledNotQualifiedPortfolio(
+    account: OwnedTradingAccount,
+    result: NonNullable<
+      Awaited<
+        ReturnType<
+          TradingAccountPortfolioService['findNotQualifiedFinalResult']
+        >
+      >
+    >,
+  ) {
+    const participant = account.seasonParticipant!;
+    const snapshot = await this.prisma.equitySnapshot.findFirst({
+      where: {
+        tradingAccountId: account.id,
+        snapshotReason: 'settlement',
+      },
+      orderBy: [{ capturedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
+    });
+    if (
+      snapshot &&
+      (!snapshot.totalAssetKrw.eq(result.totalAssetKrw) ||
+        !snapshot.returnRate.eq(result.totalReturnRate) ||
+        snapshot.cumulativeExternalFundingKrw !== null ||
+        snapshot.timeWeightedReturnFactor !== null)
+    ) {
+      setAdminDiagnosticContext({
+        domain: 'PORTFOLIO',
+        operation: 'SETTLED_PORTFOLIO_READ',
+        failureStage: 'final_evidence_consistency',
+        entities: {
+          tradingAccountId: account.id,
+          seasonId: participant.season.id,
+        },
+        evidence: {
+          result: 'participant_snapshot_mismatch',
+          snapshotId: snapshot.id,
+        },
+        nextInvestigation: [
+          'backend/src/batch/season-settlement-job.service.ts',
+        ],
+      });
+      throw createApiError(
+        'TRADING_ACCOUNT_INTEGRITY',
+        'Stored final portfolio evidence could not be verified.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+    const allocationAvailable =
+      snapshot &&
+      [
+        snapshot.krwCash,
+        snapshot.usdCashKrw,
+        snapshot.domesticStockValueKrw,
+        snapshot.usStockValueKrw,
+        snapshot.cryptoValueKrw,
+      ].every((v) => v !== null);
+    const sectionErrors = allocationAvailable
+      ? []
+      : [
+          {
+            section: 'allocation',
+            code: 'FINAL_ALLOCATION_UNAVAILABLE',
+            message: 'The stored final allocation is unavailable.',
+            diagnostic: buildAdminPartialFailureDiagnostic(
+              null,
+              'FINAL_ALLOCATION_UNAVAILABLE',
+              {
+                domain: 'PORTFOLIO',
+                operation: 'SETTLED_PORTFOLIO_READ',
+                failureStage: 'final_evidence_read',
+                entities: {
+                  tradingAccountId: account.id,
+                  seasonId: participant.season.id,
+                  seasonParticipantId: participant.id,
+                },
+                evidence: {
+                  result: 'final_evidence_missing',
+                  finalRankingAvailable: false,
+                  settlementSnapshotAvailable: !!snapshot,
+                },
+                nextInvestigation: [
+                  'backend/src/batch/season-settlement-job.service.ts',
+                ],
+              },
+            ),
+          },
+        ];
+
+    return {
+      success: true as const,
+      data: {
+        tradingAccountId: account.id,
+        mode: account.mode,
+        status: account.status,
+        state: 'available' as const,
+        summary: null,
+        finalResult: {
+          state: 'not_qualified' as const,
+          reason: 'FINAL_RANKING_NOT_QUALIFIED',
+          resultSource: 'season_participants' as const,
+          totalAssetKrw: result.totalAssetKrw.toFixed(8),
+          returnRate: result.totalReturnRate.toFixed(8),
+          returnRateMethod: 'initial_capital' as const,
+          maxDrawdown: result.maxDrawdown.toFixed(8),
+          totalFillCount: result.totalFillCount,
+          reachedReturnAt: null,
+          rank: null,
+          tier: null,
+          tradedInstrumentCount: result.finalTradedInstrumentCount,
+          recognizedTurnoverKrw:
+            result.finalRecognizedTurnoverKrw?.toFixed(8) ?? null,
+          endAt: participant.season.endAt.toISOString(),
+          capturedAt: snapshot?.capturedAt.toISOString() ?? null,
+        },
+        allocation: allocationAvailable
+          ? {
+              state: 'available' as const,
+              cashKrwValue: snapshot.krwCash
+                .add(snapshot.usdCashKrw)
+                .toFixed(8),
+              domesticStockValueKrw: snapshot.domesticStockValueKrw.toFixed(8),
+              usStockValueKrw: snapshot.usStockValueKrw.toFixed(8),
+              cryptoValueKrw: snapshot.cryptoValueKrw.toFixed(8),
+            }
+          : {
+              state: 'unavailable' as const,
+              cashKrwValue: ZERO_MONEY,
+              domesticStockValueKrw: ZERO_MONEY,
+              usStockValueKrw: ZERO_MONEY,
+              cryptoValueKrw: ZERO_MONEY,
+              reason: 'FINAL_ALLOCATION_UNAVAILABLE',
             },
         sectionErrors,
       },

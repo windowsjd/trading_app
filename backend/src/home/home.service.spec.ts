@@ -1290,6 +1290,60 @@ describe('HomeService', () => {
     expectNoHomeWrites(prisma);
   });
 
+  it('returns a settled participant that did not meet the final ranking criteria as a normal result', async () => {
+    const { prisma, service } = createService();
+    mockSettledSeason(prisma);
+    prisma.seasonParticipant.findUnique.mockResolvedValueOnce({
+      ...settledParticipant,
+      tradingAccountId: 'account-participant-1',
+      finalTier: null,
+      finalQualified: false,
+      finalTradedInstrumentCount: 4,
+      finalRecognizedTurnoverKrw: new Prisma.Decimal('5500000'),
+      totalAssetKrw: new Prisma.Decimal('1300000'),
+      totalReturnRate: new Prisma.Decimal('30'),
+      maxDrawdown: new Prisma.Decimal('2.5'),
+      totalFillCount: 7,
+    });
+    prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+    prisma.dailyPortfolioSnapshot.findMany.mockResolvedValueOnce([
+      chartSnapshot('2026-05-21', '1300000.00000000', '30.00000000'),
+    ]);
+
+    const response = await service.getHome('user-1');
+    const data = response.data as unknown as {
+      mode: string;
+      finalResult: {
+        state: string;
+        reason: string;
+        rank: number | null;
+        totalAssetKrw: string;
+        returnRate: string;
+        tradedInstrumentCount: number;
+        recognizedTurnoverKrw: string;
+        tier: { state: string; reason: string };
+        reward: { state: string };
+      };
+      sectionErrors: Array<{ code: string }>;
+    };
+
+    expect(data.mode).toBe('settled_joined');
+    expect(
+      `${data.finalResult.state}:${data.finalResult.reason}:${data.finalResult.rank}`,
+    ).toBe('unavailable:FINAL_RANKING_NOT_QUALIFIED:null');
+    expect(
+      `${data.finalResult.totalAssetKrw}:${data.finalResult.returnRate}`,
+    ).toBe('1300000.00000000:30.00000000');
+    expect(
+      `${data.finalResult.tradedInstrumentCount}:${data.finalResult.recognizedTurnoverKrw}`,
+    ).toBe('4:5500000.00000000');
+    expect(data.finalResult.tier.reason).toBe('FINAL_RANKING_NOT_QUALIFIED');
+    expect(data.finalResult.reward.state).toBe('unavailable');
+    // A normal outcome: not reported as a missing ranking, tier or reward.
+    expect(data.sectionErrors.map((error) => error.code).join(',')).toBe('');
+    expectNoHomeWrites(prisma);
+  });
+
   it('returns settled joined final result from final season rankings and daily snapshots without writes', async () => {
     const { prisma, service } = createService();
     mockSettledSeason(prisma);
@@ -1320,6 +1374,15 @@ describe('HomeService', () => {
         finalTier: true,
         rewardGrantedAt: true,
         tradingAccountId: true,
+        // Confirmed final-ranking eligibility and the settled financial
+        // result shown when a participant did not qualify.
+        finalQualified: true,
+        finalTradedInstrumentCount: true,
+        finalRecognizedTurnoverKrw: true,
+        totalAssetKrw: true,
+        totalReturnRate: true,
+        maxDrawdown: true,
+        totalFillCount: true,
       },
     });
     expect(prisma.seasonRanking.findFirst).toHaveBeenCalledWith({

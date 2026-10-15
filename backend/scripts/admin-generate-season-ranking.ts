@@ -13,6 +13,7 @@ import {
   buildRankingParticipantScopes,
   RANKING_PARTICIPANT_SCOPE_SELECT,
 } from '../src/ranking/ranking-source-scope';
+import { resolveSeasonFinalQualificationCriteria } from '../src/ranking/season-final-qualification';
 
 type SeasonRankingCliArgs = {
   seasonId?: string;
@@ -86,6 +87,10 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
   const prisma = new PrismaClient({ adapter });
 
   try {
+    if (rankType === SeasonRankingType.final) {
+      await assertFinalRankingGeneratedBySettlementOnly(prisma, seasonId);
+    }
+
     // The verified participant -> season account map every source row below is
     // measured against (작업 8 §9.4). One query, no per-row lookup.
     const participants = await prisma.seasonParticipant.findMany({
@@ -259,6 +264,31 @@ export async function runAdminGenerateSeasonRanking(argv: string[]) {
     );
   } finally {
     await prisma.$disconnect();
+  }
+}
+
+/**
+ * A season with final-ranking eligibility criteria gets its final ranking only
+ * from season settlement, which confirms who qualified. This tool ranks every
+ * participant with a daily snapshot, so writing a FINAL set with it would rank
+ * participants that did not qualify (docs/season-final-ranking-eligibility.md).
+ */
+async function assertFinalRankingGeneratedBySettlementOnly(
+  prisma: PrismaClient,
+  seasonId: string,
+) {
+  const season = await prisma.season.findUnique({
+    where: { id: seasonId },
+    select: {
+      initialCapitalKrw: true,
+      finalRankingMinTradedInstruments: true,
+      finalRankingMinTurnoverRatio: true,
+    },
+  });
+  if (season && resolveSeasonFinalQualificationCriteria(season)) {
+    throw new Error(
+      'This season has final-ranking eligibility criteria; its final ranking is written only by season settlement. Use --rank-type daily.',
+    );
   }
 }
 

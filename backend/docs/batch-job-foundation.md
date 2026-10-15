@@ -413,6 +413,24 @@ job that quietly closed the stragglers would produce a season whose accounts are
 closed without the transaction that is supposed to have closed them. The
 operator re-runs `season-settlement`.
 
+## 시즌 최종 랭킹 참여 자격 (2026-10-15)
+
+[기준 문서](season-final-ranking-eligibility.md). 자격 기준(`seasons.final_ranking_min_*`)이
+있는 시즌만 해당하며, 없는 시즌은 위 정책 그대로다.
+
+- `season-settlement`: 평가 뒤 정상 참가자 전원의 실적(서로 다른 종목 수, 인정 거래대금)을
+  판정한다. 적격자만 1..N 최종 순위·티어(모수 N)를 받고, 미달자도 정산 스냅샷·확정 재무값·
+  판정(`final_qualified` 등)·`finished`·계정 종료를 같은 트랜잭션에서 받는다(`currentRank`는
+  NULL). 적격자 0명이면 빈 최종 랭킹으로 정상 `settled`. 결과 payload에 `finalQualification`
+  요약(`applied/evaluated/qualified/notQualified`)이 추가됐다.
+- 상태표(자격 시즌): `ended` + 최종 행/판정 있음 → `FINAL_RESULTS_INTEGRITY`; `settled` + 전원 판정
+  + 최종 행 = 적격자 → 멱등 재실행(빈 결과 포함); `settled` + 판정 누락/불일치 →
+  `FINAL_RESULTS_INTEGRITY`. 체결·FX 증거 오류는 `RANKING_QUALIFICATION_*`(500)이며 아무것도
+  쓰지 않는다. 잠금 전 판정 후 참가자 변경은 기존처럼 `SETTLEMENT_PARTICIPANTS_CHANGED`.
+- `final-tier-assignment`: 최종 행 집합이 확정 적격자 집합과 같아야 한다(아니면
+  `FINAL_RESULTS_INTEGRITY`). 행 0 + 적격자 0이면 `NO_QUALIFIED_PARTICIPANTS`로 정상 종료.
+- `admin-generate-season-ranking --rank-type final`은 자격 시즌에서 거부된다.
+
 ## Future Work
 
 Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/delivery/external fulfillment remain separate gates.

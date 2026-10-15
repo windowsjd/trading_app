@@ -6,6 +6,7 @@ import {
   TradingAccountMode,
   TradingAccountStatus,
 } from '../generated/prisma/client';
+import type { ParticipantStatus } from '../generated/prisma/client';
 import {
   formatDecimalScale,
   formatMoneyScale8,
@@ -16,6 +17,7 @@ import {
   assertSeasonRankingScopes,
   SEASON_RANKING_SCOPE_SELECT,
 } from '../ranking/season-ranking-scope';
+import { resolveSeasonFinalQualificationCriteria } from '../ranking/season-final-qualification';
 import { BatchService } from './batch.service';
 import {
   FINAL_TIER_ASSIGNMENT_JOB_NAME,
@@ -30,6 +32,11 @@ import {
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const FINAL_RANK_TYPE = SeasonRankingType.final;
+const RANKED_PARTICIPANT_STATUSES = [
+  'active',
+  'finished',
+  'rewarded',
+] as const satisfies readonly ParticipantStatus[];
 const TOP_ASSIGNMENTS_LIMIT = 10;
 const ALLOWED_TIERS = [
   'master',
@@ -131,6 +138,9 @@ export class FinalTierAssignmentJobService {
       select: {
         id: true,
         status: true,
+        initialCapitalKrw: true,
+        finalRankingMinTradedInstruments: true,
+        finalRankingMinTurnoverRatio: true,
       },
     });
 
@@ -153,13 +163,38 @@ export class FinalTierAssignmentJobService {
       policy: policy.summary,
       totalFinalRanked: rows.length,
     });
+    // Under an eligibility rule the final ranking — and so the tier
+    // denominator — is exactly the participants settlement confirmed as
+    // qualified (docs/season-final-ranking-eligibility.md).
+    const qualifiedParticipantIds = resolveSeasonFinalQualificationCriteria(
+      season,
+    )
+      ? await this.findConfirmedQualifiedParticipantIds(seasonId)
+      : null;
 
     if (rows.length === 0) {
+      if (qualifiedParticipantIds?.size === 0) {
+        // A confirmed empty final ranking: nobody qualified, nothing to tier.
+        await this.assertEverySeasonAccountClosed(seasonId);
+        result.reason = 'NO_QUALIFIED_PARTICIPANTS';
+        result.message =
+          'No participant met the final ranking eligibility criteria; there is no final tier to assign.';
+        return result;
+      }
+
       this.failWithResult(
         HttpStatus.BAD_REQUEST,
         'FINAL_RANKING_UNAVAILABLE',
         'Final ranking rows are unavailable for this season and rankingDate.',
         result,
+      );
+    }
+
+    if (qualifiedParticipantIds) {
+      this.assertFinalRankingCoversQualifiedParticipants(
+        seasonId,
+        rows,
+        qualifiedParticipantIds,
       );
     }
 
@@ -237,6 +272,66 @@ export class FinalTierAssignmentJobService {
     assertSeasonRankingScopes(rows);
 
     return rows;
+  }
+
+  /**
+   * The verdicts settlement stored for every ranked-status participant. One
+   * without a verdict means settlement did not confirm eligibility — damage,
+   * never an implicit "qualified" or "not qualified".
+   */
+  private async findConfirmedQualifiedParticipantIds(
+    seasonId: string,
+  ): Promise<Set<string>> {
+    const participants = await this.prisma.seasonParticipant.findMany({
+      where: {
+        seasonId,
+        participantStatus: { in: [...RANKED_PARTICIPANT_STATUSES] },
+      },
+      select: { id: true, finalQualified: true },
+    });
+    const unconfirmed = participants.filter(
+      (participant) => typeof participant.finalQualified !== 'boolean',
+    );
+    if (unconfirmed.length > 0) {
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_INTEGRITY',
+        `Season ${seasonId} has ${unconfirmed.length} participant(s) without a confirmed final ranking eligibility (first: ${unconfirmed[0].id}); re-run season settlement instead of assigning tiers.`,
+      );
+    }
+
+    return new Set(
+      participants
+        .filter((participant) => participant.finalQualified === true)
+        .map((participant) => participant.id),
+    );
+  }
+
+  /**
+   * A final row for a participant that did not qualify would hand it a tier
+   * (and a tier reward); a qualified participant without a row would shrink
+   * every tier cutoff. Either way the tiers would not be the season's.
+   */
+  private assertFinalRankingCoversQualifiedParticipants(
+    seasonId: string,
+    rows: readonly FinalRankingRow[],
+    qualifiedParticipantIds: ReadonlySet<string>,
+  ): void {
+    const rankedIds = new Set(rows.map((row) => row.seasonParticipantId));
+    const unqualified = rows.filter(
+      (row) => !qualifiedParticipantIds.has(row.seasonParticipantId),
+    );
+    const unranked = [...qualifiedParticipantIds].filter(
+      (participantId) => !rankedIds.has(participantId),
+    );
+
+    if (unqualified.length > 0 || unranked.length > 0) {
+      this.throwJobError(
+        HttpStatus.CONFLICT,
+        'FINAL_RESULTS_INTEGRITY',
+        `Season ${seasonId} final ranking does not match its confirmed eligibility: ${unqualified.length} row(s) for participants that did not qualify, ${unranked.length} qualified participant(s) without a row.`,
+      );
+    }
   }
 
   /**
