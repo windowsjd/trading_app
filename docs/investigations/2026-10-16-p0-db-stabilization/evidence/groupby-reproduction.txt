@@ -1,0 +1,20 @@
+# Previous Futures Mark freshness groupBy (HEAD 4f5c4dda futures-mark-ingestion.service.ts:237), exact Prisma
+# SQL shape from the production slow log:
+#   SELECT instrument_id FROM futures_mark_snapshots
+#   WHERE instrument_id IN ($1..$25) AND source = CAST($26::text AS "FuturesMarkSource") AND effective_at >= $27
+#   GROUP BY instrument_id OFFSET $28
+# vs one LATERAL (ORDER BY effective_at DESC LIMIT 1) per instrument (WS source).
+# EXPLAIN (ANALYZE, BUFFERS) x3, PostgreSQL 17.10 with production pg_settings, isolated *_test databases.
+# Data: repro/gen-mark.cjs, 48 simulated hours with a sliding 24 h window, deletes and VACUUM every 4 h.
+# Buffers = shared hit + read of the top node. Times are local (cached) and are NOT production times.
+
+dataset                          contracts rows       REST rows                         groupBy buffers (ms)          LATERAL buffers
+p0_mark_perf_test                25        2,167,200  every 300 s for all contracts     101, 101, 101 (0.4/0.08/0.07) 101
+p0_mark_zero_test                25        2,160,000  none                              101, 101, 101                 101
+p0_mark_norest_test (prod-like)  25        2,160,312  hourly for half the contracts     9,583 x3 (38/16/15 ms)        101
+p0_mark100_norest_test           100       8,641,200  hourly for half the contracts     19,302 x3 (85/29/28 ms)       401
+
+# Production (2026-10-15, audit evidence/explain-plans.txt): 25 contracts, 2.09M rows, unique index 50,267 pages,
+# 352k dead tuples, REST rows 0.013 % (pg_stats MCV): ~27,000 buffers per execution, 0.16-4.7 s.
+# Plan in all cases: Group <- Index Only Scan on futures_mark_snapshots_instrument_id_source_effective_at_key.
+# The plan does not change; the leaf-page walk inside the PG17 ScalarArrayOp scan does.

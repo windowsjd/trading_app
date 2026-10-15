@@ -1,0 +1,31 @@
+# Render PostgreSQL log lines for dpg-da7ac0e1egvs73e2sv20-a (read-only GET /v1/logs, 2026-10-16).
+# User/db/client fields, internal IPs and session ids removed. Times are UTC.
+# Each line was observed in a forward-ordered listing of the stated window.
+
+## 1. Write failures (client sessions, ERROR, SQLSTATE 53100)
+2026-10-12T22:47:46.491936119Z | ERROR:  could not extend file "base/16389/29548": No space left on device   (first)
+2026-10-12T22:47:46.535271300Z | ERROR:  could not extend file "base/16389/16680.2": No space left on device
+2026-10-12T23:05:00.368842053Z | ERROR:  could not extend file "base/16389/16680.2": No space left on device   (last before shutdown)
+
+## 2. Orchestrated fast shutdown and refused connections
+2026-10-12T23:05:00.398441244Z | INFO: Cleanly shutting down PostgreSQL in force fast mode..
+2026-10-12T23:05:01.016329292Z | waiting for server to shut down....
+2026-10-12T23:05:03.485484606Z | FATAL:  the database system is shutting down   (connections refused)
+2026-10-12T23:05:13.328642846Z | FATAL:  the database system is shutting down   (last log line before a 6 h 42 min gap)
+
+## 3. Restart, ~6 min of service, WAL PANIC
+2026-10-13T05:47:21.640765669Z | INFO: Starting PostgreSQL..
+2026-10-13T05:47:21.841238516Z | LOG:  database system is ready to accept connections
+2026-10-13T05:53:14.652587632Z | PANIC:  could not write to file "pg_wal/xlogtemp.1407": No space left on device   (client session)
+
+## 4. Crash-recovery restart loop: no space for WAL
+2026-10-13T05:53:16.740902735Z | FATAL:  could not write to file "pg_wal/xlogtemp.1625": No space left on device
+2026-10-13T05:53:23.846914389Z | FATAL:  could not write to file "pg_wal/xlogtemp.59": No space left on device   (first of 25)
+2026-10-13T06:41:36.817336469Z | FATAL:  could not write to file "pg_wal/xlogtemp.59": No space left on device   (last of 25)
+# After the PANIC, "starting PostgreSQL 17.11" was logged 14 times, each start failing on WAL space:
+# 05:53:22, 05:53:51, 05:54:23, 05:55:22, 05:56:56, 05:59:49, 06:05:02, 06:10:13, 06:15:33, 06:20:44, 06:25:57,
+# 06:31:09, 06:36:25, 06:41:36 (UTC).
+
+## 5. Recovery after the disk resize
+2026-10-13T06:46:53.017667818Z | LOG:  starting PostgreSQL 17.11 (Debian 17.11-1.pgdg12+2)
+2026-10-13T06:46:55.442288868Z | LOG:  database system is ready to accept connections   (stable since; stats_reset of the audit = 06:46:53Z)

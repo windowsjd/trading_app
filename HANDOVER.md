@@ -10,6 +10,70 @@
 
 ---
 
+## 2026-10-16 P0 DB 운영 안정화 — 선물 Mark 신선도 병목 제거·보존 계획 안정화·장애 감지·10-12 디스크 사고 기록
+
+- 시작 `main`=`origin/main`=`4f5c4dda`, clean. branch 없이 main 작업 트리에서 작업했다.
+- **커밋·push·배포·운영 DB 쓰기·운영 env 변경은 하지 않았다(미커밋 인계).** main push는 Render 자동 배포이므로 승인이 필요하다.
+- 기준 문서: [P0 보고서](docs/investigations/2026-10-16-p0-db-stabilization/report.md), [사고 기록](docs/investigations/2026-10-12-db-disk-full-incident/report.md), [운영 감시 런북](backend/docs/database-operations-monitoring.md).
+
+**실제 원인** (격리 PG17.10, 운영 설정·크기로 재현)
+
+- **Mark groupBy.**
+  - 매초 신선도 groupBy가 PG17 IN-list 스캔에서 다음 계약의 24시간 이력 전체를 잎 단위로 훑었다.
+  - 조건은 계약 경계에 REST 행이 몇 개만 있는 배치다. 운영 REST 비율 0.013%가 정확히 그 배치다.
+  - 25계약 9,583 버퍼, 100계약 19,302 버퍼였다. REST가 촘촘하거나 없으면 101 버퍼다.
+  - 이 쿼리와 REST 복구(2.5초 제한)를 `busy` 안에서 기다려 드레인이 멈췄다.
+- **보존 실패.**
+  - CHECK로 중복인 `effective_at < cutoff`와 자기조인 `EXISTS(newer)`가 행 수 추정을 수십 배 줄였다. 플래너가 정렬·해시 계획(자기조인 쪽 전체 스캔 포함)으로 바뀌었다.
+  - 이전 SQL은 기본 배치 1000에서도 6분 백로그면 정렬 계획이었다. Last는 정상 상태 실행 2/2가 Sort/Hash였다. 배치 100,000 실행은 운영과 같은 57014(5초 timeout)였다.
+  - 운영 실패 당시 정확한 계획은 NOT_VERIFIED다(통계 미보존).
+
+**수정**
+
+- **Mark 수집.**
+  - DB 신선도 조회를 없앴다. 저장이 확인된 행의 시각을 계약별로 메모리에 기록한다.
+  - 다중 행 INSERT를 1초에 1회 한다. 거부된 행만 단독으로 재시도한다.
+  - REST 복구는 저장된 WS Mark가 3초 없는 계약만, 별도 작업 1개로, 3초에 1회 한다.
+  - 중복·역행 프레임을 차단하고, 5초 stale·쓰기 실패·disk_full을 감지한다.
+  - **위험·청산·평가는 계속 PostgreSQL 행을 읽는다.**
+- **Mark·Last 보존.**
+  - 새 SQL 빌더 `futures*RetentionBatchSql`을 쓴다. `(captured_at,id)` 순서 범위 스캔 하나에서 후보를 읽고, 최신 행은 계약·소스별 LATERAL LIMIT 1 id 배열로 보호한다.
+  - 최신 행 조회는 source **범위** 조건과 `ORDER BY source, 시각`으로 쓴다. 처음 쓴 등호판은 100계약에서 ANALYZE 표본에 따라 다른 인덱스를 골라 464만 버퍼·timeout이 났다. 측정 중 발견해 고쳤다.
+  - 보호 조건·24h·배치·5초 timeout은 그대로다.
+  - 실패하면 `failureKind`와 진행분을 기록한다. 3회 연속 실패는 failing, 10회 연속 상한 도달은 backlog로 본다.
+  - Mark 보존은 30초 늦게 시작한다.
+- **감지.** `/readiness` 이유 코드(`FUTURES_MARK_STALE`, `*_RETENTION_FAILING|BACKLOG`, `DB_DISK_FULL`, `DB_STORAGE_*`)와 구조 로그를 추가했다. 디스크 감시는 `DATABASE_STORAGE_MONITOR_ENABLED`·`DATABASE_STORAGE_CAPACITY_GB`(기본 꺼짐)로 켠다.
+- 마이그레이션·스키마·프런트엔드·KOSCOM·Last 수집 변경은 없다.
+
+**검증(로컬)**
+
+- 최종 코드 기준: typecheck·build·lint(accounts·candles)·format·진단 게이트·diff check PASS. backend 단위 320 suites / 5,148 tests PASS.
+- 가격 안전 PG 통합 14/14 PASS. 운영 SQL 빌더로 10만 행 백로그의 계획 형태를 단언했다(정렬·해시·전체 스캔 없음, 최신 행 조회는 unique 인덱스).
+- E2E 407/407 PASS. `.env*`를 뺀 사본에서 빈 환경으로 돌렸다.
+- CI 금융 DB 목록 27/27 PASS(범위 조회 수정 전 코드).
+  - 공유 실행의 8 FAIL은 모두 WSL 시계 후퇴 직후의 신선도 거부였고, 단독 재실행에서 통과했다.
+  - 수정 뒤에는 보존 관련 F3.1·조건부 진입·선물 통합을 단독으로 다시 돌려 PASS.
+- 성능(로컬, 25계약 60초):
+  - Mark 테이블 버퍼 19,853 → 550/s, 트랜잭션 25.3 → 1.1/s, 사이클 p50 75 → 6.9 ms.
+  - 보존 배치당 버퍼 −10~31%(Mark·Last, 25·100계약). 100계약 백로그는 50배치 모두 timeout 0이다. 처리량은 한 실행을 빼고 모두 늘었다.
+- 로컬 ms는 운영값이 아니다. 운영 효과는 NOT_VERIFIED다.
+
+**10-12 사고**
+
+- 쓰기 불가 구간: 10-12 22:47:46Z – 10-13 06:46:55Z.
+  - DB 중지 6시간 42분과 WAL 공간 부족으로 재기동이 실패한 약 1시간이 포함된다.
+  - 디스크는 5.247 GB가 가득 찼고, 그 뒤 10 GB(10-13), 50 GB(10-15)로 확장됐다.
+- 국내 10-13 세션 원천 행 98.5%, 암호화폐 현물 약 6.7시간, FX 약 7회분이 결측이다.
+- 금융 기록은 0건이고 미결 선물 포지션도 0건이었다.
+- 복구하지 않았다. **10-13 KRX는 결측 세션으로 다룬다**(70종목 검증 포함).
+
+**주의/남은 일**
+
+1. 커밋·push(배포) 승인이 필요하다.
+2. 런북 §3을 설정해야 한다. 디스크 env, 외부 `/readiness` 감시, 자동 확장 결정이다. **경보 전달은 아직 비활성이다.**
+3. 배포 뒤 감사 Q04·Q09·Q12·Q15로 다시 잰다.
+4. KOSCOM 호가 수집 OFF 권고는 채택하지 않았다(사용자 결정).
+
 ## 2026-10-15 KOSCOM 100종목 수집 후속 감사 (보존 ③ 날짜·G4-H 4h/1d·G4-I 공집합·CI 편입·L10-B/L1 모의)
 
 - 시작 `main`=`origin/main`=`9a11e979`(CI 7/7 success). branch 없이 작업. **commit·push·배포·운영 DB/Redis 접근·실제 KOSCOM 호출 없음(미커밋 인계, 커밋은 사용자 승인 필요).**

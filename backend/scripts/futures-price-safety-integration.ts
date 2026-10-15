@@ -17,7 +17,15 @@ import {
 } from './futures-integration';
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
-import { FuturesLastPriceRetentionService } from '../src/futures/futures-last-price-retention.service';
+import {
+  FuturesLastPriceRetentionService,
+  futuresLastPriceRetentionBatchSql,
+} from '../src/futures/futures-last-price-retention.service';
+import {
+  FuturesMarkRetentionService,
+  futuresMarkRetentionBatchSql,
+} from '../src/futures/futures-mark-retention.service';
+import { databaseFailureKind } from '../src/common/database-failure';
 import { ConditionalService } from '../src/conditional/conditional.service';
 import { TradingAccountAccessService } from '../src/trading-accounts/trading-account-access.service';
 import { OrdersService } from '../src/orders/orders.service';
@@ -55,6 +63,66 @@ const deferred = () => {
   });
   return { resolve, promise };
 };
+/** The production batch statement must be ONE ordered range scan of
+ * (captured_at, id) that stops at its LIMIT: no Sort, no Hash join and no
+ * sequential scan of the snapshot table, however large the backlog. */
+type PlanNode = {
+  'Node Type': string;
+  'Relation Name'?: string;
+  'Index Name'?: string;
+  Plans?: PlanNode[];
+};
+function assertOrderedRetentionPlan(explain: unknown, table: string) {
+  const nodes: PlanNode[] = [];
+  const walk = (node: PlanNode) => {
+    nodes.push(node);
+    for (const child of node.Plans ?? []) walk(child);
+  };
+  walk(
+    (explain as Array<{ 'QUERY PLAN': Array<{ Plan: PlanNode }> }>)[0][
+      'QUERY PLAN'
+    ][0].Plan,
+  );
+  const shape = nodes
+    .map((n) => `${n['Node Type']}:${n['Relation Name'] ?? ''}`)
+    .join(' > ');
+  assert.equal(
+    nodes.some(
+      (n) => n['Node Type'] === 'Seq Scan' && n['Relation Name'] === table,
+    ),
+    false,
+    shape,
+  );
+  assert.equal(
+    nodes.some(
+      (n) => n['Node Type'] === 'Sort' || n['Node Type'] === 'Hash Join',
+    ),
+    false,
+    shape,
+  );
+  assert.equal(
+    nodes.some((n) => n['Index Name'] === `${table}_captured_at_id_idx`),
+    true,
+    shape,
+  );
+  // The newest-row-per-pair probe must use the (instrument, source, time)
+  // unique index; any other index can walk a whole instrument's history.
+  const probes = nodes.filter((n) => {
+    const index = n['Index Name'];
+    return (
+      n['Relation Name'] === table &&
+      index !== undefined &&
+      ![`${table}_captured_at_id_idx`, `${table}_pkey`].includes(index)
+    );
+  });
+  assert.equal(probes.length > 0, true, shape);
+  assert.equal(
+    probes.every((n) => n['Index Name']?.endsWith('_key') === true),
+    true,
+    shape,
+  );
+  return shape;
+}
 async function main() {
   // Actual CLI: fresh fixture evidence + inactive empty companion instrument.
   const s = await fixture('general');
@@ -418,22 +486,16 @@ async function main() {
       ${new Date(+old - 86400000)}::timestamp + n * interval '1 millisecond', ${new Date(+old - 86400000)}::timestamp + n * interval '1 millisecond'
     FROM generate_series(1, ${bulk}::integer) n`;
   await db.$executeRaw`ANALYZE futures_last_price_snapshots`;
-  const explain = await db.$transaction(async (tx) => {
-    const plan = await tx.$queryRaw`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)
-      WITH candidates AS (SELECT m.id FROM futures_last_price_snapshots m
-        WHERE m.captured_at < ${cutoff} AND m.effective_at < ${cutoff}
-        AND NOT EXISTS (SELECT 1 FROM futures_executions e WHERE e.last_price_snapshot_id = m.id)
-        AND NOT EXISTS (SELECT 1 FROM futures_season_prices p WHERE p.last_price_snapshot_id = m.id)
-        AND NOT EXISTS (SELECT 1 FROM protection_children c WHERE c.futures_last_price_snapshot_id = m.id)
-        AND NOT EXISTS (SELECT 1 FROM futures_conditional_entries ce WHERE ce.registration_snapshot_id = m.id)
-        AND NOT EXISTS (SELECT 1 FROM futures_conditional_entries ce WHERE ce.trigger_snapshot_id = m.id)
-        AND NOT EXISTS (SELECT 1 FROM seasons s WHERE m.captured_at BETWEEN s.end_at - interval '10 seconds' AND s.end_at)
-        AND EXISTS (SELECT 1 FROM futures_last_price_snapshots newer WHERE newer.instrument_id = m.instrument_id AND newer.source = m.source AND newer.captured_at > m.captured_at)
-        ORDER BY m.captured_at, m.id LIMIT 1000 FOR UPDATE OF m SKIP LOCKED)
-      DELETE FROM futures_last_price_snapshots m USING candidates c WHERE m.id = c.id`;
+  const explain = await db.$transaction(async (tx) =>
     // EXPLAIN ANALYZE really deletes its batch; it is part of the measured total.
-    return plan;
-  });
+    tx.$queryRaw(
+      Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${futuresLastPriceRetentionBatchSql(cutoff, 1000)}`,
+    ),
+  );
+  const lastPlan = assertOrderedRetentionPlan(
+    explain,
+    'futures_last_price_snapshots',
+  );
   const start = performance.now();
   const concurrent = await Promise.all([
     worker.deleteBatch(cutoff, 1000),
@@ -449,7 +511,115 @@ async function main() {
   assert.equal(removed, bulk);
   const elapsedMs = performance.now() - start;
   pass(
-    'concurrent SKIP LOCKED batches delete each old observation exactly once at scale',
+    'Last retention at a 100k backlog: one ordered (captured_at, id) range plan; concurrent SKIP LOCKED batches delete each old observation exactly once',
+  );
+
+  // Futures Mark retention: the same plan guarantee at scale, newest row per
+  // source kept even when older than the cutoff, failure evidence and resume.
+  const markRetention = () => new FuturesMarkRetentionService(db, locks, runs);
+  const markOld = new Date(+(await now()) - 3 * 86400000);
+  const markCutoff = new Date(+(await now()) - 86400000);
+  const markRow = (
+    at: Date,
+    source: 'binance_usdm_mark_ws' | 'binance_usdm_mark_rest',
+  ) =>
+    db.futuresMarkSnapshot.create({
+      data: {
+        instrumentId: i.instrument.id,
+        symbol: i.asset.symbol,
+        price: '100',
+        source,
+        effectiveAt: at,
+        capturedAt: at,
+      },
+    });
+  const olderMarkRest = await markRow(
+    new Date(+markOld - 1000),
+    'binance_usdm_mark_rest',
+  );
+  const newestMarkRest = await markRow(markOld, 'binance_usdm_mark_rest');
+  const newestMarkWs = await markRow(await now(), 'binance_usdm_mark_ws');
+  const markPrefix = randomUUID();
+  await db.$executeRaw`INSERT INTO futures_mark_snapshots(id,instrument_id,symbol,source,price,effective_at,captured_at)
+    SELECT ${markPrefix} || n::text, ${i.instrument.id}, ${i.asset.symbol}, 'binance_usdm_mark_ws'::"FuturesMarkSource", 100,
+      ${new Date(+markOld - 86400000)}::timestamp + n * interval '1 millisecond', ${new Date(+markOld - 86400000)}::timestamp + n * interval '1 millisecond'
+    FROM generate_series(1, ${bulk}::integer) n`;
+  await db.$executeRaw`ANALYZE futures_mark_snapshots`;
+  const markExplain = await db.$transaction(async (tx) =>
+    tx.$queryRaw(
+      Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${futuresMarkRetentionBatchSql(markCutoff, 1000)}`,
+    ),
+  );
+  const markPlan = assertOrderedRetentionPlan(
+    markExplain,
+    'futures_mark_snapshots',
+  );
+  const markStart = performance.now();
+  assert.deepEqual(
+    await Promise.all([
+      markRetention().deleteBatch(markCutoff, 1000),
+      markRetention().deleteBatch(markCutoff, 1000),
+    ]),
+    [1000, 1000],
+  );
+  let markRemoved = 3000;
+  while (true) {
+    const n = await markRetention().deleteBatch(markCutoff, 1000);
+    markRemoved += n;
+    if (n < 1000) break;
+  }
+  const markElapsedMs = performance.now() - markStart;
+  assert.equal(markRemoved, bulk + 1);
+  const markExists = async (id: string) =>
+    (await db.futuresMarkSnapshot.count({ where: { id } })) === 1;
+  assert.equal(await markExists(olderMarkRest.id), false);
+  assert.equal(await markExists(newestMarkRest.id), true);
+  assert.equal(await markExists(newestMarkWs.id), true);
+  assert.equal(await markRetention().deleteBatch(markCutoff, 1000), 0);
+  pass(
+    'Mark retention at a 100k backlog: one ordered (captured_at, id) range plan; concurrent SKIP LOCKED batches delete each row exactly once; the newest row per source survives even when older than the cutoff',
+  );
+
+  // A real statement timeout is classified from the actual driver error, and a
+  // failed run records committed progress plus that category, then resumes.
+  const realTimeout = await db
+    .$transaction(async (tx) => {
+      await tx.$executeRaw`SET LOCAL statement_timeout = '20ms'`;
+      await tx.$queryRaw`SELECT pg_sleep(1)`;
+    })
+    .then(
+      () => null,
+      (reason: unknown) => reason,
+    );
+  assert.equal(databaseFailureKind(realTimeout), 'statement_timeout');
+  process.env.FUTURES_MARK_RETENTION_ENABLED = 'true';
+  // One row per batch, so the run continues into the failing second batch.
+  process.env.FUTURES_MARK_RETENTION_BATCH_SIZE = '1';
+  for (let k = 1; k <= 3; k++)
+    await markRow(new Date(+markOld - 10000 - k), 'binance_usdm_mark_ws');
+  const failing = markRetention();
+  const realMark = markRetention();
+  let markCalls = 0;
+  failing.deleteBatch = async (c, n) => {
+    if (++markCalls === 2) throw realTimeout;
+    return await realMark.deleteBatch(c, n);
+  };
+  await assert.rejects(failing.run());
+  const failedMark = await db.opsJobRun.findFirstOrThrow({
+    where: { jobName: 'futures_mark_retention', status: 'failed' },
+    orderBy: { startedAt: 'desc' },
+  });
+  assert.equal(failedMark.errorCode, 'FUTURES_MARK_RETENTION_FAILED');
+  const failedResult = failedMark.resultJson as Record<string, unknown>;
+  assert.equal(failedResult.failureKind, 'statement_timeout');
+  assert.equal(failedResult.deletedCount, 1);
+  assert.equal(failedResult.batchCount, 1);
+  assert.equal(failing.getStatus().lastFailureKind, 'statement_timeout');
+  assert.equal((await markRetention().run())?.deletedCount, 2);
+  delete process.env.FUTURES_MARK_RETENTION_BATCH_SIZE;
+  assert.equal(await markExists(newestMarkRest.id), true);
+  pass(
+    'a real statement timeout is classified; a failed Mark run records committed progress and category, then the next run resumes',
   );
 
   // Real multi-instance Ops lock, interruption after a committed batch, then resume.
@@ -604,7 +774,16 @@ async function main() {
             deleted: removed,
             measuredDeleteMs: elapsedMs,
             rowsPerSecond: (bulk - 1000) / (elapsedMs / 1000),
+            plan: lastPlan,
             explain,
+          },
+          markRetention: {
+            rows: bulk + 1,
+            deleted: markRemoved,
+            measuredDeleteMs: markElapsedMs,
+            rowsPerSecond: (bulk + 1 - 1000) / (markElapsedMs / 1000),
+            plan: markPlan,
+            explain: markExplain,
           },
         },
         null,

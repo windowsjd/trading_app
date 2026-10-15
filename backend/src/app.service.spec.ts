@@ -425,4 +425,113 @@ describe('AppService candle readiness', () => {
       delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
     }
   });
+  describe('collector, retention and storage health', () => {
+    const at = new Date('2026-10-16T00:00:00Z');
+    const build = (sources: {
+      mark?: unknown;
+      markRetention?: unknown;
+      lastRetention?: unknown;
+      storage?: unknown;
+    }) =>
+      new AppService(
+        {
+          $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+        } as never,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { getStatus: jest.fn().mockReturnValue(sources.mark) } as never,
+        {
+          getStatus: jest.fn().mockReturnValue(sources.markRetention),
+        } as never,
+        {
+          getStatus: jest.fn().mockReturnValue(sources.lastRetention),
+        } as never,
+        { getStatus: jest.fn().mockReturnValue(sources.storage) } as never,
+      );
+    const unhealthy = (enabled: boolean) => ({
+      mark: {
+        enabled,
+        staleTargets: 2,
+        consecutivePersistFailures: 3,
+        lastPersistFailure: {
+          kind: 'disk_full',
+          at: new Date(+at - 60000).toISOString(),
+        },
+      },
+      markRetention: {
+        enabled,
+        failing: true,
+        backlog: false,
+        lastFailureKind: 'statement_timeout',
+        lastFailedAt: at.toISOString(),
+      },
+      lastRetention: {
+        enabled,
+        failing: false,
+        backlog: true,
+        lastFailureKind: null,
+        lastFailedAt: null,
+      },
+      storage: {
+        enabled,
+        level: 'action_required',
+        daysUntil80Percent: 3,
+      },
+    });
+    beforeEach(() => {
+      delete process.env.REDIS_URL;
+      process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+      process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+    });
+    afterEach(() => {
+      delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+    });
+
+    it('adds no reason while the features are disabled', async () => {
+      const result = await build(unhealthy(false)).getReadiness(at);
+      expect(result.data.status).toBe('ready');
+      expect(result.data.reasons).toEqual([]);
+      expect(result.data.futuresMark?.enabled).toBe(false);
+    });
+
+    it('reports each unhealthy signal with a fixed reason and stays serving', async () => {
+      const result = await build(unhealthy(true)).getReadiness(at);
+      expect(result.success).toBe(true);
+      expect(result.data.status).toBe('degraded');
+      expect(result.data.reasons).toEqual([
+        'FUTURES_MARK_STALE',
+        'FUTURES_MARK_PERSIST_FAILING',
+        'FUTURES_MARK_RETENTION_FAILING',
+        'FUTURES_LAST_PRICE_RETENTION_BACKLOG',
+        'DB_DISK_FULL',
+        'DB_STORAGE_ACTION_REQUIRED',
+        'DB_STORAGE_RUNWAY_SHORT',
+      ]);
+    });
+
+    it('drops DB_DISK_FULL ten minutes after the last disk-full write failure', async () => {
+      const sources = unhealthy(true);
+      sources.mark.lastPersistFailure.at = new Date(+at - 600001).toISOString();
+      const result = await build(sources).getReadiness(at);
+      expect(result.data.reasons.includes('DB_DISK_FULL')).toBe(false);
+    });
+
+    it.each([
+      ['warning', 'DB_STORAGE_WARNING'],
+      ['critical', 'DB_STORAGE_CRITICAL'],
+    ])('maps storage level %s to %s', async (level, reason) => {
+      const result = await build({
+        storage: { enabled: true, level, daysUntil80Percent: null },
+      }).getReadiness(at);
+      expect(result.data.reasons).toEqual([reason]);
+    });
+  });
 });

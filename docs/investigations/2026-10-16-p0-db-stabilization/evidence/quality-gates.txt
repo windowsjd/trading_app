@@ -1,0 +1,21 @@
+# Backend quality gates, work tree, 2026-10-16
+# Final run: after the range-form newest-row probe (03:42) and the price-safety
+# script lint cleanup. Earlier first-draft runs gave the same results.
+pnpm run typecheck (tsconfig.build.json): PASS
+pnpm run build: PASS
+pnpm run lint:accounts:check: PASS
+pnpm run lint:candles:check: PASS
+pnpm run format:candles:check: PASS
+prettier --check on every changed/new backend source, spec and script: PASS
+node ../scripts/diagnostic-enforcement.cjs backend (diff vs HEAD incl. untracked): PASS
+git diff --check: PASS
+eslint (not CI-gated) on changed production files: 0 problems
+eslint (not CI-gated) on scripts/futures-price-safety-integration.ts: 15 findings, all pre-existing (HEAD: 16; the unused Prisma import is now used); 0 in added code
+eslint (not CI-gated) on changed/new spec files: 32 no-unsafe-* findings from untyped jest mocks = futures-mark-ingestion.spec.ts 27 (HEAD: 21) + futures-retention-health.spec.ts 5 (new); app.service, database-failure and storage-monitor specs 0 (sibling specs risk-worker+last-ingestion: 31)
+tsc -p tsconfig.json (incl. specs and scripts, not CI-gated): 140 errors, all in untouched specs (HEAD: 152); 0 in changed files
+jest, changed specs (ingestion, retention health, database failure, storage monitor, app.service):
+Test Suites: 5 passed, 5 total
+Tests:       78 passed, 78 total
+jest (all unit suites, --maxWorkers=4, loopback DATABASE_URL), final code:
+Test Suites: 76 skipped, 320 passed, 320 of 396 total
+Tests:       109 skipped, 5148 passed, 5257 total

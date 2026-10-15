@@ -1,0 +1,21 @@
+# Render metrics API (read-only GET /v1/metrics/disk-usage and /disk-capacity), resource dpg-da7ac0e1egvs73e2sv20-a,
+# hourly resolution, values in bytes / 1e9. No samples exist while the database was down (23:00Z..06:00Z).
+time(UTC)              usage_GB  capacity_GB
+2026-10-12T12:00:00Z   3.889     5.247
+2026-10-12T13:00:00Z   4.037     5.247
+2026-10-12T14:00:00Z   4.152     5.247
+2026-10-12T15:00:00Z   4.288     5.247
+2026-10-12T16:00:00Z   4.420     5.247
+2026-10-12T17:00:00Z   4.531     5.247
+2026-10-12T18:00:00Z   4.646     5.247
+2026-10-12T19:00:00Z   4.755     5.247
+2026-10-12T20:00:00Z   4.882     5.247
+2026-10-12T21:00:00Z   5.009     5.247
+2026-10-12T22:00:00Z   5.120     5.247
+2026-10-12T23:00:00Z   5.230     5.247     (99.7 %)
+2026-10-13T06:00:00Z   5.228     5.247
+2026-10-13T07:00:00Z   5.268     10.531    (resized; the 06:46:53Z start succeeded)
+2026-10-13T08:00:00Z   5.382     10.531
+2026-10-13T12:00:00Z   5.837     10.531
+# Growth on 10-12 was ~0.11-0.13 GB/h (the new Futures Mark/Last 24 h window filling, plus Binance spot and KOSCOM).
+# Later: resized to 50 GB at 2026-10-15T15:08Z (see the 2026-10-16 audit).

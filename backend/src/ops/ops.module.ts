@@ -9,6 +9,7 @@ import { OpsJobLockService } from './ops-job-lock.service';
 import { OpsJobRunService } from './ops-job-run.service';
 import { OpsJobRunnerService } from './ops-job-runner.service';
 import { OpsSchedulerService } from './ops-scheduler.service';
+import { DatabaseStorageMonitorService } from './database-storage-monitor.service';
 
 @Module({
   imports: [
@@ -24,12 +25,14 @@ import { OpsSchedulerService } from './ops-scheduler.service';
     OpsJobRunService,
     OpsJobRunnerService,
     OpsSchedulerService,
+    DatabaseStorageMonitorService,
   ],
   exports: [
     OpsJobLockService,
     OpsJobRunService,
     OpsJobRunnerService,
     OpsSchedulerService,
+    DatabaseStorageMonitorService,
   ],
 })
 export class OpsModule {}

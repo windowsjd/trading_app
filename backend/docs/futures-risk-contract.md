@@ -47,6 +47,23 @@ Provider `E` (WS) / `time` (REST) is effectiveAt; received time is capturedAt.
 Both must be nonfuture and at most 5 seconds old. Fresh WS has priority, then fresh
 REST. Duplicate source/instrument/effectiveAt is immutable, and selection orders
 by provider time so delayed evidence cannot supersede newer evidence.
+
+Collection (since 2026-10-16) works as follows.
+- Once a second the collector writes the newest frame per contract in ONE
+  multi-row insert. A duplicate or out-of-order provider time never re-enters,
+  even after an earlier frame was stored.
+- The collector keeps an in-process record of the rows PostgreSQL confirmed and
+  runs no freshness query against the snapshot table.
+- A contract with no STORED WS Mark in the last 3 s gets REST recovery. This
+  covers a silent stream and a failed write alike. There is one public
+  `premiumIndex` call, at most one in flight and one per 3 s, with a 2.5 s
+  timeout. It never blocks the WS drain, and only the quiet contracts' rows are
+  stored.
+- A row rejected by the identity/shape guards is retried alone, so other
+  contracts keep storing.
+- Risk, liquidation and valuation still decide freshness from PostgreSQL rows
+  (`readFuturesMark`), never from the collector's memory.
+- Monitoring: [database-operations-monitoring.md](database-operations-monitoring.md).
 Only exact matching USDT symbols are accepted. A Spot underlying without the same
 USDⓈ-M perpetual symbol stays unavailable; no implicit 1000-token/unit conversion
 is introduced. F3 persists exact exchangeInfo coverage and filters the user catalog

@@ -35,7 +35,12 @@ import { FuturesConditionalEntryWorker } from './futures-conditional-entry-worke
     FuturesLimitController,
     FuturesConditionalEntryController,
   ],
-  exports: [FuturesService],
+  exports: [
+    FuturesService,
+    FuturesMarkIngestion,
+    FuturesMarkRetentionService,
+    FuturesLastPriceRetentionService,
+  ],
   providers: [
     FuturesPerformanceService,
     FuturesService,

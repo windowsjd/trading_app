@@ -1,0 +1,34 @@
+# CI 'Limit order PostgreSQL integration' list (27 suites, CI env flags) on PostgreSQL 17.10 + Redis 7, local WSL, 2026-10-16 02:59-03:04 KST
+# One shared DB (p0_limit_order_test), as in CI.
+Test Suites: 8 failed, 19 passed, 27 total
+Tests:       8 failed, 20 passed, 28 total
+# Failed suites in the shared run (all freshness rejections):
+  FAIL src/futures/futures-risk.integration.spec.ts
+  FAIL src/wallets/wallet-fx-transfer.integration.spec.ts
+  FAIL src/futures/futures-f3.integration.spec.ts (6.921 s)
+  FAIL src/orders/trading-fee-pinning.integration.spec.ts
+  FAIL src/orders/orders.execute.integration.spec.ts
+  FAIL src/orders/market-execution.integration.spec.ts
+  FAIL src/fx/fx.execute.integration.spec.ts
+  FAIL src/mvp-flow.integration.spec.ts
+  futures-risk: FUTURES_MARK_UNAVAILABLE at 03:00:18 KST (rollbackCases → readFuturesMark)
+  futures-f3: 'Fresh Futures Mark Price is required' at 03:02:45 KST
+  trading-fee-pinning / orders.execute / market-execution: PRICE_STALE; wallet-fx-transfer / fx.execute: FX_RATE_UNAVAILABLE; mvp-flow
+# journalctl 'Clock change detected' (WSL wall clock steps back), 03:00-03:03 KST:
+  03:00:15 03:00:44 03:01:14 03:01:44 03:02:13 03:02:43 03:03:12
+# Import check: 7 of the 8 failed suites load no changed module; futures-risk uses FuturesMarkIngestion.persist() only (semantics unchanged) and failed elsewhere.
+# Isolated reruns: fresh clone of a migrated template DB per suite, started 0.3 s after a clock step:
+  risk rc=0 start=03:04:41.979067554 end=03:05:22.278361894 steps_during=1 Tests:       1 passed, 1 total
+  f3 rc=0 start=03:05:41.081707836 end=03:05:51.970044593 steps_during=0 Tests:       1 passed, 1 total
+  wfx rc=0 start=03:06:10.625780882 end=03:06:37.721546569 steps_during=0 Tests:       1 passed, 1 total
+  fee rc=0 start=03:06:40.140390355 end=03:06:45.755954282 steps_during=0 Tests:       1 passed, 1 total
+  oexec rc=0 start=03:07:09.695523381 end=03:07:14.012396136 steps_during=0 Tests:       2 passed, 2 total
+  mexec rc=0 start=03:07:39.236381809 end=03:07:43.541056276 steps_during=0 Tests:       1 passed, 1 total
+  fxexec rc=0 start=03:08:08.772051832 end=03:08:11.841973445 steps_during=0 Tests:       1 passed, 1 total
+  mvp rc=0 start=03:08:38.332030326 end=03:08:40.313387241 steps_during=0 Tests:       1 passed, 1 total
+# Result: 27/27 suites pass (19 in the shared run + 8 in isolated reruns).
+# After the final range-form newest-row probe (03:42 KST), the retention-related suites were rerun alone on fresh DBs:
+  f31final rc=0 start=03:46:45.525119753 end=03:46:48.154566226 steps_during=0 Tests:       1 passed, 1 total
+  centry rc=0 start=03:47:17.136508625 end=03:47:33.620448307 steps_during=0 Tests:       1 passed, 1 total
+  futfinal rc=0 start=03:47:48.838118657 end=03:48:19.800358436 steps_during=0 Tests:       1 passed, 1 total
+#   f31final = src/futures/futures-f31.integration.spec.ts, centry = src/futures/futures-conditional-entry.integration.spec.ts, futfinal = src/futures/futures.integration.spec.ts

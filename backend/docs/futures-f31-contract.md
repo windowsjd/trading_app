@@ -43,6 +43,30 @@ Every 60 seconds the dedicated worker takes the existing Ops lease, executes at
 most ten batches, extends the lease between batches, and records count/cutoff/
 failure evidence. Each delete statement is limited to five seconds. A referenced
 row stays protected by the FK even during a concurrent financial write.
+
+Batch statement (since 2026-10-16, `futuresMarkRetentionBatchSql`):
+- Candidates come from ONE ordered range scan of `(captured_at, id)` below the
+  cutoff that stops at the LIMIT. `effective_at <= captured_at` is a table CHECK,
+  so the receipt cutoff bounds both times, and the DELETE re-checks `effective_at`.
+- The newest row per instrument/source is excluded through an id array. That
+  array is built from an index-backed `LATERAL ... LIMIT 1` per pair in the same
+  snapshot.
+  - The probe filters source by a range (`>= s AND <= s`) and orders by
+    `(source, effective_at)`, so only the unique index fits it.
+  - An equality filter tied with `(instrument_id, effective_at)` in planner
+    cost. Depending on the ANALYZE sample, it read the whole history of a
+    contract that had no REST rows (measured: 4.6M buffers, then 5 s timeouts,
+    at 100 contracts).
+- Liquidation-close references are excluded by `NOT EXISTS`.
+- The former self-join (`EXISTS` on a newer row of the same table) and the
+  redundant `effective_at` filter let the planner choose sorts, hash joins and
+  full scans of the table for a backlog. Production saw 385 five-second timeouts
+  and 1,325 sequential scans.
+- The worker starts half a period after Futures Last retention, so the two delete
+  bursts do not share a second.
+- A failed run records `failureKind` plus the committed `deletedCount`/
+  `batchCount`. Repeated failures or a capped backlog surface in `/readiness`
+  ([monitoring](database-operations-monitoring.md)).
 New schema/index/enum changes use additive migrations only. Applied migration
 files, persistent databases and production configuration are untouched.
 

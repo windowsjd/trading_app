@@ -1,0 +1,37 @@
+# repro/plan-probe-mark.cjs, FINAL statement (source range probe), EXPLAIN only, PostgreSQL 17.10
+## p0_mark_norest_test (25 contracts, prod-like)
+24    1000   old=ordered       cost=9.13       | new=ordered cost=1834.27
+24    10000  old=ordered       cost=9.13       | new=ordered cost=1834.27
+23.9  1000   old=SORT/HASH/SEQ cost=8256.15    | new=ordered cost=3049.57
+      old:  > Sort > Nested Loop > Nested Loop > Bitmap Heap Scan(futures_mark_snapshots) > Bitmap Index Scan > Index Scan(futures_mark_snapshots) > Index Scan(futures_liquidation_closes)
+23.9  10000  old=SORT/HASH/SEQ cost=8256.15    | new=SORT/HASH/SEQ cost=10869.5
+      old:  > Sort > Nested Loop > Nested Loop > Bitmap Heap Scan(futures_mark_snapshots) > Bitmap Index Scan > Index Scan(futures_mark_snapshots) > Index Scan(futures_liquidation_closes)
+      new:  > Sort > Hash Join > Bitmap Heap Scan(futures_mark_snapshots) > Bitmap Index Scan > Hash > Seq Scan(futures_liquidation_closes)
+23    1000   old=ordered       cost=45880.03   | new=ordered cost=2631.72
+23    10000  old=SORT/HASH/SEQ cost=55554.72   | new=ordered cost=9868.65
+      old:  > Sort > Hash Join > Nested Loop > Bitmap Heap Scan(futures_mark_snapshots) > Bitmap Index Scan > Index Scan(futures_mark_snapshots) > Hash > Seq Scan(futures_liquidation_closes)
+18    1000   old=ordered       cost=7091.12    | new=ordered cost=2150.31
+18    10000  old=ordered       cost=70900.98   | new=ordered cost=5054.54
+12    1000   old=ordered       cost=4806.15    | new=ordered cost=2095.88
+12    10000  old=ordered       cost=48051.33   | new=ordered cost=4510.22
+2     1000   old=ordered       cost=3892.46    | new=ordered cost=2071.85
+2     10000  old=ordered       cost=38914.43   | new=ordered cost=4269.93
+{"cases":12,"oldUnordered":3,"newUnordered":1}
+
+## p0_mark100_norest_test (100 contracts)
+24    1000   old=ordered       cost=9.27       | new=ordered cost=360.31
+24    10000  old=ordered       cost=9.27       | new=ordered cost=360.31
+23.9  1000   old=SORT/HASH/SEQ cost=38722.79   | new=ordered cost=2118.77
+      old:  > Sort > Nested Loop > Nested Loop > Bitmap Heap Scan(futures_mark_snapshots) > Bitmap Index Scan > Index Scan(futures_mark_snapshots) > Index Scan(futures_liquidation_closes)
+23.9  10000  old=SORT/HASH/SEQ cost=38722.79   | new=ordered cost=18004.79
+      old:  > Sort > Nested Loop > Nested Loop > Bitmap Heap Scan(futures_mark_snapshots) > Bitmap Index Scan > Index Scan(futures_mark_snapshots) > Index Scan(futures_liquidation_closes)
+23    1000   old=ordered       cost=70042.02   | new=ordered cost=1928.49
+23    10000  old=SORT/HASH/SEQ cost=302672.89  | new=ordered cost=16102.08
+      old:  > Sort > Hash Join > Nested Loop > Bitmap Heap Scan(futures_mark_snapshots) > BitmapAnd > Bitmap Index Scan > Bitmap Index Scan > Index Scan(futures_mark_snapshots) > Hash > Seq Scan(futures_liquidat
+18    1000   old=ordered       cost=16014.59   | new=ordered cost=1904.48
+18    10000  old=ordered       cost=160135.59  | new=ordered cost=15861.9
+12    1000   old=ordered       cost=10444.91   | new=ordered cost=1901.98
+12    10000  old=ordered       cost=104438.85  | new=ordered cost=15836.89
+2     1000   old=ordered       cost=7938.5     | new=ordered cost=1900.85
+2     10000  old=ordered       cost=79374.78   | new=ordered cost=15825.61
+{"cases":12,"oldUnordered":3,"newUnordered":0}

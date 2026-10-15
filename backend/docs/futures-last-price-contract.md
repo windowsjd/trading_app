@@ -119,6 +119,16 @@ are not rewritten; their next execution uses Futures Last.
   by an execution, Season pin or trigger; rows received in any Season's
   `[endAt-10s, endAt]` window; the newest row per instrument/source.
   `FUTURES_LAST_PRICE_RETENTION_ENABLED` follows the ingestion flag.
+  - Since 2026-10-16 each batch (`futuresLastPriceRetentionBatchSql`) reads its
+    candidates from one ordered `(captured_at, id)` range scan that stops at the
+    LIMIT.
+  - The newest row per instrument/source is excluded through an id array built
+    from an index-backed `LATERAL ... LIMIT 1` per pair. This replaces the former
+    self-join, which let the planner sort or hash the whole backlog.
+  - The probe filters source by a range and orders by `(source, captured_at)`,
+    so only the unique index fits it.
+  - Failed runs record `failureKind` and committed progress
+    ([monitoring](database-operations-monitoring.md)).
 - Keep Last ingestion running whenever open Futures positions exist, including
   in DISABLED mode: a Season can only settle with end-boundary evidence.
 

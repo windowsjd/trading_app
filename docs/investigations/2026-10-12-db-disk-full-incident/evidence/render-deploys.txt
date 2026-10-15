@@ -1,0 +1,7 @@
+# Render deploys of srv-da84cg8u01pc73cjasa0 around the outage (read-only GET /v1/services/{id}/deploys).
+status        created(UTC)                 commit
+deactivated   2026-10-12T18:05:28Z         4c830060   (live when the disk filled)
+build_failed  2026-10-13T02:32:29Z         ffb9a515   (build runs prisma migrate deploy; the database was down)
+build_failed  2026-10-13T05:45:00Z         ffb9a515   (database still down)
+deactivated   2026-10-13T05:48:07Z         ffb9a515   (live 05:49:41Z, during the ~6 min the database was up)
+deactivated   2026-10-13T07:29:39Z         cf21e688

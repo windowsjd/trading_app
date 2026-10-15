@@ -1,0 +1,18 @@
+# repro/plan-probe-last.cjs, FINAL statement, EXPLAIN only, PostgreSQL 17.10, p0_last_perf_test (25 contracts)
+24    1000   old=46.7        ordered   | new=1873.48     ordered
+24    10000  old=46.7        ordered   | new=1873.48     ordered
+23.9  1000   old=9467.8      SORT/HASH | new=10641.63    ordered
+      old:  > Sort > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Bitmap Heap Scan(futures_last_price_snapshots) > Bitmap Index Scan > Index Scan(futures_last_price_snapshots) > 
+23.9  10000  old=9467.8      SORT/HASH | new=68074.49    SORT/HASH
+      old:  > Sort > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Nested Loop > Bitmap Heap Scan(futures_last_price_snapshots) > Bitmap Index Scan > Index Scan(futures_last_price_snapshots) > 
+      new:  > Sort > Hash Join > Hash Join > Hash Join > Hash Join > Hash Join > Nested Loop > Index Scan(futures_last_price_snapshots) > Materialize > Seq Scan(seasons) > Hash > Seq Scan(futures_season_prices) > Hash > Seq Scan(fu
+23    1000   old=58960.88    ordered   | new=10170.63    ordered
+23    10000  old=65428.11    SORT/HASH | new=85237.62    ordered
+      old:  > Sort > Hash Join > Hash Join > Hash Join > Hash Join > Nested Loop > Hash Join > Nested Loop > Bitmap Heap Scan(futures_last_price_snapshots) > Bitmap Index Scan > Index Scan(futures_last_price_snapshots) > Hash > Seq
+18    1000   old=16376.96    ordered   | new=9633.4      ordered
+18    10000  old=163754.19   ordered   | new=79865.32    ordered
+12    1000   old=13689.48    ordered   | new=9573.2      ordered
+12    10000  old=136879.42   ordered   | new=79263.36    ordered
+2     1000   old=12539.92    ordered   | new=9545.21     ordered
+2     10000  old=125383.83   ordered   | new=78983.48    ordered
+{"cases":12,"oldUnordered":3,"newUnordered":1}

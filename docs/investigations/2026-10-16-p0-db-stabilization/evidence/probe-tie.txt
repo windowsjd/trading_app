@@ -1,0 +1,6 @@
+# repro/probe-tie.cjs: newest-row-per-pair probe of the retention statements, EXPLAIN (ANALYZE, BUFFERS)
+# after each of N independent ANALYZE samples on a fresh clone. PostgreSQL 17.10, prod pg_settings.
+# equality = first 2026-10-16 draft (source = s.source ORDER BY time DESC); range = final statement.
+{"template":"p0_mark100_norest_test","table":"mark","rounds":40,"choice":{"equality":{"instrument_id_source_effective_at_key":39,"instrument_id_effective_at_idx":1},"range":{"instrument_id_source_effective_at_key":40}},"worstBuffers":{"equality":4633016,"range":954}}
+{"template":"p0_mark_norest_test","table":"mark","rounds":20,"choice":{"equality":{"instrument_id_source_effective_at_key":20},"range":{"instrument_id_source_effective_at_key":20}},"worstBuffers":{"equality":241,"range":241}}
+{"template":"p0_last_perf_test","table":"last","rounds":40,"choice":{"equality":{"instrument_id_source_captured__key":40},"range":{"instrument_id_source_captured__key":40}},"worstBuffers":{"equality":253,"range":253}}

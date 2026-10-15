@@ -1,0 +1,406 @@
+{
+ "note": "READ ONLY session (default_transaction_read_only, BEGIN READ ONLY ... ROLLBACK, statement_timeout 15 s), 2026-10-15T18:2xZ. Aggregates only. Timestamps are naive UTC.",
+ "krx_session_rows_by_day": {
+  "10-12": {
+   "price_rows": 98288,
+   "orderbook_rows": 116970,
+   "assets": 15
+  },
+  "10-13": {
+   "price_rows": 1481,
+   "orderbook_rows": 1590,
+   "assets": 15
+  },
+  "10-14": {
+   "price_rows": 93506,
+   "orderbook_rows": 116952,
+   "assets": 15
+  }
+ },
+ "krx_1013_per_asset": [
+  {
+   "symbol": "000270",
+   "price_rows": "105",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "000660",
+   "price_rows": "106",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "005380",
+   "price_rows": "105",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "005930",
+   "price_rows": "106",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "010140",
+   "price_rows": "105",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "028300",
+   "price_rows": "65",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:58.715",
+   "last_at": "2026-10-13 05:53:12.847"
+  },
+  {
+   "symbol": "034020",
+   "price_rows": "104",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "035420",
+   "price_rows": "105",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "035720",
+   "price_rows": "89",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "042660",
+   "price_rows": "104",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "051910",
+   "price_rows": "106",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "066570",
+   "price_rows": "104",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "068270",
+   "price_rows": "106",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:57.401",
+   "last_at": "2026-10-13 05:53:12.629"
+  },
+  {
+   "symbol": "086520",
+   "price_rows": "92",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:58.715",
+   "last_at": "2026-10-13 05:53:12.847"
+  },
+  {
+   "symbol": "247540",
+   "price_rows": "79",
+   "book_rows": "106",
+   "first_at": "2026-10-13 05:47:58.715",
+   "last_at": "2026-10-13 05:53:12.847"
+  }
+ ],
+ "crypto_spot_2026-10-12T22Z_to_2026-10-13T08Z": {
+  "assets_without_rows": "5",
+  "assets": "30",
+  "rows_in_window": "30893",
+  "rows_day_before": "143793"
+ },
+ "btcusdt_spot_rows_per_hour": {
+  "10-12 22:00": 500,
+  "10-12 23:00": 0,
+  "10-13 00:00": 0,
+  "10-13 01:00": 0,
+  "10-13 02:00": 0,
+  "10-13 03:00": 0,
+  "10-13 04:00": 0,
+  "10-13 05:00": 91,
+  "10-13 06:00": 128,
+  "10-13 07:00": 633
+ },
+ "candles_5m_stored_now": {
+  "BINANCE:ADAUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:ASTERUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:AVAXUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:BNBUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:BTCUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:CHIPUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:DOGEUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:ENAUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:ETHUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:LINKUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:LTCUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:NEARUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:NIGHTUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:PEPEUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:SOLUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:SUIUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:TAOUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:TRUMPUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:TRXUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:UNIUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:WLDUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:XLMUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:XRPUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:ZECUSDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "BINANCE:币安人生USDT": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 120
+  },
+  "KRX:000270": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 78
+  },
+  "KRX:000660": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 78
+  },
+  "KRX:005930": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 78
+  },
+  "KRX:034020": {
+   "krx_session_1013": 78,
+   "outage_window_22Z_08Z": 78
+  }
+ },
+ "krx_1d_candles_1012_1014": {
+  "000270": 3,
+  "000660": 0,
+  "005380": 0,
+  "005930": 3,
+  "010140": 0,
+  "028300": 0,
+  "034020": 0,
+  "035420": 0,
+  "035720": 0,
+  "042660": 0,
+  "051910": 0,
+  "066570": 0,
+  "068270": 0,
+  "086520": 0,
+  "247540": 0
+ },
+ "fx_rate_snapshots_22Z_08Z": [
+  {
+   "captured_at": "2026-10-12 22:10:56.207",
+   "source_type": "provider_api"
+  },
+  {
+   "captured_at": "2026-10-13 05:47:57.88",
+   "source_type": "provider_api"
+  },
+  {
+   "captured_at": "2026-10-13 05:49:37.209",
+   "source_type": "provider_api"
+  },
+  {
+   "captured_at": "2026-10-13 06:49:42.787",
+   "source_type": "provider_api"
+  },
+  {
+   "captured_at": "2026-10-13 07:31:08.753",
+   "source_type": "provider_api"
+  }
+ ],
+ "ops_job_runs_20Z_10Z": [
+  {
+   "job_name": "futures_last_price_retention",
+   "status": "succeeded",
+   "runs": "369",
+   "first": "2026-10-12 20:00:55.526",
+   "last": "2026-10-13 09:59:07.971"
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "status": "succeeded",
+   "runs": "371",
+   "first": "2026-10-12 20:00:55.521",
+   "last": "2026-10-13 09:59:07.96"
+  },
+  {
+   "job_name": "market_candle_reconciliation",
+   "status": "failed",
+   "runs": "7",
+   "first": "2026-10-12 20:11:55.598",
+   "last": "2026-10-12 22:47:55.592"
+  },
+  {
+   "job_name": "market_candle_reconciliation",
+   "status": "succeeded",
+   "runs": "55",
+   "first": "2026-10-12 20:05:55.549",
+   "last": "2026-10-13 09:59:08.085"
+  },
+  {
+   "job_name": "market_candle_sync",
+   "status": "failed",
+   "runs": "5",
+   "first": "2026-10-12 20:15:55.549",
+   "last": "2026-10-12 22:49:55.558"
+  },
+  {
+   "job_name": "market_candle_sync",
+   "status": "succeeded",
+   "runs": "30",
+   "first": "2026-10-12 20:04:55.537",
+   "last": "2026-10-13 09:54:08.073"
+  },
+  {
+   "job_name": "provider_fx_ingest",
+   "status": "succeeded",
+   "runs": "9",
+   "first": "2026-10-12 20:08:55.531",
+   "last": "2026-10-13 09:33:08.171"
+  }
+ ],
+ "financial_records_22Z_08Z": {
+  "orders": "0",
+  "quotes": "0",
+  "futures_executions": "0",
+  "futures_liquidations": "0",
+  "exchange_transactions": "0",
+  "wallet_transactions": "0",
+  "equity_snapshots": "0",
+  "orders_total": "8",
+  "futures_open_positions": "0",
+  "seasons": "1",
+  "season_states": "active:2099-12-31 23:59:59"
+ },
+ "futures_positions_open_during_outage": 0,
+ "daily_portfolio_snapshots": {
+  "2026-10-13": {
+   "first_created": "2026-10-12 15:00:48.415",
+   "last_created": "2026-10-12 15:00:56.105",
+   "n": "8"
+  },
+  "by_date": [
+   {
+    "date": "2026-10-10",
+    "rows": "6"
+   },
+   {
+    "date": "2026-10-11",
+    "rows": "6"
+   },
+   {
+    "date": "2026-10-12",
+    "rows": "8"
+   },
+   {
+    "date": "2026-10-13",
+    "rows": "8"
+   },
+   {
+    "date": "2026-10-14",
+    "rows": "8"
+   },
+   {
+    "date": "2026-10-15",
+    "rows": "8"
+   }
+  ]
+ },
+ "futures_snapshots_left_from_window": {
+  "mark_rows_in_window": "0",
+  "last_rows_in_window": "0",
+  "mark_oldest": "2026-10-14 18:00:27.077",
+  "last_oldest": "2026-10-12 10:40:14.52"
+ }
+}

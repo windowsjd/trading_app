@@ -29,6 +29,13 @@ import {
   readKoscomConfig,
 } from './providers/koscom/koscom.config';
 import { TiingoDiagnosticsService } from './providers/tiingo/tiingo-diagnostics.service';
+import { FuturesMarkIngestion } from './futures/futures-mark-ingestion.service';
+import { FuturesMarkRetentionService } from './futures/futures-mark-retention.service';
+import { FuturesLastPriceRetentionService } from './futures/futures-last-price-retention.service';
+import {
+  DATABASE_STORAGE_RUNWAY_ALERT_DAYS,
+  DatabaseStorageMonitorService,
+} from './ops/database-storage-monitor.service';
 
 /**
  * Structured readiness reasons for the operator market-session override
@@ -71,6 +78,14 @@ export class AppService {
     private readonly assetTickerGateway?: TickerFanoutMetricsSource,
     @Optional()
     private readonly tiingoDiagnostics?: TiingoDiagnosticsService,
+    @Optional()
+    private readonly futuresMarkIngestion?: FuturesMarkIngestion,
+    @Optional()
+    private readonly futuresMarkRetention?: FuturesMarkRetentionService,
+    @Optional()
+    private readonly futuresLastPriceRetention?: FuturesLastPriceRetentionService,
+    @Optional()
+    private readonly databaseStorage?: DatabaseStorageMonitorService,
   ) {}
 
   getHealth() {
@@ -231,6 +246,11 @@ export class AppService {
       reasons.push('RECONCILIATION_STALE');
     }
 
+    // Collector/worker/storage health from in-process state only: readiness
+    // adds no query against the large snapshot tables.
+    const operations = this.operationalHealth(now);
+    reasons.push(...operations.reasons);
+
     const degraded =
       (redisConfig.url !== undefined && redis !== 'ok') ||
       providerDegraded ||
@@ -282,9 +302,67 @@ export class AppService {
           reconciliationDependencyWarnings: liveReconciliationViolations,
         },
         reconciliation,
+        futuresMark: operations.futuresMark,
+        futuresRetention: operations.futuresRetention,
+        databaseStorage: operations.databaseStorage,
         currentTime: now.toISOString(),
       },
     };
+  }
+
+  /** Reasons stay empty while the related feature is disabled. A disk-full
+   * write failure is reported for 10 minutes after the last occurrence. */
+  private operationalHealth(now: Date) {
+    const reasons: string[] = [];
+    const recent = (at: string | null | undefined) =>
+      !!at && now.getTime() - Date.parse(at) <= 600000;
+    const futuresMark =
+      this.futuresMarkIngestion?.getStatus(now.getTime()) ?? null;
+    if (futuresMark?.enabled) {
+      if (futuresMark.staleTargets > 0) reasons.push('FUTURES_MARK_STALE');
+      if (futuresMark.consecutivePersistFailures >= 3)
+        reasons.push('FUTURES_MARK_PERSIST_FAILING');
+    }
+    const futuresRetention = {
+      mark: this.futuresMarkRetention?.getStatus() ?? null,
+      last: this.futuresLastPriceRetention?.getStatus() ?? null,
+    };
+    for (const [prefix, job] of [
+      ['FUTURES_MARK_RETENTION', futuresRetention.mark],
+      ['FUTURES_LAST_PRICE_RETENTION', futuresRetention.last],
+    ] as const) {
+      if (!job?.enabled) continue;
+      if (job.failing) reasons.push(`${prefix}_FAILING`);
+      if (job.backlog) reasons.push(`${prefix}_BACKLOG`);
+    }
+    if (
+      (futuresMark?.enabled &&
+        futuresMark.lastPersistFailure?.kind === 'disk_full' &&
+        recent(futuresMark.lastPersistFailure.at)) ||
+      Object.values(futuresRetention).some(
+        (job) =>
+          job?.enabled &&
+          job.lastFailureKind === 'disk_full' &&
+          recent(job.lastFailedAt),
+      )
+    )
+      reasons.push('DB_DISK_FULL');
+    const databaseStorage =
+      this.databaseStorage?.getStatus(now.getTime()) ?? null;
+    if (databaseStorage?.enabled) {
+      if (databaseStorage.level === 'warning')
+        reasons.push('DB_STORAGE_WARNING');
+      if (databaseStorage.level === 'action_required')
+        reasons.push('DB_STORAGE_ACTION_REQUIRED');
+      if (databaseStorage.level === 'critical')
+        reasons.push('DB_STORAGE_CRITICAL');
+      if (
+        databaseStorage.daysUntil80Percent !== null &&
+        databaseStorage.daysUntil80Percent < DATABASE_STORAGE_RUNWAY_ALERT_DAYS
+      )
+        reasons.push('DB_STORAGE_RUNWAY_SHORT');
+    }
+    return { reasons, futuresMark, futuresRetention, databaseStorage };
   }
 
   private async reconciliationReadiness(

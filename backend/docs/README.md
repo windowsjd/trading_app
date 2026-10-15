@@ -49,6 +49,7 @@ First compare current implementation, tests and migrations with explicit current
 5. `docs/provider-ingestion-foundation.md` — how provider ingestion is configured and operated (env vars, operator commands, per-provider request/response mapping). The historical 40-symbol stock universe lives in code at `src/providers/kis/kis-fixed-asset-universe.ts` (seed with `pnpm tsx scripts/seed-kis-fixed-asset-universe.ts`), not in a doc.
    - `docs/binance-rest-limits.md` — shared REST cooldown, admission budget, Redis requirement and approved recovery procedure.
 5. `docs/scheduler-ops-foundation.md` — scheduler/ops contracts: flags default off; enabled scheduled jobs execute with `dryRun=false`. PostgreSQL lease renewal/loss and safe work boundaries are described there.
+   - `docs/database-operations-monitoring.md` — disk usage, Futures Mark freshness and retention failure/backlog signals: `/readiness` reasons, log events, and the operator setup needed to deliver alerts.
 6. `docs/batch-job-foundation.md` — batch job foundation for daily snapshot/ranking/cycle/settlement/final-tier/reward-grant jobs.
 7. `docs/ranking-backfill-runbook.md` — migration/backfill runbook for ranking tie-breakers.
 8. `docs/operator-api-contract.md` — admin/operator authorization, account management, and audit foundation.
