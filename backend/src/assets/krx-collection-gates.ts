@@ -310,7 +310,7 @@ export class KrxCollectionGateDiagnostics {
       ? resolveKisDailyPeriodWindows('KRX', windowFrom, input.now)
       : null;
     const fourHourWindow = previousSessions(nowMs, FOUR_HOUR_SESSIONS);
-    const assets = await this.assets(input.assetIds);
+    const assets = await this.assets(input.assetIds, { includeInactive: true });
     const oldest = fourHourWindow.sessions.at(-1);
     const holds = oldest
       ? await this.recordedHolds(
@@ -595,12 +595,22 @@ export class KrxCollectionGateDiagnostics {
     return out;
   }
 
-  private assets(assetIds?: readonly string[]) {
+  /**
+   * Active domestic stocks, narrowed to `assetIds` when given. With
+   * `includeInactive`, an explicit id list may also name not-yet-active
+   * assets, as the 1d/4h backfill tools allow: G4-H must judge a new cohort's
+   * history BEFORE its activation (design §10.5). G4-I never passes it — only
+   * active assets carry an obligation.
+   */
+  private assets(
+    assetIds?: readonly string[],
+    options: { includeInactive?: boolean } = {},
+  ) {
     return this.prisma.asset.findMany({
       where: {
         assetType: AssetType.domestic_stock,
         currencyCode: CurrencyCode.KRW,
-        isActive: true,
+        ...(assetIds && options.includeInactive ? {} : { isActive: true }),
         ...(assetIds ? { id: { in: [...assetIds] } } : {}),
       },
       orderBy: [{ symbol: 'asc' }, { id: 'asc' }],

@@ -46,6 +46,7 @@ CAPTURED_LIMIT_S = 11            # floor(now - capturedAt) <= 10 s  <=>  now - c
 AUCTION_S = 600                  # closing single-price auction: last 10 min, no prints
 TICKS = 79                       # completed-5m-bucket ticks 09:05..15:30 (78) + 1
 HEADROOM_GB = 10.0 - 7.40        # GPT observation: 10 GB disk, ~7.40 GB used
+SPLIT_70 = (59, 11)              # (KOSPI, KOSDAQ) of the proposed 70-stock universe, §10
 
 
 def batches(kospi: int, kosdaq: int, konex: int = 0) -> int:
@@ -490,3 +491,55 @@ if __name__ == '__main__':
         z = final_design(n, batch_range(n)[1], t)
         print(f'  6 s trial at N={n}: price {t:g} s, b={batch_range(n)[1]}: {fmt(z.trading)}/day '
               f'({z.trading / DAILY_CAP:.0%}), month {fmt(z.monthly())} ({z.monthly() / MONTHLY_CAP:.0%})')
+
+    print('\n## 10. 70-stock expansion (brief 2026-10-15: 15 -> 70 directly, F normal/worst, 1w weekly on)')
+    # Market split of the proposed universe: existing 12 KOSPI + 3 KOSDAQ plus the
+    # 55 candidates (expansion-70/candidates_55.csv). None = show both batch counts.
+    split_70 = SPLIT_70
+    lo_b, hi_b = batch_range(70)
+    shown_b = sorted({lo_b, hi_b}) if split_70 is None else [batches(*split_70)]
+    if split_70 is not None:
+        print(f'  proposed universe: KOSPI {split_70[0]} / KOSDAQ {split_70[1]} -> {batches(*split_70)} price batches '
+              f'(any 70-stock split gives {lo_b}-{hi_b})')
+    print('| T | b | normal day | worst day | month (22 sessions) | rolling 31 d (23) | every day worst (22) | worst day <= 85% and month <= 80% |')
+    print('|---|---:|---:|---:|---:|---:|---:|---|')
+    for b in sorted({lo_b, hi_b}):
+        for t in (3.0, 4.0, 5.0, 6.0):
+            nd, wd = final_design(70, b, t), final_design(70, b, t, worst=True)
+            m22 = nd.monthly()
+            m23 = nd.monthly(SESSIONS_ROLLING_31, 31 - SESSIONS_ROLLING_31)
+            mw = wd.monthly()
+            ok = wd.trading <= 0.85 * DAILY_CAP and m22 <= 0.80 * MONTHLY_CAP
+            mark = ' (proposed split)' if b in shown_b and split_70 is not None else ''
+            print(f'| {t:g}s | {b}{mark} | {fmt(nd.trading)} ({nd.trading / DAILY_CAP:.1%}) | {fmt(wd.trading)} ({wd.trading / DAILY_CAP:.1%}) | '
+                  f'{fmt(m22)} ({m22 / MONTHLY_CAP:.1%}) | {fmt(m23)} ({m23 / MONTHLY_CAP:.1%}) | {fmt(mw)} ({mw / MONTHLY_CAP:.1%}) | '
+                  f'{"yes" if ok else "NO"} |')
+    s0 = 2 * 2 * cycles(3.0)
+    print(f'  today (S0 shape, 15 stocks, 2 batches, 3 s, price + order book): price+book {fmt(s0)}/day '
+          f'({s0 / DAILY_CAP:.1%}), x22 = {fmt(22 * s0)} ({22 * s0 / MONTHLY_CAP:.1%}) before any candle call; '
+          f'the same shape at 70 stocks would be {fmt(2 * lo_b * cycles(3.0))}-{fmt(2 * hi_b * cycles(3.0))}/day (over the daily cap)')
+    for b in sorted({lo_b, hi_b}):
+        for t in (3.0, 5.0, 6.0):
+            print(f'  b={b} T={t:g}s: mean-latency limit for D <= T-1 s = {max_latency_for(b, t, 2):.2f} s (2 slots), '
+                  f'{max_latency_for(b, t, 3):.2f} s (3 slots); D at 0.3 / 1.0 s mean latency = '
+                  f'{cycle_duration(b, 0.3):.1f} / {cycle_duration(b, 1.0):.1f} s')
+    d1, h4_new, h4_old, w1 = 55 * 7, 55 * 97, 15 * 97, 55
+    print(f'  one-off backfill, 55 new stocks: 1d 576 sessions {fmt(d1)} + 4h 97 sessions {fmt(h4_new)} + 1w {fmt(w1)} '
+          f'= {fmt(d1 + h4_new + w1)}; + {fmt(h4_old)} if the existing 15 never ran the 4h 97 backfill '
+          f'(weekend quota day room at 85%: {fmt(0.85 * DAILY_CAP - 12)})')
+    # Render disk metrics 2026-10-15 14:00Z (expansion-70/render-postgres-disk.json):
+    # capacity 10,530,681,000 B, used 8,668,082,000 B.
+    free_mb = (10_530_681_000 - 8_668_082_000) / 1024 / 1024
+    print(f'  measured free disk {free_mb:,.0f} MB; KOSCOM price rows only (other writers and today\'s growth NOT included):')
+    for label, per, kb in (('70, 5 s, book off, full raw', 5.0, (0.4, 2.0)),
+                           ('70, 5 s, book off, slim raw', 5.0, (0.35, 0.6)),
+                           ('70, 6 s, book off, slim raw', 6.0, (0.35, 0.6))):
+        pr, _, lo, hi = db_growth(70, per, False, row_kb=kb)
+        print(f'    {label}: {fmt(pr)} rows/day, {lo:,.0f}-{hi:,.0f} MB/trading day, '
+              f'{free_mb / hi:.0f}-{free_mb / lo:.0f} trading days to fill the measured free space')
+    # Calibration from the same metrics: growth in 09-16 KST hours on 10-14 / 10-15
+    # was 838 / 700 MB, against 265-450 MB per WHOLE weekend day for 24/7 writers.
+    rows15 = 15 * cycles(3.0) * 0.95 + 15 * cycles(3.0)
+    for kosc in (700 - 131, 838 - 77):
+        print(f'    calibration: {kosc} MB/session day attributed to today\'s 15-stock KOSCOM shape '
+              f'= {kosc * 1024 / rows15:.1f} KB per price/book row (model assumed 0.4-3.0)')

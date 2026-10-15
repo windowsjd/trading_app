@@ -5,6 +5,10 @@
  * production read; DATABASE_URL is read from the environment only.
  *
  *   DATABASE_URL=... pnpm tsx scripts/krx-collection-gates.ts [--sessions 3] [--asset-id <id> ...]
+ *
+ * With --asset-id, G4-H also judges listed assets that are not active yet
+ * (a new cohort's 1d/4h history before its activation); G4-I always counts
+ * active assets only.
  */
 import { PrismaService } from '../src/prisma/prisma.service';
 import { KrxCollectionGateDiagnostics } from '../src/assets/krx-collection-gates';

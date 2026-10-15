@@ -1,0 +1,148 @@
+{
+ "audit": "Q14 — KRX 2024 market calendar (backend/src/orders/market-calendar/data/krx-2024.ts)",
+ "auditedAt": "2026-10-15",
+ "verdict": "PASS — every full-day closure and both special-session times match KRX's own sources; data unchanged, provenance relabelled 2024.1-provisional -> 2024.1",
+ "officialHolidayList": {
+  "page": "http://open.krx.co.kr/contents/MKD/01/0110/01100305/MKD01100305.jsp",
+  "request": "GET /contents/COM/GenerateOTP.jspx?bld=MKD/01/0110/01100305/mkd01100305_01&name=form, then POST /contents/OPN/99/OPN99000001.jspx search_bas_yy=2024&gridTp=KRX&code=<otp>",
+  "fetchedAtUtc": "2026-10-15T14:03:39Z",
+  "responseSha256": "d5961ae5998036cc1710fe28e22d324db0233b570dd5c417b088fba1408f857f",
+  "closures": [
+   {
+    "date": "2024-01-01",
+    "weekday": "MON",
+    "name": "신정"
+   },
+   {
+    "date": "2024-02-09",
+    "weekday": "FRI",
+    "name": "설날"
+   },
+   {
+    "date": "2024-02-12",
+    "weekday": "MON",
+    "name": "설날(대체휴일)"
+   },
+   {
+    "date": "2024-03-01",
+    "weekday": "FRI",
+    "name": "삼일절"
+   },
+   {
+    "date": "2024-04-10",
+    "weekday": "WED",
+    "name": "임시공휴일"
+   },
+   {
+    "date": "2024-05-01",
+    "weekday": "WED",
+    "name": "근로자의날"
+   },
+   {
+    "date": "2024-05-06",
+    "weekday": "MON",
+    "name": "어린이날(대체휴일)"
+   },
+   {
+    "date": "2024-05-15",
+    "weekday": "WED",
+    "name": "석가탄신일"
+   },
+   {
+    "date": "2024-06-06",
+    "weekday": "THU",
+    "name": "현충일"
+   },
+   {
+    "date": "2024-08-15",
+    "weekday": "THU",
+    "name": "광복절"
+   },
+   {
+    "date": "2024-09-16",
+    "weekday": "MON",
+    "name": "추석"
+   },
+   {
+    "date": "2024-09-17",
+    "weekday": "TUE",
+    "name": "추석"
+   },
+   {
+    "date": "2024-09-18",
+    "weekday": "WED",
+    "name": "추석"
+   },
+   {
+    "date": "2024-10-01",
+    "weekday": "TUE",
+    "name": "임시공휴일"
+   },
+   {
+    "date": "2024-10-03",
+    "weekday": "THU",
+    "name": "개천절"
+   },
+   {
+    "date": "2024-10-09",
+    "weekday": "WED",
+    "name": "한글날"
+   },
+   {
+    "date": "2024-12-25",
+    "weekday": "WED",
+    "name": "성탄절"
+   },
+   {
+    "date": "2024-12-31",
+    "weekday": "TUE",
+    "name": "연말휴장일"
+   }
+  ]
+ },
+ "pressReleases": {
+  "board": "http://open.krx.co.kr/contents/OPN/05/05000000/OPN05000000T1.jsp",
+  "items": [
+   {
+    "noti_no": "2023121402",
+    "title": "2023년 연말 시장운영 일정 및 2024년 연초 개장일(1.2) 매매거래시간 안내",
+    "noti_dd": "20231214",
+    "pdf_sha256": "8fa6835588b0b7caad0497bae8a5c00eac9e2cab953062ed32ec941f98966e28"
+   },
+   {
+    "noti_no": "2024032702",
+    "title": "국회의원 선거일(4월 10일)·근로자의 날(5월 1일) 증권·파생·일반상품시장 휴장 안내",
+    "noti_dd": "20240327",
+    "pdf_sha256": "d223008e304173678b175531b0932fc109e370b0709ba498f17a3e98b19e64a4"
+   },
+   {
+    "noti_no": "2024091001",
+    "title": "임시공휴일 지정에 따른 증권·파생·일반상품시장 휴장 안내",
+    "noti_dd": "20240910",
+    "pdf_sha256": "2a98c8f8e5c341ada0b909353db461205d11070ead27d3c0faa97770307b0b6a"
+   },
+   {
+    "noti_no": "2024103104",
+    "title": "대학수학능력시험일(11.14) 증권시장 등 거래시간 임시 변경",
+    "noti_dd": "20241031",
+    "pdf_sha256": "d598442e0d3d640c1bd74191bffb62054ca40ab9038afdbda430412c13dc8504"
+   },
+   {
+    "noti_no": "2024121701",
+    "title": "2024년 연말 시장운영 일정 및 2025년 연초 개장일(1.2) 매매거래시간 안내",
+    "noti_dd": "20241217",
+    "pdf_sha256": "ccb1c42d528fe45ff246d0f4c441778cc72680c25a39a754422092443afbaa54"
+   }
+  ],
+  "specialSessionsQuoted": {
+   "2024-01-02": "2023121402: 주식 정규시장 09:00~15:30 -> 10:00~15:30 (종료시각은 현행과 동일)",
+   "2024-11-14": "2024103104: 증권시장 정규시장을 10시 개장, 종료시간도 1시간 순연 (10:00~16:30)"
+  }
+ },
+ "sessionCountCrossCheck": {
+  "calendarImplied": 244,
+  "note": "262 weekdays - 18 closures; equals the 2024 daily rows (date for date) of KOSPI, KOSDAQ, 005930, 000660, 035720, 086520 in Naver siseJson and of 005930.KS, ^KS11, ^KQ11 in Yahoo chart data (fetched 2026-10-15 ~14:08Z UTC). Corroboration only; the verdict rests on the KRX sources."
+ },
+ "unofficialSourceNotes": "data.krx.co.kr now requires login (HTTP 400 LOGOUT) and was not used.",
+ "followUpOutsideQ14": "KRX's current list does not include 2027-06-07, which the provisional krx-2027.ts closes as a 현충일 substitute holiday; re-check when 2027 is audited."
+}

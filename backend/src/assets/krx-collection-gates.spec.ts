@@ -196,8 +196,8 @@ describe('G4-H 1d readiness (576 sessions, §5.4)', () => {
       state: 'ready',
       windowFrom: kstMidnight(dates[0]).toISOString(),
       calendarAvailable: true,
-      // KRX 2024 is still provisional (Q14): `ready` rests on it.
-      provisionalCalendarYears: [2024],
+      // KRX 2024 was audited against KRX's own notices (Q14, 2026-10-15).
+      provisionalCalendarYears: [],
       coverageComplete: true,
       sessionsExpected: 577,
       confirmed: 577,
@@ -205,6 +205,14 @@ describe('G4-H 1d readiness (576 sessions, §5.4)', () => {
       unconfirmed: { count: 0, sessions: [] },
       unexpected: { count: 0, dates: [] },
     });
+  });
+
+  it('names a provisional calendar year the window rests on (KRX 2027 until audited)', async () => {
+    // 18:00 KST 2027-03-02: the 576-session window spans 2024-11 … 2027-03.
+    const now = new Date('2027-03-02T09:00:00.000Z');
+    const asset = await g4h({ now, daily: dailyBars(now) });
+    expect(asset.daily.state).toBe('ready');
+    expect(asset.daily.provisionalCalendarYears).toEqual([2027]);
   });
 
   it('a complete checkpoint without its bars is not ready (oldest, middle and newest)', async () => {
@@ -515,5 +523,33 @@ describe('G4-I evidence', () => {
     }).gates.g4i({ now: NOW_1D });
     expect(report.pass.measured).toBe(true);
     expect(report.totals.obligated > 0).toBe(true);
+  });
+});
+
+describe('asset selection', () => {
+  type AssetWhere = { isActive?: boolean; id?: { in: string[] } };
+  const selected = (prisma: ReturnType<typeof harness>['prisma']) =>
+    (prisma.asset.findMany.mock.calls[0] as [{ where: AssetWhere }])[0].where;
+
+  it('lets G4-H judge explicitly listed assets before their activation', async () => {
+    const { gates, prisma } = harness({ now: NOW_1D });
+    await gates.g4h({ now: NOW_1D, assetIds: [ASSET.id] });
+    const where = selected(prisma);
+    expect('isActive' in where).toBe(false);
+    expect(where.id?.in.join(',')).toBe(ASSET.id);
+  });
+
+  it('keeps G4-H on active assets without an explicit list', async () => {
+    const { gates, prisma } = harness({ now: NOW_1D });
+    await gates.g4h({ now: NOW_1D });
+    expect(selected(prisma).isActive).toBe(true);
+  });
+
+  it('keeps G4-I on active assets even for an explicit list (only they carry an obligation)', async () => {
+    const { gates, prisma } = harness({ now: NOW_1D });
+    await gates.g4i({ now: NOW_1D, assetIds: [ASSET.id] });
+    const where = selected(prisma);
+    expect(where.isActive).toBe(true);
+    expect(where.id?.in.join(',')).toBe(ASSET.id);
   });
 });

@@ -2,38 +2,31 @@ import type { MarketCalendarDataset } from '../market-calendar.types';
 
 /**
  * KRX (KOSPI/KOSDAQ/KONEX) regular-session calendar for 2024 (historical,
- * fully elapsed year) — PROVISIONAL until audited against KRX's own notice
- * (design 2026-10-15 KOSCOM 100-stock report v2.1, item Q14).
+ * fully elapsed year).
  *
  * Needed by the domestic daily chart policy of 576 completed sessions: until
  * 2027-05-17 that window reaches into 2024, and without this dataset the 1d
  * sync ends `calendar_unavailable` and dated 2024 daily rows are rejected
  * (design F21).
  *
- * Evidence per non-routine date (collected 2026-10-15):
- * - 2024-01-02 delayed open 10:00, close 15:30 unchanged; 2023-12-29 year-end
- *   closure: KRX notice of 2023-12-14 as reported by Kyunghyang
- *   (khan.co.kr/article/202312141411001).
- * - 2024-02-09 / 02-12 Seollal closures: KB Securities market-issue report
- *   (kbthink.com Market-Issue-Report-240207).
- * - 2024-04-10 22nd National Assembly election: "KRX … Closed" with the note
- *   "Korea: 2024/4/10 Parliamentary Election Day" in Yuanta Futures (HK)
- *   April 2024 holiday schedule.
- * - 2024-05-01 / 05-06 / 05-15: Labor Day, Children's Day substitute,
- *   Buddha's Birthday closures (Wikitree / FnNews market-holiday coverage).
- * - 2024-10-01 Armed Forces Day temporary holiday: Eurex circular 4110148
- *   ("The Korea Exchange (KRX) has made a Market Closing Announcement for
- *   1 October 2024").
- * - 2024-10-03 / 10-09: "Korea Exchange Full Day Closure" in Phillip Nova
- *   October 2024 holiday schedule.
- * - 2024-11-14 CSAT day 10:00–16:30: KRX notice as reported by YTN
- *   (ytn.co.kr/_ln/0102_202411140621142860).
- * - 2024-12-31 year-end closure (2024-12-30 last session): KRX notice relayed
- *   by Samsung POP notice #21797 (also cited by the 2025 dataset).
- * - Statutory weekday holidays (2024-01-01, 03-01, 06-06, 08-15, 09-16..18
- *   Chuseok, 12-25) follow 관공서의 공휴일에 관한 규정, on which KRX is always
- *   closed; June 6, August 15 and the Chuseok block also appear in public
- *   KRX holiday listings (FXEmpire XKRX).
+ * Audited 2026-10-15 against KRX's own sources (design 2026-10-15 KOSCOM
+ * 100-stock report v2.1, item Q14); the dates and times below were already
+ * right, only the provenance changed (was `2024.1-provisional`, sourced from
+ * press and member-firm relays of the KRX notices):
+ * - KRX open-data market holiday list for 2024 (MKD01100305): the 18 weekday
+ *   full-day closures below match it exactly, none missing, none extra.
+ * - KRX press releases:
+ *   - 2023121402: 2023-12-29 year-end closure; 2024-01-02 stock regular
+ *     session 10:00–15:30 (open delayed, close unchanged).
+ *   - 2024032702: 04-10 National Assembly election and 05-01 Labor Day
+ *     closures.
+ *   - 2024091001: 10-01 temporary public holiday (Armed Forces Day) closure.
+ *   - 2024103104: 11-14 CSAT day, open 10:00 and close moved one hour to
+ *     16:30.
+ *   - 2024121701: 12-30 last session, 12-31 year-end closure.
+ * - Cross-check: the implied 244 sessions (262 weekdays − 18 closures) equal,
+ *   date for date, the 2024 daily rows of KOSPI, KOSDAQ and four listed
+ *   stocks in two independent public price histories.
  *
  * Constitution Day (07-17) was not a public holiday in 2024 (re-designated
  * only from 2026), so 2024-07-17 was a regular session. Weekend-falling
@@ -44,11 +37,11 @@ export const KRX_2024: MarketCalendarDataset = {
   year: 2024,
   timeZone: 'Asia/Seoul',
   sourceName:
-    'KRX market operation notices as relayed by press and member/partner notices (Kyunghyang, KB Securities, Yuanta Futures HK, Eurex circular 4110148, Phillip Nova, YTN, Samsung POP #21797) + statutory public holidays',
+    'KRX open-data market holiday list 2024 (MKD01100305) + KRX press releases 2023121402, 2024032702, 2024091001, 2024103104, 2024121701',
   sourceReference:
-    'https://www.khan.co.kr/article/202312141411001 ; https://kbthink.com/main/economy/issue_and_news/market-Issue-report/Market-Issue-Report-240207.html ; https://www.yuantafutures.com.hk/en/Uploads/file/20240325/1711376036576589.pdf ; https://eurexchange.com/ex-en/find/circulars/circular-4110148 ; https://phillipnova.com.sg/wp-content/uploads/2024/09/Oct-2024-Holiday-Schedule.pdf ; https://www.ytn.co.kr/_ln/0102_202411140621142860 ; https://www.samsungpop.com/ux/kor/customer/notice/notice/noticeViewContent.do?MenuSeqNo=21797',
+    'http://open.krx.co.kr/contents/MKD/01/0110/01100305/MKD01100305.jsp (search_bas_yy=2024) ; http://open.krx.co.kr/contents/OPN/05/05000000/OPN05000000T1.jsp (press releases 2023121402, 2024032702, 2024091001, 2024103104, 2024121701)',
   verifiedAt: '2026-10-15',
-  version: '2024.1-provisional',
+  version: '2024.1',
   schedules: [
     { date: '2024-01-01', name: '신정', isFullDayClosed: true },
     {

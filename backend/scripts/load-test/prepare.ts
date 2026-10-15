@@ -159,27 +159,29 @@ export async function prepare(
     if ((await db.user.count()) !== 0)
       throw new Error('LOAD_TEST_PREPARE_REQUIRES_EMPTY_USER_DATA');
     const at = new Date();
-    for (const a of [
-      ...CRYPTO,
-      ...STOCKS,
-      ...BINANCE_FUTURES_ONLY_ASSETS.map((a) => ({
-        ...a,
-        market: 'BINANCE' as const,
-        assetType: 'crypto' as const,
-        currencyCode: 'USD' as const,
+    // One statement: the live-candle supervisor reads the crypto catalog once
+    // per connection, so a partly inserted catalog subscribed to a subset for
+    // good (2 of 25 in CI run 38741391258 → REPLAY_INITIAL_PRICES_TIMEOUT).
+    await db.asset.createMany({
+      data: [
+        ...CRYPTO,
+        ...STOCKS,
+        ...BINANCE_FUTURES_ONLY_ASSETS.map((a) => ({
+          ...a,
+          market: 'BINANCE' as const,
+          assetType: 'crypto' as const,
+          currencyCode: 'USD' as const,
+        })),
+      ].map((a) => ({
+        symbol: a.symbol,
+        name: a.name,
+        market: a.market,
+        assetType: a.assetType,
+        currencyCode: a.currencyCode,
+        priceCurrency: a.currencyCode,
+        settlementCurrency: a.currencyCode,
       })),
-    ])
-      await db.asset.create({
-        data: {
-          symbol: a.symbol,
-          name: a.name,
-          market: a.market,
-          assetType: a.assetType,
-          currencyCode: a.currencyCode,
-          priceCurrency: a.currencyCode,
-          settlementCurrency: a.currencyCode,
-        },
-      });
+    });
     const assets = await db.asset.findMany({
       orderBy: [{ assetType: 'asc' }, { symbol: 'asc' }],
     });
@@ -283,13 +285,17 @@ export async function prepare(
     });
     // Ingestion keeps its existing 30s discovery / 1s write cadence.
     const end = Date.now() + 45000;
-    while (
-      (await db.futuresLastPriceSnapshot.count()) < instruments.length ||
-      (await db.assetPriceSnapshot.count({
+    for (;;) {
+      const futuresLast = await db.futuresLastPriceSnapshot.count();
+      const cryptoRows = await db.assetPriceSnapshot.count({
         where: { asset: { assetType: 'crypto' } },
-      })) < CRYPTO.length
-    ) {
-      if (Date.now() > end) throw new Error('REPLAY_INITIAL_PRICES_TIMEOUT');
+      });
+      if (futuresLast >= instruments.length && cryptoRows >= CRYPTO.length)
+        break;
+      if (Date.now() > end)
+        throw new Error(
+          `REPLAY_INITIAL_PRICES_TIMEOUT futuresLast=${futuresLast}/${instruments.length} cryptoRows=${cryptoRows}/${CRYPTO.length}`,
+        );
       await delay(500);
     }
     const actors: FixtureActor[] = [];

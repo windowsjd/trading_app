@@ -230,3 +230,30 @@ current 15 (12 KOSPI/3 KOSDAQ, KIND): 2 batches
   keep price at 4 s for N=100 b=6: 43,530/day (87%), month 957,779 (96%)
   6 s trial at N=50: price 6 s, b=4: 19,821/day (40%), month 436,178 (44%)
   6 s trial at N=50: price 3 s, b=4: 35,421/day (71%), month 779,378 (78%)
+
+## 10. 70-stock expansion (brief 2026-10-15: 15 -> 70 directly, F normal/worst, 1w weekly on)
+  proposed universe: KOSPI 59 / KOSDAQ 11 -> 4 price batches (any 70-stock split gives 4-5)
+| T | b | normal day | worst day | month (22 sessions) | rolling 31 d (23) | every day worst (22) | worst day <= 85% and month <= 80% |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 3s | 4 (proposed split) | 37,105 (74.2%) | 41,722 (83.4%) | 816,418 (81.6%) | 853,511 (85.4%) | 919,430 (91.9%) | NO |
+| 4s | 4 (proposed split) | 29,305 (58.6%) | 33,922 (67.8%) | 644,818 (64.5%) | 674,111 (67.4%) | 747,830 (74.8%) | yes |
+| 5s | 4 (proposed split) | 24,625 (49.2%) | 29,242 (58.5%) | 541,858 (54.2%) | 566,471 (56.6%) | 644,870 (64.5%) | yes |
+| 6s | 4 (proposed split) | 21,505 (43.0%) | 26,122 (52.2%) | 473,218 (47.3%) | 494,711 (49.5%) | 576,230 (57.6%) | yes |
+| 3s | 5 | 44,905 (89.8%) | 49,522 (99.0%) | 988,018 (98.8%) | 1,032,911 (103.3%) | 1,091,030 (109.1%) | NO |
+| 4s | 5 | 35,155 (70.3%) | 39,772 (79.5%) | 773,518 (77.4%) | 808,661 (80.9%) | 876,530 (87.7%) | yes |
+| 5s | 5 | 29,305 (58.6%) | 33,922 (67.8%) | 644,818 (64.5%) | 674,111 (67.4%) | 747,830 (74.8%) | yes |
+| 6s | 5 | 25,405 (50.8%) | 30,022 (60.0%) | 559,018 (55.9%) | 584,411 (58.4%) | 662,030 (66.2%) | yes |
+  today (S0 shape, 15 stocks, 2 batches, 3 s, price + order book): price+book 31,200/day (62.4%), x22 = 686,400 (68.6%) before any candle call; the same shape at 70 stocks would be 62,400-78,000/day (over the daily cap)
+  b=4 T=3s: mean-latency limit for D <= T-1 s = 0.69 s (2 slots), 0.69 s (3 slots); D at 0.3 / 1.0 s mean latency = 1.2 / 2.6 s
+  b=4 T=5s: mean-latency limit for D <= T-1 s = 1.69 s (2 slots), 1.69 s (3 slots); D at 0.3 / 1.0 s mean latency = 1.2 / 2.6 s
+  b=4 T=6s: mean-latency limit for D <= T-1 s = 2.20 s (2 slots), 2.20 s (3 slots); D at 0.3 / 1.0 s mean latency = 1.2 / 2.6 s
+  b=5 T=3s: mean-latency limit for D <= T-1 s = 0.36 s (2 slots), 0.69 s (3 slots); D at 0.3 / 1.0 s mean latency = 1.8 / 3.9 s
+  b=5 T=5s: mean-latency limit for D <= T-1 s = 1.03 s (2 slots), 1.69 s (3 slots); D at 0.3 / 1.0 s mean latency = 1.8 / 3.9 s
+  b=5 T=6s: mean-latency limit for D <= T-1 s = 1.36 s (2 slots), 2.20 s (3 slots); D at 0.3 / 1.0 s mean latency = 1.8 / 3.9 s
+  one-off backfill, 55 new stocks: 1d 576 sessions 385 + 4h 97 sessions 5,335 + 1w 55 = 5,775; + 1,455 if the existing 15 never ran the 4h 97 backfill (weekend quota day room at 85%: 42,488)
+  measured free disk 1,776 MB; KOSCOM price rows only (other writers and today's growth NOT included):
+    70, 5 s, book off, full raw: 311,220 rows/day, 122-608 MB/trading day, 3-15 trading days to fill the measured free space
+    70, 5 s, book off, slim raw: 311,220 rows/day, 106-182 MB/trading day, 10-17 trading days to fill the measured free space
+    70, 6 s, book off, slim raw: 259,350 rows/day, 89-152 MB/trading day, 12-20 trading days to fill the measured free space
+    calibration: 569 MB/session day attributed to today's 15-stock KOSCOM shape = 2.6 KB per price/book row (model assumed 0.4-3.0)
+    calibration: 761 MB/session day attributed to today's 15-stock KOSCOM shape = 3.4 KB per price/book row (model assumed 0.4-3.0)
