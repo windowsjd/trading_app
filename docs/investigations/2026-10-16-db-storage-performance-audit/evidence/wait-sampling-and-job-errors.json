@@ -1,0 +1,103 @@
+{
+ "note": "pg_stat_activity sampled every 250 ms for 150 s (2026-10-15 ~16:05Z), query text not stored",
+ "samples": 506,
+ "waitCounts": {
+  "client backend|active|CPU:-": 100,
+  "client backend|active|Client:ClientRead": 1,
+  "client backend|active|IO:DataFileRead": 106,
+  "client backend|active|IO:WalSync": 18,
+  "client backend|active|IPC:BufferIo": 1,
+  "client backend|active|IO:WalWrite": 1,
+  "client backend|active|LWLock:WALWrite": 1
+ },
+ "failedJobErrorCodes": [
+  {
+   "job_name": "daily_portfolio_snapshot",
+   "status": "failed",
+   "error_code": "DAILY_SNAPSHOT_PARTIAL_FAILURE",
+   "n": 182,
+   "first": "2026-09-10 07:37:59.474",
+   "last": "2026-09-14 15:06:44.662"
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "status": "failed",
+   "error_code": "FUTURES_LAST_PRICE_RETENTION_FAILED",
+   "n": 4,
+   "first": "2026-10-14 10:26:07.666",
+   "last": "2026-10-14 10:34:07.625"
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "status": "running",
+   "error_code": "-",
+   "n": 1,
+   "first": "2026-10-14 19:03:21.16",
+   "last": "2026-10-14 19:03:21.16"
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "status": "failed",
+   "error_code": "FUTURES_MARK_RETENTION_FAILED",
+   "n": 385,
+   "first": "2026-10-13 18:11:18.466",
+   "last": "2026-10-15 04:55:58.826"
+  },
+  {
+   "job_name": "market_candle_reconciliation",
+   "status": "failed",
+   "error_code": "MARKET_CANDLE_RECONCILIATION_FAILED",
+   "n": 2988,
+   "first": "2026-09-08 11:23:17.885",
+   "last": "2026-10-15 14:46:43.786"
+  },
+  {
+   "job_name": "market_candle_reconciliation",
+   "status": "locked",
+   "error_code": "-",
+   "n": 152,
+   "first": "2026-09-08 11:11:19.377",
+   "last": "2026-10-09 10:48:51.841"
+  },
+  {
+   "job_name": "market_candle_reconciliation",
+   "status": "running",
+   "error_code": "-",
+   "n": 41,
+   "first": "2026-09-10 14:24:47.625",
+   "last": "2026-10-09 10:57:51.843"
+  },
+  {
+   "job_name": "market_candle_sync",
+   "status": "failed",
+   "error_code": "MARKET_CANDLE_SYNC_FAILED",
+   "n": 759,
+   "first": "2026-09-07 09:16:38.467",
+   "last": "2026-10-15 14:57:26.427"
+  },
+  {
+   "job_name": "market_candle_sync",
+   "status": "failed",
+   "error_code": "OPS_JOB_FAILED",
+   "n": 31,
+   "first": "2026-09-30 08:34:19.612",
+   "last": "2026-10-12 22:49:55.558"
+  },
+  {
+   "job_name": "market_candle_sync",
+   "status": "running",
+   "error_code": "-",
+   "n": 11,
+   "first": "2026-09-14 12:46:26.302",
+   "last": "2026-10-05 07:09:05.005"
+  },
+  {
+   "job_name": "provider_fx_ingest",
+   "status": "failed",
+   "error_code": "PROVIDER_FX_INGEST_FAILED",
+   "n": 23,
+   "first": "2026-09-11 05:04:52.815",
+   "last": "2026-10-14 02:01:07.639"
+  }
+ ]
+}

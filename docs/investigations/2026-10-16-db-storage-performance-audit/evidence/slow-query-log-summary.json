@@ -1,0 +1,149 @@
+{
+ "source": "Render PG logs, log_min_duration_statement=2000 ms, 2026-10-13T06:47Z..2026-10-15T15:02Z, parameters removed",
+ "shapes": [
+  {
+   "query": "SELECT \"futures_mark_snapshots\".\"instrument_id\" FROM \"futures_mark_snapshots\" WHERE (\"futures_mark_snapshots\".\"instrument_id\" IN ($n) AND \"futures_mark_snapshots\".\"source\" = CAST($n::text AS \"FuturesMarkSource\") AND \"fut",
+   "count": 502,
+   "total_s": 4569,
+   "max_ms": 38891.635,
+   "first": "2026-10-13T06:47:46.469006956Z",
+   "last": "2026-10-15T15:02:36.031050278Z",
+   "avg_ms": 9102
+  },
+  {
+   "query": "(multi-line raw SQL: futures_mark_snapshots retention DELETE, see context)",
+   "count": 618,
+   "total_s": 1586,
+   "max_ms": 9837.479,
+   "first": "2026-10-13T13:02:11.225233821Z",
+   "last": "2026-10-15T04:36:01.273565535Z",
+   "avg_ms": 2566
+  },
+  {
+   "query": "SELECT a.is_active,COUNT(*)::int AS stocks,COUNT(*) FILTER(WHERE d.asset_id IS NOT NULL)::int AS has_1013_daily,COUNT(*) FILTER(WHERE p.asset_id IS NOT NULL)::int AS has_koscom_price",
+   "count": 1,
+   "total_s": 721,
+   "max_ms": 720621.993,
+   "first": "2026-10-14T10:36:02.789844457Z",
+   "last": "2026-10-14T10:36:02.789844457Z",
+   "avg_ms": 720622
+  },
+  {
+   "query": "SELECT \"asset_price_snapshots\".\"id\", \"asset_price_snapshots\".\"asset_id\", \"asset_price_snapshots\".\"price\", \"asset_price_snapshots\".\"price_krw\", \"asset_price_snapshots\".\"currency_code\"::text, \"asset_price_snapshots\".\"sourc",
+   "count": 70,
+   "total_s": 567,
+   "max_ms": 10202.439,
+   "first": "2026-10-13T07:52:27.477721904Z",
+   "last": "2026-10-15T15:00:34.377485386Z",
+   "avg_ms": 8096
+  },
+  {
+   "query": "SELECT COUNT(*) AS \"_count$_all\" FROM (SELECT \"asset_price_snapshots\".\"id\" FROM \"asset_price_snapshots\" WHERE 1=1 OFFSET $n) AS \"sub\"",
+   "count": 22,
+   "total_s": 227,
+   "max_ms": 21606.333,
+   "first": "2026-10-13T06:47:43.32378078Z",
+   "last": "2026-10-15T06:30:14.75545933Z",
+   "avg_ms": 10334
+  },
+  {
+   "query": "WITH gaps AS (SELECT asset_id,captured_at,EXTRACT(EPOCH FROM (captured_at - LAG(captured_at) OVER (PARTITION BY asset_id ORDER BY captured_at))) AS gap_sec FROM asset_price_snapshots WHERE source_name='koscom_krx_realtim",
+   "count": 1,
+   "total_s": 104,
+   "max_ms": 103986.885,
+   "first": "2026-10-14T15:38:04.590018179Z",
+   "last": "2026-10-14T15:38:04.590018179Z",
+   "avg_ms": 103987
+  },
+  {
+   "query": "SELECT source_name, COUNT(DISTINCT asset_id)::int AS domestic_assets,COUNT(*)::bigint AS snapshot_rows",
+   "count": 1,
+   "total_s": 84,
+   "max_ms": 83517.627,
+   "first": "2026-10-14T16:28:17.681437746Z",
+   "last": "2026-10-14T16:28:17.681437746Z",
+   "avg_ms": 83518
+  },
+  {
+   "query": "SELECT a.asset_type::text AS asset_type,p.source_name,COUNT(*)::bigint AS rows,COUNT(DISTINCT p.asset_id)::int AS asset_count,MAX(p.captured_at) AS latest_received FROM asset_price_snapshots p JOIN assets a ON a.id=p.ass",
+   "count": 1,
+   "total_s": 30,
+   "max_ms": 30067.361,
+   "first": "2026-10-14T16:31:00.578212018Z",
+   "last": "2026-10-14T16:31:00.578212018Z",
+   "avg_ms": 30067
+  },
+  {
+   "query": "WITH picked AS (SELECT id,symbol,asset_type::text AS typ FROM assets WHERE (asset_type='crypto' AND symbol IN ('BTCUSDT','ETHUSDT','SOLUSDT','ADAUSDT')) OR (asset_type='domestic_stock' AND symbol IN ('005930','000270')) ",
+   "count": 1,
+   "total_s": 30,
+   "max_ms": 29733.138,
+   "first": "2026-10-15T15:01:19.640168023Z",
+   "last": "2026-10-15T15:01:19.640168023Z",
+   "avg_ms": 29733
+  },
+  {
+   "query": "SELECT source_name, count(*)::bigint AS total_rows, count(DISTINCT asset_id)::int AS assets, min(captured_at) AS oldest, max(captured_at) AS newest FROM asset_price_snapshots GROUP BY source_name ORDER BY total_rows DESC",
+   "count": 1,
+   "total_s": 28,
+   "max_ms": 28460.855,
+   "first": "2026-10-14T13:00:38.201451342Z",
+   "last": "2026-10-14T13:00:38.201451342Z",
+   "avg_ms": 28461
+  },
+  {
+   "query": "WITH sample AS (SELECT * FROM asset_price_snapshots WHERE source_name='koscom_krx_realtime_price' AND captured_at >= '2026-10-14T00:00:00Z' LIMIT 2000) SELECT count(*)::int AS n,round(avg(pg_column_size(sample.*)))::int ",
+   "count": 1,
+   "total_s": 26,
+   "max_ms": 26468.672,
+   "first": "2026-10-14T15:40:49.357201867Z",
+   "last": "2026-10-14T15:40:49.357201867Z",
+   "avg_ms": 26469
+  },
+  {
+   "query": "SELECT source_name, count(*)::bigint AS rows_last_60m, count(DISTINCT asset_id)::int AS asset_count, min(captured_at) AS first_seen, max(captured_at) AS last_seen",
+   "count": 1,
+   "total_s": 25,
+   "max_ms": 24656.438,
+   "first": "2026-10-14T12:59:58.824216965Z",
+   "last": "2026-10-14T12:59:58.824216965Z",
+   "avg_ms": 24656
+  },
+  {
+   "query": "SELECT (captured_at AT TIME ZONE 'Asia/Seoul')::date AS date_kst, COUNT(*)::bigint AS price_snapshots, COUNT(DISTINCT asset_id)::int AS distinct_assets, MIN(captured_at) AS first_at,MAX(captured_at) AS last_at FROM asset",
+   "count": 1,
+   "total_s": 22,
+   "max_ms": 21796.703,
+   "first": "2026-10-14T15:36:42.880187315Z",
+   "last": "2026-10-14T15:36:42.880187315Z",
+   "avg_ms": 21797
+  },
+  {
+   "query": "SELECT mc.interval,mc.source_provider,count(*)::bigint AS stored_bars,count(DISTINCT mc.asset_id)::int AS distinct_assets,min(mc.open_time) AS oldest_bar,max(mc.open_time) AS latest_bar",
+   "count": 1,
+   "total_s": 6,
+   "max_ms": 5850.996,
+   "first": "2026-10-14T14:41:37.675534016Z",
+   "last": "2026-10-14T14:41:37.675534016Z",
+   "avg_ms": 5851
+  },
+  {
+   "query": "WITH rows AS (",
+   "count": 1,
+   "total_s": 3,
+   "max_ms": 3445.782,
+   "first": "2026-10-14T15:55:05.596494841Z",
+   "last": "2026-10-14T15:55:05.596494841Z",
+   "avg_ms": 3446
+  },
+  {
+   "query": "SELECT a.asset_type::text, a.symbol, x.interval, x.count_rows FROM (SELECT id,symbol,asset_type FROM assets WHERE symbol IN ('BTCUSDT','ETHUSDT','005930','AAPL','NVDA')) a CROSS JOIN LATERAL (SELECT interval, count(*)::i",
+   "count": 1,
+   "total_s": 2,
+   "max_ms": 2072.617,
+   "first": "2026-10-15T15:00:51.258622066Z",
+   "last": "2026-10-15T15:00:51.258622066Z",
+   "avg_ms": 2073
+  }
+ ]
+}

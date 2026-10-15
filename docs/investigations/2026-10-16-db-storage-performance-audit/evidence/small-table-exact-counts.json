@@ -1,0 +1,78 @@
+{
+ "counts": {
+  "_prisma_migrations": 78,
+  "ad_reward_claims": 0,
+  "assets": 70,
+  "badges": 0,
+  "batch_job_runs": 251,
+  "beginner_quest_acknowledgements": 0,
+  "cash_wallets": 32,
+  "conditional_buy_orders": 0,
+  "conditional_sell_orders": 0,
+  "daily_portfolio_snapshots": 156,
+  "equity_snapshots": 120,
+  "exchange_transactions": 13,
+  "friendships": 1,
+  "futures_conditional_entries": 0,
+  "futures_execute_requests": 8,
+  "futures_executions": 8,
+  "futures_instruments": 25,
+  "futures_limit_orders": 1,
+  "futures_liquidation_closes": 0,
+  "futures_liquidations": 0,
+  "futures_market_candles": 0,
+  "futures_positions": 3,
+  "futures_season_closes": 0,
+  "futures_season_prices": 0,
+  "futures_season_settlements": 0,
+  "fx_execute_requests": 13,
+  "fx_rate_snapshots": 421,
+  "inquiries": 0,
+  "limit_on_close_orders": 0,
+  "limit_order_candle_evidences": 0,
+  "market_session_overrides": 0,
+  "operator_audit_logs": 0,
+  "ops_job_locks": 74,
+  "orders": 8,
+  "positions": 8,
+  "protection_children": 1,
+  "protection_commands": 3,
+  "protection_groups": 2,
+  "protection_legs": 4,
+  "quotes": 33,
+  "refresh_token_sessions": 459,
+  "reward_fulfillment_requests": 0,
+  "season_participants": 3,
+  "season_rankings": 21,
+  "season_rewards": 0,
+  "seasons": 1,
+  "session_close_price_evidences": 0,
+  "trading_accounts": 8,
+  "user_badges": 0,
+  "users": 4,
+  "wallet_transactions": 63,
+  "wallet_transfer_execute_requests": 1,
+  "wallet_transfer_quotes": 1,
+  "wallet_transfers": 5
+ },
+ "extra": {
+  "users": 4,
+  "accounts": 8,
+  "accounts_by_mode": {
+   "general": 3,
+   "beginner": 2,
+   "season": 3
+  },
+  "quotes_by_status": {
+   "active": 12,
+   "consumed": 21
+  },
+  "refresh_by_status": {
+   "revoked": 434,
+   "active": 25
+  },
+  "seasons_by_status": {
+   "active": 1
+  }
+ }
+}

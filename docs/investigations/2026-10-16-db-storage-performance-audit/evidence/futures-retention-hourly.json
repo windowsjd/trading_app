@@ -1,0 +1,1465 @@
+{
+ "source": "ops_job_runs aggregated per UTC hour (result_json.deletedCount, batchLimitReached)",
+ "rows": [
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 10",
+   "runs": 36,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 26
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 24
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 12",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 15,
+   "max_ms": 104
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 13",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 16
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 21
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 15",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 22
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 16",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 23
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 17",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 19
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 18",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 15,
+   "max_ms": 62
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 19",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 72
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 20",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 16,
+   "max_ms": 74
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 21",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 19
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-12 22",
+   "runs": 50,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 19,
+   "max_ms": 102
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 05",
+   "runs": 6,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 224,
+   "max_ms": 1248
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 06",
+   "runs": 13,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 15,
+   "max_ms": 32
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 07",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 37
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 08",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 20
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 09",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 19,
+   "max_ms": 179
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 10",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "35092",
+   "limit_hit": 0,
+   "avg_ms": 144,
+   "max_ms": 417
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "64959",
+   "limit_hit": 0,
+   "avg_ms": 250,
+   "max_ms": 708
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 12",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "69870",
+   "limit_hit": 0,
+   "avg_ms": 391,
+   "max_ms": 714
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 13",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "69862",
+   "limit_hit": 0,
+   "avg_ms": 582,
+   "max_ms": 3312
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "75992",
+   "limit_hit": 0,
+   "avg_ms": 549,
+   "max_ms": 986
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 15",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "68732",
+   "limit_hit": 0,
+   "avg_ms": 707,
+   "max_ms": 1176
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 16",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "68913",
+   "limit_hit": 0,
+   "avg_ms": 598,
+   "max_ms": 981
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 17",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "67332",
+   "limit_hit": 0,
+   "avg_ms": 566,
+   "max_ms": 1105
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 18",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "61999",
+   "limit_hit": 0,
+   "avg_ms": 922,
+   "max_ms": 2295
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 19",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "63559",
+   "limit_hit": 0,
+   "avg_ms": 964,
+   "max_ms": 2477
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 20",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "61441",
+   "limit_hit": 0,
+   "avg_ms": 590,
+   "max_ms": 1480
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 21",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "67106",
+   "limit_hit": 0,
+   "avg_ms": 876,
+   "max_ms": 2443
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 22",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "58670",
+   "limit_hit": 0,
+   "avg_ms": 541,
+   "max_ms": 1130
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-13 23",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 18,
+   "max_ms": 39
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 00",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 17,
+   "max_ms": 89
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 01",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 39
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 02",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 27
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 03",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 25
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 04",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 24
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 05",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "6181",
+   "limit_hit": 0,
+   "avg_ms": 43,
+   "max_ms": 489
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 06",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "12072",
+   "limit_hit": 0,
+   "avg_ms": 137,
+   "max_ms": 800
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 07",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "66858",
+   "limit_hit": 0,
+   "avg_ms": 412,
+   "max_ms": 997
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 08",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "64623",
+   "limit_hit": 0,
+   "avg_ms": 313,
+   "max_ms": 769
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 09",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "69728",
+   "limit_hit": 0,
+   "avg_ms": 681,
+   "max_ms": 1205
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 10",
+   "runs": 60,
+   "failed": 4,
+   "deleted": "67079",
+   "limit_hit": 0,
+   "avg_ms": 1386,
+   "max_ms": 6359
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "72530",
+   "limit_hit": 0,
+   "avg_ms": 797,
+   "max_ms": 1135
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 12",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "69066",
+   "limit_hit": 0,
+   "avg_ms": 742,
+   "max_ms": 1374
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 13",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "72816",
+   "limit_hit": 0,
+   "avg_ms": 945,
+   "max_ms": 1713
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "74593",
+   "limit_hit": 0,
+   "avg_ms": 1499,
+   "max_ms": 2300
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 15",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "71054",
+   "limit_hit": 0,
+   "avg_ms": 1696,
+   "max_ms": 3110
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 16",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "67098",
+   "limit_hit": 0,
+   "avg_ms": 697,
+   "max_ms": 1594
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 17",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "61250",
+   "limit_hit": 0,
+   "avg_ms": 610,
+   "max_ms": 1140
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 18",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "60212",
+   "limit_hit": 0,
+   "avg_ms": 624,
+   "max_ms": 1605
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 19",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "57851",
+   "limit_hit": 0,
+   "avg_ms": 1006,
+   "max_ms": 2507
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 20",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "53980",
+   "limit_hit": 0,
+   "avg_ms": 759,
+   "max_ms": 2390
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 21",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "51222",
+   "limit_hit": 0,
+   "avg_ms": 503,
+   "max_ms": 1073
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 22",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "51258",
+   "limit_hit": 0,
+   "avg_ms": 625,
+   "max_ms": 1165
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-14 23",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "53093",
+   "limit_hit": 0,
+   "avg_ms": 1021,
+   "max_ms": 1576
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 00",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "63874",
+   "limit_hit": 0,
+   "avg_ms": 636,
+   "max_ms": 1594
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 01",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "63596",
+   "limit_hit": 0,
+   "avg_ms": 797,
+   "max_ms": 2196
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 02",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "59684",
+   "limit_hit": 0,
+   "avg_ms": 551,
+   "max_ms": 1308
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 03",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "57846",
+   "limit_hit": 0,
+   "avg_ms": 963,
+   "max_ms": 1928
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 04",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "56161",
+   "limit_hit": 0,
+   "avg_ms": 1245,
+   "max_ms": 2688
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 05",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "61152",
+   "limit_hit": 0,
+   "avg_ms": 927,
+   "max_ms": 2280
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 06",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "57230",
+   "limit_hit": 0,
+   "avg_ms": 547,
+   "max_ms": 1026
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 07",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "55005",
+   "limit_hit": 0,
+   "avg_ms": 395,
+   "max_ms": 770
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 08",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "64809",
+   "limit_hit": 0,
+   "avg_ms": 780,
+   "max_ms": 1103
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 09",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "62346",
+   "limit_hit": 0,
+   "avg_ms": 897,
+   "max_ms": 2151
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 10",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "58197",
+   "limit_hit": 0,
+   "avg_ms": 805,
+   "max_ms": 1502
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "55486",
+   "limit_hit": 0,
+   "avg_ms": 704,
+   "max_ms": 1210
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 12",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "76343",
+   "limit_hit": 0,
+   "avg_ms": 838,
+   "max_ms": 1463
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 13",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "83331",
+   "limit_hit": 0,
+   "avg_ms": 915,
+   "max_ms": 1695
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "82693",
+   "limit_hit": 0,
+   "avg_ms": 800,
+   "max_ms": 1827
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 15",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "75774",
+   "limit_hit": 0,
+   "avg_ms": 835,
+   "max_ms": 1467
+  },
+  {
+   "job_name": "futures_last_price_retention",
+   "hour_utc": "10-15 16",
+   "runs": 1,
+   "failed": 0,
+   "deleted": "1231",
+   "limit_hit": 0,
+   "avg_ms": 779,
+   "max_ms": 779
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 10",
+   "runs": 36,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 24
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 18
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 12",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 20
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 13",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 11,
+   "max_ms": 15
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 18
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 15",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 11,
+   "max_ms": 17
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 16",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 10,
+   "max_ms": 20
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 17",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 10,
+   "max_ms": 16
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 18",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 32
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 19",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 17
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 20",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 72
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 21",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 16
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-12 22",
+   "runs": 52,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 15,
+   "max_ms": 70
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 05",
+   "runs": 6,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 222,
+   "max_ms": 1252
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 06",
+   "runs": 13,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 26
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 07",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 32
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 08",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 12,
+   "max_ms": 14
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 09",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 13,
+   "max_ms": 91
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 10",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "53250",
+   "limit_hit": 0,
+   "avg_ms": 150,
+   "max_ms": 533
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 240,
+   "max_ms": 1003
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 12",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 370,
+   "max_ms": 610
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 13",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 3207,
+   "max_ms": 7059
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89146",
+   "limit_hit": 0,
+   "avg_ms": 3135,
+   "max_ms": 5199
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 15",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90025",
+   "limit_hit": 0,
+   "avg_ms": 3778,
+   "max_ms": 5833
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 16",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "89339",
+   "limit_hit": 0,
+   "avg_ms": 3748,
+   "max_ms": 5921
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 17",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 3548,
+   "max_ms": 5423
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 18",
+   "runs": 60,
+   "failed": 1,
+   "deleted": "88875",
+   "limit_hit": 0,
+   "avg_ms": 3558,
+   "max_ms": 9625
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 19",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89307",
+   "limit_hit": 0,
+   "avg_ms": 3967,
+   "max_ms": 6738
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 20",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "91025",
+   "limit_hit": 0,
+   "avg_ms": 3569,
+   "max_ms": 5505
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 21",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89046",
+   "limit_hit": 0,
+   "avg_ms": 3575,
+   "max_ms": 5663
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 22",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "71889",
+   "limit_hit": 0,
+   "avg_ms": 2683,
+   "max_ms": 5403
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-13 23",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 15,
+   "max_ms": 37
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 00",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 14,
+   "max_ms": 22
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 01",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 11,
+   "max_ms": 24
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 02",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 11,
+   "max_ms": 13
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 03",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 10,
+   "max_ms": 15
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 04",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 11,
+   "max_ms": 19
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 05",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "7563",
+   "limit_hit": 0,
+   "avg_ms": 43,
+   "max_ms": 479
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 06",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "17000",
+   "limit_hit": 0,
+   "avg_ms": 139,
+   "max_ms": 877
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 07",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "88615",
+   "limit_hit": 0,
+   "avg_ms": 444,
+   "max_ms": 803
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 08",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89995",
+   "limit_hit": 0,
+   "avg_ms": 372,
+   "max_ms": 926
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 09",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "90575",
+   "limit_hit": 0,
+   "avg_ms": 729,
+   "max_ms": 1393
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 10",
+   "runs": 60,
+   "failed": 5,
+   "deleted": "88550",
+   "limit_hit": 0,
+   "avg_ms": 1425,
+   "max_ms": 6826
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 789,
+   "max_ms": 1177
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 12",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89318",
+   "limit_hit": 0,
+   "avg_ms": 770,
+   "max_ms": 1334
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 13",
+   "runs": 60,
+   "failed": 9,
+   "deleted": "77595",
+   "limit_hit": 0,
+   "avg_ms": 1526,
+   "max_ms": 6421
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 14",
+   "runs": 60,
+   "failed": 60,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 5052,
+   "max_ms": 5111
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 15",
+   "runs": 60,
+   "failed": 60,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 5028,
+   "max_ms": 5101
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 16",
+   "runs": 60,
+   "failed": 6,
+   "deleted": "278087",
+   "limit_hit": 23,
+   "avg_ms": 2324,
+   "max_ms": 8309
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 17",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "89814",
+   "limit_hit": 0,
+   "avg_ms": 698,
+   "max_ms": 1274
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 18",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89750",
+   "limit_hit": 0,
+   "avg_ms": 629,
+   "max_ms": 960
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 19",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89925",
+   "limit_hit": 0,
+   "avg_ms": 859,
+   "max_ms": 1941
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 20",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "88941",
+   "limit_hit": 0,
+   "avg_ms": 788,
+   "max_ms": 1532
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 21",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "88367",
+   "limit_hit": 0,
+   "avg_ms": 680,
+   "max_ms": 1485
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 22",
+   "runs": 60,
+   "failed": 52,
+   "deleted": "19000",
+   "limit_hit": 0,
+   "avg_ms": 6604,
+   "max_ms": 42971
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-14 23",
+   "runs": 60,
+   "failed": 60,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 5050,
+   "max_ms": 5174
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 00",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "224404",
+   "limit_hit": 15,
+   "avg_ms": 1188,
+   "max_ms": 5386
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 01",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89754",
+   "limit_hit": 0,
+   "avg_ms": 909,
+   "max_ms": 2123
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 02",
+   "runs": 60,
+   "failed": 15,
+   "deleted": "67485",
+   "limit_hit": 0,
+   "avg_ms": 1823,
+   "max_ms": 7383
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 03",
+   "runs": 60,
+   "failed": 60,
+   "deleted": "0",
+   "limit_hit": 0,
+   "avg_ms": 5067,
+   "max_ms": 5366
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 04",
+   "runs": 61,
+   "failed": 57,
+   "deleted": "40000",
+   "limit_hit": 4,
+   "avg_ms": 4990,
+   "max_ms": 5210
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 05",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "243426",
+   "limit_hit": 18,
+   "avg_ms": 1959,
+   "max_ms": 5735
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 06",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89975",
+   "limit_hit": 0,
+   "avg_ms": 701,
+   "max_ms": 1225
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 07",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 489,
+   "max_ms": 844
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 08",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "88559",
+   "limit_hit": 0,
+   "avg_ms": 758,
+   "max_ms": 1121
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 09",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "90000",
+   "limit_hit": 0,
+   "avg_ms": 735,
+   "max_ms": 1608
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 10",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "69764",
+   "limit_hit": 0,
+   "avg_ms": 788,
+   "max_ms": 1706
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 11",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "67956",
+   "limit_hit": 0,
+   "avg_ms": 622,
+   "max_ms": 1307
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 12",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "85675",
+   "limit_hit": 0,
+   "avg_ms": 552,
+   "max_ms": 1096
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 13",
+   "runs": 61,
+   "failed": 0,
+   "deleted": "90925",
+   "limit_hit": 0,
+   "avg_ms": 702,
+   "max_ms": 1481
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 14",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "87313",
+   "limit_hit": 0,
+   "avg_ms": 674,
+   "max_ms": 1726
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 15",
+   "runs": 60,
+   "failed": 0,
+   "deleted": "89950",
+   "limit_hit": 0,
+   "avg_ms": 809,
+   "max_ms": 1361
+  },
+  {
+   "job_name": "futures_mark_retention",
+   "hour_utc": "10-15 16",
+   "runs": 1,
+   "failed": 0,
+   "deleted": "1500",
+   "limit_hit": 0,
+   "avg_ms": 776,
+   "max_ms": 776
+  }
+ ]
+}

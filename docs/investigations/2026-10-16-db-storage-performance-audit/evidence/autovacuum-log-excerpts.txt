@@ -1,0 +1,58 @@
+# Render PG autovacuum log excerpts (log_autovacuum_min_duration=0), big tables only.
+# Fetched read-only through the Render logs API on 2026-10-15 ~16:00Z. Log timestamp = end of the vacuum run.
+
+== 2026-10-15T11:31:06Z futures_mark_snapshots
+automatic vacuum of table "trading_app_fbbk.public.futures_mark_snapshots": index scans: 1
+  pages: 0 removed, 54166 remain, 23799 scanned (43.94% of total)
+  tuples: 31857 removed, 1824379 remain, 0 are dead but not yet removable
+  frozen: 14 pages from table (0.03% of total) had 406 tuples frozen
+  index scan needed: 8948 pages from table (16.52% of total) had 393726 dead item identifiers removed
+  index "futures_mark_snapshots_pkey": pages: 24923 in total, 0 newly deleted, 0 currently deleted, 0 reusable
+  index "futures_mark_snapshots_instrument_id_effective_at_idx": pages: 42824 in total, 5828 newly deleted, 12044 currently deleted, 12044 reusable
+  index "futures_mark_snapshots_instrument_id_source_effective_at_key": pages: 50267 in total, 6742 newly deleted, 14647 currently deleted, 14647 reusable
+  index "futures_mark_snapshots_captured_at_id_idx": pages: 20980 in total, 3261 newly deleted, 3764 currently deleted, 3637 reusable
+  avg read rate: 30.936 MB/s, avg write rate: 12.758 MB/s
+  buffer usage: 215571 hits, 143416 misses, 59145 dirtied
+  WAL usage: 100171 records, 55497 full page images, 257307217 bytes
+  system usage: CPU: user: 1.22 s, system: 1.36 s, elapsed: 36.21 s
+
+== 2026-10-15T15:08:00Z futures_last_price_snapshots
+automatic vacuum of table "trading_app_fbbk.public.futures_last_price_snapshots": index scans: 1
+  pages: 0 removed, 42308 remain, 19469 scanned (46.02% of total)
+  tuples: 30575 removed, 1498431 remain, 0 are dead but not yet removable
+  frozen: 452 pages from table (1.07% of total) had 18834 tuples frozen
+  index scan needed: 7324 pages from table (17.31% of total) had 327586 dead item identifiers removed
+  index "futures_last_price_snapshots_pkey": pages: 19113 in total, 0 newly deleted, 0 currently deleted, 0 reusable
+  index "futures_last_price_snapshots_instrument_id_effective_at_cap_idx": pages: 36617 in total, 5450 newly deleted, 8925 currently deleted, 8925 reusable
+  index "futures_last_price_snapshots_captured_at_id_idx": pages: 18916 in total, 2712 newly deleted, 5165 currently deleted, 5165 reusable
+  index "futures_last_price_snapshots_instrument_id_source_captured__key": pages: 38722 in total, 5557 newly deleted, 10561 currently deleted, 10561 reusable
+  avg read rate: 41.297 MB/s, avg write rate: 14.447 MB/s
+  buffer usage: 165575 hits, 139177 misses, 48689 dirtied
+  WAL usage: 84106 records, 42094 full page images, 198964503 bytes
+  system usage: CPU: user: 0.99 s, system: 1.14 s, elapsed: 26.32 s
+
+== 2026-10-14T16:10:45Z asset_price_snapshots (insert-triggered vacuum)
+automatic vacuum of table "trading_app_fbbk.public.asset_price_snapshots": index scans: 0
+  pages: 0 removed, 365998 remain, 130922 scanned (35.77% of total)
+  tuples: 0 removed, 2977343 remain, 0 are dead but not yet removable
+  frozen: 72 pages from table (0.02% of total) had 560 tuples frozen
+  index scan bypassed: 23 pages from table (0.01% of total) have 165 dead item identifiers
+  avg read rate: 18.952 MB/s, avg write rate: 17.750 MB/s
+  buffer usage: 131010 hits, 131047 misses, 122733 dirtied
+  WAL usage: 122868 records, 122733 full page images, 940304132 bytes
+  system usage: CPU: user: 1.17 s, system: 1.45 s, elapsed: 54.02 s
+
+== 2026-10-15T06:05:29Z asset_orderbook_snapshots (insert-triggered vacuum)
+automatic vacuum of table "trading_app_fbbk.public.asset_orderbook_snapshots": index scans: 0
+  pages: 0 removed, 57505 remain, 15935 scanned (27.71% of total)
+  tuples: 0 removed, 345211 remain, 0 are dead but not yet removable
+  frozen: 7224 pages from table (12.56% of total) had 42323 tuples frozen
+  index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+  avg read rate: 25.455 MB/s, avg write rate: 17.757 MB/s
+  buffer usage: 16048 hits, 15925 misses, 11109 dirtied
+  WAL usage: 25580 records, 11037 full page images, 83581161 bytes
+  system usage: CPU: user: 0.15 s, system: 0.18 s, elapsed: 4.88 s
+
+# Autovacuum runs per big table, 2026-10-14 15:00Z .. 2026-10-15 15:48Z (first log lines):
+# futures_last_price_snapshots 6, futures_mark_snapshots 5, asset_orderbook_snapshots 2, asset_price_snapshots 1,
+# ops_job_runs 1, market_candle_sync_states 1, ops_job_locks 1,465.

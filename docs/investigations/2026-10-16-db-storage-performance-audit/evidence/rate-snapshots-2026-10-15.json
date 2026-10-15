@@ -1,0 +1,553 @@
+{
+ "note": "Counter deltas between two catalog snapshots (KRX closed, US regular session open, crypto/futures 24/7).",
+ "long": {
+  "from": "2026-10-15T15:42:45.374Z",
+  "to": "2026-10-15T16:01:53.936Z",
+  "seconds": 1148.562,
+  "db_per_s": {
+   "xact": 110.97528910063193,
+   "tup_inserted": 46.290927263830774,
+   "tup_updated": 4.35414022055405,
+   "tup_deleted": 45.09203682517792,
+   "blks_read": 587.313527698113,
+   "blks_hit": 25627.127660500697,
+   "temp_bytes": 0,
+   "sessions_per_h": 473.2874672851792
+  },
+  "wal": {
+   "mb_per_h": 1009.2983195930756,
+   "fpi_per_s": 45.52039855053537,
+   "records_per_s": 458.510729068174
+  },
+  "db_size_mb_per_day": 520.1068814744002,
+  "tables": {
+   "seasons": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.05,
+    "blk_hit_s": 0.06,
+    "seq_h": 178.66
+   },
+   "fx_rate_snapshots": {
+    "ins_h": 3.13,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.11,
+    "blk_hit_s": 23.96,
+    "seq_h": 1767.78
+   },
+   "asset_price_snapshots": {
+    "ins_h": 14966.54,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 19.71,
+    "blk_read_s": 11.34,
+    "blk_hit_s": 252.74,
+    "seq_h": 0
+   },
+   "assets": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.08,
+    "blk_hit_s": 144.07,
+    "seq_h": 761.65
+   },
+   "daily_portfolio_snapshots": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.11,
+    "blk_hit_s": 0.23,
+    "seq_h": 0
+   },
+   "ops_job_locks": {
+    "ins_h": 0,
+    "upd_h": 7716.78,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.92,
+    "blk_hit_s": 31.71,
+    "seq_h": 0
+   },
+   "ops_job_runs": {
+    "ins_h": 134.78,
+    "upd_h": 134.78,
+    "del_h": 0,
+    "size_mb_h": 0.05,
+    "blk_read_s": 6.21,
+    "blk_hit_s": 1.66,
+    "seq_h": 9.4
+   },
+   "asset_orderbook_snapshots": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 1.06,
+    "blk_hit_s": 0.1,
+    "seq_h": 0
+   },
+   "market_candle_sync_states": {
+    "ins_h": 278.96,
+    "upd_h": 733.44,
+    "del_h": 0,
+    "size_mb_h": 0.34,
+    "blk_read_s": 4.23,
+    "blk_hit_s": 17.45,
+    "seq_h": 0
+   },
+   "market_session_overrides": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.07,
+    "blk_hit_s": 0,
+    "seq_h": 59.55
+   },
+   "orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.26,
+    "blk_hit_s": 0.96,
+    "seq_h": 0
+   },
+   "market_candles": {
+    "ins_h": 235.08,
+    "upd_h": 6184.08,
+    "del_h": 0,
+    "size_mb_h": 0.07,
+    "blk_read_s": 3.32,
+    "blk_hit_s": 24.5,
+    "seq_h": 0
+   },
+   "trading_accounts": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.11,
+    "blk_hit_s": 0.26,
+    "seq_h": 238.21
+   },
+   "futures_positions": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.1,
+    "blk_hit_s": 1.25,
+    "seq_h": 0
+   },
+   "futures_mark_snapshots": {
+    "ins_h": 74770.02,
+    "upd_h": 0,
+    "del_h": 89250.73,
+    "size_mb_h": 1.47,
+    "blk_read_s": 490.83,
+    "blk_hit_s": 22903.72,
+    "seq_h": 0
+   },
+   "futures_liquidation_closes": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.08,
+    "blk_hit_s": 91.01,
+    "seq_h": 6278.11
+   },
+   "futures_instruments": {
+    "ins_h": 0,
+    "upd_h": 313.44,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.05,
+    "blk_hit_s": 215.92,
+    "seq_h": 376.12
+   },
+   "futures_season_prices": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.04,
+    "blk_hit_s": 81.28,
+    "seq_h": 0
+   },
+   "futures_limit_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.12,
+    "blk_hit_s": 1.37,
+    "seq_h": 0
+   },
+   "futures_last_price_snapshots": {
+    "ins_h": 76008.09,
+    "upd_h": 0,
+    "del_h": 72832.99,
+    "size_mb_h": 0,
+    "blk_read_s": 62.87,
+    "blk_hit_s": 876.34,
+    "seq_h": 0
+   },
+   "protection_groups": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.15,
+    "blk_hit_s": 1.4,
+    "seq_h": 0
+   },
+   "protection_children": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.13,
+    "blk_hit_s": 40.45,
+    "seq_h": 0
+   },
+   "futures_executions": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.14,
+    "blk_hit_s": 20.26,
+    "seq_h": 72952.09
+   },
+   "conditional_buy_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0,
+    "blk_hit_s": 11,
+    "seq_h": 0
+   },
+   "conditional_sell_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.01,
+    "blk_hit_s": 12.99,
+    "seq_h": 0
+   },
+   "limit_on_close_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.01,
+    "blk_hit_s": 1.72,
+    "seq_h": 0
+   },
+   "futures_conditional_entries": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.01,
+    "blk_hit_s": 177.77,
+    "seq_h": 0
+   },
+   "season_participants": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.16,
+    "blk_hit_s": 0.29,
+    "seq_h": 0
+   }
+  }
+ },
+ "short": {
+  "from": "2026-10-15T15:42:45.374Z",
+  "to": "2026-10-15T15:47:24.888Z",
+  "seconds": 279.514,
+  "db_per_s": {
+   "xact": 113.93347023762674,
+   "tup_inserted": 49.08877551750538,
+   "tup_updated": 4.650929828201807,
+   "tup_deleted": 38.624183404051315,
+   "blks_read": 515.4625528596063,
+   "blks_hit": 27700.37636755225,
+   "temp_bytes": 0,
+   "sessions_per_h": 502.30042144579517
+  },
+  "wal": {
+   "mb_per_h": 1053.4072736552607,
+   "fpi_per_s": 47.9331983371137,
+   "records_per_s": 467.77263392889085
+  },
+  "db_size_mb_per_day": 502.30042144579517,
+  "tables": {
+   "seasons": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.04,
+    "blk_hit_s": 0.06,
+    "seq_h": 154.55
+   },
+   "fx_rate_snapshots": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.12,
+    "blk_hit_s": 24.02,
+    "seq_h": 1777.37
+   },
+   "asset_price_snapshots": {
+    "ins_h": 15004.62,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 19.12,
+    "blk_read_s": 22.47,
+    "blk_hit_s": 260.29,
+    "seq_h": 0
+   },
+   "assets": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.06,
+    "blk_hit_s": 150.79,
+    "seq_h": 837.17
+   },
+   "daily_portfolio_snapshots": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.1,
+    "blk_hit_s": 0.2,
+    "seq_h": 0
+   },
+   "ops_job_locks": {
+    "ins_h": 0,
+    "upd_h": 7676.18,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.82,
+    "blk_hit_s": 29.86,
+    "seq_h": 0
+   },
+   "ops_job_runs": {
+    "ins_h": 115.92,
+    "upd_h": 115.92,
+    "del_h": 0,
+    "size_mb_h": 0.1,
+    "blk_read_s": 11.09,
+    "blk_hit_s": 0.94,
+    "seq_h": 25.76
+   },
+   "asset_orderbook_snapshots": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 4.34,
+    "blk_hit_s": 0.42,
+    "seq_h": 0
+   },
+   "market_candle_sync_states": {
+    "ins_h": 321.99,
+    "upd_h": 643.97,
+    "del_h": 0,
+    "size_mb_h": 0.2,
+    "blk_read_s": 1.94,
+    "blk_hit_s": 6.62,
+    "seq_h": 0
+   },
+   "market_session_overrides": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.06,
+    "blk_hit_s": 0,
+    "seq_h": 51.52
+   },
+   "orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.21,
+    "blk_hit_s": 1.04,
+    "seq_h": 0
+   },
+   "market_candles": {
+    "ins_h": 321.99,
+    "upd_h": 7405.71,
+    "del_h": 0,
+    "size_mb_h": 0.1,
+    "blk_read_s": 5.81,
+    "blk_hit_s": 42.94,
+    "seq_h": 0
+   },
+   "trading_accounts": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.09,
+    "blk_hit_s": 0.28,
+    "seq_h": 206.07
+   },
+   "futures_positions": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.09,
+    "blk_hit_s": 1.24,
+    "seq_h": 0
+   },
+   "futures_mark_snapshots": {
+    "ins_h": 81540.1,
+    "upd_h": 0,
+    "del_h": 77276.99,
+    "size_mb_h": 1.31,
+    "blk_read_s": 404.16,
+    "blk_hit_s": 24978.31,
+    "seq_h": 0
+   },
+   "futures_liquidation_closes": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.08,
+    "blk_hit_s": 75.62,
+    "seq_h": 19319.25
+   },
+   "futures_instruments": {
+    "ins_h": 0,
+    "upd_h": 321.99,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.04,
+    "blk_hit_s": 229.52,
+    "seq_h": 386.38
+   },
+   "futures_season_prices": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.04,
+    "blk_hit_s": 68.67,
+    "seq_h": 0
+   },
+   "futures_limit_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.1,
+    "blk_hit_s": 1.35,
+    "seq_h": 0
+   },
+   "futures_last_price_snapshots": {
+    "ins_h": 79273.31,
+    "upd_h": 0,
+    "del_h": 61525.36,
+    "size_mb_h": 0,
+    "blk_read_s": 58.99,
+    "blk_hit_s": 869.66,
+    "seq_h": 0
+   },
+   "protection_groups": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.11,
+    "blk_hit_s": 1.34,
+    "seq_h": 0
+   },
+   "protection_children": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.1,
+    "blk_hit_s": 34.18,
+    "seq_h": 0
+   },
+   "futures_executions": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.12,
+    "blk_hit_s": 17.11,
+    "seq_h": 61628.4
+   },
+   "conditional_buy_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0,
+    "blk_hit_s": 10.98,
+    "seq_h": 0
+   },
+   "conditional_sell_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0,
+    "blk_hit_s": 12.98,
+    "seq_h": 0
+   },
+   "limit_on_close_orders": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.02,
+    "blk_hit_s": 1.7,
+    "seq_h": 0
+   },
+   "futures_conditional_entries": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0,
+    "blk_hit_s": 152.31,
+    "seq_h": 0
+   },
+   "season_participants": {
+    "ins_h": 0,
+    "upd_h": 0,
+    "del_h": 0,
+    "size_mb_h": 0,
+    "blk_read_s": 0.13,
+    "blk_hit_s": 0.33,
+    "seq_h": 0
+   }
+  }
+ }
+}

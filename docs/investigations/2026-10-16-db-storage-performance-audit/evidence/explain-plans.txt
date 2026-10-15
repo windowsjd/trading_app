@@ -1,0 +1,62 @@
+# EXPLAIN outputs (production, read-only session, 2026-10-15 ~15:52-15:58Z). 25 instrument ids replaced by <25 ids>.
+
+## A. Futures Mark freshness groupBy (futures-mark-ingestion.service.ts:237), plain EXPLAIN
+Group  (cost=0.56..89.61 rows=25 width=37)
+  Group Key: instrument_id
+  ->  Index Only Scan using futures_mark_snapshots_instrument_id_source_effective_at_key on futures_mark_snapshots  (cost=0.56..89.27 rows=134 width=37)
+        Index Cond: ((instrument_id = ANY ('{<25 ids>}'::text[])) AND (source = 'binance_usdm_mark_ws') AND (effective_at >= now()-3s))
+
+## B. Same query, EXPLAIN (ANALYZE, BUFFERS), 3 runs 20 s apart (runs 2-3 reuse run 1's cutoff, so they match more rows)
+run 1: wall 5,244 ms
+  Group (actual time=0.117..4693.085 rows=25 loops=1)  Buffers: shared hit=19241 read=7363
+  -> Index Only Scan ... (actual time=0.116..4693.039 rows=25)  Heap Fetches: 25
+  Execution Time: 4693.147 ms
+run 2: wall 427 ms   Buffers: shared hit=27005            rows=500  Heap Fetches: 500  Execution Time: 310.670 ms
+run 3: wall 254 ms   Buffers: shared hit=27394            rows=950  Heap Fetches: 950  Execution Time: 159.186 ms
+=> ~27k buffer accesses (~210 MB of page visits) to return 25 groups; expected ~100.
+
+## C. US stock carry-forward lookup (shape from slow log; kis_us_delayed_trade has 0 rows in production), plain EXPLAIN
+window 2026-10-14 13:30..20:00 ->
+  Limit -> Incremental Sort -> Index Scan Backward using asset_price_snapshots_asset_id_effective_at_idx  (cost=0.56..2.81 rows=1)
+window 2026-10-15 13:30..20:00 ->
+  Limit -> Incremental Sort -> Index Scan Backward using asset_price_snapshots_source_type_effective_at_idx  (cost=0.43..2.68 rows=1)
+        Filter: (price > 0) AND (asset_id = <AAPL>) AND (source_name = 'kis_us_delayed_trade') AND (currency_code = 'USD')
+=> the second plan walks every provider_api row (Binance ~15k/h) in the 6.5 h window for an asset with no rows;
+   slow log: 70 executions, avg 8.1 s, max 10.2 s (10-13..10-15).
+
+## D. Mark retention candidate SELECT (FOR UPDATE removed), planning only, 2026-10-15 ~16:20Z
+-- cutoff now-24h
+    Limit  (cost=1.13..24692.12 rows=330 width=45)
+      ->  Nested Loop Anti Join  (cost=1.13..24692.12 rows=330 width=45)
+            ->  Nested Loop Semi Join  (cost=0.99..24634.44 rows=330 width=45)
+                  ->  Index Scan using futures_mark_snapshots_captured_at_id_idx on futures_mark_snapshots m  (cost=0.43..23962.73 rows=990 width=94)
+                        Index Cond: (captured_at < ((now() AT TIME ZONE 'UTC'::text) - '24:00:00'::interval))
+                        Filter: (effective_at < ((now() AT TIME ZONE 'UTC'::text) - '24:00:00'::interval))
+                  ->  Index Only Scan using futures_mark_snapshots_instrument_id_source_effective_at_key on futures_mark_snapshots newer  (cost=0.55..2241.67 rows=13958 width=49)
+                        Index Cond: ((instrument_id = m.instrument_id) AND (source = m.source) AND (effective_at > m.effective_at))
+            ->  Index Only Scan using futures_liquidation_closes_mark_snapshot_id_idx on futures_liquidation_closes c  (cost=0.14..0.17 rows=1 width=32)
+                  Index Cond: (mark_snapshot_id = m.id)
+-- cutoff now-12h
+    Limit  (cost=1.13..3517.44 rows=1000 width=45)
+      ->  Nested Loop Anti Join  (cost=1.13..652054.84 rows=185437 width=45)
+            ->  Nested Loop Semi Join  (cost=0.99..621914.02 rows=185456 width=45)
+                  ->  Index Scan using futures_mark_snapshots_captured_at_id_idx on futures_mark_snapshots m  (cost=0.43..245061.61 rows=556368 width=94)
+                        Index Cond: (captured_at < ((now() AT TIME ZONE 'UTC'::text) - '12:00:00'::interval))
+                        Filter: (effective_at < ((now() AT TIME ZONE 'UTC'::text) - '12:00:00'::interval))
+                  ->  Index Only Scan using futures_mark_snapshots_instrument_id_source_effective_at_key on futures_mark_snapshots newer  (cost=0.55..2221.09 rows=13958 width=49)
+                        Index Cond: ((instrument_id = m.instrument_id) AND (source = m.source) AND (effective_at > m.effective_at))
+            ->  Index Only Scan using futures_liquidation_closes_mark_snapshot_id_idx on futures_liquidation_closes c  (cost=0.14..0.16 rows=1 width=32)
+                  Index Cond: (mark_snapshot_id = m.id)
+-- cutoff now-2h
+    Limit  (cost=1.13..2897.82 rows=1000 width=45)
+      ->  Nested Loop Anti Join  (cost=1.13..1785621.03 rows=616436 width=45)
+            ->  Nested Loop Semi Join  (cost=0.99..1685435.45 rows=616498 width=45)
+                  ->  Index Scan using futures_mark_snapshots_captured_at_id_idx on futures_mark_snapshots m  (cost=0.43..432694.82 rows=1849494 width=94)
+                        Index Cond: (captured_at < ((now() AT TIME ZONE 'UTC'::text) - '02:00:00'::interval))
+                        Filter: (effective_at < ((now() AT TIME ZONE 'UTC'::text) - '02:00:00'::interval))
+                  ->  Index Only Scan using futures_mark_snapshots_instrument_id_source_effective_at_key on futures_mark_snapshots newer  (cost=0.55..2221.07 rows=13958 width=49)
+                        Index Cond: ((instrument_id = m.instrument_id) AND (source = m.source) AND (effective_at > m.effective_at))
+            ->  Index Only Scan using futures_liquidation_closes_mark_snapshot_id_idx on futures_liquidation_closes c  (cost=0.14..0.16 rows=1 width=32)
+                  Index Cond: (mark_snapshot_id = m.id)
+=> with current statistics the plan is index-based (nested loop semi/anti join) at 24 h, 12 h and 2 h cutoffs.
+   The 1,325 sequential scans of futures_mark_snapshots (2.19 B tuples, last 2026-10-15T04:56Z) are NOT reproduced by this plan; cause NOT_VERIFIED.

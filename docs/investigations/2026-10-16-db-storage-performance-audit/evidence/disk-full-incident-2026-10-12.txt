@@ -1,0 +1,8 @@
+# Disk-full incident (Render PG logs, read-only)
+first "No space left" error: 2026-10-12T22:47:46.491936119Z  [6acd6355.5896d-4] ERROR:  could not extend file "base/16389/29548": No space left on device
+errors in first 16 s: 300+ (page limit)
+page of 100 errors ending at: 2026-10-13T06:41:36.817336469Z
+2026-10-13T05:47:21.841238516Z  [6acdc5e9.33-6] LOG:  database system is ready to accept connections
+2026-10-13T06:46:55.442288868Z  [6acdd3dc.32-6] LOG:  database system is ready to accept connections
+KOSCOM 005930 rows per session day (asset_price_snapshots / asset_orderbook_snapshots): 10-12 7592/7798, 10-13 106/106 (05:47:57-05:53:12Z only), 10-14 7590/7797, 10-15 6988/7795
+Render disk metrics: 10-12T23:00Z usage 5.230 GB of 5.25 GB capacity; metric gap until 10-13T06:00Z; capacity 10.53 GB from 10-13; resized to 50 GB at 2026-10-15T15:08Z (postgres.updatedAt)

@@ -1,0 +1,125 @@
+{
+ "binance": {
+  "ms": 84,
+  "jsonb_bytes": 697,
+  "row_bytes": 981,
+  "text_bytes": 584,
+  "shape": {
+   "payload": {
+    "payload": {
+     "data": "object",
+     "stream": "string:16B"
+    },
+    "provider": "string:9B",
+    "streamName": "string:16B",
+    "messageType": "string:16B"
+   },
+   "truncated": "boolean:5B"
+  }
+ },
+ "koscom": {
+  "ms": 80,
+  "jsonb_bytes": 512,
+  "row_bytes": 703,
+  "text_bytes": 453,
+  "shape": {
+   "payload": {
+    "row": {
+     "hgprc": "string:8B",
+     "lwprc": "string:8B",
+     "trdTm": "string:10B",
+     "opnprc": "string:8B",
+     "trdPrc": "string:8B",
+     "trdvol": "string:5B",
+     "isuSrtCd": "string:8B",
+     "accTrdval": "string:15B",
+     "accTrdvol": "string:10B",
+     "askordPrc_1": "string:8B",
+     "bidordPrc_1": "string:8B",
+     "cmpprevddPrc": "string:8B",
+     "cmpprevddTpCd": "string:3B",
+     "lstAskbidTpCd": "string:3B"
+    },
+    "market": "string:7B",
+    "provider": "string:8B",
+    "dateBasis": "string:17B",
+    "changeRate": "string:13B",
+    "messageType": "string:20B"
+   },
+   "truncated": "boolean:5B"
+  }
+ },
+ "orderbook": {
+  "ms": 84,
+  "jsonb_bytes": 835,
+  "row_bytes": 1032,
+  "text_bytes": 1835,
+  "shape": {
+   "payload": {
+    "row": {
+     "isuSrtCd": "string:8B",
+     "accTrdvol": "string:10B",
+     "deemTrdPrc": "string:8B",
+     "deemTrdvol": "string:4B",
+     "askordTotRqty": "string:8B",
+     "bidordTotRqty": "string:8B",
+     "deemAccTrdvol": "string:9B",
+     "askStep1BstordPrc": "string:8B",
+     "askStep2BstordPrc": "string:8B",
+     "askStep3BstordPrc": "string:8B",
+     "askStep4BstordPrc": "string:3B",
+     "askStep5BstordPrc": "string:3B",
+     "askStep6BstordPrc": "string:3B",
+     "askStep7BstordPrc": "string:3B",
+     "askStep8BstordPrc": "string:3B",
+     "askStep9BstordPrc": "string:3B",
+     "bidStep1BstordPrc": "string:8B",
+     "bidStep2BstordPrc": "string:8B",
+     "bidStep3BstordPrc": "string:8B",
+     "bidStep4BstordPrc": "string:3B",
+     "bidStep5BstordPrc": "string:3B",
+     "bidStep6BstordPrc": "string:3B",
+     "bidStep7BstordPrc": "string:3B",
+     "bidStep8BstordPrc": "string:3B",
+     "bidStep9BstordPrc": "string:3B",
+     "askStep10BstordPrc": "string:3B",
+     "askStep1BstordRqty": "string:7B",
+     "askStep2BstordRqty": "string:7B",
+     "askStep3BstordRqty": "string:7B",
+     "askStep4BstordRqty": "string:3B",
+     "askStep5BstordRqty": "string:3B",
+     "askStep6BstordRqty": "string:3B",
+     "askStep7BstordRqty": "string:3B",
+     "askStep8BstordRqty": "string:3B",
+     "askStep9BstordRqty": "string:3B",
+     "bidStep10BstordPrc": "string:3B",
+     "bidStep1BstordRqty": "string:8B",
+     "bidStep2BstordRqty": "string:8B",
+     "bidStep3BstordRqty": "string:8B",
+     "bidStep4BstordRqty": "string:3B",
+     "bidStep5BstordRqty": "string:3B",
+     "bidStep6BstordRqty": "string:3B",
+     "bidStep7BstordRqty": "string:3B",
+     "bidStep8BstordRqty": "string:3B",
+     "bidStep9BstordRqty": "string:3B",
+     "askStep10BstordRqty": "string:3B",
+     "bidStep10BstordRqty": "string:3B",
+     "pstoffhrAskTotOrdRqty": "string:3B",
+     "pstoffhrBidTotOrdRqty": "string:3B"
+    },
+    "book": {
+     "asks": "array[3]:169B",
+     "bids": "array[3]:172B",
+     "askTotal": "string:17B",
+     "bidTotal": "string:17B",
+     "spreadBps": "string:13B"
+    },
+    "market": "string:7B",
+    "provider": "string:8B",
+    "messageType": "string:11B",
+    "timestampBasis": "string:9B"
+   },
+   "truncated": "boolean:5B"
+  }
+ }
+}
