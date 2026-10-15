@@ -1,0 +1,19 @@
+# Strict retention plan rule on the CI fixture (repro/strict-plan-rule-probe.py)
+# Fixture: futures-price-safety-integration.ts (100k-row backlogs), migrations of the working tree.
+# Matrix per ANALYZE round: cost profiles postgresDefaults/production x batch 1000/10000,
+# 12 ANALYZE rounds per table + the EXPLAIN ANALYZE batch 1000 = 49 plans per table.
+# Rule (committed assertion): no Sort, no Hash Join anywhere; no Seq Scan or non-pkey Bitmap Heap Scan
+# of the snapshot table; (captured_at, id) range used; DELETE reaches the table by pkey; probes use *_key.
+# Shape = node types:relation in depth-first order.
+
+## PostgreSQL 16.14 (initdb defaults, as postgres:16): 98 plans, assertion violations 0, run result PASS (14 groups)
+- futures_last_price_snapshots: 49 plans (postgresDefaults/1000 x12, postgresDefaults/10000 x12, production/1000 x12, production/10000 x12, analyze-1000 x1), 1 distinct shape(s)
+  - x49: ModifyTable:futures_last_price_snapshots > Limit: > Nested Loop: > Seq Scan:futures_instruments > Nested Loop: > Function Scan: > Limit: > Index Scan:futures_last_price_snapshots > LockRows: > Nested Loop: > Nested Loop: > Nested Loop: > Nested Loop: > Nested Loop: > Nested Loop: > Index Scan:futures_last_price_snapshots > Index Scan:futures_season_prices > Materialize: > Seq Scan:seasons > Index Scan:protection_children > Index Scan:futures_executions > Index Scan:futures_conditional_entries > Index Scan:futures_conditional_entries > CTE Scan: > Index Scan:futures_last_price_snapshots
+- futures_mark_snapshots: 49 plans (postgresDefaults/1000 x12, postgresDefaults/10000 x12, production/1000 x12, production/10000 x12, analyze-1000 x1), 1 distinct shape(s)
+  - x49: ModifyTable:futures_mark_snapshots > Limit: > Nested Loop: > Seq Scan:futures_instruments > Nested Loop: > Function Scan: > Limit: > Index Scan:futures_mark_snapshots > LockRows: > Nested Loop: > Index Scan:futures_mark_snapshots > Index Scan:futures_liquidation_closes > CTE Scan: > Index Scan:futures_mark_snapshots
+
+## PostgreSQL 17.10 (initdb defaults, as postgres:17): 98 plans, assertion violations 0, run result PASS (14 groups)
+- futures_last_price_snapshots: 49 plans (postgresDefaults/1000 x12, postgresDefaults/10000 x12, production/1000 x12, production/10000 x12, analyze-1000 x1), 1 distinct shape(s)
+  - x49: ModifyTable:futures_last_price_snapshots > Limit: > Nested Loop: > Seq Scan:futures_instruments > Nested Loop: > Function Scan: > Limit: > Index Scan:futures_last_price_snapshots > LockRows: > Nested Loop: > Nested Loop: > Nested Loop: > Nested Loop: > Nested Loop: > Nested Loop: > Index Scan:futures_last_price_snapshots > Index Scan:futures_season_prices > Materialize: > Seq Scan:seasons > Index Scan:protection_children > Index Scan:futures_executions > Index Scan:futures_conditional_entries > Index Scan:futures_conditional_entries > CTE Scan: > Index Scan:futures_last_price_snapshots
+- futures_mark_snapshots: 49 plans (postgresDefaults/1000 x12, postgresDefaults/10000 x12, production/1000 x12, production/10000 x12, analyze-1000 x1), 1 distinct shape(s)
+  - x49: ModifyTable:futures_mark_snapshots > Limit: > Nested Loop: > Seq Scan:futures_instruments > Nested Loop: > Function Scan: > Limit: > Index Scan:futures_mark_snapshots > LockRows: > Nested Loop: > Index Scan:futures_mark_snapshots > Index Scan:futures_liquidation_closes > CTE Scan: > Index Scan:futures_mark_snapshots

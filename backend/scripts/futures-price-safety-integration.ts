@@ -65,10 +65,8 @@ const deferred = () => {
 };
 /** The production batch statement must be ONE ordered range scan of
  * (captured_at, id) that stops at its LIMIT, and the DELETE must reach its
- * rows by primary key: no sequential or bitmap scan of the snapshot table and
- * no Sort or Hash over snapshot rows, however large the backlog. Hashing a
- * small protection table (seasons, executions, ...) is allowed: the ordered
- * outer scan still stops at the LIMIT. */
+ * rows by primary key: no Sort, no Hash join and no sequential or bitmap scan
+ * of the snapshot table, however large the backlog. */
 type PlanNode = {
   'Node Type': string;
   'Relation Name'?: string;
@@ -88,9 +86,6 @@ function assertOrderedRetentionPlan(explain: unknown, table: string) {
   const shape = nodes
     .map((n) => `${n['Node Type']}:${n['Relation Name'] ?? ''}`)
     .join(' > ');
-  const readsTable = (node: PlanNode): boolean =>
-    node['Relation Name'] === table ||
-    (node.Plans ?? []).some((child) => readsTable(child));
   const indexes = (node: PlanNode): string[] => [
     ...(node['Index Name'] ? [node['Index Name']] : []),
     ...(node.Plans ?? []).flatMap(indexes),
@@ -114,7 +109,7 @@ function assertOrderedRetentionPlan(explain: unknown, table: string) {
   );
   assert.equal(
     nodes.some(
-      (n) => ['Sort', 'Hash'].includes(n['Node Type']) && readsTable(n),
+      (n) => n['Node Type'] === 'Sort' || n['Node Type'] === 'Hash Join',
     ),
     false,
     shape,

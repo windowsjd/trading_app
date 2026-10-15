@@ -10,10 +10,10 @@
 
 | 구분 | 상태 | 근거 |
 |---|---|---|
-| P0 코드·CI | **`P0_FIXED`** (로컬 PG16·PG17 재현과 수정 확인. GitHub CI 결과는 §13) | §2 |
+| P0 코드·CI | **`P0_FIXED`** — 로컬 PG16·PG17 재현·수정 확인, **GitHub CI 전 job 통과**(기준 SHA에서 실패한 `Limit order PostgreSQL integration`, 새 PG17 job 포함) | §2, §13.1 |
 | P0 감지 / 외부 알림 | 감지 코드 **구현 완료**. 외부 알림 **미활성(NOT_ACTIVATED)** — 운영자 설정 필요 | §3 |
 | P0 운영 효과 | **`PRODUCTION_NOT_VERIFIED`** — 배포 후 1.8시간만 관찰. 초기 지표는 개선(§4) | §4 |
-| P1 코드 | **`P1_CODE_COMPLETE`** (로컬 전체 게이트·DB 통합 통과. GitHub CI는 §13) | §5–§13 |
+| P1 코드 | **`P1_CODE_COMPLETE`** — 로컬 전체 게이트·DB 통합 통과, **GitHub CI 전 job 통과**(`0865b8ba`). 후속 커밋(시험 단언 복원·문서)은 로컬 검증, GitHub CI는 main push 때 실행 | §5–§13 |
 | P1 운영 적용 | **`P1_READY_FOR_ROLLOUT`** — 절차·롤백 준비. 활성화는 모두 승인 대기 | §14–§15 |
 | P1 운영 효과 | **미검증** (운영 반영 전) | — |
 
@@ -29,7 +29,7 @@
 | 운영 live | Render `dep-db8i7k60tbcc738euph0` = `70f51455`, **live 2026-10-15T19:06:25Z** [실측: Render CLI] |
 | 기준 CI | `CI` run 38790937028 **failure**: `Limit order PostgreSQL integration` 중 `futures-price-safety.integration.spec.ts`. 나머지 5 job·Futures release fixture는 success |
 | 병렬 작업 | worktree 3개(`trading-app-claude` e8e19635, `trading-app-futures-verify` 40728d1d, `trading-app-long-4h-candles` bf228f29)와 /tmp prunable 6개. 건드리지 않았다. 변경 파일이 겹치지 않는다 |
-| 작업 위치 | main 작업 트리에서 개발. **main push = Render 자동 배포**이므로 검증 뒤 브랜치 `p1/db-optimization-20261016`에 커밋·push하고 PR로 CI를 돌렸다(§13). Render PR preview는 꺼져 있다 [실측: `pullRequestPreviewsEnabled: no`] |
+| 작업 위치 | main 작업 트리에서 개발. 검증 뒤 브랜치 `p1/db-optimization-20261016`에 커밋·push하고 PR #7로 GitHub CI를 돌렸다(§13.1. Render PR preview는 꺼져 있다 [실측: `pullRequestPreviewsEnabled: no`]). 이후 사용자 지시에 따라 **모든 커밋을 로컬 `main`으로 옮겼다**(fast-forward, 로컬 브랜치 삭제). **origin/main push = Render 자동 배포 + 마이그레이션**이므로 push는 승인 항목이다(§15) |
 | 로컬 DB | PG16 :55816, PG17 :55817(기본값), PG17 :55818(운영 설정), Redis :56817. 다른 세션의 서버는 쓰지 않았다 |
 | 운영 접근 | Render API GET, 운영 DB **읽기 전용** 세션 2회(`default_transaction_read_only=on`, 20 s timeout, 1 s lock timeout, 카탈로그·통계·인덱스 범위 조회만, 가장 무거운 질의 3.1 s) |
 
@@ -62,10 +62,12 @@
 | 파일 | 변경 |
 |---|---|
 | [futures-mark-retention.service.ts](../../../backend/src/futures/futures-mark-retention.service.ts), [futures-last-price-retention.service.ts](../../../backend/src/futures/futures-last-price-retention.service.ts) | DELETE 단계를 `WHERE m.id = ANY (ARRAY(SELECT c.id FROM candidates c)) AND m.effective_at < cutoff`로 바꿨다. 후보 선정(순서 범위 스캔·SKIP LOCKED·보호 조건·최신 행 배열)과 effective_at 재확인은 그대로다 |
-| [futures-price-safety-integration.ts](../../../backend/scripts/futures-price-safety-integration.ts) | 계획 단언을 **두 비용 설정(PG 기본·운영) × 배치 2종(1000·10000)**에서 EXPLAIN으로 확인한다. 금지: 스냅샷 표의 Seq Scan, pkey 외 인덱스의 Bitmap Heap Scan, 스냅샷 행 위의 Sort/Hash. 필수: `(captured_at,id)` 범위, 최신 행 조회의 unique 인덱스, **DELETE 대상의 pkey 접근**. 작은 보호 표(seasons 등)의 해시는 허용한다(바깥 순서 스캔은 여전히 LIMIT에서 멈춤). 동시 DELETE 중 신규 INSERT 200행이 모두 남는지 추가 단언 |
+| [futures-price-safety-integration.ts](../../../backend/scripts/futures-price-safety-integration.ts) | **기존 계획 단언은 그대로 둔다**: 계획 어디에도 Sort·Hash Join 없음, 스냅샷 표 Seq Scan 없음, `(captured_at,id)` 범위, 최신 행 조회의 unique 인덱스. **추가:** pkey 외 인덱스의 Bitmap Heap Scan 금지, **DELETE 대상의 pkey 접근** 필수, 이 검사를 **두 비용 설정(PG 기본·운영) × 배치 2종(1000·10000)**에서 EXPLAIN으로 반복, 동시 DELETE 중 신규 INSERT 200행이 모두 남는지 확인 |
 | [ci.yml](../../../.github/workflows/ci.yml) | 새 job **`Retention safety on PostgreSQL 17`**(`postgres:17`): 선물 가격 안전·가격 스냅샷 보존 통합을 운영 메이저에서 **추가로** 실행. 기존 PG16 실행은 그대로 둔다 |
 
 **음성 대조** [실측]: 새 단언으로 기존 문장을 돌리면 PG17 기본 설정·배치 1000에서 정확히 실패한다(`futures_last_price_snapshots plan (postgresDefaults, batch 1000)`).
+
+**단언 강도** [실측]: 첫 커밋 `0865b8ba`는 Sort/Hash 금지를 "스냅샷 행을 읽는 Sort/Hash"로 좁혀 두었다(작은 보호 표의 해시 허용). 수정 문장의 모든 계획이 기준 SHA의 규칙(Sort·Hash Join 전면 금지)도 만족함을 확인하고(§2.3), 후속 커밋에서 기준 규칙으로 되돌렸다. 이제 이 시험의 금지 조건은 기준 SHA의 **상위 집합**이다.
 
 ### 2.3 검증 [실측]
 
@@ -75,6 +77,7 @@
 | 25계약 2.16M·2.21M 행, 운영 설정 PG17: steady·12 h 백로그·스냅샷 보유·dead prefix·배치 1000/10000 | 기존·수정 모두 오류 0, temp 0, timeout 0. 수정판은 모든 배치가 DELETE pkey 접근 |
 | 100계약 8.64M·8.83M 행: steady·백로그·배치 1000/10000 | 같음 |
 | 계획 안정성: 반복 ANALYZE 20회(25계약)·10회(100계약) × 비용 설정 2 × cutoff 2 × 배치 2 | 수정판 **320+160/320+160 전부 pkey**. 위험 신호 0 |
+| CI 픽스처의 엄격 규칙 안정성: 반복 ANALYZE 12회 × (비용 설정 2 × 배치 2) + EXPLAIN ANALYZE 1 = 표당 49 계획 | PG16·PG17 각 **98/98 통과**, 표마다 계획 모양 1종 ([evidence](evidence/futures-plan-strict-rule-ci-fixture.txt), [repro](repro/strict-plan-rule-probe.py)) |
 | 배치당 버퍼 (수정 − 기존) | +4~7% (예: Mark 25 steady 12,494 → 13,315, Last 100 steady 21,323 → 22,207). 계획 고정의 비용으로 작다 |
 
 원자료: [futures-retention-25-pg17.jsonl](evidence/futures-retention-25-pg17.jsonl), [-100-](evidence/futures-retention-100-pg17.jsonl), [plan probes](evidence/futures-plan-probe-mark100.json).
@@ -215,7 +218,7 @@
 | 파일 크기 | heap 5.34 GB **그대로**(DELETE는 파일을 줄이지 않는다). 이후 20만 행 INSERT에도 heap 증가 0 — **빈 공간 재사용** |
 | 계획 (반복 ANALYZE 10회 × 자산 유형 3 × 비용 설정 2 × 배치 2) | 스캔은 항상 `(asset_id, effective_at)`, DELETE는 항상 pkey(Index Scan 또는 pkey Bitmap). 위험 신호 0 |
 
-정확성 PG 통합([asset-price-snapshot-retention-integration.ts](../../../backend/scripts/asset-price-snapshot-retention-integration.ts)): 독립 오라클과 손 계산 후보 집합 일치(DST·KST 자정·세션 TimeZone 3종), dry-run 무변경, 배치 후 참조 추가, 진행 중 참조(SKIP LOCKED), 3세션 동시 sweep 중복 삭제 0, 2차 0건, **8.6만 행 규모 계획 단언(두 비용 설정)**, 죽은 소스·인용된 행·당일 마지막 행 보존, **워커: 잠금 1개·실행 기록·실제 timeout 분류·재개**. **PG16·PG17 PASS.**
+정확성 PG 통합([asset-price-snapshot-retention-integration.ts](../../../backend/scripts/asset-price-snapshot-retention-integration.ts)): 독립 오라클과 손 계산 후보 집합 일치(DST·KST 자정·세션 TimeZone 3종), dry-run 무변경, 배치 후 참조 추가, 진행 중 참조(SKIP LOCKED), 3세션 동시 sweep 중복 삭제 0, 2차 0건, **8.6만 행 규모 계획 단언(두 비용 설정. 금지: 스냅샷 표 Seq Scan·pkey 외 Bitmap, 스냅샷 표를 읽는 Sort/Hash. 커서용 `last_row`의 top-1 Sort는 배치 크기 이하로 materialized된 `scan` CTE 위라 허용)**, 죽은 소스·인용된 행·당일 마지막 행 보존, **워커: 잠금 1개·실행 기록·실제 timeout 분류·재개**. **PG16·PG17 PASS.**
 
 ### 6.4 기존 운영 데이터 정리 방법
 
@@ -417,8 +420,9 @@ WAL·삭제 부담 [모델]:
 | 그 밖의 캔들 DB 시험: 캔들 보존 smoke, 4h 장기(`MARKET_CANDLE_LONG_DB_SMOKE`) | PASS |
 | 프런트엔드 | 변경 없음 — NOT_RUN |
 | Futures release fixture workflow | NOT_RUN 로컬(WSL 시계 후퇴로 이 호스트에서 재현 불가, 기존 기록). GitHub에서 실행 |
+| 후속 커밋(선물 계획 단언을 기준 규칙으로 복원, 보존 시험 스크립트 lint 정리, E2E 파일의 무관한 서식 변경 되돌림) | 선물 가격 안전·가격 스냅샷 보존 **PG16·PG17 PASS**, E2E **409/409**, typecheck PASS. 변경 시험 스크립트 lint: 가격 보존 0건(기준 4건), 선물 가격 안전 15건 = 기준과 같은 줄·규칙(추가 줄 0건) |
 | 알림 워크플로 셸 논리 | 로컬 시험(가짜 `gh`·응답): 미설정 시 no-op, 1회 경보 무시, 지속 경보 issue 생성, 같은 코드 무댓글, 코드 변경 1댓글, 2회 정상 시 종료 |
-| **GitHub CI (PR)** | 아래 §13.1 |
+| **GitHub CI (PR #7, `0865b8ba`)** | **전 job PASS** — §13.1 |
 
 **공유 DB 1차 4 FAIL 분류: 비결정적, 회귀 아님.**
 - 오류는 모두 "견적 이후 더 새로운 다른 환율 행이 선택됨"이다. FX 선택은 시각 순서만 쓰고 id를 쓰지 않는다(uuid(7) 무관). FX 코드는 바꾸지 않았다.
@@ -428,7 +432,20 @@ WAL·삭제 부담 [모델]:
 
 ### 13.1 GitHub CI
 
-(커밋 후 갱신)
+PR [#7](https://github.com/windowsjd/trading_app/pull/7), 커밋 `0865b8ba` [실측: `gh run view`].
+
+| Workflow / job | `0865b8ba` | 기준 `70f51455` |
+|---|---|---|
+| CI run 38808289243 (10 m 19 s) — Backend quality | success | success |
+| — Frontend quality | success | success |
+| — Release-critical E2E | success | success |
+| — Core account PostgreSQL integration | success | success |
+| — **Limit order PostgreSQL integration** (선물 가격 안전 PG16 포함) | **success** | **failure** (run 38790937028) |
+| — Candle fixture integration (새 캔들 upsert 가드 단계 포함) | success | success |
+| — **Retention safety on PostgreSQL 17** (신규 `postgres:17`: 선물 가격 안전·가격 스냅샷 보존) | **success** | — |
+| Futures release fixture run 38808289474 (2 m 4 s) | success | success |
+
+- 후속 커밋은 시험 스크립트와 문서만 바꾼다. 같은 job 단계를 로컬 PG16·PG17에서 다시 통과했다(§13 표). GitHub CI는 PR과 main push에서 돌므로 origin/main push 때 다시 실행된다.
 
 ---
 
@@ -438,7 +455,7 @@ WAL·삭제 부담 [모델]:
 
 | 단계 | 조치 | 확인 | 롤백 |
 |---|---|---|---|
-| 0. 병합·배포 | PR 병합 → Render 자동 배포. 빌드가 마이그레이션 실행(enum 추가, 작은 표 인덱스) | 배포 live, `/readiness` 정상, `/readiness/alerts` 200 | 커밋 revert. 마이그레이션은 추가형(enum 값·인덱스, 남겨도 무해) |
+| 0. 배포 | 로컬 main(반영 완료)을 origin/main에 push → Render 자동 배포(PR #7은 자동으로 merged 표시). 빌드가 마이그레이션 실행(enum 추가, 작은 표 인덱스) | 배포 live, `/readiness` 정상, `/readiness/alerts` 200 | 커밋 revert. 마이그레이션은 추가형(enum 값·인덱스, 남겨도 무해) |
 | 1. 감시 | `DATABASE_STORAGE_MONITOR_ENABLED=true`, `DATABASE_STORAGE_CAPACITY_GB=50` | `databaseStorage.usedPercent` ≈ Render + 약 1 GB | env false |
 | 2. 알림 전달 | 저장소 변수 `OPS_READINESS_ALERTS_URL` 설정 또는 외부 모니터 등록, Render 실패 알림 켜기 | workflow_dispatch 1회, 시험 경보(스테이징) | 변수 삭제 |
 | 3. 가격 보존 | `ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED=true` (저부하 시간 시작 권장) | 실행 기록 `deletedCount`, 배치 시간, `ASSET_PRICE_SNAPSHOT_RETENTION_FAILING` 없음, Mark·KOSCOM 저장 공백 없음, WAL·CPU | env false (삭제 행은 복원 불가. 보호 규칙 대상은 남음) |
@@ -453,7 +470,7 @@ WAL·삭제 부담 [모델]:
 
 ## 15. 사용자 승인이 필요한 운영 변경
 
-1. **PR 병합(= main push = Render 배포 + 마이그레이션 2건).**
+1. **origin/main push(= Render 배포 + 마이그레이션 1개: enum 값 추가·작은 표 인덱스).** 커밋은 로컬 main에 있다.
 2. 운영 env: `DATABASE_STORAGE_MONITOR_ENABLED=true`, `DATABASE_STORAGE_CAPACITY_GB=50`.
 3. 알림 전달: GitHub 변수 `OPS_READINESS_ALERTS_URL` 또는 외부 모니터 서비스, Render 알림 설정.
 4. **가격 스냅샷 보존 활성화**(기존 데이터 약 70만 행 이상 삭제 시작): `ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED=true`.
@@ -485,4 +502,41 @@ WAL·삭제 부담 [모델]:
 
 ## 17. 최종 git diff 검토
 
-(커밋 후 갱신)
+범위: `70f51455..main` = `0865b8ba` + 후속 커밋 1개. **84 files, +4,966 / −320** [실측: `git diff --numstat`].
+
+| 영역 | 파일 | 줄 (+/−) | 내용 |
+|---|---:|---:|---|
+| `backend/src` (생성 Prisma 클라이언트 2파일 포함) | 30 | +1,589 / −205 | 보존·수집·조회·감지 코드와 단위 시험 |
+| `backend/scripts` | 3 | +828 / −57 | PG 통합 시험: 선물 가격 안전, 가격 스냅샷 보존, 캔들 upsert 가드(신규) |
+| `backend/prisma` | 2 | +20 / −4 | 마이그레이션 1개(enum 값·인덱스), 스냅샷 4표 `uuid(7)` 기본값 |
+| `backend/test` | 1 | +45 / −0 | `/readiness/alerts` E2E 2건 |
+| `.github/workflows` | 2 | +156 / −0 | PG17 job, 캔들 upsert 가드 단계, 경보 워크플로(신규) |
+| `backend` 문서·README·`.env.example` | 8 | +161 / −54 | 운영 감시 런북, 5m 보존 35→45일 문서 정합, env 예시 |
+| `docs/investigations`, `HANDOVER.md` | 38 | +2,167 / −0 | 이 보고서·재현·증거·용량 모델, 인수인계 |
+
+**금지·위험 항목 점검** [실측: diff 검색]
+- 프런트엔드 변경 0, `/api/v2` 0, 삭제된 파일 0.
+- `KOSCOM_ORDERBOOK_COLLECTION_ENABLED`: `.env.example`에 `=true`를 적었을 뿐이다. 호가 수집 코드·저장 내용·과거 데이터는 바뀌지 않았다(호가 슬림 시도는 측정 후 모두 되돌림, §7.2).
+- 시험: 삭제된 `it`/`test`/`describe` 0, `skip`/`only` 추가 0. 지워지거나 다시 쓴 단언 줄은 3곳이며 모두 의미가 유지된다.
+  1. 선물 Mark 동시 삭제 `[1000, 1000]` 단언: 같은 값을 그대로 단언하고, 동시 INSERT 200행 생존 단언을 더했다.
+  2. Binance 거래대금 단언: 줄바꿈만 바뀌었다.
+  3. 선물 계획 단언: 기준 규칙을 유지하고 검사를 더했다(§2.2).
+  - E2E 파일에서 이번 작업과 무관하게 바뀌었던 서식(초보자 퀘스트 시험)은 되돌렸다.
+- 마이그레이션은 추가형 1개다(`OpsJobName` 값, `futures_season_prices(asset_price_snapshot_id)` 인덱스). 기존 마이그레이션은 수정하지 않았다.
+- 비밀값 패턴(비밀번호가 든 접속 문자열, API 키·토큰) 0. 증거 파일에 운영 URL·자격 증명은 없다.
+- 운영 DB는 읽기 전용 확인만 했다. 쓰기·삭제·VACUUM·REINDEX·env·플랜 변경은 0이다.
+
+**배포하면 바로 바뀌는 동작 (env 없이 켜짐)** — 나머지 새 동작은 env 기본값이 false다.
+
+| 변경 | 위험 판단 | 근거 |
+|---|---|---|
+| 선물 Mark/Last 보존 DELETE를 `id = ANY(ARRAY(...))`로 | 대상 행 집합 동일, 배치당 버퍼 +4~7% | §2 |
+| Binance 현물: 프레임당 DB 조회 제거(마지막 저장 행 메모리, 매핑·FX TTL 캐시), 역행·미래 프레임 거부 | 5 s 저장 주기와 저장 행 증거는 유지. INSERT 실패 시 메모리 미갱신 | §10 |
+| 캔들 upsert: 마감 확인 뒤 같은 값의 확정봉 UPDATE 생략 | 마감 뒤 첫 확인은 기록 | §9.1 |
+| 스냅샷 4표 신규 행 id `uuid(7)` | 기존 행 무변경. id는 동점 정렬에만 쓰인다 | §11 |
+| 미국주식 이월 조회 `source_type NOT IN (...)`, 선물 기준가 읽기 범위 조건 | 결과 동일(시험), 계획 고정 | §11 |
+| `/readiness` 응답에 `alerts`·보존 상태 필드 추가, `/readiness/alerts` 신설 | 추가형. `/readiness`는 계속 200. 경보 엔드포인트는 Render health check로 쓰지 않는다 | §3 |
+| 저장 공간 감시의 WAL 여유분·샘플 정지 판정 | 감시 env가 켜진 경우에만 동작. 경보가 조금 일찍 뜬다 | §3 |
+| `futures_season_prices` 인덱스 생성(빌드 중 마이그레이션) | 작은 표라 잠금이 짧다 | §6.2 |
+
+- 남은 lint 부채: 게이트 밖 시험 스크립트 `futures-price-safety-integration.ts`의 15건은 기준 SHA와 같은 규칙이고, 모두 이번에 추가한 줄 밖에 있다. 가격 보존 시험 스크립트는 기준 4건 → 0건이다.

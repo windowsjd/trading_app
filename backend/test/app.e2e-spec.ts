@@ -2996,45 +2996,23 @@ describe('AppController (e2e)', () => {
   it('/api/v1/trading-accounts/:accountId/quests/acknowledgements (POST) requires authentication', async () => {
     const spy = jest.spyOn(app.get(BeginnerQuestsService), 'acknowledge');
     try {
-      await request(app.getHttpServer())
-        .post(
-          '/api/v1/trading-accounts/trading-account-3/quests/acknowledgements',
-        )
-        .send({ stepId: 'holdings_reviewed', orderId: 'order-1' })
-        .expect(401);
+      await request(app.getHttpServer()).post('/api/v1/trading-accounts/trading-account-3/quests/acknowledgements')
+        .send({ stepId: 'holdings_reviewed', orderId: 'order-1' }).expect(401);
       expect(spy).not.toHaveBeenCalled();
-    } finally {
-      spy.mockRestore();
-    }
+    } finally { spy.mockRestore(); }
   });
 
   it('quest acknowledgement rejects another owner and general mode before evidence reads', async () => {
-    resetPrismaMocks();
-    mockActiveUser();
+    resetPrismaMocks(); mockActiveUser();
     const token = await createValidAccessToken();
-    const path =
-      '/api/v1/trading-accounts/trading-account-2/quests/acknowledgements';
+    const path = '/api/v1/trading-accounts/trading-account-2/quests/acknowledgements';
     prisma.tradingAccount.findFirst.mockResolvedValueOnce(null);
-    await request(app.getHttpServer())
-      .post(path)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' })
-      .expect(404);
-    prisma.tradingAccount.findFirst.mockResolvedValueOnce({
-      id: 'trading-account-2',
-      userId: user.id,
-      mode: 'general',
-      status: 'active',
-      seasonParticipant: null,
-    });
-    await request(app.getHttpServer())
-      .post(path)
-      .set('Authorization', `Bearer ${token}`)
-      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' })
-      .expect(409)
-      .expect((response) =>
-        expect(response.body.error.code).toBe('BEGINNER_QUEST_ACCOUNT_ONLY'),
-      );
+    await request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${token}`)
+      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' }).expect(404);
+    prisma.tradingAccount.findFirst.mockResolvedValueOnce({ id: 'trading-account-2', userId: user.id, mode: 'general', status: 'active', seasonParticipant: null });
+    await request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${token}`)
+      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' }).expect(409)
+      .expect(response => expect(response.body.error.code).toBe('BEGINNER_QUEST_ACCOUNT_ONLY'));
     expect(prisma.order.findFirst).not.toHaveBeenCalled();
   });
 

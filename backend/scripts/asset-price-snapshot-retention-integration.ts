@@ -918,15 +918,14 @@ async function main() {
         (reason: unknown) => reason,
       );
     assert.equal(databaseFailureKind(realTimeout), 'statement_timeout');
+    assert.ok(realTimeout instanceof Error);
     const inner = (
       failing as unknown as { retention: AssetPriceSnapshotRetentionService }
     ).retention;
-    const original = inner.deleteBatch.bind(inner);
+    const real = new AssetPriceSnapshotRetentionService(prisma);
     let calls = 0;
-    inner.deleteBatch = async (scope) => {
-      if (++calls === 2) throw realTimeout;
-      return original(scope);
-    };
+    inner.deleteBatch = (scope) =>
+      ++calls === 2 ? Promise.reject(realTimeout) : real.deleteBatch(scope);
     await assert.rejects(failing.run());
     const failedRun = await prisma.opsJobRun.findFirstOrThrow({
       where: { jobName: 'asset_price_snapshot_retention', status: 'failed' },
