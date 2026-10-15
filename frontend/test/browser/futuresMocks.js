@@ -1,7 +1,7 @@
 import { conditionalFixture } from '../conditionalFixtures.cjs';
 import { futuresFixture, accounts, futuresCandlesFixture, futuresOrderBookFixture, futuresConditionalFixture } from '../futuresFixtures.cjs';
 const params = new URLSearchParams(location.search);
-export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED' };
+export const state = { accountId: params.get('account') ?? 'A', requests: [], kind: params.get('kind') ?? 'isolated', mode: params.get('mode') ?? 'ENABLED', options: { missingMark: params.get('mark') === 'missing', expiredMark: params.get('mark') === 'stale', missingReference: params.get('last') === 'missing', ...(params.has('free') ? { freeCollateral: params.get('free'), crossBase: params.get('free'), liquidationBuffer: params.get('free') } : {}) } };
 export const useIsFocused = () => true;
 export const useHeaderHeight = () => 64;
 // Quest provider / root ref imports; inert in the isolated futures fixture.
@@ -40,14 +40,14 @@ export const apiClient = {
     if (state.kind === 'loading') return new Promise(() => {});
     if (state.kind === 'error') throw new Error('fixture unavailable');
     const id = path.split('/')[2];
-    const fixture = futuresFixture(id, { position: !['open','empty'].includes(state.kind), marginMode: state.kind === 'cross' ? 'cross' : 'isolated', mode: state.mode, stale: state.kind === 'stale', large: true, empty: state.kind === 'empty', direction: 'short' });
+    const fixture = futuresFixture(id, { position: !['open','empty'].includes(state.kind), marginMode: state.kind === 'cross' ? 'cross' : 'isolated', mode: state.mode, stale: state.kind === 'stale', large: true, ...state.options, empty: state.kind === 'empty', direction: 'short' });
     if(path.includes('limit-orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
     if(path.endsWith('/orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
     return { data: { success: true, data: path.includes('instruments') ? fixture.catalog : path.includes('positions') ? fixture.positions : path.includes('liquidations') ? fixture.liquidations : path.includes('executions') ? fixture.executions : fixture.final } };
   },
   async post(path, body) { state.requests.push({ path, body });
     // `?execute=409|network` (+ `executeDelay` ms): a clear refusal or a lost response for 시장가 commands.
-    if (path.endsWith('/execute') && params.get('execute')) {
+    if ((path.endsWith('/execute') || path.endsWith('/limit-orders')) && params.get('execute')) {
       await new Promise((resolve) => setTimeout(resolve, Number(params.get('executeDelay') ?? 0)));
       if (params.get('execute') === '409') throw { response: { status: 409, data: { success: false, error: { code: 'INSUFFICIENT_FUTURES_FREE_COLLATERAL', message: 'Available Futures collateral is insufficient for margin and fees.' } } } };
       if (params.get('execute') === 'network') throw new Error('Network Error');

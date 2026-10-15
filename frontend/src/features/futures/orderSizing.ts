@@ -94,7 +94,7 @@ export type FuturesEntryCapacity =
       /** What 100% writes: the limit less headroom, rounded down to cents. */
       max: string;
     }
-  | { state: 'unavailable'; reason: 'collateral' | 'fee' | 'price' | 'maintenance' };
+  | { state: 'unavailable'; reason: 'collateral' | 'fee' | 'price' | 'mark' | 'maintenance' };
 
 /**
  * How large a new or increased position the account's collateral can carry,
@@ -119,8 +119,10 @@ export function futuresEntryCapacity(input: {
   direction: Direction;
   /** The basis the quantity is computed at (Futures Last, a limit or trigger price). */
   price: string | null | undefined;
-  /** Fresh Mark when the basis is the current Futures Last; otherwise omitted. */
+  /** Fresh Mark for an immediate fill; the caller verifies evidence freshness. */
   mark?: string | null;
+  /** Limit/conditional estimates use their future fill basis, explicitly. */
+  deferred?: boolean;
   /** Opening a new position (not increasing a held one). */
   opening: boolean;
 }): FuturesEntryCapacity {
@@ -129,11 +131,13 @@ export function futuresEntryCapacity(input: {
     return { state: 'unavailable', reason: 'collateral' };
   if (!input.feeRate || !FEE.test(input.feeRate)) return { state: 'unavailable', reason: 'fee' };
   if (!positive(input.price)) return { state: 'unavailable', reason: 'price' };
+  if (!input.deferred && !positive(input.mark)) return { state: 'unavailable', reason: 'mark' };
   const fee = new D(input.feeRate);
   const margin = new D(1).div(input.leverage);
   const maintenance = new D(FUTURES_MAINTENANCE_RATE).add(fee);
   const side = input.direction === 'long' ? 1 : -1;
-  // Mark per unit of the basis price; 1 when the order fills at a later price.
+  // A future fill uses the existing deferred estimate; immediate fills never
+  // substitute the basis price for missing Mark evidence.
   const mark = positive(input.mark) ? new D(input.mark).div(input.price) : new D(1);
   // Unrealized result per notional at entry: (Mark − price) × direction.
   const opening = mark.sub(1).mul(side);

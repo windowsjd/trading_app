@@ -60,6 +60,7 @@ import {
   futuresInputError,
   positionCommand,
 } from "../../features/futures/policy";
+import { COLLATERAL_SHORT, MAINTENANCE_SHORT, futuresErrorMessage } from "../../features/futures/orderFeedback";
 import {
   futuresAmountAtRatio,
   futuresAmountExceeds,
@@ -176,6 +177,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [protectionPositionId, setProtectionPositionId] = useState<string | null>(null);
   const [operation, setOperation] = useState<Operation>("open");
   const [failure, setFailure] = useState<unknown>(null);
+  const [collateralAttempted, setCollateralAttempted] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [listView, setListView] = useState<ListView>('positions');
   const scope = useRef({ key: "", epoch: 0, mounted: true });
@@ -282,6 +284,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         // Only a lost or failed response may have executed: that one keeps its
         // key for the same-request check. A clear refusal (4xx) did not fill.
         request.uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
+        if (!request.uncertain) action.current = null;
         setNotice(futuresErrorMessage(info.serverCode, request.uncertain));
       }
     },
@@ -349,6 +352,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         p.markState === "fresh" && freshFuturesEvidence(p.markEvidence, clock),
     );
   const markFresh =
+    !!futuresPrice(position ? position.markPrice : instrument?.markPrice) &&
     timely &&
     crossFresh &&
     (position
@@ -408,6 +412,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     selectedOperation === "close" ||
     allInstruments.some((i) => i.id === instrument?.id);
   const allowed =
+    focused &&
     !pendingResult &&
     covered &&
     !!instrument &&
@@ -425,7 +430,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   // 100% of an entry: what the free collateral carries after margin, fee and
   // the server's Cross/maintenance checks (an estimate; the server decides).
   const capacity = entering
-    ? futuresEntryCapacity({
+    ? method !== "conditional" && !markFresh
+      ? { state: "unavailable" as const, reason: "mark" as const }
+      : futuresEntryCapacity({
         freeCollateral: collateralKnown ? data.collateral.freeCollateral : null,
         crossBase: collateralKnown ? data.cross.metrics?.crossBaseCollateral : null,
         liquidationBuffer: collateralKnown ? data.cross.metrics?.liquidationBuffer : null,
@@ -434,7 +441,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         marginMode: orderMarginMode,
         direction: orderDirection,
         price: basisPrice,
-        // Mark matters for an order filled now; a later fill meets a later Mark.
+        // Deferred estimates keep the existing fill-time pricing assumption.
+        // Market/limit entries still require fresh Mark evidence above.
+        deferred: method !== "market",
         mark: method === "market" && markFresh ? (position?.markPrice ?? instrument?.markPrice ?? null) : null,
         opening: !position,
       })
@@ -450,7 +459,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       ? capacity?.state === "unavailable"
         ? capacity.reason === "fee"
           ? tradingAccount.isError ? "수수료 정보를 확인할 수 없어 비율을 계산할 수 없습니다." : "수수료 정보를 확인하는 중입니다."
-          : capacity.reason === "price" ? unpriced
+          : capacity.reason === "mark" ? "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다."
+            : capacity.reason === "price" ? unpriced
             : capacity.reason === "maintenance" ? MAINTENANCE_SHORT
               : "사용 가능한 담보를 평가하는 중입니다."
         : ratioBase === "0" ? "주문가능 금액이 없습니다." : null
@@ -463,14 +473,20 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const displayedRatio = activeRatio ?? (ratioReason ? 0 : futuresAmountRatio(amount, ratioBase));
   // Live pre-checks (the server still decides): no free collateral, or an
   // amount above what it carries, is refused here; unknown is never short.
-  const entryProblem = !entering || !selectedQuantity || inputError
+  const entryProblem = !entering || method === "conditional" || !markFresh || !selectedQuantity || inputError
     ? null
-    : hasNoFreeCollateral(data.collateral.freeCollateral) || (capacity?.state === "ready" && futuresAmountExceeds(amount, capacity.limit))
-      ? COLLATERAL_SHORT
-      : capacity?.state === "unavailable" && capacity.reason === "maintenance" ? MAINTENANCE_SHORT : null;
-  const collateralShort = !!entryProblem;
+    : capacity?.state === "unavailable" && capacity.reason === "maintenance"
+      ? MAINTENANCE_SHORT
+      : (collateralKnown && hasNoFreeCollateral(data.collateral.freeCollateral))
+          || (capacity?.state === "ready" && futuresAmountExceeds(amount, capacity.limit))
+        ? COLLATERAL_SHORT : null;
+  const collateralShort = entryProblem === COLLATERAL_SHORT;
+  const riskBlocked = entryProblem === MAINTENANCE_SHORT;
+  const orderNotice = collateralAttempted ? (collateralShort ? COLLATERAL_SHORT : null) : notice;
   const clearFailure = () => {
-    if (failure) { setFailure(null); setNotice(null); }
+    setCollateralAttempted(false);
+    setFailure(null);
+    setNotice(null);
   };
   const changeAmount = (value: string) => {
     if (locked) return;
@@ -497,7 +513,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     if (locked) return;
     // An add and a reduce amount mean different things: start over.
     setOperation(op);
-    setNotice(null);
+    clearFailure();
     setAmount("");
     setChosenRatio(null);
     setRatioMessage(null);
@@ -512,7 +528,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setChosenRatio(null);
     setRatioMessage(null);
     setOperation("open");
-    setNotice(null);
+    clearFailure();
     action.current = null;
     // Another contract starts at 시장가 without a limit draft (the spot rule).
     setMethod(DEFAULT_ORDER_METHOD);
@@ -542,13 +558,20 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       setMethod(next);
       setLimitPrice("");
       setConditionalDraft(emptyFuturesConditionalDraft);
-      setNotice(null);
+      clearFailure();
       setRatioMessage(null);
     });
   };
   const submit = () => {
     if (!entryGate.allowed) { entryGate.guard(() => undefined); return; }
-    if (method !== 'market' || !allowed || inputError || collateralShort || submitLock.current || !instrument) return;
+    if (method !== 'market' || !allowed || inputError || riskBlocked || submitLock.current || !instrument) return;
+    if (collateralShort) {
+      setFailure(null);
+      setNotice(null);
+      setCollateralAttempted(true);
+      return;
+    }
+    setCollateralAttempted(false);
     const signature = JSON.stringify([
       scope.current.epoch,
       instrument.id,
@@ -755,11 +778,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         accessibilityLabels={{ buy: directionLabel.long, sell: directionLabel.short }}
                         testIDs={{ buy: 'futures-direction-long', sell: 'futures-direction-short' }}
                         disabled={locked}
-                        onChange={(side) => setDirection(side === 'buy' ? 'long' : 'short')}
+                        onChange={(side) => { setDirection(side === 'buy' ? 'long' : 'short'); clearFailure(); }}
                       />
                     </View>
                     <View ref={questGuideTarget('futures-margin')} collapsable={false} style={styles.controls}>
-                      <FuturesMarginModeField value={marginMode} onChange={setMarginMode} disabled={locked} />
+                      <FuturesMarginModeField value={marginMode} onChange={(value) => { setMarginMode(value); clearFailure(); }} disabled={locked} />
                       <FuturesLeverageSelect
                         leverage={Number(leverage)}
                         disabled={locked}
@@ -821,7 +844,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                           accessibilityLabel="선물 진입 지정가"
                           testID="futures-limit-price"
                           value={limitPrice}
-                          onChangeText={setLimitPrice}
+                          onChangeText={(value) => { setLimitPrice(value); clearFailure(); }}
                           editable={!locked}
                           keyboardType="decimal-pad"
                           placeholder="지정가 입력"
@@ -866,7 +889,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     {ratioMessage ? (
                       <Text testID="futures-ratio-message" accessibilityLiveRegion="polite" style={styles.error}>{ratioMessage}</Text>
                     ) : null}
-                    {entryProblem && method !== 'conditional' ? (
+                    {riskBlocked && method !== 'conditional' ? (
                       <Text testID="futures-collateral-insufficient" accessibilityLiveRegion="polite" style={styles.error}>
                         {entryProblem}
                       </Text>
@@ -874,8 +897,9 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     {method === 'limit' ? (
                       <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
                         assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage}
-                        quantity={selectedQuantity} limitPrice={limitPrice}
-                        allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !collateralShort && !pendingResult}
+                        quantity={selectedQuantity} amount={amount} limitPrice={limitPrice}
+                        allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !riskBlocked && !pendingResult}
+                        collateralError={collateralShort ? COLLATERAL_SHORT : null}
                         onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
                     ) : method === 'conditional' ? (
                       <FuturesConditionalEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
@@ -895,7 +919,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                           state={
                             mutation.isPending
                               ? "loading"
-                              : allowed && !inputError && !collateralShort
+                              : allowed && !inputError && !riskBlocked
                                 ? "enabled"
                                 : "disabled"
                           }
@@ -905,17 +929,17 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   </>
                 )}
                 {/* A refusal or the fill result reads right under the button. */}
-                {notice ? (
+                {orderNotice ? (
                   failure ? (
                     <ErrorNotice
                       error={failure}
-                      message={notice}
+                      message={orderNotice}
                       style={styles.notice}
                       testID="futures-order-notice"
                     />
                   ) : (
                     <Text accessibilityRole="alert" style={styles.notice} testID="futures-order-notice">
-                      {notice}
+                      {orderNotice}
                     </Text>
                   )
                 ) : null}
@@ -1094,37 +1118,6 @@ function hasNoFreeCollateral(value: string | null) {
   return Number(value) <= 0;
 }
 
-const COLLATERAL_SHORT = "사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.";
-const MAINTENANCE_SHORT = "현재 Mark 기준으로 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.";
-
-/**
- * A lost or failed response may have executed: it keeps its key and asks for
- * the same-request check. A clear refusal (4xx) did not fill and says why.
- */
-function futuresErrorMessage(code: string | null, uncertain: boolean) {
-  if (uncertain)
-    return "체결을 확인하지 못했습니다. 같은 요청을 다시 누르면 중복 체결 없이 결과를 확인합니다.";
-  if (code === "FUTURES_INSTRUMENT_UNVERIFIED")
-    return "현재 이 상품은 신규 진입할 수 없습니다. 보유 포지션의 Reduce/Close는 가능합니다.";
-  if (code === "FUTURES_PRICE_UNAVAILABLE")
-    return "현재 거래 기준 시세를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.";
-  if (code === "FUTURES_LIQUIDATION_REQUIRED")
-    return "현재 손실과 수수료가 담보 범위를 초과합니다. 위험 관리 시스템의 전량 청산이 필요합니다.";
-  if (code === "FUTURES_REDUCE_ONLY") return "현재 Reduce/Close만 가능합니다.";
-  if (code === "FUTURES_TRADING_DISABLED")
-    return "현재 선물 거래가 비활성 상태입니다.";
-  if (code?.includes("MARK"))
-    return "Mark 정보를 확인할 수 없습니다. 잠시 후 다시 시도해주세요.";
-  if (code === "FUTURES_MAINTENANCE_UNSAFE") return MAINTENANCE_SHORT;
-  if (code?.includes("COLLATERAL")) return COLLATERAL_SHORT;
-  if (code === "FUTURES_VALUE_TOO_SMALL")
-    return "주문 금액이 너무 작습니다. 금액을 늘려주세요.";
-  if (code === "INVALID_FUTURES_REDUCE_QUANTITY")
-    return "보유 수량을 초과할 수 없습니다. 최신 포지션을 확인해주세요.";
-  if (code === "FUTURES_POSITION_NOT_FOUND")
-    return "포지션이 이미 종료되었거나 변경되었습니다. 최신 상태를 확인해주세요.";
-  return "주문이 접수되지 않았습니다. 입력값과 거래 가능 상태를 확인해주세요.";
-}
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: semantic.screen },
   // The spot order screen's spacing (12px sides, 12px between sections).

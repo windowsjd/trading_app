@@ -117,7 +117,7 @@ describe('ratio capacity (100% of 주문가능)', () => {
   });
 
   it('unknown collateral, fee or price never yields an amount', () => {
-    const known = { freeCollateral: '70', crossBase: '70', liquidationBuffer: '70', leverage: 10, feeRate: fee, marginMode: 'isolated' as const, direction: 'long' as const, price: '100', opening: true };
+    const known = { freeCollateral: '70', crossBase: '70', liquidationBuffer: '70', leverage: 10, feeRate: fee, marginMode: 'isolated' as const, direction: 'long' as const, price: '100', mark: '100', opening: true };
     assert.deepEqual(futuresEntryCapacity({ ...known, freeCollateral: null }), { state: 'unavailable', reason: 'collateral' });
     assert.deepEqual(futuresEntryCapacity({ ...known, crossBase: undefined }), { state: 'unavailable', reason: 'collateral' });
     assert.deepEqual(futuresEntryCapacity({ ...known, feeRate: null }), { state: 'unavailable', reason: 'fee' });
@@ -126,6 +126,14 @@ describe('ratio capacity (100% of 주문가능)', () => {
     assert.deepEqual(futuresEntryCapacity({ ...known, leverage: 101 }), { state: 'unavailable', reason: 'collateral' });
     const empty = futuresEntryCapacity({ ...known, freeCollateral: '-3', crossBase: '0', liquidationBuffer: '0' });
     assert.equal(empty.state === 'ready' && empty.max === '0' && empty.limit === '0', true, 'no collateral, no amount');
+  });
+
+  it('immediate fills require valid Mark; deferred estimates are an explicit opt-in', () => {
+    const known = { freeCollateral: '70', crossBase: '70', liquidationBuffer: '70', leverage: 10, feeRate: fee,
+      marginMode: 'isolated' as const, direction: 'long' as const, price: '100', opening: true };
+    for (const mark of [null, undefined, '', '0', '-1', 'abc', '1.123456789'])
+      assert.deepEqual(futuresEntryCapacity({ ...known, mark }), { state: 'unavailable', reason: 'mark' });
+    assert.equal(futuresEntryCapacity({ ...known, deferred: true }).state, 'ready');
   });
 
   it('a new isolated position that would start under maintenance on Mark has no capacity', () => {

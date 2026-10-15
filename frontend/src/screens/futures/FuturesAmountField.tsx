@@ -83,17 +83,18 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
               accessibilityRole="button"
               accessibilityLabel={`${ratioLabel} ${text}`}
               aria-pressed={selected}
-              accessibilityState={{ disabled: !editable, selected }}
-              disabled={!editable}
+              accessibilityState={{ disabled: !editable || ratioDisabled, selected }}
+              disabled={!editable || ratioDisabled}
               hitSlop={{ top: 6, bottom: 6 }}
               onPress={() => onRatio(value)}
-              style={[styles.ratioButton, { flexBasis: 34 * fontScale }, selected && styles.ratioSelected, !editable && styles.ratioPending]}
+              style={[styles.ratioButton, { flexBasis: 34 * fontScale }, selected && styles.ratioSelected, (!editable || ratioDisabled) && styles.ratioPending]}
             >
               <Text style={[styles.ratioText, selected && styles.ratioTextSelected]}>{text}</Text>
             </ActionPressable>
           );
         })}
       </View>
+      {ratioReason ? <Text style={styles.helper} testID="futures-ratio-reason" accessibilityLiveRegion="polite">{ratioReason}</Text> : null}
       <Text style={styles.helper} testID="futures-available-collateral">{available}</Text>
     </View>
   );

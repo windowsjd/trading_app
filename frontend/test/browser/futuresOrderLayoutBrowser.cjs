@@ -108,6 +108,22 @@ async function main() {
         assert.notEqual(await id('futures-amount').inputValue(), '', `${label}: 25% writes an amount`);
         // Enabled by the amount, the submit takes the tap.
         assert.ok(await hittable('futures-submit'), `${label}: futures-submit tappable`);
+        // Local collateral preflight: the same error below an enabled button,
+        // with zero transport calls, even at the narrowest/largest font layout.
+        await id('futures-amount').fill('99999999');
+        assert.notEqual(await id('futures-submit').getAttribute('aria-disabled'), 'true');
+        await id('futures-submit').click(); await id('futures-order-notice').waitFor();
+        assert.equal(await id('futures-order-notice').textContent(), '사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.');
+        assert.equal(await page.evaluate(() => window.futuresFixture.requests.length), 0);
+        const refusalButton = await box('futures-submit'), refusalText = await box('futures-order-notice');
+        assert.ok(refusalText.y >= refusalButton.y + refusalButton.height, `${label}: error below the button`);
+        assert.deepEqual(await page.evaluate(clipped), [], `${label}: collateral error is not clipped`);
+        if (width === 320 && fontScale === 2) {
+          await id('futures-order-notice').scrollIntoViewIfNeeded();
+          await page.screenshot({ path: path.join(out, `${label}-local-refusal.png`) });
+        }
+        await id('futures-amount').fill('51');
+        assert.equal(await id('futures-order-notice').count(), 0);
         await id('futures-ratio-100').click();
         assert.equal(await id('futures-collateral-insufficient').count(), 0, `${label}: 100% fits the collateral`);
         assert.equal(await id('futures-amount-ratio').textContent(), '100%');
@@ -177,36 +193,74 @@ async function main() {
     await open('kind=open&fontScale=1.5', 'light');
     await id('futures-amount').fill('51'); await id('futures-amount').focus();
     assert.ok(await hittable('futures-amount') && await hittable('futures-submit'), 'keyboard-sized viewport');
+    await id('futures-amount').fill('99999999'); await id('futures-amount').focus(); await id('futures-submit').click();
+    assert.ok(await hittable('futures-submit') && await hittable('futures-order-notice'), 'keyboard-sized viewport with refusal');
+    assert.deepEqual(await page.evaluate(clipped), [], 'keyboard-sized viewport with refusal text');
     // The order button after a refused (409) order: no frozen ink, usable again, reason under it.
     await page.setViewportSize({ width: 390, height: 844 });
     const ink = [];
-    for (const [query, label] of [['execute=409&executeDelay=60', '409'], ['execute=409&executeDelay=0', '409-immediate']]) {
+    for (const method of ['market', 'limit']) for (const [query, kind] of [['free=0', 'local'], ['execute=409&executeDelay=60', '409'], ['execute=409&executeDelay=0', '409-immediate']]) {
+      const label = `${method}-${kind}`;
       await open(`kind=open&${query}`, 'light');
+      if (method === 'limit') { await id('order-type-select').click(); await id('order-method-limit').click(); await page.waitForTimeout(350); await id('futures-limit-price').fill('100'); }
+      const submitId = method === 'market' ? 'futures-submit' : 'futures-limit-submit';
+      const noticeId = method === 'market' ? 'futures-order-notice' : 'futures-limit-notice';
       await id('futures-amount').fill('51');
-      const b = await box('futures-submit');
+      await id(submitId).scrollIntoViewIfNeeded(); await page.waitForTimeout(150);
+      const b = await box(submitId);
       await page.mouse.move(b.x + b.width / 3, b.y + b.height / 2); await page.mouse.down(); await page.waitForTimeout(70); await page.mouse.up();
-      await id('futures-order-notice').waitFor();
-      assert.equal(await id('futures-order-notice').textContent(), '사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.');
-      const order = await page.evaluate(() => { const submit = document.querySelector('[data-testid="futures-submit"]'), notice = document.querySelector('[data-testid="futures-order-notice"]'); return submit.compareDocumentPosition(notice) & Node.DOCUMENT_POSITION_FOLLOWING ? 'after' : 'before'; });
-      assert.equal(order, 'after', 'the reason reads under the button');
+      await id(noticeId).waitFor();
+      assert.equal(await id(noticeId).textContent(), '사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.');
+      const submitBox = await box(submitId), noticeBox = await box(noticeId);
+      assert.ok(noticeBox.y >= submitBox.y + submitBox.height, `${label}: the reason reads under the button`);
+      assert.equal(await page.evaluate(() => window.futuresFixture.requests.length), kind === 'local' ? 0 : 1);
       await page.waitForTimeout(500);
-      const state = await page.evaluate(() => {
-        const submit = document.querySelector('[data-testid="futures-submit"]');
+      const state = await id(submitId).evaluate((submit) => {
         const inkEl = [...submit.querySelectorAll('div')].find((n) => { const s = getComputedStyle(n); return s.position === 'absolute' && s.width === '64px' && s.height === '64px' && s.borderRadius === '32px'; });
-        return { disabled: submit.getAttribute('aria-disabled'), busy: submit.getAttribute('aria-busy'), inkOpacity: inkEl ? Number(getComputedStyle(inkEl).opacity) : null };
+        const surface = [...submit.querySelectorAll('div')].find((n) => getComputedStyle(n).transform.startsWith('matrix'));
+        return { disabled: submit.getAttribute('aria-disabled'), busy: submit.getAttribute('aria-busy'), inkOpacity: inkEl ? Number(getComputedStyle(inkEl).opacity) : null, transform: surface ? getComputedStyle(surface).transform : null };
       });
       ink.push({ label, ...state });
       assert.equal(state.inkOpacity, 0, `${label}: the ink faded out (${JSON.stringify(state)})`);
       assert.notEqual(state.disabled, 'true', `${label}: the button is enabled again`);
+      assert.notEqual(state.busy, 'true', `${label}: loading ended`);
+      assert.ok(state.transform === null || state.transform === 'matrix(1, 0, 0, 1, 0, 0)', `${label}: press scale released`);
       assert.equal(await id('futures-retry').count(), 0, `${label}: a refusal is not an unknown result`);
       await page.screenshot({ path: path.join(out, `390-${label}-after.png`) });
+    }
+    // Live Mark transitions: stale and missing clear the ratio's capacity and
+    // disable every ratio control; manual amounts survive recovery.
+    const evidence = [];
+    for (const mark of ['fresh', 'missing', 'stale']) for (const last of ['fresh', 'missing']) {
+      await open(`kind=open&mark=${mark}&last=${last}`, 'light');
+      await id('futures-amount').fill('51');
+      const disabled = mark !== 'fresh' || last === 'missing';
+      assert.equal(await id('futures-amount-slider').isDisabled(), disabled);
+      for (const ratio of [25, 50, 75, 100]) assert.equal(await id(`futures-ratio-${ratio}`).getAttribute('aria-disabled') === 'true', disabled);
+      assert.equal(await id('futures-submit').getAttribute('aria-disabled') === 'true', disabled);
+      if (disabled) assert.equal(await id('futures-amount-ratio').textContent(), '0%');
+      if (mark !== 'fresh') assert.match(await id('futures-ratio-reason').textContent(), /Mark 정보를 확인할 수 없어/);
+      await page.evaluate(async () => { window.futuresFixture.options = { freeCollateral: '70', crossBase: '70', liquidationBuffer: '70' }; await window.refreshFuturesFixture(); });
+      await page.waitForFunction(() => !document.querySelector('[data-testid="futures-amount-slider"]').disabled);
+      assert.equal(await id('futures-amount').inputValue(), '51');
+      await id('futures-ratio-100').click();
+      assert.equal(await id('futures-amount').inputValue(), '69.58');
+      evidence.push({ mark, last, disabled, recovered: true });
     }
     // A lost response asks for the same-request check instead.
     await open('kind=open&execute=network', 'light');
     await id('futures-amount').fill('51'); await id('futures-submit').click(); await id('futures-retry').waitFor();
     assert.match(await id('futures-order-notice').textContent(), /체결을 확인하지 못했습니다/);
+    // Record the fonts that actually painted the Korean error, so a headless
+    // environment with missing Hangul glyphs cannot masquerade as a font check.
+    const cdp = await page.context().newCDPSession(page);
+    await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+    const { root: documentNode } = await cdp.send('DOM.getDocument');
+    const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: documentNode.nodeId, selector: '[data-testid="futures-order-notice"]' });
+    const { fonts } = await cdp.send('CSS.getPlatformFontsForNode', { nodeId });
+    if (process.env.FUTURES_LAYOUT_KOREAN_FONT) assert.ok(fonts.some((font) => font.familyName === process.env.FUTURES_LAYOUT_KOREAN_FONT && font.glyphCount > 0), `Korean glyph font: ${JSON.stringify(fonts)}`);
     assert.deepEqual(errors, []);
-    fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({ layouts: results.length, results, ink, errors, scope: 'RN Web; native Android/iOS rendering, IME and haptics not exercised' }, null, 2));
+    fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify({ layouts: results.length, results, ink, evidence, fonts, errors, scope: 'RN Web; native Android/iOS rendering, IME and haptics not exercised' }, null, 2));
     console.log(`Futures order layout browser: ${results.length} layouts, sheets, ladder, keyboard-size and 409 ink checks passed`);
   } finally { await browser.close(); await new Promise((resolve) => server.close(resolve)); }
 }

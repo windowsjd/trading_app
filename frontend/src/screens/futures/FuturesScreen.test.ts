@@ -311,13 +311,16 @@ test("uncertain open replays the original command after poll shows a position an
   assert.equal(h.requests[1].body.operation, "open");
 });
 
-test("opening with no free collateral is flagged while typing; reduce and unknown collateral are not", async (t) => {
+test("opening with no free collateral is refused on press; reduce and unknown collateral are not", async (t) => {
   const h = futuresHarness({ freeCollateral: "0.00000000" });
   await h.start();
   t.after(h.close);
   await h.amount("102");
-  assert.equal(h.node("futures-collateral-insufficient")?.props.children, "사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.");
-  assert.equal(h.node("futures-submit").props.state, "disabled");
+  assert.equal(h.node("futures-submit").props.state, "enabled");
+  await h.press("futures-submit");
+  assert.equal(h.requests.length, 0);
+  assert.equal(h.node("futures-order-notice")?.props.children, "사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.");
+  assert.equal(h.node("futures-submit").props.state, "enabled");
   await h.press("futures-submit");
   assert.equal(h.requests.length, 0, "the server is never asked for a certain rejection");
   const unknown = futuresHarness({ freeCollateral: null });

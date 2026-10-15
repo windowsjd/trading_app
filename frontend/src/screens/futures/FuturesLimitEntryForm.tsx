@@ -1,3 +1,4 @@
+import { futuresErrorMessage } from '../../features/futures/orderFeedback';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import React, { useEffect, useRef, useState } from 'react';
@@ -22,12 +23,13 @@ import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invali
  * attached TP/SL and owns the idempotent submit. `onBusy` holds the screen's
  * inputs while a request or an uncertain result keeps this exact intent.
  */
-export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId, direction, marginMode, leverage, quantity, limitPrice, allowed, onBusy, onInputFocus, onInputBlur }: {
+export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId, direction, marginMode, leverage, quantity, amount, limitPrice, allowed, collateralError, onBusy, onInputFocus, onInputBlur }: {
   accountId: string; instrumentId: string; assetId: string; direction: Direction; marginMode: MarginMode;
-  leverage: string; quantity: string; limitPrice: string; allowed: boolean; onBusy: (busy: boolean) => void;
+  leverage: string; quantity: string; amount: string; limitPrice: string; allowed: boolean; collateralError: string | null; onBusy: (busy: boolean) => void;
   onInputFocus?: (input: View | null) => void; onInputBlur?: () => void;
 }) {
   const learning = useLearningAccess(accountId).gate('allTrading');
+  const [collateralAttempted, setCollateralAttempted] = useState(false);
   const [draft, setDraft] = useState(emptyProtection);
   const [busy, setBusy] = useState(false), [uncertain, setUncertain] = useState(false);
   const [message, setMessage] = useState<string | null>(null), [failure, setFailure] = useState<unknown>(null);
@@ -41,12 +43,22 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
   const caps = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'futures', assetId), queryFn: () => getProtections(accountId, 'futures', assetId), enabled: selectedAccountId === accountId, refetchInterval: 4000 });
   const canAttach = !caps.isError && caps.data?.tradingAccountId === accountId && !!caps.data.capabilities.canCreateFutures;
   const validPrice = /^\d{1,16}(\.\d{1,8})?$/.test(limitPrice) && Number(limitPrice) > 0;
-  const permission = useRef({ allowed, canAttach });
-  permission.current = { allowed, canAttach };
+  const permission = useRef({ allowed, canAttach, collateralError });
+  permission.current = { allowed, canAttach, collateralError };
   const current = () => alive.current && selected.current === accountId && isCurrentSession(session);
+  useEffect(() => {
+    if (!locked.current && !request.current) {
+      setFailure(null); setMessage(null); setCollateralAttempted(false);
+    }
+  }, [amount, quantity, leverage, limitPrice, direction, marginMode, draft]);
+  const shownMessage = collateralAttempted ? collateralError : message;
   const submit = async () => {
     if (locked.current || !current() || (!uncertain && (!permission.current.allowed || !validPrice))) return;
     if (!uncertain) {
+      if (permission.current.collateralError) {
+        setFailure(null); setMessage(null); setCollateralAttempted(true); return;
+      }
+      setCollateralAttempted(false);
       const error = protectionInputError(draft, { direction, limitPrice });
       if (error) { setFailure(null); setMessage(error); return; }
       const legs = draftLegs(draft);
@@ -64,7 +76,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
       if (!current()) return;
       const info = getApiErrorInfo(error); const retry = !info.hasResponse || (info.status ?? 0) >= 500;
       setUncertain(retry); if (!retry) request.current = null;
-      setFailure(error); setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.' : info.serverCode === 'PROTECTION_ALREADY_TRIGGERED' ? `${direction.toUpperCase()} 조건 가격을 확인해주세요. ${direction === 'long' ? 'SL < 진입 지정가 < TP' : 'TP < 진입 지정가 < SL'} 관계가 필요합니다.` : '지정가 주문을 접수하지 못했습니다. 입력값과 사용 가능 담보를 확인해주세요.');
+      setFailure(error); setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.' : info.serverCode === 'PROTECTION_ALREADY_TRIGGERED' ? `${direction.toUpperCase()} 조건 가격을 확인해주세요. ${direction === 'long' ? 'SL < 진입 지정가 < TP' : 'TP < 진입 지정가 < SL'} 관계가 필요합니다.` : futuresErrorMessage(info.serverCode, false));
     } finally { locked.current = false; if (current()) { setBusy(false); onBusy(!!request.current); } }
   };
   return <View style={styles.stack} testID="futures-limit-entry">
@@ -77,7 +89,7 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, assetId
     <CTAButton testID="futures-limit-submit" label={uncertain ? '동일 진입 요청 확인' : `${direction === 'long' ? '롱(Long)' : '숏(Short)'} 지정가 진입`}
       style={{ backgroundColor: direction === 'long' ? BUY_COLOR : SELL_COLOR }}
       learningHint={learning.locked ? learning.message : null} onPress={() => learning.guard(() => void submit())} state={busy ? 'loading' : uncertain || (allowed && validPrice) ? 'enabled' : 'disabled'} />
-    {message ? failure ? <ErrorNotice error={failure} message={message} /> : <Text style={styles.text} accessibilityLiveRegion="polite">{message}</Text> : null}
+    {shownMessage ? failure ? <ErrorNotice testID="futures-limit-notice" error={failure} message={shownMessage} style={styles.text} /> : <Text testID="futures-limit-notice" style={styles.text} accessibilityLiveRegion="polite">{shownMessage}</Text> : null}
   </View>;
 }
 const styles = StyleSheet.create({ stack: { gap: 12, minWidth: 0 }, attached: { gap: 8, minWidth: 0 }, label: { color: semantic.muted, fontSize: 12 }, text: { color: semantic.text, fontSize: 14, flexShrink: 1 }, hint: { color: semantic.secondary, fontSize: 12, flexShrink: 1 } });

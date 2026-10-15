@@ -7,6 +7,7 @@ import FuturesScreen from '../../src/screens/futures/FuturesScreen';
 import { ScreenSheetHost } from '../../src/components/common/ScreenSheetHost';
 import { state } from './futuresMocks';
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+window.refreshFuturesFixture = () => client.invalidateQueries();
 function ThemeReady() { const appearance = useAppearance(); window.futuresAppearance = appearance; return null; }
 function App() {
   const [, refresh] = React.useState(0);
