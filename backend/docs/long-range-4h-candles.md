@@ -17,7 +17,7 @@ Evidence for the KRX source: [KOSCOM 10-minute history live check](../../docs/in
 | Storage | `market_candles` (`interval='4h'`) | `market_candles` (`interval='4h'`) | `futures_market_candles` (keyed by `FuturesInstrument`) |
 | Retention | 180 calendar days (`MARKET_CANDLE_4H_RETENTION_DAYS`, min 150) | same | same |
 
-- 5m retention stays 35 days; 15m/30m/1h stay read-time aggregates; 1d/1w are
+- 5m retention stays at its default of 45 days; 15m/30m/1h stay read-time aggregates; 1d/1w are
   unchanged and never pruned. 180-day retention is a ceiling, not a promise
   that 180 days were collected: only confirmed history is shown.
 - US stocks (2026-10-14): `range=96d` is accepted with the US session

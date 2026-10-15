@@ -1,0 +1,2 @@
+{"plan":"0.5c-1g","diskSizeGB":50,"diskAutoscalingEnabled":false,"version":"17","status":"available","highAvailabilityEnabled":false,"readReplicas":0}
+{"type":"web_service","branch":"main","autoDeploy":"yes","rootDir":"backend","healthCheckPath":"","plan":"1c-2g","numInstances":1,"previews":{"generation":"off"},"pullRequestPreviewsEnabled":"no"}

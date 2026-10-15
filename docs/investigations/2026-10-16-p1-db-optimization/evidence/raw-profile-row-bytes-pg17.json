@@ -1,0 +1,86 @@
+{
+ "binance_full__default": {
+  "bytesPerRow": 1229,
+  "heapPerRow": 1024,
+  "indexPerRow": 204,
+  "rawJsonbBytes": 698,
+  "tupleBytes": 938
+ },
+ "binance_slim__default": {
+  "bytesPerRow": 886,
+  "heapPerRow": 683,
+  "indexPerRow": 202,
+  "rawJsonbBytes": 495,
+  "tupleBytes": 654
+ },
+ "koscom_price_full__default": {
+  "bytesPerRow": 948,
+  "heapPerRow": 745,
+  "indexPerRow": 202,
+  "rawJsonbBytes": 544,
+  "tupleBytes": 703
+ },
+ "koscom_price_slim__default": {
+  "bytesPerRow": 883,
+  "heapPerRow": 683,
+  "indexPerRow": 200,
+  "rawJsonbBytes": 481,
+  "tupleBytes": 640
+ },
+ "koscom_book_full__default": {
+  "bytesPerRow": 1615,
+  "heapPerRow": 1365,
+  "indexPerRow": 248,
+  "rawJsonbBytes": 1032,
+  "tupleBytes": 1187
+ },
+ "koscom_book_slim__default": {
+  "bytesPerRow": 1954,
+  "heapPerRow": 1707,
+  "indexPerRow": 247,
+  "rawJsonbBytes": 1491,
+  "tupleBytes": 1648
+ },
+ "binance_full__toast128_pglz": {
+  "bytesPerRow": 1226,
+  "heapPerRow": 1024,
+  "indexPerRow": 202,
+  "rawJsonbBytes": 698,
+  "tupleBytes": 938
+ },
+ "binance_slim__toast128_pglz": {
+  "bytesPerRow": 883,
+  "heapPerRow": 683,
+  "indexPerRow": 200,
+  "rawJsonbBytes": 495,
+  "tupleBytes": 654
+ },
+ "koscom_price_full__toast128_pglz": {
+  "bytesPerRow": 946,
+  "heapPerRow": 745,
+  "indexPerRow": 201,
+  "rawJsonbBytes": 544,
+  "tupleBytes": 703
+ },
+ "koscom_price_slim__toast128_pglz": {
+  "bytesPerRow": 884,
+  "heapPerRow": 683,
+  "indexPerRow": 200,
+  "rawJsonbBytes": 481,
+  "tupleBytes": 640
+ },
+ "koscom_book_full__toast128_pglz": {
+  "bytesPerRow": 1618,
+  "heapPerRow": 167,
+  "indexPerRow": 235,
+  "rawJsonbBytes": 1028,
+  "tupleBytes": 1187
+ },
+ "koscom_book_slim__toast128_pglz": {
+  "bytesPerRow": 2022,
+  "heapPerRow": 1456,
+  "indexPerRow": 246,
+  "rawJsonbBytes": 1490,
+  "tupleBytes": 1648
+ }
+}

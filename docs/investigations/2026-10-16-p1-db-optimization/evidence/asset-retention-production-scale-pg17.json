@@ -1,0 +1,109 @@
+{
+ "template": "p1_aps_test",
+ "oldRowsAtStart": 2100590,
+ "sizeBefore": {
+  "heap": "5337571328",
+  "idx": "1802797056",
+  "live": "0",
+  "dead": "0"
+ },
+ "plans": {
+  "domestic_stock|postgresDefaults|1000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "domestic_stock|postgresDefaults|10000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "domestic_stock|production|1000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "domestic_stock|production|10000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "us_stock|postgresDefaults|1000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_captured_at_idx+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "us_stock|postgresDefaults|10000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_captured_at_idx+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "us_stock|production|1000": {
+   "Index Scan:asset_id_captured_at_idx+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "us_stock|production|10000": {
+   "Index Scan:asset_id_captured_at_idx+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "crypto|postgresDefaults|1000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "crypto|postgresDefaults|10000": {
+   "Bitmap Heap Scan:+Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "crypto|production|1000": {
+   "Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  },
+  "crypto|production|10000": {
+   "Index Scan:asset_id_effective_at_idx+Index Scan:pkey+ModifyTable:": 10
+  }
+ },
+ "sampleBatch": {
+  "ms": 43.773,
+  "buffers": 49951,
+  "deletedRows": null
+ },
+ "cleanup": {
+  "runs": 104,
+  "deleted": 2098755,
+  "scanned": 2100665,
+  "seconds": 87.7,
+  "rowsPerSecond": 23943,
+  "runMs": {
+   "p50": 836.4,
+   "p95": 892.1,
+   "max": 1016.6
+  },
+  "batchMs": {
+   "count": 2187,
+   "p50": 39.6,
+   "p95": 42.3,
+   "max": 194
+  },
+  "walBytes": 2329239408,
+  "fpi": 262490,
+  "walBytesPerDeletedRow": 1110
+ },
+ "concurrentInsertMs": {
+  "count": 44,
+  "p50": 0.8,
+  "p95": 0.9,
+  "max": 4.5
+ },
+ "sizeAfterCleanup": {
+  "heap": "5337571328",
+  "idx": "1803059200",
+  "live": "3224795",
+  "dead": "2084744"
+ },
+ "steadyRun": {
+  "ms": 120,
+  "deleted": 0,
+  "scanned": 0,
+  "batches": 41
+ },
+ "vacuum": {
+  "seconds": 4,
+  "walBytes": 547653232,
+  "fpi": 640190
+ },
+ "sizeAfterVacuum": {
+  "heap": "5337571328",
+  "idx": "1803059200",
+  "live": "3171390",
+  "dead": "0"
+ },
+ "sizeAfterReuseOf200kRows": {
+  "heap": "5337571328",
+  "idx": "1858240512",
+  "live": "3371390",
+  "dead": "0"
+ }
+}

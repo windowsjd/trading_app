@@ -44,9 +44,14 @@ export async function readFuturesReferencePrices(
       CROSS JOIN (VALUES ('binance_usdm_mark_ws'::"FuturesMarkSource"), ('binance_usdm_mark_rest'::"FuturesMarkSource")) AS sources(source)
       CROSS JOIN LATERAL (
         SELECT s.* FROM futures_mark_snapshots s
-        WHERE s.instrument_id = target.instrument_id AND s.source = sources.source
+        -- Range, not equality, on source (as the retention probes): the
+        -- (source, effective_at) order then fits only the unique index. With
+        -- equality the (instrument_id, effective_at) index ties, and for a
+        -- contract without REST rows it walks the whole 24 h history.
+        WHERE s.instrument_id = target.instrument_id
+          AND s.source >= sources.source AND s.source <= sources.source
           AND s.effective_at <= ${now} AND s.captured_at <= ${now}
-        ORDER BY s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT 1
+        ORDER BY s.source DESC, s.effective_at DESC, s.captured_at DESC, s.id DESC LIMIT 1
       ) m`),
   ]);
   for (const instrument of instruments) {

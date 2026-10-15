@@ -28,16 +28,20 @@ export class RetentionHealth {
   private lastFailed: { kind: RetentionFailureKind; at: number } | null = null;
   private readonly lastAlert = new Map<string, number>();
 
+  /** `eventPrefix` names the log events (`<prefix>_failing`, ...); the
+   * futures jobs keep `futures_retention`. */
   constructor(
     private readonly job: string,
     private readonly logger: Logger,
+    private readonly eventPrefix = 'futures_retention',
+    private readonly backlogAfter = RETENTION_BACKLOG_AFTER,
   ) {}
 
   succeeded(batchLimitReached: boolean, now = Date.now()) {
     if (this.consecutiveFailures >= RETENTION_FAILING_AFTER)
       this.logger.log(
         JSON.stringify({
-          event: 'futures_retention_recovered',
+          event: `${this.eventPrefix}_recovered`,
           job: this.job,
           failedRuns: this.consecutiveFailures,
         }),
@@ -46,11 +50,11 @@ export class RetentionHealth {
     this.lastAlert.delete('failing');
     this.lastSucceededAt = now;
     this.saturatedRuns = batchLimitReached ? this.saturatedRuns + 1 : 0;
-    if (this.saturatedRuns >= RETENTION_BACKLOG_AFTER)
+    if (this.saturatedRuns >= this.backlogAfter)
       this.alert('backlog', now, () =>
         this.logger.warn(
           JSON.stringify({
-            event: 'futures_retention_backlog',
+            event: `${this.eventPrefix}_backlog`,
             job: this.job,
             saturatedRuns: this.saturatedRuns,
           }),
@@ -72,7 +76,7 @@ export class RetentionHealth {
       this.alert('failing', now, () =>
         this.logger.error(
           JSON.stringify({
-            event: 'futures_retention_failing',
+            event: `${this.eventPrefix}_failing`,
             job: this.job,
             consecutiveFailures: this.consecutiveFailures,
             kind,
@@ -86,7 +90,7 @@ export class RetentionHealth {
       consecutiveFailures: this.consecutiveFailures,
       failing: this.consecutiveFailures >= RETENTION_FAILING_AFTER,
       saturatedRuns: this.saturatedRuns,
-      backlog: this.saturatedRuns >= RETENTION_BACKLOG_AFTER,
+      backlog: this.saturatedRuns >= this.backlogAfter,
       lastSucceededAt:
         this.lastSucceededAt === null
           ? null

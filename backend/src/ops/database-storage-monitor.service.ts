@@ -26,6 +26,8 @@ export const DATABASE_STORAGE_LEVELS: ReadonlyArray<
 /** Remaining days before 80 % at the measured growth that raise an alert. */
 export const DATABASE_STORAGE_RUNWAY_ALERT_DAYS = 14;
 const HISTORY_MS = 25 * 3600000;
+/** Three missed five-minute samples: the level shown is no longer current. */
+export const DATABASE_STORAGE_SAMPLE_STALE_MS = 15 * 60000;
 const GROWTH_MIN_WINDOW_MS = 3600000;
 const RUNWAY_MIN_WINDOW_MS = 6 * 3600000;
 const REPEAT_MS: Record<DatabaseStorageLevel, number> = {
@@ -38,8 +40,10 @@ const REPEAT_MS: Record<DatabaseStorageLevel, number> = {
 
 /** Samples pg_database_size (a file stat per relation, no table reads) every
  * five minutes. Growth is measured from this process's own samples (up to the
- * last 24 h), so it is unknown for the first hour after a restart. Render's disk
- * metric remains the authoritative usage including WAL; see the ops runbook. */
+ * last 24 h), so it is unknown for the first hour after a restart. The usage
+ * level counts max_wal_size on top as WAL headroom: pg_database_size excludes
+ * pg_wal, which shares the disk (the 2026-10-12 restart failed for WAL space).
+ * Render's disk metric remains the authoritative usage; see the ops runbook. */
 @Injectable()
 export class DatabaseStorageMonitorService
   implements OnModuleInit, OnModuleDestroy
@@ -49,6 +53,8 @@ export class DatabaseStorageMonitorService
   private timer?: NodeJS.Timeout;
   private sampling = false;
   private samples: Array<{ at: number; bytes: number }> = [];
+  private walReserveBytes = 0;
+  private startedAt?: number;
   private level: DatabaseStorageLevel = 'unknown';
   private readonly lastAlert = new Map<string, number>();
   private lastSampleFailure: { kind: string; at: number } | null = null;
@@ -58,6 +64,7 @@ export class DatabaseStorageMonitorService
   onModuleInit() {
     const config = readDatabaseStorageMonitorConfig();
     if (!config.enabled) return;
+    this.startedAt = Date.now();
     this.first = setTimeout(
       () => void this.sample(),
       config.firstSampleDelayMs,
@@ -74,9 +81,13 @@ export class DatabaseStorageMonitorService
     if (this.sampling) return;
     this.sampling = true;
     try {
-      const [row] = await this.prisma.$queryRaw<Array<{ bytes: bigint }>>`
-        SELECT pg_database_size(current_database())::bigint AS bytes`;
+      const [row] = await this.prisma.$queryRaw<
+        Array<{ bytes: bigint; wal?: bigint | null }>
+      >`
+        SELECT pg_database_size(current_database())::bigint AS bytes,
+          pg_size_bytes(current_setting('max_wal_size'))::bigint AS wal`;
       this.samples.push({ at: now, bytes: Number(row.bytes) });
+      this.walReserveBytes = row.wal == null ? 0 : Number(row.wal);
       this.samples = this.samples.filter((s) => now - s.at <= HISTORY_MS);
       this.lastSampleFailure = null;
       this.evaluate(now);
@@ -96,10 +107,23 @@ export class DatabaseStorageMonitorService
   }
 
   getStatus(now = Date.now()) {
-    const { enabled, capacityBytes } = readDatabaseStorageMonitorConfig();
+    const { enabled, capacityBytes, firstSampleDelayMs } =
+      readDatabaseStorageMonitorConfig();
     const latest = this.samples.at(-1) ?? null;
     const usedRatio =
-      latest && capacityBytes ? latest.bytes / capacityBytes : null;
+      latest && capacityBytes
+        ? (latest.bytes + this.walReserveBytes) / capacityBytes
+        : null;
+    // No sample yet counts from the first scheduled sample, not from start.
+    const freshSince =
+      latest?.at ??
+      (this.startedAt === undefined
+        ? undefined
+        : this.startedAt + firstSampleDelayMs);
+    const sampleStale =
+      enabled &&
+      freshSince !== undefined &&
+      now - freshSince > DATABASE_STORAGE_SAMPLE_STALE_MS;
     const level: DatabaseStorageLevel =
       usedRatio === null
         ? 'unknown'
@@ -123,7 +147,7 @@ export class DatabaseStorageMonitorService
         ? Math.max(
             0,
             +(
-              (capacityBytes * ratio - latest.bytes) /
+              (capacityBytes * ratio - latest.bytes - this.walReserveBytes) /
               growthBytesPerDay
             ).toFixed(1),
           )
@@ -132,7 +156,9 @@ export class DatabaseStorageMonitorService
       enabled,
       capacityConfigured: capacityBytes !== null,
       databaseBytes: latest?.bytes ?? null,
+      walReserveBytes: latest ? this.walReserveBytes : null,
       sampledAt: latest ? new Date(latest.at).toISOString() : null,
+      sampleStale,
       usedPercent: usedRatio === null ? null : +(usedRatio * 100).toFixed(1),
       level,
       growthBytesPerDay,
@@ -171,7 +197,7 @@ export class DatabaseStorageMonitorService
       else this.logger.log(event);
       this.level = status.level;
       this.lastAlert.set('level', now);
-    } else
+    } else if (REPEAT_MS[status.level] !== Infinity)
       this.alert('level', now, REPEAT_MS[status.level], () => {
         const event = JSON.stringify({ event: 'db_storage_level', ...summary });
         if (status.level === 'warning') this.logger.warn(event);

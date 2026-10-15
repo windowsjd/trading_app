@@ -10,6 +10,7 @@ import { OpsJobRunService } from './ops-job-run.service';
 import { OpsJobRunnerService } from './ops-job-runner.service';
 import { OpsSchedulerService } from './ops-scheduler.service';
 import { DatabaseStorageMonitorService } from './database-storage-monitor.service';
+import { AssetPriceSnapshotRetentionWorker } from '../providers/asset-price-snapshot-retention.worker';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { DatabaseStorageMonitorService } from './database-storage-monitor.servic
     OpsJobRunnerService,
     OpsSchedulerService,
     DatabaseStorageMonitorService,
+    AssetPriceSnapshotRetentionWorker,
   ],
   exports: [
     OpsJobLockService,
@@ -33,6 +35,7 @@ import { DatabaseStorageMonitorService } from './database-storage-monitor.servic
     OpsJobRunnerService,
     OpsSchedulerService,
     DatabaseStorageMonitorService,
+    AssetPriceSnapshotRetentionWorker,
   ],
 })
 export class OpsModule {}

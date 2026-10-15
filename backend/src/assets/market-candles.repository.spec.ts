@@ -170,6 +170,24 @@ describe('MarketCandlesRepository', () => {
       );
     });
 
+    it('leaves an unchanged closed bar alone once it was confirmed after its close', async () => {
+      const { prisma, repository } = createRepository();
+      prisma.$executeRaw.mockResolvedValueOnce(0);
+
+      expect(await repository.upsertMany([createCandleInput()])).toEqual({
+        writtenCount: 0,
+      });
+
+      const query = upsertQueryOf(prisma);
+      expect(query.text).toContain(
+        '"market_candles"."is_closed" AND EXCLUDED."is_closed"',
+      );
+      expect(query.text).toContain(
+        `"market_candles"."source_updated_at" >= "market_candles"."close_time" + interval '2 minutes'`,
+      );
+      expect(query.text).toContain(') IS NOT DISTINCT FROM (');
+    });
+
     it('stores a batch of candles in one statement', async () => {
       const { prisma, repository } = createRepository();
       prisma.$executeRaw.mockResolvedValueOnce(3);

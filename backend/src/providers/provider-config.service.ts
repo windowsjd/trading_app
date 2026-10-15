@@ -45,6 +45,9 @@ export type BinancePublicMarketDataConfig = {
   wsStreamingReconnectMaxMs: number;
   wsStreamingHeartbeatTimeoutMs: number;
   wsSnapshotThrottleMs: number;
+  /** Store only the identity, price, time and 24 h fields of a WS ticker
+   * frame (BINANCE_WS_RAW_SLIM_ENABLED, off by default; new rows only). */
+  wsRawSlimEnabled: boolean;
 };
 
 export type KisMarketDataConfig = {
@@ -262,6 +265,12 @@ export function buildProviderConfig(env: ProviderEnv): ProviderConfig {
       env,
       'BINANCE_WS_SNAPSHOT_THROTTLE_MS',
       5000,
+      'binance',
+    ),
+    wsRawSlimEnabled: readBooleanEnv(
+      env,
+      'BINANCE_WS_RAW_SLIM_ENABLED',
+      false,
       'binance',
     ),
   };

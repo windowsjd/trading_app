@@ -36,6 +36,7 @@ import {
   DATABASE_STORAGE_RUNWAY_ALERT_DAYS,
   DatabaseStorageMonitorService,
 } from './ops/database-storage-monitor.service';
+import { AssetPriceSnapshotRetentionWorker } from './providers/asset-price-snapshot-retention.worker';
 
 /**
  * Structured readiness reasons for the operator market-session override
@@ -53,6 +54,33 @@ export const MARKET_SESSION_OVERRIDE_READINESS_REASONS = {
   unavailable: 'MARKET_SESSION_OVERRIDE_UNAVAILABLE',
   lastKnownGood: 'MARKET_SESSION_OVERRIDE_LAST_KNOWN_GOOD',
 } as const;
+
+/**
+ * Reasons that need an operator, not just a note in the payload. `/readiness`
+ * stays HTTP 200 for every state (its contract); `/readiness/alerts` answers
+ * 503 while any of these is present, so a plain HTTP monitor can page without
+ * parsing the body. The calendar and provider reasons stay out: they degrade
+ * readiness by design (e.g. a provisional KRX year) and are not incidents.
+ */
+export const OPERATOR_ALERT_REASONS: ReadonlySet<string> = new Set([
+  'CANDLE_DB_UNAVAILABLE',
+  'DB_DISK_FULL',
+  'DB_STORAGE_WARNING',
+  'DB_STORAGE_ACTION_REQUIRED',
+  'DB_STORAGE_CRITICAL',
+  'DB_STORAGE_RUNWAY_SHORT',
+  'DB_STORAGE_SAMPLE_STALE',
+  'FUTURES_MARK_STALE',
+  'FUTURES_MARK_PERSIST_FAILING',
+  'FUTURES_MARK_RETENTION_FAILING',
+  'FUTURES_MARK_RETENTION_BACKLOG',
+  'FUTURES_LAST_PRICE_RETENTION_FAILING',
+  'FUTURES_LAST_PRICE_RETENTION_BACKLOG',
+  // Its backlog stays a readiness note: the first cleanup of the existing
+  // history runs at the capped pace for hours by design, and storage growth
+  // is paged by the DB_STORAGE_ codes.
+  'ASSET_PRICE_SNAPSHOT_RETENTION_FAILING',
+]);
 
 @Injectable()
 export class AppService {
@@ -86,6 +114,8 @@ export class AppService {
     private readonly futuresLastPriceRetention?: FuturesLastPriceRetentionService,
     @Optional()
     private readonly databaseStorage?: DatabaseStorageMonitorService,
+    @Optional()
+    private readonly assetPriceRetention?: AssetPriceSnapshotRetentionWorker,
   ) {}
 
   getHealth() {
@@ -245,6 +275,15 @@ export class AppService {
     if (reconciliation.some((item) => item.state === 'stale')) {
       reasons.push('RECONCILIATION_STALE');
     }
+    const marketCandleRetention = await this.candleRetentionReadiness(
+      scheduler,
+      now,
+      database === 'ok',
+    );
+    if (marketCandleRetention.state === 'failed')
+      reasons.push('MARKET_CANDLE_RETENTION_FAILED');
+    if (marketCandleRetention.state === 'stale')
+      reasons.push('MARKET_CANDLE_RETENTION_STALE');
 
     // Collector/worker/storage health from in-process state only: readiness
     // adds no query against the large snapshot tables.
@@ -269,6 +308,7 @@ export class AppService {
         app: 'ok',
         status,
         reasons,
+        alerts: reasons.filter((reason) => OPERATOR_ALERT_REASONS.has(reason)),
         database,
         redis,
         scheduler: {
@@ -302,10 +342,31 @@ export class AppService {
           reconciliationDependencyWarnings: liveReconciliationViolations,
         },
         reconciliation,
+        marketCandleRetention,
         futuresMark: operations.futuresMark,
         futuresRetention: operations.futuresRetention,
+        assetPriceRetention: operations.assetPriceRetention,
         databaseStorage: operations.databaseStorage,
         currentTime: now.toISOString(),
+      },
+    };
+  }
+
+  /** Operator-alert view of readiness for external HTTP monitors: 503 while
+   * any OPERATOR_ALERT_REASONS code is present, else 200. It runs exactly the
+   * /readiness queries (SELECT 1 and small Ops-run reads for enabled jobs). */
+  async getReadinessAlerts(now: Date = new Date()) {
+    const { data } = await this.getReadiness(now);
+    const alerting = data.alerts.length > 0;
+    return {
+      httpStatus: alerting ? 503 : 200,
+      body: {
+        success: !alerting,
+        data: {
+          status: data.status,
+          alerts: data.alerts,
+          currentTime: data.currentTime,
+        },
       },
     };
   }
@@ -327,9 +388,11 @@ export class AppService {
       mark: this.futuresMarkRetention?.getStatus() ?? null,
       last: this.futuresLastPriceRetention?.getStatus() ?? null,
     };
+    const assetPriceRetention = this.assetPriceRetention?.getStatus() ?? null;
     for (const [prefix, job] of [
       ['FUTURES_MARK_RETENTION', futuresRetention.mark],
       ['FUTURES_LAST_PRICE_RETENTION', futuresRetention.last],
+      ['ASSET_PRICE_SNAPSHOT_RETENTION', assetPriceRetention],
     ] as const) {
       if (!job?.enabled) continue;
       if (job.failing) reasons.push(`${prefix}_FAILING`);
@@ -339,7 +402,7 @@ export class AppService {
       (futuresMark?.enabled &&
         futuresMark.lastPersistFailure?.kind === 'disk_full' &&
         recent(futuresMark.lastPersistFailure.at)) ||
-      Object.values(futuresRetention).some(
+      [...Object.values(futuresRetention), assetPriceRetention].some(
         (job) =>
           job?.enabled &&
           job.lastFailureKind === 'disk_full' &&
@@ -361,8 +424,46 @@ export class AppService {
         databaseStorage.daysUntil80Percent < DATABASE_STORAGE_RUNWAY_ALERT_DAYS
       )
         reasons.push('DB_STORAGE_RUNWAY_SHORT');
+      // A failing sampler must not keep showing its last good level.
+      if (databaseStorage.sampleStale) reasons.push('DB_STORAGE_SAMPLE_STALE');
     }
-    return { reasons, futuresMark, futuresRetention, databaseStorage };
+    return {
+      reasons,
+      futuresMark,
+      futuresRetention,
+      assetPriceRetention,
+      databaseStorage,
+    };
+  }
+
+  /** The daily candle retention job, when the scheduler runs it: failed when
+   * its latest run failed, stale when no successful run finished in the last
+   * 26 h (daily at 04:00 plus slack), pending before its first run. Two small
+   * Ops-run reads; none while the job is disabled. */
+  private async candleRetentionReadiness(
+    scheduler: ReturnType<typeof getOpsSchedulerConfig>,
+    now: Date,
+    databaseAvailable: boolean,
+  ) {
+    if (!scheduler.enabled || !scheduler.jobs.market_candle_retention)
+      return { state: 'disabled' as const, lastSuccessfulAt: null };
+    if (!databaseAvailable || !this.opsJobRuns)
+      return { state: 'unknown' as const, lastSuccessfulAt: null };
+    const [latest, succeeded] = await Promise.all([
+      this.opsJobRuns.findLatestRunForJob('market_candle_retention'),
+      this.opsJobRuns.findLatestSucceededRunForJob('market_candle_retention'),
+    ]);
+    const lastAt = succeeded?.finishedAt ?? succeeded?.startedAt ?? null;
+    const state = !latest
+      ? ('pending' as const)
+      : latest.status === 'failed'
+        ? ('failed' as const)
+        : lastAt && now.getTime() - lastAt.getTime() <= 26 * 3_600_000
+          ? ('fresh' as const)
+          : latest.status === 'running' && !lastAt
+            ? ('pending' as const)
+            : ('stale' as const);
+    return { state, lastSuccessfulAt: lastAt?.toISOString() ?? null };
   }
 
   private async reconciliationReadiness(

@@ -360,7 +360,8 @@ export const OpsJobName = {
   conditional_sell_orders: 'conditional_sell_orders',
   market_candle_long_sync: 'market_candle_long_sync',
   futures_candle_sync: 'futures_candle_sync',
-  futures_conditional_entries: 'futures_conditional_entries'
+  futures_conditional_entries: 'futures_conditional_entries',
+  asset_price_snapshot_retention: 'asset_price_snapshot_retention'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]

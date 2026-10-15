@@ -44,7 +44,12 @@ function create(count = 1, env: Record<string, string> = {}, budget?: object) {
         .mockResolvedValue({ id: 'p' }),
     },
     assetOrderbookSnapshot: {
-      create: jest.fn().mockResolvedValue({ id: 'b' }),
+      create: jest
+        .fn<
+          Promise<{ id: string }>,
+          [{ data: Prisma.AssetOrderbookSnapshotUncheckedCreateInput }]
+        >()
+        .mockResolvedValue({ id: 'b' }),
     },
   };
   const key = randomUUID();
@@ -451,6 +456,7 @@ describe('KOSCOM stage-2a slim price raw payload', () => {
         'bidordPrc_1',
         'cmpprevddPrc',
         'cmpprevddTpCd',
+        'isuSrtCd',
         'trdDd',
         'trdPrc',
         'trdTm',

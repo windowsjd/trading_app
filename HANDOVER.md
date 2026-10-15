@@ -10,6 +10,35 @@
 
 ---
 
+## 2026-10-16 P0 보완·P1 전체 시장 DB 최적화 — 보존 DELETE 계획 고정·14일 가격 보존·Binance 조회 제거·캔들 재기록 방지·uuid(7)·경보 엔드포인트
+
+- 시작 `main`=`origin/main`=`70f51455`(CI 1 job 실패). main 작업 트리에서 개발 → 검증 뒤 **브랜치 `p1/db-optimization-20261016` 커밋·push·PR**(CI 확인용). **main 병합(=Render 배포)·운영 DB 쓰기·운영 env 변경은 하지 않았다.**
+- 기준 문서: [P1 보고서](docs/investigations/2026-10-16-p1-db-optimization/report.md), [운영 감시 런북](backend/docs/database-operations-monitoring.md) §3·§4·§6.
+
+**P0-A1 CI 실패 원인**
+- PG 버전 문제가 아니다. PG16·PG17 **기본 설정**에서 같은 실패를 재현했다. P0 로컬은 운영 설정(`random_page_cost=1.1`)이라 통과했다.
+- 보존 DELETE가 후보 CTE와 **조인**해서, 표가 배치보다 충분히 크지 않으면(10만 행 픽스처, 또는 운영 설정에서도 배치 10,000) 표 전체 순차 스캔 + 해시를 골랐다. 운영 규모(200만 행)에서는 안전했다.
+- 수정: DELETE를 `id = ANY(ARRAY(SELECT id FROM candidates))`로 바꿔 항상 pkey. 시험은 두 비용 설정 × 배치 2종을 단언한다. CI에 **PostgreSQL 17 job 추가**(기존 16 유지).
+
+**P1 구현 (모두 기본 꺼짐이거나 의미가 같은 계획 수정)**
+- 가격 스냅샷 14일 보존 워커(`ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED`, 5분, Ops 잠금, 자산별 커서, 행 수·60 s 상한, 실패 기록·재개). 보호 ①–⑦ 유지, **④ 시즌 증거 10 → 20행**(정산이 소스 합산 20행을 읽음). 마이그레이션: OpsJobName 값, `futures_season_prices(asset_price_snapshot_id)` 인덱스.
+- Binance 현물: 프레임당 SELECT 3회 → 0(매핑 30 s, 마지막 저장 행 메모리, INSERT 성공 뒤 갱신), 역행·미래 프레임 거부, 슬림 원문(`BINANCE_WS_RAW_SLIM_ENABLED`, −28%/행 실측).
+- 캔들 upsert: 마감 뒤 확인된 확정봉의 동일값 재기록 생략(첫 확인은 기록). 캔들 보존 readiness 이유.
+- uuid(7)(스냅샷 4표, 마이그레이션 없음): Mark WAL −77% 실측.
+- `/readiness/alerts`(경보 시 503), 디스크 감시 WAL 여유·샘플 정지 감지, GitHub 경보 워크플로(변수 미설정 시 비활성).
+- 미국주식 휴장 이월 조회 8 s 함정 수정(`source_type NOT IN`), 선물 기준가 API Mark 동률 수정.
+- **호가 수집·저장 무변경.** 호가 슬림은 측정 결과 +21%(압축 임계 아래로 내려감)라 철회.
+
+**검증(로컬)**: typecheck·build·lint·format·진단·diff check PASS, 단위 321/5,176, E2E 409/409, DB 통합(금융 27 — 공유 실행 4건 FX 재견적은 단독 PASS·HEAD 비교, 코어 25, 캔들 job 전부, 가격 보존·가격 안전 PG16/17) PASS. 운영 규모(530만 행) 보존 시험: 210만 행 삭제, 배치 최대 194 ms, 동시 INSERT p95 0.9 ms.
+
+**운영 관찰(P0 배포 19:06Z 뒤 1.8 h, 읽기 전용)**: DB CPU 0.15 → 0.035–0.065, 버퍼 −86%, Mark 버퍼 −96%, Mark 공백 0, 보존 0.3 s. **24 h 미달 → PRODUCTION_NOT_VERIFIED.**
+
+**주의/남은 일**
+1. PR 병합(배포)과 env 활성화는 승인 대기(보고서 §15).
+2. **KOSCOM 호가 이력 보존 기간 결정이 국내 70종목 확대의 선행 조건**이다(전량 저장 시 70종목 0.64 GB/일, 약 2개월에 50 GB 초과).
+3. 커버리지 조회 2,000행 상한(암호화폐 재조정 288행/자산/일) — P2 우선.
+4. 운영 24 h 재측정: `docs/investigations/2026-10-16-p1-db-optimization/repro/prod-readonly-check.cjs`(TZ=UTC).
+
 ## 2026-10-16 P0 DB 운영 안정화 — 선물 Mark 신선도 병목 제거·보존 계획 안정화·장애 감지·10-12 디스크 사고 기록
 
 - 시작 `main`=`origin/main`=`4f5c4dda`, clean. branch 없이 main 작업 트리에서 작업했다.

@@ -6,6 +6,17 @@ import {
   type ProviderWorkflow,
 } from './source-eligibility.policy';
 
+/** `source_type <> each other enum value` is `= 'provider_api'` row for row,
+ * but cannot drive the (source_type, effective_at) index. With equality and a
+ * session window newer than the last ANALYZE, the planner estimated ~1 row and
+ * walked every provider row of the window for an asset that has none (US
+ * stocks, 8 s per call in production on 2026-10-15). Only the
+ * (asset_id, effective_at) index then fits. A spec pins the enum values. */
+export const NON_PROVIDER_SOURCE_TYPES = [
+  'admin_manual',
+  'official_batch',
+] as const;
+
 type PriceRead = {
   asset: ProviderAssetCandidate & { id: string };
   workflow: ProviderWorkflow;
@@ -17,7 +28,8 @@ export function closedMarketPriceScope(input: PriceRead) {
   if (
     input.asset.assetType === 'crypto' ||
     !CLOSED_MARKET_CARRY_FORWARD_WORKFLOWS.has(input.workflow)
-  ) return null;
+  )
+    return null;
   const marketState = resolveStockMarketSessionState(input.asset, input.now);
   if (marketState?.state === 'open') return null;
   const session = marketState?.latestCompletedSession;
@@ -42,7 +54,7 @@ export async function findMarketAwareAssetPriceCandidates(
     where: {
       assetId: input.asset.id,
       currencyCode: input.asset.currencyCode,
-      sourceType: 'provider_api' as const,
+      sourceType: { notIn: [...NON_PROVIDER_SOURCE_TYPES] },
     },
     orderBy: [
       { effectiveAt: 'desc' as const },
@@ -64,17 +76,30 @@ export async function findMarketAwareAssetPriceCandidates(
   } satisfies Prisma.AssetPriceSnapshotFindManyArgs;
   const scope = closedMarketPriceScope(input);
   if (!scope) {
-    return (await client.assetPriceSnapshot.findMany({ ...query, take: 10 })) ?? [];
+    return (
+      (await client.assetPriceSnapshot.findMany({ ...query, take: 10 })) ?? []
+    );
   }
-  const candidates = (await Promise.all(input.sourceNames.map((sourceName) =>
-    client.assetPriceSnapshot.findMany({
-      ...query,
-      where: { ...query.where, ...scope.where, sourceName, price: { gt: 0 } },
-      take: 1,
-    }),
-  ))).flat();
+  const candidates = (
+    await Promise.all(
+      input.sourceNames.map((sourceName) =>
+        client.assetPriceSnapshot.findMany({
+          ...query,
+          where: {
+            ...query.where,
+            ...scope.where,
+            sourceName,
+            price: { gt: 0 },
+          },
+          take: 1,
+        }),
+      ),
+    )
+  ).flat();
   if (candidates.length > 0) return candidates;
   // Failure diagnostics retain the newest rejected evidence. The shared
   // selector still rejects it; this is never an older-session fallback.
-  return (await client.assetPriceSnapshot.findMany({ ...query, take: 1 })) ?? [];
+  return (
+    (await client.assetPriceSnapshot.findMany({ ...query, take: 1 })) ?? []
+  );
 }

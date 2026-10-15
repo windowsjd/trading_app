@@ -100,6 +100,11 @@ describe('AppService candle readiness', () => {
       data: { status: 'unavailable', database: 'unavailable' },
     });
     expect(result.data.reasons).toContain('CANDLE_DB_UNAVAILABLE');
+    // Readiness itself stays HTTP 200; the alert view must page on it.
+    expect(result.data.alerts).toEqual(['CANDLE_DB_UNAVAILABLE']);
+    const alerts = await service.getReadinessAlerts();
+    expect(alerts.httpStatus).toBe(503);
+    expect(alerts.body.data.status).toBe('unavailable');
   });
 
   it('degrades with MARKET_CALENDAR_COVERAGE_MISSING when required years lack datasets', async () => {
@@ -425,6 +430,82 @@ describe('AppService candle readiness', () => {
       delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
     }
   });
+  describe('market candle retention readiness', () => {
+    const at = new Date('2026-10-16T00:00:00Z');
+    const build = (latest: unknown, succeeded: unknown) => {
+      const runs = {
+        findLatestRunForJob: jest.fn().mockResolvedValue(latest),
+        findLatestSucceededRunForJob: jest.fn().mockResolvedValue(succeeded),
+        findLatestSucceededReconciliationRun: jest.fn(),
+      };
+      const service = new AppService(
+        {
+          $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+        } as never,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        runs as never,
+      );
+      return { service, runs };
+    };
+    beforeEach(() => {
+      delete process.env.REDIS_URL;
+      process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR = '2026';
+      process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2026';
+      process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED = 'true';
+    });
+    afterEach(() => {
+      delete process.env.MARKET_CALENDAR_REQUIRED_FROM_YEAR;
+      delete process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR;
+      delete process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED;
+    });
+    const hoursAgo = (h: number) => new Date(+at - h * 3_600_000);
+
+    it('reads nothing while the job is disabled', async () => {
+      delete process.env.SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED;
+      const { service, runs } = build(null, null);
+      const result = await service.getReadiness(at);
+      expect(result.data.marketCandleRetention.state).toBe('disabled');
+      expect(runs.findLatestRunForJob).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['pending before the first run', null, null, 'pending', []],
+      [
+        'fresh after a run in the last 26 h',
+        { status: 'succeeded', startedAt: hoursAgo(20) },
+        { status: 'succeeded', finishedAt: hoursAgo(20) },
+        'fresh',
+        [],
+      ],
+      [
+        'failed when its latest run failed',
+        { status: 'failed', startedAt: hoursAgo(1) },
+        { status: 'succeeded', finishedAt: hoursAgo(20) },
+        'failed',
+        ['MARKET_CANDLE_RETENTION_FAILED'],
+      ],
+      [
+        'stale without a success in 26 h',
+        { status: 'succeeded', startedAt: hoursAgo(30) },
+        { status: 'succeeded', finishedAt: hoursAgo(30) },
+        'stale',
+        ['MARKET_CANDLE_RETENTION_STALE'],
+      ],
+    ])('is %s', async (_label, latest, succeeded, state, reasons) => {
+      const result = await build(latest, succeeded).service.getReadiness(at);
+      expect(result.data.marketCandleRetention.state).toBe(state);
+      expect(
+        result.data.reasons.filter((r) => r.startsWith('MARKET_CANDLE_')),
+      ).toEqual(reasons);
+      // A daily housekeeping job is a readiness note, not a page.
+      expect(result.data.alerts).toEqual([]);
+    });
+  });
+
   describe('collector, retention and storage health', () => {
     const at = new Date('2026-10-16T00:00:00Z');
     const build = (sources: {
@@ -515,6 +596,39 @@ describe('AppService candle readiness', () => {
         'DB_STORAGE_ACTION_REQUIRED',
         'DB_STORAGE_RUNWAY_SHORT',
       ]);
+    });
+
+    it('lists only operator reasons as alerts; the alert view answers 503 until they clear', async () => {
+      const unhealthyResult = await build(unhealthy(true)).getReadiness(at);
+      expect(unhealthyResult.data.alerts).toEqual(unhealthyResult.data.reasons);
+      const alerting = await build(unhealthy(true)).getReadinessAlerts(at);
+      expect(alerting.httpStatus).toBe(503);
+      expect(alerting.body.success).toBe(false);
+      expect(alerting.body.data.alerts).toContain('DB_DISK_FULL');
+      const healthy = await build({}).getReadinessAlerts(at);
+      expect(healthy.httpStatus).toBe(200);
+      expect(healthy.body.data.alerts).toEqual([]);
+    });
+
+    it('keeps a calendar-only degradation out of the alerts', async () => {
+      process.env.MARKET_CALENDAR_REQUIRED_THROUGH_YEAR = '2099';
+      const result = await build({}).getReadinessAlerts(at);
+      expect(result.body.data.status).toBe('degraded');
+      expect(result.httpStatus).toBe(200);
+      expect(result.body.data.alerts).toEqual([]);
+    });
+
+    it('alerts on a stale storage sample instead of showing its last level', async () => {
+      const result = await build({
+        storage: {
+          enabled: true,
+          level: 'ok',
+          daysUntil80Percent: null,
+          sampleStale: true,
+        },
+      }).getReadiness(at);
+      expect(result.data.reasons).toEqual(['DB_STORAGE_SAMPLE_STALE']);
+      expect(result.data.alerts).toEqual(['DB_STORAGE_SAMPLE_STALE']);
     });
 
     it('drops DB_DISK_FULL ten minutes after the last disk-full write failure', async () => {

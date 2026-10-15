@@ -1,0 +1,14 @@
+#!/usr/bin/env python3
+# Test stand-in for the three jq filters the workflow uses.
+import sys, json
+args = [a for a in sys.argv[1:] if a != '-r']
+flt, files = args[0], args[1:]
+data = json.load(open(files[0])) if files else json.load(sys.stdin)
+if flt == '(.data.alerts // []) | join(",")':
+    print(','.join(((data.get('data') or {}).get('alerts')) or []))
+elif flt == '.[0].number // empty':
+    if data: print(data[0]['number'])
+elif flt == '.[0].body':
+    print(data[0]['body'] if data else 'null')
+else:
+    sys.exit('unsupported filter ' + flt)

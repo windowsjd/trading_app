@@ -16,6 +16,7 @@ import {
 } from '../conditional/conditional-sell.config';
 import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
 import { readDatabaseStorageMonitorConfig } from '../ops/database-storage-monitor.config';
+import { assetPriceSnapshotRetentionConfig } from '../providers/asset-price-snapshot-retention.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -57,6 +58,7 @@ export function validateEnv(
   collect(errors, () => futuresMarkRetentionConfig(env));
   collect(errors, () => futuresLastPriceRetentionConfig(env));
   collect(errors, () => readDatabaseStorageMonitorConfig(env));
+  collect(errors, () => assetPriceSnapshotRetentionConfig(env));
   collect(errors, () => conditionalEnabled(env));
   collect(errors, () => conditionalBuyEnabled(env));
   collect(errors, () => conditionalSellEnabled(env));

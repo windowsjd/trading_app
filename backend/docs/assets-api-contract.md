@@ -322,7 +322,7 @@ Trading note policy:
 - 그 외 interval은 validation error로 처리한다.
 - 필요 시 서버가 더 짧은 원천 candle을 집계해 상위 interval candle을 생성한다.
 - `15m`, `30m`, `1h`, `4h` are aggregated at read time from the STORED `5m`
-  feed (35-day retention), never from a separate stored table — except
+  feed (45-day default retention), never from a separate stored table — except
   `range=96d` (4h only; KRX stocks and crypto read stored history; US stocks
   have no stored 4h history and get their 5m-aggregated window), which serves the stored
   COMPLETED 4h history (Spot native klines / KRX verified KOSCOM 10-minute

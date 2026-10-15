@@ -3315,7 +3315,8 @@ describe('OrdersService', () => {
         where: {
           assetId: string;
           currencyCode: CurrencyCode;
-          sourceType: AssetPriceSourceType;
+          // Provider candidates filter `notIn` the other source types.
+          sourceType: AssetPriceSourceType | { notIn: AssetPriceSourceType[] };
           sourceName?: string;
           price?: { gt: number };
           id?: { in: string[] };
@@ -3323,13 +3324,20 @@ describe('OrdersService', () => {
         };
         take?: number;
       };
+      const sourceTypeMatches = (
+        type: AssetPriceSourceType,
+        filter: Query['where']['sourceType'],
+      ) =>
+        typeof filter === 'string'
+          ? type === filter
+          : !filter.notIn.includes(type);
       const queryRows = ({ where, take }: Query) =>
         rows
           .filter(
             (row) =>
               row.assetId === where.assetId &&
               row.currencyCode === where.currencyCode &&
-              row.sourceType === where.sourceType &&
+              sourceTypeMatches(row.sourceType, where.sourceType) &&
               (!where.sourceName || row.sourceName === where.sourceName) &&
               (!where.price || row.price.gt(where.price.gt)) &&
               (!where.id || where.id.in.includes(row.id)) &&

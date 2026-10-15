@@ -386,6 +386,24 @@ export class MarketCandlesRepository {
           AND "market_candles"."source_provider" IN ('kis_domestic_minute', 'kis_domestic_period')
           AND EXCLUDED."source_provider" IN ('koscom_intraday', 'koscom_history')
         )
+        -- A closed bar already confirmed after its close that arrives again
+        -- unchanged is left alone (no dead tuple, WAL or cache invalidation).
+        -- The first confirmation still lands: readers need source_updated_at at
+        -- or after the close (daily evidence, change rate) and 4h re-confirms
+        -- a bar fetched within 2 minutes of it. Changed values always update.
+        AND NOT (
+          "market_candles"."is_closed" AND EXCLUDED."is_closed"
+          AND "market_candles"."source_updated_at" >= "market_candles"."close_time" + interval '2 minutes'
+          AND (
+            "market_candles"."close_time", "market_candles"."open", "market_candles"."high",
+            "market_candles"."low", "market_candles"."close", "market_candles"."volume",
+            "market_candles"."amount", "market_candles"."source_provider"
+          ) IS NOT DISTINCT FROM (
+            EXCLUDED."close_time", EXCLUDED."open", EXCLUDED."high",
+            EXCLUDED."low", EXCLUDED."close", EXCLUDED."volume",
+            EXCLUDED."amount", EXCLUDED."source_provider"
+          )
+        )
     `;
 
     try {

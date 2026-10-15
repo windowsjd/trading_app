@@ -196,6 +196,10 @@ export function futuresLastPriceRetentionBatchSql(cutoff: Date, limit: number) {
           ORDER BY m.captured_at, m.id
           LIMIT ${limit} FOR UPDATE OF m SKIP LOCKED
         )
-        DELETE FROM futures_last_price_snapshots m USING candidates c
-        WHERE m.id = c.id AND m.effective_at < ${cutoff}`;
+        -- An array of the locked ids, not a join to the CTE: a join is costed
+        -- from table size, and on a table small relative to the batch it hashes a
+        -- full scan of the table. The array keeps the DELETE on the primary key.
+        DELETE FROM futures_last_price_snapshots m
+        WHERE m.id = ANY (ARRAY(SELECT c.id FROM candidates c))
+          AND m.effective_at < ${cutoff}`;
 }

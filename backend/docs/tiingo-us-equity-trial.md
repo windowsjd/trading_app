@@ -17,7 +17,7 @@ KIS 미국주식 데이터 공급자를 Tiingo로 교체하기 위한 1차 통�
 | REST 현재가 | `KisRestCurrentPriceIngestionService` (ops job `provider_kis_ingest`, mode `rest_current_price`, 미국 정규장만) | `asset_price_snapshots` (`kis_us_delayed_trade`), 이벤트 발행 없음 → gateway 3초 poll |
 | WS 지연 체결 (HDFSCNT0) | `KisWebSocketStreamingService` (상시) / `KisWebSocketClient` (ops batch) | 메모리 cache + in-process `KisRealtimePriceEventBus` → `MarketPriceEventService`(delayed) + 5초 throttle DB snapshot |
 | Live 5m | `LiveCandleStreamSupervisorService` KIS 소켓 (`CANDLE_LIVE_KIS_US_DELAYED_ENABLED`) | Redis `candles:live:v1:provider-price-fanout` + live candle store. 이 모드에서는 KIS snapshot을 쓰지 않음 |
-| 5m/1d/1w 캔들 | `MarketCandleSyncService` (`kis_overseas_minute`, `kis_overseas_period` MODP=1 수정주가) | `market_candles` (5m 35일, 1d/1w) |
+| 5m/1d/1w 캔들 | `MarketCandleSyncService` (`kis_overseas_minute`, `kis_overseas_period` MODP=1 수정주가) | `market_candles` (5m 45일, 1d/1w) |
 | 4h | 15m–4h는 5m 읽기 시점 집계. 미국 장기 4h 저장 없음, `range=96d`는 400 | — |
 | 호가 | `KisRestHogaIngestionService` (operator `rest_hoga`만) | `asset_orderbook_snapshots`에 쓰지만 **읽는 코드 없음** |
 
@@ -184,7 +184,7 @@ REST ≤ 7회 + WS 2회(기본 30초). 가격·수량 없이 필드 유무, 봉 
 갱신 빈도, 30·96세션 전 커버리지만 출력한다. 데이터를 못 받으면 PASS가 아니다.
 
 ## 7. 정식 계약 후 (후속)
-1. 저장: Tiingo 5m → `market_candles '5m'`, 완료 4h → `'4h'`(기존 보관 35일/180일, sync/backfill
+1. 저장: Tiingo 5m → `market_candles '5m'`, 완료 4h → `'4h'`(기존 보관 45일/180일, sync/backfill
    lock·coverage 재사용), 현재가 → `asset_price_snapshots`(새 source 이름). 이번 parser/정규화 재사용.
 2. 금융 전환: eligibility의 미국주식 source를 Tiingo로 바꾸는 별도 결정(quote/execute freshness,
    `tngoLast`가 mid일 수 있음, 원주가/수정주가, 등락률 기준).

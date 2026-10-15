@@ -5,7 +5,9 @@ jest.mock('../generated/prisma/client', () => ({
   },
 }));
 import { Prisma } from '../generated/prisma/client';
+import { AssetPriceSourceType } from '../generated/prisma/enums';
 import {
+  NON_PROVIDER_SOURCE_TYPES,
   closedMarketPriceScope,
   findMarketAwareAssetPriceCandidates,
 } from './asset-price-snapshot-query';
@@ -38,6 +40,8 @@ const regular = [
   row('06:30:00', '248500'),
 ];
 const noise = [
+  // A manual row is never a provider candidate, even with a provider name.
+  { ...row('06:30:30', '777777'), sourceType: 'admin_manual' },
   ...Array.from({ length: 25 }, (_, i) =>
     row(`07:${String(i).padStart(2, '0')}:00`, '999999'),
   ),
@@ -55,7 +59,7 @@ function database(rows: ReturnType<typeof row>[]) {
             (r) =>
               r.assetId === where.assetId &&
               r.currencyCode === where.currencyCode &&
-              r.sourceType === where.sourceType &&
+              !where.sourceType.notIn.includes(r.sourceType) &&
               (!where.sourceName || r.sourceName === where.sourceName) &&
               (!where.price || r.price.gt(where.price.gt)) &&
               (!where.id || where.id.in.includes(r.id)) &&
@@ -70,6 +74,19 @@ function database(rows: ReturnType<typeof row>[]) {
   };
 }
 afterEach(() => resetMarketSessionOverrideStoreForTest());
+describe('provider price source-type filter', () => {
+  it('excludes every source type except provider_api', () => {
+    // Candidates filter `notIn` these values instead of `= provider_api`
+    // (planner reasons in asset-price-snapshot-query.ts). A new enum value
+    // must be classified there before it can reach provider candidates.
+    expect(
+      Object.values(AssetPriceSourceType).filter(
+        (type) =>
+          !(NON_PROVIDER_SOURCE_TYPES as readonly string[]).includes(type),
+      ),
+    ).toEqual(['provider_api']);
+  });
+});
 describe('completed-session DB candidate selection', () => {
   it.each([
     '2026-07-10T09:00:00Z',

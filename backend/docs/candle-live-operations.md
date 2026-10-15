@@ -264,9 +264,9 @@ coverage evidence still fails.
 | `1d` | `1y` | 400 | stored `1d` | rolling 365 days |
 | `1w` | `1y` | 60 | stored `1w` | rolling 365 days |
 
-Stored `5m` retention is 35 days (`MARKET_CANDLE_5M_RETENTION_DAYS`), which
-holds the 3-day, 14-day and 30-day windows including the 4h source padding
-(`30d + 4h < 35d`), so those requests stay `managedByPersistence=true`. The
+Stored `5m` retention is 45 days by default (`MARKET_CANDLE_5M_RETENTION_DAYS`,
+minimum 31), which holds the 3-day, 14-day and 30-day windows including the 4h
+source padding (`30d + 4h < 31d`), so those requests stay `managedByPersistence=true`. The
 `15m`/`30m`/`1h` limits are the crypto (24/7) upper bounds — 3 × 96, 14 × 48
 and 14 × 24; stocks legitimately return fewer because they only trade during
 the regular session. No 15m/30m/1h table exists and none should be added. The

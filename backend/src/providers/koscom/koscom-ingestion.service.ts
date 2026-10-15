@@ -46,12 +46,14 @@ import {
 } from './koscom-price-cycle-stats';
 
 /**
- * Raw fields a slim KOSCOM price row keeps (design v2.1 §8.4): the price,
- * trade clock and business date, the previous-day change that derives the
- * change rate, the session turnover the asset-list sort reads
+ * Raw fields a slim KOSCOM price row keeps (design v2.1 §8.4): the provider's
+ * instrument code (the row's own identity, next to the mapped asset_id), the
+ * price, trade clock and business date, the previous-day change that derives
+ * the change rate, the session turnover the asset-list sort reads
  * (`payload.row.accTrdval`, see asset-list-turnover.ts) and the top of book.
  */
 export const KOSCOM_PRICE_SLIM_ROW_FIELDS = [
+  'isuSrtCd',
   'trdDd',
   'trdTm',
   'trdPrc',

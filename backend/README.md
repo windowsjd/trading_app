@@ -591,14 +591,14 @@ It only creates and deletes keys under a random-UUID asset namespace and never f
 
 ### Market candle retention
 
-The internal source policy keeps 5-minute candles for 35 days by default (the regular 30-day 4h window plus a five-day margin). The 5m prune deletes only rows satisfying all of `interval='5m'`, `is_closed=true`, and `open_time < cutoff`. The completed long-range 4h history (`market_candles` `interval='4h'` and `futures_market_candles`) is then pruned independently with its own cutoff, `MARKET_CANDLE_4H_RETENTION_DAYS` (default 180, minimum 150; see `docs/long-range-4h-candles.md`). Open candles, daily candles, weekly candles, and rows exactly at a cutoff are preserved.
+The internal source policy keeps 5-minute candles for 45 days by default (`MARKET_CANDLE_5M_RETENTION_DAYS`, minimum 31; KRX central collection requires at least 45; the regular 30-day 4h window fits with margin). The 5m prune deletes only rows satisfying all of `interval='5m'`, `is_closed=true`, and `open_time < cutoff`. The completed long-range 4h history (`market_candles` `interval='4h'` and `futures_market_candles`) is then pruned independently with its own cutoff, `MARKET_CANDLE_4H_RETENTION_DAYS` (default 180, minimum 150; see `docs/long-range-4h-candles.md`). Open candles, daily candles, weekly candles, and rows exactly at a cutoff are preserved.
 
 Retention uses deterministic bounded PostgreSQL batches (default 5,000 rows), yields between full batches, and is idempotent after partial failure. The existing `(interval, open_time)` and `(is_closed, open_time)` indexes support candidate selection; no speculative index was added.
 
 Scheduler configuration:
 
 - `SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED=false`
-- `MARKET_CANDLE_5M_RETENTION_DAYS=35` (minimum 31)
+- `MARKET_CANDLE_5M_RETENTION_DAYS=45` (code default; minimum 31)
 - `MARKET_CANDLE_RETENTION_BATCH_SIZE=5000` (maximum 10,000)
 - `SCHEDULER_MARKET_CANDLE_RETENTION_HOUR=4`
 - `SCHEDULER_MARKET_CANDLE_RETENTION_MINUTE=0`

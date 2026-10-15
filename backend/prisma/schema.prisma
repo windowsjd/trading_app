@@ -276,6 +276,7 @@ enum OpsJobName {
   market_candle_long_sync
   futures_candle_sync
   futures_conditional_entries
+  asset_price_snapshot_retention
 }
 
 enum MarketCandleSyncMode {
@@ -736,7 +737,7 @@ model Asset {
 }
 
 model AssetPriceSnapshot {
-  id              String               @id @default(uuid())
+  id              String               @id @default(uuid(7))
   assetId         String               @map("asset_id")
   price           Decimal              @db.Decimal(24, 8)
   priceKrw        Decimal?             @map("price_krw") @db.Decimal(24, 8)
@@ -768,7 +769,7 @@ model AssetPriceSnapshot {
 }
 
 model AssetOrderbookSnapshot {
-  id             String               @id @default(uuid())
+  id             String               @id @default(uuid(7))
   assetId        String               @map("asset_id")
   sourceType     AssetPriceSourceType @map("source_type")
   sourceName     String               @map("source_name")
@@ -2236,7 +2237,7 @@ enum FuturesLastPriceSource {
 // trigger and Season final price. Never Spot, Mark or Index evidence.
 // effectiveAt is the provider trade time; capturedAt is the server receipt time.
 model FuturesLastPriceSnapshot {
-  id                            String                    @id @default(uuid())
+  id                            String                    @id @default(uuid(7))
   instrumentId                  String                    @map("instrument_id")
   symbol                        String
   providerProduct               String                    @default("binance_usdm_perpetual") @map("provider_product")
@@ -2260,7 +2261,7 @@ model FuturesLastPriceSnapshot {
 
 // Deliberately separate from Spot valuation/execution evidence.
 model FuturesMarkSnapshot {
-  id              String                    @id @default(uuid())
+  id              String                    @id @default(uuid(7))
   instrumentId    String                    @map("instrument_id")
   symbol          String
   providerProduct String                    @default("binance_usdm_perpetual") @map("provider_product")
@@ -2351,6 +2352,7 @@ model FuturesSeasonPrice {
 
   @@unique([seasonId, instrumentId])
   @@index([lastPriceSnapshotId])
+  @@index([assetPriceSnapshotId])
   @@map("futures_season_prices")
 }
 

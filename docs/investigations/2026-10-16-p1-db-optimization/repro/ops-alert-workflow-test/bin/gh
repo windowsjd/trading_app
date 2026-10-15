@@ -1,0 +1,18 @@
+#!/usr/bin/env python3
+# Fake gh: one-issue state in $GH_STATE, every call logged to $GH_LOG.
+import sys, json, os
+state_file, log = os.environ['GH_STATE'], os.environ['GH_LOG']
+state = json.load(open(state_file)) if os.path.exists(state_file) else []
+args = sys.argv[1:]
+open(log, 'a').write(json.dumps(args) + '\n')
+def opt(name):
+    return args[args.index(name) + 1] if name in args else None
+if args[:2] == ['issue', 'list']:
+    print(json.dumps(state))
+elif args[:2] == ['issue', 'create']:
+    state = [{'number': 1, 'title': opt('--title'), 'body': opt('--body')}]
+elif args[:2] == ['issue', 'edit']:
+    state[0]['body'] = opt('--body'); state[0]['title'] = opt('--title')
+elif args[:2] == ['issue', 'close']:
+    state = []
+json.dump(state, open(state_file, 'w'))

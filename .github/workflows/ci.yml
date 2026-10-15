@@ -273,6 +273,64 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts
 
+  # Production runs PostgreSQL 17 while the suites above run on 16. Retention
+  # DELETE plans are chosen by the planner, so the retention fences also run on
+  # the production major here. Nothing is skipped on 16: these run in addition.
+  retention-pg17:
+    name: Retention safety on PostgreSQL 17
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: trading_app
+          POSTGRES_PASSWORD: trading_app_pw
+          POSTGRES_DB: trading_app
+          TZ: UTC
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trading_app"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        run: npm install -g pnpm@10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: backend/pnpm-lock.yaml
+      - name: Install dependencies (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm exec prisma generate
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/trading_app?schema=public
+      - name: PostgreSQL server version
+        run: PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -tA -c 'SHOW server_version'
+      - name: Futures readiness and Mark/Last retention PostgreSQL 17 safety
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/futures_price_safety_test?schema=public
+          FUTURES_PRICE_SAFETY_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE futures_price_safety_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/futures/futures-price-safety.integration.spec.ts
+      - name: Price snapshot retention PostgreSQL 17 safety
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/price_snapshot_retention_test?schema=public
+          ASSET_PRICE_SNAPSHOT_RETENTION_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE price_snapshot_retention_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/providers/asset-price-snapshot-retention.integration.spec.ts
+
   core-account-db-integration:
     name: Core account PostgreSQL integration
     runs-on: ubuntu-latest
@@ -533,6 +591,14 @@ jobs:
           PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE koscom_price_slots_test'
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/providers/koscom/koscom-price-load.integration.spec.ts
+      - name: Market candle upsert guard PostgreSQL (unchanged confirmed closed bars)
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/candle_upsert_guard_test?schema=public
+          MARKET_CANDLE_UPSERT_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE candle_upsert_guard_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/assets/market-candle-upsert-guard.integration.spec.ts
       - name: Price snapshot retention PostgreSQL safety (session time zones, DST, races)
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/price_snapshot_retention_test?schema=public

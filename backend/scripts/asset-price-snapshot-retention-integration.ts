@@ -19,12 +19,21 @@
  */
 import assert from 'node:assert/strict';
 import { randomInt, randomUUID } from 'node:crypto';
+import { performance } from 'node:perf_hooks';
+import { Prisma } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import {
   ASSET_PRICE_SNAPSHOT_REFERENCES,
   AssetPriceSnapshotRetentionService,
   SEASON_EVIDENCE_ROWS,
+  SEASON_EVIDENCE_SCAN_ROWS,
+  assetPriceSnapshotRetentionBatchSql,
+  type PriceSnapshotRetentionCursor,
 } from '../src/providers/asset-price-snapshot-retention.service';
+import { AssetPriceSnapshotRetentionWorker } from '../src/providers/asset-price-snapshot-retention.worker';
+import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
+import { OpsJobRunService } from '../src/ops/ops-job-run.service';
+import { databaseFailureKind } from '../src/common/database-failure';
 
 const dbUrl = new URL(process.env.DATABASE_URL ?? 'postgresql://invalid');
 assert.ok(
@@ -90,7 +99,98 @@ type Seed = {
 };
 
 const prisma = new PrismaService();
-const ids = { assets: [] as string[], season: '', user: '', account: '' };
+const ids = {
+  assets: [] as string[],
+  season: '',
+  futureSeason: '',
+  user: '',
+  account: '',
+};
+
+type PlanNode = {
+  'Node Type': string;
+  'Relation Name'?: string;
+  'Index Name'?: string;
+  Plans?: PlanNode[];
+};
+/** The batch must read one ordered range of the (asset_id, effective_at) index
+ * and delete by primary key: no sequential or bitmap scan of the snapshot
+ * table and no Sort or Hash over its rows, whatever the cost settings. */
+function assertBatchPlan(explain: unknown, label: string) {
+  const T = 'asset_price_snapshots';
+  const nodes: PlanNode[] = [];
+  const walk = (node: PlanNode) => {
+    nodes.push(node);
+    for (const child of node.Plans ?? []) walk(child);
+  };
+  walk(
+    (explain as Array<{ 'QUERY PLAN': Array<{ Plan: PlanNode }> }>)[0][
+      'QUERY PLAN'
+    ][0].Plan,
+  );
+  const shape = `${label}: ${nodes
+    .map(
+      (n) => `${n['Node Type']}:${n['Index Name'] ?? n['Relation Name'] ?? ''}`,
+    )
+    .join(' > ')}`;
+  const readsTable = (node: PlanNode): boolean =>
+    node['Relation Name'] === T ||
+    (node.Plans ?? []).some((child) => readsTable(child));
+  const indexes = (node: PlanNode): string[] => [
+    ...(node['Index Name'] ? [node['Index Name']] : []),
+    ...(node.Plans ?? []).flatMap(indexes),
+  ];
+  // A bitmap over the primary key (id = ANY of a bounded array) is a keyed
+  // read; a bitmap over any other index would read rows out of order.
+  const byPrimaryKey = (n: PlanNode) =>
+    n['Relation Name'] === T &&
+    ((n['Node Type'] === 'Index Scan' && n['Index Name'] === `${T}_pkey`) ||
+      (n['Node Type'] === 'Bitmap Heap Scan' &&
+        indexes(n).every((name) => name === `${T}_pkey`)));
+  assert.equal(
+    nodes.some(
+      (n) =>
+        n['Relation Name'] === T &&
+        (n['Node Type'] === 'Seq Scan' ||
+          (n['Node Type'] === 'Bitmap Heap Scan' && !byPrimaryKey(n))),
+    ),
+    false,
+    shape,
+  );
+  assert.equal(
+    nodes.some(
+      (n) => ['Sort', 'Hash'].includes(n['Node Type']) && readsTable(n),
+    ),
+    false,
+    shape,
+  );
+  assert.equal(
+    nodes.some((n) => n['Index Name'] === `${T}_asset_id_effective_at_idx`),
+    true,
+    shape,
+  );
+  // The DELETE target itself is reached only through the primary key.
+  const modify = nodes.find((n) => n['Node Type'] === 'ModifyTable');
+  assert.equal(
+    (modify?.Plans ?? []).some(
+      (n) => n['Relation Name'] === T && byPrimaryKey(n),
+    ),
+    true,
+    shape,
+  );
+}
+const COST_PROFILES: Record<string, string[]> = {
+  postgresDefaults: [
+    'random_page_cost = 4',
+    "effective_cache_size = '4GB'",
+    "work_mem = '4MB'",
+  ],
+  production: [
+    'random_page_cost = 1.1',
+    "effective_cache_size = '768MB'",
+    "work_mem = '6617kB'",
+  ],
+};
 
 /** A client whose PostgreSQL session TimeZone is `zone`. */
 function prismaInZone(zone: string): PrismaService {
@@ -210,9 +310,10 @@ async function main() {
     add('B1000', krx.id, kst(29, '10:00'));
     add('B1100', krx.id, kst(29, '11:00'));
     add('B1529', krx.id, kst(29, '15:29'));
-    // Day C: Season ends at 12:00; 18 rows before, 2 after.
-    for (let i = 0; i < 18; i++) {
-      const minutes = 9 * 60 + i * 10;
+    // Day C: Season ends at 12:00; 28 rows before, 2 after. ④ keeps the 20
+    // newest before the end (settlement reads 10 per eligible source together).
+    for (let i = 0; i < 28; i++) {
+      const minutes = 7 * 60 + 20 + i * 10;
       const time = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
       add(`C${time.replace(':', '')}`, krx.id, kst(28, time));
     }
@@ -373,14 +474,14 @@ async function main() {
       'A1000',
       'A1100',
       'B1100',
-      'C0900',
-      'C0910',
-      'C0920',
-      'C0930',
-      'C0940',
-      'C0950',
-      'C1000',
-      'C1010',
+      'C0720',
+      'C0730',
+      'C0740',
+      'C0750',
+      'C0800',
+      'C0810',
+      'C0820',
+      'C0830',
       'C1300',
       'E0930',
       'F1000',
@@ -446,23 +547,26 @@ async function main() {
     assert.equal(await total(), before, 'dry-run deletes nothing');
 
     // A quote pins a candidate after the dry-run: it must survive.
-    await pin('C0900');
-    references.add('C0900');
+    await pin('C0720');
+    references.add('C0720');
 
     // A reference still in flight when a batch runs: the quote's FK check
     // holds FOR KEY SHARE on the row, so FOR UPDATE … SKIP LOCKED passes over
-    // it — the oldest candidate, which LIMIT 1 would take — and the batch
-    // deletes the next one. Once committed, ① protects it.
+    // it. The batch examines the three oldest KRX rows — A1000 (locked),
+    // ADMIN1 (⑤) and A1100 — and deletes A1100 only. Once committed, ①
+    // protects A1000.
     let deleted = 0;
     await prisma.$transaction(
       async (tx) => {
         await pin('A1000', tx);
-        deleted += await sessions[1].service.deleteBatch({
+        const batch = await sessions[1].service.deleteBatch({
           retentionDays: RETENTION_DAYS,
           assetId: krx.id,
-          limit: 1,
+          limit: 3,
           now: NOW,
         });
+        assert.equal(batch.scanned, 3, 'the batch examined three rows');
+        deleted += batch.deleted;
         const kept = await prisma.assetPriceSnapshot.findMany({
           where: { id: { in: [created.get('A1000')!, created.get('A1100')!] } },
           select: { id: true },
@@ -480,24 +584,34 @@ async function main() {
     const finalExpected = expected(references);
 
     // ---- batched + concurrent deletes from all three session zones -----------
-    const drain = async (assetId: string) => {
+    // Each session sweeps the asset with its own cursor, two rows a batch; a
+    // row another sweep has locked is skipped and deleted by that sweep.
+    const sweep = async (
+      service: AssetPriceSnapshotRetentionService,
+      assetId: string,
+      limit: number,
+    ) => {
       let removed = 0;
+      let after: PriceSnapshotRetentionCursor | null = null;
       for (;;) {
-        const counts = await Promise.all(
-          sessions.map(({ service }) =>
-            service.deleteBatch({
-              retentionDays: RETENTION_DAYS,
-              assetId,
-              limit: 2,
-              now: NOW,
-            }),
-          ),
-        );
-        const round = counts.reduce((sum, count) => sum + count, 0);
-        removed += round;
-        if (round === 0) return removed;
+        const batch = await service.deleteBatch({
+          retentionDays: RETENTION_DAYS,
+          assetId,
+          limit,
+          now: NOW,
+          after,
+        });
+        removed += batch.deleted;
+        after = batch.next;
+        if (batch.scanned < limit) return removed;
       }
     };
+    const drain = async (assetId: string) =>
+      (
+        await Promise.all(
+          sessions.map(({ service }) => sweep(service, assetId, 2)),
+        )
+      ).reduce((sum, count) => sum + count, 0);
     deleted += await drain(krx.id);
     deleted += await drain(us.id);
     const survivors = new Set(
@@ -526,7 +640,7 @@ async function main() {
     for (const key of [
       'A1000',
       'B1000',
-      'C0900',
+      'C0720',
       'A1529',
       'C1529',
       'D1000',
@@ -551,25 +665,293 @@ async function main() {
         'no candidate is left in any session zone',
       );
     assert.equal(
-      await sessions[0].service.deleteBatch({
-        retentionDays: RETENTION_DAYS,
-        assetId: krx.id,
-        limit: 10,
-        now: NOW,
-      }),
+      await sweep(sessions[0].service, krx.id, 10),
       0,
       'a second pass deletes nothing',
     );
     await assert.rejects(
       sessions[0].service.deleteBatch({
         retentionDays: 1,
+        assetId: krx.id,
         limit: 10,
         now: NOW,
       }),
       /retentionDays must be an explicit integer/,
     );
     console.log(
-      `asset price snapshot retention integration ok: ${seeds.length} rows, ${deleted} deleted, ${survivors.size} kept`,
+      `asset price snapshot retention correctness ok: ${seeds.length} rows, ${deleted} deleted, ${survivors.size} kept`,
+    );
+
+    // ---- scale: a 5 s Binance history, plan shape and bounded probes --------
+    // A Season ending in the future makes ④ apply to every row, as in
+    // production. Old rows: a dense WS feed (5 days at 5 s), a REST source that
+    // wrote 30 rows and stopped, and a legacy source whose rows are 4,000 WS
+    // rows apart (its successors lie beyond the ④ read bound, so all are kept).
+    const future = await prisma.season.create({
+      data: {
+        name: `retention-future-${randomUUID()}`,
+        status: 'upcoming',
+        startAt: new Date(NOW.getTime() + DAY),
+        endAt: new Date(NOW.getTime() + 30 * DAY),
+        initialCapitalKrw: '10000000',
+        tradeFeeRate: '0.001',
+        fxFeeRate: '0.001',
+      },
+    });
+    ids.futureSeason = future.id;
+    const scale = await prisma.asset.create({
+      data: {
+        symbol: `RTS${base}USDT`,
+        name: 'retention scale fixture',
+        market: 'BINANCE',
+        assetType: 'crypto',
+        currencyCode: 'USD',
+        isActive: false,
+      },
+    });
+    ids.assets.push(scale.id);
+    const wsStart = new Date(NOW.getTime() - 20 * DAY);
+    const WS_ROWS = 5 * 17_280;
+    const insertSeries = (
+      source: string,
+      from: Date,
+      stepSeconds: number,
+      count: number,
+    ) => prisma.$executeRaw`
+      INSERT INTO asset_price_snapshots
+        (id, asset_id, price, currency_code, source_type, source_name, effective_at, captured_at, created_at)
+      SELECT gen_random_uuid()::text, ${scale.id}, 100 + (n % 50), 'USD', 'provider_api', ${source},
+        ${from}::timestamp + n * make_interval(secs => ${stepSeconds}),
+        ${from}::timestamp + n * make_interval(secs => ${stepSeconds}),
+        ${from}::timestamp + n * make_interval(secs => ${stepSeconds})
+      FROM generate_series(0, ${count}::int - 1) n`;
+    await insertSeries('binance_spot_ws_ticker', wsStart, 5, WS_ROWS);
+    await insertSeries(
+      'binance_public_rest_24hr_ticker',
+      new Date(wsStart.getTime() - 3_600_000),
+      60,
+      30,
+    );
+    await insertSeries(
+      'legacy_fixture_source',
+      new Date(wsStart.getTime() + 2_500),
+      20_000,
+      Math.floor((WS_ROWS * 5) / 20_000),
+    );
+    // Recent rows inside the retention window: never touched.
+    await insertSeries(
+      'binance_spot_ws_ticker',
+      new Date(NOW.getTime() - 3 * DAY),
+      60,
+      3 * 1440,
+    );
+    const scaleCutoff = new Date(NOW.getTime() - RETENTION_DAYS * DAY);
+    const pinnedRow = await prisma.assetPriceSnapshot.findFirstOrThrow({
+      where: {
+        assetId: scale.id,
+        sourceName: 'binance_spot_ws_ticker',
+        effectiveAt: { gte: new Date(wsStart.getTime() + 2 * DAY) },
+      },
+      orderBy: { effectiveAt: 'asc' },
+      select: { id: true },
+    });
+    await prisma.quote.create({
+      data: {
+        userId: user.id,
+        tradingAccountId: account.id,
+        quoteType: 'order',
+        cashWalletScope: 'securities',
+        assetId: scale.id,
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+        currencyCode: 'USD',
+        quotedPrice: '100',
+        assetPriceSnapshotId: pinnedRow.id,
+        maxChangeBps: '100',
+        expiresAt: new Date(NOW.getTime() + 60_000),
+        requestHash: `fixture-scale-${randomUUID()}`,
+      },
+    });
+    await prisma.$executeRaw`ANALYZE asset_price_snapshots`;
+    // Expected survivors among old rows, from the rules directly.
+    const [expectedKept] = await prisma.$queryRaw<
+      Array<{ ws_day_last: number; legacy: number; old_total: number }>
+    >`SELECT
+        (SELECT count(DISTINCT timezone('Asia/Seoul', timezone('UTC', effective_at))::date)
+         FROM asset_price_snapshots WHERE asset_id = ${scale.id}
+           AND source_name = 'binance_spot_ws_ticker' AND effective_at < ${scaleCutoff})::int AS ws_day_last,
+        (SELECT count(*) FROM asset_price_snapshots WHERE asset_id = ${scale.id}
+           AND source_name = 'legacy_fixture_source')::int AS legacy,
+        (SELECT count(*) FROM asset_price_snapshots WHERE asset_id = ${scale.id}
+           AND effective_at < ${scaleCutoff})::int AS old_total`;
+    assert.ok(expectedKept.legacy >= 20, 'legacy rows exceed the ④ count');
+    for (const [profile, settings] of Object.entries(COST_PROFILES))
+      for (const limit of [1000, 10000]) {
+        const explain = await prisma.$transaction(async (tx) => {
+          for (const setting of settings)
+            await tx.$executeRawUnsafe(`SET LOCAL ${setting}`);
+          return tx.$queryRaw(
+            Prisma.sql`EXPLAIN (FORMAT JSON) ${assetPriceSnapshotRetentionBatchSql(
+              {
+                retentionDays: RETENTION_DAYS,
+                assetId: scale.id,
+                limit,
+                now: NOW,
+              },
+            )}`,
+          );
+        });
+        assertBatchPlan(explain, `${profile}, batch ${limit}`);
+      }
+    const scaleService = sessions[0].service;
+    let scaleDeleted = 0;
+    let scaleBatches = 0;
+    let slowestMs = 0;
+    let after: PriceSnapshotRetentionCursor | null = null;
+    const sweepStart = performance.now();
+    for (;;) {
+      const t = performance.now();
+      const batch = await scaleService.deleteBatch({
+        retentionDays: RETENTION_DAYS,
+        assetId: scale.id,
+        limit: 1000,
+        now: NOW,
+        after,
+      });
+      slowestMs = Math.max(slowestMs, performance.now() - t);
+      scaleBatches++;
+      scaleDeleted += batch.deleted;
+      after = batch.next;
+      if (batch.scanned < 1000) break;
+    }
+    const sweepMs = performance.now() - sweepStart;
+    // REST: the 20 newest are ④ evidence; legacy: all kept by the ④ bound.
+    const keptOld = expectedKept.ws_day_last + 20 + expectedKept.legacy + 1;
+    assert.equal(scaleDeleted, expectedKept.old_total - keptOld);
+    const remaining = await prisma.$queryRaw<
+      Array<{ source_name: string; rows: number }>
+    >`SELECT source_name, count(*)::int AS rows FROM asset_price_snapshots
+      WHERE asset_id = ${scale.id} AND effective_at < ${scaleCutoff}
+      GROUP BY source_name ORDER BY source_name`;
+    assert.deepEqual(
+      Object.fromEntries(remaining.map((r) => [r.source_name, r.rows])),
+      {
+        binance_public_rest_24hr_ticker: 20,
+        binance_spot_ws_ticker: expectedKept.ws_day_last + 1,
+        legacy_fixture_source: expectedKept.legacy,
+      },
+    );
+    assert.equal(
+      await prisma.assetPriceSnapshot.count({ where: { id: pinnedRow.id } }),
+      1,
+      'the quoted row survives',
+    );
+    assert.equal(
+      await prisma.assetPriceSnapshot.count({
+        where: { assetId: scale.id, effectiveAt: { gte: scaleCutoff } },
+      }),
+      3 * 1440,
+      'rows inside the retention window are untouched',
+    );
+    console.log(
+      JSON.stringify({
+        event: 'asset_price_snapshot_retention_scale',
+        oldRows: expectedKept.old_total,
+        deleted: scaleDeleted,
+        batches: scaleBatches,
+        sweepMs: Math.round(sweepMs),
+        slowestBatchMs: Math.round(slowestMs),
+        seasonEvidenceScanRows: SEASON_EVIDENCE_SCAN_ROWS,
+      }),
+    );
+
+    // ---- scheduled worker: one lease, run records, failure and resume -------
+    process.env.ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED = 'true';
+    process.env.ASSET_PRICE_SNAPSHOT_RETENTION_BATCH_SIZE = '500';
+    process.env.ASSET_PRICE_SNAPSHOT_RETENTION_MAX_BATCHES = '3';
+    const locks = new OpsJobLockService(prisma);
+    const runs = new OpsJobRunService(prisma);
+    const worker = () =>
+      new AssetPriceSnapshotRetentionWorker(prisma, locks, runs);
+    await insertSeries(
+      'binance_spot_ws_ticker',
+      new Date(wsStart.getTime() - 2 * DAY),
+      5,
+      4_000,
+    );
+    const pendingOld = () =>
+      prisma.assetPriceSnapshot.count({
+        where: {
+          assetId: scale.id,
+          sourceName: 'binance_spot_ws_ticker',
+          effectiveAt: { lt: new Date(wsStart.getTime() - DAY) },
+        },
+      });
+    assert.equal(await pendingOld(), 4_000);
+    const [{ dates: workerDayLasts }] = await prisma.$queryRaw<
+      Array<{ dates: number }>
+    >`SELECT count(DISTINCT timezone('Asia/Seoul', timezone('UTC', effective_at))::date)::int AS dates
+      FROM asset_price_snapshots WHERE asset_id = ${scale.id}
+        AND source_name = 'binance_spot_ws_ticker'
+        AND effective_at < ${new Date(wsStart.getTime() - DAY)}`;
+    const [first, second] = await Promise.all([worker().run(), worker().run()]);
+    assert.equal(
+      [first, second].filter((r) => r === undefined).length,
+      1,
+      'one instance holds the lease',
+    );
+    const ran = (first ?? second)!;
+    // The run stops once it has examined 3 × 500 rows (one batch may straddle).
+    assert.equal(ran.batchLimitReached, true);
+    assert.ok(ran.scannedCount >= 1_500 && ran.scannedCount < 2_000);
+    // A real statement timeout after one committed batch: recorded with its
+    // category and progress; the next run resumes from the database state.
+    const failing = worker();
+    const realTimeout = await prisma
+      .$transaction(async (tx) => {
+        await tx.$executeRaw`SET LOCAL statement_timeout = '20ms'`;
+        await tx.$queryRaw`SELECT pg_sleep(1)`;
+      })
+      .then(
+        () => null,
+        (reason: unknown) => reason,
+      );
+    assert.equal(databaseFailureKind(realTimeout), 'statement_timeout');
+    const inner = (
+      failing as unknown as { retention: AssetPriceSnapshotRetentionService }
+    ).retention;
+    const original = inner.deleteBatch.bind(inner);
+    let calls = 0;
+    inner.deleteBatch = async (scope) => {
+      if (++calls === 2) throw realTimeout;
+      return original(scope);
+    };
+    await assert.rejects(failing.run());
+    const failedRun = await prisma.opsJobRun.findFirstOrThrow({
+      where: { jobName: 'asset_price_snapshot_retention', status: 'failed' },
+      orderBy: { startedAt: 'desc' },
+    });
+    assert.equal(failedRun.errorCode, 'ASSET_PRICE_SNAPSHOT_RETENTION_FAILED');
+    const failedResult = failedRun.resultJson as Record<string, unknown>;
+    assert.equal(failedResult.failureKind, 'statement_timeout');
+    assert.equal(failedResult.batchCount, 1);
+    assert.equal(failing.getStatus().lastFailureKind, 'statement_timeout');
+    const resumer = worker();
+    for (let k = 0; k < 50; k++) {
+      const result = await resumer.run();
+      if (result && !result.batchLimitReached) break;
+    }
+    // Of these 4,000 old rows only each KST date's last row remains (③).
+    assert.equal(await pendingOld(), workerDayLasts);
+    const succeeded = await prisma.opsJobRun.count({
+      where: { jobName: 'asset_price_snapshot_retention', status: 'succeeded' },
+    });
+    assert.ok(succeeded >= 2, 'every finished run is recorded');
+    delete process.env.ASSET_PRICE_SNAPSHOT_RETENTION_BATCH_SIZE;
+    delete process.env.ASSET_PRICE_SNAPSHOT_RETENTION_MAX_BATCHES;
+    console.log(
+      `asset price snapshot retention integration ok: correctness, scale (${scaleDeleted} deleted in ${scaleBatches} batches), worker`,
     );
   } finally {
     if (ids.account)
@@ -585,6 +967,11 @@ async function main() {
     if (ids.account)
       await prisma.tradingAccount.delete({ where: { id: ids.account } });
     if (ids.season) await prisma.season.delete({ where: { id: ids.season } });
+    if (ids.futureSeason)
+      await prisma.season.delete({ where: { id: ids.futureSeason } });
+    await prisma.opsJobRun.deleteMany({
+      where: { jobName: 'asset_price_snapshot_retention' },
+    });
     if (ids.user) await prisma.user.delete({ where: { id: ids.user } });
     await prisma.$disconnect();
     for (const session of sessions) await session.client.$disconnect();

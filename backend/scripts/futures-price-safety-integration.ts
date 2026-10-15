@@ -64,8 +64,11 @@ const deferred = () => {
   return { resolve, promise };
 };
 /** The production batch statement must be ONE ordered range scan of
- * (captured_at, id) that stops at its LIMIT: no Sort, no Hash join and no
- * sequential scan of the snapshot table, however large the backlog. */
+ * (captured_at, id) that stops at its LIMIT, and the DELETE must reach its
+ * rows by primary key: no sequential or bitmap scan of the snapshot table and
+ * no Sort or Hash over snapshot rows, however large the backlog. Hashing a
+ * small protection table (seasons, executions, ...) is allowed: the ordered
+ * outer scan still stops at the LIMIT. */
 type PlanNode = {
   'Node Type': string;
   'Relation Name'?: string;
@@ -78,30 +81,53 @@ function assertOrderedRetentionPlan(explain: unknown, table: string) {
     nodes.push(node);
     for (const child of node.Plans ?? []) walk(child);
   };
-  walk(
-    (explain as Array<{ 'QUERY PLAN': Array<{ Plan: PlanNode }> }>)[0][
-      'QUERY PLAN'
-    ][0].Plan,
-  );
+  const root = (
+    explain as Array<{ 'QUERY PLAN': Array<{ Plan: PlanNode }> }>
+  )[0]['QUERY PLAN'][0].Plan;
+  walk(root);
   const shape = nodes
     .map((n) => `${n['Node Type']}:${n['Relation Name'] ?? ''}`)
     .join(' > ');
+  const readsTable = (node: PlanNode): boolean =>
+    node['Relation Name'] === table ||
+    (node.Plans ?? []).some((child) => readsTable(child));
+  const indexes = (node: PlanNode): string[] => [
+    ...(node['Index Name'] ? [node['Index Name']] : []),
+    ...(node.Plans ?? []).flatMap(indexes),
+  ];
+  // A bitmap over the primary key (id = ANY of a bounded array) is a keyed
+  // read; a bitmap over any other index reads candidates out of order.
+  const byPrimaryKey = (n: PlanNode) =>
+    n['Relation Name'] === table &&
+    ((n['Node Type'] === 'Index Scan' && n['Index Name'] === `${table}_pkey`) ||
+      (n['Node Type'] === 'Bitmap Heap Scan' &&
+        indexes(n).every((name) => name === `${table}_pkey`)));
   assert.equal(
     nodes.some(
-      (n) => n['Node Type'] === 'Seq Scan' && n['Relation Name'] === table,
+      (n) =>
+        n['Relation Name'] === table &&
+        (n['Node Type'] === 'Seq Scan' ||
+          (n['Node Type'] === 'Bitmap Heap Scan' && !byPrimaryKey(n))),
     ),
     false,
     shape,
   );
   assert.equal(
     nodes.some(
-      (n) => n['Node Type'] === 'Sort' || n['Node Type'] === 'Hash Join',
+      (n) => ['Sort', 'Hash'].includes(n['Node Type']) && readsTable(n),
     ),
     false,
     shape,
   );
   assert.equal(
     nodes.some((n) => n['Index Name'] === `${table}_captured_at_id_idx`),
+    true,
+    shape,
+  );
+  // The DELETE target itself is reached only through the primary key.
+  assert.equal(root['Node Type'], 'ModifyTable', shape);
+  assert.equal(
+    (root.Plans ?? []).some((n) => byPrimaryKey(n)),
     true,
     shape,
   );
@@ -122,6 +148,44 @@ function assertOrderedRetentionPlan(explain: unknown, table: string) {
     shape,
   );
   return shape;
+}
+/** Plan choice must not depend on cost settings: PostgreSQL defaults (the CI
+ * container) and the production pg_settings (2026-10-16 audit evidence), at
+ * the default and at the largest configurable batch. */
+const COST_PROFILES: Record<string, string[]> = {
+  postgresDefaults: [
+    'random_page_cost = 4',
+    "effective_cache_size = '4GB'",
+    "work_mem = '4MB'",
+  ],
+  production: [
+    'random_page_cost = 1.1',
+    "effective_cache_size = '768MB'",
+    "work_mem = '6617kB'",
+  ],
+};
+async function assertStableRetentionPlans(
+  build: (cutoff: Date, limit: number) => Prisma.Sql,
+  cutoff: Date,
+  table: string,
+) {
+  for (const [profile, settings] of Object.entries(COST_PROFILES))
+    for (const limit of [1000, 10000]) {
+      const explain = await db.$transaction(async (tx) => {
+        for (const setting of settings)
+          await tx.$executeRawUnsafe(`SET LOCAL ${setting}`);
+        return tx.$queryRaw(
+          Prisma.sql`EXPLAIN (FORMAT JSON) ${build(cutoff, limit)}`,
+        );
+      });
+      try {
+        assertOrderedRetentionPlan(explain, table);
+      } catch (error) {
+        throw new Error(
+          `${table} plan (${profile}, batch ${limit}): ${(error as Error).message}`,
+        );
+      }
+    }
 }
 async function main() {
   // Actual CLI: fresh fixture evidence + inactive empty companion instrument.
@@ -486,6 +550,11 @@ async function main() {
       ${new Date(+old - 86400000)}::timestamp + n * interval '1 millisecond', ${new Date(+old - 86400000)}::timestamp + n * interval '1 millisecond'
     FROM generate_series(1, ${bulk}::integer) n`;
   await db.$executeRaw`ANALYZE futures_last_price_snapshots`;
+  await assertStableRetentionPlans(
+    futuresLastPriceRetentionBatchSql,
+    cutoff,
+    'futures_last_price_snapshots',
+  );
   const explain = await db.$transaction(async (tx) =>
     // EXPLAIN ANALYZE really deletes its batch; it is part of the measured total.
     tx.$queryRaw(
@@ -511,7 +580,7 @@ async function main() {
   assert.equal(removed, bulk);
   const elapsedMs = performance.now() - start;
   pass(
-    'Last retention at a 100k backlog: one ordered (captured_at, id) range plan; concurrent SKIP LOCKED batches delete each old observation exactly once',
+    'Last retention at a 100k backlog: one ordered (captured_at, id) range plan and a primary-key DELETE under default and production cost settings; concurrent SKIP LOCKED batches delete each old observation exactly once',
   );
 
   // Futures Mark retention: the same plan guarantee at scale, newest row per
@@ -545,6 +614,11 @@ async function main() {
       ${new Date(+markOld - 86400000)}::timestamp + n * interval '1 millisecond', ${new Date(+markOld - 86400000)}::timestamp + n * interval '1 millisecond'
     FROM generate_series(1, ${bulk}::integer) n`;
   await db.$executeRaw`ANALYZE futures_mark_snapshots`;
+  await assertStableRetentionPlans(
+    futuresMarkRetentionBatchSql,
+    markCutoff,
+    'futures_mark_snapshots',
+  );
   const markExplain = await db.$transaction(async (tx) =>
     tx.$queryRaw(
       Prisma.sql`EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${futuresMarkRetentionBatchSql(markCutoff, 1000)}`,
@@ -555,13 +629,28 @@ async function main() {
     'futures_mark_snapshots',
   );
   const markStart = performance.now();
-  assert.deepEqual(
-    await Promise.all([
-      markRetention().deleteBatch(markCutoff, 1000),
-      markRetention().deleteBatch(markCutoff, 1000),
-    ]),
-    [1000, 1000],
-  );
+  // Ingestion keeps inserting while two workers delete: fresh rows are never
+  // candidates, and each old row is still deleted exactly once.
+  const freshAt = await now();
+  const freshIds = Array.from({ length: 200 }, () => randomUUID());
+  const [firstBatch, secondBatch, freshInsert] = await Promise.all([
+    markRetention().deleteBatch(markCutoff, 1000),
+    markRetention().deleteBatch(markCutoff, 1000),
+    db.futuresMarkSnapshot.createMany({
+      data: freshIds.map((id, k) => ({
+        id,
+        instrumentId: i.instrument.id,
+        symbol: i.asset.symbol,
+        price: '100',
+        source: 'binance_usdm_mark_ws' as const,
+        effectiveAt: new Date(+freshAt - 1 - k),
+        capturedAt: freshAt,
+      })),
+      skipDuplicates: true,
+    }),
+  ]);
+  assert.deepEqual([firstBatch, secondBatch], [1000, 1000]);
+  assert.equal(freshInsert.count > 0, true);
   let markRemoved = 3000;
   while (true) {
     const n = await markRetention().deleteBatch(markCutoff, 1000);
@@ -575,9 +664,13 @@ async function main() {
   assert.equal(await markExists(olderMarkRest.id), false);
   assert.equal(await markExists(newestMarkRest.id), true);
   assert.equal(await markExists(newestMarkWs.id), true);
+  assert.equal(
+    await db.futuresMarkSnapshot.count({ where: { id: { in: freshIds } } }),
+    freshInsert.count,
+  );
   assert.equal(await markRetention().deleteBatch(markCutoff, 1000), 0);
   pass(
-    'Mark retention at a 100k backlog: one ordered (captured_at, id) range plan; concurrent SKIP LOCKED batches delete each row exactly once; the newest row per source survives even when older than the cutoff',
+    'Mark retention at a 100k backlog: one ordered (captured_at, id) range plan and a primary-key DELETE under default and production cost settings; concurrent SKIP LOCKED batches delete each row exactly once while ingestion inserts; the newest row per source survives even when older than the cutoff',
   );
 
   // A real statement timeout is classified from the actual driver error, and a

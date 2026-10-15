@@ -13,6 +13,15 @@ describe('KOSCOM collection switches', () => {
     // Observation only: counters and the per-minute cycle summary.
     expect(config.callMetricsEnabled).toBe(true);
     expect(config.cycleMetricsEnabled).toBe(true);
+    // Raw-payload slimming changes stored evidence: off until approved.
+    expect(config.priceRawSlimEnabled).toBe(false);
+  });
+
+  it('turns the price raw slim profile on only explicitly', () => {
+    const config = readKoscomConfig({ KOSCOM_PRICE_RAW_SLIM_ENABLED: 'true' });
+    expect(config.priceRawSlimEnabled).toBe(true);
+    // Order-book collection is a separate switch and stays on.
+    expect(config.orderbookCollectionEnabled).toBe(true);
   });
 
   it('turns each switch on or off explicitly', () => {

@@ -156,6 +156,49 @@ describe('DatabaseStorageMonitorService', () => {
     expect(status.level).toBe('unknown');
   });
 
+  it('counts max_wal_size on top of the database size as WAL headroom', async () => {
+    queryRaw.mockResolvedValueOnce([
+      { bytes: BigInt(28.8 * GB), wal: BigInt(1.28 * GB) },
+    ]);
+    await service.sample(Date.parse('2026-10-16T00:00:00Z'));
+    const status = service.getStatus(Date.parse('2026-10-16T00:00:01Z'));
+    // 28.8 GB alone is 57.6 %; with 1.28 GB of WAL it crosses 60 %.
+    expect(status.databaseBytes).toBe(28.8 * GB);
+    expect(status.walReserveBytes).toBe(1.28 * GB);
+    expect(status.usedPercent).toBe(60.2);
+    expect(status.level).toBe('warning');
+  });
+
+  it('marks the level stale after fifteen minutes without a successful sample', async () => {
+    jest.useFakeTimers({ now: Date.parse('2026-10-16T00:00:00Z') });
+    queryRaw.mockRejectedValue(new Error('timeout'));
+    service.onModuleInit();
+    const start = Date.now();
+    await jest.advanceTimersByTimeAsync(30000);
+    expect(service.getStatus(start + 30000).sampleStale).toBe(false);
+    // First sample due at +30 s, so fifteen minutes later it is stale.
+    expect(service.getStatus(start + 30000 + 15 * 60000).sampleStale).toBe(
+      false,
+    );
+    expect(service.getStatus(start + 30001 + 15 * 60000).sampleStale).toBe(
+      true,
+    );
+    queryRaw.mockReset();
+    size(10 * GB);
+    await service.sample(start + 20 * 60000);
+    expect(service.getStatus(start + 21 * 60000).sampleStale).toBe(false);
+    expect(service.getStatus(start + 36 * 60000).sampleStale).toBe(true);
+  });
+
+  it('logs no error for an unknown level when no capacity is configured', async () => {
+    delete process.env.DATABASE_STORAGE_CAPACITY_GB;
+    size(9 * GB);
+    await service.sample(Date.parse('2026-10-16T00:00:00Z'));
+    size(9 * GB);
+    await service.sample(Date.parse('2026-10-16T00:05:00Z'));
+    expect(events(error)).toEqual([]);
+  });
+
   it('records a failed sample by category without driver text', async () => {
     queryRaw.mockRejectedValueOnce(
       Object.assign(new Error('x'), {
