@@ -4,6 +4,7 @@ import {
   type MarketCandleReconciliationConfig,
 } from '../assets/market-candle-reconciliation.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
+import { DEFAULT_MARKET_CANDLE_RETENTION_DAYS } from '../assets/market-candle-retention.config';
 
 export type ProviderOpsJobName =
   | typeof OpsJobName.provider_fx_ingest
@@ -133,7 +134,7 @@ export function getOpsSchedulerConfig(
   );
   const retentionDays = parseStrictIntegerEnv(
     env.MARKET_CANDLE_5M_RETENTION_DAYS,
-    35,
+    DEFAULT_MARKET_CANDLE_RETENTION_DAYS,
     'MARKET_CANDLE_5M_RETENTION_DAYS',
     31,
   );
@@ -206,6 +207,8 @@ export function getOpsSchedulerConfig(
   return {
     enabled:
       parseBooleanEnv(env.SCHEDULER_ENABLED, false) ||
+      // The central KRX schedule relies on the tick for its 05:00 compaction.
+      parseBooleanEnv(env.KOSCOM_CENTRAL_CANDLES_ENABLED, false) ||
       dailySnapshotEnabled ||
       rankingEnabled ||
       lifecycleEnabled ||

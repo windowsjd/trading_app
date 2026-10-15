@@ -62,6 +62,12 @@ jest.mock('../assets/market-candle-long-sync.service', () => ({
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
 }));
+jest.mock('../assets/krx-central-candle.service', () => ({
+  KrxCentralCandleService: class KrxCentralCandleService {},
+}));
+jest.mock('../assets/krx-checkpoint-compaction.service', () => ({
+  KrxCheckpointCompactionService: class KrxCheckpointCompactionService {},
+}));
 jest.mock('../assets/market-candle-reconciliation.service', () => ({
   MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));
@@ -76,6 +82,11 @@ import {
 } from '../orders/market-calendar/market-session-override.store';
 import { getOpsSchedulerConfig } from './ops-config';
 import { OpsSchedulerService } from './ops-scheduler.service';
+
+// First argument of a mock's first call, read through unknown (jest types
+// untyped mock calls as any).
+const firstCallArg = (fn: jest.Mock): unknown =>
+  (fn.mock.calls as unknown[][])[0][0];
 
 describe('OpsSchedulerService', () => {
   const originalEnv = { ...process.env };
@@ -190,7 +201,7 @@ describe('OpsSchedulerService', () => {
     expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledTimes(1);
     expect(runner.runMarketCandleRetentionJob).toHaveBeenCalledWith(
       expect.objectContaining({
-        retentionDays: 35,
+        retentionDays: 45,
         batchSize: 5000,
         metadataJson: { businessDate: '2026-07-11' },
       }),
@@ -1195,5 +1206,327 @@ describe('OpsSchedulerService', () => {
       new Date('2026-07-13T00:02:00.000Z'),
     );
     expect(runner.runMarketCandleReconciliationJob).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 2b/2d: the Ops scheduler owns the KOSCOM price loop in slot mode — one
+ * attempt per slot boundary per process, independent of the live candle
+ * flag — and drains an in-flight cycle on shutdown (F27).
+ */
+describe('OpsSchedulerService KOSCOM price slot loop', () => {
+  const originalEnv = process.env;
+  const T = 3000;
+  const base = Date.parse('2026-09-30T01:00:01.200Z');
+
+  const create = (env: Record<string, string>) => {
+    process.env = {
+      ...originalEnv,
+      KOSCOM_API_KEY: 'k',
+      PROVIDER_INGESTION_ENABLED: 'true',
+      KOSCOM_POLLING_ENABLED: 'true',
+      ...env,
+    };
+    const koscom = {
+      collect: jest.fn().mockResolvedValue({ success: true }),
+      collectSlot: jest.fn().mockResolvedValue({ success: true }),
+      drain: jest.fn().mockResolvedValue(undefined),
+    };
+    const { readKoscomConfig } = jest.requireActual<
+      typeof import('../providers/koscom/koscom.config')
+    >('../providers/koscom/koscom.config');
+    const service = new OpsSchedulerService(
+      {} as never,
+      {} as never,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      koscom as never,
+      { getConfig: () => readKoscomConfig() } as never,
+    );
+    return { service, koscom };
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(base);
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    process.env = originalEnv;
+  });
+
+  it('attempts each slot exactly once, at the boundary, and never the legacy interval', async () => {
+    const { service, koscom } = create({ KOSCOM_PRICE_SLOT_ENABLED: 'true' });
+    service.onModuleInit();
+    const first = Math.floor(base / T);
+    expect(koscom.collectSlot).toHaveBeenCalledTimes(1);
+    expect(firstCallArg(koscom.collectSlot)).toEqual({
+      slot: first,
+      periodMs: T,
+    });
+    // Next boundary is 1.8 s away; nothing fires before it.
+    await jest.advanceTimersByTimeAsync(1_700);
+    expect(koscom.collectSlot).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(100 + 4 * T);
+    const slots = koscom.collectSlot.mock.calls.map(
+      (call: [{ slot: number }]) => call[0].slot,
+    );
+    expect(slots).toEqual([
+      first,
+      first + 1,
+      first + 2,
+      first + 3,
+      first + 4,
+      first + 5,
+    ]);
+    expect(koscom.collect).not.toHaveBeenCalled();
+    await service.onModuleDestroy();
+  });
+
+  it('keeps owning KOSCOM prices when live candles are enabled (2d)', async () => {
+    const { service, koscom } = create({
+      KOSCOM_PRICE_SLOT_ENABLED: 'true',
+      CANDLE_LIVE_STREAMING_ENABLED: 'true',
+    });
+    service.onModuleInit();
+    expect(koscom.collectSlot).toHaveBeenCalledTimes(1);
+    await service.onModuleDestroy();
+  });
+
+  it('leaves legacy mode unchanged: live candles enabled means no scheduler poll', async () => {
+    const { service, koscom } = create({
+      CANDLE_LIVE_STREAMING_ENABLED: 'true',
+    });
+    service.onModuleInit();
+    await jest.advanceTimersByTimeAsync(3 * T);
+    expect(koscom.collect).not.toHaveBeenCalled();
+    expect(koscom.collectSlot).not.toHaveBeenCalled();
+    service.clearInterval();
+  });
+
+  it('drains the in-flight cycle on shutdown and attempts no slot afterwards', async () => {
+    const { service, koscom } = create({ KOSCOM_PRICE_SLOT_ENABLED: 'true' });
+    service.onModuleInit();
+    await service.onModuleDestroy();
+    expect(koscom.drain).toHaveBeenCalledTimes(1);
+    const timeout = (koscom.drain.mock.calls[0] as [number])[0];
+    expect(timeout >= 5_000 && timeout <= 15_000).toBe(true);
+    const calls = koscom.collectSlot.mock.calls.length;
+    await jest.advanceTimersByTimeAsync(5 * T);
+    expect(koscom.collectSlot.mock.calls.length).toBe(calls);
+  });
+
+  it('logs a set-but-ignored KOSCOM value once at start-up (F16)', async () => {
+    const warn = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const { service } = create({
+      KOSCOM_PRICE_SLOT_ENABLED: 'true',
+      KOSCOM_POLL_INTERVAL_MS: '120000',
+    });
+    service.onModuleInit();
+    const details = (warn.mock.calls as unknown[][]).map((call) => call[1]);
+    expect(details).toContainEqual({
+      setting: 'KOSCOM_POLL_INTERVAL_MS',
+      reason: 'out_of_range',
+      fallback: 3000,
+    });
+    await service.onModuleDestroy();
+    warn.mockRestore();
+  });
+});
+
+/**
+ * 3b: the central KRX schedule (design v2.1 §3, §4.4, §7.6) — calendar-
+ * derived instants claimed cluster-wide, 4h long sync after each daily
+ * phase, KRX left out of the interval sync and the reconciliation, and the
+ * 05:00 checkpoint compaction once per business date.
+ */
+describe('OpsSchedulerService central KRX candles', () => {
+  const originalEnv = process.env;
+
+  const create = (enabled = true) => {
+    const ok = () => jest.fn().mockResolvedValue({ success: true });
+    const runner = {
+      runKrxCentralCandleJob: ok(),
+      runKrxCheckpointCompactionJob: ok(),
+      runMarketCandleLongSyncJob: ok(),
+      runMarketCandleSyncJob: ok(),
+      runMarketCandleRetentionJob: ok(),
+      runMarketCandleReconciliationJob: ok(),
+      runFuturesCandleSyncJob: ok(),
+      runScheduledDailySnapshotJobs: jest.fn().mockResolvedValue([]),
+    };
+    const runService = {
+      findLatestRunForJob: jest.fn().mockResolvedValue(null),
+      findLatestSucceededRunForJob: jest.fn().mockResolvedValue(null),
+      findLatestSucceededReconciliationRun: jest.fn().mockResolvedValue(null),
+      findLatestReconciliationAttempt: jest.fn().mockResolvedValue(null),
+    };
+    const central = {
+      isEnabled: jest.fn(() => enabled),
+      tickDelayMs: 70_000,
+      claimRun: jest.fn().mockResolvedValue(true),
+    };
+    const service = new OpsSchedulerService(
+      runner as never,
+      runService as never,
+      undefined,
+      {
+        getConfig: () => ({ binance: { wsStreamingEnabled: false } }),
+      } as never,
+      {
+        hasRecentCanonicalCoverage: jest.fn().mockResolvedValue(false),
+      } as never,
+      undefined,
+      undefined,
+      undefined,
+      central as never,
+    );
+    return { service, runner, runService, central };
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    // The central flag alone keeps the scheduler tick alive (ops-config).
+    process.env = { ...originalEnv, KOSCOM_CENTRAL_CANDLES_ENABLED: 'true' };
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+    process.env = originalEnv;
+  });
+
+  it('runs a claimed instant once per cluster, and the KRX 4h long sync after each daily phase', async () => {
+    const { service, runner, central } = create();
+    const at = Date.parse('2026-10-15T00:06:10.000Z');
+    await service.runKrxCentralPhase('intraday', at);
+    expect(central.claimRun).toHaveBeenCalledWith('intraday', at);
+    expect(runner.runKrxCentralCandleJob).toHaveBeenCalledTimes(1);
+    expect(firstCallArg(runner.runKrxCentralCandleJob)).toMatchObject({
+      phase: 'intraday',
+      trigger: 'scheduler',
+      requestedBy: 'scheduler',
+      dryRun: false,
+    });
+    expect(runner.runMarketCandleLongSyncJob).not.toHaveBeenCalled();
+
+    // Another instance already claimed this instant: nothing runs here.
+    const daily = Date.parse('2026-10-15T06:50:00.000Z');
+    central.claimRun.mockResolvedValueOnce(false);
+    await service.runKrxCentralPhase('daily', daily);
+    expect(runner.runKrxCentralCandleJob).toHaveBeenCalledTimes(1);
+
+    await service.runKrxCentralPhase('daily', daily + 1);
+    expect(runner.runKrxCentralCandleJob).toHaveBeenCalledTimes(2);
+    expect(runner.runMarketCandleLongSyncJob).toHaveBeenCalledTimes(1);
+    expect(firstCallArg(runner.runMarketCandleLongSyncJob)).toMatchObject({
+      mode: 'incremental',
+      markets: ['krx'],
+    });
+  });
+
+  it('does nothing when the central collection is disabled', async () => {
+    const { service, runner, central } = create(false);
+    await service.runKrxCentralPhase('intraday', Date.now());
+    expect(central.claimRun).not.toHaveBeenCalled();
+    expect(runner.runKrxCentralCandleJob).not.toHaveBeenCalled();
+    await service.runEnabledJobs(new Date('2026-07-10T20:00:00.000Z'));
+    expect(runner.runKrxCheckpointCompactionJob).not.toHaveBeenCalled();
+  });
+
+  it('arms the calendar loop: the first tick is the bucket end plus the delay', async () => {
+    // 2026-10-15 09:04 KST: the 09:00–09:05 bucket is collected at 09:06:10.
+    jest.setSystemTime(Date.parse('2026-10-15T00:04:00.000Z'));
+    const { service, central } = create();
+    service.onModuleInit();
+    await jest.advanceTimersByTimeAsync(130_000 - 100);
+    expect(central.claimRun).not.toHaveBeenCalled();
+    await jest.advanceTimersByTimeAsync(100);
+    expect(central.claimRun).toHaveBeenCalledTimes(1);
+    expect(central.claimRun.mock.calls[0]).toEqual([
+      'intraday',
+      Date.parse('2026-10-15T00:06:10.000Z'),
+    ]);
+    // Re-armed for the next bucket (09:11:10), not the same instant.
+    await jest.advanceTimersByTimeAsync(5 * 60_000);
+    expect(central.claimRun.mock.calls[1]).toEqual([
+      'intraday',
+      Date.parse('2026-10-15T00:11:10.000Z'),
+    ]);
+    service.clearInterval();
+    await jest.advanceTimersByTimeAsync(10 * 60_000);
+    expect(central.claimRun).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps KRX out of the interval sync and gates it on its own lock key only', async () => {
+    process.env.SCHEDULER_MARKET_CANDLE_SYNC_ENABLED = 'true';
+    const on = create();
+    await on.service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+    expect(on.runService.findLatestRunForJob).toHaveBeenCalledWith(
+      'market_candle_sync',
+      'market_candle_sync:manual',
+    );
+    expect(firstCallArg(on.runner.runMarketCandleSyncJob)).toMatchObject({
+      mode: 'incremental',
+      assetTypes: ['us_stock', 'crypto'],
+    });
+
+    const off = create(false);
+    await off.service.runEnabledJobs(new Date('2026-07-10T03:00:00.000Z'));
+    const input = firstCallArg(off.runner.runMarketCandleSyncJob) as object;
+    expect('assetTypes' in input).toBe(false);
+  });
+
+  it('skips KRX reconciliation with a single warning while the central collection owns it', async () => {
+    process.env.CANDLE_RECONCILIATION_KRX_ENABLED = 'true';
+    const warn = jest
+      .spyOn(console, 'warn')
+      .mockImplementation(() => undefined);
+    const { service, runner } = create();
+    await service.runEnabledJobs(new Date('2026-07-10T06:50:00.000Z'));
+    await service.runEnabledJobs(new Date('2026-07-10T07:50:00.000Z'));
+    const krxRuns = (
+      runner.runMarketCandleReconciliationJob.mock.calls as unknown[][]
+    ).filter((call) => (call[0] as { market?: string }).market === 'KRX');
+    expect(krxRuns.length).toBe(0);
+    const skips = (warn.mock.calls as unknown[][]).filter(
+      (call) =>
+        call[0] ===
+        'KRX candle reconciliation skipped: the central KRX collection owns it.',
+    );
+    expect(skips.length).toBe(1);
+    warn.mockRestore();
+  });
+
+  it('compacts KRX checkpoints after 05:00 local time, once per successful business date', async () => {
+    const { service, runner, runService } = create();
+    await service.runEnabledJobs(new Date('2026-07-10T19:59:00.000Z'));
+    expect(runner.runKrxCheckpointCompactionJob).not.toHaveBeenCalled();
+
+    await service.runEnabledJobs(new Date('2026-07-10T20:00:00.000Z'));
+    expect(runner.runKrxCheckpointCompactionJob).toHaveBeenCalledTimes(1);
+    expect(runService.findLatestSucceededRunForJob).toHaveBeenCalledWith(
+      'market_candle_sync',
+      'market_candle_sync:krx_compaction',
+    );
+    expect(firstCallArg(runner.runKrxCheckpointCompactionJob)).toMatchObject({
+      trigger: 'scheduler',
+      dryRun: false,
+      now: '2026-07-10T20:00:00.000Z',
+    });
+
+    const done = {
+      startedAt: new Date('2026-07-10T20:00:00.000Z'),
+      finishedAt: new Date('2026-07-10T20:01:00.000Z'),
+    };
+    runService.findLatestSucceededRunForJob.mockResolvedValueOnce(done);
+    await service.runEnabledJobs(new Date('2026-07-10T23:00:00.000Z'));
+    expect(runner.runKrxCheckpointCompactionJob).toHaveBeenCalledTimes(1);
+
+    runService.findLatestSucceededRunForJob.mockResolvedValueOnce(done);
+    await service.runEnabledJobs(new Date('2026-07-11T20:00:00.000Z'));
+    expect(runner.runKrxCheckpointCompactionJob).toHaveBeenCalledTimes(2);
   });
 });

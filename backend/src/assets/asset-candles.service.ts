@@ -51,6 +51,10 @@ export type AssetCandlesQuery = {
 
 // 'prev_open'  = previous real market-session open → now
 // 'prev2_open' = second previous real market-session open → now
+// 'prevN_open' (N = 3, 6, 12, 24, 576) = Nth previous real session open →
+//         now: the domestic chart policy (5m 3, 15m 6, 30m 12, 1h 24, 1d 576
+//         sessions; design v2.1 §5.1). Daily/weekly windows start at that
+//         session date's 00:00 so its own candle is included.
 // '3d'/'7d'/'14d'/'30d'/'1y' = rolling N days → now
 // '96d' = long-range 4h window (4h only):
 //         stocks = 96th previous real exchange session open → now (96
@@ -67,6 +71,11 @@ export type CandleRange =
   | '30d'
   | 'prev_open'
   | 'prev2_open'
+  | 'prev3_open'
+  | 'prev6_open'
+  | 'prev12_open'
+  | 'prev24_open'
+  | 'prev576_open'
   | '1y'
   | 'season'
   | '96d';
@@ -262,6 +271,11 @@ const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
   '30d': '1d',
   prev_open: '5m',
   prev2_open: '30m',
+  prev3_open: '5m',
+  prev6_open: '15m',
+  prev12_open: '30m',
+  prev24_open: '1h',
+  prev576_open: '1d',
   '1y': '1d',
   season: '1d',
   '96d': '4h',
@@ -276,10 +290,21 @@ const DEFAULT_INTERVAL_BY_RANGE: Record<CandleRange, CandleInterval> = {
  * error instead.
  */
 const DAY_MS = 86_400_000;
-type RollingCandleRange = Exclude<
-  CandleRange,
-  'season' | 'prev_open' | 'prev2_open'
->;
+/** Ranges anchored at the Nth real exchange session before today. */
+const SESSION_ANCHOR_RANGES = {
+  prev_open: 1,
+  prev2_open: 2,
+  prev3_open: 3,
+  prev6_open: 6,
+  prev12_open: 12,
+  prev24_open: 24,
+  prev576_open: 576,
+} as const;
+type SessionAnchorRange = keyof typeof SESSION_ANCHOR_RANGES;
+type RollingCandleRange = Exclude<CandleRange, 'season' | SessionAnchorRange>;
+function isSessionAnchorRange(range: CandleRange): range is SessionAnchorRange {
+  return Object.hasOwn(SESSION_ANCHOR_RANGES, range);
+}
 const ROLLING_RANGE_DURATION_MS: Record<RollingCandleRange, number> = {
   '1d': DAY_MS,
   '3d': 3 * DAY_MS,
@@ -321,6 +346,11 @@ const CANDLE_RANGES: Record<CandleRange, true> = {
   '30d': true,
   prev_open: true,
   prev2_open: true,
+  prev3_open: true,
+  prev6_open: true,
+  prev12_open: true,
+  prev24_open: true,
+  prev576_open: true,
   '1y': true,
   season: true,
   '96d': true,
@@ -342,6 +372,12 @@ const RANGE_INTERVALS: Record<
   '30d': CANDLE_INTERVALS,
   prev_open: CANDLE_INTERVALS,
   prev2_open: CANDLE_INTERVALS,
+  prev3_open: CANDLE_INTERVALS,
+  prev6_open: CANDLE_INTERVALS,
+  prev12_open: CANDLE_INTERVALS,
+  prev24_open: CANDLE_INTERVALS,
+  // 577 daily candles; finer intervals over ~2.4 years are never charted.
+  prev576_open: { '1d': true },
   '1y': CANDLE_INTERVALS,
   season: CANDLE_INTERVALS,
   '96d': { '4h': true },
@@ -1158,7 +1194,7 @@ export class AssetCandlesService {
     const interval = this.parseInterval(query.interval, asset.assetType, range);
     const rangeWindow =
       rangeProvided || (!legacyDateProvided && !legacyToProvided)
-        ? await this.resolveRangeWindow(range, clock, asset)
+        ? await this.resolveRangeWindow(range, clock, asset, interval)
         : null;
     const parsedTo = rangeWindow
       ? {
@@ -1202,7 +1238,7 @@ export class AssetCandlesService {
     this.throwApiError(
       HttpStatus.BAD_REQUEST,
       'ASSET_CANDLES_INVALID_RANGE',
-      'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, 1y, season, or 96d.',
+      'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, prev3_open, prev6_open, prev12_open, prev24_open, prev576_open, 1y, season, or 96d.',
     );
   }
 
@@ -1240,7 +1276,9 @@ export class AssetCandlesService {
       'ASSET_CANDLES_INVALID_INTERVAL',
       range === LONG_FOUR_HOUR_RANGE
         ? 'interval 4h is the only interval supported for range 96d.'
-        : `interval ${interval} is not supported for range ${range}.`,
+        : range === 'prev576_open'
+          ? 'interval 1d is the only interval supported for range prev576_open.'
+          : `interval ${interval} is not supported for range ${range}.`,
     );
   }
 
@@ -1361,6 +1399,7 @@ export class AssetCandlesService {
     range: CandleRange,
     now: Date,
     asset: AssetRecord,
+    interval: CandleInterval,
   ): Promise<{ startAt: Date; endAt: Date }> {
     if (range === 'season') {
       const season = await this.findCurrentSeasonForRange(now);
@@ -1385,13 +1424,19 @@ export class AssetCandlesService {
       };
     }
 
-    if (range === 'prev_open' || range === 'prev2_open') {
+    if (isSessionAnchorRange(range)) {
+      const anchor = this.resolveMarketOpenAnchor(
+        asset,
+        SESSION_ANCHOR_RANGES[range],
+        now,
+      );
       return {
-        startAt: this.resolveMarketOpenAnchor(
-          asset,
-          range === 'prev_open' ? 1 : 2,
-          now,
-        ),
+        // A daily/weekly candle opens at its local 00:00, before the session
+        // open: start the window at the anchor date so its candle is kept.
+        startAt:
+          interval === '1d' || interval === '1w'
+            ? this.localDayStart(anchor, asset)
+            : anchor,
         endAt: now,
       };
     }
@@ -1416,6 +1461,17 @@ export class AssetCandlesService {
       startAt: new Date(now.getTime() - this.rangeDurationMs(range)),
       endAt: now,
     };
+  }
+
+  private localDayStart(instant: Date, asset: AssetRecord): Date {
+    const timeZone =
+      asset.assetType === AssetType.domestic_stock
+        ? KOREA_TIME_ZONE
+        : asset.assetType === AssetType.us_stock
+          ? US_EASTERN_TIME_ZONE
+          : KOREA_TIME_ZONE;
+    const day = this.dateInZone(instant, timeZone).replace(/-/gu, '');
+    return this.zonedDateTimeToUtc(day, '000000', timeZone);
   }
 
   /**

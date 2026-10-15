@@ -22,6 +22,7 @@ describe('CandleReadPlanBuilder', () => {
     staleWaiterMaxWaitMs: 100,
     maxManagedFiveMinuteRangeMs: 35 * 86_400_000,
     maxManagedPeriodRangeMs: 365 * 86_400_000,
+    maxManagedKrxDailyRangeMs: 875 * 86_400_000,
     maxOnDemandRepairRangeMs: 2 * 86_400_000,
     coverageTailToleranceMs: 86_400_000,
   });
@@ -70,6 +71,33 @@ describe('CandleReadPlanBuilder', () => {
     expect(result.sourceRange.from.getTime()).toBe(
       base.rangeStartAt!.getTime() - (aggregated ? 4 * 60 * 60_000 : 0),
     );
+  });
+
+  it('manages the KRX 576-session daily window but keeps other daily feeds at 365 days', () => {
+    const DAY = 86_400_000;
+    const krxDaily = builder.build(asset, {
+      ...base,
+      range: 'prev576_open',
+      interval: '1d',
+      rangeStartAt: new Date(base.rangeEndAt!.getTime() - 867 * DAY),
+    });
+    expect(krxDaily.managedByPersistence).toBe(true);
+    const us = builder.build(
+      { ...asset, market: 'NAS', assetType: AssetType.us_stock },
+      {
+        ...base,
+        range: 'prev576_open',
+        interval: '1d',
+        rangeStartAt: new Date(base.rangeEndAt!.getTime() - 867 * DAY),
+      },
+    );
+    expect(us.outOfPolicyReason).toBe('period_range_exceeds_policy');
+    const krxWeekly = builder.build(asset, {
+      ...base,
+      interval: '1w',
+      rangeStartAt: new Date(base.rangeEndAt!.getTime() - 400 * DAY),
+    });
+    expect(krxWeekly.outOfPolicyReason).toBe('period_range_exceeds_policy');
   });
 
   // The four aggregated chart tabs that must be owned by the database path.

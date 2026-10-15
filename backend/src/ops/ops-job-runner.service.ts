@@ -41,6 +41,9 @@ import {
   type KisPriceIngestionMode,
 } from './ops-config';
 import { OpsJobLockService } from './ops-job-lock.service';
+import { KrxCentralCandleService } from '../assets/krx-central-candle.service';
+import { KrxCheckpointCompactionService } from '../assets/krx-checkpoint-compaction.service';
+import type { KrxCentralPhase } from '../assets/krx-candle-collection.policy';
 import { OpsJobRunService, SerializedOpsJobRun } from './ops-job-run.service';
 import { MarketCandleRetentionService } from '../assets/market-candle-retention.service';
 import { readMarketCandleRetentionConfig } from '../assets/market-candle-retention.config';
@@ -140,6 +143,17 @@ export type MarketCandleSyncOpsJobInput = OpsJobRunnerInput & {
   maxAssets?: number;
 };
 
+export type KrxCentralCandleOpsJobInput = OpsJobRunnerInput & {
+  phase: KrxCentralPhase;
+  now?: string;
+};
+
+/** Lock of the central KRX candle phases; the regular sync keeps its own. */
+export const KRX_CENTRAL_CANDLE_LOCK_KEY = 'market_candle_sync:krx_central';
+export const KRX_CHECKPOINT_COMPACTION_LOCK_KEY =
+  'market_candle_sync:krx_compaction';
+export const MARKET_CANDLE_SYNC_LOCK_KEY = 'market_candle_sync:manual';
+
 export type MarketCandleLongSyncOpsJobInput = OpsJobRunnerInput & {
   now?: string | null;
   mode?: string;
@@ -210,7 +224,77 @@ export class OpsJobRunnerService {
     private readonly limitOrderMatchingService?: LimitOrderMatchingService,
     @Optional()
     private readonly marketCandleLongSyncService?: MarketCandleLongSyncService,
+    @Optional()
+    private readonly krxCentralCandleService?: KrxCentralCandleService,
+    @Optional()
+    private readonly krxCheckpointCompactionService?: KrxCheckpointCompactionService,
   ) {}
+
+  /** Daily KRX checkpoint compaction (design v2.1 §4.4) under its own lock. */
+  async runKrxCheckpointCompactionJob(
+    input: OpsJobRunnerInput,
+  ): Promise<OpsJobRunnerResponse> {
+    const service = this.krxCheckpointCompactionService;
+    if (!service || !this.krxCentralCandleService?.isEnabled()) {
+      return this.recordNotImplemented(
+        OpsJobName.market_candle_sync,
+        input,
+        'KRX checkpoint compaction runs only with central KRX collection.',
+      );
+    }
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+    const dryRunResult =
+      input.dryRun === true
+        ? await service.run({ now, dryRun: true })
+        : undefined;
+    return this.runLockedOpsJob(
+      OpsJobName.market_candle_sync,
+      { ...input, metadataJson: { krxCompaction: true } },
+      KRX_CHECKPOINT_COMPACTION_LOCK_KEY,
+      (context) => service.run({ now, signal: context.signal }),
+      { renewLock: true, dryRunResult },
+    );
+  }
+
+  /**
+   * One central KRX candle phase (design v2.1 §3, stage 3b) under its own
+   * Ops lock and run record. Recorded under `market_candle_sync` (no new job
+   * enum value) with the KRX_CENTRAL lock key; the regular interval sync
+   * only looks at runs of its own lock key, so its cadence is unchanged.
+   * Per-asset shortfalls are outcomes in the result (G4-I evidence and
+   * alerts), not job failures.
+   */
+  async runKrxCentralCandleJob(
+    input: KrxCentralCandleOpsJobInput,
+  ): Promise<OpsJobRunnerResponse> {
+    const service = this.krxCentralCandleService;
+    if (!service?.isEnabled()) {
+      return this.recordNotImplemented(
+        OpsJobName.market_candle_sync,
+        input,
+        'Central KRX candle collection is disabled.',
+      );
+    }
+    const now = this.parseOptionalDate(input.now) ?? new Date();
+    return this.runLockedOpsJob(
+      OpsJobName.market_candle_sync,
+      {
+        ...input,
+        metadataJson: {
+          krxCentralPhase: input.phase,
+          scheduledAt: now.toISOString(),
+        },
+      },
+      KRX_CENTRAL_CANDLE_LOCK_KEY,
+      (context) =>
+        input.phase === 'intraday'
+          ? service.runIntradayTick({ now, signal: context.signal })
+          : input.phase === 'repair'
+            ? service.runRepair({ now, signal: context.signal })
+            : service.runDaily({ now, signal: context.signal }),
+      { renewLock: true },
+    );
+  }
 
   /**
    * One limit-order matching cycle (paths A/B) under the shared OpsJobLock, so
@@ -738,7 +822,7 @@ export class OpsJobRunnerService {
     return this.runLockedOpsJob(
       OpsJobName.market_candle_sync,
       input,
-      'market_candle_sync:manual',
+      MARKET_CANDLE_SYNC_LOCK_KEY,
       async (context) => {
         const summary = await this.marketCandleSyncService.syncAssets({
           ...syncInput,

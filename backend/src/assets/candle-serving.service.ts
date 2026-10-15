@@ -44,6 +44,11 @@ import {
 import { MarketCandleSyncService } from './market-candle-sync.service';
 import type { MarketCandleAssetSyncResult } from './market-candle-sync.types';
 import { LiveCandleOverlayService } from './live-candle-overlay.service';
+import {
+  KRX_CENTRAL_CANDLES_CONFIG,
+  type KrxCentralCandlesConfig,
+} from './krx-central-candles.config';
+import { runWithKoscomCallCategory } from '../providers/koscom/koscom-call-context';
 
 export type CandleDeliveryState =
   | 'fresh_cache'
@@ -99,6 +104,9 @@ export class CandleServingService {
     @Inject(CANDLE_SERVING_CONFIG)
     private readonly config: CandleServingConfig,
     @Optional() private readonly liveOverlay?: LiveCandleOverlayService,
+    @Optional()
+    @Inject(KRX_CENTRAL_CANDLES_CONFIG)
+    private readonly krxCentral?: KrxCentralCandlesConfig,
   ) {}
 
   async serve(
@@ -106,7 +114,13 @@ export class CandleServingService {
     query: ParsedAssetCandlesQuery,
     legacyLoader: () => Promise<AssetCandlesResponse>,
   ): Promise<AssetCandlesResponse> {
-    const response = await this.serveBase(asset, query, legacyLoader);
+    // Any KOSCOM call a chart request causes is attributed to that request.
+    const response =
+      asset.assetType === 'domestic_stock'
+        ? await runWithKoscomCallCategory('user_request', () =>
+            this.serveBase(asset, query, legacyLoader),
+          )
+        : await this.serveBase(asset, query, legacyLoader);
     return this.liveOverlay
       ? this.liveOverlay.overlayHttpResponse(response, query)
       : response;
@@ -117,6 +131,8 @@ export class CandleServingService {
     query: ParsedAssetCandlesQuery,
     legacyLoader: () => Promise<AssetCandlesResponse>,
   ): Promise<AssetCandlesResponse> {
+    if (asset.assetType === 'domestic_stock' && this.krxCentral?.enabled)
+      return this.serveKrxFromDatabase(asset, query);
     // Compatibility reads share the same cache and cross-instance single flight
     // as persisted charts. One viewer must not create a new provider poller.
     if (asset.assetType === 'domestic_stock') {
@@ -402,6 +418,81 @@ export class CandleServingService {
     throw new CandleOperationalRefreshError(
       feed?.errorCode ?? feed?.stopReason ?? 'Candle refresh did not complete.',
     );
+  }
+
+  /**
+   * KRX while central collection is on (design v2.1 §4.2 rule 9): the
+   * response comes from PostgreSQL only — no managed sync, no legacy
+   * provider read, no cold-baseline fallback, whatever the serving mode.
+   * The provider call count therefore depends on assets and time only,
+   * never on how many people open a chart.
+   *
+   *  trustworthy (complete / stale_tail, no blocking run, nothing dropped)
+   *    → stored answer;  some stored candles → `database_partial`;
+   *  nothing stored → 503: BASELINE_NOT_READY for 15m/30m/1h/4h, the
+   *    provider-unavailable contract for 5m/1d and out-of-policy requests.
+   */
+  private serveKrxFromDatabase(
+    asset: AssetCandlesAsset,
+    query: ParsedAssetCandlesQuery,
+  ): Promise<AssetCandlesResponse> {
+    const plan = this.plans.build(asset, query);
+    if (!plan.managedByPersistence) {
+      this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
+        reason: `krx_central_out_of_policy:${plan.outOfPolicyReason}`,
+      });
+      return Promise.reject(this.providerCompatibilityError(asset));
+    }
+    return this.singleFlight.getOrLoad({
+      cacheKeyInput: this.cacheKey(asset.id, query, plan),
+      staleWaiterMaxWaitMs: this.config.staleWaiterMaxWaitMs,
+      loader: () => this.loadKrxFromDatabase(asset, query, plan),
+    });
+  }
+
+  private async loadKrxFromDatabase(
+    asset: AssetCandlesAsset,
+    query: ParsedAssetCandlesQuery,
+    plan: CandleReadPlan,
+  ): Promise<AssetCandlesResponse> {
+    const result = await this.database.load(asset, query, plan);
+    const context = {
+      ...this.coverageContext(result),
+      krxCentral: true,
+      ...(result.obligation ? { obligation: result.obligation } : {}),
+    };
+    if (result.state === 'available' || result.state === 'confirmed_empty') {
+      this.logDelivery(
+        result.fresh ? 'database_fresh' : 'database_fallback',
+        asset.id,
+        query,
+        plan,
+        result.fresh ? context : { ...context, reason: 'krx_stale_tail' },
+      );
+      return result.response as AssetCandlesResponse;
+    }
+    if (this.hasServableCandles(result)) {
+      this.logDelivery('database_partial', asset.id, query, plan, {
+        ...context,
+        reason:
+          result.droppedIncompleteBuckets > 0
+            ? 'incomplete_buckets_dropped'
+            : 'coverage_unconfirmed',
+      });
+      return result.response as AssetCandlesResponse;
+    }
+    if (plan.requiresAggregation) {
+      this.logDeliveryFailed('baseline_not_ready', asset.id, query, plan, {
+        ...context,
+        reason: 'krx_central_no_stored_candles',
+      });
+      throw this.baselineNotReadyError();
+    }
+    this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
+      ...context,
+      reason: 'krx_central_no_stored_candles',
+    });
+    throw this.providerCompatibilityError(asset);
   }
 
   private usableLastKnownGood(result: CandleDatabaseLoadResult): boolean {

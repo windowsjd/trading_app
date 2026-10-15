@@ -137,6 +137,7 @@ describe('CandleDatabaseLoader', () => {
         staleWaiterMaxWaitMs: 100,
         maxManagedFiveMinuteRangeMs: 35 * 86_400_000,
         maxManagedPeriodRangeMs: 365 * 86_400_000,
+        maxManagedKrxDailyRangeMs: 875 * 86_400_000,
         maxOnDemandRepairRangeMs: 2 * 86_400_000,
         coverageTailToleranceMs: 86_400_000,
       },
@@ -404,4 +405,185 @@ describe('CandleDatabaseLoader', () => {
       expect(responses.buildPersisted.mock.calls[0][2]).toHaveLength(1);
     },
   );
+
+  describe('KRX central mode (design v2.1 §4.2 rules 7, 8, 10; §4.5)', () => {
+    const A = new Date('2026-10-13T15:00:00.000Z'); // 2026-10-14 00:00 KST
+    const krx = {
+      ...asset,
+      symbol: '005930',
+      market: 'KRX',
+      assetType: AssetType.domestic_stock,
+      currencyCode: CurrencyCode.KRW,
+      priceCurrency: CurrencyCode.KRW,
+      settlementCurrency: CurrencyCode.KRW,
+    };
+    const clock = new Date('2026-10-15T01:21:00.000Z'); // 10:21 KST
+    const krxQuery = { ...query, clock, rangeEndAt: clock, toInstant: clock };
+    const covered = {
+      startsAtRequestedFrom: true,
+      contiguousCoveredTo: clock,
+      newestCompletedAt: clock,
+      hasInteriorGap: false,
+    };
+    const insufficient = {
+      startsAtRequestedFrom: false,
+      contiguousCoveredTo: null,
+      newestCompletedAt: null,
+      hasInteriorGap: false,
+    };
+    const createKrx = () => {
+      const base = create();
+      const loader = new CandleDatabaseLoader(
+        { build: jest.fn() } as never,
+        base.repository as never,
+        base.states as never,
+        base.aggregation as never,
+        base.responses as never,
+        {
+          mode: 'database',
+          currentFreshnessMs: 60_000,
+          onDemandRefreshEnabled: true,
+          onDemandRefreshMaxDurationMs: 1000,
+          onDemandRefreshMaxPages: 10,
+          onDemandRefreshMaxRows: 5000,
+          staleWaiterMaxWaitMs: 100,
+          maxManagedFiveMinuteRangeMs: 45 * 86_400_000,
+          maxManagedPeriodRangeMs: 365 * 86_400_000,
+          maxManagedKrxDailyRangeMs: 875 * 86_400_000,
+          maxOnDemandRepairRangeMs: 2 * 86_400_000,
+          coverageTailToleranceMs: 86_400_000,
+        },
+        {
+          enabled: true,
+          tickDelayMs: 70_000,
+          weeklySyncEnabled: true,
+          cohorts: [
+            {
+              id: 'cohort-1',
+              obligationStart: A.toISOString(),
+              symbols: ['005930'],
+            },
+          ],
+        },
+      );
+      return { ...base, loader };
+    };
+    const fivePlan = (from: Date) => ({
+      ...plan,
+      assetType: krx.assetType,
+      market: krx.market,
+      requestedRange: { from, to: clock },
+      sourceRange: { from, to: clock },
+    });
+    const dailyPlan = {
+      ...plan,
+      assetType: krx.assetType,
+      market: krx.market,
+      targetInterval: '1d' as const,
+      sourceInterval: '1d' as const,
+      requestedRange: { from: new Date('2026-09-01T00:00:00Z'), to: clock },
+      sourceRange: { from: new Date('2026-09-01T00:00:00Z'), to: clock },
+      limit: 600,
+    };
+    const fiveMinute = (local: string, closed = true) => {
+      const open = new Date(`2026-10-15T${local}:00+09:00`);
+      return {
+        openTime: open,
+        closeTime: new Date(open.getTime() + 5 * 60_000),
+        open: new Prisma.Decimal(100),
+        high: new Prisma.Decimal(local === '09:30' ? 110 : 101),
+        low: new Prisma.Decimal(local === '10:00' ? 90 : 99),
+        close: new Prisma.Decimal(local === '10:20' ? 105 : 100),
+        volume: new Prisma.Decimal(10),
+        amount: new Prisma.Decimal(1000),
+        isClosed: closed,
+        sourceUpdatedAt: new Date(open.getTime() + 6 * 60_000),
+        sourceProvider: 'koscom_intraday',
+      };
+    };
+    const morning = (skip?: string) => {
+      const rows = [];
+      for (let m = 9 * 60; m <= 10 * 60 + 15; m += 5) {
+        const local = `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+        if (local !== skip) rows.push(fiveMinute(local));
+      }
+      return [...rows, fiveMinute('10:20', false)];
+    };
+
+    it('reads 5m evidence with the holiday bridge and the obligation filter; fresh only when complete', async () => {
+      const { loader, states, repository } = createKrx();
+      repository.findRange.mockResolvedValue([candle(0)]);
+      states.findCandleCoverage.mockResolvedValue(covered);
+      const result = await loader.load(krx, krxQuery, fivePlan(A));
+      const options = (
+        states.findCandleCoverage.mock.calls[0] as unknown[]
+      )[4] as {
+        bridge?: unknown;
+        createdAtOrAfter?: Date;
+      };
+      expect(typeof options.bridge).toBe('function');
+      expect(options.createdAtOrAfter?.toISOString()).toBe(A.toISOString());
+      expect(result.fresh).toBe(true);
+      states.findCandleCoverage.mockResolvedValue({
+        ...covered,
+        contiguousCoveredTo: new Date(clock.getTime() - 70_000),
+      });
+      const stale = await loader.load(krx, krxQuery, fivePlan(A));
+      expect(stale.coverageStatus).toBe('stale_tail');
+      expect(stale.fresh).toBe(false);
+    });
+
+    it('classifies a window that starts before A as pre- or post-obligation (log only)', async () => {
+      const { loader, states } = createKrx();
+      const early = fivePlan(new Date(A.getTime() - 5 * 86_400_000));
+      states.findCandleCoverage
+        .mockResolvedValueOnce(insufficient)
+        .mockResolvedValueOnce(covered);
+      const pre = await loader.load(krx, krxQuery, early);
+      expect(pre.obligation).toBe('pre_obligation');
+      expect(pre.coverageStatus).toBe('insufficient');
+      states.findCandleCoverage
+        .mockResolvedValueOnce(insufficient)
+        .mockResolvedValueOnce({ ...covered, hasInteriorGap: true });
+      const post = await loader.load(krx, krxQuery, early);
+      expect(post.obligation).toBe('post_obligation');
+      const inside = await loader.load(krx, krxQuery, fivePlan(A));
+      expect(inside.obligation).toBeNull();
+    });
+
+    it("builds today's in-progress daily bar only from a complete set of today's 5m candles", async () => {
+      const { loader, repository, responses } = createKrx();
+      repository.findRange.mockImplementation(
+        ({ interval }: { interval: string }) =>
+          Promise.resolve(interval === '5m' ? morning() : []),
+      );
+      await loader.load(krx, krxQuery, dailyPlan);
+      const rows = (
+        responses.buildPersisted.mock.calls.at(-1) as unknown[]
+      )[2] as {
+        openTime: Date;
+        high: Prisma.Decimal;
+        low: Prisma.Decimal;
+        close: Prisma.Decimal;
+        volume: Prisma.Decimal;
+      }[];
+      expect(rows.length).toBe(1);
+      expect(rows[0].openTime.toISOString()).toBe('2026-10-14T15:00:00.000Z');
+      expect(rows[0].high.toString()).toBe('110');
+      expect(rows[0].low.toString()).toBe('90');
+      expect(rows[0].close.toString()).toBe('105');
+      expect(rows[0].volume.toString()).toBe('170'); // 16 closed + 1 current
+
+      // One closed required slot missing: no in-progress bar at all.
+      repository.findRange.mockImplementation(
+        ({ interval }: { interval: string }) =>
+          Promise.resolve(interval === '5m' ? morning('09:45') : []),
+      );
+      await loader.load(krx, krxQuery, dailyPlan);
+      const holed = (
+        responses.buildPersisted.mock.calls.at(-1) as unknown[]
+      )[2] as unknown[];
+      expect(holed.length).toBe(0);
+    });
+  });
 });

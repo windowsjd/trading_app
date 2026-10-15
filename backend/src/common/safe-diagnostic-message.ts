@@ -449,6 +449,8 @@ const SAFE_MESSAGES = new Set<string>([
   'quoteId is required.',
   'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, 1y, or season.',
   'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, 1y, season, or 96d.',
+  'range must be one of 1d, 3d, 7d, 14d, 30d, prev_open, prev2_open, prev3_open, prev6_open, prev12_open, prev24_open, prev576_open, 1y, season, or 96d.',
+  'interval 1d is the only interval supported for range prev576_open.',
   'range 96d is available for KRX stocks and crypto only.',
   'interval 4h is the only interval supported for range 96d.',
   'Futures chart supports interval 4h, range 96d and a limit from 1 to 1000.',

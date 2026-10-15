@@ -13,6 +13,7 @@ jest.mock('../generated/prisma/client', () => {
   };
 });
 
+import { Logger } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { resolveMarketSession } from '../orders/market-calendar.policy';
 import { KoscomError } from '../providers/koscom/koscom.config';
@@ -137,7 +138,7 @@ function seedOf(date: string) {
   return Number(date.slice(4)) % 97;
 }
 
-function createService() {
+function createService(extra: { redis?: object; krxCentral?: object } = {}) {
   const prisma = {
     asset: { findMany: jest.fn() },
     futuresInstrument: { findMany: jest.fn() },
@@ -204,6 +205,8 @@ function createService() {
     usdmCandles as never,
     koscom as never,
     koscomClient as never,
+    extra.redis as never,
+    extra.krxCentral as never,
   );
   return {
     service,
@@ -491,6 +494,171 @@ describe('MarketCandleLongSyncService — KRX (KOSCOM 10-minute history)', () =>
       sessions: 1,
     });
     expect(earlySummary.series[0].pending.length).toBe(1);
+  });
+
+  it('central mode (F23): a held session is retried once on a later trading day, then left to the operator backfill', async () => {
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const store = new Map<string, string>();
+    const redis = {
+      get: jest.fn((key: string) => Promise.resolve(store.get(key) ?? null)),
+      setWithTtl: jest.fn((key: string, value: string) => {
+        store.set(key, value);
+        return Promise.resolve();
+      }),
+    };
+    const h = createService({ redis, krxCentral: { enabled: true } });
+    h.prisma.asset.findMany.mockResolvedValue([asset]);
+    // 10-12 always answers with another session's data (held); 10-13 and
+    // 10-14 are clean, each captured after its close.
+    h.koscom.fetchDomesticTenMinuteSession.mockImplementation(
+      (input: { date: string }) => {
+        h.requestedTenMinuteDates.push(input.date);
+        return Promise.resolve({
+          rows:
+            input.date === '20261012'
+              ? tenMinuteRows('20261008', seedOf('20261008')).map((row) => ({
+                  ...row,
+                  label: new Date(row.label.getTime() + 4 * DAY),
+                }))
+              : tenMinuteRows(input.date, seedOf(input.date)),
+          invalidRows: 0,
+          providerReturnedRows: 39,
+          receivedAt: new Date(
+            `${input.date.slice(0, 4)}-${input.date.slice(4, 6)}-${input.date.slice(6, 8)}T07:30:00.000Z`,
+          ),
+        });
+      },
+    );
+    const seedDaily = async (date: string) => {
+      const iso = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+      const daily = dailyRow(date, tenMinuteRows(date, seedOf(date))).value;
+      const open = Date.parse(`${iso}T00:00:00+09:00`);
+      await h.repository.upsertMany([
+        {
+          assetId: asset.id,
+          interval: '1d',
+          openTime: new Date(open),
+          closeTime: new Date(open + DAY),
+          open: daily.stck_oprc,
+          high: daily.stck_hgpr,
+          low: daily.stck_lwpr,
+          close: daily.stck_clpr,
+          volume: daily.acml_vol,
+          amount: null,
+          isClosed: true,
+          sourceProvider: 'koscom_history',
+          sourceUpdatedAt: new Date(`${iso}T07:00:00.000Z`),
+        },
+      ]);
+    };
+    const calls = (date: string) =>
+      h.requestedTenMinuteDates.filter((entry) => entry === date).length;
+    const pendingReasons = (summary: { series: { pending: unknown[] }[] }) =>
+      (summary.series[0].pending as { date: string; reason: string }[]).map(
+        (entry) => `${entry.date}:${entry.reason}`,
+      );
+    await seedDaily('20261012');
+    await seedDaily('20261013');
+    await seedDaily('20261014');
+
+    const first = await h.service.syncKrx({
+      mode: 'incremental',
+      now,
+      sessions: 1,
+    });
+    expect(first.series[0].held.length).toBe(1);
+    expect(calls('20261012')).toBe(1);
+    // Same trading day: backed off, no provider call.
+    const again = await h.service.syncKrx({
+      mode: 'incremental',
+      now,
+      sessions: 1,
+    });
+    expect(pendingReasons(again)).toEqual(['20261012:HELD_BACKOFF']);
+    expect(calls('20261012')).toBe(1);
+    expect(
+      warn.mock.calls.some((call) =>
+        String(call[0]).includes('krx_long4h_session_held'),
+      ),
+    ).toBe(false);
+
+    // Next trading day: one retry, held again → alerted, then never again.
+    const nextDay = await h.service.syncKrx({
+      mode: 'incremental',
+      now: new Date('2026-10-13T07:20:00.000Z'),
+      sessions: 2,
+    });
+    expect(calls('20261012')).toBe(2);
+    expect(calls('20261013')).toBe(1);
+    expect(nextDay.series[0].held.map((entry) => entry.date)).toEqual([
+      '20261012',
+    ]);
+    const alerts = warn.mock.calls.filter((call) =>
+      String(call[0]).includes('krx_long4h_session_held'),
+    );
+    expect(alerts.length).toBe(1);
+    const later = await h.service.syncKrx({
+      mode: 'incremental',
+      now: new Date('2026-10-14T07:20:00.000Z'),
+      sessions: 3,
+    });
+    expect(calls('20261012')).toBe(2);
+    expect(pendingReasons(later)).toEqual(['20261012:HELD_BACKOFF']);
+
+    // The operator backfill ignores the backoff.
+    await h.service.syncKrx({
+      mode: 'backfill',
+      now: new Date('2026-10-14T07:20:00.000Z'),
+      sessions: 3,
+      krx: { minCallIntervalMs: 0 },
+    });
+    expect(calls('20261012')).toBe(3);
+    warn.mockRestore();
+  });
+
+  it('keeps the old retry-every-run behaviour without the central collection', async () => {
+    const h = createService({
+      redis: { get: jest.fn(), setWithTtl: jest.fn() },
+      krxCentral: { enabled: false },
+    });
+    h.prisma.asset.findMany.mockResolvedValue([asset]);
+    h.koscom.fetchDomesticTenMinuteSession.mockImplementation(() =>
+      Promise.resolve({
+        rows: tenMinuteRows('20261008', seedOf('20261008')).map((row) => ({
+          ...row,
+          label: new Date(row.label.getTime() + 4 * DAY),
+        })),
+        invalidRows: 0,
+        providerReturnedRows: 39,
+        receivedAt: new Date('2026-10-12T07:30:00.000Z'),
+      }),
+    );
+    const daily = dailyRow(
+      '20261012',
+      tenMinuteRows('20261012', seedOf('20261012')),
+    ).value;
+    await h.repository.upsertMany([
+      {
+        assetId: asset.id,
+        interval: '1d',
+        openTime: new Date('2026-10-11T15:00:00.000Z'),
+        closeTime: new Date('2026-10-12T15:00:00.000Z'),
+        open: daily.stck_oprc,
+        high: daily.stck_hgpr,
+        low: daily.stck_lwpr,
+        close: daily.stck_clpr,
+        volume: daily.acml_vol,
+        amount: null,
+        isClosed: true,
+        sourceProvider: 'koscom_history',
+        sourceUpdatedAt: new Date('2026-10-12T07:00:00.000Z'),
+      },
+    ]);
+    await h.service.syncKrx({ mode: 'incremental', now, sessions: 1 });
+    await h.service.syncKrx({ mode: 'incremental', now, sessions: 1 });
+    expect(h.koscom.fetchDomesticTenMinuteSession).toHaveBeenCalledTimes(2);
   });
 
   it('refuses to run during the regular session and stops the run on a KOSCOM rate limit', async () => {

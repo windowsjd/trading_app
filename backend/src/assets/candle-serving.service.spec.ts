@@ -180,6 +180,7 @@ describe('CandleServingService', () => {
         staleWaiterMaxWaitMs: 50,
         maxManagedFiveMinuteRangeMs: 35 * 86_400_000,
         maxManagedPeriodRangeMs: 365 * 86_400_000,
+        maxManagedKrxDailyRangeMs: 875 * 86_400_000,
         maxOnDemandRepairRangeMs: 2 * 86_400_000,
         coverageTailToleranceMs: 86_400_000,
       },
@@ -761,5 +762,161 @@ describe('CandleServingService', () => {
     });
     expectSafeFinancialDiagnostic(diagnostic);
     expect(legacy).not.toHaveBeenCalled();
+  });
+
+  describe('KRX while central collection is on (design v2.1 §4.2 rule 9)', () => {
+    const krx = {
+      ...asset,
+      symbol: '005930',
+      market: 'KRX',
+      assetType: AssetType.domestic_stock,
+      currencyCode: CurrencyCode.KRW,
+      priceCurrency: CurrencyCode.KRW,
+      settlementCurrency: CurrencyCode.KRW,
+    };
+    const central = (
+      mode: 'legacy' | 'database' = 'database',
+      planOverrides: Partial<CandleReadPlan> = {},
+    ) => {
+      const plans = {
+        build: jest.fn().mockReturnValue({
+          ...plan,
+          assetType: krx.assetType,
+          market: krx.market,
+          ...planOverrides,
+        }),
+      };
+      const database = { load: jest.fn() };
+      const singleFlight = {
+        getOrLoad: jest.fn(
+          ({ loader }: { loader: () => Promise<AssetCandlesResponse> }) =>
+            loader(),
+        ),
+      };
+      const sync = { syncAsset: jest.fn() };
+      const service = new CandleServingService(
+        plans as never,
+        database as never,
+        { get: jest.fn().mockResolvedValue({ status: 'miss' }) } as never,
+        singleFlight as never,
+        sync as never,
+        {
+          mode,
+          currentFreshnessMs: 60_000,
+          onDemandRefreshEnabled: true,
+          onDemandRefreshMaxDurationMs: 1_000,
+          onDemandRefreshMaxPages: 10,
+          onDemandRefreshMaxRows: 5000,
+          staleWaiterMaxWaitMs: 50,
+          maxManagedFiveMinuteRangeMs: 45 * 86_400_000,
+          maxManagedPeriodRangeMs: 365 * 86_400_000,
+          maxManagedKrxDailyRangeMs: 875 * 86_400_000,
+          maxOnDemandRepairRangeMs: 2 * 86_400_000,
+          coverageTailToleranceMs: 86_400_000,
+        },
+        undefined,
+        {
+          enabled: true,
+          tickDelayMs: 70_000,
+          weeklySyncEnabled: true,
+          cohorts: [],
+        },
+      );
+      return { service, database, sync, singleFlight };
+    };
+    const status = async (promise: Promise<unknown>) => {
+      const error = await promise.then(
+        () => null,
+        (e: unknown) => e,
+      );
+      const http = error as {
+        getStatus?: () => number;
+        getResponse?: () => { error?: { code?: string } };
+      } | null;
+      return http?.getStatus
+        ? `${http.getStatus()}:${http.getResponse?.()?.error?.code ?? ''}`
+        : 'no-http-error';
+    };
+
+    it('answers trustworthy coverage from PostgreSQL, even in legacy mode, never refreshing', async () => {
+      for (const mode of ['database', 'legacy'] as const) {
+        const { service, database, sync } = central(mode);
+        database.load.mockResolvedValue(
+          load('available', response('db'), { fresh: false }),
+        );
+        const legacy = jest.fn();
+        await expect(service.serve(krx, query, legacy)).resolves.toEqual(
+          response('db'),
+        );
+        expect(sync.syncAsset).not.toHaveBeenCalled();
+        expect(legacy).not.toHaveBeenCalled();
+      }
+    });
+
+    it('serves stored candles of an unconfirmed window as partial, without a provider call', async () => {
+      const { service, database, sync } = central();
+      database.load.mockResolvedValue(
+        load('incomplete', response('partial'), { completedCoverage: false }),
+      );
+      const legacy = jest.fn();
+      await expect(service.serve(krx, query, legacy)).resolves.toEqual(
+        response('partial'),
+      );
+      expect(sync.syncAsset).not.toHaveBeenCalled();
+      expect(legacy).not.toHaveBeenCalled();
+    });
+
+    it('fails an empty window with the existing 503 codes instead of fetching', async () => {
+      const fiveMinute = central();
+      fiveMinute.database.load.mockResolvedValue(
+        load('missing', null, { completedCoverage: false }),
+      );
+      expect(
+        await status(fiveMinute.service.serve(krx, query, jest.fn())),
+      ).toBe('503:ASSET_CANDLES_PROVIDER_UNAVAILABLE');
+      const aggregated = central('database', { requiresAggregation: true });
+      aggregated.database.load.mockResolvedValue(
+        load('missing', null, { completedCoverage: false }),
+      );
+      expect(
+        await status(aggregated.service.serve(krx, query, jest.fn())),
+      ).toBe('503:ASSET_CANDLES_BASELINE_NOT_READY');
+      expect(fiveMinute.sync.syncAsset).not.toHaveBeenCalled();
+      expect(aggregated.sync.syncAsset).not.toHaveBeenCalled();
+    });
+
+    it('rejects 1m and out-of-policy windows with 503 instead of a provider-direct read', async () => {
+      const { service, database, sync } = central('database', {
+        managedByPersistence: false,
+        outOfPolicyReason: 'interval_not_persisted',
+      });
+      const legacy = jest.fn();
+      expect(await status(service.serve(krx, query, legacy))).toBe(
+        '503:ASSET_CANDLES_PROVIDER_UNAVAILABLE',
+      );
+      expect(database.load).not.toHaveBeenCalled();
+      expect(sync.syncAsset).not.toHaveBeenCalled();
+      expect(legacy).not.toHaveBeenCalled();
+    });
+
+    it('leaves crypto/US serving on the existing managed path', async () => {
+      const { service, database, sync } = central();
+      database.load
+        .mockResolvedValueOnce(
+          load('available', response('old'), { fresh: false }),
+        )
+        .mockResolvedValueOnce(
+          load('available', response('old'), { fresh: false }),
+        )
+        .mockResolvedValueOnce(load('available', response('requery')));
+      sync.syncAsset.mockResolvedValue({
+        assetId: asset.id,
+        feeds: [{ status: 'completed', complete: true, writtenRows: 1 }],
+      });
+      await expect(service.serve(asset, query, jest.fn())).resolves.toEqual(
+        response('requery'),
+      );
+      expect(sync.syncAsset).toHaveBeenCalledTimes(1);
+    });
   });
 });

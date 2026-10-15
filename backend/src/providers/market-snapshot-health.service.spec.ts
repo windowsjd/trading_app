@@ -119,6 +119,35 @@ describe('MarketSnapshotHealthService', () => {
   });
 });
 
+describe('MarketSnapshotHealthService snapshot counts (F12)', () => {
+  const now = new Date('2026-06-04T00:02:00.000Z');
+
+  it('reports planner estimates and never scans the snapshot tables with COUNT', async () => {
+    const prisma = createPrismaMock({ assets: [] });
+    const result = await createService(prisma).checkActiveAssetCoverage({
+      now,
+    });
+    expect(result.snapshotCounts.estimated).toBe(true);
+    expect(result.snapshotCounts.assetPriceSnapshotsTotal).toBe(1_234_567);
+    // -1 = never analyzed: unknown, not zero.
+    expect(result.snapshotCounts.fxRateSnapshotsTotal).toBeNull();
+    expect(prisma.assetPriceSnapshot.count).not.toHaveBeenCalled();
+    expect(prisma.fxRateSnapshot.count).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the coverage verdict when the estimate cannot be read', async () => {
+    const prisma = createPrismaMock({ assets: [] });
+    prisma.$queryRaw.mockRejectedValueOnce(new Error('pg_class unavailable'));
+    const result = await createService(prisma).checkActiveAssetCoverage({
+      now,
+    });
+    expect(result.status).toBe('pass');
+    expect(result.snapshotCounts.assetPriceSnapshotsTotal).toBeNull();
+    expect(result.snapshotCounts.fxRateSnapshotsTotal).toBeNull();
+  });
+});
+
 function createService(prisma: ReturnType<typeof createPrismaMock>) {
   const resolver = {
     resolveProviderTargets: jest.fn().mockResolvedValue({
@@ -145,6 +174,10 @@ function createPrismaMock(input: {
   }>;
 }) {
   return {
+    $queryRaw: jest.fn().mockResolvedValue([
+      { relation: 'asset_price_snapshots', estimate: BigInt(1_234_567) },
+      { relation: 'fx_rate_snapshots', estimate: BigInt(-1) },
+    ]),
     asset: {
       findMany: jest.fn().mockResolvedValue(input.assets),
     },

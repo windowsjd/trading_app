@@ -4,9 +4,9 @@ import {
 } from './market-candle-retention.config';
 
 describe('market candle retention config', () => {
-  it('defaults to 35 days and 5000 rows per batch', () => {
+  it('defaults to 45 days (design v2.1 §5.2) and 5000 rows per batch', () => {
     expect(readMarketCandleRetentionConfig({})).toMatchObject({
-      retentionDays: 35,
+      retentionDays: 45,
       batchSize: 5000,
     });
   });

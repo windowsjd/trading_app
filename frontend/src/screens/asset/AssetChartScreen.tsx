@@ -96,10 +96,10 @@ export function AssetMarketChart({
     queryFn: () => getAssetDetail(assetId),
     enabled: isFocused,
   });
-  // The selected tab's request window. Only the 4h tab differs from the base
-  // list (the long-range 96-session/96-day window for every market); it waits
-  // for the asset type instead of caching a wrong window, and falls back to
-  // the tab's own window if the detail cannot load.
+  // The selected tab's request window depends on the market (KRX session
+  // windows, the long-range 4h window); it waits for the asset type instead
+  // of caching a wrong window, and falls back to the tab's own window if the
+  // detail cannot load.
   const requestTimeframe =
     resolveAssetChartTimeframe(
       selectedTimeframe,

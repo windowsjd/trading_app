@@ -142,10 +142,12 @@ export class OpsJobRunService {
     return this.createTerminalRun(OpsJobRunStatus.locked, input);
   }
 
-  findLatestRunForJob(jobName: OpsJobName) {
+  /** Latest run of a job, optionally only runs under one lock key. */
+  findLatestRunForJob(jobName: OpsJobName, lockKey?: string) {
     return this.prisma.opsJobRun.findFirst({
       where: {
         jobName,
+        ...(lockKey ? { lockKey } : {}),
       },
       orderBy: [
         { startedAt: 'desc' },
@@ -161,12 +163,13 @@ export class OpsJobRunService {
     });
   }
 
-  findLatestSucceededRunForJob(jobName: OpsJobName) {
+  findLatestSucceededRunForJob(jobName: OpsJobName, lockKey?: string) {
     return this.prisma.opsJobRun.findFirst({
       where: {
         jobName,
         status: OpsJobRunStatus.succeeded,
         dryRun: false,
+        ...(lockKey ? { lockKey } : {}),
       },
       orderBy: [{ finishedAt: 'desc' }, { startedAt: 'desc' }],
       select: {

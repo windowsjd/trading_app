@@ -45,7 +45,7 @@ const AGGREGATED_INTERVALS = new Set<CandleInterval>([
 ]);
 const SOURCE_PADDING_MS = 4 * 60 * 60_000;
 // The 5m-aggregated part of a long-range 4h read: the same 30-day window the
-// regular 4h chart reads (30d + 4h padding stays inside the 35-day 5m store).
+// regular 4h chart reads (30d + 4h padding stays inside the 45-day 5m store).
 const LONG_FOUR_HOUR_RECENT_WINDOW_MS = 30 * 24 * 60 * 60_000;
 
 @Injectable()
@@ -96,7 +96,10 @@ export class CandleReadPlanBuilder {
       outOfPolicyReason = 'five_minute_range_exceeds_retention';
     } else if (
       sourceInterval !== '5m' &&
-      durationMs > this.config.maxManagedPeriodRangeMs
+      durationMs >
+        (sourceInterval === '1d' && asset.assetType === AssetType.domestic_stock
+          ? this.config.maxManagedKrxDailyRangeMs
+          : this.config.maxManagedPeriodRangeMs)
     ) {
       outOfPolicyReason = 'period_range_exceeds_policy';
     }

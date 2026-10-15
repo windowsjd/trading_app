@@ -32,11 +32,25 @@ describe('readCandleServingConfig', () => {
   it('keeps the 5m retention window as the managed range ceiling', () => {
     // 30d 4h + 4h source padding must stay inside it, or the request would be
     // routed out of the managed path.
+    const DAY_MS = 24 * 60 * 60_000;
     const config = readCandleServingConfig({});
-    expect(config.maxManagedFiveMinuteRangeMs).toBe(35 * 24 * 60 * 60_000);
-    expect(30 * 24 * 60 * 60_000 + 4 * 60 * 60_000).toBeLessThan(
+    expect(config.maxManagedFiveMinuteRangeMs).toBe(45 * DAY_MS);
+    expect(30 * DAY_MS + 4 * 60 * 60_000).toBeLessThan(
       config.maxManagedFiveMinuteRangeMs,
     );
+    // Never beyond the configured retention (no window over deleted rows)…
+    expect(
+      readCandleServingConfig({ MARKET_CANDLE_5M_RETENTION_DAYS: '35' })
+        .maxManagedFiveMinuteRangeMs,
+    ).toBe(35 * DAY_MS);
+    // …and never beyond the 45-day policy when retention is longer.
+    expect(
+      readCandleServingConfig({ MARKET_CANDLE_5M_RETENTION_DAYS: '60' })
+        .maxManagedFiveMinuteRangeMs,
+    ).toBe(45 * DAY_MS);
+    // KRX 1d 576 sessions (≤ 867.6 days, design v2.1 §5.4).
+    expect(config.maxManagedKrxDailyRangeMs).toBe(875 * DAY_MS);
+    expect(config.maxManagedPeriodRangeMs).toBe(365 * DAY_MS);
   });
 
   it('lets the 15m/3d chart self-heal inside the on-demand repair budget', () => {

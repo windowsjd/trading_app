@@ -20,8 +20,30 @@ describe('market calendar registry', () => {
         expect(dataset.schedules.length).toBeGreaterThan(5);
       }
     }
-    expect(hasCalendarYear('KRX', 2024)).toBe(false);
+    // KRX 2024 serves the 576-session daily window (provisional until Q14).
+    expect(hasCalendarYear('KRX', 2024)).toBe(true);
+    expect(getCalendarDataset('KRX', 2024)?.version).toBe('2024.1-provisional');
+    expect(hasCalendarYear('KRX', 2023)).toBe(false);
+    expect(hasCalendarYear('US', 2024)).toBe(false);
     expect(hasCalendarYear('US', 2028)).toBe(false);
+  });
+
+  it('counts the 2024 KRX sessions the 576-session window relies on', () => {
+    // 366 days − 104 weekend days = 262 weekdays − 18 closures = 244.
+    let sessions = 0;
+    for (
+      let day = Date.UTC(2024, 0, 1);
+      day < Date.UTC(2025, 0, 1);
+      day += 86_400_000
+    ) {
+      const date = new Date(day);
+      const weekday = date.getUTCDay();
+      if (weekday === 0 || weekday === 6) continue;
+      const iso = date.toISOString().slice(0, 10);
+      const schedule = findCalendarSchedule('KRX', iso);
+      if (!schedule?.isFullDayClosed) sessions += 1;
+    }
+    expect(sessions).toBe(244);
   });
 
   it('keeps the fully elapsed 2025 datasets audited, never provisional', () => {
@@ -171,15 +193,19 @@ describe('market calendar registry', () => {
     }
 
     // A required range starting before the earliest dataset flags the
-    // missing PREVIOUS year, which the 365-day lookback depends on.
+    // missing PREVIOUS year, which the 365-day lookback depends on. KRX 2024
+    // exists for the 576-session daily window but is provisional (Q14).
     const missingPrevious = getMarketCalendarCoverage({
       requiredFromYear: 2024,
       requiredThroughYear: 2026,
     });
     expect(missingPrevious.complete).toBe(false);
-    for (const market of missingPrevious.markets) {
-      expect(market.missingYears).toEqual([2024]);
-    }
+    expect(missingPrevious.productionReady).toBe(false);
+    const krx2024 = missingPrevious.markets.find((m) => m.market === 'KRX')!;
+    expect(krx2024.missingYears).toEqual([]);
+    expect(krx2024.provisionalYears).toEqual([2024]);
+    const us2024 = missingPrevious.markets.find((m) => m.market === 'US')!;
+    expect(us2024.missingYears).toEqual([2024]);
 
     // With the requirement pinned to the audited year, the provisional KRX
     // 2027 dataset no longer affects the status at all.

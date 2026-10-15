@@ -1,5 +1,24 @@
-import { Inject, Injectable } from '@nestjs/common';
-import { MarketCandleSyncStatus } from '../generated/prisma/client';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import {
+  MarketCandleSyncStatus,
+  Prisma,
+  type MarketCandle,
+} from '../generated/prisma/client';
+import { resolveMarketSession } from '../orders/market-calendar.policy';
+import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
+import {
+  FIVE_MINUTES_MS,
+  kstDate,
+  kstDayStartMs,
+  krxDailyBridge,
+  krxFiveMinuteBridge,
+  requiredFiveMinuteSlotStarts,
+} from './krx-candle-collection.policy';
+import {
+  KRX_CENTRAL_CANDLES_CONFIG,
+  resolveKrxObligationStart,
+  type KrxCentralCandlesConfig,
+} from './krx-central-candles.config';
 import type {
   AssetCandlesAsset,
   ParsedAssetCandlesQuery,
@@ -8,6 +27,7 @@ import { MarketCandleAggregationService } from './market-candle-aggregation.serv
 import {
   MarketCandleSyncStateRepository,
   type CandleCoverageEvidence,
+  type CandleCoverageOptions,
 } from './market-candle-sync-state.repository';
 import { MarketCandlesRepository } from './market-candles.repository';
 import {
@@ -55,6 +75,12 @@ export type CandleDatabaseLoadResult = {
   /** Usable candles the store actually produced for this window. */
   storedCandleCount: number;
   response: ReturnType<CandleResponseBuilder['buildPersisted']> | null;
+  /**
+   * KRX central mode, 5m-sourced windows starting before the obligation
+   * start A (design v2.1 §4.2 rule 10, log/G4 only): `pre_obligation` when
+   * everything after A is proven, `post_obligation` when it is not.
+   */
+  obligation?: 'pre_obligation' | 'post_obligation' | null;
 };
 
 @Injectable()
@@ -67,6 +93,9 @@ export class CandleDatabaseLoader {
     private readonly responses: CandleResponseBuilder,
     @Inject(CANDLE_SERVING_CONFIG)
     private readonly config: CandleServingConfig,
+    @Optional()
+    @Inject(KRX_CENTRAL_CANDLES_CONFIG)
+    private readonly krxCentral?: KrxCentralCandlesConfig,
   ) {}
 
   async load(
@@ -101,6 +130,7 @@ export class CandleDatabaseLoader {
     const coverageTo = new Date(
       Math.min(plan.sourceRange.to.getTime(), query.clock.getTime()),
     );
+    const krxEvidence = this.krxCentralEvidence(asset, plan, query.clock);
     const [coverage, latestCheckpoint] = await Promise.all([
       coverageTo.getTime() > plan.sourceRange.from.getTime()
         ? this.syncStates.findCandleCoverage(
@@ -108,6 +138,7 @@ export class CandleDatabaseLoader {
             plan.sourceInterval,
             plan.sourceRange.from,
             coverageTo,
+            ...(krxEvidence ? [krxEvidence] : []),
           )
         : Promise.resolve<CandleCoverageEvidence>({
             startsAtRequestedFrom: false,
@@ -184,12 +215,14 @@ export class CandleDatabaseLoader {
         ];
       }
     } else {
-      const stored = await this.repository.findRange({
+      let stored = await this.repository.findRange({
         assetId: plan.assetId,
         interval: plan.sourceInterval,
         from: plan.requestedRange.from,
         to: plan.requestedRange.to,
       });
+      if (krxEvidence && plan.sourceInterval === '1d')
+        stored = await this.withKrxDailyInProgress(plan, stored, query.clock);
       const usable = stored.filter((candle) => {
         if (
           candle.isClosed ||
@@ -229,12 +262,11 @@ export class CandleDatabaseLoader {
       rows,
       sourceProviders,
     );
-    const fresh = this.isFresh(
-      rows,
-      coverage.newestCompletedAt,
-      plan,
-      query.clock,
-    );
+    // KRX central mode (rule 8): fresh exactly when everything that can
+    // exist as confirmed data is proven — there is no refresh to trigger.
+    const fresh = krxEvidence
+      ? coverageStatus === 'complete'
+      : this.isFresh(rows, coverage.newestCompletedAt, plan, query.clock);
     // `available` still means "the store fully answers this request". A
     // stale tail is NOT a hole: the history is confirmed and only the last
     // stretch has not been re-confirmed since the previous sync, so it stays
@@ -264,7 +296,150 @@ export class CandleDatabaseLoader {
       droppedIncompleteBuckets,
       storedCandleCount: rows.length,
       response,
+      ...(krxEvidence
+        ? {
+            obligation: await this.classifyObligation(
+              asset,
+              plan,
+              coverageTo,
+              krxEvidence,
+            ),
+          }
+        : {}),
     };
+  }
+
+  /** KRX central evidence rules (design v2.1 §4.2 rule 7), else undefined. */
+  private krxCentralEvidence(
+    asset: AssetCandlesAsset,
+    plan: CandleReadPlan,
+    clock: Date,
+  ): CandleCoverageOptions | undefined {
+    if (!this.krxCentral?.enabled || asset.assetType !== 'domestic_stock')
+      return undefined;
+    if (plan.sourceInterval === '5m') {
+      const start = resolveKrxObligationStart(this.krxCentral, asset.symbol);
+      // Checkpoints from before A (e.g. legacy KIS/on-demand runs, F26) are
+      // never evidence; the data itself is untouched.
+      return {
+        bridge: krxFiveMinuteBridge(clock.getTime()),
+        ...(start ? { createdAtOrAfter: start } : {}),
+      };
+    }
+    if (plan.sourceInterval === '1d')
+      return { bridge: krxDailyBridge(clock.getTime()) };
+    return {};
+  }
+
+  /**
+   * Rule 10 (log/G4 only): a 5m-sourced window that starts before A is
+   * re-judged from A with the same rules. Proven after A = initial history
+   * (`pre_obligation`); a hole after A is a collection defect.
+   */
+  private async classifyObligation(
+    asset: AssetCandlesAsset,
+    plan: CandleReadPlan,
+    coverageTo: Date,
+    evidence: CandleCoverageOptions,
+  ): Promise<'pre_obligation' | 'post_obligation' | null> {
+    const start = evidence.createdAtOrAfter;
+    if (
+      plan.sourceInterval !== '5m' ||
+      !start ||
+      plan.sourceRange.from.getTime() >= start.getTime() ||
+      coverageTo.getTime() <= start.getTime()
+    )
+      return null;
+    const afterStart = await this.syncStates.findCandleCoverage(
+      plan.assetId,
+      '5m',
+      start,
+      coverageTo,
+      evidence,
+    );
+    const status = this.classifyCoverage(afterStart, coverageTo);
+    return status === 'insufficient' ? 'post_obligation' : 'pre_obligation';
+  }
+
+  /**
+   * KRX central mode (design v2.1 §4.5, product approval P2): today's
+   * in-progress daily bar is built at read time from today's stored KOSCOM
+   * 5m candles, never from price snapshots. Only when EVERY closed required
+   * slot of today is stored; otherwise no in-progress bar is shown (no
+   * interpolation). The confirmed post-close daily bar replaces it.
+   */
+  private async withKrxDailyInProgress(
+    plan: CandleReadPlan,
+    stored: MarketCandle[],
+    clock: Date,
+  ): Promise<MarketCandle[]> {
+    const session = resolveMarketSession(
+      'KRX',
+      kstDate(clock.getTime()).replace(/-/gu, ''),
+    );
+    if (!session || clock.getTime() <= session.openTime.getTime())
+      return stored;
+    const dayStart = kstDayStartMs(session.localDate);
+    if (
+      dayStart < plan.requestedRange.from.getTime() ||
+      dayStart >= plan.requestedRange.to.getTime()
+    )
+      return stored;
+    const confirmed = stored.find(
+      (row) => row.openTime.getTime() === dayStart && row.isClosed,
+    );
+    if (confirmed) return stored;
+    const others = stored.filter((row) => row.openTime.getTime() !== dayStart);
+    const fiveMinute = (
+      await this.repository.findRange({
+        assetId: plan.assetId,
+        interval: '5m',
+        from: session.openTime,
+        to: new Date(
+          Math.max(
+            session.openTime.getTime() + 1,
+            Math.min(clock.getTime(), session.closeTime.getTime()),
+          ),
+        ),
+      })
+    ).filter((row) => row.sourceProvider === KOSCOM_MINUTE_SOURCE);
+    const closedSlots = new Set(
+      fiveMinute
+        .filter((row) => row.isClosed)
+        .map((row) => row.openTime.getTime()),
+    );
+    const complete = requiredFiveMinuteSlotStarts(session).every(
+      (slot) =>
+        slot + FIVE_MINUTES_MS > clock.getTime() || closedSlots.has(slot),
+    );
+    if (!complete || fiveMinute.length === 0) return others;
+    const first = fiveMinute[0];
+    const last = fiveMinute[fiveMinute.length - 1];
+    const inProgress: MarketCandle = {
+      ...first,
+      interval: '1d',
+      openTime: new Date(dayStart),
+      closeTime: new Date(dayStart + 24 * 60 * 60_000),
+      open: first.open,
+      high: Prisma.Decimal.max(...fiveMinute.map((row) => row.high)),
+      low: Prisma.Decimal.min(...fiveMinute.map((row) => row.low)),
+      close: last.close,
+      volume: fiveMinute.reduce(
+        (sum, row) => sum.add(row.volume),
+        new Prisma.Decimal(0),
+      ),
+      amount: fiveMinute.every((row) => row.amount !== null)
+        ? fiveMinute.reduce(
+            (sum, row) => sum.add(row.amount as Prisma.Decimal),
+            new Prisma.Decimal(0),
+          )
+        : null,
+      isClosed: false,
+      sourceUpdatedAt: new Date(
+        Math.max(...fiveMinute.map((row) => row.sourceUpdatedAt.getTime())),
+      ),
+    };
+    return [...others, inProgress];
   }
 
   /**

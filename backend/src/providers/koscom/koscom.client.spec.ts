@@ -6,6 +6,27 @@ import {
   type KoscomTarget,
 } from './koscom.client';
 import { readKoscomConfig, KoscomError } from './koscom.config';
+import {
+  inferKoscomCallCategory,
+  runWithKoscomCallCategory,
+  type KoscomCallCategory,
+} from './koscom-call-context';
+
+type QuotaObservation = {
+  limitDay: number | null;
+  remainingDay: number | null;
+  observedAt: Date;
+};
+type AdmitInput = {
+  namespace: string;
+  category: KoscomCallCategory;
+  enforce: boolean;
+  caps: { dailyCap: number; monthlyCap: number };
+};
+type BudgetMock = {
+  admitAttempt: jest.Mock<Promise<string>, [AdmitInput]>;
+  recordQuotaHeaders: jest.Mock<Promise<boolean>, [string, QuotaObservation]>;
+};
 
 const targets = (count: number, market: KoscomTarget['market'] = 'kospi') =>
   Array.from({ length: count }, (_, i) => ({
@@ -14,13 +35,14 @@ const targets = (count: number, market: KoscomTarget['market'] = 'kospi') =>
     market,
   }));
 
-function harness() {
+function harness(budget?: BudgetMock, env: Record<string, string> = {}) {
   const apiKey = randomUUID();
   const config = {
     getConfig: () => ({
       ...readKoscomConfig({
         KOSCOM_API_KEY: apiKey,
         PROVIDER_INGESTION_ENABLED: 'true',
+        ...env,
       }),
       timeoutMs: 40,
       minIntervalMs: 1,
@@ -47,7 +69,12 @@ function harness() {
     ),
   };
   return {
-    client: new KoscomClient(config as never, redis as never, locks as never),
+    client: new KoscomClient(
+      config as never,
+      redis as never,
+      locks as never,
+      budget as never,
+    ),
     config,
     redis,
     locks,
@@ -266,6 +293,165 @@ describe('KOSCOM v3 client', () => {
   });
 });
 
+describe('KOSCOM call budget attribution (stage 1, observation only)', () => {
+  const original = global.fetch;
+  afterEach(() => {
+    global.fetch = original;
+  });
+  const budget = (): BudgetMock => ({
+    admitAttempt: jest
+      .fn<Promise<string>, [AdmitInput]>()
+      .mockResolvedValue('admitted'),
+    recordQuotaHeaders: jest
+      .fn<Promise<boolean>, [string, QuotaObservation]>()
+      .mockResolvedValue(true),
+  });
+  const ok = () =>
+    Promise.resolve(
+      new Response('{"jsonrpc":"2.0","result":{"isuSrtCd":"005930"}}'),
+    );
+
+  it.each([
+    ['/v3/market/realtime/kospi/multiquote/stocks/price', {}, 'price'],
+    ['/v3/market/realtime/konex/stocks/000001/orderbook', {}, 'orderbook'],
+    ['/v3/market/closed/kosdaq/lists', {}, 'lists'],
+    [
+      '/v3/market/realtime/kospi/stocks/005930/intraday',
+      { inddCycleTpCd: '60' },
+      'minute',
+    ],
+    [
+      '/v3/market/realtime/kospi/stocks/005930/intraday',
+      { inddCycleTpCd: '600' },
+      'long_4h',
+    ],
+    [
+      '/v3/market/closed/kospi/005930/history',
+      { trnsmCycleTpCd: 'D' },
+      'daily',
+    ],
+    [
+      '/v3/market/closed/kospi/005930/history',
+      { trnsmCycleTpCd: 'W' },
+      'weekly',
+    ],
+    ['/v3/market/closed/kospi/005930/master', {}, 'other'],
+  ] as const)('infers %s %j as %s', (path, query, category) => {
+    expect(inferKoscomCallCategory(path, query)).toBe(category);
+  });
+
+  it('counts every sent attempt, retries included, under the endpoint category', async () => {
+    const b = budget();
+    const h = harness(b);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockImplementationOnce(ok);
+    await h.client.get('/v3/market/closed/kospi/005930/history', {
+      trnsmCycleTpCd: 'D',
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(b.admitAttempt.mock.calls.map((c) => c[0].category)).toEqual([
+      'daily',
+      'daily',
+    ]);
+    // The namespace, never the API key, scopes the counters; unenforced.
+    expect(
+      b.admitAttempt.mock.calls.every(
+        (c) =>
+          c[0].namespace === h.config.getConfig().namespace &&
+          c[0].enforce === false,
+      ),
+    ).toBe(true);
+  });
+
+  it('lets an explicit option beat the async context, and the context beat the endpoint', async () => {
+    const b = budget();
+    const h = harness(b);
+    global.fetch = jest.fn(ok);
+    await runWithKoscomCallCategory('gap_repair', async () => {
+      await h.client.get('/v3/market/realtime/kospi/stocks/005930/intraday', {
+        inddCycleTpCd: '60',
+      });
+      await h.client.get(
+        '/v3/market/closed/kospi/005930/history',
+        { trnsmCycleTpCd: 'D' },
+        undefined,
+        { category: 'recover_close' },
+      );
+    });
+    expect(b.admitAttempt.mock.calls.map((c) => c[0].category)).toEqual([
+      'gap_repair',
+      'recover_close',
+    ]);
+  });
+
+  it('does not retry when the caller asks for zero retries', async () => {
+    const b = budget();
+    const h = harness(b);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValue(new Response('', { status: 503 }));
+    await expect(
+      h.client.batch(koscomBatches(targets(1))[0], 'price', undefined, {
+        retries: 0,
+      }),
+    ).rejects.toMatchObject({ code: 'KOSCOM_HTTP_FAILED' });
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(b.admitAttempt.mock.calls.map((c) => c[0].category)).toEqual([
+      'price',
+    ]);
+  });
+
+  it('never waits on or fails because of the counter store', async () => {
+    const hanging: BudgetMock = {
+      admitAttempt: jest.fn<Promise<string>, [AdmitInput]>(
+        () => new Promise<string>(() => undefined),
+      ),
+      recordQuotaHeaders: jest.fn<Promise<boolean>, [string, QuotaObservation]>(
+        () => new Promise<boolean>(() => undefined),
+      ),
+    };
+    const h = harness(hanging);
+    global.fetch = jest.fn(ok);
+    await expect(
+      h.client.get('/v3/market/closed/kospi/lists'),
+    ).resolves.toBeDefined();
+    expect(hanging.admitAttempt).toHaveBeenCalledTimes(1);
+  });
+
+  it('records quota headers and counts nothing that was never sent or when metrics are off', async () => {
+    const b = budget();
+    const h = harness(b);
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        new Response('{"jsonrpc":"2.0","result":{"isuSrtCd":"005930"}}', {
+          headers: {
+            'X-RateLimit-Limit-Day': '50000',
+            'X-RateLimit-Remaining-Day': '41000',
+          },
+        }),
+      ),
+    );
+    await h.client.get('/v3/market/closed/kospi/005930/master');
+    expect(b.recordQuotaHeaders).toHaveBeenCalledTimes(1);
+    expect(b.recordQuotaHeaders.mock.calls[0][1].remainingDay).toBe(41000);
+
+    // A shared 429 cooldown refuses before sending: not an attempt.
+    const cooling = harness(budget());
+    cooling.redis.get.mockResolvedValue('1');
+    await expect(
+      cooling.client.get('/v3/market/closed/kospi/lists'),
+    ).rejects.toMatchObject({ code: 'KOSCOM_RATE_LIMITED' });
+
+    const off = budget();
+    const disabled = harness(off, { KOSCOM_CALL_METRICS_ENABLED: 'false' });
+    await disabled.client.get('/v3/market/closed/kospi/005930/master');
+    expect(off.admitAttempt).not.toHaveBeenCalled();
+    expect(off.recordQuotaHeaders).not.toHaveBeenCalled();
+  });
+});
+
 function fetchUrl(input: Parameters<typeof fetch>[0]): string {
   return typeof input === 'string'
     ? input
@@ -273,3 +459,101 @@ function fetchUrl(input: Parameters<typeof fetch>[0]): string {
       ? input.href
       : input.url;
 }
+
+describe('KOSCOM budget enforcement and price priority lane (3c)', () => {
+  const original = global.fetch;
+  afterEach(() => {
+    global.fetch = original;
+  });
+  const enforced = { KOSCOM_BUDGET_ENFORCEMENT_ENABLED: 'true' };
+  const ok = () =>
+    Promise.resolve(
+      new Response('{"jsonrpc":"2.0","result":{"isuSrtCd":"005930"}}'),
+    );
+  const budgetAnswering = (answer: () => Promise<string>): BudgetMock => ({
+    admitAttempt: jest.fn<Promise<string>, [AdmitInput]>(answer),
+    recordQuotaHeaders: jest
+      .fn<Promise<boolean>, [string, QuotaObservation]>()
+      .mockResolvedValue(true),
+  });
+
+  it('never sends (nor retries) an attempt the governor refuses', async () => {
+    const b = budgetAnswering(() => Promise.resolve('denied'));
+    const h = harness(b, enforced);
+    global.fetch = jest.fn(ok);
+    await expect(
+      h.client.get('/v3/market/realtime/kospi/stocks/005930/intraday', {
+        inddCycleTpCd: '60',
+      }),
+    ).rejects.toMatchObject({ code: 'KOSCOM_BUDGET_EXHAUSTED' });
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(b.admitAttempt).toHaveBeenCalledTimes(1);
+    const input = b.admitAttempt.mock.calls[0][0];
+    expect(input.category).toBe('minute');
+    expect(input.enforce).toBe(true);
+    expect(input.caps).toEqual({ dailyCap: 50000, monthlyCap: 1000000 });
+    // The HTTP slot is released for the next caller.
+    expect(h.locks.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails closed when the governor cannot decide', async () => {
+    const b = budgetAnswering(() => Promise.reject(new Error('redis down')));
+    const h = harness(b, enforced);
+    global.fetch = jest.fn(ok);
+    await expect(
+      h.client.get('/v3/market/closed/kospi/005930/history', {
+        trnsmCycleTpCd: 'D',
+      }),
+    ).rejects.toMatchObject({ code: 'KOSCOM_COORDINATION_UNAVAILABLE' });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('sends admitted attempts and counts each retry as its own attempt', async () => {
+    const b = budgetAnswering(() => Promise.resolve('admitted'));
+    const h = harness(b, enforced);
+    global.fetch = jest
+      .fn()
+      .mockResolvedValueOnce(new Response('', { status: 503 }))
+      .mockImplementationOnce(ok);
+    await h.client.get('/v3/market/closed/kospi/005930/history', {
+      trnsmCycleTpCd: 'D',
+    });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(b.admitAttempt).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds background calls while a price cycle owns the lane, never price or lists', async () => {
+    const b = budgetAnswering(() => Promise.resolve('admitted'));
+    const h = harness(b, { KOSCOM_PRICE_PRIORITY_LANE_ENABLED: 'true' });
+    const lane = `koscom:${h.config.getConfig().namespace}:price-lane`;
+    let laneReads = 0;
+    h.redis.get.mockImplementation((key: string) => {
+      if (key !== lane) return Promise.resolve(null);
+      laneReads += 1;
+      return Promise.resolve(laneReads <= 3 ? 'held' : null);
+    });
+    global.fetch = jest.fn(ok);
+    await h.client.get('/v3/market/realtime/kospi/stocks/005930/intraday', {
+      inddCycleTpCd: '60',
+    });
+    // Waited until the lane was released (fourth read), then sent once.
+    expect(laneReads).toBe(4);
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    laneReads = 0;
+    h.redis.get.mockImplementation((key: string) =>
+      Promise.resolve(key === lane ? 'held' : null),
+    );
+    global.fetch = jest.fn(() =>
+      Promise.resolve(
+        new Response('{"jsonrpc":"2.0","result":{"isulist":[]}}'),
+      ),
+    );
+    await h.client.batch(koscomBatches(targets(1))[0], 'price');
+    global.fetch = jest.fn(() =>
+      Promise.resolve(new Response('{"isuLists":[]}')),
+    );
+    await h.client.get('/v3/market/closed/kospi/lists');
+    expect(laneReads).toBe(0);
+  });
+});

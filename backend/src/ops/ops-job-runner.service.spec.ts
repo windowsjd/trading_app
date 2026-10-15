@@ -60,6 +60,12 @@ jest.mock('../assets/market-candle-long-sync.service', () => ({
 jest.mock('../assets/market-candle-sync.service', () => ({
   MarketCandleSyncService: class MarketCandleSyncService {},
 }));
+jest.mock('../assets/krx-central-candle.service', () => ({
+  KrxCentralCandleService: class KrxCentralCandleService {},
+}));
+jest.mock('../assets/krx-checkpoint-compaction.service', () => ({
+  KrxCheckpointCompactionService: class KrxCheckpointCompactionService {},
+}));
 jest.mock('../assets/market-candle-reconciliation.service', () => ({
   MarketCandleReconciliationService: class MarketCandleReconciliationService {},
 }));
@@ -144,7 +150,9 @@ describe('OpsJobRunnerService', () => {
     updatedAt: startedAt.toISOString(),
   });
 
-  const createService = () => {
+  const createService = (
+    options: { krxCentral?: object; krxCompaction?: object } = {},
+  ) => {
     const dailyPortfolioSnapshotJobService = {
       run: jest.fn(),
     };
@@ -263,10 +271,127 @@ describe('OpsJobRunnerService', () => {
         marketCandleReconciliationService as never,
         limitOrderMatchingService as never,
         marketCandleLongSyncService as never,
+        options.krxCentral as never,
+        options.krxCompaction as never,
       ),
       marketCandleLongSyncService,
     };
   };
+
+  describe('central KRX candle jobs (3b)', () => {
+    const lockAcquired = (
+      f: ReturnType<typeof createService>,
+      lockKey: string,
+    ) => {
+      f.lockService.acquireLock.mockResolvedValue({
+        acquired: true,
+        lockKey,
+        ownerId: 'owner',
+      });
+      f.runService.createRunning.mockResolvedValue({ id: 'krx', startedAt });
+      f.runService.recordSucceeded.mockResolvedValue({
+        serialized: serializedRun(),
+      });
+    };
+    const firstCallArg = (fn: jest.Mock): unknown =>
+      (fn.mock.calls as unknown[][])[0][0];
+    const central = (enabled = true) => ({
+      isEnabled: () => enabled,
+      runIntradayTick: jest.fn().mockResolvedValue({ phase: 'intraday' }),
+      runRepair: jest.fn().mockResolvedValue({ phase: 'repair' }),
+      runDaily: jest.fn().mockResolvedValue({ phase: 'daily' }),
+    });
+
+    it.each([
+      ['intraday', 'runIntradayTick'],
+      ['repair', 'runRepair'],
+      ['daily', 'runDaily'],
+    ] as const)(
+      'runs the %s phase under the central lock key with its scheduled instant',
+      async (phase, method) => {
+        const krxCentral = central();
+        const f = createService({ krxCentral });
+        lockAcquired(f, 'market_candle_sync:krx_central');
+        const result = await f.service.runKrxCentralCandleJob({
+          phase,
+          now: startedAt.toISOString(),
+          trigger: OpsJobTrigger.scheduler,
+          requestedBy: 'scheduler',
+        });
+        expect(result.success).toBe(true);
+        expect(firstCallArg(f.lockService.acquireLock)).toMatchObject({
+          jobName: OpsJobName.market_candle_sync,
+          lockKey: 'market_candle_sync:krx_central',
+        });
+        expect(firstCallArg(f.runService.createRunning)).toMatchObject({
+          jobName: OpsJobName.market_candle_sync,
+          lockKey: 'market_candle_sync:krx_central',
+          metadataJson: {
+            krxCentralPhase: phase,
+            scheduledAt: startedAt.toISOString(),
+          },
+        });
+        const calls = (
+          ['runIntradayTick', 'runRepair', 'runDaily'] as const
+        ).map((name) => krxCentral[name].mock.calls.length);
+        expect(calls).toEqual(
+          (['runIntradayTick', 'runRepair', 'runDaily'] as const).map((name) =>
+            name === method ? 1 : 0,
+          ),
+        );
+        const input = firstCallArg(krxCentral[method]) as { now: Date };
+        expect(input.now.toISOString()).toBe(startedAt.toISOString());
+      },
+    );
+
+    it('records a skipped run without taking a lock while the collection is disabled', async () => {
+      const krxCentral = central(false);
+      const f = createService({
+        krxCentral,
+        krxCompaction: { run: jest.fn() },
+      });
+      f.runService.recordSkipped.mockResolvedValue({
+        serialized: serializedRun({ status: OpsJobRunStatus.skipped }),
+      });
+      await f.service.runKrxCentralCandleJob({ phase: 'intraday' });
+      await f.service.runKrxCheckpointCompactionJob({});
+      expect(f.lockService.acquireLock).not.toHaveBeenCalled();
+      expect(krxCentral.runIntradayTick).not.toHaveBeenCalled();
+      const reasons = (
+        f.runService.recordSkipped.mock.calls as unknown[][]
+      ).map(
+        (call) =>
+          (call[0] as { resultJson: { reason: string } }).resultJson.reason,
+      );
+      expect(reasons).toEqual(['NOT_IMPLEMENTED', 'NOT_IMPLEMENTED']);
+    });
+
+    it('compacts checkpoints under its own lock key, separate from the phases', async () => {
+      const summary = { assets: 3, rowsDeleted: 10 };
+      const krxCompaction = { run: jest.fn().mockResolvedValue(summary) };
+      const f = createService({ krxCentral: central(), krxCompaction });
+      lockAcquired(f, 'market_candle_sync:krx_compaction');
+      const result = await f.service.runKrxCheckpointCompactionJob({
+        now: startedAt.toISOString(),
+        trigger: OpsJobTrigger.scheduler,
+      });
+      expect(result.success).toBe(true);
+      expect(firstCallArg(f.lockService.acquireLock)).toMatchObject({
+        lockKey: 'market_candle_sync:krx_compaction',
+      });
+      expect(krxCompaction.run).toHaveBeenCalledTimes(1);
+      const input = firstCallArg(krxCompaction.run) as {
+        now: Date;
+        dryRun?: boolean;
+      };
+      expect(input.now.toISOString()).toBe(startedAt.toISOString());
+      expect(input.dryRun === undefined).toBe(true);
+      expect(f.runService.recordSucceeded).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'krx' }),
+        { resultJson: summary },
+      );
+    });
+  });
 
   it('forwards the complete bounded limit matcher summary to Ops persistence', async () => {
     const f = createService();
@@ -1170,7 +1295,7 @@ describe('OpsJobRunnerService', () => {
     });
     marketCandleRetentionService.run.mockResolvedValueOnce({
       cutoff: new Date('2026-06-06T00:00:00.000Z'),
-      retentionDays: 35,
+      retentionDays: 45,
       deletedCount: 12,
       batchCount: 2,
       fourHour: {
@@ -1194,7 +1319,7 @@ describe('OpsJobRunnerService', () => {
       now: '2026-07-11T00:00:00.000Z',
     });
     expect(marketCandleRetentionService.run).toHaveBeenCalledWith(
-      expect.objectContaining({ retentionDays: 35, batchSize: 5000 }),
+      expect.objectContaining({ retentionDays: 45, batchSize: 5000 }),
     );
     expect(runService.recordSucceeded).toHaveBeenCalledWith(
       expect.anything(),

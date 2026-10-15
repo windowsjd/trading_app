@@ -9,6 +9,12 @@ import {
   type KoscomMarket,
 } from './koscom.config';
 
+// 2c (F15): a failing list waits 30 s, 60 s, … up to 30 min between fetches
+// across the cluster instead of every 30 s per process.
+const LIST_BACKOFF_BASE_MS = 30_000;
+const LIST_BACKOFF_MAX_MS = 30 * 60_000;
+const LIST_FETCH_LEASE_MS = 30_000;
+
 @Injectable()
 export class KoscomMarketMapService {
   private pending: Promise<Map<string, KoscomMarket>> | null = null;
@@ -124,22 +130,7 @@ export class KoscomMarketMapService {
             /* refresh invalid cache */
           }
         }
-        const { result } = await this.client.get(
-          `/v3/market/closed/${market}/lists`,
-        );
-        if (!Array.isArray(result.isuLists))
-          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
-            'KOSCOM_MALFORMED_LIST',
-          );
-        const symbols = result.isuLists
-          .map((value) => koscomRecord(value).isuSrtCd)
-          .filter(
-            (v): v is string => typeof v === 'string' && /^\d{6}$/.test(v),
-          );
-        if (!symbols.length)
-          throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
-            'KOSCOM_EMPTY_LIST',
-          );
+        const symbols = await this.fetchList(market);
         await this.redis
           .setWithTtl(key, JSON.stringify(symbols), 21600)
           .catch(() => undefined);
@@ -170,6 +161,81 @@ export class KoscomMarketMapService {
       map,
     };
     return map;
+  }
+
+  private async fetchList(market: KoscomMarket): Promise<string[]> {
+    const config = this.config.getConfig();
+    const prefix = `koscom:${config.namespace}:lists`;
+    if (config.listBackoffEnabled) {
+      const until = await this.redis
+        .get(`${prefix}:backoff-until:${market}`)
+        .catch(() => null);
+      if (until !== null && Number(until) > Date.now())
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_LIST_BACKOFF',
+        );
+      // Cluster single flight: whoever fetches fills the shared 6 h cache.
+      const leader = await this.redis
+        .setNxPx(`${prefix}:fetching:${market}`, '1', LIST_FETCH_LEASE_MS)
+        .catch(() => true);
+      if (!leader)
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_LIST_FETCH_IN_PROGRESS',
+        );
+    }
+    try {
+      // Always P1 `lists`, whichever caller's category context resolved it.
+      const { result } = await this.client.get(
+        `/v3/market/closed/${market}/lists`,
+        {},
+        undefined,
+        { category: 'lists' },
+      );
+      if (!Array.isArray(result.isuLists))
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_MALFORMED_LIST',
+        );
+      const symbols = result.isuLists
+        .map((value) => koscomRecord(value).isuSrtCd)
+        .filter((v): v is string => typeof v === 'string' && /^\d{6}$/.test(v));
+      if (!symbols.length)
+        throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+          'KOSCOM_EMPTY_LIST',
+        );
+      if (config.listBackoffEnabled)
+        await this.redis
+          .delete(`${prefix}:failures:${market}`)
+          .catch(() => undefined);
+      return symbols;
+    } catch (error) {
+      if (config.listBackoffEnabled) await this.backOffList(prefix, market);
+      throw error;
+    } finally {
+      if (config.listBackoffEnabled)
+        await this.redis
+          .delete(`${prefix}:fetching:${market}`)
+          .catch(() => undefined);
+    }
+  }
+
+  private async backOffList(prefix: string, market: KoscomMarket) {
+    try {
+      const failures = await this.redis.increment(
+        `${prefix}:failures:${market}`,
+      );
+      await this.redis.expire(`${prefix}:failures:${market}`, 86_400);
+      const backoffMs = Math.min(
+        LIST_BACKOFF_MAX_MS,
+        LIST_BACKOFF_BASE_MS * 2 ** Math.max(0, failures - 1),
+      );
+      await this.redis.setWithTtl(
+        `${prefix}:backoff-until:${market}`,
+        String(Date.now() + backoffMs),
+        Math.ceil(backoffMs / 1000),
+      );
+    } catch {
+      // Without Redis the per-process 30 s back-off below still applies.
+    }
   }
 }
 

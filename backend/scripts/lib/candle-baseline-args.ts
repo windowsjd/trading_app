@@ -16,7 +16,12 @@ export type CandleBaselineArgs = {
   assetIds: string[];
   maxAssets?: number;
   resume: boolean;
+  /** Only with explicit --asset-id: backfill named assets before activation. */
+  includeInactive: boolean;
 };
+
+// The KRX 576-session daily chart spans up to 868 calendar days.
+const MAX_BASELINE_DAYS = 900;
 
 export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
   const args: CandleBaselineArgs = {
@@ -28,6 +33,7 @@ export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
     assetTypes: [],
     assetIds: [],
     resume: true,
+    includeInactive: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -45,6 +51,9 @@ export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
       case '--no-resume':
         args.resume = false;
         break;
+      case '--include-inactive':
+        args.includeInactive = true;
+        break;
       case '--mode':
         if (
           value !== 'initial' &&
@@ -58,8 +67,14 @@ export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
         break;
       case '--days': {
         const days = Number(value);
-        if (!Number.isSafeInteger(days) || days < 1 || days > 365) {
-          throw new Error('--days must be an integer between 1 and 365.');
+        if (
+          !Number.isSafeInteger(days) ||
+          days < 1 ||
+          days > MAX_BASELINE_DAYS
+        ) {
+          throw new Error(
+            `--days must be an integer between 1 and ${MAX_BASELINE_DAYS}.`,
+          );
         }
         args.days = days;
         index += 1;
@@ -104,6 +119,9 @@ export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
     }
   }
 
+  if (args.includeInactive && args.assetIds.length === 0) {
+    throw new Error('--include-inactive requires explicit --asset-id values.');
+  }
   if (args.targets.length === 0) args.targets.push('5m');
   if (args.report && (args.targets.length !== 1 || args.targets[0] !== '5m')) {
     throw new Error('--report only supports the 5m baseline.');

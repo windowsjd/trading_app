@@ -25,6 +25,10 @@ import { KoscomCandleAdapter } from '../src/providers/koscom/koscom-candle.adapt
  *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --days 365 \
  *     --target 1d --target 1w --asset-id <uuid>
  *
+ *   # KRX 576-session daily backfill of a cohort before it is activated
+ *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --mode repair \
+ *     --days 875 --target 1d --asset-id <uuid> --include-inactive
+ *
  *   # keep the tail fresh afterwards (cheap; run on a schedule)
  *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --mode incremental
  *
@@ -32,12 +36,13 @@ import { KoscomCandleAdapter } from '../src/providers/koscom/koscom-candle.adapt
  *   --report                 coverage report only (no provider calls)
  *   --apply | --dry-run      run for real / plan only (default: --dry-run)
  *   --mode initial|incremental|repair   default: initial
- *   --days N                 baseline window, default 35 (the 5m retention)
+ *   --days N                 baseline window, default 35, at most 900
  *   --target 5m|1d|1w        repeatable; default: 5m
  *   --asset-type domestic_stock|us_stock|crypto   repeatable
  *   --asset-id <uuid>        repeatable; overrides --asset-type
  *   --max-assets N           process at most N assets
  *   --no-resume              start fresh instead of resuming a checkpoint
+ *   --include-inactive       with --asset-id only: include inactive assets
  *
  * `--report` needs PostgreSQL only. Sync dependencies are assembled directly,
  * without starting the full Nest app, realtime streams or schedulers. Before
@@ -155,7 +160,7 @@ async function report(
   const from = new Date(now.getTime() - args.days * DAY_MS);
   const assets = await prisma.asset.findMany({
     where: {
-      isActive: true,
+      ...(args.includeInactive ? {} : { isActive: true }),
       ...(args.assetIds.length ? { id: { in: args.assetIds } } : {}),
       ...(args.assetTypes.length ? { assetType: { in: args.assetTypes } } : {}),
     },
@@ -256,7 +261,8 @@ export async function main(
       ...(args.mode === MarketCandleSyncMode.incremental
         ? {}
         : { from, to: now }),
-      activeOnly: true,
+      // Named assets may be backfilled before activation (design v2.1 Q12).
+      activeOnly: !args.includeInactive,
       resume: args.resume,
       dryRun: !args.apply,
       ...(args.assetIds.length ? { assetIds: args.assetIds } : {}),

@@ -771,15 +771,18 @@ function printProviderVerboseDetails(summary: ProviderSummary) {
 }
 
 function printSnapshotStatus(input: {
-  assetPriceSnapshotsTotal: number;
-  fxRateSnapshotsTotal: number;
+  assetPriceSnapshotsTotal: number | null;
+  fxRateSnapshotsTotal: number | null;
 }) {
+  // Planner estimates (pg_class.reltuples), not exact counts.
   console.log('');
-  console.log('Snapshot status');
+  console.log('Snapshot status (estimated rows)');
   console.log(
-    `- asset_price_snapshots total: ${input.assetPriceSnapshotsTotal}`,
+    `- asset_price_snapshots: ~${input.assetPriceSnapshotsTotal ?? 'unknown'}`,
   );
-  console.log(`- fx_rate_snapshots total: ${input.fxRateSnapshotsTotal}`);
+  console.log(
+    `- fx_rate_snapshots: ~${input.fxRateSnapshotsTotal ?? 'unknown'}`,
+  );
 }
 
 function printCoverageSummary(

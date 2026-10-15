@@ -61,6 +61,7 @@ describe('chart windows over a stored 5m fixture', () => {
     staleWaiterMaxWaitMs: 500,
     maxManagedFiveMinuteRangeMs: 35 * DAY_MS,
     maxManagedPeriodRangeMs: 365 * DAY_MS,
+    maxManagedKrxDailyRangeMs: 875 * DAY_MS,
     maxOnDemandRepairRangeMs: 2 * DAY_MS,
     coverageTailToleranceMs: DAY_MS,
   };

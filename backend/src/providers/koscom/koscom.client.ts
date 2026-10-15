@@ -1,12 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import {
   RedisLockService,
   type RedisLock,
 } from '../../redis/redis-lock.service';
 import { RedisService } from '../../redis/redis.service';
+import { KoscomCallBudgetService } from './koscom-call-budget.service';
+import {
+  currentKoscomCallCategory,
+  inferKoscomCallCategory,
+  type KoscomCallCategory,
+} from './koscom-call-context';
 import {
   KoscomConfigService,
   KoscomError,
+  type KoscomConfig,
   type KoscomMarket,
 } from './koscom.config';
 
@@ -20,6 +27,12 @@ export type KoscomTarget = {
   market: KoscomMarket;
 };
 export type KoscomBatch = { market: KoscomMarket; targets: KoscomTarget[] };
+export type KoscomRequestOptions = {
+  /** Budget attribution; defaults to the async context, then the endpoint. */
+  category?: KoscomCallCategory;
+  /** Retries after a retryable failure (timeout/network/5xx). Default 1. */
+  retries?: 0 | 1;
+};
 /**
  * Last numeric daily-quota headers this process saw on a successful response.
  * Several remaining-count streams were observed live (2026-10-12/13) while the
@@ -68,6 +81,11 @@ export function parseKoscomJson(text: string): unknown {
   ) as unknown;
 }
 
+/** Held by the price loop while its batches run (3c priority lane). */
+export function koscomPriceLaneKey(namespace: string): string {
+  return `koscom:${namespace}:price-lane`;
+}
+
 export function koscomRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
@@ -86,12 +104,14 @@ export class KoscomClient {
     private readonly config: KoscomConfigService,
     private readonly redis: RedisService,
     private readonly locks: RedisLockService,
+    @Optional() private readonly budget?: KoscomCallBudgetService,
   ) {}
 
   get(
     path: string,
     query: Record<string, string> = {},
     signal?: AbortSignal,
+    options: KoscomRequestOptions = {},
   ): Promise<KoscomResponse> {
     if (!this.config.getConfig().enabled)
       return Promise.reject(
@@ -121,7 +141,17 @@ export class KoscomClient {
         ),
       );
     this.activeRequests++;
-    const promise = this.request(path, query, signal).finally(() => {
+    const category =
+      options.category ??
+      currentKoscomCallCategory() ??
+      inferKoscomCallCategory(path, query);
+    const promise = this.request(
+      path,
+      query,
+      signal,
+      category,
+      options.retries ?? 1,
+    ).finally(() => {
       this.activeRequests--;
     });
     if (signal) return promise;
@@ -141,6 +171,7 @@ export class KoscomClient {
     batch: KoscomBatch,
     kind: 'price' | 'orderbook',
     signal?: AbortSignal,
+    options: Pick<KoscomRequestOptions, 'retries'> = {},
   ) {
     if (
       !batch.targets.length ||
@@ -159,6 +190,7 @@ export class KoscomClient {
       path,
       single ? {} : { isuCd: batch.targets.map((t) => t.symbol).join(',') },
       signal,
+      { category: kind, retries: options.retries },
     );
     const rows = single ? [response.result] : response.result.isulist;
     if (!Array.isArray(rows) || rows.length > batch.targets.length)
@@ -171,11 +203,13 @@ export class KoscomClient {
   private async request(
     path: string,
     query: Record<string, string>,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    category: KoscomCallCategory,
+    retries: number,
   ): Promise<KoscomResponse> {
     for (let attempt = 0; ; attempt++) {
       try {
-        return await this.attempt(path, query, signal);
+        return await this.attempt(path, query, signal, category);
       } catch (error) {
         const safe =
           error instanceof KoscomError
@@ -183,7 +217,8 @@ export class KoscomClient {
             : /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
                 'KOSCOM_REQUEST_FAILED',
               );
-        if (!safe.retryable || attempt >= 1 || signal?.aborted) throw safe;
+        if (!safe.retryable || attempt >= retries || signal?.aborted)
+          throw safe;
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
@@ -192,14 +227,15 @@ export class KoscomClient {
   private async attempt(
     path: string,
     query: Record<string, string>,
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    category: KoscomCallCategory,
   ): Promise<KoscomResponse> {
     const config = this.config.getConfig();
     if (!config.enabled)
       throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
         'KOSCOM_DISABLED',
       );
-    const lock = await this.admit(signal);
+    const lock = await this.admit(signal, category);
     const controller = new AbortController();
     const abort = () => controller.abort();
     signal?.addEventListener('abort', abort, { once: true });
@@ -213,6 +249,8 @@ export class KoscomClient {
       for (const [key, value] of Object.entries(query))
         url.searchParams.set(key, value);
       url.searchParams.set('apikey', config.apiKey);
+      // Counted as billed the moment it is sent, retries included.
+      await this.countAttempt(config, category);
       const response = await fetch(url, {
         method: 'GET',
         signal: controller.signal,
@@ -242,7 +280,7 @@ export class KoscomClient {
       }
       const body = await response.text();
       const receivedAt = new Date();
-      this.recordRateLimit(response.headers, receivedAt);
+      this.recordRateLimit(response.headers, receivedAt, config);
       if (body.length > 8_000_000)
         throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
           'KOSCOM_RESPONSE_TOO_LARGE',
@@ -284,7 +322,56 @@ export class KoscomClient {
     }
   }
 
-  private recordRateLimit(headers: Headers, observedAt: Date): void {
+  /**
+   * Stage 3c: enforced, the governor admits or refuses the attempt by its
+   * category's priority before it is sent (counted atomically with the
+   * decision); unenforced, it is counted with the would-be decision only.
+   */
+  private async countAttempt(
+    config: KoscomConfig,
+    category: KoscomCallCategory,
+  ): Promise<void> {
+    if (!this.budget) return;
+    const caps = {
+      dailyCap: config.budgetDailyLimit,
+      monthlyCap: config.budgetMonthlyLimit,
+    };
+    if (!config.budgetEnforcementEnabled) {
+      if (config.callMetricsEnabled)
+        void this.budget
+          .admitAttempt({
+            namespace: config.namespace,
+            category,
+            enforce: false,
+            caps,
+          })
+          .catch(() => undefined);
+      return;
+    }
+    let decision: string;
+    try {
+      decision = await this.budget.admitAttempt({
+        namespace: config.namespace,
+        category,
+        enforce: true,
+        caps,
+      });
+    } catch {
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_COORDINATION_UNAVAILABLE',
+      );
+    }
+    if (decision === 'denied')
+      throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
+        'KOSCOM_BUDGET_EXHAUSTED',
+      );
+  }
+
+  private recordRateLimit(
+    headers: Headers,
+    observedAt: Date,
+    config: KoscomConfig,
+  ): void {
     const read = (name: string) => {
       const raw = headers.get(name)?.trim();
       return raw && /^\d{1,9}$/.test(raw) ? Number(raw) : null;
@@ -293,12 +380,21 @@ export class KoscomClient {
     const remainingDay = read('x-ratelimit-remaining-day');
     if (limitDay === null && remainingDay === null) return;
     this.lastRateLimit = { limitDay, remainingDay, observedAt };
+    if (config.callMetricsEnabled && this.budget)
+      void this.budget.recordQuotaHeaders(config.namespace, this.lastRateLimit);
   }
 
-  private async admit(signal?: AbortSignal): Promise<RedisLock> {
+  private async admit(
+    signal: AbortSignal | undefined,
+    category: KoscomCallCategory,
+  ): Promise<RedisLock> {
     const config = this.config.getConfig();
     const prefix = `koscom:${config.namespace}`;
     const deadline = performance.now() + 30000;
+    // 3c price priority lane: while a price cycle's batches run, every other
+    // category but the market lists price collection itself needs waits.
+    const yieldsToPrice =
+      config.priceLaneEnabled && category !== 'price' && category !== 'lists';
     try {
       while (performance.now() < deadline) {
         if (signal?.aborted)
@@ -309,6 +405,13 @@ export class KoscomClient {
           throw /* @diagnosticSurface internal: Fixed provider categories handled by candle HTTP, stream supervision or ingestion summaries. */ new KoscomError(
             'KOSCOM_RATE_LIMITED',
           );
+        if (
+          yieldsToPrice &&
+          (await this.redis.get(koscomPriceLaneKey(config.namespace)))
+        ) {
+          await new Promise((resolve) => setTimeout(resolve, 25));
+          continue;
+        }
         for (let i = 0; i < config.concurrency; i++) {
           const acquired = await this.locks.acquire(
             `${prefix}:http:${i}`,

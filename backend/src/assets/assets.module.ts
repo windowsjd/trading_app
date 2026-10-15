@@ -1,6 +1,9 @@
 import { KoscomCandleReaderService } from './koscom-candle-reader.service';
 import { TiingoCandleReaderService } from './tiingo-candle-reader.service';
-import { readKoscomConfig } from '../providers/koscom/koscom.config';
+import {
+  isKoscomPollingOwnedByLiveSupervisor,
+  readKoscomConfig,
+} from '../providers/koscom/koscom.config';
 import { Logger, Module } from '@nestjs/common';
 import { RedisModule } from '../redis/redis.module';
 import { RedisService } from '../redis/redis.service';
@@ -57,6 +60,12 @@ import { FuturesCandlesService } from './market-candle-futures.service';
 import { FuturesCandlesController } from './market-candle-futures.controller';
 import { MarketCandleLongSyncService } from './market-candle-long-sync.service';
 import { readMarketCandleRetentionConfig } from './market-candle-retention.config';
+import {
+  KRX_CENTRAL_CANDLES_CONFIG,
+  readKrxCentralCandlesConfig,
+} from './krx-central-candles.config';
+import { KrxCentralCandleService } from './krx-central-candle.service';
+import { KrxCheckpointCompactionService } from './krx-checkpoint-compaction.service';
 
 // AssetCandlesCacheService is provided (via factory so Nest supplies its default
 // env-derived config) and exported for a later serving step to inject. It is
@@ -117,7 +126,7 @@ import { readMarketCandleRetentionConfig } from './market-candle-retention.confi
         // returns warnings elsewhere.
         const warnings = validateLiveReconciliationDependencies({
           live,
-          koscomPollingEnabled: koscom.enabled && koscom.pollingEnabled,
+          koscomPollingEnabled: isKoscomPollingOwnedByLiveSupervisor(koscom),
           reconciliation: readMarketCandleReconciliationConfig(),
           nodeEnv: process.env.NODE_ENV,
         });
@@ -135,6 +144,14 @@ import { readMarketCandleRetentionConfig } from './market-candle-retention.confi
       provide: CANDLE_SERVING_CONFIG,
       useFactory: () => readCandleServingConfig(),
     },
+    {
+      // Validated at start-up: enabling without a cohort or with a 5m
+      // retention under the managed range refuses to boot (fail closed).
+      provide: KRX_CENTRAL_CANDLES_CONFIG,
+      useFactory: () => readKrxCentralCandlesConfig(),
+    },
+    KrxCentralCandleService,
+    KrxCheckpointCompactionService,
     {
       provide: MARKET_CANDLE_SYNC_CONFIG,
       useFactory: () => readMarketCandleSyncConfig(),
@@ -177,6 +194,9 @@ import { readMarketCandleRetentionConfig } from './market-candle-retention.confi
     LiveCandlePipelineService,
     MARKET_CANDLE_RECONCILIATION_CONFIG,
     MarketCandleReconciliationService,
+    KRX_CENTRAL_CANDLES_CONFIG,
+    KrxCentralCandleService,
+    KrxCheckpointCompactionService,
   ],
 })
 export class AssetsModule {}

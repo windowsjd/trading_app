@@ -1,6 +1,7 @@
 import { MARKET_CANDLE_DELETE_BATCH_MAX_LIMIT } from './market-candle-retention.constants';
 
-export const DEFAULT_MARKET_CANDLE_RETENTION_DAYS = 35;
+// Design v2.1 §5.2: ≥ the 45-day managed 5m range (KRX 1h 24 sessions).
+export const DEFAULT_MARKET_CANDLE_RETENTION_DAYS = 45;
 export const MIN_MARKET_CANDLE_RETENTION_DAYS = 31;
 // Long-range completed 4h history (market_candles '4h' and the USDⓈ-M
 // futures_market_candles). 180 calendar days by policy; never below 150, which

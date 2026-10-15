@@ -1667,6 +1667,121 @@ describe('AssetCandlesService', () => {
     });
   });
 
+  describe('domestic session-count ranges (design v2.1 §5.1)', () => {
+    const domestic = () =>
+      asset({
+        id: 'asset-krx-sessions',
+        symbol: '005930',
+        market: 'KRX',
+        assetType: AssetType.domestic_stock,
+        currencyCode: CurrencyCode.KRW,
+      });
+    const parsedFor = async (query: Record<string, string>) => {
+      const { prisma, service, serving } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(domestic());
+      await service.getAssetCandles('user-1', 'asset-krx-sessions', query);
+      return (
+        serving.serve.mock.calls[0] as unknown[]
+      )[1] as ParsedAssetCandlesQuery;
+    };
+
+    it.each([
+      ['prev3_open', '5m', 3],
+      ['prev6_open', '15m', 6],
+      ['prev12_open', '30m', 12],
+      ['prev24_open', '1h', 24],
+    ] as const)(
+      '%s defaults to %s and opens at the %sth previous real session',
+      async (range, interval, sessions) => {
+        const parsed = await parsedFor({ range });
+        expect(parsed.interval).toBe(interval);
+        const anchor = findPreviousMarketSession(
+          domestic(),
+          new Date('2026-06-19T03:00:00.000Z'),
+          sessions,
+        );
+        expect(anchor).not.toBeNull();
+        expect((parsed.rangeStartAt as Date).toISOString()).toBe(
+          anchor!.openTime.toISOString(),
+        );
+      },
+    );
+
+    it('starts prev576_open at 00:00 KST of the 576th previous session (2024 calendar)', async () => {
+      const parsed = await parsedFor({ range: 'prev576_open', limit: '600' });
+      expect(parsed.interval).toBe('1d');
+      expect(parsed.limit).toBe(600);
+      const anchor = findPreviousMarketSession(
+        domestic(),
+        new Date('2026-06-19T03:00:00.000Z'),
+        576,
+      );
+      expect(anchor).not.toBeNull();
+      expect(anchor!.localDate.startsWith('2024-')).toBe(true);
+      // The daily candle of the anchor date opens at its local midnight.
+      expect((parsed.rangeStartAt as Date).toISOString()).toBe(
+        new Date(
+          Date.parse(`${anchor!.localDate}T00:00:00+09:00`),
+        ).toISOString(),
+      );
+    });
+
+    it('allows only the 1d interval on prev576_open', async () => {
+      const { prisma, service, serving } = createService();
+      prisma.asset.findUnique.mockResolvedValueOnce(domestic());
+      const envelope = (await expectApiError(
+        service.getAssetCandles('user-1', 'asset-krx-sessions', {
+          range: 'prev576_open',
+          interval: '5m',
+        }),
+        400,
+        'ASSET_CANDLES_INVALID_INTERVAL',
+      )) as { error: { message: string } };
+      expect(envelope.error.message).toBe(
+        'interval 1d is the only interval supported for range prev576_open.',
+      );
+      expect(serving.serve).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['prev_open', '5m', 1],
+      ['prev2_open', '30m', 2],
+    ] as const)(
+      'keeps the existing %s token unchanged (old app compatibility)',
+      async (range, interval, sessions) => {
+        const parsed = await parsedFor({ range });
+        expect(parsed.interval).toBe(interval);
+        expect((parsed.rangeStartAt as Date).toISOString()).toBe(
+          findPreviousMarketSession(
+            domestic(),
+            new Date('2026-06-19T03:00:00.000Z'),
+            sessions,
+          )!.openTime.toISOString(),
+        );
+      },
+    );
+
+    it.each([
+      ['3d', '15m', 3],
+      ['14d', '1h', 14],
+      ['1y', '1d', 365],
+    ] as const)(
+      'keeps the rolling %s window for old apps',
+      async (range, interval, days) => {
+        const parsed = await parsedFor({ range, interval });
+        expect(
+          (parsed.rangeEndAt as Date).getTime() -
+            (parsed.rangeStartAt as Date).getTime(),
+        ).toBe(days * 86_400_000);
+      },
+    );
+
+    it('keeps answering the weekly tab of old apps', async () => {
+      const parsed = await parsedFor({ range: '1y', interval: '1w' });
+      expect(parsed.interval).toBe('1w');
+    });
+  });
+
   describe('96d long-range 4h window', () => {
     it('gives crypto a rolling 96 × 24h window with 4h as the default interval', async () => {
       const { prisma, binancePublicClient, service, serving } = createService();

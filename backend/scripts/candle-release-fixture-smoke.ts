@@ -250,6 +250,7 @@ async function main() {
     staleWaiterMaxWaitMs: 100,
     maxManagedFiveMinuteRangeMs: 35 * DAY,
     maxManagedPeriodRangeMs: 365 * DAY,
+    maxManagedKrxDailyRangeMs: 875 * DAY,
     maxOnDemandRepairRangeMs: 2 * DAY,
     coverageTailToleranceMs: DAY,
   };

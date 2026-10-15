@@ -31,6 +31,10 @@ function setup() {
   return { ...h, renderer, selections, button, Screen };
 }
 
+const KRX_RANGES: Record<string, string> = {
+  '5m': 'prev3_open', '15m': 'prev6_open', '30m': 'prev12_open', '1h': 'prev24_open', '4h': '96d', '1d': 'prev576_open',
+};
+
 describe('chart timeframe selector', () => {
   it('drives the actual detail screen candle query, live interval and viewport reset for every selection', () => {
     const h = createTradingUiHarness('asset/AssetChartScreen.tsx');
@@ -41,10 +45,11 @@ describe('chart timeframe selector', () => {
       const tree = h.render();
       assert.strictEqual(elements(tree, 'ChartTimeframeSelector')[0].props.selectedTimeframe, timeframe);
       const query = h.queries.find((option: any) => option.queryKey[0] === 'asset' && option.queryKey[1] === 'candles');
-      // KRX (this fixture) and crypto read the long-range 4h window; every
-      // other tab requests exactly its own policy window.
+      // This fixture is a KRX stock: the confirmed KRX session windows and the
+      // long-range 4h window (design v2.1 §5.1).
+      assert.equal(h.asset.assetType, 'domestic_stock');
       const window = resolveAssetChartTimeframe(timeframe, h.asset.assetType) ?? timeframe;
-      assert.equal(window.range, timeframe.interval === '4h' ? '96d' : timeframe.range);
+      assert.equal(window.range, KRX_RANGES[timeframe.interval]);
       assert.deepEqual(query.queryKey, QUERY_KEYS.asset.candles(h.asset.id, {
         interval: window.interval, range: window.range, limit: window.limit,
       }));
@@ -53,7 +58,7 @@ describe('chart timeframe selector', () => {
     }
   });
 
-  it('opens from one localized button, selects all seven original policy objects and closes immediately', (t) => {
+  it('opens from one localized button, selects all six original policy objects and closes immediately', (t) => {
     const h = setup();
     t.after(() => act(() => h.renderer.unmount()));
     const trigger = () => h.button('asset-timeframe-selector');
@@ -61,7 +66,8 @@ describe('chart timeframe selector', () => {
     assert.equal(modal().props.visible, false);
     assert.equal(trigger().props.accessibilityLabel, '시간봉 선택. 현재 5분');
     const options = h.renderer.root.findAllByType('Pressable').filter((node: any) => node.props.testID?.startsWith('asset-timeframe-option-'));
-    assert.deepEqual(options.map((node: any) => node.props.accessibilityLabel), ['5분', '15분', '30분', '1시간', '4시간', '1일', '1주']);
+    // No 1w tab (design v2.1 §5.5).
+    assert.deepEqual(options.map((node: any) => node.props.accessibilityLabel), ['5분', '15분', '30분', '1시간', '4시간', '1일']);
     assert.deepEqual(options.map((node: any) => node.props.testID), ASSET_CHART_TIMEFRAMES.map((item) => `asset-timeframe-option-${item.interval}`));
     const originalPolicies = ASSET_CHART_TIMEFRAMES.map((item) => ({ ...item }));
     for (const timeframe of ASSET_CHART_TIMEFRAMES) {
@@ -81,7 +87,7 @@ describe('chart timeframe selector', () => {
       assert.equal(h.selections.length, count, 'reselection only dismisses the list');
       assert.equal(modal().props.visible, false);
     }
-    assert.equal(h.selections.length, 6);
+    assert.equal(h.selections.length, 5);
     assert.deepEqual(ASSET_CHART_TIMEFRAMES, originalPolicies, 'range/interval/limit objects are never changed');
   });
 

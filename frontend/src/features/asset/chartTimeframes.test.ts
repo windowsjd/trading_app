@@ -34,8 +34,8 @@ const RANGE_WORST_CASE_DAYS: Record<string, number> = {
 };
 
 // The backend aggregates 15m/30m/1h/4h from the stored 5m feed, which is kept
-// for 35 days. No aggregated tab may ask for more than that.
-const FIVE_MINUTE_RETENTION_DAYS = 35;
+// for 45 days. No aggregated tab may ask for more than that.
+const FIVE_MINUTE_RETENTION_DAYS = 45;
 const AGGREGATED_INTERVALS = new Set(['15m', '30m', '1h', '4h']);
 
 test('1m tab is not offered', () => {
@@ -47,10 +47,10 @@ test('1m tab is not offered', () => {
   );
 });
 
-test('expected tab order and count', () => {
+test('expected tab order and count (no 1w tab, design v2.1 §5.5)', () => {
   assert.deepEqual(
     ASSET_CHART_TIMEFRAMES.map((tab) => tab.label),
-    ['5m', '15m', '30m', '1h', '4h', '1d', '1w'],
+    ['5m', '15m', '30m', '1h', '4h', '1d'],
   );
 });
 
@@ -68,7 +68,6 @@ test('range and limit policy matches the backend candle windows', () => {
       { interval: '1h', range: '14d', limit: 336 },
       { interval: '4h', range: '30d', limit: 200 },
       { interval: '1d', range: '1y', limit: 400 },
-      { interval: '1w', range: '1y', limit: 60 },
     ],
   );
 });
@@ -99,12 +98,9 @@ test('5m request is not capped near the old 100 limit', () => {
   assert.ok(fiveMinute && fiveMinute.limit > 100);
 });
 
-test('daily and weekly limits are fixed for 1y chart requests', () => {
+test('daily limit is fixed for 1y chart requests', () => {
   const daily = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '1d');
-  const weekly = ASSET_CHART_TIMEFRAMES.find((tab) => tab.interval === '1w');
-
   assert.equal(daily?.limit, 400);
-  assert.equal(weekly?.limit, 60);
 });
 
 test('30m and 1h show the last 14 days at the crypto upper-bound limit', () => {
@@ -144,13 +140,53 @@ test('KRX stocks, US stocks and crypto read the long-range 4h window', () => {
       limit: 600,
     });
   }
-  // Unknown asset type: wait instead of fetching (and caching) a wrong window.
-  assert.equal(resolveAssetChartTimeframe(fourHour, undefined), null);
-  // Every other tab is identical for every market.
+  // Unknown asset type: every tab waits instead of fetching (and caching) a
+  // wrong window.
+  for (const tab of ASSET_CHART_TIMEFRAMES) {
+    assert.equal(resolveAssetChartTimeframe(tab, undefined) === null, true);
+  }
+  // Every other tab of US stocks and crypto is the base list.
   for (const tab of ASSET_CHART_TIMEFRAMES.filter((t) => t.interval !== '4h')) {
-    for (const assetType of [undefined, 'domestic_stock', 'us_stock', 'crypto']) {
+    for (const assetType of ['us_stock', 'crypto']) {
       assert.equal(resolveAssetChartTimeframe(tab, assetType), tab);
     }
+  }
+});
+
+// Design v2.1 §5.1: [sessions N, 5m-bucket count per KRX session for the
+// interval, source max width in days from calc/krx_sessions.py].
+const KRX_SESSION_POLICY: Record<
+  string,
+  { range: string; limit: number; sessions: number; perSession: number; maxDays: number }
+> = {
+  '5m': { range: 'prev3_open', limit: 600, sessions: 3, perSession: 78, maxDays: 12.6 },
+  '15m': { range: 'prev6_open', limit: 288, sessions: 6, perSession: 26, maxDays: 17.8 },
+  '30m': { range: 'prev12_open', limit: 672, sessions: 12, perSession: 13, maxDays: 25.8 },
+  '1h': { range: 'prev24_open', limit: 336, sessions: 24, perSession: 7, maxDays: 41.8 },
+  '1d': { range: 'prev576_open', limit: 600, sessions: 576, perSession: 1, maxDays: 867.6 },
+};
+
+test('KRX stocks read the confirmed session windows (design v2.1 §5.1)', () => {
+  for (const tab of ASSET_CHART_TIMEFRAMES) {
+    const resolved = resolveAssetChartTimeframe(tab, 'domestic_stock');
+    if (tab.interval === '4h') {
+      assert.equal(resolved, LONG_RANGE_FOUR_HOUR_TIMEFRAME);
+      continue;
+    }
+    const policy = KRX_SESSION_POLICY[tab.interval];
+    assert.ok(policy, `no KRX policy for ${tab.interval}`);
+    assert.deepEqual(resolved, {
+      label: tab.label,
+      interval: tab.interval,
+      range: policy.range,
+      limit: policy.limit,
+    });
+    // N sessions + today all fit in one request, under the Binance cap.
+    assert.ok(policy.limit >= (policy.sessions + 1) * policy.perSession);
+    assert.ok(policy.limit <= BINANCE_KLINE_MAX_LIMIT);
+    // 5m-aggregated windows stay inside the stored 5m retention.
+    if (tab.interval !== '1d')
+      assert.ok(policy.maxDays <= FIVE_MINUTE_RETENTION_DAYS);
   }
 });
 
@@ -175,7 +211,7 @@ test('4h shows the last 30 days', () => {
   );
 });
 
-test('aggregated tabs stay inside the 35-day 5m retention window', () => {
+test('aggregated tabs stay inside the 45-day 5m retention window', () => {
   for (const tab of ASSET_CHART_TIMEFRAMES) {
     if (!AGGREGATED_INTERVALS.has(tab.interval)) continue;
     const days = RANGE_WORST_CASE_DAYS[tab.range];
@@ -187,7 +223,14 @@ test('aggregated tabs stay inside the 35-day 5m retention window', () => {
 });
 
 test('each timeframe gets its own candle query key (14d never collides)', () => {
-  const keys = ASSET_CHART_TIMEFRAMES.map((tab) =>
+  const krx = ASSET_CHART_TIMEFRAMES.map(
+    (tab) => resolveAssetChartTimeframe(tab, 'domestic_stock')!,
+  );
+  const windows = [
+    ...ASSET_CHART_TIMEFRAMES,
+    ...krx.filter((tab) => tab.interval !== '4h'),
+  ];
+  const keys = windows.map((tab) =>
     JSON.stringify(
       QUERY_KEYS.asset.candles('asset-1', {
         range: tab.range,

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual<{ Decimal: unknown }>(
     '@prisma/client/runtime/client',
@@ -32,7 +33,7 @@ import { LiveCandleHealthService } from './live-candle-health.service';
 import type { LiveFiveMinuteCandleState } from './live-candle.types';
 
 describe('LiveCandleFinalizerService', () => {
-  const setup = () => {
+  const setup = (env: Record<string, string> = {}) => {
     const calls: string[] = [];
     const store = {
       getDueStateKeys: jest.fn().mockResolvedValue([]),
@@ -69,6 +70,8 @@ describe('LiveCandleFinalizerService', () => {
         calls.push('discard');
         return Promise.resolve(true);
       }),
+      incrementReconcileAttempts: jest.fn().mockResolvedValue(1),
+      clearReconcileAttempts: jest.fn().mockResolvedValue(undefined),
     };
     const repository = {
       upsertMany: jest.fn(() => {
@@ -108,7 +111,7 @@ describe('LiveCandleFinalizerService', () => {
       locks as never,
       publisher as never,
       health,
-      readLiveCandleConfig({}),
+      readLiveCandleConfig(env),
       sync as never,
     );
     return {
@@ -344,6 +347,66 @@ describe('LiveCandleFinalizerService', () => {
       expect(fixture.health.snapshot().liveCandle.recoveryRepairFailure).toBe(
         1,
       );
+    });
+
+    it('holds a bucket with an alert after the configured failed attempts (F8)', async () => {
+      const fixture = setup({ CANDLE_LIVE_RECOVERY_MAX_ATTEMPTS: '2' });
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      fixture.store.getDueReconcilePending.mockResolvedValue([
+        {
+          member: 'asset-1|1783987200000',
+          assetId: 'asset-1',
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+        },
+      ]);
+      fixture.sync.syncAsset.mockRejectedValue(new Error('provider down'));
+      fixture.store.incrementReconcileAttempts
+        .mockResolvedValueOnce(1)
+        .mockResolvedValueOnce(2);
+      await fixture.service.runOnce(new Date('2026-07-13T00:06:00Z'));
+      expect(fixture.store.deferReconcilePending).toHaveBeenCalledTimes(1);
+      expect(fixture.store.resolveReconcilePending).not.toHaveBeenCalled();
+      await fixture.service.runOnce(new Date('2026-07-13T00:07:00Z'));
+      expect(fixture.store.deferReconcilePending).toHaveBeenCalledTimes(1);
+      expect(fixture.store.resolveReconcilePending).toHaveBeenCalledWith(
+        'asset-1|1783987200000',
+      );
+      const held = warn.mock.calls
+        .map((call) => String(call[0]))
+        .filter((line) => line.includes('live_candle_pending_bucket_held'));
+      expect(held.length).toBe(1);
+      expect(held[0].includes('attempts_exhausted')).toBe(true);
+      warn.mockRestore();
+    });
+
+    it('never calls the provider for a bucket past its KST day once capped (F8)', async () => {
+      const fixture = setup({ CANDLE_LIVE_RECOVERY_MAX_ATTEMPTS: '2' });
+      fixture.store.getDueReconcilePending.mockResolvedValue([
+        {
+          member: 'asset-1|1783987200000',
+          assetId: 'asset-1',
+          // 09:00 KST on 07-13; 07-14 00:00 KST is 07-13T15:00Z.
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+        },
+      ]);
+      await fixture.service.runOnce(new Date('2026-07-13T15:00:00Z'));
+      expect(fixture.sync.syncAsset).not.toHaveBeenCalled();
+      expect(fixture.store.resolveReconcilePending).toHaveBeenCalledWith(
+        'asset-1|1783987200000',
+      );
+      // Unlimited (default) keeps the old behaviour: still repaired late.
+      const legacy = setup();
+      legacy.store.getDueReconcilePending.mockResolvedValue([
+        {
+          member: 'asset-1|1783987200000',
+          assetId: 'asset-1',
+          openTime: new Date('2026-07-13T00:00:00.000Z'),
+        },
+      ]);
+      await legacy.service.runOnce(new Date('2026-07-13T15:00:00Z'));
+      expect(legacy.sync.syncAsset).toHaveBeenCalledTimes(1);
     });
 
     it('drops queue entries whose repair can never succeed (validation errors)', async () => {

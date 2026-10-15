@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { safeAdminDiagnosticLog } from '../common/admin-diagnostics';
 import { classifyFailureCause } from '../common/safe-failure-cause';
 import { AssetType } from '../generated/prisma/client';
@@ -14,6 +14,12 @@ import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types
 import { BINANCE_USDM_CANDLE_INGESTION } from '../providers/binance/binance-kline-usdm.client';
 import { KoscomCandleAdapter } from '../providers/koscom/koscom-candle.adapter';
 import { KoscomClient } from '../providers/koscom/koscom.client';
+import { runWithKoscomCallCategory } from '../providers/koscom/koscom-call-context';
+import { RedisService } from '../redis/redis.service';
+import {
+  KRX_CENTRAL_CANDLES_CONFIG,
+  type KrxCentralCandlesConfig,
+} from './krx-central-candles.config';
 import {
   KOSCOM_HISTORY_SOURCE,
   KoscomError,
@@ -75,6 +81,7 @@ const KRX_DAILY_PAGE_SESSIONS = 100;
 /** KOSCOM failures that stop the whole run (budget/coordination/credentials). */
 const KOSCOM_STOP_CODES = new Set([
   'KOSCOM_RATE_LIMITED',
+  'KOSCOM_BUDGET_EXHAUSTED',
   'KOSCOM_AUTH_FAILED',
   'KOSCOM_DISABLED',
   'KOSCOM_COORDINATION_UNAVAILABLE',
@@ -259,6 +266,10 @@ export class MarketCandleLongSyncService {
     private readonly usdmCandles: BinanceCandleIngestionService,
     private readonly koscom: KoscomCandleAdapter,
     private readonly koscomClient: KoscomClient,
+    @Optional() private readonly redis?: RedisService,
+    @Optional()
+    @Inject(KRX_CENTRAL_CANDLES_CONFIG)
+    private readonly krxCentral?: KrxCentralCandlesConfig,
   ) {}
 
   // ---------------------------------------------------------------- Spot --
@@ -585,7 +596,17 @@ export class MarketCandleLongSyncService {
 
   // ----------------------------------------------------------------- KRX --
 
-  async syncKrx(input: LongCandleSyncInput): Promise<LongCandleSyncSummary> {
+  syncKrx(input: LongCandleSyncInput): Promise<LongCandleSyncSummary> {
+    // Daily references fetched here serve the 4h verification, not the 1d feed.
+    return runWithKoscomCallCategory(
+      input.mode === 'backfill' ? 'backfill' : 'long_4h',
+      () => this.syncKrxInContext(input),
+    );
+  }
+
+  private async syncKrxInContext(
+    input: LongCandleSyncInput,
+  ): Promise<LongCandleSyncSummary> {
     const base = this.context(input);
     const sessionsWanted = this.krxSessions(input);
     const defaults =
@@ -669,13 +690,82 @@ export class MarketCandleLongSyncService {
       select: { id: true, symbol: true, market: true },
     });
     const series: LongCandleSeriesResult[] = [];
+    // F23 (central mode): a held session is retried once on a later trading
+    // day, then left to the operator backfill (which ignores the backoff).
+    const heldBackoff =
+      this.krxCentral?.enabled === true &&
+      this.redis !== undefined &&
+      input.mode === 'incremental';
     for (const asset of assets) {
       if (this.stopped(context)) break;
       series.push(
-        await this.syncKrxAsset(asset, sessions, context, fetchMissingDaily),
+        await this.syncKrxAsset(
+          asset,
+          sessions,
+          context,
+          fetchMissingDaily,
+          heldBackoff,
+        ),
       );
     }
     return finish(series, sessions, assets.length);
+  }
+
+  private heldKey(assetId: string, date: string): string {
+    return `koscom:krx-long4h-held:${assetId}:${date}`;
+  }
+
+  /** Whether a held session may be fetched again under the F23 backoff. */
+  private async heldRetryAllowed(
+    assetId: string,
+    date: string,
+    latestSessionDate: string,
+  ): Promise<boolean> {
+    try {
+      const raw = await this.redis!.get(this.heldKey(assetId, date));
+      if (!raw) return true;
+      const record = JSON.parse(raw) as {
+        attempts?: number;
+        afterSession?: string;
+      };
+      return (
+        (record.attempts ?? 0) < 2 &&
+        typeof record.afterSession === 'string' &&
+        record.afterSession < latestSessionDate
+      );
+    } catch {
+      return true;
+    }
+  }
+
+  private async recordHeld(
+    assetId: string,
+    date: string,
+    latestSessionDate: string,
+  ): Promise<void> {
+    try {
+      const key = this.heldKey(assetId, date);
+      const raw = await this.redis!.get(key);
+      const attempts = raw
+        ? ((JSON.parse(raw) as { attempts?: number }).attempts ?? 0) + 1
+        : 1;
+      await this.redis!.setWithTtl(
+        key,
+        JSON.stringify({ attempts, afterSession: latestSessionDate }),
+        60 * 24 * 60 * 60,
+      );
+      if (attempts >= 2)
+        this.logger.warn(
+          JSON.stringify({
+            event: 'krx_long4h_session_held',
+            assetId,
+            sessionDate: date,
+            attempts,
+          }),
+        );
+    } catch {
+      // Without Redis the session is simply retried next run (old behaviour).
+    }
   }
 
   private async syncKrxAsset(
@@ -683,6 +773,7 @@ export class MarketCandleLongSyncService {
     sessions: readonly MarketSessionWindow[],
     context: KrxRunContext,
     fetchMissingDaily: boolean,
+    heldBackoff = false,
   ): Promise<LongCandleSeriesResult> {
     const volumeRelations: Record<KrxVolumeRelation, number> = {
       equal: 0,
@@ -785,12 +876,20 @@ export class MarketCandleLongSyncService {
 
       let consecutiveFailures = 0;
       let verifiedSessions = 0;
+      const latestSessionDate = localDate(sessions[sessions.length - 1]);
       for (const session of missing) {
         const date = localDate(session);
         if (this.stopped(context) || errorCode === 'LOCK_LOST') break;
         const daily = dailyRefs.get(date);
         if (!daily) {
           result.pending.push({ date, reason: 'DAILY_REFERENCE_UNAVAILABLE' });
+          continue;
+        }
+        if (
+          heldBackoff &&
+          !(await this.heldRetryAllowed(asset.id, date, latestSessionDate))
+        ) {
+          result.pending.push({ date, reason: 'HELD_BACKOFF' });
           continue;
         }
         if (!(await renew())) {
@@ -825,6 +924,8 @@ export class MarketCandleLongSyncService {
           }
           if (KOSCOM_DATA_CODES.has(code)) {
             result.held.push({ date, reason: code });
+            if (heldBackoff)
+              await this.recordHeld(asset.id, date, latestSessionDate);
             consecutiveFailures = 0;
             continue;
           }
@@ -851,6 +952,8 @@ export class MarketCandleLongSyncService {
             reason: verdict.reason,
             detail: verdict.detail,
           });
+          if (heldBackoff)
+            await this.recordHeld(asset.id, date, latestSessionDate);
           continue;
         }
         const written = await this.repository.upsertMany(

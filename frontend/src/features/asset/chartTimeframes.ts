@@ -14,8 +14,14 @@
 //                    stocks (KRX and US) = the 96 most recent completed
 //                    sessions + today on the exchange calendar,
 //                    crypto = rolling 96 × 24h → now
+//   - 'prevN_open' = (KRX only, N = 3/6/12/24/576) the regular open of the
+//                    N-th actual KRX session before today's KST date → now
+//                    (N sessions on a holiday, N + 1 while trading). These
+//                    are the confirmed KRX chart windows (KOSCOM 100-stock
+//                    design v2.1 §5.1); they need the backend that accepts
+//                    the tokens (an older backend answers 400).
 //
-// 15m/30m/1h are aggregated by the backend from the stored 5m feed (35-day
+// 15m/30m/1h are aggregated by the backend from the stored 5m feed (45-day
 // retention), so their windows are bounded by that retention, not by a
 // provider page size. The 4h tab of KRX stocks and crypto reads the stored
 // COMPLETED 4h history (180-day retention) plus the live 5m-aggregated recent
@@ -26,6 +32,9 @@
 // 1m was removed from the chart on purpose: KIS same-day minute data is capped
 // at 30 rows, which cannot draw a meaningful 1m chart. The backend still
 // accepts interval=1m for compatibility, but the UI must not offer it.
+//
+// 1w is not charted (design v2.1 §5.5): the tab is gone for every market.
+// The backend keeps answering interval=1w for installed older apps.
 
 export type AssetCandleRange =
   | '1d'
@@ -35,6 +44,11 @@ export type AssetCandleRange =
   | '30d'
   | 'prev_open'
   | 'prev2_open'
+  | 'prev3_open'
+  | 'prev6_open'
+  | 'prev12_open'
+  | 'prev24_open'
+  | 'prev576_open'
   | '1y'
   | 'season'
   | '96d';
@@ -74,8 +88,6 @@ export const ASSET_CHART_TIMEFRAMES: AssetChartTimeframe[] = [
   { label: '4h', interval: '4h', range: '30d', limit: 200 },
   // ~366 daily candles per year
   { label: '1d', interval: '1d', range: '1y', limit: 400 },
-  // ~53 weekly candles per year
-  { label: '1w', interval: '1w', range: '1y', limit: 60 },
 ];
 
 export const DEFAULT_ASSET_CHART_TIMEFRAME = ASSET_CHART_TIMEFRAMES[0];
@@ -95,19 +107,36 @@ const LONG_RANGE_ASSET_TYPES: ReadonlySet<string> = new Set([
   'crypto',
 ]);
 
+// KRX session windows (design v2.1 §5.1): N sessions + today. Limits cover
+// N + 1 sessions — 5m 4 × 78 = 312, 15m 7 × 26 = 182, 30m 13 × 13 = 169,
+// 1h 25 × 7 = 175, 1d 577 — under the 600/288/672/336/600 caps.
+const KRX_SESSION_TIMEFRAMES: Partial<
+  Record<AssetCandleInterval, AssetChartTimeframe>
+> = {
+  '5m': { label: '5m', interval: '5m', range: 'prev3_open', limit: 600 },
+  '15m': { label: '15m', interval: '15m', range: 'prev6_open', limit: 288 },
+  '30m': { label: '30m', interval: '30m', range: 'prev12_open', limit: 672 },
+  '1h': { label: '1h', interval: '1h', range: 'prev24_open', limit: 336 },
+  '1d': { label: '1d', interval: '1d', range: 'prev576_open', limit: 600 },
+};
+
 /**
- * The request window for a selected tab. Only the 4h tab differs from the
- * base list: every supported market uses the long-range window. Returns null
- * while the asset type is still unknown so the caller waits instead of
- * fetching (and caching) the wrong window.
+ * The request window for a selected tab: KRX stocks use the session
+ * windows, the 4h tab of every supported market the long-range window, and
+ * everything else the base list. Returns null while the asset type is still
+ * unknown so the caller waits instead of fetching (and caching) the wrong
+ * window.
  */
 export function resolveAssetChartTimeframe(
   timeframe: AssetChartTimeframe,
   assetType: string | null | undefined,
 ): AssetChartTimeframe | null {
-  if (timeframe.interval !== '4h') return timeframe;
   if (!assetType) return null;
-  return LONG_RANGE_ASSET_TYPES.has(assetType)
-    ? LONG_RANGE_FOUR_HOUR_TIMEFRAME
-    : timeframe;
+  if (timeframe.interval === '4h')
+    return LONG_RANGE_ASSET_TYPES.has(assetType)
+      ? LONG_RANGE_FOUR_HOUR_TIMEFRAME
+      : timeframe;
+  if (assetType === 'domestic_stock')
+    return KRX_SESSION_TIMEFRAMES[timeframe.interval] ?? timeframe;
+  return timeframe;
 }

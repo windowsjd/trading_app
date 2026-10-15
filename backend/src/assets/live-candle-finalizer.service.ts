@@ -329,9 +329,16 @@ export class LiveCandleFinalizerService
       return;
     }
     if (!this.sync) return;
+    const capped = this.config.recoveryMaxAttempts > 0;
     for (const entry of entries) {
       if (!isOwner()) return;
       const closeTime = new Date(entry.openTime.getTime() + FIVE_MINUTES_MS);
+      // F8: past the bucket's KST day a KRX minute repair cannot succeed and
+      // would only create another sync-state row; hold it instead.
+      if (capped && now.getTime() >= kstDayEndMs(entry.openTime)) {
+        await this.holdPendingBucket(entry, 'deadline');
+        continue;
+      }
       try {
         await this.sync.syncAsset({
           assetId: entry.assetId,
@@ -361,6 +368,10 @@ export class LiveCandleFinalizerService
           entry.openTime,
         );
         await this.store.resolveReconcilePending(entry.member);
+        if (capped)
+          await this.store
+            .clearReconcileAttempts(entry.member)
+            .catch(() => undefined);
         this.health.increment('recoveryRepairSuccess');
         this.logger.log(
           JSON.stringify({
@@ -376,10 +387,18 @@ export class LiveCandleFinalizerService
         // retrying it forever. Operational failures back off and retry.
         const permanent =
           error instanceof Error && error.name === 'MarketCandleSyncInputError';
+        const exhausted =
+          !permanent &&
+          capped &&
+          (await this.store
+            .incrementReconcileAttempts(entry.member)
+            .catch(() => 0)) >= this.config.recoveryMaxAttempts;
         if (permanent) {
           await this.store
             .resolveReconcilePending(entry.member)
             .catch(() => undefined);
+        } else if (exhausted) {
+          await this.holdPendingBucket(entry, 'attempts_exhausted');
         } else {
           await this.store
             .deferReconcilePending(
@@ -399,6 +418,29 @@ export class LiveCandleFinalizerService
         );
       }
     }
+  }
+
+  /** Gives a queued bucket up with an alert; it stays a visible gap (no fill). */
+  private async holdPendingBucket(
+    entry: LiveCandleReconcilePendingEntry,
+    reason: 'deadline' | 'attempts_exhausted',
+  ): Promise<void> {
+    await this.store
+      .resolveReconcilePending(entry.member)
+      .catch(() => undefined);
+    await this.store
+      .clearReconcileAttempts(entry.member)
+      .catch(() => undefined);
+    this.health.increment('recoveryRepairFailure');
+    this.logger.warn(
+      JSON.stringify({
+        event: 'live_candle_pending_bucket_held',
+        assetId: entry.assetId,
+        openTime: entry.openTime.toISOString(),
+        reason,
+        maxAttempts: this.config.recoveryMaxAttempts,
+      }),
+    );
   }
 
   private async hasCanonicalClosedRow(
@@ -468,4 +510,16 @@ export class LiveCandleFinalizerService
       return false;
     }
   }
+}
+
+const KST_OFFSET_MS = 9 * 60 * 60_000;
+const DAY_MS = 24 * 60 * 60_000;
+
+/** First instant of the KST calendar day after `instant`'s KST day. */
+function kstDayEndMs(instant: Date): number {
+  return (
+    Math.floor((instant.getTime() + KST_OFFSET_MS) / DAY_MS) * DAY_MS +
+    DAY_MS -
+    KST_OFFSET_MS
+  );
 }

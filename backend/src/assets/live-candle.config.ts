@@ -28,6 +28,10 @@ export type LiveCandleConfig = {
   // Old-generation / deferred bucket recovery (bounded queue processing).
   recoveryMaxBatch: number;
   recoveryRetryMs: number;
+  // F8 (2c): failed repairs per queued bucket before it is held with an
+  // alert, and the KST day of the bucket as the repair deadline (the KRX
+  // minute source is trusted for the current KST day only). 0 = unlimited.
+  recoveryMaxAttempts: number;
   // Escape hatch for running live ingestion without its reconciliation
   // safety net. Never enable in production.
   allowWithoutReconciliation: boolean;
@@ -161,6 +165,13 @@ export function readLiveCandleConfig(
       60_000,
       1_000,
       3_600_000,
+    ),
+    recoveryMaxAttempts: integer(
+      env,
+      'CANDLE_LIVE_RECOVERY_MAX_ATTEMPTS',
+      0,
+      0,
+      20,
     ),
     allowWithoutReconciliation: boolean(
       env,

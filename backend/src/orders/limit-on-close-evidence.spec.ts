@@ -76,6 +76,9 @@ describe('KOSCOM dated session-close observation', () => {
         inqEndDd: '20260713',
         reqCnt: '1',
       },
+      undefined,
+      // LOC evidence is a P2 budget category (design v2.1 §7.2).
+      { category: 'loc' },
     );
     expect(observation.closePrice.toFixed()).toBe('70500');
     expect(observation.providerTradingDate).toBe('20260713');

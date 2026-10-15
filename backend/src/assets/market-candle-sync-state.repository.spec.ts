@@ -21,6 +21,7 @@ import {
   MarketCandleSyncStateInvariantError,
   MarketCandleSyncStateRepository,
 } from './market-candle-sync-state.repository';
+import { krxFiveMinuteBridge } from './krx-candle-collection.policy';
 
 // Typed accessor for jest mock call arguments: jest.fn() exposes `any`
 // call tuples, so reads go through unknown before asserting the shape the
@@ -630,6 +631,99 @@ describe('MarketCandleSyncStateRepository', () => {
         contiguousCoveredTo: null,
         newestCompletedAt: null,
         hasInteriorGap: false,
+      });
+    });
+
+    describe('with the KRX holiday bridge (central mode)', () => {
+      const kst = (local: string) => new Date(`${local}+09:00`);
+      const krx = (from: string, to: string) => ({
+        coveredFrom: kst(from),
+        coveredTo: kst(to),
+        completedAt: kst(to),
+      });
+
+      it('connects a night and a not-yet-closed tail but nothing else', async () => {
+        const { repository, delegate } = createRepository();
+        delegate.findMany.mockResolvedValue([
+          krx('2026-10-15T09:00:00', '2026-10-15T15:31:10'),
+          krx('2026-10-16T09:00:00', '2026-10-16T10:21:10'),
+        ]);
+        const now = kst('2026-10-16T10:22:00').getTime();
+        const coverage = await repository.findCandleCoverage(
+          'asset-1',
+          '5m',
+          kst('2026-10-15T09:00:00'),
+          kst('2026-10-16T10:22:00'),
+          {
+            bridge: krxFiveMinuteBridge(now),
+            createdAtOrAfter: kst('2026-10-15T00:00:00'),
+          },
+        );
+        expect(coverage.startsAtRequestedFrom).toBe(true);
+        expect(coverage.hasInteriorGap).toBe(false);
+        expect(coverage.contiguousCoveredTo?.toISOString()).toBe(
+          kst('2026-10-16T10:22:00').toISOString(),
+        );
+        const { where } = callArg<{ where: Record<string, unknown> }>(
+          delegate.findMany,
+        );
+        expect(where.createdAt).toEqual({ gte: kst('2026-10-15T00:00:00') });
+      });
+
+      it('never bridges a missing closed required slot (interior hole)', async () => {
+        const { repository, delegate } = createRepository();
+        delegate.findMany.mockResolvedValue([
+          krx('2026-10-15T09:00:00', '2026-10-15T10:15:00'),
+          krx('2026-10-15T10:20:00', '2026-10-15T15:31:10'),
+        ]);
+        const coverage = await repository.findCandleCoverage(
+          'asset-1',
+          '5m',
+          kst('2026-10-15T09:00:00'),
+          kst('2026-10-15T16:00:00'),
+          { bridge: krxFiveMinuteBridge(kst('2026-10-15T16:00:00').getTime()) },
+        );
+        expect(coverage.hasInteriorGap).toBe(true);
+        expect(coverage.contiguousCoveredTo?.toISOString()).toBe(
+          kst('2026-10-15T10:15:00').toISOString(),
+        );
+      });
+
+      it('starts a window whose head is a night before the first proof', async () => {
+        const { repository, delegate } = createRepository();
+        delegate.findMany.mockResolvedValue([
+          krx('2026-10-15T09:00:00', '2026-10-15T10:01:10'),
+        ]);
+        const coverage = await repository.findCandleCoverage(
+          'asset-1',
+          '5m',
+          kst('2026-10-14T20:00:00'),
+          kst('2026-10-15T10:02:00'),
+          { bridge: krxFiveMinuteBridge(kst('2026-10-15T10:02:00').getTime()) },
+        );
+        expect(coverage.startsAtRequestedFrom).toBe(true);
+        expect(coverage.hasInteriorGap).toBe(false);
+        expect(coverage.contiguousCoveredTo?.toISOString()).toBe(
+          kst('2026-10-15T10:02:00').toISOString(),
+        );
+      });
+
+      it('reaches only up to a missing slot in the head (still a hole)', async () => {
+        const { repository, delegate } = createRepository();
+        delegate.findMany.mockResolvedValue([
+          krx('2026-10-15T09:10:00', '2026-10-15T10:01:10'),
+        ]);
+        const coverage = await repository.findCandleCoverage(
+          'asset-1',
+          '5m',
+          kst('2026-10-14T20:00:00'),
+          kst('2026-10-15T10:02:00'),
+          { bridge: krxFiveMinuteBridge(kst('2026-10-15T10:02:00').getTime()) },
+        );
+        expect(coverage.hasInteriorGap).toBe(true);
+        expect(coverage.contiguousCoveredTo?.toISOString()).toBe(
+          kst('2026-10-15T09:00:00').toISOString(),
+        );
       });
     });
 

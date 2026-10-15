@@ -88,7 +88,9 @@ export class KoscomSessionCloseSource {
       inqEndDd: date,
       reqCnt: '1',
     };
-    const response = await this.client.get(path, query);
+    const response = await this.client.get(path, query, undefined, {
+      category: 'loc',
+    });
     if (response.result.isuSrtCd !== target.symbol)
       throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
         'KOSCOM_CLOSE_SYMBOL_MISMATCH',

@@ -31,6 +31,15 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.jobs[OpsJobName.daily_portfolio_snapshot]).toBe(true);
     expect(config.timezone).toBe('Asia/Seoul');
   });
+  it('runs the scheduler tick for the central KRX candle compaction', () => {
+    expect(
+      getOpsSchedulerConfig({ KOSCOM_CENTRAL_CANDLES_ENABLED: 'true' }).enabled,
+    ).toBe(true);
+    expect(
+      getOpsSchedulerConfig({ KOSCOM_CENTRAL_CANDLES_ENABLED: 'false' })
+        .enabled,
+    ).toBe(false);
+  });
   it('defaults scheduler disabled, dry-run-compatible timing to 60000ms', () => {
     const config = getOpsSchedulerConfig({});
 
@@ -68,7 +77,8 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.providerKisPriceIngestionMode).toBe('websocket_trade');
     expect(config.marketCandleRetention).toEqual({
       enabled: false,
-      retentionDays: 35,
+      // Design v2.1 §5.2: 45-day 5m retention (KRX 1h 24 sessions).
+      retentionDays: 45,
       batchSize: 5000,
       hour: 4,
       minute: 0,

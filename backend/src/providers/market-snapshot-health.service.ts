@@ -1,5 +1,8 @@
 import { SPOT_ASSET_WHERE } from './binance/binance-product-catalog';
-import { closedMarketPriceScope, findMarketAwareAssetPriceCandidates } from './asset-price-snapshot-query';
+import {
+  closedMarketPriceScope,
+  findMarketAwareAssetPriceCandidates,
+} from './asset-price-snapshot-query';
 import { Injectable } from '@nestjs/common';
 import {
   AssetPriceSourceType,
@@ -94,9 +97,15 @@ export type MarketSnapshotHealthResult = {
     kisUsSymbolCount: number;
     unsupportedAssets: ProviderTargets['unsupportedAssets'];
   };
+  /**
+   * Planner row ESTIMATES (pg_class.reltuples), never an exact COUNT: an exact
+   * count scans the whole table on every health check (F12). Null when the
+   * table was never analyzed or the estimate could not be read.
+   */
   snapshotCounts: {
-    assetPriceSnapshotsTotal: number;
-    fxRateSnapshotsTotal: number;
+    estimated: true;
+    assetPriceSnapshotsTotal: number | null;
+    fxRateSnapshotsTotal: number | null;
   };
   coverage: {
     activeAssets: number;
@@ -216,15 +225,33 @@ export class MarketSnapshotHealthService {
     });
   }
 
-  private async readSnapshotCounts() {
-    const [assetPriceSnapshotsTotal, fxRateSnapshotsTotal] = await Promise.all([
-      this.prisma.assetPriceSnapshot.count(),
-      this.prisma.fxRateSnapshot.count(),
-    ]);
-
+  private async readSnapshotCounts(): Promise<
+    MarketSnapshotHealthResult['snapshotCounts']
+  > {
+    let rows: { relation: string; estimate: bigint | number | null }[] = [];
+    try {
+      rows = await this.prisma.$queryRaw<
+        { relation: string; estimate: bigint | number | null }[]
+      >`SELECT c.relname AS relation, c.reltuples::bigint AS estimate
+        FROM pg_class c
+        WHERE c.oid IN (
+          to_regclass('asset_price_snapshots'),
+          to_regclass('fx_rate_snapshots')
+        )`;
+    } catch {
+      // Diagnostic-only figure: an unreadable estimate never fails the check.
+    }
+    const read = (relation: string): number | null => {
+      const value = rows.find((row) => row.relation === relation)?.estimate;
+      const estimate =
+        value === null || value === undefined ? NaN : Number(value);
+      // reltuples is -1 until the table is first vacuumed/analyzed.
+      return Number.isSafeInteger(estimate) && estimate >= 0 ? estimate : null;
+    };
     return {
-      assetPriceSnapshotsTotal,
-      fxRateSnapshotsTotal,
+      estimated: true,
+      assetPriceSnapshotsTotal: read('asset_price_snapshots'),
+      fxRateSnapshotsTotal: read('fx_rate_snapshots'),
     };
   }
 
@@ -243,10 +270,17 @@ export class MarketSnapshotHealthService {
         currencyCode: priceCurrency,
       },
     });
-    const priceRead = { asset: { ...asset, currencyCode: priceCurrency }, workflow: 'assets_with_price' as const, now: now };
+    const priceRead = {
+      asset: { ...asset, currencyCode: priceCurrency },
+      workflow: 'assets_with_price' as const,
+      now: now,
+    };
     const closedScope = closedMarketPriceScope(priceRead);
     const providerCandidates = providerEligibility.eligible
-      ? await findMarketAwareAssetPriceCandidates(this.prisma, { ...priceRead, sourceNames: providerEligibility.sourceNames })
+      ? await findMarketAwareAssetPriceCandidates(this.prisma, {
+          ...priceRead,
+          sourceNames: providerEligibility.sourceNames,
+        })
       : [];
     const providerSelection = providerEligibility.eligible
       ? selectMarketAwareAssetPriceSnapshotBySourcePriority({

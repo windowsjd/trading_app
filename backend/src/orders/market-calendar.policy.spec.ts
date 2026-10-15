@@ -213,13 +213,35 @@ describe('market calendar policy', () => {
   it('fails safe on dates in years without an audited calendar dataset', () => {
     expect(resolveMarketSession('KRX', '20280104')).toBeNull();
     expect(resolveMarketSession('US', '20280104')).toBeNull();
-    expect(resolveMarketSession('KRX', '20240705')).toBeNull();
+    // KRX starts at 2024 (576-session daily window); 2023 stays uncovered.
+    expect(resolveMarketSession('KRX', '20230705')).toBeNull();
+    expect(resolveMarketSession('US', '20240705')).toBeNull();
     expect(
       resolveRegularSessionForEvent(
         { assetType: AssetType.domestic_stock, market: 'KRX' },
         new Date('2028-01-04T01:00:00.000Z'),
       ),
     ).toBeNull();
+  });
+
+  it('treats real 2024 KRX closures and special sessions per the dataset', () => {
+    // Election day, temporary Armed Forces Day holiday, year-end closure.
+    expect(resolveMarketSession('KRX', '20240410')).toBeNull();
+    expect(resolveMarketSession('KRX', '20241001')).toBeNull();
+    expect(resolveMarketSession('KRX', '20241231')).toBeNull();
+    // Constitution Day was not a holiday in 2024: a regular session.
+    expect(resolveMarketSession('KRX', '20240717')).toMatchObject({
+      openTime: new Date('2024-07-17T00:00:00.000Z'),
+      closeTime: new Date('2024-07-17T06:30:00.000Z'),
+    });
+    expect(resolveMarketSession('KRX', '20240102')).toMatchObject({
+      openTime: new Date('2024-01-02T01:00:00.000Z'),
+      closeTime: new Date('2024-01-02T06:30:00.000Z'),
+    });
+    expect(resolveMarketSession('KRX', '20241114')).toMatchObject({
+      openTime: new Date('2024-11-14T01:00:00.000Z'),
+      closeTime: new Date('2024-11-14T07:30:00.000Z'),
+    });
   });
 
   it('treats real 2025 exchange holidays as closed via the registry', () => {

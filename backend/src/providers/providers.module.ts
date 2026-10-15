@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { KoscomConfigService } from './koscom/koscom.config';
 import { KoscomClient } from './koscom/koscom.client';
+import { KoscomCallBudgetService } from './koscom/koscom-call-budget.service';
 import { KoscomMarketMapService } from './koscom/koscom-market-map.service';
 import { KoscomCandleAdapter } from './koscom/koscom-candle.adapter';
 import { KoscomIngestionService } from './koscom/koscom-ingestion.service';
@@ -64,6 +65,7 @@ import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
   imports: [PrismaModule, RedisModule],
   providers: [
     KoscomConfigService,
+    KoscomCallBudgetService,
     KoscomClient,
     KoscomCandleAdapter,
     KoscomMarketMapService,
@@ -146,6 +148,7 @@ import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
   ],
   exports: [
     KoscomConfigService,
+    KoscomCallBudgetService,
     KoscomClient,
     KoscomCandleAdapter,
     KoscomMarketMapService,

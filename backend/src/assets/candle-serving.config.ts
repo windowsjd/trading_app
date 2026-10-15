@@ -1,3 +1,5 @@
+import { readMarketCandleRetentionConfig } from './market-candle-retention.config';
+
 export type CandleServingMode = 'legacy' | 'database';
 
 export type CandleServingConfig = {
@@ -10,6 +12,8 @@ export type CandleServingConfig = {
   staleWaiterMaxWaitMs: number;
   maxManagedFiveMinuteRangeMs: number;
   maxManagedPeriodRangeMs: number;
+  /** KRX 1d only: the 576-session daily chart spans up to 867.6 days. */
+  maxManagedKrxDailyRangeMs: number;
   maxOnDemandRepairRangeMs: number;
   coverageTailToleranceMs: number;
 };
@@ -17,6 +21,7 @@ export type CandleServingConfig = {
 export const CANDLE_SERVING_CONFIG = Symbol('CANDLE_SERVING_CONFIG');
 
 const DAY_MS = 24 * 60 * 60_000;
+export const MANAGED_FIVE_MINUTE_RANGE_DAYS = 45;
 
 export class CandleServingConfigError extends Error {
   constructor(message: string) {
@@ -80,8 +85,16 @@ export function readCandleServingConfig(
       'CANDLE_SERVING_STALE_WAITER_MAX_WAIT_MS',
       500,
     ),
-    maxManagedFiveMinuteRangeMs: 35 * DAY_MS,
+    // Design v2.1 §5.2: the KRX 1h 24-session window reads up to 41.8 days
+    // of 5m source (+3 days margin → 45). Never beyond the 5m retention, so
+    // a managed window can never point at data the retention job deleted.
+    maxManagedFiveMinuteRangeMs:
+      Math.min(
+        MANAGED_FIVE_MINUTE_RANGE_DAYS,
+        readMarketCandleRetentionConfig(env).retentionDays,
+      ) * DAY_MS,
     maxManagedPeriodRangeMs: 365 * DAY_MS,
+    maxManagedKrxDailyRangeMs: 875 * DAY_MS,
     // Must cover the largest chart window that is expected to SELF-HEAL on
     // demand: the 15m tab requests range=3d, whose aggregated read plan spans
     // 3d + 4h of source padding. With the old 2-day default that request

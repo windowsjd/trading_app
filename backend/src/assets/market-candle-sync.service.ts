@@ -18,6 +18,7 @@ import {
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { redactText } from '../providers/provider-secret-redaction';
+import { projectOpsFailure } from '../ops/ops-failure';
 import { toBinanceUsdtSymbol } from '../providers/provider-target-resolver.service';
 import { normalizeKisUsMarketCode } from '../providers/kis/kis-websocket.subscription';
 import { formatZonedCursor } from '../providers/kis/candles/kis-candle-time';
@@ -68,17 +69,24 @@ import {
   resolveCalendarMarket,
   resolveStockMarketDataUpperBound,
 } from '../orders/market-calendar.policy';
+import {
+  FIVE_MINUTES_MS,
+  krxSessionsBetween,
+  requiredFiveMinuteSlotStarts,
+} from './krx-candle-collection.policy';
 
 const DAY_MS = 24 * 60 * 60_000;
-// Retention windows: 5m 35 days, 1d/1w one year (documented storage policy).
+// Default lookbacks of a cold incremental run (collection policy, unchanged):
+// 5m 35 days, 1d/1w one year. Longer windows are explicit backfills.
 const FEED_DEFAULT_LOOKBACK_MS: Record<MarketCandleFeed, number> = {
   '5m': 35 * DAY_MS,
   '1d': 365 * DAY_MS,
   '1w': 365 * DAY_MS,
 };
-// Approximate feed row caps: ~400 daily and ~60 weekly rows cover one year.
+// Feed row caps per run: 600 daily rows hold the KRX 576-session window
+// (design v2.1 §5.4); ~60 weekly rows cover one year. Runs resume past caps.
 const FEED_ROW_CAPS: Partial<Record<MarketCandleFeed, number>> = {
-  '1d': 400,
+  '1d': 600,
   '1w': 60,
 };
 const FEED_APPROX_INTERVAL_MS: Record<MarketCandleFeed, number> = {
@@ -110,6 +118,8 @@ const SWEEP_TERMINAL_REASONS: ReadonlySet<MarketCandleSyncStopReason> = new Set(
     'data_incomplete',
   ],
 );
+
+type KrxSlotAudit = { firstMissingMs: number | null };
 
 type SyncAssetRecord = {
   id: string;
@@ -145,6 +155,15 @@ export type MarketCandleSyncAssetInput = {
     maxRows: number;
     maxDurationMs: number;
   };
+  /**
+   * Central KRX writer only (design v2.1 §4.2 rule 3): a KRX 5m run claims
+   * coverage only for what the STORED candles prove — every closed required
+   * slot of the claim has a closed KOSCOM 5m row. A run that finds an
+   * unproven slot claims the proven prefix as its own checkpoint and records
+   * the slot. `phase` tags the run so post-close repair attempts are
+   * counted exactly. Other callers keep the provider-sweep claim unchanged.
+   */
+  krxAudit?: { phase: 'intraday' | 'repair' };
 };
 
 export type MarketCandleSyncAssetsInput = {
@@ -233,6 +252,7 @@ export class MarketCandleSyncService {
       now: input.now ?? new Date(),
       signal: input.signal,
       budget: input.budget,
+      krxAudit: input.krxAudit,
     });
   }
 
@@ -436,6 +456,7 @@ export class MarketCandleSyncService {
       now: Date;
       signal?: AbortSignal;
       budget?: MarketCandleSyncAssetInput['budget'];
+      krxAudit?: { phase: 'intraday' | 'repair' };
     },
   ): Promise<MarketCandleAssetSyncResult> {
     const feeds: MarketCandleFeedResult[] = [];
@@ -476,6 +497,7 @@ export class MarketCandleSyncService {
       now: Date;
       signal?: AbortSignal;
       budget?: MarketCandleSyncAssetInput['budget'];
+      krxAudit?: { phase: 'intraday' | 'repair' };
     },
   ): Promise<MarketCandleFeedResult> {
     const sourceProvider = this.sourceProviderFor(descriptor, feed);
@@ -619,6 +641,7 @@ export class MarketCandleSyncService {
       now: Date;
       signal?: AbortSignal;
       budget?: MarketCandleSyncAssetInput['budget'];
+      krxAudit?: { phase: 'intraday' | 'repair' };
     },
   ): Promise<MarketCandleFeedResult> {
     const base = {
@@ -950,6 +973,42 @@ export class MarketCandleSyncService {
             coveredTo !== null &&
             coveredFrom.getTime() <= targetFrom.getTime() &&
             coveredTo.getTime() >= requiredTo;
+          // Central KRX writer: the stored candles, not the provider sweep,
+          // decide the claim (catches buckets without a single minute row,
+          // F26, and ignores the closing auction's non-required slots, F25).
+          let audit: KrxSlotAudit | null = null;
+          if (
+            options.krxAudit &&
+            descriptor.kind === 'kis_domestic' &&
+            feed === '5m'
+          ) {
+            try {
+              audit = await this.auditKrxRequiredSlots(
+                asset.id,
+                targetFrom.getTime(),
+                requiredTo,
+                options.now.getTime(),
+              );
+            } catch (error) {
+              const failure = projectOpsFailure(
+                error,
+                'CANDLE_EVIDENCE_READ_FAILED',
+              );
+              stopReason = 'write_failed';
+              status = MarketCandleSyncStatus.failed;
+              errorCode = failure.code;
+              errorMessage = failure.message;
+              await this.stateRepository.markFailed(state.id, {
+                errorCode: failure.code,
+                errorMessage: failure.message,
+              });
+              break;
+            }
+            coverageComplete = audit.firstMissingMs === null;
+            coverageSealed = !coverageComplete;
+            coveredFrom = coverageComplete ? targetFrom : null;
+            coveredTo = coverageComplete ? new Date(requiredTo) : null;
+          }
           complete = coverageComplete;
           const progressRow = await this.stateRepository.findById(state.id);
           const acceptedTotal = progressRow?.rowsAccepted ?? page.acceptedRows;
@@ -971,7 +1030,29 @@ export class MarketCandleSyncService {
             // this effective bound: a targetTo in the future can only be
             // confirmed up to the sync-time `now`.
             requiredCoveredTo: new Date(requiredTo),
+            ...(audit && options.krxAudit
+              ? {
+                  cursorJson: {
+                    auditPhase: options.krxAudit.phase,
+                    auditFirstMissing:
+                      audit.firstMissingMs === null
+                        ? null
+                        : new Date(audit.firstMissingMs).toISOString(),
+                  },
+                }
+              : {}),
           });
+          if (audit?.firstMissingMs != null && options.krxAudit) {
+            await this.recordKrxProvenPrefix(
+              asset.id,
+              feed,
+              sourceProvider,
+              targetFrom,
+              audit.firstMissingMs,
+              state.id,
+              options.krxAudit.phase,
+            );
+          }
         } else {
           status = MarketCandleSyncStatus.failed;
           errorCode = stopReason.toUpperCase();
@@ -1015,6 +1096,81 @@ export class MarketCandleSyncService {
         ? errorMessage
         : (finalState?.errorMessage ?? errorMessage),
     };
+  }
+
+  /**
+   * The first closed required KRX slot overlapping `[fromMs, toMs)` without a
+   * closed KOSCOM 5m candle (null = all proven). Unknown calendar dates make
+   * the very first instant unproven (fail closed: nothing is claimed).
+   */
+  private async auditKrxRequiredSlots(
+    assetId: string,
+    fromMs: number,
+    toMs: number,
+    nowMs: number,
+  ): Promise<KrxSlotAudit> {
+    const sessions = krxSessionsBetween(fromMs - FIVE_MINUTES_MS, toMs);
+    if (sessions === null) return { firstMissingMs: fromMs };
+    const required = sessions
+      .flatMap((session) => requiredFiveMinuteSlotStarts(session))
+      .filter(
+        (slot) =>
+          slot < toMs &&
+          slot + FIVE_MINUTES_MS > fromMs &&
+          slot + FIVE_MINUTES_MS <= nowMs,
+      );
+    if (required.length === 0) return { firstMissingMs: null };
+    const rows = await this.repository.findRange({
+      assetId,
+      interval: '5m',
+      from: new Date(required[0]),
+      to: new Date(required[required.length - 1] + FIVE_MINUTES_MS),
+    });
+    const proven = new Set(
+      rows
+        .filter(
+          (row) => row.isClosed && row.sourceProvider === KOSCOM_MINUTE_SOURCE,
+        )
+        .map((row) => row.openTime.getTime()),
+    );
+    return {
+      firstMissingMs: required.find((slot) => !proven.has(slot)) ?? null,
+    };
+  }
+
+  /**
+   * Records the audited prefix `[targetFrom, firstMissing)` of an incomplete
+   * central run as its own coverage-complete checkpoint, through the same
+   * invariant-checked create/complete path as every run. Called while the
+   * asset/feed backfill lock is still held and the run row is terminal.
+   */
+  private async recordKrxProvenPrefix(
+    assetId: string,
+    feed: MarketCandleFeed,
+    sourceProvider: string,
+    targetFrom: Date,
+    firstMissingMs: number,
+    runId: string,
+    phase: 'intraday' | 'repair',
+  ): Promise<void> {
+    if (firstMissingMs <= targetFrom.getTime()) return;
+    const prefixTo = new Date(firstMissingMs);
+    const claim = await this.stateRepository.createRunning({
+      assetId,
+      feed,
+      sourceProvider,
+      mode: MarketCandleSyncMode.repair,
+      targetFrom,
+      targetTo: prefixTo,
+    });
+    await this.stateRepository.markCompleted(claim.id, new Date(), {
+      coverageComplete: true,
+      completionReason: 'target_reached',
+      coveredFrom: targetFrom,
+      coveredTo: prefixTo,
+      requiredCoveredTo: prefixTo,
+      cursorJson: { auditPrefixOf: runId, auditPhase: phase },
+    });
   }
 
   private async inspectKisDailyEvidence(

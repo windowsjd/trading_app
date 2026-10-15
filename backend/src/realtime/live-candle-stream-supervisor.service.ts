@@ -1,6 +1,9 @@
 import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
-import { KoscomConfigService } from '../providers/koscom/koscom.config';
+import {
+  KoscomConfigService,
+  isKoscomPollingOwnedByLiveSupervisor,
+} from '../providers/koscom/koscom.config';
 import { MarketCandleIngestionService } from '../assets/market-candle-ingestion.service';
 import { resolveRegularSessionForEvent } from '../orders/market-calendar.policy';
 import {
@@ -122,7 +125,8 @@ export class LiveCandleStreamSupervisorService
     if (!this.config.enabled || this.tasks.length > 0) return;
     this.stopping = false;
     const koscom = this.koscomConfig?.getConfig();
-    if (koscom?.enabled && koscom.pollingEnabled)
+    // Slot mode (2d) moves KOSCOM prices to the Ops scheduler in every mode.
+    if (koscom && isKoscomPollingOwnedByLiveSupervisor(koscom))
       this.tasks.push(this.runOwnershipLoop('koscom'));
     if (this.config.binanceEnabled) {
       this.tasks.push(this.runOwnershipLoop('binance'));

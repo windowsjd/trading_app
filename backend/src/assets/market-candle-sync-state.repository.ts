@@ -10,6 +10,10 @@ import type {
   MarketCandleFeed,
   MarketCandleSyncCompletionReason,
 } from './market-candle-sync.types';
+import type {
+  CoverageBridge,
+  KrxCheckpointRow,
+} from './krx-candle-collection.policy';
 
 const ERROR_MESSAGE_MAX_LENGTH = 500;
 
@@ -100,6 +104,18 @@ export type MarketCandleSyncPageProgress = {
   coveredTo: Date | null;
 };
 
+/** Optional evidence rules of `findCandleCoverage` (KRX central mode). */
+export type CandleCoverageOptions = {
+  /**
+   * Reach of a coverage gap `[from, to)` that needs no proof (holidays,
+   * nights, non-required slots): the gap counts as covered up to the
+   * returned instant. Absent → gaps are never bridged (existing behaviour).
+   */
+  bridge?: CoverageBridge;
+  /** Only checkpoints created at/after this instant are evidence. */
+  createdAtOrAfter?: Date;
+};
+
 export type MarketCandleSyncCompletionInput = {
   // True only when the provider cursor confirmed the whole target range.
   coverageComplete: boolean;
@@ -111,6 +127,9 @@ export type MarketCandleSyncCompletionInput = {
   // provider can confirm, so completeness is judged against this instant
   // instead of targetTo alone.
   requiredCoveredTo: Date;
+  // Terminal audit note of the run (a completed row is never resumed, so its
+  // cursor slot carries it): e.g. the first unproven KRX slot.
+  cursorJson?: Prisma.JsonObject;
 };
 
 /**
@@ -268,6 +287,7 @@ export class MarketCandleSyncStateRepository {
     feed: MarketCandleFeed,
     from: Date,
     to: Date,
+    options: CandleCoverageOptions = {},
   ): Promise<CandleCoverageEvidence> {
     if (from.getTime() >= to.getTime()) return EMPTY_COVERAGE;
     const rows = await this.prisma.marketCandleSyncState.findMany({
@@ -279,6 +299,9 @@ export class MarketCandleSyncStateRepository {
         coveredFrom: { not: null, lt: to },
         coveredTo: { not: null, gt: from },
         completedAt: { not: null },
+        ...(options.createdAtOrAfter
+          ? { createdAt: { gte: options.createdAtOrAfter } }
+          : {}),
       },
       orderBy: [{ coveredFrom: 'asc' }, { coveredTo: 'desc' }],
       take: COVERAGE_UNION_MAX_ROWS,
@@ -287,18 +310,37 @@ export class MarketCandleSyncStateRepository {
 
     const fromMs = from.getTime();
     const toMs = to.getTime();
+    // How far a gap starting at `gapFrom` counts as covered without proof.
+    const reach = (gapFrom: number, gapTo: number) =>
+      options.bridge ? options.bridge(gapFrom, gapTo) : gapFrom;
     let cursorMs = fromMs;
     let started = false;
     let newestCompletedAt: Date | null = null;
     let hasInteriorGap = false;
+    let holeFound = false;
     for (const row of rows) {
       if (!row.coveredFrom || !row.coveredTo || !row.completedAt) continue;
-      if (row.coveredFrom.getTime() > cursorMs) {
-        // Rows are ordered by coveredFrom, so this row starts after a hole.
-        // Coverage that resumes later inside the window is an INTERIOR gap;
-        // everything past the contiguous prefix stays unconfirmed either way.
-        if (started && row.coveredFrom.getTime() < toMs) hasInteriorGap = true;
-        break;
+      const rowFrom = row.coveredFrom.getTime();
+      if (rowFrom > cursorMs) {
+        const gapEnd = Math.min(rowFrom, toMs);
+        const bridged = reach(cursorMs, gapEnd);
+        if (bridged < gapEnd) {
+          // Rows are ordered by coveredFrom, so this row starts after a
+          // hole. Coverage that resumes later inside the window is an
+          // INTERIOR gap; everything past the contiguous prefix stays
+          // unconfirmed either way. A bridged head still starts the window.
+          if (bridged > cursorMs) {
+            started = true;
+            cursorMs = bridged;
+          }
+          if (started && rowFrom < toMs) hasInteriorGap = true;
+          holeFound = true;
+          break;
+        }
+        // The whole gap needs no proof (e.g. a KRX holiday): connected.
+        started = true;
+        cursorMs = gapEnd;
+        if (cursorMs >= toMs) break;
       }
       if (row.coveredTo.getTime() <= cursorMs) continue;
       started = true;
@@ -311,6 +353,14 @@ export class MarketCandleSyncStateRepository {
       }
       if (cursorMs >= toMs) break;
     }
+    // A tail that needs no proof (e.g. the night after the last run).
+    if (!holeFound && cursorMs < toMs && options.bridge) {
+      const bridged = reach(cursorMs, toMs);
+      if (bridged > cursorMs) {
+        started = true;
+        cursorMs = bridged;
+      }
+    }
 
     if (!started) return EMPTY_COVERAGE;
     return {
@@ -319,6 +369,93 @@ export class MarketCandleSyncStateRepository {
       newestCompletedAt,
       hasInteriorGap,
     };
+  }
+
+  /**
+   * Every checkpoint (any status) whose target overlaps `[from, to)`, created
+   * at/after `createdAtOrAfter` — the input of the KRX central planners.
+   */
+  async findCheckpointsOverlapping(
+    assetId: string,
+    feed: MarketCandleFeed,
+    from: Date,
+    to: Date,
+    createdAtOrAfter?: Date,
+  ): Promise<KrxCheckpointRow[]> {
+    const rows = await this.prisma.marketCandleSyncState.findMany({
+      where: {
+        assetId,
+        feed,
+        targetFrom: { lt: to },
+        targetTo: { gt: from },
+        ...(createdAtOrAfter ? { createdAt: { gte: createdAtOrAfter } } : {}),
+      },
+      orderBy: { createdAt: 'asc' },
+      take: COVERAGE_UNION_MAX_ROWS,
+      select: {
+        mode: true,
+        status: true,
+        coverageComplete: true,
+        targetFrom: true,
+        targetTo: true,
+        coveredFrom: true,
+        coveredTo: true,
+        createdAt: true,
+        cursorJson: true,
+      },
+    });
+    return rows.map((row) => {
+      const cursor =
+        row.cursorJson &&
+        typeof row.cursorJson === 'object' &&
+        !Array.isArray(row.cursorJson)
+          ? (row.cursorJson as Record<string, unknown>)
+          : null;
+      const missing =
+        typeof cursor?.auditFirstMissing === 'string'
+          ? Date.parse(cursor.auditFirstMissing)
+          : NaN;
+      // Only the audited run itself (it records auditFirstMissing, possibly
+      // null) carries a phase; its proven-prefix claim does not count again.
+      const phase =
+        cursor &&
+        'auditFirstMissing' in cursor &&
+        (cursor.auditPhase === 'intraday' || cursor.auditPhase === 'repair')
+          ? cursor.auditPhase
+          : null;
+      return {
+        mode: row.mode,
+        status: row.status,
+        coverageComplete: row.coverageComplete,
+        targetFrom: row.targetFrom,
+        targetTo: row.targetTo,
+        coveredFrom: row.coveredFrom,
+        coveredTo: row.coveredTo,
+        createdAt: row.createdAt,
+        auditPhase: phase,
+        auditFirstMissingMs: Number.isFinite(missing) ? missing : null,
+      };
+    });
+  }
+
+  /**
+   * Audited central runs of one phase created at/after an instant, all
+   * assets together: rows recording `auditFirstMissing` (proven-prefix
+   * claims never do).
+   */
+  async countAuditedRuns(
+    feed: MarketCandleFeed,
+    phase: 'intraday' | 'repair',
+    createdAtOrAfter: Date,
+  ): Promise<number> {
+    const rows = await this.prisma.$queryRaw<{ runs: number }[]>`
+      SELECT count(*)::int AS runs
+      FROM market_candle_sync_states
+      WHERE feed = ${feed}
+        AND created_at >= ${createdAtOrAfter}
+        AND cursor_json ->> 'auditPhase' = ${phase}
+        AND cursor_json ? 'auditFirstMissing'`;
+    return rows[0]?.runs ?? 0;
   }
 
   /** Returns the refreshed row, or null when the run was not resumable. */
@@ -397,18 +534,22 @@ export class MarketCandleSyncStateRepository {
       select: { targetFrom: true, targetTo: true },
     });
     if (row) assertCompletionInvariant(id, row, coverage);
+    const completed = {
+      status: MarketCandleSyncStatus.completed,
+      completedAt,
+      coverageComplete: coverage.coverageComplete,
+      completionReason: coverage.completionReason,
+      coveredFrom: coverage.coveredFrom,
+      coveredTo: coverage.coveredTo,
+      errorCode: null,
+      errorMessage: null,
+    };
     const updated = await this.prisma.marketCandleSyncState.updateMany({
       where: { id, status: MarketCandleSyncStatus.running },
-      data: {
-        status: MarketCandleSyncStatus.completed,
-        completedAt,
-        coverageComplete: coverage.coverageComplete,
-        completionReason: coverage.completionReason,
-        coveredFrom: coverage.coveredFrom,
-        coveredTo: coverage.coveredTo,
-        errorCode: null,
-        errorMessage: null,
-      },
+      // An audited central KRX run also records its audit outcome.
+      data: coverage.cursorJson
+        ? { ...completed, cursorJson: coverage.cursorJson }
+        : completed,
     });
     return updated.count === 1;
   }

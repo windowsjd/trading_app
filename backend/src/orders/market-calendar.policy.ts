@@ -184,13 +184,14 @@ export function findLatestCompletedMarketSession(
 /**
  * Resolves the Nth exchange session strictly before the reference's local
  * calendar date. The reference date itself is never counted, even after its
- * close; this is the chart `prev_open` / `prev2_open` meaning.
+ * close; this is the chart `prev_open` / `prevN_open` meaning. The default
+ * search bound covers the 576-session daily chart (≤ 868 calendar days).
  */
 export function findPreviousMarketSession(
   asset: MarketCalendarAsset,
   reference: Date,
   sessionsBack: number,
-  maxLookbackDays = 370,
+  maxLookbackDays = 900,
   scheduleLookup: typeof findEffectiveMarketSchedule = findEffectiveMarketSchedule,
 ): MarketSessionWindow | null {
   const market = resolveCalendarMarket(asset);

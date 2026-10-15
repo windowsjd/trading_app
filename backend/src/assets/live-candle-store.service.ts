@@ -283,6 +283,20 @@ export class LiveCandleStoreService {
     );
   }
 
+  /** Failed repair attempts of one queued bucket (F8 cap), kept 2 days. */
+  async incrementReconcileAttempts(member: string): Promise<number> {
+    const key = `${LIVE_CANDLE_RECONCILE_PENDING_KEY}:attempts:${member}`;
+    const attempts = await this.redis.increment(key);
+    await this.redis.expire(key, 2 * 24 * 60 * 60);
+    return attempts;
+  }
+
+  async clearReconcileAttempts(member: string): Promise<void> {
+    await this.redis.delete(
+      `${LIVE_CANDLE_RECONCILE_PENDING_KEY}:attempts:${member}`,
+    );
+  }
+
   async countReconcilePendingDue(now: Date): Promise<number> {
     const members = await this.redis.zrangeByScore(
       LIVE_CANDLE_RECONCILE_PENDING_KEY,

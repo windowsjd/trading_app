@@ -1,6 +1,9 @@
 import { readLiveCandleConfig } from '../assets/live-candle.config';
 import { KoscomIngestionService } from '../providers/koscom/koscom-ingestion.service';
-import { KoscomConfigService } from '../providers/koscom/koscom.config';
+import {
+  KoscomConfigService,
+  koscomConfigWarnings,
+} from '../providers/koscom/koscom.config';
 import {
   Injectable,
   OnModuleDestroy,
@@ -20,10 +23,17 @@ import {
   OpsSchedulerConfig,
 } from './ops-config';
 import {
+  KRX_CHECKPOINT_COMPACTION_LOCK_KEY,
+  MARKET_CANDLE_SYNC_LOCK_KEY,
   OpsJobRunnerResponse,
   OpsJobRunnerInput,
   OpsJobRunnerService,
 } from './ops-job-runner.service';
+import { KrxCentralCandleService } from '../assets/krx-central-candle.service';
+import {
+  nextKrxCentralRun,
+  type KrxCentralPhase,
+} from '../assets/krx-candle-collection.policy';
 import { OpsJobRunService } from './ops-job-run.service';
 import { MarketSnapshotHealthService } from '../providers/market-snapshot-health.service';
 import { ProviderConfigService } from '../providers/provider-config.service';
@@ -44,6 +54,12 @@ import { classifyFailureCause } from '../common/safe-failure-cause';
 @Injectable()
 export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
   private koscomInterval: NodeJS.Timeout | null = null;
+  private koscomSlotTimer: NodeJS.Timeout | null = null;
+  private koscomSlotStopped = true;
+  private lastKoscomSlot = -1;
+  private krxCentralTimer: NodeJS.Timeout | null = null;
+  private krxCentralStopped = true;
+  private krxReconciliationSkipLogged = false;
   private interval: NodeJS.Timeout | null = null;
   private limitOrderMatchingInterval: NodeJS.Timeout | null = null;
   /** Prevents same-process tick overlap of the candle sync job (see below). */
@@ -69,11 +85,20 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly limitOrderMatchingService?: LimitOrderMatchingService,
     @Optional() private readonly koscom?: KoscomIngestionService,
     @Optional() private readonly koscomConfig?: KoscomConfigService,
+    @Optional() private readonly krxCentral?: KrxCentralCandleService,
   ) {}
 
   onModuleInit() {
     const koscom = this.koscomConfig?.getConfig();
-    if (
+    if (koscom?.enabled) {
+      // F16: a set-but-ignored value used to fall back silently.
+      for (const warning of koscomConfigWarnings())
+        console.warn('KOSCOM setting ignored; using the fallback.', warning);
+    }
+    if (koscom?.enabled && koscom.pollingEnabled && koscom.priceSlotEnabled) {
+      // 2b/2d: the cluster slot loop owns KOSCOM prices in every live mode.
+      this.startKoscomSlotLoop(koscom.pollIntervalMs);
+    } else if (
       koscom?.enabled &&
       koscom.pollingEnabled &&
       !readLiveCandleConfig().enabled
@@ -85,6 +110,7 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       this.koscomInterval.unref?.();
       collect();
     }
+    if (this.krxCentral?.isEnabled()) this.startKrxCentralLoop();
     const config = getOpsSchedulerConfig();
     if (config.providerIngestionRunOnStartup) {
       const startupAt = new Date();
@@ -143,13 +169,117 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  onModuleDestroy() {
+  async onModuleDestroy() {
+    const slotMode = !this.koscomSlotStopped;
     this.clearInterval();
+    // F27: let an in-flight slot cycle finish and release its 3T cycle lock,
+    // so a deploy hands the next slot over instead of waiting for the TTL.
+    if (slotMode) {
+      const periodMs = this.koscomConfig?.getConfig().pollIntervalMs ?? 3000;
+      await this.koscom?.drain(Math.min(15_000, Math.max(5_000, 3 * periodMs)));
+    }
+  }
+
+  /**
+   * One attempt per slot boundary per process; whichever instance claims the
+   * slot key runs it (see KoscomIngestionService.collectSlot). The timer is
+   * re-armed for the next boundary, so start jitter is timer latency only.
+   */
+  private startKoscomSlotLoop(periodMs: number) {
+    this.koscomSlotStopped = false;
+    const tick = () => {
+      if (this.koscomSlotStopped) return;
+      const slot = Math.floor(Date.now() / periodMs);
+      if (slot > this.lastKoscomSlot) {
+        this.lastKoscomSlot = slot;
+        void this.koscom
+          ?.collectSlot({ slot, periodMs })
+          .catch(() => undefined);
+      }
+      this.koscomSlotTimer = setTimeout(
+        tick,
+        Math.max(1, (slot + 1) * periodMs - Date.now()),
+      );
+      this.koscomSlotTimer.unref?.();
+    };
+    tick();
+  }
+
+  /**
+   * Central KRX candle schedule (design v2.1 §3): every 5m bucket end +
+   * delay during the session, then repair/daily phases after the close, all
+   * derived from the calendar. Each instant is claimed cluster-wide, so one
+   * instance runs it; a run that overlaps the next instant simply makes the
+   * frontier catch up on the following one.
+   */
+  private startKrxCentralLoop() {
+    const central = this.krxCentral;
+    if (!central) return;
+    this.krxCentralStopped = false;
+    const arm = () => {
+      if (this.krxCentralStopped) return;
+      const next = nextKrxCentralRun(Date.now(), central.tickDelayMs);
+      const waitMs = next
+        ? Math.min(Math.max(0, next.atMs - Date.now()), 5 * 60_000)
+        : 10 * 60_000; // calendar gap: look again later, never guess
+      this.krxCentralTimer = setTimeout(() => {
+        if (next && Date.now() + 50 >= next.atMs) {
+          void this.runKrxCentralPhase(next.phase, next.atMs)
+            .catch(() => undefined)
+            .finally(arm);
+        } else {
+          arm();
+        }
+      }, waitMs);
+      this.krxCentralTimer.unref?.();
+    };
+    arm();
+  }
+
+  async runKrxCentralPhase(phase: KrxCentralPhase, atMs: number) {
+    const central = this.krxCentral;
+    if (!central?.isEnabled() || !(await central.claimRun(phase, atMs))) return;
+    const config = getOpsSchedulerConfig();
+    const baseInput = {
+      trigger: OpsJobTrigger.scheduler,
+      requestedBy: 'scheduler',
+      dryRun: false,
+      lockTtlSeconds: config.lockTtlSeconds,
+      maxAttempts: config.maxAttempts,
+    };
+    const now = new Date();
+    try {
+      await this.runner.runKrxCentralCandleJob({
+        ...baseInput,
+        phase,
+        now: now.toISOString(),
+      });
+      // 4h long history is verified against the stored dated daily bar, so
+      // it runs after each daily phase (design v2.1 §5.3).
+      if (phase === 'daily')
+        await this.runner.runMarketCandleLongSyncJob({
+          ...baseInput,
+          mode: 'incremental',
+          markets: ['krx'],
+          now: new Date().toISOString(),
+        });
+    } catch (error) {
+      console.warn('KRX central candle phase failed.', {
+        phase,
+        safeCause: classifyFailureCause(error),
+      });
+    }
   }
 
   clearInterval() {
     if (this.koscomInterval) clearInterval(this.koscomInterval);
     this.koscomInterval = null;
+    this.krxCentralStopped = true;
+    if (this.krxCentralTimer) clearTimeout(this.krxCentralTimer);
+    this.krxCentralTimer = null;
+    this.koscomSlotStopped = true;
+    if (this.koscomSlotTimer) clearTimeout(this.koscomSlotTimer);
+    this.koscomSlotTimer = null;
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
@@ -271,6 +401,9 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
 
     const retention = await this.runMarketCandleRetentionIfDue(now, config);
     if (retention) results.push(retention);
+
+    const compaction = await this.runKrxCheckpointCompactionIfDue(now, config);
+    if (compaction) results.push(compaction);
 
     for (const market of ['KRX', 'US', 'CRYPTO'] as const) {
       const reconciliation = await this.runMarketCandleReconciliationIfDue(
@@ -431,8 +564,11 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
     if (this.marketCandleSyncInFlight) return undefined;
     this.marketCandleSyncInFlight = true;
     try {
+      // Only the interval sync's own runs gate its cadence: the central KRX
+      // phases share the job name under a different lock key.
       const latestRun = await this.runService.findLatestRunForJob(
         OpsJobName.market_candle_sync,
+        MARKET_CANDLE_SYNC_LOCK_KEY,
       );
       if (latestRun) {
         const lastRunAt = latestRun.finishedAt ?? latestRun.startedAt;
@@ -450,6 +586,10 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           continueOnError: true,
           now: now.toISOString(),
           assetIds: config.marketCandleSync.assetIds,
+          // KRX is collected only by the central schedule (design §7.6).
+          ...(this.krxCentral?.isEnabled()
+            ? { assetTypes: ['us_stock', 'crypto'] }
+            : {}),
         });
       } catch {
         // Recorded on the run row; the next interval retries from checkpoints.
@@ -514,6 +654,17 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
           ? reconciliation.us.enabled
           : reconciliation.crypto.enabled;
     if (!reconciliation.enabled || !enabled) return undefined;
+    // The central post-close repair replaces KRX reconciliation (§7.6).
+    if (market === 'KRX' && this.krxCentral?.isEnabled()) {
+      if (!this.krxReconciliationSkipLogged) {
+        this.krxReconciliationSkipLogged = true;
+        console.warn(
+          'KRX candle reconciliation skipped: the central KRX collection owns it.',
+          { reason: 'KRX_CENTRAL_CANDLES_ENABLED' },
+        );
+      }
+      return undefined;
+    }
 
     if (market === 'CRYPTO') {
       const attempted =
@@ -719,6 +870,39 @@ export class OpsSchedulerService implements OnModuleInit, OnModuleDestroy {
       retentionDays: config.marketCandleRetention.retentionDays,
       batchSize: config.marketCandleRetention.batchSize,
       metadataJson: { businessDate },
+    });
+  }
+
+  /**
+   * Daily KRX checkpoint compaction at 05:00 local time, after the 04:00 5m
+   * retention (design v2.1 §4.4); central KRX collection only, once per
+   * successful business date.
+   */
+  async runKrxCheckpointCompactionIfDue(
+    now: Date,
+    config: OpsSchedulerConfig = getOpsSchedulerConfig(),
+  ): Promise<OpsJobRunnerResponse | undefined> {
+    if (!this.krxCentral?.isEnabled()) return undefined;
+    const local = getSchedulerLocalDateTime(now, config.timezone);
+    if (local.hour < 5) return undefined;
+    const businessDate = getSchedulerBusinessDate(now, config.timezone);
+    const latest = await this.runService.findLatestSucceededRunForJob(
+      OpsJobName.market_candle_sync,
+      KRX_CHECKPOINT_COMPACTION_LOCK_KEY,
+    );
+    if (
+      latest &&
+      getSchedulerBusinessDate(latest.startedAt, config.timezone) ===
+        businessDate
+    )
+      return undefined;
+    return this.runner.runKrxCheckpointCompactionJob({
+      trigger: OpsJobTrigger.scheduler,
+      requestedBy: 'scheduler',
+      dryRun: false,
+      lockTtlSeconds: config.lockTtlSeconds,
+      maxAttempts: config.maxAttempts,
+      now: now.toISOString(),
     });
   }
 

@@ -4,6 +4,7 @@ import type {
   MarketCalendarMarket,
   MarketCalendarSchedule,
 } from './market-calendar.types';
+import { KRX_2024 } from './data/krx-2024';
 import { KRX_2025 } from './data/krx-2025';
 import { KRX_2026 } from './data/krx-2026';
 import { KRX_2027 } from './data/krx-2027';
@@ -19,6 +20,7 @@ export class MarketCalendarConfigError extends Error {
 }
 
 const DATASETS: readonly MarketCalendarDataset[] = [
+  KRX_2024,
   KRX_2025,
   KRX_2026,
   KRX_2027,

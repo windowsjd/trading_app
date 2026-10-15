@@ -625,6 +625,32 @@ describe('LiveCandleStreamSupervisorService', () => {
     }
   });
 
+  it.each([
+    [false, 1],
+    [true, 0],
+  ])(
+    'owns a KOSCOM price loop only outside slot mode (slot mode %s → %s loops, 2d)',
+    async (priceSlotEnabled, loops) => {
+      const fixture = setup(
+        () => new FakeSocket(),
+        [],
+        200,
+        {
+          binanceEnabled: false,
+          kisEnabled: false,
+          kisUsDelayedEnabled: false,
+        },
+        { pollingEnabled: true, priceSlotEnabled },
+      );
+      fixture.locks.acquire.mockResolvedValue({ status: 'busy' });
+      fixture.service.start();
+      const tasks = (fixture.service as unknown as { tasks: unknown[] }).tasks;
+      expect(tasks.length).toBe(loops);
+      await fixture.service.stop();
+      expect(fixture.koscom.collect).not.toHaveBeenCalled();
+    },
+  );
+
   it('closes the provider socket immediately after owner lease renewal is lost', async () => {
     jest.useFakeTimers();
     const socket = new FakeSocket();
@@ -645,6 +671,7 @@ function setup(
   assets = [cryptoAsset('btc', 'BTC')],
   maxProviderSubscriptionsPerShard = 200,
   configOverrides: Record<string, unknown> = {},
+  koscomConfigOverrides: Record<string, unknown> = {},
 ) {
   const prisma = {
     asset: {
@@ -749,8 +776,10 @@ function setup(
       getConfig: () => ({
         enabled: true,
         pollingEnabled: false,
+        priceSlotEnabled: false,
         pollIntervalMs: 1,
         concurrency: 2,
+        ...koscomConfigOverrides,
       }),
     } as never,
     candleIngestion as never,

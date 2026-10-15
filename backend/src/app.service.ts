@@ -24,7 +24,10 @@ import {
 import { LiveCandlePubSubService } from './realtime/live-candle-pubsub.service';
 import { RedisService } from './redis/redis.service';
 import { readRedisConfig } from './redis/redis.config';
-import { readKoscomConfig } from './providers/koscom/koscom.config';
+import {
+  isKoscomPollingOwnedByLiveSupervisor,
+  readKoscomConfig,
+} from './providers/koscom/koscom.config';
 import { TiingoDiagnosticsService } from './providers/tiingo/tiingo-diagnostics.service';
 
 /**
@@ -154,7 +157,7 @@ export class AppService {
       liveEnabled && this.liveCandleConfig
         ? validateLiveReconciliationDependencies({
             live: this.liveCandleConfig,
-            koscomPollingEnabled: koscom.enabled && koscom.pollingEnabled,
+            koscomPollingEnabled: isKoscomPollingOwnedByLiveSupervisor(koscom),
             reconciliation: {
               krx: {
                 enabled: scheduler.marketCandleReconciliation.krx.enabled,
