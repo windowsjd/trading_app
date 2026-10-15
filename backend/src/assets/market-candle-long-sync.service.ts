@@ -38,11 +38,12 @@ import { MarketCandlesRepository } from './market-candles.repository';
 import { FuturesMarketCandlesRepository } from './market-candle-futures.repository';
 import {
   KOSCOM_TEN_MINUTE_HISTORY_SOURCE,
-  planKrxTenMinuteBuckets,
+  groupStoredKrxRows,
+  isStoredKrxSessionComplete,
   verifyKrxTenMinuteSession,
-  type KrxComparableCandle,
   type KrxDailyReference,
   type KrxVolumeRelation,
+  type StoredKrxCandle,
 } from './market-candle-krx-history';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -1387,46 +1388,6 @@ export function enumerateCompletedKrxSessions(
     }
   }
   return { sessions: sessions.reverse(), calendarGap: false };
-}
-
-type StoredKrxCandle = KrxComparableCandle & {
-  closeTime: Date;
-  isClosed?: boolean;
-  sourceProvider?: string;
-};
-
-function groupStoredKrxRows(
-  rows: readonly StoredKrxCandle[],
-): Map<string, StoredKrxCandle[]> {
-  const bySession = new Map<string, StoredKrxCandle[]>();
-  for (const row of rows) {
-    if (row.sourceProvider !== KOSCOM_TEN_MINUTE_HISTORY_SOURCE) continue;
-    if (row.isClosed === false) continue;
-    const date = formatZonedCursor(row.openTime, KST).date;
-    const list = bySession.get(date) ?? [];
-    list.push(row);
-    bySession.set(date, list);
-  }
-  for (const list of bySession.values()) {
-    list.sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
-  }
-  return bySession;
-}
-
-function isStoredKrxSessionComplete(
-  session: MarketSessionWindow,
-  stored: Map<string, StoredKrxCandle[]>,
-): boolean {
-  const rows = stored.get(localDate(session)) ?? [];
-  const planned = planKrxTenMinuteBuckets(session);
-  return (
-    rows.length === planned.length &&
-    planned.every(
-      (bucket, index) =>
-        rows[index].openTime.getTime() === bucket.openTime.getTime() &&
-        rows[index].closeTime.getTime() === bucket.closeTime.getTime(),
-    )
-  );
 }
 
 function previousStoredSession(

@@ -503,6 +503,44 @@ jobs:
         run: BINANCE_REST_REDIS_FIXTURE=1 BINANCE_REST_FIXTURE_REDIS_URL=redis://localhost:6379 pnpm test --runInBand --runTestsByPath src/providers/binance/binance-rest-coordinator.integration.spec.ts
       - name: Candle checkpoint and daily recovery DB fixture (mock providers)
         run: MARKET_CANDLE_SYNC_DB_SMOKE=1 pnpm test --runInBand --runTestsByPath src/assets/market-candle-sync.integration.spec.ts
+      # KOSCOM 100-stock stage fixtures: a local mock KOSCOM HTTP server only,
+      # never the real API. Each PostgreSQL suite gets its own fresh *_test
+      # database (their guards refuse anything else); Redis keys use random
+      # per-run namespaces, so the job's Redis is shared safely.
+      - name: KOSCOM call budget Redis fixture (two instances, governor)
+        run: KOSCOM_BUDGET_REDIS_FIXTURE=1 KOSCOM_BUDGET_FIXTURE_REDIS_URL=redis://localhost:6379 pnpm test --runInBand --runTestsByPath src/providers/koscom/koscom-call-budget.integration.spec.ts
+      - name: Central KRX candle collection PostgreSQL + Redis (mock KOSCOM)
+        env:
+          # The runner requires no other active domestic stock in its database.
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/krx_central_candles_test?schema=public
+          KRX_CENTRAL_CANDLES_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE krx_central_candles_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/assets/krx-central-candles.integration.spec.ts
+      - name: KRX 1d 576 / 4h 97 history backfill and G4-H (L10-B, mock KOSCOM)
+        env:
+          # Reuses the central suite's database: that suite removes its assets.
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/krx_central_candles_test?schema=public
+          KRX_HISTORY_BACKFILL_DB_INTEGRATION: "1"
+        run: pnpm exec jest --runInBand --runTestsByPath src/assets/krx-history-backfill.integration.spec.ts
+      - name: KOSCOM 100-stock price slots smoke (L1, two instances, mock KOSCOM)
+        env:
+          # Its own database: the runner requires exactly its 100 active stocks.
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/koscom_price_slots_test?schema=public
+          KOSCOM_PRICE_LOAD_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE koscom_price_slots_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/providers/koscom/koscom-price-load.integration.spec.ts
+      - name: Price snapshot retention PostgreSQL safety (session time zones, DST, races)
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/price_snapshot_retention_test?schema=public
+          ASSET_PRICE_SNAPSHOT_RETENTION_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE price_snapshot_retention_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/providers/asset-price-snapshot-retention.integration.spec.ts
       # Identify exactly the fixture JSON this run produced (files not present at
       # checkout). Runs on success and failure so a smoke that wrote a report
       # before failing still yields one debuggable file — but never falls back

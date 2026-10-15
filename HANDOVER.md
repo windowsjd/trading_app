@@ -10,10 +10,32 @@
 
 ---
 
+## 2026-10-15 KOSCOM 100종목 수집 후속 감사 (보존 ③ 날짜·G4-H 4h/1d·G4-I 공집합·CI 편입·L10-B/L1 모의)
+
+- 시작 `main`=`origin/main`=`9a11e979`(CI 7/7 success). branch 없이 작업. **commit·push·배포·운영 DB/Redis 접근·실제 KOSCOM 호출 없음(미커밋 인계, 커밋은 사용자 승인 필요).**
+  기준 문서: [followup-audit-2026-10-15.md](docs/investigations/2026-10-15-koscom-100-stock-collection-design/followup-audit-2026-10-15.md), 런북 §3.1·§4.2–§4.4.
+- **실제 원인(수정 전 코드로 재현):**
+  - 가격 스냅샷 보존 ③: `timezone(z.tz, effective_at)::date`가 naive UTC를 현지 시각으로 읽어 날짜가 DB 세션 TimeZone을 따랐다(UTC 세션: KST 18:00·ET 16:00/14:00에 날짜가 바뀜) → 그날 마지막 행이 후보가 될 수 있었다. 삭제는 스케줄·CLI가 없고 운영 dry-run도 없어 실제 삭제 0건.
+  - G4-H 4h: 세션에 행 1개만 있어도 저장으로 셈(버킷 절반만 있어도 `ready`). 1d: 체크포인트 coverage만 봄(저장 일봉 0개여도 `ready`).
+  - G4-I: 코호트 레지스트리가 비면 아무것도 재지 않고 통과.
+- **수정:** ③ `timezone(z.tz, timezone('UTC', effective_at))::date`. G4-H 4h는 long sync 완전성 함수를 `market-candle-krx-history.ts`로 옮겨 공유, held는 `ops_job_runs` 기록에서 읽고 `ready/held/incomplete` 구분. 1d는 coverage + 세션별 확정 일봉(`dailyCandleDefects`, 일봉 감사에서 추출, 닫힌 KIS 일봉 인정). 캘린더 공백은 fail-closed, 잠정 달력 연도(`provisionalCalendarYears`, KRX 2024 = Q14 미완료) 표시. G4-I `pass.measured`.
+- **CI:** `candle-fixture-integration` job에 5단계 추가(예산 Redis, 중앙 KRX PG+Redis, L10-B 백필, L1 smoke, 보존 PG). 모두 모의 KOSCOM·`*_test` DB. push 전이라 GitHub 실행은 아직 없음.
+- **모의 검증:** L10-B(1d 576/4h 97 백필·중단 재개·held·G4-H) 통과. L1 smoke 통과, 15분 성능 실측 2회(T 6 s/5 s)는 감사 문서 §3.4. L10-A 26세션 재생은 NOT_RUN(다세션 fixture 생성기 필요).
+- **검증(로컬):**
+  - backend 품질 미러 전부 PASS(unit 317 suites / 5,090 tests), 옵트인 6종 PASS
+  - 금융 목록: core 34/35, limit 21/28, price safety 실패
+  - 실패 8건은 모두 HEAD와 같은 코드다(import 그래프에 변경 파일 없음). 시계 후퇴 3건, 그 뒤 남은 USD/KRW 1400 행 오염 4건, 이 로컬 DB에 작업 1이 남긴 fixture 충돌 1건이다.
+  - 새 DB 단독 재실행 8/8 통과(감사 문서 §5)
+- **주의:**
+  - `*_load_test`로 끝나는 DB 이름은 `LOAD_TEST_GUARD`가 거부한다(부하 시험 CLI 전용).
+  - WSL에서는 Redis 벽시계 후퇴가 키 TTL을 늘려 KOSCOM 요청 입장이 수 초 멈춘다(요청 간격 키). L1 하네스가 `redisClockSteps`로 따로 보고한다.
+  - 확대: 지금은 25종목도 불가(코호트 미등록, P1–P3 미승인, Q1·Q14 미완료). 런북 §4.4 참고.
+
 ## 2026-10-15 시즌 참여 자격 출시 전 보완 (선물 FX 고정·정산 순서·빈 랭킹 검증·0명 시즌·정산 쓰기 예산)
 
-- 시작 `main`=`origin/main`=`6f732b24`(GitHub CI 7개 전부 success), clean. branch 없이 작업, **commit·push·배포·운영 DB 변경 없음(미커밋 인계)**.
+- 시작 `main`=`origin/main`=`6f732b24`(GitHub CI 7개 전부 success), clean. branch 없이 작업.
   기준 문서: [season-final-ranking-eligibility.md](backend/docs/season-final-ranking-eligibility.md) §1(보완 의도)·§3·§5·§9·§10.
+- **커밋·배포(사용자 지시로 push):** `9a11e979`. GitHub CI 7/7 success(run 38724879989·38724880150). Render 자동 배포 live 2026-10-15 11:07:09Z, 빌드의 `prisma migrate deploy`가 `20261015200000_pin_futures_execution_fx_evidence`를 11:06:00Z에 적용(빌드 로그 확인). 운영 DB 직접 조회는 하지 않았다.
 - **실제 원인(수정 전 HEAD를 실제 PostgreSQL로 재현):**
   - 정산이 선물 최종 청산 → 평가 → 자격 판정 순서였다. 판정이 FX 증거 누락으로 실패하면 포지션 종료·지갑(100 → 109.89 USD)·최종가 고정·원장 2건은 이미 커밋되고 시즌은 `ended`.
   - 선물 체결은 FX를 저장하지 않았다. 환율이 하나도 없던 시점의 자격 시즌 선물 체결도 그대로 확정됐고(본인 진행 API 500), 나중에 커밋된 `captured_at` 과거 행이 이미 끝난 체결의 거래대금을 바꿨다(55,000 → 75,000원). 처음 설계의 "시각 조회는 결정적" 전제가 성립하지 않았다(관리자 FX 입력도 `captured_at` 지정 가능).
@@ -26,7 +48,7 @@
   - 정산: 판정을 선물 최종 청산 **앞으로** 이동. 경합 검토 결과 `ended` 이후 판정 입력은 바뀌지 않아 잠금 안 재계산은 하지 않았다. 자격 시즌은 정상 참가자 0명이어도 선물 종료·계정 종료 후 `settled`. 최종 쓰기 트랜잭션만 10분 상한.
   - 랭킹: 자격 시즌 final 조회 전 정산과 같은 조건 검증(`season-final-result-integrity.ts`, count 6회), 어긋나면 500 `FINAL_RESULTS_INTEGRITY`.
 - **DB:** 추가형 migration `20261015200000_pin_futures_execution_fx_evidence`(컬럼·FK RESTRICT·인덱스·트리거). 기존 행 NULL 유지, 백필 없음.
-  운영 적용 상태: Render 빌드 로그상 `20261015120000_add_season_final_ranking_eligibility`는 2026-10-15 04:24:40Z 적용, 현재 live 백엔드 `dc0fcc72`(pending 없음). 새 migration은 미적용(main push 시 빌드에서 적용됨).
+  운영 적용 상태: Render 빌드 로그상 `20261015120000_add_season_final_ranking_eligibility`는 2026-10-15 04:24:40Z 적용. 새 migration은 위 push 뒤 11:06:00Z 적용.
 - **운영 확인(읽기 전용):** 운영 DB 직접 조회는 권한 분류기가 차단해 하지 못했다. 공개 `GET /api/v1/seasons` 기준 시즌은 `sea_2026_s1`(2000-01-01~2099-12-31, `active`) 하나 — **출시 시즌은 아직 없다**. 이 시즌의 기준은 마이그레이션(NULL 추가)+트리거(활성 후 변경 불가)로 NULL일 것이지만 DB로 확인하지 못했다. Render: plan 1c-2g, Singapore, autoDeploy main, build에 `prisma migrate deploy`.
 - **검증(로컬, 격리 PG16 127.0.0.1:55611 `*_test`, Redis 56611):**
   - backend typecheck·build·lint(accounts/candles)·format(candles)·load-test 110/110·진단 게이트 PASS, `git diff --check` clean, 생성 Prisma 산출물 재생성 일치.
@@ -38,7 +60,7 @@
   - 프런트엔드 무변경(HEAD CI success). Futures release fixture는 시계 후퇴 시 실패하도록 설계돼 WSL에서 재현 불가(HEAD CI success). Candle fixture는 관련 코드 무변경으로 미실행.
 - **성능(로컬 실측, `scripts/season-final-qualification-benchmark.ts`, [결과](backend/docs/benchmarks/season-final-qualification-2026-10-15.json)):** 10,000명·111만 체결 시즌 판정 4.6 s(1,000문장, 힙 +261 MB), 본인 진행 API ≤19 ms(규모 무관), final 조회 49 ms(검증 21 ms), 정산 50.3 s/잠금 13.3 s(수정 후). 최악 배치(50명×3,000건) 힙 +247 MB — 2 GB 인스턴스 기준 병목 아님으로 판단, 배치 로직 무변경. 운영 실측 없음.
 - **주의/남은 일:**
-  - 배포: 새 migration을 **출시 시즌이 `active`가 되기 전에** 배포. main push = Render 빌드에서 운영 migrate(승인 필요).
+  - 배포: 새 migration은 출시 시즌이 `active`가 되기 전에 들어가야 했고, 위 push로 운영에 적용됐다(출시 시즌은 아직 없음).
   - 출시 시즌은 `upcoming`으로 만들며 기준 5/3 설정·3주 확인(SQL은 기준 문서 §9).
   - 고정 도입 전 자격 시즌 체결만 시각 조회 경로를 탄다(운영엔 없음). 과거 `captured_at` FX 입력 금지.
   - 잠정 랭킹 새로고침도 참가자당 UPDATE를 기본 5 s 트랜잭션에서 한다(이번 범위 밖, 10,000명 전 확인 필요).

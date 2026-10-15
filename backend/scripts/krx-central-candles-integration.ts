@@ -810,6 +810,7 @@ async function main() {
       'G4-I: the missing bucket is an alerted hold',
     );
     assert.equal(g4i.pass.defectRateWithin, false, '1 / 228 exceeds 0.1 %');
+    assert.equal(g4i.pass.measured, true, 'G4-I measured recorded slots');
     assert.equal(
       g4i.pass.collectionStartedInTime,
       true,
@@ -832,13 +833,33 @@ async function main() {
     );
     assert.equal(
       newcomerH.daily.state,
-      'missing',
+      'incomplete',
       'no 576-session daily backfill in the fixture',
+    );
+    const daily = newcomerH.daily;
+    assert.ok(
+      daily.confirmed > 0 && daily.missing.count > 0,
+      "the central job's own bars are confirmed; older sessions are missing",
+    );
+    assert.equal(
+      daily.unconfirmed.count + daily.unexpected.count,
+      0,
+      'bars the central writer stored meet the daily audit rule',
+    );
+    assert.equal(
+      daily.confirmed + daily.missing.count,
+      daily.sessionsExpected,
+      'every closed session is either confirmed or missing',
     );
     assert.equal(
       newcomerH.fourHour.state,
       'incomplete',
       'no 4h long sync in the fixture',
+    );
+    assert.equal(
+      newcomerH.fourHour.missing.count,
+      newcomerH.fourHour.sessionsExpected,
+      'every 4h session is missing (none stored, none held)',
     );
 
     console.log(

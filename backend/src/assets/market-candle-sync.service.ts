@@ -24,7 +24,6 @@ import { normalizeKisUsMarketCode } from '../providers/kis/kis-websocket.subscri
 import { formatZonedCursor } from '../providers/kis/candles/kis-candle-time';
 import { KIS_US_CANDLE_SOURCE } from '../providers/kis/candles/kis-candle.types';
 import {
-  KIS_DOMESTIC_PERIOD_SOURCE,
   KIS_OVERSEAS_PERIOD_SOURCE,
   type KisPeriodInterval,
   type KisPeriodPageResult,
@@ -74,6 +73,7 @@ import {
   krxSessionsBetween,
   requiredFiveMinuteSlotStarts,
 } from './krx-candle-collection.policy';
+import { dailyCandleDefects } from './daily-candle-evidence.policy';
 
 const DAY_MS = 24 * 60 * 60_000;
 // Default lookbacks of a cold incremental run (collection policy, unchanged):
@@ -1206,25 +1206,8 @@ export class MarketCandleSyncService {
         row !== undefined &&
         row.assetId === asset.id &&
         row.interval === '1d' &&
-        (row.sourceProvider === sourceProvider ||
-          (sourceProvider === KOSCOM_HISTORY_SOURCE &&
-            row.sourceProvider === KIS_DOMESTIC_PERIOD_SOURCE)) &&
-        row.isClosed &&
-        row.closeTime.getTime() === window.closeTime.getTime() &&
-        Number.isFinite(row.sourceUpdatedAt.getTime()) &&
-        row.sourceUpdatedAt >= window.closedAt &&
-        row.sourceUpdatedAt <= observedAt &&
-        [row.open, row.high, row.low, row.close].every(
-          (value) => value.isFinite() && value.gt(0),
-        ) &&
-        row.high.gte(row.open) &&
-        row.high.gte(row.close) &&
-        row.high.gte(row.low) &&
-        row.low.lte(row.open) &&
-        row.low.lte(row.close) &&
-        row.volume.isFinite() &&
-        row.volume.gte(0) &&
-        (row.amount === null || (row.amount.isFinite() && row.amount.gte(0)))
+        dailyCandleDefects(row, window, { sourceProvider, observedAt })
+          .length === 0
       );
     });
     return complete ? 'complete' : 'data_incomplete';

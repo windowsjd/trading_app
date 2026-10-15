@@ -8,6 +8,12 @@
  * exactly the candidates, a reference added after the dry-run is honoured,
  * and a second pass deletes nothing.
  *
+ * The exchange-local session date (③) is exercised where it can go wrong:
+ * KST midnight and after-hours rows, US DST start and end, and PostgreSQL
+ * sessions whose TimeZone is Asia/Seoul or America/New_York (dry-run and
+ * deletes must equal the UTC session's). A reference inserted while a batch
+ * runs locks its row, so the batch skips it.
+ *
  *   ASSET_PRICE_SNAPSHOT_RETENTION_DB_INTEGRATION=1 DATABASE_URL=<local *_test> \
  *   pnpm tsx scripts/asset-price-snapshot-retention-integration.ts
  */
@@ -84,12 +90,41 @@ type Seed = {
 };
 
 const prisma = new PrismaService();
-const service = new AssetPriceSnapshotRetentionService(prisma);
 const ids = { assets: [] as string[], season: '', user: '', account: '' };
+
+/** A client whose PostgreSQL session TimeZone is `zone`. */
+function prismaInZone(zone: string): PrismaService {
+  const saved = process.env.DATABASE_URL!;
+  const url = new URL(saved);
+  url.searchParams.set('options', `-c TimeZone=${zone}`);
+  process.env.DATABASE_URL = url.toString();
+  try {
+    return new PrismaService();
+  } finally {
+    process.env.DATABASE_URL = saved;
+  }
+}
+// ③ must not follow the session TimeZone: every dry-run and delete below
+// runs from UTC, Seoul and New York sessions alike.
+const sessions = ['UTC', 'Asia/Seoul', 'America/New_York'].map((zone) => {
+  const client = prismaInZone(zone);
+  return {
+    zone,
+    client,
+    service: new AssetPriceSnapshotRetentionService(client),
+  };
+});
 
 async function main() {
   await prisma.$connect();
   try {
+    for (const session of sessions) {
+      const [row] = await session.client.$queryRaw<
+        Array<{ zone: string }>
+      >`SELECT current_setting('TimeZone') AS zone`;
+      assert.equal(row.zone, session.zone, 'the session TimeZone is set');
+    }
+
     // ---- FK catalog guard --------------------------------------------------
     const catalog = await prisma.$queryRaw<
       Array<{ table_name: string; column_name: string }>
@@ -195,10 +230,39 @@ async function main() {
       sourceType: 'admin_manual',
       sourceName: null,
     });
+    // Days F/G: KST midnight. 23:50 is F's last row although 00:10 G shares
+    // its UTC date; 19:00 and 23:50 sit past 18:00 KST, where a date that
+    // followed a UTC session used to roll over (after the fixture Season).
+    add('F1000', krx.id, kst(25, '10:00'));
+    add('F1529', krx.id, kst(25, '15:29'));
+    add('F1900', krx.id, kst(25, '19:00'));
+    add('F2350', krx.id, kst(25, '23:50'));
+    add('G0010', krx.id, kst(24, '00:10'));
+    add('G1000', krx.id, kst(24, '10:00'));
+    add('G1529', krx.id, kst(24, '15:29'));
     // US: 09:30 and 15:59 New York are one ET session but two KST dates
     // (after the fixture Season's end, so only ③ decides).
     add('E0930', us.id, zoned(etDay(20), '09:30', 'America/New_York'));
     add('E1559', us.id, zoned(etDay(20), '15:59', 'America/New_York'));
+    // US DST end (2025-11-02) and start (2026-03-08): each Thursday and
+    // Monday 23:30 is its ET day's last row. A fixed -4h/-5h offset, or a
+    // date that follows the session TimeZone, joins it to the next day.
+    for (const [date, times] of [
+      ['2025-10-30', ['15:59', '23:30']],
+      ['2025-10-31', ['00:30', '15:59']],
+      ['2025-11-03', ['00:30', '15:59', '23:30']],
+      ['2025-11-04', ['00:30', '15:59']],
+      ['2026-03-05', ['15:59', '23:30']],
+      ['2026-03-06', ['00:30', '15:59']],
+      ['2026-03-09', ['00:30', '15:59', '23:30']],
+      ['2026-03-10', ['00:30', '15:59']],
+    ] as const)
+      for (const time of times)
+        add(`ET ${date} ${time}`, us.id, zoned(date, time, 'America/New_York'));
+    // One row a day (each its day's last) between the DST rows and the
+    // fixture Season's end, so ④ does not decide the DST rows.
+    for (let i = 0; i < SEASON_EVIDENCE_ROWS + 2; i++)
+      add(`UF${i}`, us.id, zoned(etDay(40 + i), '12:00', 'America/New_York'));
     // Recent rows inside the retention (⑥) for both, newest = latest (②).
     for (let i = 0; i < 12; i++) {
       add(
@@ -241,8 +305,8 @@ async function main() {
       },
     });
     ids.account = account.id;
-    const pin = (key: string) =>
-      prisma.quote.create({
+    const pin = (key: string, db: Pick<PrismaService, 'quote'> = prisma) =>
+      db.quote.create({
         data: {
           userId: user.id,
           tradingAccountId: account.id,
@@ -319,6 +383,21 @@ async function main() {
       'C1010',
       'C1300',
       'E0930',
+      'F1000',
+      'F1529',
+      'F1900',
+      'G0010',
+      'G1000',
+      'ET 2025-10-30 15:59',
+      'ET 2025-10-31 00:30',
+      'ET 2025-11-03 00:30',
+      'ET 2025-11-03 15:59',
+      'ET 2025-11-04 00:30',
+      'ET 2026-03-05 15:59',
+      'ET 2026-03-06 00:30',
+      'ET 2026-03-09 00:30',
+      'ET 2026-03-09 15:59',
+      'ET 2026-03-10 00:30',
     ].sort();
     assert.deepEqual(
       expected(references),
@@ -326,22 +405,40 @@ async function main() {
       'oracle agrees with the hand-derived candidate set',
     );
 
-    // ---- dry-run: counts, read-only ----------------------------------------
+    // ---- dry-run: counts, read-only, equal in every session zone ------------
     const total = () =>
       prisma.assetPriceSnapshot.count({
         where: { assetId: { in: ids.assets } },
       });
     const before = await total();
-    const scoped = async (assetId: string) =>
-      service.dryRun({ retentionDays: RETENTION_DAYS, assetId, now: NOW });
-    const dryKrx = await scoped(krx.id);
-    const dryUs = await scoped(us.id);
+    const dryRun = async (assetId: string) => {
+      const [utc, ...others] = await Promise.all(
+        sessions.map(({ service }) =>
+          service.dryRun({ retentionDays: RETENTION_DAYS, assetId, now: NOW }),
+        ),
+      );
+      for (const [i, other] of others.entries())
+        assert.deepEqual(
+          other,
+          utc,
+          `the ${sessions[i + 1].zone} session dry-run equals the UTC one`,
+        );
+      return utc;
+    };
+    const dryKrx = await dryRun(krx.id);
+    const dryUs = await dryRun(us.id);
+    const isUs = (key: string) =>
+      seeds.find((seed) => seed.key === key)!.assetId === us.id;
     assert.equal(
-      dryKrx.candidates + dryUs.candidates,
-      explicit.length,
-      'dry-run candidate count',
+      dryKrx.candidates,
+      explicit.filter((key) => !isUs(key)).length,
+      'KRX dry-run candidate count',
     );
-    assert.equal(dryUs.candidates, 1, 'the ET-session row is a candidate');
+    assert.equal(
+      dryUs.candidates,
+      explicit.filter(isUs).length,
+      'US dry-run candidate count (ET session, DST)',
+    );
     assert.equal(dryKrx.protectedReferenced, 1);
     assert.equal(dryKrx.protectedAdminManual, 2);
     assert.equal(dryKrx.protectedTooYoung, 1);
@@ -351,34 +448,58 @@ async function main() {
     // A quote pins a candidate after the dry-run: it must survive.
     await pin('C0900');
     references.add('C0900');
+
+    // A reference still in flight when a batch runs: the quote's FK check
+    // holds FOR KEY SHARE on the row, so FOR UPDATE … SKIP LOCKED passes over
+    // it — the oldest candidate, which LIMIT 1 would take — and the batch
+    // deletes the next one. Once committed, ① protects it.
+    let deleted = 0;
+    await prisma.$transaction(
+      async (tx) => {
+        await pin('A1000', tx);
+        deleted += await sessions[1].service.deleteBatch({
+          retentionDays: RETENTION_DAYS,
+          assetId: krx.id,
+          limit: 1,
+          now: NOW,
+        });
+        const kept = await prisma.assetPriceSnapshot.findMany({
+          where: { id: { in: [created.get('A1000')!, created.get('A1100')!] } },
+          select: { id: true },
+        });
+        assert.equal(deleted, 1, 'the batch took one row');
+        assert.deepEqual(
+          kept.map((row) => row.id),
+          [created.get('A1000')],
+          'the in-flight reference kept A1000; A1100 went',
+        );
+      },
+      { timeout: 30_000 },
+    );
+    references.add('A1000');
     const finalExpected = expected(references);
 
-    // ---- batched + concurrent deletes ------------------------------------------
-    let deleted = 0;
-    for (;;) {
-      const [a, b] = await Promise.all([
-        service.deleteBatch({
-          retentionDays: RETENTION_DAYS,
-          assetId: krx.id,
-          limit: 2,
-          now: NOW,
-        }),
-        service.deleteBatch({
-          retentionDays: RETENTION_DAYS,
-          assetId: krx.id,
-          limit: 2,
-          now: NOW,
-        }),
-      ]);
-      deleted += a + b;
-      if (a + b === 0) break;
-    }
-    deleted += await service.deleteBatch({
-      retentionDays: RETENTION_DAYS,
-      assetId: us.id,
-      limit: 10,
-      now: NOW,
-    });
+    // ---- batched + concurrent deletes from all three session zones -----------
+    const drain = async (assetId: string) => {
+      let removed = 0;
+      for (;;) {
+        const counts = await Promise.all(
+          sessions.map(({ service }) =>
+            service.deleteBatch({
+              retentionDays: RETENTION_DAYS,
+              assetId,
+              limit: 2,
+              now: NOW,
+            }),
+          ),
+        );
+        const round = counts.reduce((sum, count) => sum + count, 0);
+        removed += round;
+        if (round === 0) return removed;
+      }
+    };
+    deleted += await drain(krx.id);
+    deleted += await drain(us.id);
     const survivors = new Set(
       (
         await prisma.assetPriceSnapshot.findMany({
@@ -397,18 +518,40 @@ async function main() {
       'exactly the candidates were deleted',
     );
     assert.equal(deleted, finalExpected.length, 'no row was deleted twice');
+    assert.equal(
+      deleted,
+      dryKrx.candidates + dryUs.candidates - 2,
+      'the dry-run counted every deleted row and the two pinned after it',
+    );
     for (const key of [
+      'A1000',
       'B1000',
       'C0900',
       'A1529',
       'C1529',
       'D1000',
+      'F2350',
+      'G1529',
       'E1559',
+      'ET 2025-10-30 23:30',
+      'ET 2025-10-31 15:59',
+      'ET 2025-11-03 23:30',
+      'ET 2025-11-04 15:59',
+      'ET 2026-03-05 23:30',
+      'ET 2026-03-06 15:59',
+      'ET 2026-03-09 23:30',
+      'ET 2026-03-10 15:59',
       'ADMIN1',
     ])
       assert.ok(survivors.has(created.get(key)!), `${key} survives`);
+    for (const assetId of ids.assets)
+      assert.equal(
+        (await dryRun(assetId)).candidates,
+        0,
+        'no candidate is left in any session zone',
+      );
     assert.equal(
-      await service.deleteBatch({
+      await sessions[0].service.deleteBatch({
         retentionDays: RETENTION_DAYS,
         assetId: krx.id,
         limit: 10,
@@ -418,7 +561,11 @@ async function main() {
       'a second pass deletes nothing',
     );
     await assert.rejects(
-      service.deleteBatch({ retentionDays: 1, limit: 10, now: NOW }),
+      sessions[0].service.deleteBatch({
+        retentionDays: 1,
+        limit: 10,
+        now: NOW,
+      }),
       /retentionDays must be an explicit integer/,
     );
     console.log(
@@ -440,6 +587,7 @@ async function main() {
     if (ids.season) await prisma.season.delete({ where: { id: ids.season } });
     if (ids.user) await prisma.user.delete({ where: { id: ids.user } });
     await prisma.$disconnect();
+    for (const session of sessions) await session.client.$disconnect();
   }
 }
 

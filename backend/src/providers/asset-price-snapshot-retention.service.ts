@@ -214,10 +214,16 @@ function fragments(
   const latest = Prisma.sql`NOT EXISTS (
     SELECT 1 FROM asset_price_snapshots n WHERE ${sameSource} AND ${newer})`;
   // The exchange-local trading date: New York for US stocks, Seoul otherwise.
+  // effective_at is a naive UTC timestamp, so it is read AS UTC first and only
+  // then turned into the exchange's wall clock (DST follows the zone). A bare
+  // timezone(zone, naive) would treat the UTC value as zone-local time and its
+  // ::date would follow the session TimeZone.
+  const localDate = (alias: 'm' | 'n') =>
+    Prisma.sql`timezone(z.tz, timezone('UTC', ${Prisma.raw(alias)}.effective_at))::date`;
   const sessionLast = Prisma.sql`NOT EXISTS (
     SELECT 1 FROM asset_price_snapshots n
     WHERE ${sameSource} AND ${newer}
-      AND timezone(z.tz, n.effective_at)::date = timezone(z.tz, m.effective_at)::date)`;
+      AND ${localDate('n')} = ${localDate('m')})`;
   const seasonEvidence = Prisma.sql`EXISTS (
     SELECT 1 FROM seasons s
     WHERE m.effective_at <= s.end_at

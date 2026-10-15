@@ -1,5 +1,6 @@
 import { Prisma } from '../generated/prisma/client';
 import type { MarketSessionWindow } from '../orders/market-calendar.policy';
+import { formatZonedCursor } from '../providers/kis/candles/kis-candle-time';
 
 /**
  * Source name of KRX 4h rows built from verified KOSCOM 10-minute history.
@@ -12,6 +13,7 @@ import type { MarketSessionWindow } from '../orders/market-calendar.policy';
  */
 export const KOSCOM_TEN_MINUTE_HISTORY_SOURCE = 'koscom_history_10m';
 
+const KST = 'Asia/Seoul';
 const TEN_MINUTES_MS = 10 * 60_000;
 const FOUR_HOURS_MS = 4 * 60 * 60_000;
 // Same closing single-price auction length as candle-expected-slots.policy:
@@ -135,6 +137,52 @@ export function planKrxTenMinuteBuckets(
     });
   }
   return buckets;
+}
+
+/** A stored KRX 4h row as the long sync and the G4-H gate read it. */
+export type StoredKrxCandle = KrxComparableCandle & {
+  closeTime: Date;
+  isClosed?: boolean;
+  sourceProvider?: string;
+};
+
+/**
+ * Closed `koscom_history_10m` rows by KST session date (YYYYMMDD), oldest
+ * first. Other sources and unclosed rows never count toward a session.
+ */
+export function groupStoredKrxRows(
+  rows: readonly StoredKrxCandle[],
+): Map<string, StoredKrxCandle[]> {
+  const bySession = new Map<string, StoredKrxCandle[]>();
+  for (const row of rows) {
+    if (row.sourceProvider !== KOSCOM_TEN_MINUTE_HISTORY_SOURCE) continue;
+    if (row.isClosed === false) continue;
+    const date = formatZonedCursor(row.openTime, KST).date;
+    const list = bySession.get(date) ?? [];
+    list.push(row);
+    bySession.set(date, list);
+  }
+  for (const list of bySession.values()) {
+    list.sort((a, b) => a.openTime.getTime() - b.openTime.getTime());
+  }
+  return bySession;
+}
+
+/** The session's grouped rows are exactly its planned 4h buckets. */
+export function isStoredKrxSessionComplete(
+  session: MarketSessionWindow,
+  stored: Map<string, StoredKrxCandle[]>,
+): boolean {
+  const rows = stored.get(session.localDate.replaceAll('-', '')) ?? [];
+  const planned = planKrxTenMinuteBuckets(session);
+  return (
+    rows.length === planned.length &&
+    planned.every(
+      (bucket, index) =>
+        rows[index].openTime.getTime() === bucket.openTime.getTime() &&
+        rows[index].closeTime.getTime() === bucket.closeTime.getTime(),
+    )
+  );
 }
 
 /**
