@@ -70,6 +70,7 @@ describe('RankingService', () => {
     },
     seasonParticipant: {
       findUnique: jest.fn(),
+      count: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
       upsert: jest.fn(),
@@ -921,7 +922,76 @@ describe('RankingService', () => {
       ...overrides,
     });
 
-    it('answers a settled season whose confirmed final ranking is empty as a normal result', async () => {
+    /**
+     * The settled-season verification counts (season-final-result-integrity),
+     * answered by WHERE shape so call order never matters. `listed` is the
+     * ordinary page count of the selected snapshot.
+     */
+    const mockFinalResult = (
+      prisma: ReturnType<typeof createPrisma>,
+      state: Partial<{
+        unconfirmed: number;
+        qualified: number;
+        verdicts: number;
+        rows: number;
+        qualifiedRows: number;
+        minDate: Date | null;
+        maxDate: Date | null;
+        openAccounts: number;
+        listed: number;
+      }> = {},
+    ) => {
+      const s = {
+        unconfirmed: 0,
+        qualified: 0,
+        verdicts: 0,
+        rows: 0,
+        qualifiedRows: 0,
+        minDate: null,
+        maxDate: null,
+        openAccounts: 0,
+        listed: 0,
+        ...state,
+      };
+      Object.assign(prisma.seasonParticipant, {
+        count: jest.fn(({ where }: { where: { finalQualified?: unknown } }) =>
+          Promise.resolve(
+            where.finalQualified === null
+              ? s.unconfirmed
+              : where.finalQualified === true
+                ? s.qualified
+                : s.verdicts,
+          ),
+        ),
+      });
+      prisma.seasonRanking.count.mockImplementation(
+        ({
+          where,
+        }: {
+          where: { rankingDate?: unknown; seasonParticipant?: unknown };
+        }) =>
+          Promise.resolve(
+            where.rankingDate
+              ? s.listed
+              : where.seasonParticipant
+                ? s.qualifiedRows
+                : s.rows,
+          ),
+      );
+      Object.assign(prisma.seasonRanking, {
+        aggregate: jest.fn().mockResolvedValue({
+          _min: { rankingDate: s.minDate },
+          _max: { rankingDate: s.maxDate },
+        }),
+      });
+      Object.assign(prisma, {
+        tradingAccount: {
+          count: jest.fn().mockResolvedValue(s.openAccounts),
+        },
+      });
+    };
+
+    it('answers a settled season whose verified final ranking is empty as a normal result', async () => {
       const { prisma, service } = createService();
       prisma.season.findUnique.mockResolvedValueOnce(
         eligibilitySeason(SeasonStatus.settled),
@@ -930,11 +1000,7 @@ describe('RankingService', () => {
       prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
         participantWith({ finalQualified: false }),
       );
-      const count = jest
-        .fn()
-        .mockResolvedValueOnce(0) // qualified
-        .mockResolvedValueOnce(3); // confirmed not qualified
-      Object.assign(prisma.seasonParticipant, { count });
+      mockFinalResult(prisma);
 
       const response = await service.getRanking('user-2', {
         seasonId: 'season-1',
@@ -951,6 +1017,131 @@ describe('RankingService', () => {
       expectNoRankingWrites(prisma);
     });
 
+    it.each([
+      ['a rankable participant lost its verdict', { unconfirmed: 2 }],
+      [
+        'a final row belongs to a participant that did not qualify',
+        { rows: 1, qualifiedRows: 0 },
+      ],
+      [
+        'a qualified participant has no final row',
+        { qualified: 1, rows: 0, qualifiedRows: 0 },
+      ],
+      ['a season account is still open', { openAccounts: 1 }],
+      [
+        'final rows are split over two rankingDates',
+        {
+          qualified: 2,
+          rows: 2,
+          qualifiedRows: 2,
+          minDate: rankingDate,
+          maxDate: new Date('2026-05-08T00:00:00.000Z'),
+        },
+      ],
+    ])(
+      'never reports a damaged settled result as empty or pending: %s',
+      async (_label, state) => {
+        for (const scope of ['all', 'friends', 'top10']) {
+          const { prisma, service } = createService();
+          prisma.season.findUnique.mockResolvedValueOnce(
+            eligibilitySeason(SeasonStatus.settled),
+          );
+          prisma.seasonRanking.findFirst.mockResolvedValue(null);
+          prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+            participantWith({ finalQualified: false }),
+          );
+          mockFinalResult(prisma, state);
+
+          await expect(
+            service.getRanking('user-2', {
+              seasonId: 'season-1',
+              rankType: 'final',
+              scope,
+            }),
+          ).rejects.toMatchObject({
+            status: HttpStatus.INTERNAL_SERVER_ERROR,
+            response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+          });
+          expect(prisma.seasonRanking.findMany).not.toHaveBeenCalled();
+          expectNoRankingWrites(prisma);
+        }
+      },
+    );
+
+    it('refuses a final row or verdict on an eligibility season that is not settled', async () => {
+      for (const state of [{ rows: 1 }, { verdicts: 1 }]) {
+        const { prisma, service } = createService();
+        prisma.season.findUnique.mockResolvedValueOnce(
+          eligibilitySeason(SeasonStatus.ended),
+        );
+        prisma.seasonRanking.findFirst.mockResolvedValue(null);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+          participantWith(),
+        );
+        mockFinalResult(prisma, state);
+
+        await expect(
+          service.getRanking('user-2', {
+            seasonId: 'season-1',
+            rankType: 'final',
+          }),
+        ).rejects.toMatchObject({
+          response: { error: { code: 'FINAL_RESULTS_INTEGRITY' } },
+        });
+      }
+    });
+
+    it('keeps a pending eligibility season (no rows, no verdicts) as RANKING_UNAVAILABLE', async () => {
+      const { prisma, service } = createService();
+      prisma.season.findUnique.mockResolvedValueOnce(
+        eligibilitySeason(SeasonStatus.ended),
+      );
+      prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+      prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
+        participantWith(),
+      );
+      mockFinalResult(prisma);
+
+      const response = await service.getRanking('user-2', {
+        seasonId: 'season-1',
+        rankType: 'final',
+      });
+
+      expect(`${response.data.state}:${response.data.reason}`).toBe(
+        'unavailable:RANKING_UNAVAILABLE',
+      );
+    });
+
+    it('does not verify eligibility results for the daily ranking or a season without a rule', async () => {
+      for (const [query, seasonRow] of [
+        [{ rankType: 'daily' }, eligibilitySeason(SeasonStatus.settled)],
+        [
+          { rankType: 'final' },
+          {
+            ...season,
+            status: SeasonStatus.settled,
+            initialCapitalKrw: new Prisma.Decimal('1000000'),
+            finalRankingMinTradedInstruments: null,
+            finalRankingMinTurnoverRatio: null,
+          },
+        ],
+      ] as const) {
+        const { prisma, service } = createService();
+        prisma.season.findUnique.mockResolvedValueOnce(seasonRow);
+        prisma.seasonRanking.findFirst.mockResolvedValueOnce(null);
+        prisma.seasonParticipant.findUnique.mockResolvedValueOnce(null);
+        mockFinalResult(prisma, { unconfirmed: 5, openAccounts: 3 });
+
+        const response = await service.getRanking('user-x', {
+          seasonId: 'season-1',
+          ...query,
+        });
+
+        expect(response.data.reason).toBe('RANKING_UNAVAILABLE');
+        expect(prisma.seasonParticipant.count).not.toHaveBeenCalled();
+      }
+    });
+
     it('tells a participant without a final row that it did not qualify', async () => {
       const { prisma, service } = createService();
       prisma.season.findUnique.mockResolvedValueOnce(
@@ -963,7 +1154,14 @@ describe('RankingService', () => {
       prisma.seasonParticipant.findUnique.mockResolvedValueOnce(
         participantWith({ finalQualified: false }),
       );
-      prisma.seasonRanking.count.mockResolvedValueOnce(1);
+      mockFinalResult(prisma, {
+        qualified: 1,
+        rows: 1,
+        qualifiedRows: 1,
+        minDate: rankingDate,
+        maxDate: rankingDate,
+        listed: 1,
+      });
       prisma.seasonRanking.findUnique.mockResolvedValueOnce(null);
       mockRankingRows(prisma, [rankingRow(1)]);
 

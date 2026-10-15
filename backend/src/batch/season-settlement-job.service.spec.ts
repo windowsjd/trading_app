@@ -308,6 +308,11 @@ describe('SeasonSettlementJobService', () => {
     expect(prisma.season.updateMany).not.toHaveBeenCalled();
     expect(prisma.__tx.seasonRanking.create).toHaveBeenCalledTimes(1);
     expect(prisma.__tx.season.updateMany).toHaveBeenCalledTimes(1);
+    // Scales with the season: never Prisma's 5 s per-request default.
+    expect(
+      (prisma.$transaction.mock.calls[0] as [unknown, { timeout: number }])[1]
+        .timeout,
+    ).toBe(10 * 60_000);
   });
 
   it('does not overwrite existing final rankings and settles an ended season only', async () => {
@@ -1548,6 +1553,113 @@ describe('SeasonSettlementJobService final-ranking eligibility', () => {
     expect(result.finalQualification.qualified).toBe(0);
     expect(result.finalQualification.notQualified).toBe(2);
     expect(result.season.updated).toBe(true);
+  });
+
+  it.each([false, true])(
+    'judges eligibility before the Futures final exit, so missing FX evidence moves no money (dryRun=%s)',
+    async (dryRun) => {
+      const { service, prisma, futuresFinal } = createService();
+      mockEligibilitySeason(prisma, SeasonStatus.ended);
+      mockParticipants(prisma, [{ id: 'sp-1', userId: 'user-1' }]);
+      mockExistingRankings(prisma, []);
+      // An execution committed before executions pinned their FX, with no
+      // USD/KRW evidence held at its execution time.
+      Object.assign(prisma, {
+        futuresExecution: {
+          findMany: jest.fn().mockResolvedValue([
+            {
+              id: 'execution-1',
+              tradingAccountId: 'account-of-sp-1',
+              instrumentId: 'instrument-1',
+              notional: new Prisma.Decimal('100'),
+              leverage: 2,
+              executedAt: new Date('2026-05-02T00:00:00.000Z'),
+              fxRateSnapshot: null,
+            },
+          ]),
+        },
+        $queryRaw: jest.fn().mockResolvedValue([]),
+      });
+
+      const response = await captureHttpExceptionResponse(
+        service.run({ seasonId: 'season-1', settlementDate, dryRun }),
+      );
+
+      expect(response.error.code).toBe(
+        'RANKING_QUALIFICATION_FX_EVIDENCE_MISSING',
+      );
+      expect(futuresFinal.settleSeason).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
+  it('settles an eligibility season with no rankable participant: accounts closed, empty final ranking', async () => {
+    const { service, prisma, futuresFinal } = createService();
+    mockEligibilitySeason(prisma, SeasonStatus.ended);
+    mockParticipants(prisma, []);
+    mockSnapshots(prisma, []);
+    // Only an excluded participant: never judged, never ranked, still closed.
+    accountParticipants = [accountParticipant('sp-x', 'user-x', 'excluded')];
+    mockExistingRankings(prisma, []);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      settlementDate,
+    });
+
+    expect(futuresFinal.settleSeason).toHaveBeenCalledTimes(1);
+    expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    expect(prisma.__tx.equitySnapshot.create).not.toHaveBeenCalled();
+    expect(prisma.__tx.seasonParticipant.update).not.toHaveBeenCalled();
+    expect(prisma.__tx.season.updateMany).toHaveBeenCalledTimes(1);
+    expect(result.closedTradingAccountIds).toEqual(['account-of-sp-x']);
+    expect(result.season.updated).toBe(true);
+    expect(
+      `${result.finalQualification.evaluated}:${result.finalQualification.qualified}:${result.finalRankings.created}`,
+    ).toBe('0:0:0');
+    expect(result.message).toContain('no participant eligible');
+  });
+
+  it('replays a settled eligibility season that had no rankable participant', async () => {
+    const { service, prisma, futuresFinal } = createService();
+    mockEligibilitySeason(prisma, SeasonStatus.settled);
+    mockParticipants(prisma, []);
+    accountParticipants = [
+      {
+        ...accountParticipant('sp-x', 'user-x', 'excluded'),
+        tradingAccount: {
+          ...accountParticipant('sp-x', 'user-x', 'excluded').tradingAccount,
+          status: 'closed',
+          closedAt: SEASON_END_AT,
+        },
+      },
+    ];
+    mockExistingRankings(prisma, []);
+
+    const result = await runAndGetResult(service, {
+      seasonId: 'season-1',
+      settlementDate,
+    });
+
+    expect(futuresFinal.settleSeason).not.toHaveBeenCalled();
+    expect(futuresFinal.assertNoOpen).toHaveBeenCalled();
+    expect(prisma.__tx.seasonRanking.create).not.toHaveBeenCalled();
+    expect(result.finalRankings.existing).toBe(0);
+    expect(result.season.updated).toBe(true);
+  });
+
+  it('keeps refusing a season without a rule that has no eligible participant', async () => {
+    const { service, prisma, futuresFinal } = createService();
+    mockSeason(prisma, SeasonStatus.ended);
+    mockParticipants(prisma, []);
+
+    const response = await captureHttpExceptionResponse(
+      service.run({ seasonId: 'season-1', settlementDate }),
+    );
+
+    expect(response.error.code).toBe('NO_SETTLEMENT_PARTICIPANTS');
+    expect(futuresFinal.settleSeason).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });
 

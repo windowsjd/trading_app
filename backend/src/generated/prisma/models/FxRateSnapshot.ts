@@ -279,6 +279,7 @@ export type FxRateSnapshotWhereInput = {
   exchangeTransactions?: Prisma.ExchangeTransactionListRelationFilter
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
+  futuresExecutions?: Prisma.FuturesExecutionListRelationFilter
 }
 
 export type FxRateSnapshotOrderByWithRelationInput = {
@@ -298,6 +299,7 @@ export type FxRateSnapshotOrderByWithRelationInput = {
   exchangeTransactions?: Prisma.ExchangeTransactionOrderByRelationAggregateInput
   orders?: Prisma.OrderOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
+  futuresExecutions?: Prisma.FuturesExecutionOrderByRelationAggregateInput
 }
 
 export type FxRateSnapshotWhereUniqueInput = Prisma.AtLeast<{
@@ -320,6 +322,7 @@ export type FxRateSnapshotWhereUniqueInput = Prisma.AtLeast<{
   exchangeTransactions?: Prisma.ExchangeTransactionListRelationFilter
   orders?: Prisma.OrderListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
+  futuresExecutions?: Prisma.FuturesExecutionListRelationFilter
 }, "id">
 
 export type FxRateSnapshotOrderByWithAggregationInput = {
@@ -379,6 +382,7 @@ export type FxRateSnapshotCreateInput = {
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutFxRateSnapshotInput
   orders?: Prisma.OrderCreateNestedManyWithoutFxRateSnapshotInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotUncheckedCreateInput = {
@@ -398,6 +402,7 @@ export type FxRateSnapshotUncheckedCreateInput = {
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutFxRateSnapshotInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotUpdateInput = {
@@ -417,6 +422,7 @@ export type FxRateSnapshotUpdateInput = {
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutFxRateSnapshotNestedInput
   orders?: Prisma.OrderUpdateManyWithoutFxRateSnapshotNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotUncheckedUpdateInput = {
@@ -436,6 +442,7 @@ export type FxRateSnapshotUncheckedUpdateInput = {
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotCreateManyInput = {
@@ -545,6 +552,22 @@ export type FxRateSnapshotSumOrderByAggregateInput = {
   rate?: Prisma.SortOrder
 }
 
+export type FxRateSnapshotCreateNestedOneWithoutFuturesExecutionsInput = {
+  create?: Prisma.XOR<Prisma.FxRateSnapshotCreateWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUncheckedCreateWithoutFuturesExecutionsInput>
+  connectOrCreate?: Prisma.FxRateSnapshotCreateOrConnectWithoutFuturesExecutionsInput
+  connect?: Prisma.FxRateSnapshotWhereUniqueInput
+}
+
+export type FxRateSnapshotUpdateOneWithoutFuturesExecutionsNestedInput = {
+  create?: Prisma.XOR<Prisma.FxRateSnapshotCreateWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUncheckedCreateWithoutFuturesExecutionsInput>
+  connectOrCreate?: Prisma.FxRateSnapshotCreateOrConnectWithoutFuturesExecutionsInput
+  upsert?: Prisma.FxRateSnapshotUpsertWithoutFuturesExecutionsInput
+  disconnect?: Prisma.FxRateSnapshotWhereInput | boolean
+  delete?: Prisma.FxRateSnapshotWhereInput | boolean
+  connect?: Prisma.FxRateSnapshotWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FxRateSnapshotUpdateToOneWithWhereWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUpdateWithoutFuturesExecutionsInput>, Prisma.FxRateSnapshotUncheckedUpdateWithoutFuturesExecutionsInput>
+}
+
 export type FxRateSnapshotCreateNestedOneWithoutOrdersInput = {
   create?: Prisma.XOR<Prisma.FxRateSnapshotCreateWithoutOrdersInput, Prisma.FxRateSnapshotUncheckedCreateWithoutOrdersInput>
   connectOrCreate?: Prisma.FxRateSnapshotCreateOrConnectWithoutOrdersInput
@@ -597,6 +620,98 @@ export type FxRateSnapshotUpdateOneWithoutQuotesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.FxRateSnapshotUpdateToOneWithWhereWithoutQuotesInput, Prisma.FxRateSnapshotUpdateWithoutQuotesInput>, Prisma.FxRateSnapshotUncheckedUpdateWithoutQuotesInput>
 }
 
+export type FxRateSnapshotCreateWithoutFuturesExecutionsInput = {
+  id?: string
+  baseCurrency: $Enums.CurrencyCode
+  quoteCurrency: $Enums.CurrencyCode
+  rate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  sourceType: $Enums.FxRateSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  approvedByUserId?: string | null
+  note?: string | null
+  exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutFxRateSnapshotInput
+  orders?: Prisma.OrderCreateNestedManyWithoutFxRateSnapshotInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutFxRateSnapshotInput
+}
+
+export type FxRateSnapshotUncheckedCreateWithoutFuturesExecutionsInput = {
+  id?: string
+  baseCurrency: $Enums.CurrencyCode
+  quoteCurrency: $Enums.CurrencyCode
+  rate: runtime.Decimal | runtime.DecimalJsLike | number | string
+  sourceType: $Enums.FxRateSourceType
+  sourceName?: string | null
+  sourceTimestamp?: Date | string | null
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  createdAt?: Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  approvedByUserId?: string | null
+  note?: string | null
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+  orders?: Prisma.OrderUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+}
+
+export type FxRateSnapshotCreateOrConnectWithoutFuturesExecutionsInput = {
+  where: Prisma.FxRateSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.FxRateSnapshotCreateWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUncheckedCreateWithoutFuturesExecutionsInput>
+}
+
+export type FxRateSnapshotUpsertWithoutFuturesExecutionsInput = {
+  update: Prisma.XOR<Prisma.FxRateSnapshotUpdateWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUncheckedUpdateWithoutFuturesExecutionsInput>
+  create: Prisma.XOR<Prisma.FxRateSnapshotCreateWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUncheckedCreateWithoutFuturesExecutionsInput>
+  where?: Prisma.FxRateSnapshotWhereInput
+}
+
+export type FxRateSnapshotUpdateToOneWithWhereWithoutFuturesExecutionsInput = {
+  where?: Prisma.FxRateSnapshotWhereInput
+  data: Prisma.XOR<Prisma.FxRateSnapshotUpdateWithoutFuturesExecutionsInput, Prisma.FxRateSnapshotUncheckedUpdateWithoutFuturesExecutionsInput>
+}
+
+export type FxRateSnapshotUpdateWithoutFuturesExecutionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  baseCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  quoteCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  rate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  sourceType?: Prisma.EnumFxRateSourceTypeFieldUpdateOperationsInput | $Enums.FxRateSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  approvedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutFxRateSnapshotNestedInput
+  orders?: Prisma.OrderUpdateManyWithoutFxRateSnapshotNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutFxRateSnapshotNestedInput
+}
+
+export type FxRateSnapshotUncheckedUpdateWithoutFuturesExecutionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  baseCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  quoteCurrency?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  rate?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  sourceType?: Prisma.EnumFxRateSourceTypeFieldUpdateOperationsInput | $Enums.FxRateSourceType
+  sourceName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  sourceTimestamp?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  rawPayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  approvedByUserId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+  orders?: Prisma.OrderUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+}
+
 export type FxRateSnapshotCreateWithoutOrdersInput = {
   id?: string
   baseCurrency: $Enums.CurrencyCode
@@ -613,6 +728,7 @@ export type FxRateSnapshotCreateWithoutOrdersInput = {
   note?: string | null
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutFxRateSnapshotInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotUncheckedCreateWithoutOrdersInput = {
@@ -631,6 +747,7 @@ export type FxRateSnapshotUncheckedCreateWithoutOrdersInput = {
   note?: string | null
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotCreateOrConnectWithoutOrdersInput = {
@@ -665,6 +782,7 @@ export type FxRateSnapshotUpdateWithoutOrdersInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutFxRateSnapshotNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotUncheckedUpdateWithoutOrdersInput = {
@@ -683,6 +801,7 @@ export type FxRateSnapshotUncheckedUpdateWithoutOrdersInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotCreateWithoutExchangeTransactionsInput = {
@@ -701,6 +820,7 @@ export type FxRateSnapshotCreateWithoutExchangeTransactionsInput = {
   note?: string | null
   orders?: Prisma.OrderCreateNestedManyWithoutFxRateSnapshotInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotUncheckedCreateWithoutExchangeTransactionsInput = {
@@ -719,6 +839,7 @@ export type FxRateSnapshotUncheckedCreateWithoutExchangeTransactionsInput = {
   note?: string | null
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutFxRateSnapshotInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotCreateOrConnectWithoutExchangeTransactionsInput = {
@@ -753,6 +874,7 @@ export type FxRateSnapshotUpdateWithoutExchangeTransactionsInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orders?: Prisma.OrderUpdateManyWithoutFxRateSnapshotNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotUncheckedUpdateWithoutExchangeTransactionsInput = {
@@ -771,6 +893,7 @@ export type FxRateSnapshotUncheckedUpdateWithoutExchangeTransactionsInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   orders?: Prisma.OrderUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotCreateWithoutQuotesInput = {
@@ -789,6 +912,7 @@ export type FxRateSnapshotCreateWithoutQuotesInput = {
   note?: string | null
   exchangeTransactions?: Prisma.ExchangeTransactionCreateNestedManyWithoutFxRateSnapshotInput
   orders?: Prisma.OrderCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotUncheckedCreateWithoutQuotesInput = {
@@ -807,6 +931,7 @@ export type FxRateSnapshotUncheckedCreateWithoutQuotesInput = {
   note?: string | null
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
   orders?: Prisma.OrderUncheckedCreateNestedManyWithoutFxRateSnapshotInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutFxRateSnapshotInput
 }
 
 export type FxRateSnapshotCreateOrConnectWithoutQuotesInput = {
@@ -841,6 +966,7 @@ export type FxRateSnapshotUpdateWithoutQuotesInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   exchangeTransactions?: Prisma.ExchangeTransactionUpdateManyWithoutFxRateSnapshotNestedInput
   orders?: Prisma.OrderUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 export type FxRateSnapshotUncheckedUpdateWithoutQuotesInput = {
@@ -859,6 +985,7 @@ export type FxRateSnapshotUncheckedUpdateWithoutQuotesInput = {
   note?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   exchangeTransactions?: Prisma.ExchangeTransactionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
   orders?: Prisma.OrderUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
+  futuresExecutions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutFxRateSnapshotNestedInput
 }
 
 
@@ -870,12 +997,14 @@ export type FxRateSnapshotCountOutputType = {
   exchangeTransactions: number
   orders: number
   quotes: number
+  futuresExecutions: number
 }
 
 export type FxRateSnapshotCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   exchangeTransactions?: boolean | FxRateSnapshotCountOutputTypeCountExchangeTransactionsArgs
   orders?: boolean | FxRateSnapshotCountOutputTypeCountOrdersArgs
   quotes?: boolean | FxRateSnapshotCountOutputTypeCountQuotesArgs
+  futuresExecutions?: boolean | FxRateSnapshotCountOutputTypeCountFuturesExecutionsArgs
 }
 
 /**
@@ -909,6 +1038,13 @@ export type FxRateSnapshotCountOutputTypeCountQuotesArgs<ExtArgs extends runtime
   where?: Prisma.QuoteWhereInput
 }
 
+/**
+ * FxRateSnapshotCountOutputType without action
+ */
+export type FxRateSnapshotCountOutputTypeCountFuturesExecutionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesExecutionWhereInput
+}
+
 
 export type FxRateSnapshotSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -927,6 +1063,7 @@ export type FxRateSnapshotSelect<ExtArgs extends runtime.Types.Extensions.Intern
   exchangeTransactions?: boolean | Prisma.FxRateSnapshot$exchangeTransactionsArgs<ExtArgs>
   orders?: boolean | Prisma.FxRateSnapshot$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.FxRateSnapshot$quotesArgs<ExtArgs>
+  futuresExecutions?: boolean | Prisma.FxRateSnapshot$futuresExecutionsArgs<ExtArgs>
   _count?: boolean | Prisma.FxRateSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["fxRateSnapshot"]>
 
@@ -983,6 +1120,7 @@ export type FxRateSnapshotInclude<ExtArgs extends runtime.Types.Extensions.Inter
   exchangeTransactions?: boolean | Prisma.FxRateSnapshot$exchangeTransactionsArgs<ExtArgs>
   orders?: boolean | Prisma.FxRateSnapshot$ordersArgs<ExtArgs>
   quotes?: boolean | Prisma.FxRateSnapshot$quotesArgs<ExtArgs>
+  futuresExecutions?: boolean | Prisma.FxRateSnapshot$futuresExecutionsArgs<ExtArgs>
   _count?: boolean | Prisma.FxRateSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FxRateSnapshotIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {}
@@ -994,6 +1132,7 @@ export type $FxRateSnapshotPayload<ExtArgs extends runtime.Types.Extensions.Inte
     exchangeTransactions: Prisma.$ExchangeTransactionPayload<ExtArgs>[]
     orders: Prisma.$OrderPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
+    futuresExecutions: Prisma.$FuturesExecutionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1406,6 +1545,7 @@ export interface Prisma__FxRateSnapshotClient<T, Null = never, ExtArgs extends r
   exchangeTransactions<T extends Prisma.FxRateSnapshot$exchangeTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FxRateSnapshot$exchangeTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ExchangeTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   orders<T extends Prisma.FxRateSnapshot$ordersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FxRateSnapshot$ordersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.FxRateSnapshot$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FxRateSnapshot$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  futuresExecutions<T extends Prisma.FxRateSnapshot$futuresExecutionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FxRateSnapshot$futuresExecutionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1910,6 +2050,30 @@ export type FxRateSnapshot$quotesArgs<ExtArgs extends runtime.Types.Extensions.I
   take?: number
   skip?: number
   distinct?: Prisma.QuoteScalarFieldEnum | Prisma.QuoteScalarFieldEnum[]
+}
+
+/**
+ * FxRateSnapshot.futuresExecutions
+ */
+export type FxRateSnapshot$futuresExecutionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesExecution
+   */
+  select?: Prisma.FuturesExecutionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesExecution
+   */
+  omit?: Prisma.FuturesExecutionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesExecutionInclude<ExtArgs> | null
+  where?: Prisma.FuturesExecutionWhereInput
+  orderBy?: Prisma.FuturesExecutionOrderByWithRelationInput | Prisma.FuturesExecutionOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesExecutionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesExecutionScalarFieldEnum | Prisma.FuturesExecutionScalarFieldEnum[]
 }
 
 /**

@@ -69,6 +69,9 @@ writers request participant FOR NO KEY UPDATE from the start, avoiding lock upgr
 
 1. Existing Season lifecycle establishes ended and releases submitted order/reservations.
 2. The existing settlement job checks reservations and eligible final participants.
+   In a Season with a final-ranking eligibility rule it also judges eligibility
+   HERE, before step 3 (2026-10-15): an evidence fault stops the job before any
+   pin, close or cash settlement ([eligibility](season-final-ranking-eligibility.md)).
 3. Under the Season write lock, pin every required instrument's price and fee before
    any account cash settlement. `FuturesSeasonPrice` is unique per Season/instrument.
 4. For every account with open Futures, including excluded/non-ranking participants,
@@ -78,7 +81,10 @@ writers request participant FOR NO KEY UPDATE from the start, avoiding lock upgr
    settle cash/fee/ledger and create its final event. No whole-Season clearing transaction.
 6. Assert no open Futures; calculate final valuation; under the existing final-write
    Season lock recheck the barrier and write final snapshot/ranking/tier/account
-   closure/settled. The existing no-eligible-participants error remains unchanged.
+   closure/settled. The existing no-eligible-participants error remains unchanged
+   for Seasons without an eligibility rule; a rule Season with no rankable
+   participant still exits every open position (excluded ones included), closes
+   every account and becomes settled with an empty final ranking.
 
 Final exit uses Binance USDⓈ-M **Futures Last** (2026-10-10; [contract](futures-last-price-contract.md)),
 the product's normal execution price. Liquidation continues using Mark. Selection

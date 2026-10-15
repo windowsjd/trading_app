@@ -431,6 +431,30 @@ operator re-runs `season-settlement`.
   `FINAL_RESULTS_INTEGRITY`). 행 0 + 적격자 0이면 `NO_QUALIFIED_PARTICIPANTS`로 정상 종료.
 - `admin-generate-season-ranking --rank-type final`은 자격 시즌에서 거부된다.
 
+### 출시 전 보완 (2026-10-15 후속)
+
+- **실행 순서**: 자격 시즌의 판정은 이제 **선물 최종 종료(`futuresFinal.settleSeason`) 전에**
+  한다: 예약 확인 → 판정 → 선물 최종가 고정·계정별 청산 → 평가 → 원자적 최종 쓰기. 판정의
+  체결·FX 증거 오류(`RANKING_QUALIFICATION_*`, 500)는 포지션·지갑·원장·최종가 고정·스냅샷·
+  판정·계정·시즌 상태를 하나도 바꾸지 않는다(드라이런 포함). 남는 기록은 실패한 배치 실행
+  이력뿐이다. 이전 순서에서는 청산이 먼저 커밋된 뒤 판정이 실패해 금융 처리만 부분 진행됐다.
+- 판정 이후(최종가 없음·평가 실패·최종 쓰기 롤백) 실패는 기존 재시도 정책 그대로다. 이미
+  커밋된 계정별 선물 청산은 유지되고, 재실행은 남은 계정만 청산하며 같은 계정을 두 번
+  청산·차감하지 않는다. 판정은 `ended` 이후 바뀌지 않는 입력만 읽으므로 잠금 안에서 다시
+  계산하지 않는다([경합 검토](season-final-ranking-eligibility.md#5-최종-정산)).
+- **정상 참가자 0명**: 자격 시즌은 참가자가 없거나 전원 `excluded`/`registered`여도
+  `NO_SETTLEMENT_PARTICIPANTS`로 멈추지 않는다. 판정·평가·스냅샷·최종 행 없이 선물 최종 종료
+  (제외자 포함)와 모든 시즌 계정 종료 후 `settled`; 재실행은 멱등 성공, 티어 잡은
+  `NO_QUALIFIED_PARTICIPANTS`. 예약·열린 선물·계정 연결 손상은 기존처럼 실패한다. 자격 기준
+  없는 시즌은 `NO_SETTLEMENT_PARTICIPANTS`(400) 그대로다.
+- 최종 쓰기 트랜잭션(시즌 잠금 아래 스냅샷·결과·최종 행·계정 종료·`settled`)은 Prisma 기본 5 s가
+  아니라 10분 상한을 쓴다(`FINAL_SETTLEMENT_WRITE_TIMEOUT_MS`). 로컬 실측에서 10,000명 시즌은 5 s에서
+  매번 롤백돼 정산이 끝나지 않았고, 수정 후 잠금 13.3 s로 완료됐다(1,000명 1.4 s). 운영은 미측정.
+  모든 시즌(기준 유무 무관)의 정산 쓰기에 적용되며 쓰는 내용은 같다.
+- 스케줄러(`season_settlement:ended`)는 실패한 시즌을 틱마다 새 키로 재시도한다. 판정 증거
+  오류는 고칠 수 없는 데이터 문제이므로 같은 오류가 반복되며, 이때도 금융 상태는 바뀌지
+  않는다. 대응은 [운영 절차](season-final-ranking-eligibility.md#9-운영-절차).
+
 ## Future Work
 
 Cron scheduling, provider ingestion, daily snapshot automation, ranking overwrite/regeneration, settlement extensions beyond final tier assignment, true competition tie rank, reward amount policy, and actual payment/point/delivery/external fulfillment remain separate gates.

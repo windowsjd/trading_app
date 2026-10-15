@@ -154,6 +154,19 @@ complete first response in the same PostgreSQL transaction. Same key/request
 replays that response; different request conflicts; no price/position/cash
 recalculation on replay. Ownership is always checked before replay.
 
+USD/KRW evidence (2026-10-15, [eligibility](season-final-ranking-eligibility.md)):
+only in a Season with a final-ranking eligibility rule, the transaction pins, as
+its last check before any write, the snapshot the Season settlement FX rule
+selects at `executedAt` (provider priority then approved manual; effective and
+captured at or before the execution; no freshness bound) in
+`fxRateSnapshotId`, which the eligibility turnover is converted with. Without
+such evidence the command fails with 409 `FUTURES_FX_EVIDENCE_UNAVAILABLE` and
+nothing is written. Every path (market, Limit entry, conditional entry, TP/SL)
+shares this core. A DB trigger requires the pin in those Seasons, checks it was
+held at execution and freezes it. General, beginner and no-rule Season
+executions perform no FX lookup and keep `NULL`; responses and history are
+unchanged.
+
 Locks: General account `FOR UPDATE`; Season `FOR SHARE`→account `FOR SHARE`→
 participant `FOR NO KEY UPDATE` via the lifecycle helper, since the transaction
 may also update participant performance. Then instrument/underlying

@@ -109,8 +109,10 @@ Transient refusals (`FUTURES_PRICE_UNAVAILABLE`, `FUTURES_PRICE_STALE`,
 `FUTURES_MARK_UNAVAILABLE`, `FUTURES_MARK_STALE`, unexpected non-API errors)
 retry on the next cycle, at most 3 attempts within 30 s of the trigger. Every
 other refusal — insufficient collateral, maintenance, existing position or
-pending entry, mode, account/Season/beginner gates, verification — fails the
-entry at once with the engine's code in `failureCode`. A trigger 30 s old or
+pending entry, mode, account/Season/beginner gates, verification, and (in a
+Season with a final-ranking eligibility rule) missing USD/KRW evidence
+`FUTURES_FX_EVIDENCE_UNAVAILABLE` — fails the entry at once with the engine's
+code in `failureCode`. A trigger 30 s old or
 older never becomes an order (`failed`/`execution_window_expired`).
 
 ## States

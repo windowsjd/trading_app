@@ -1036,12 +1036,21 @@ model FuturesExecution {
   isolatedMarginAfter    Decimal              @map("isolated_margin_after") @db.Decimal(24, 8)
   executedAt             DateTime             @map("executed_at")
   createdAt              DateTime             @default(now()) @map("created_at")
+  /// USD/KRW evidence pinned by the execution transaction in a season with a
+  /// final-ranking eligibility rule (docs/season-final-ranking-eligibility.md):
+  /// the snapshot the settlement FX rule selects at executedAt, so recognized
+  /// turnover is reproduced from this row, never from a later FX lookup. NULL
+  /// for general/beginner accounts, seasons without a rule, and executions
+  /// committed before this column. A trigger requires it in rule seasons,
+  /// checks it was effective and captured by executedAt, and freezes it.
+  fxRateSnapshotId       String?              @map("fx_rate_snapshot_id")
 
   tradingAccount     TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
   instrument         FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
   position           FuturesPosition           @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
   assetPriceSnapshot AssetPriceSnapshot?       @relation(fields: [assetPriceSnapshotId], references: [id], onDelete: Restrict)
   lastPriceSnapshot  FuturesLastPriceSnapshot? @relation(fields: [lastPriceSnapshotId], references: [id], onDelete: Restrict)
+  fxRateSnapshot     FxRateSnapshot?           @relation(fields: [fxRateSnapshotId], references: [id], onDelete: Restrict)
   executeRequest     FuturesExecuteRequest?
   protectionChild    ProtectionChild?
   limitOrder         FuturesLimitOrder?
@@ -1053,6 +1062,7 @@ model FuturesExecution {
   @@index([positionId])
   @@index([assetPriceSnapshotId])
   @@index([lastPriceSnapshotId])
+  @@index([fxRateSnapshotId])
   @@map("futures_executions")
 }
 
@@ -1817,6 +1827,7 @@ model FxRateSnapshot {
   exchangeTransactions ExchangeTransaction[]
   orders               Order[]
   quotes               Quote[]
+  futuresExecutions    FuturesExecution[]
 
   @@index([baseCurrency, quoteCurrency, effectiveAt])
   @@index([baseCurrency, quoteCurrency, capturedAt])

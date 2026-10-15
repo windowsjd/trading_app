@@ -28,6 +28,7 @@ import {
   resolveSeasonFinalQualificationCriteria,
   type SeasonTradingActivity,
 } from './season-final-qualification';
+import { verifyEligibilityFinalResult } from './season-final-result-integrity';
 
 export type RankingQuery = {
   seasonId?: string;
@@ -488,6 +489,15 @@ export class RankingService {
       });
     }
 
+    // A season with an eligibility rule publishes a FINAL ranking only as
+    // settlement confirmed it, so it is verified by settlement's criteria
+    // before any of it (or its absence) is served, on every scope.
+    const eligibilityFinal =
+      parsedQuery.rankType === SeasonRankingType.final &&
+      resolveSeasonFinalQualificationCriteria(season)
+        ? await verifyEligibilityFinalResult(client, season)
+        : null;
+
     const selectedRanking = parsedQuery.rankingDate
       ? await this.findRankingDateMetadata(
           season.id,
@@ -508,13 +518,12 @@ export class RankingService {
     const participant = await this.findParticipant(season.id, userId, client);
 
     if (!selectedRanking) {
-      // A settled eligibility season whose confirmed final ranking is EMPTY
-      // (nobody qualified) is a normal result, not a ranking still pending.
-      const noQualifiedParticipants = await this.isConfirmedEmptyFinalRanking(
-        client,
-        season,
-        parsedQuery.rankType,
-      );
+      // A settled eligibility season whose verified final ranking is EMPTY
+      // (nobody qualified, or nobody was rankable) is a normal result, not a
+      // ranking still pending.
+      const noQualifiedParticipants =
+        eligibilityFinal?.settled === true &&
+        eligibilityFinal.qualifiedCount === 0;
       return this.unavailableResponse({
         season,
         rankType: parsedQuery.rankType,
@@ -1102,36 +1111,6 @@ export class RankingService {
             assignRankingTier(ranking.rank, totalParticipants))
           : null,
     };
-  }
-
-  /**
-   * Settled eligibility season, nobody qualified: settlement confirmed a
-   * verdict for its participants and none of them is `qualified`. Damage (no
-   * verdicts at all) stays the ordinary RANKING_UNAVAILABLE.
-   */
-  private async isConfirmedEmptyFinalRanking(
-    client: Prisma.TransactionClient,
-    season: RankingSeason,
-    rankType: SeasonRankingType,
-  ): Promise<boolean> {
-    if (
-      rankType !== SeasonRankingType.final ||
-      season.status !== SeasonStatus.settled ||
-      !resolveSeasonFinalQualificationCriteria(season)
-    ) {
-      return false;
-    }
-
-    const [qualifiedCount, notQualifiedCount] = await Promise.all([
-      client.seasonParticipant.count({
-        where: { seasonId: season.id, finalQualified: true },
-      }),
-      client.seasonParticipant.count({
-        where: { seasonId: season.id, finalQualified: false },
-      }),
-    ]);
-
-    return qualifiedCount === 0 && notQualifiedCount > 0;
   }
 
   /** Settlement stores `false` only for a participant it confirmed unqualified. */

@@ -63,6 +63,15 @@ type ExecutionRow = {
   notional: Prisma.Decimal;
   leverage: number;
   executedAt: Date;
+  /** The evidence the execution transaction pinned; null = before pinning. */
+  fxRateSnapshot: {
+    id: string;
+    baseCurrency: string;
+    quoteCurrency: string;
+    rate: Prisma.Decimal;
+    effectiveAt: Date;
+    capturedAt: Date;
+  } | null;
 };
 type FxTable = Record<string, Record<string, { id: string; rate: string }>>;
 /** The `where` the activity reader sends; read back by the scope test. */
@@ -165,6 +174,7 @@ function execution(
   leverage: number,
   executedAt: string,
   tradingAccountId = 'account-1',
+  fxRateSnapshot: ExecutionRow['fxRateSnapshot'] = null,
 ): ExecutionRow {
   return {
     id,
@@ -173,6 +183,27 @@ function execution(
     notional: d(notional),
     leverage,
     executedAt: new Date(executedAt),
+    fxRateSnapshot,
+  };
+}
+
+/** A USD/KRW pin held `secondsBefore` the execution instant. */
+function pin(
+  id: string,
+  rate: string,
+  executedAt: string,
+  overrides: Partial<NonNullable<ExecutionRow['fxRateSnapshot']>> = {},
+  secondsBefore = 60,
+): NonNullable<ExecutionRow['fxRateSnapshot']> {
+  const held = new Date(new Date(executedAt).getTime() - secondsBefore * 1000);
+  return {
+    id,
+    baseCurrency: 'USD',
+    quoteCurrency: 'KRW',
+    rate: d(rate),
+    effectiveAt: held,
+    capturedAt: held,
+    ...overrides,
   };
 }
 
@@ -487,6 +518,92 @@ describe('readSeasonTradingActivity', () => {
       (call) => (call[1] as string[]).length,
     );
     expect(asked.join(',')).toBe('3,2,1');
+  });
+
+  it('uses the FX a Futures execution pinned and never looks its rate up again', async () => {
+    const at = '2026-11-03T01:00:00.000Z';
+    const client = createClient({
+      executions: [
+        execution('e-1', 'btc-perp', '1000', 4, at, 'account-1', {
+          ...pin('fx-pinned', '1250', at),
+        }),
+      ],
+      // A rate an as-of lookup would now find (e.g. committed later with an
+      // earlier captured time) must not re-price the pinned execution.
+      fx: { [KOREA_EXIM]: { [at]: { id: 'fx-later', rate: '9999' } } },
+    });
+
+    const activity = (await activityOf(client)).get('account-1')!;
+
+    // 1000 ÷ 4 × 1250.
+    expect(activity.recognizedTurnoverKrw.toFixed(8)).toBe('312500.00000000');
+    expect(client.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  it('looks up only the executions committed before executions pinned their FX', async () => {
+    const pinnedAt = '2026-11-03T01:00:00.000Z';
+    const legacyAt = '2026-11-04T01:00:00.000Z';
+    const client = createClient({
+      executions: [
+        execution('e-pinned', 'btc-perp', '100', 1, pinnedAt, 'account-1', {
+          ...pin('fx-pinned', '1200', pinnedAt),
+        }),
+        execution('e-legacy', 'eth-perp', '100', 1, legacyAt),
+      ],
+      fx: { [KOREA_EXIM]: { [legacyAt]: { id: 'fx-legacy', rate: '1300' } } },
+    });
+
+    const activity = (await activityOf(client)).get('account-1')!;
+
+    // 100 × 1200 (pinned) + 100 × 1300 (legacy as-of lookup).
+    expect(activity.recognizedTurnoverKrw.toFixed(8)).toBe('250000.00000000');
+    expect(client.$queryRaw.mock.calls[0][1]).toEqual([legacyAt]);
+  });
+
+  it.each([
+    ['a non USD/KRW pair', { baseCurrency: 'KRW', quoteCurrency: 'USD' }],
+    ['a non-positive rate', { rate: d('0') }],
+    [
+      'evidence effective after the execution',
+      { effectiveAt: new Date('2026-11-03T01:00:00.001Z') },
+    ],
+    [
+      'evidence captured after the execution',
+      { capturedAt: new Date('2026-11-03T01:00:00.001Z') },
+    ],
+  ])(
+    'fails closed on a Futures execution pinned to %s',
+    async (_label, overrides) => {
+      const at = '2026-11-03T01:00:00.000Z';
+      const client = createClient({
+        executions: [
+          execution('e-1', 'btc-perp', '100', 2, at, 'account-1', {
+            ...pin('fx-bad', '1300', at, overrides),
+          }),
+        ],
+        fx: { [KOREA_EXIM]: { [at]: { id: 'fx-good', rate: '1300' } } },
+      });
+
+      const failure = await failureOf(activityOf(client));
+
+      expect(failure.status).toBe(500);
+      expect(failure.code).toBe('RANKING_QUALIFICATION_FX_EVIDENCE_MISMATCH');
+    },
+  );
+
+  it('accepts evidence held exactly at the execution instant', async () => {
+    const at = '2026-11-03T01:00:00.000Z';
+    const client = createClient({
+      executions: [
+        execution('e-1', 'btc-perp', '100', 1, at, 'account-1', {
+          ...pin('fx-edge', '1300', at, {}, 0),
+        }),
+      ],
+    });
+
+    const activity = (await activityOf(client)).get('account-1')!;
+
+    expect(activity.recognizedTurnoverKrw.toFixed(8)).toBe('130000.00000000');
   });
 
   it('sums raw Decimals and rounds the total half-up to 8 places once', async () => {

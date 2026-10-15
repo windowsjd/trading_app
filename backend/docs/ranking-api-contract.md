@@ -347,11 +347,34 @@ rankings, tie-breaks and tier ratios are unchanged.
 - `myRanking` of a participant without a final row because it did not qualify:
   `{ "state": "unavailable", "reason": "FINAL_RANKING_NOT_QUALIFIED" }`.
 - A settled eligibility season in which nobody qualified (confirmed verdicts, no
-  final rows): `state: "unavailable"`, `reason: "NO_QUALIFIED_PARTICIPANTS"` —
-  a normal empty final result, distinct from `RANKING_UNAVAILABLE`.
+  final rows) — including one that had no rankable participant at all:
+  `state: "unavailable"`, `reason: "NO_QUALIFIED_PARTICIPANTS"` — a normal empty
+  final result, distinct from `RANKING_UNAVAILABLE`.
 - New `GET /api/v1/ranking/qualification?seasonId=` returns the caller's own
   eligibility (`provisional` while the season runs, `final` once settled). It
   reads only the caller's account and never writes.
+
+### Final result verification (2026-10-15 follow-up)
+
+Before an eligibility season's `rankType=final` response — rows or their
+absence, on every scope (`all`, `friends`, `top10`) — the reader checks what
+settlement checks before it sets `settled`
+(`src/ranking/season-final-result-integrity.ts`):
+
+- not settled: no final row and no confirmed verdict may exist yet (both are
+  written only together with `settled`); otherwise damage. A clean pending
+  season keeps `RANKING_UNAVAILABLE`.
+- settled: every active/finished/rewarded participant holds a verdict; the final
+  rows are exactly one per confirmed-qualified participant on one rankingDate;
+  every season account is closed.
+
+Any contradiction — a lost verdict, a row for a participant that did not
+qualify, a qualified participant's missing row, rows split across dates, an
+account open again — is `500 FINAL_RESULTS_INTEGRITY`. It is never reported as
+`NO_QUALIFIED_PARTICIPANTS` (previously a lost verdict could be) or as a pending
+`RANKING_UNAVAILABLE` (previously a deleted row was), and rows are never filtered
+or re-ranked around it. Cost: six indexed counts per request; fills and FX are
+not re-read. Seasons without a rule and daily rankings are not affected.
 
 ## Not Implemented
 

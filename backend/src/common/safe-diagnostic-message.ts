@@ -15,6 +15,10 @@ const SAFE_MESSAGES = new Set<string>([
   'A USD season order references FX evidence that is not a positive USD/KRW rate.',
   'A season Futures execution has no positive notional or leverage.',
   'A season Futures execution has no USD/KRW evidence at or before its execution time.',
+  // Pinned Futures FX evidence and verified final results (2026-10-15).
+  'A season Futures execution pins FX evidence that is not a positive USD/KRW rate held at its execution time.',
+  'USD/KRW evidence for this Season execution is unavailable. Please try again later.',
+  'The confirmed season final result could not be verified.',
   // Fixed Futures Conditional Entry v1 product copy.
   'Futures conditional entries are currently disabled.',
   'Invalid Futures conditional entry.',

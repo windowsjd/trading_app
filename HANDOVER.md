@@ -10,6 +10,40 @@
 
 ---
 
+## 2026-10-15 시즌 참여 자격 출시 전 보완 (선물 FX 고정·정산 순서·빈 랭킹 검증·0명 시즌·정산 쓰기 예산)
+
+- 시작 `main`=`origin/main`=`6f732b24`(GitHub CI 7개 전부 success), clean. branch 없이 작업, **commit·push·배포·운영 DB 변경 없음(미커밋 인계)**.
+  기준 문서: [season-final-ranking-eligibility.md](backend/docs/season-final-ranking-eligibility.md) §1(보완 의도)·§3·§5·§9·§10.
+- **실제 원인(수정 전 HEAD를 실제 PostgreSQL로 재현):**
+  - 정산이 선물 최종 청산 → 평가 → 자격 판정 순서였다. 판정이 FX 증거 누락으로 실패하면 포지션 종료·지갑(100 → 109.89 USD)·최종가 고정·원장 2건은 이미 커밋되고 시즌은 `ended`.
+  - 선물 체결은 FX를 저장하지 않았다. 환율이 하나도 없던 시점의 자격 시즌 선물 체결도 그대로 확정됐고(본인 진행 API 500), 나중에 커밋된 `captured_at` 과거 행이 이미 끝난 체결의 거래대금을 바꿨다(55,000 → 75,000원). 처음 설계의 "시각 조회는 결정적" 전제가 성립하지 않았다(관리자 FX 입력도 `captured_at` 지정 가능).
+  - 공개 랭킹은 판정 2/3 누락·정산 후 열린 계정도 `NO_QUALIFIED_PARTICIPANTS`로 응답했다. 적격자 행 삭제는 `RANKING_UNAVAILABLE`(대기)로 보였다.
+  - 참가자 0명·전원 제외 자격 시즌은 `NO_SETTLEMENT_PARTICIPANTS`로 영원히 `ended`, 제외자의 열린 선물 포지션·계정도 남았다.
+  - 성능 실측 중 추가 발견: 최종 쓰기 트랜잭션이 Prisma 기본 5 s 제한을 써서 **10,000명 시즌은 정산이 끝나지 않았다**(잠금 4,999.6 ms에서 롤백, 재시도도 동일).
+- **수정:**
+  - 선물: 자격 시즌 체결은 쓰기 전에 정산 FX 규칙의 스냅샷을 `futures_executions.fx_rate_snapshot_id`로 고정, 없으면 409 `FUTURES_FX_EVIDENCE_UNAVAILABLE`(롤백). 일반·초보·기준 없는 시즌은 조회도 하지 않는다. 신선도 기준 없음.
+  - 판정: 고정 FX 사용(체결 시각 이후 효력·수집이면 `..._FX_EVIDENCE_MISMATCH`), 고정 없는(도입 전) 체결만 시각 조회.
+  - 정산: 판정을 선물 최종 청산 **앞으로** 이동. 경합 검토 결과 `ended` 이후 판정 입력은 바뀌지 않아 잠금 안 재계산은 하지 않았다. 자격 시즌은 정상 참가자 0명이어도 선물 종료·계정 종료 후 `settled`. 최종 쓰기 트랜잭션만 10분 상한.
+  - 랭킹: 자격 시즌 final 조회 전 정산과 같은 조건 검증(`season-final-result-integrity.ts`, count 6회), 어긋나면 500 `FINAL_RESULTS_INTEGRITY`.
+- **DB:** 추가형 migration `20261015200000_pin_futures_execution_fx_evidence`(컬럼·FK RESTRICT·인덱스·트리거). 기존 행 NULL 유지, 백필 없음.
+  운영 적용 상태: Render 빌드 로그상 `20261015120000_add_season_final_ranking_eligibility`는 2026-10-15 04:24:40Z 적용, 현재 live 백엔드 `dc0fcc72`(pending 없음). 새 migration은 미적용(main push 시 빌드에서 적용됨).
+- **운영 확인(읽기 전용):** 운영 DB 직접 조회는 권한 분류기가 차단해 하지 못했다. 공개 `GET /api/v1/seasons` 기준 시즌은 `sea_2026_s1`(2000-01-01~2099-12-31, `active`) 하나 — **출시 시즌은 아직 없다**. 이 시즌의 기준은 마이그레이션(NULL 추가)+트리거(활성 후 변경 불가)로 NULL일 것이지만 DB로 확인하지 못했다. Render: plan 1c-2g, Singapore, autoDeploy main, build에 `prisma migrate deploy`.
+- **검증(로컬, 격리 PG16 127.0.0.1:55611 `*_test`, Redis 56611):**
+  - backend typecheck·build·lint(accounts/candles)·format(candles)·load-test 110/110·진단 게이트 PASS, `git diff --check` clean, 생성 Prisma 산출물 재생성 일치.
+  - unit 316 suites·5,071 tests 통과(74 skip = DB 옵트인).
+  - 자격 PG 러너 16/16(신규 5: 부분 정산 방지, 실제 선물 체결 고정, 빈 결과 vs 손상, 0명·전원 제외, 선물 종료 후 실패 재시도). TC-D01 통과.
+  - 코어 계정 CI 목록 24/25 + active-admin 1/1 + 수리·감사 도구 0건. 실패 1(`general-account-trading` `ASSET_PRICE_UNAVAILABLE`)은 19:09:25 시계 후퇴 2초 뒤, 단독 재실행 2/2 통과.
+  - 금융 CI 목록 25/27 + price-safety 통과. 실패 2(`orders.execute` `ASSET_PRICE_UNAVAILABLE`, `futures-f3` `FUTURES_MARK_UNAVAILABLE`): orders 단독 통과. f3는 시계 후퇴 기준 동일 조건 비교에서 work·HEAD 사본 모두 step-free 2/2 통과, step 걸침 0/2(서로 다른 신선도 코드) → 환경 기인. 정산 쓰기 수정 후 f3 재통과.
+  - e2e 407/407(`.env*` 없는 사본에서 `env -i`).
+  - 프런트엔드 무변경(HEAD CI success). Futures release fixture는 시계 후퇴 시 실패하도록 설계돼 WSL에서 재현 불가(HEAD CI success). Candle fixture는 관련 코드 무변경으로 미실행.
+- **성능(로컬 실측, `scripts/season-final-qualification-benchmark.ts`, [결과](backend/docs/benchmarks/season-final-qualification-2026-10-15.json)):** 10,000명·111만 체결 시즌 판정 4.6 s(1,000문장, 힙 +261 MB), 본인 진행 API ≤19 ms(규모 무관), final 조회 49 ms(검증 21 ms), 정산 50.3 s/잠금 13.3 s(수정 후). 최악 배치(50명×3,000건) 힙 +247 MB — 2 GB 인스턴스 기준 병목 아님으로 판단, 배치 로직 무변경. 운영 실측 없음.
+- **주의/남은 일:**
+  - 배포: 새 migration을 **출시 시즌이 `active`가 되기 전에** 배포. main push = Render 빌드에서 운영 migrate(승인 필요).
+  - 출시 시즌은 `upcoming`으로 만들며 기준 5/3 설정·3주 확인(SQL은 기준 문서 §9).
+  - 고정 도입 전 자격 시즌 체결만 시각 조회 경로를 탄다(운영엔 없음). 과거 `captured_at` FX 입력 금지.
+  - 잠정 랭킹 새로고침도 참가자당 UPDATE를 기본 5 s 트랜잭션에서 한다(이번 범위 밖, 10,000명 전 확인 필요).
+  - 앱은 `FUTURES_FX_EVIDENCE_UNAVAILABLE`에 별도 문구가 없다(일반 거부 문구). 4번 UI 작업은 별도.
+
 ## 2026-10-15 Trading Class 시즌 최종 랭킹 참여 자격 도입 (백엔드 계약)
 
 - 시작 `main`=`origin/main`=`8191f72c`, clean. main checkout에서 branch 없이 작업. commit·push·배포·운영 DB 변경 없음(미커밋 인계).

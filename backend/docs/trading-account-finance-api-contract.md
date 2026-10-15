@@ -38,6 +38,15 @@ no final ranking row. Its portfolio is still `state: available` with
 Allocation comes from the latest settlement EquitySnapshot; one that disagrees with
 the settled totals fails with `TRADING_ACCOUNT_INTEGRITY`.
 
+Eligibility follow-up (2026-10-15): in a Season with an eligibility rule a
+Futures execution pins its USD/KRW evidence or is refused with 409
+`FUTURES_FX_EVIDENCE_UNAVAILABLE` before any wallet, position or ledger write
+([Futures contract](futures-api-contract.md#price-transactions-and-evidence)).
+Settlement judges eligibility before the Futures final exit, so an evidence
+fault leaves every wallet, position and ledger row of the Season untouched; a
+rule Season with no rankable participant is still settled (accounts closed).
+No portfolio, wallet or history response shape changes.
+
 ## Status
 
 - Implemented (2026-08-03, 작업 4):

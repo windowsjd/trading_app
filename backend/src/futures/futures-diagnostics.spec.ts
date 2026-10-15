@@ -289,6 +289,31 @@ describe('Futures existing execution diagnostic boundary', () => {
     },
   );
 
+  it('pins no FX evidence and runs no FX lookup for a general account', async () => {
+    const client = tx as {
+      futuresExecution: { create: jest.Mock };
+      $queryRaw: jest.Mock;
+    };
+    client.futuresExecution.create.mockRejectedValueOnce(
+      new Error('stop after the execution write'),
+    );
+
+    await expect(
+      service.execute('user-1', 'account-1', command),
+    ).rejects.toThrow();
+
+    const written = (
+      client.futuresExecution.create.mock.calls[0] as [
+        { data: { fxRateSnapshotId: string | null } },
+      ]
+    )[0].data;
+    expect(written.fxRateSnapshotId === null).toBe(true);
+    const fxLookups = (
+      client.$queryRaw.mock.calls as Array<[TemplateStringsArray]>
+    ).filter(([sql]) => sql.join('').includes('fx_rate_snapshots'));
+    expect(fxLookups.length).toBe(0);
+  });
+
   it('keeps reduction insufficiency meaning and predicates without balance/fee/PnL', async () => {
     wallet.balanceAmount = d('30.12345678');
     wallet.reservedAmount = d('5.12345678');

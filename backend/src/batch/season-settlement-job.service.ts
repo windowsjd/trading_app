@@ -60,6 +60,16 @@ import {
 
 const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TOP_RANKS_LIMIT = 10;
+/**
+ * Budget of the final write (one transaction under the season row lock, a few
+ * statements per participant). Prisma's default interactive-transaction
+ * timeout is 5 s: measured on loopback PostgreSQL, a 10,000-participant season
+ * held the lock until exactly that limit and every retry rolled back the same
+ * way, so the season could never settle (docs/season-final-ranking-eligibility.md
+ * §10). The season is `ended` (no trading), so a long ceiling only bounds a
+ * write that is stuck; it changes neither what is written nor its atomicity.
+ */
+const FINAL_SETTLEMENT_WRITE_TIMEOUT_MS = 10 * 60_000;
 const FINAL_RANK_TYPE = SeasonRankingType.final;
 const SETTLEMENT_PARTICIPANT_STATUSES: readonly ParticipantStatus[] = [
   ParticipantStatus.active,
@@ -286,7 +296,12 @@ export class SeasonSettlementJobService {
       criteria,
     });
 
-    if (participants.length === 0) {
+    // Without an eligibility rule an empty season keeps its existing refusal.
+    // Under a rule, "nobody to rank" is a normal final result: the season is
+    // still settled — every linked account closed, any open Futures position
+    // (e.g. an excluded participant's) finally settled — with an empty final
+    // ranking and no verdict or snapshot for anyone who was not ranked.
+    if (participants.length === 0 && !criteria) {
       this.failWithResult(
         HttpStatus.BAD_REQUEST,
         'NO_SETTLEMENT_PARTICIPANTS',
@@ -357,6 +372,24 @@ export class SeasonSettlementJobService {
       participants,
     );
 
+    // Eligibility is judged BEFORE the Futures final exit, the first step that
+    // commits money (per-account transactions, not rolled back by a later
+    // failure). Missing or contradictory eligibility evidence therefore stops
+    // the settlement while every position, wallet and ledger is untouched;
+    // failures after this point keep the existing resumable exit policy.
+    // The verdict cannot drift before the final write: it reads only fills in
+    // [startAt, endAt), which are closed once the season is `ended` (every
+    // command re-checks the season under its lock), plus FX evidence that is
+    // pinned per fill. A Season final exit is never a `futures_executions` row,
+    // and a changed participant set still fails closed under the season lock.
+    const qualification = criteria
+      ? await this.evaluateFinalQualifications({
+          season,
+          criteria,
+          participantScopes,
+        })
+      : null;
+
     const finalFuturesProjections = await this.futuresFinal.settleSeason(
       seasonId,
       dryRun,
@@ -385,16 +418,7 @@ export class SeasonSettlementJobService {
       );
     });
 
-    // Eligibility is measured from the season's fills, not from the final
-    // exit above (a Season final exit is never a `futures_executions` row).
-    // Every valued participant gets a verdict; only the qualified are ranked.
-    const qualification = criteria
-      ? await this.evaluateFinalQualifications({
-          season,
-          criteria,
-          participantScopes,
-        })
-      : null;
+    // Every valued participant has a verdict; only the qualified are ranked.
     const isRanked = (valuation: FinalValuation) =>
       !qualification ||
       qualification.get(valuation.seasonParticipantId)?.qualified === true;
@@ -481,9 +505,11 @@ export class SeasonSettlementJobService {
     result.seasonAccounts.closed = writeResult.closedTradingAccountIds.length;
     result.season.updated = writeResult.seasonUpdated;
     result.message =
-      finalRows.length === 0
-        ? 'Season settlement completed; no participant met the final ranking eligibility criteria, so the final ranking is empty. Every account was valued and closed.'
-        : 'Season settlement completed through final ranking, final tier assignment, and season account closure. Rewards remain pending.';
+      participants.length === 0
+        ? 'Season settlement completed with no participant eligible for the final ranking, so the final ranking is empty. Every linked season account was closed.'
+        : finalRows.length === 0
+          ? 'Season settlement completed; no participant met the final ranking eligibility criteria, so the final ranking is empty. Every account was valued and closed.'
+          : 'Season settlement completed through final ranking, final tier assignment, and season account closure. Rewards remain pending.';
 
     return result;
   }
@@ -1111,7 +1137,7 @@ export class SeasonSettlementJobService {
     closedTradingAccountIds: string[];
     finishedParticipantIds: string[];
   }> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.runFinalWrite(async (tx) => {
       // 1) SERIALIZATION POINT (작업 8 §13.3). Ranking refresh and the daily
       //    ranking job take the same lock, so neither can rewrite this season's
       //    rows while the final result is being fixed.
@@ -1228,7 +1254,12 @@ export class SeasonSettlementJobService {
             ),
           ]
         : [];
-      if (!fresh || evaluatedParticipantIds.length === 0) {
+      // Under an eligibility rule nobody to rank is a valid first result; the
+      // eligible-set check below still requires that nobody became rankable.
+      if (
+        !fresh ||
+        (evaluatedParticipantIds.length === 0 && !input.qualificationApplied)
+      ) {
         this.throwJobError(
           HttpStatus.CONFLICT,
           'FINAL_RANKINGS_NOT_FOUND',
@@ -1391,6 +1422,15 @@ export class SeasonSettlementJobService {
         closedTradingAccountIds,
         finishedParticipantIds,
       };
+    });
+  }
+
+  /** The final write's one interactive transaction, with its own budget. */
+  private runFinalWrite<T>(
+    work: (tx: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    return this.prisma.$transaction(work, {
+      timeout: FINAL_SETTLEMENT_WRITE_TIMEOUT_MS,
     });
   }
 

@@ -58,10 +58,69 @@ describe('Season final-ranking eligibility — schema', () => {
     );
   });
 
-  it('adds no table and no column to Order or FuturesExecution', () => {
+  it('the rule migration itself adds no table and no column to Order or FuturesExecution', () => {
+    // The Futures FX pin is a separate, later migration (contract below).
     expect(migration).not.toMatch(/CREATE TABLE/i);
     expect(migration).not.toMatch(/ALTER TABLE "orders"/i);
     expect(migration).not.toMatch(/ALTER TABLE "futures_executions"/i);
+  });
+});
+
+describe('Futures execution FX evidence pin — schema + migration', () => {
+  const pinMigration = readFileSync(
+    join(
+      __dirname,
+      '..',
+      '..',
+      'prisma',
+      'migrations',
+      '20261015200000_pin_futures_execution_fx_evidence',
+      'migration.sql',
+    ),
+    'utf8',
+  );
+
+  it('adds one nullable FX snapshot reference to FuturesExecution, restricted like Order', () => {
+    const block = modelBlock('FuturesExecution');
+    expect(block).toMatch(
+      /fxRateSnapshotId\s+String\?\s+@map\("fx_rate_snapshot_id"\)/,
+    );
+    expect(block).toMatch(
+      /fxRateSnapshot\s+FxRateSnapshot\?\s+@relation\(fields: \[fxRateSnapshotId\], references: \[id\], onDelete: Restrict\)/,
+    );
+    expect(block).toContain('@@index([fxRateSnapshotId])');
+    expect(pinMigration).toContain(
+      'REFERENCES "fx_rate_snapshots"("id") ON DELETE RESTRICT',
+    );
+  });
+
+  it('is additive: existing executions keep NULL and are never rewritten', () => {
+    expect(pinMigration).not.toMatch(/^\s*UPDATE\s/im);
+    expect(pinMigration).not.toMatch(/^\s*DELETE\s/im);
+    expect(pinMigration).not.toMatch(/\bDROP\b/i);
+    expect(pinMigration).not.toMatch(/ADD COLUMN [^,;]*\bNOT NULL\b/i);
+    expect(pinMigration).not.toMatch(/ADD COLUMN [^,;]*\bDEFAULT\b/i);
+  });
+
+  it('requires the pin in rule seasons, checks it was held at execution, and freezes it', () => {
+    expect(pinMigration).toContain(
+      'CREATE TRIGGER "futures_executions_fx_evidence_guard"',
+    );
+    expect(pinMigration).toContain(
+      'BEFORE INSERT OR UPDATE OF "fx_rate_snapshot_id", "executed_at"',
+    );
+    expect(pinMigration).toMatch(
+      /"final_ranking_min_traded_instruments" IS NOT NULL\s+OR s\."final_ranking_min_turnover_ratio" IS NOT NULL/,
+    );
+    expect(pinMigration).toContain(
+      `f."base_currency" = 'USD' AND f."quote_currency" = 'KRW' AND f."rate" > 0`,
+    );
+    expect(pinMigration).toContain(
+      'f."effective_at" <= NEW."executed_at" AND f."captured_at" <= NEW."executed_at"',
+    );
+    expect(pinMigration).toContain(
+      'NEW."fx_rate_snapshot_id" IS DISTINCT FROM OLD."fx_rate_snapshot_id"',
+    );
   });
 });
 

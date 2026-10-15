@@ -13,18 +13,29 @@
  *     denominator is N; everyone else keeps a final valuation, a settlement
  *     snapshot, a stored verdict and a closed account,
  *   - Spot uses its pinned execution FX; Futures uses notional ÷ leverage at
- *     the settlement FX rule as of its execution (priority, captured-at),
- *   - 0 qualifiers settles normally and replays idempotently,
- *   - missing/mismatched evidence fails closed and writes nothing,
- *   - exclusion during settlement, concurrent runs, operator/reward bypasses,
- *     DB constraints, seasons without a rule.
+ *     the USD/KRW its execution pinned (real FuturesService), or — for an
+ *     execution committed before pinning — the settlement FX rule as of its
+ *     execution (priority, captured-at),
+ *   - 0 qualifiers settles normally and replays idempotently; so does a rule
+ *     season with no rankable participant (none at all, or all excluded),
+ *   - missing/mismatched evidence fails closed BEFORE the Futures final exit:
+ *     no position, wallet, ledger, snapshot, verdict or status changes,
+ *   - readers never present a damaged final result as empty or pending,
+ *   - exclusion during settlement, concurrent runs, a failure after the
+ *     Futures exit, operator/reward bypasses, DB constraints, seasons without
+ *     a rule.
  * No provider/Redis/HTTP calls; fixtures are uniquely named, removed by ID. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { HttpException, Logger } from '@nestjs/common';
+import type { Prisma } from '../src/generated/prisma/client';
 import { BatchService } from '../src/batch/batch.service';
 import { FinalTierAssignmentJobService } from '../src/batch/final-tier-assignment-job.service';
 import { SeasonSettlementJobService } from '../src/batch/season-settlement-job.service';
+import { FuturesSeasonSettlementService } from '../src/futures/futures-season-settlement.service';
+import { FuturesService } from '../src/futures/futures.service';
+import { BINANCE_FUTURES_SYMBOLS } from '../src/providers/binance/binance-product-catalog';
+import { findUsdKrwRatesAtOrBefore } from '../src/providers/fx-rate-snapshot-query';
 import { OperatorAuditService } from '../src/operator/operator-audit.service';
 import { OperatorSeasonModerationService } from '../src/operator/operator-season-moderation.service';
 import { LimitOrderCancelService } from '../src/orders/limit-order-cancel.service';
@@ -84,6 +95,17 @@ const portfolio = new TradingAccountPortfolioService(
   valuation,
 );
 const records = new RecordsService(db, valuation);
+process.env.FUTURES_TRADING_ENABLED = 'true';
+const futuresFor = (prisma: PrismaService) =>
+  new FuturesService(
+    prisma,
+    new TradingAccountAccessService(prisma),
+    new GeneralAccountPerformanceService(
+      prisma,
+      valuation,
+      new GeneralExternalFundingService(prisma),
+    ),
+  );
 
 // ------------------------------------------------------------------ helpers
 
@@ -187,6 +209,8 @@ async function join(
   options: {
     userId?: string;
     status?: 'active' | 'excluded';
+    /** Futures collateral (USD) for an open position fixture. */
+    futuresUsd?: string;
   } = {},
 ): Promise<Member> {
   const userId = options.userId ?? (await createUser(label)).id;
@@ -222,7 +246,11 @@ async function join(
     data: [
       { tradingAccountId: account.id, currencyCode: 'KRW', balanceAmount: krw },
       { tradingAccountId: account.id, currencyCode: 'USD', balanceAmount: '0' },
-      ...zeroCryptoCashWalletData(account.id),
+      ...zeroCryptoCashWalletData(account.id).map((wallet) =>
+        wallet.walletScope === 'crypto_futures' && options.futuresUsd
+          ? { ...wallet, balanceAmount: options.futuresUsd }
+          : wallet,
+      ),
     ],
   });
   return { userId, accountId: account.id, participantId: participant.id };
@@ -353,22 +381,78 @@ async function fill(
   });
 }
 
+/**
+ * One Futures execution leg. In a rule season the real execution path pins the
+ * USD/KRW it is converted with (`fxId`). `legacy` inserts the row the way an
+ * execution committed BEFORE executions pinned FX looks: unpinned, with the
+ * pin guard (which did not exist then) disabled for that one transaction.
+ */
+type FuturesLeg = {
+  operation: 'open' | 'increase' | 'reduce' | 'close';
+  quantity: string;
+  after: string;
+  executedAt: Date;
+} & ({ fxId: string; legacy?: never } | { legacy: true; fxId?: never });
+
+async function insertExecution(
+  member: Member,
+  contract: Market['btc'],
+  positionId: string,
+  leverage: number,
+  leg: FuturesLeg,
+) {
+  const price = await db.futuresLastPriceSnapshot.findUniqueOrThrow({
+    where: { id: contract.priceId },
+  });
+  const data = {
+    tradingAccountId: member.accountId,
+    instrumentId: contract.instrumentId,
+    positionId,
+    operation: leg.operation,
+    direction: 'long' as const,
+    marginMode: 'isolated' as const,
+    quantity: leg.quantity,
+    leverage,
+    executionPrice: '100',
+    lastPriceSnapshotId: price.id,
+    priceSourceType: 'provider_api' as const,
+    priceSourceName: 'binance_usdm_agg_trade_ws',
+    priceEffectiveAt: price.effectiveAt,
+    priceCapturedAt: price.capturedAt,
+    notional: (Number(leg.quantity) * 100).toFixed(8),
+    feeRate: '0.001',
+    feeAmount: '0',
+    realizedPnl: '0',
+    positionQuantityAfter: leg.after,
+    averageEntryPriceAfter: '100',
+    isolatedMarginAfter:
+      leg.operation === 'close' ? '0' : (100 / leverage).toFixed(8),
+    executedAt: leg.executedAt,
+    fxRateSnapshotId: leg.fxId ?? null,
+  };
+  if (!leg.legacy) {
+    return db.futuresExecution.create({ data });
+  }
+  return db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "futures_executions" DISABLE TRIGGER "futures_executions_fx_evidence_guard"',
+    );
+    const row = await tx.futuresExecution.create({ data });
+    await tx.$executeRawUnsafe(
+      'ALTER TABLE "futures_executions" ENABLE TRIGGER "futures_executions_fx_evidence_guard"',
+    );
+    return row;
+  });
+}
+
 /** A Futures lifetime with its user executions (quantity × 100 USD each). */
 async function futuresLifetime(
   member: Member,
   contract: Market['btc'],
   leverage: number,
   closedAt: Date,
-  legs: Array<{
-    operation: 'open' | 'increase' | 'reduce' | 'close';
-    quantity: string;
-    after: string;
-    executedAt: Date;
-  }>,
+  legs: FuturesLeg[],
 ) {
-  const price = await db.futuresLastPriceSnapshot.findUniqueOrThrow({
-    where: { id: contract.priceId },
-  });
   const position = await db.futuresPosition.create({
     data: {
       tradingAccountId: member.accountId,
@@ -385,34 +469,136 @@ async function futuresLifetime(
     },
   });
   for (const leg of legs) {
-    const notional = (Number(leg.quantity) * 100).toFixed(8);
-    await db.futuresExecution.create({
-      data: {
-        tradingAccountId: member.accountId,
-        instrumentId: contract.instrumentId,
-        positionId: position.id,
-        operation: leg.operation,
-        direction: 'long',
-        marginMode: 'isolated',
-        quantity: leg.quantity,
-        leverage,
-        executionPrice: '100',
-        lastPriceSnapshotId: price.id,
-        priceSourceType: 'provider_api',
-        priceSourceName: 'binance_usdm_agg_trade_ws',
-        priceEffectiveAt: price.effectiveAt,
-        priceCapturedAt: price.capturedAt,
-        notional,
-        feeRate: '0.001',
-        feeAmount: '0',
-        realizedPnl: '0',
-        positionQuantityAfter: leg.after,
-        averageEntryPriceAfter: '100',
-        isolatedMarginAfter: leg.operation === 'close' ? '0' : '1',
-        executedAt: leg.executedAt,
-      },
-    });
+    await insertExecution(member, contract, position.id, leverage, leg);
   }
+}
+
+/** A position still OPEN at Season end (1 contract at 100 USD) and its open. */
+async function openFuturesPosition(
+  member: Member,
+  contract: Market['btc'],
+  leverage: number,
+  open: Omit<FuturesLeg, 'operation' | 'quantity' | 'after'>,
+) {
+  const position = await db.futuresPosition.create({
+    data: {
+      tradingAccountId: member.accountId,
+      instrumentId: contract.instrumentId,
+      direction: 'long',
+      marginMode: 'isolated',
+      status: 'open',
+      quantity: '1',
+      averageEntryPrice: '100',
+      entryNotional: '100',
+      leverage,
+      isolatedMargin: (100 / leverage).toFixed(8),
+      createdAt: open.executedAt,
+    },
+  });
+  await insertExecution(member, contract, position.id, leverage, {
+    ...open,
+    operation: 'open',
+    quantity: '1',
+    after: '1',
+  } as FuturesLeg);
+  return position.id;
+}
+
+/**
+ * Scenarios about "no USD/KRW evidence was held at t" first prove that this
+ * shared database holds none, so a leftover old row reads as a clear
+ * precondition failure instead of a confusing assertion later.
+ */
+async function assertNoUsdKrwEvidenceAt(instant: Date) {
+  const held = await findUsdKrwRatesAtOrBefore(db, [instant.toISOString()]);
+  assert.equal(
+    held.size,
+    0,
+    `precondition: this database already holds USD/KRW evidence at or before ${instant.toISOString()}`,
+  );
+}
+
+/** Futures Last received 5 s before endAt: the Season final exit price. */
+async function finalExitPrice(contract: Market['btc'], endAt: Date) {
+  const last = await db.futuresLastPriceSnapshot.findUniqueOrThrow({
+    where: { id: contract.priceId },
+  });
+  await db.futuresLastPriceSnapshot.create({
+    data: {
+      instrumentId: contract.instrumentId,
+      symbol: last.symbol,
+      source: 'binance_usdm_agg_trade_ws',
+      price: '110',
+      effectiveAt: at(endAt, -5000),
+      capturedAt: at(endAt, -5000),
+    },
+  });
+}
+
+/**
+ * Every financial and final-result fact of a season's accounts as ONE string of
+ * primitives, so "nothing changed" is a string comparison (never a large
+ * object in an assertion).
+ */
+async function financialState(seasonId: string, members: Member[]) {
+  const accounts = {
+    tradingAccountId: { in: members.map((m) => m.accountId) },
+  };
+  const [
+    positions,
+    wallets,
+    ledger,
+    futuresSettlements,
+    futuresCloses,
+    finalPrices,
+    snapshots,
+    participants,
+    tradingAccounts,
+    finalRows,
+    seasonRow,
+  ] = await Promise.all([
+    db.futuresPosition.findMany({ where: accounts, orderBy: { id: 'asc' } }),
+    db.cashWallet.findMany({ where: accounts, orderBy: { id: 'asc' } }),
+    db.walletTransaction.count({ where: accounts }),
+    db.futuresSeasonSettlement.count({ where: accounts }),
+    db.futuresSeasonClose.count({ where: accounts }),
+    db.futuresSeasonPrice.count({ where: { seasonId } }),
+    db.equitySnapshot.count({ where: accounts }),
+    db.seasonParticipant.findMany({
+      where: { seasonId },
+      orderBy: { id: 'asc' },
+    }),
+    db.tradingAccount.findMany({
+      where: { id: { in: members.map((m) => m.accountId) } },
+      orderBy: { id: 'asc' },
+    }),
+    db.seasonRanking.count({ where: { seasonId } }),
+    db.season.findUniqueOrThrow({ where: { id: seasonId } }),
+  ]);
+  return JSON.stringify({
+    positions: positions.map(
+      (p) =>
+        `${p.id}:${p.status}:${fixed8(p.quantity)}:${fixed8(p.isolatedMargin)}:${fixed8(p.realizedPnl)}:${p.closedAt?.toISOString() ?? '-'}`,
+    ),
+    wallets: wallets.map(
+      (w) =>
+        `${w.walletScope}:${w.currencyCode}:${fixed8(w.balanceAmount)}:${fixed8(w.reservedAmount)}`,
+    ),
+    ledger,
+    futuresSettlements,
+    futuresCloses,
+    finalPrices,
+    snapshots,
+    participants: participants.map(
+      (p) =>
+        `${p.participantStatus}:${p.finalQualified}:${p.finalRank}:${p.finalTier}:${p.currentRank}:${fixed8(p.totalAssetKrw)}`,
+    ),
+    accounts: tradingAccounts.map(
+      (a) => `${a.status}:${a.closedAt?.toISOString() ?? '-'}`,
+    ),
+    finalRows,
+    season: seasonRow.status,
+  });
 }
 
 function settle(seasonId: string, endAt: Date, label: string) {
@@ -527,13 +713,13 @@ scenario(
     // Futures as-of FX: R1 is the rate before day 4 even though R2 claims to
     // be effective on day 2 — R2 was only CAPTURED on day 4. R3 is newer but
     // a lower-priority source.
-    await fx({
+    const R1 = await fx({
       source: KOREA_EXIM,
       rate: '1000',
       effectiveAt: at(startAt, -DAY),
       capturedAt: at(startAt, -DAY),
     });
-    await fx({
+    const R2 = await fx({
       source: KOREA_EXIM,
       rate: '2000',
       effectiveAt: at(startAt, 2 * DAY),
@@ -586,10 +772,30 @@ scenario(
       scope: 'crypto_spot',
       fxId: pinned,
     }); // 91,000
+    // The open predates FX pinning (as-of lookup: R1, since R2 was only
+    // captured on day 4); the later legs pinned R2 at execution.
     await futuresLifetime(B, market.btc, 5, t(6), [
-      { operation: 'open', quantity: '15', after: '15', executedAt: t(3) }, // 1500/5 × 1000
-      { operation: 'reduce', quantity: '5', after: '10', executedAt: t(5) }, // 500/5 × 2000
-      { operation: 'close', quantity: '10', after: '0', executedAt: t(6) }, // 1000/5 × 2000
+      {
+        operation: 'open',
+        quantity: '15',
+        after: '15',
+        executedAt: t(3),
+        legacy: true,
+      }, // 1500/5 × 1000
+      {
+        operation: 'reduce',
+        quantity: '5',
+        after: '10',
+        executedAt: t(5),
+        fxId: R2,
+      }, // 500/5 × 2000
+      {
+        operation: 'close',
+        quantity: '10',
+        after: '0',
+        executedAt: t(6),
+        fxId: R2,
+      }, // 1000/5 × 2000
     ]);
     // Not fills: a canceled limit order, a fill AT endAt, another season's fill.
     await db.order.create({
@@ -638,11 +844,63 @@ scenario(
       fxId: pinned,
     }); // 13,000
     await futuresLifetime(C, market.btc, 1, t(8), [
-      { operation: 'open', quantity: '1', after: '1', executedAt: t(6) }, // 100/1 × 2000
+      {
+        operation: 'open',
+        quantity: '1',
+        after: '1',
+        executedAt: t(6),
+        fxId: R2,
+      }, // 100/1 × 2000
     ]);
     await futuresLifetime(C, market.eth, 10, t(8), [
-      { operation: 'open', quantity: '10', after: '10', executedAt: t(7) }, // 1000/10 × 2000
+      {
+        operation: 'open',
+        quantity: '10',
+        after: '10',
+        executedAt: t(7),
+        legacy: true,
+      }, // 1000/10 × 2000 (as-of lookup)
     ]);
+    // The pin guard: evidence must have been held at execution, a rule
+    // season's execution must carry it, and a pin never changes.
+    const ethLifetime = await db.futuresPosition.findFirstOrThrow({
+      where: {
+        tradingAccountId: C.accountId,
+        instrumentId: market.eth.instrumentId,
+      },
+    });
+    const probe = {
+      operation: 'open' as const,
+      quantity: '1',
+      after: '1',
+      executedAt: t(3),
+    };
+    const pinGuards = {
+      capturedLater: await dbError(
+        insertExecution(C, market.eth, ethLifetime.id, 10, {
+          ...probe,
+          fxId: R2, // captured on day 4
+        }),
+      ),
+      unpinned: await dbError(
+        insertExecution(C, market.eth, ethLifetime.id, 10, {
+          ...probe,
+          fxId: null as unknown as string,
+        }),
+      ),
+      repinned: await dbError(
+        db.futuresExecution.updateMany({
+          where: { tradingAccountId: C.accountId, fxRateSnapshotId: R2 },
+          data: { fxRateSnapshotId: R1 },
+        }),
+      ),
+    };
+    assert.match(
+      pinGuards.capturedLater,
+      /effective and captured at or before the execution/,
+    );
+    assert.match(pinGuards.unpinned, /requires USD\/KRW evidence/);
+    assert.match(pinGuards.repinned, /FX evidence is immutable/);
 
     // D (+5%): 5 instruments, turnover 0.00000001 short → NOT qualified.
     await fill(D, K1, '1000000', t(1));
@@ -1064,6 +1322,22 @@ scenario(
     });
     const damaged = await outcome(settle(season.id, endAt, 'zero-damaged'));
     assert.equal(okOrCode(damaged), 'FINAL_RESULTS_INTEGRITY');
+    // The public reader applies the same criteria: never "nobody qualified".
+    for (const scope of ['all', 'friends', 'top10']) {
+      assert.equal(
+        okOrCode(
+          await outcome(
+            ranking.getRanking(A.userId, {
+              seasonId: season.id,
+              rankType: 'final',
+              scope,
+            }),
+          ),
+        ),
+        'FINAL_RESULTS_INTEGRITY',
+        `damaged empty result on ${scope}`,
+      );
+    }
     const audit = (await auditRankingAndSettlement(db)).map(
       (finding) => finding.code,
     );
@@ -1130,8 +1404,11 @@ scenario(
 );
 
 scenario(
-  '4 Futures FX evidence missing at execution: fails closed, then settles once evidence exists',
+  '4 legacy Futures execution without FX evidence held at execution: fails closed, then settles once evidence exists',
   async () => {
+    // An execution committed BEFORE executions pinned their FX: priced by the
+    // as-of lookup. New executions can no longer be committed like this
+    // (scenario 13), which is why the late row below cannot re-price them.
     const startAt = new Date('2020-01-01T00:00:00.000Z');
     const endAt = new Date('2020-01-31T00:00:00.000Z');
     const season = await createSeason({
@@ -1149,7 +1426,15 @@ scenario(
       market.btc,
       2,
       new Date('2020-01-11T00:00:00.000Z'),
-      [{ operation: 'open', quantity: '1', after: '1', executedAt }],
+      [
+        {
+          operation: 'open',
+          quantity: '1',
+          after: '1',
+          executedAt,
+          legacy: true,
+        },
+      ],
     );
     // Effective before the execution but only captured after it: not evidence
     // the system held at execution time.
@@ -1160,6 +1445,7 @@ scenario(
       capturedAt: new Date('2020-01-15T00:00:00.000Z'),
     });
 
+    await assertNoUsdKrwEvidenceAt(executedAt);
     const failed = await outcome(settle(season.id, endAt, 'fx-missing'));
     assert.equal(okOrCode(failed), 'RANKING_QUALIFICATION_FX_EVIDENCE_MISSING');
     const after = await participantState(member);
@@ -1527,6 +1813,15 @@ scenario(
       `${b.finalRank}:${b.finalTier}:${b.qualified}`,
       '2:silver:null',
     );
+    // Readers of a season without a rule are unchanged too.
+    const read = await ranking.getRanking(A.userId, {
+      seasonId: season.id,
+      rankType: 'final',
+    });
+    assert.equal(
+      `${read.data.state}:${read.data.rankings.map((r) => r.rank).join(',')}`,
+      'available:1,2',
+    );
     return { a, b };
   },
 );
@@ -1620,6 +1915,916 @@ scenario(
   },
 );
 
+scenario(
+  '12 missing FX evidence with open Futures positions: nothing financial moves until the evidence is valid',
+  async () => {
+    const startAt = new Date('2018-06-01T00:00:00.000Z');
+    const endAt = new Date('2018-06-22T00:00:00.000Z');
+    const season = await createSeason({
+      label: 'partial',
+      status: 'ended',
+      startAt,
+      endAt,
+      criteria: true,
+    });
+    const market = await createMarket(new Date('2018-06-01T12:00:00.000Z'));
+    await finalExitPrice(market.btc, endAt);
+    await finalExitPrice(market.eth, endAt);
+    const A = await join(season.id, startAt, 'PA', '1000000', {
+      futuresUsd: '200',
+    });
+    const B = await join(season.id, startAt, 'PB', '1000000', {
+      futuresUsd: '200',
+    });
+    // B's open pinned the rate held at its execution; A's open predates
+    // pinning and NO USD/KRW was held at its execution time.
+    const heldForB = await fx({
+      source: KOREA_EXIM,
+      rate: '1200',
+      effectiveAt: new Date('2018-06-02T12:00:00.000Z'),
+      capturedAt: new Date('2018-06-02T12:00:00.000Z'),
+    });
+    await openFuturesPosition(A, market.btc, 2, {
+      executedAt: new Date('2018-06-02T00:00:00.000Z'),
+      legacy: true,
+    });
+    await openFuturesPosition(B, market.eth, 4, {
+      executedAt: new Date('2018-06-03T00:00:00.000Z'),
+      fxId: heldForB,
+    });
+    await assertNoUsdKrwEvidenceAt(new Date('2018-06-02T00:00:00.000Z'));
+    const before = await financialState(season.id, [A, B]);
+    const firstKey = created.batchKeys.length;
+
+    const dryKey = `fq:partial-dry:${season.id}:${randomUUID()}`;
+    created.batchKeys.push(dryKey);
+    const dry = await outcome(
+      settlementJob().run({
+        seasonId: season.id,
+        settlementDate: formatKstRankingDate(endAt),
+        dryRun: true,
+        idempotencyKey: dryKey,
+      }),
+    );
+    const failed = await outcome(settle(season.id, endAt, 'partial'));
+    const retried = await outcome(settle(season.id, endAt, 'partial-retry'));
+    for (const run of [dry, failed, retried]) {
+      assert.equal(okOrCode(run), 'RANKING_QUALIFICATION_FX_EVIDENCE_MISSING');
+    }
+    assert.equal(
+      await financialState(season.id, [A, B]),
+      before,
+      'no Futures exit, price pin, wallet, ledger, snapshot, verdict, rank, account or status change',
+    );
+    // What a failed run may leave behind: its job history, nothing financial.
+    assert.equal(
+      await db.batchJobRun.count({
+        where: {
+          idempotencyKey: { in: created.batchKeys.slice(firstKey) },
+          status: 'failed',
+        },
+      }),
+      3,
+    );
+
+    // The evidence the system held at A's execution becomes readable (as an
+    // in-flight ingestion row stamped earlier would). Two runs race.
+    await fx({
+      source: KOREA_EXIM,
+      rate: '1100',
+      effectiveAt: new Date('2018-06-01T00:00:00.000Z'),
+      capturedAt: new Date('2018-06-01T00:00:00.000Z'),
+    });
+    const runs = await Promise.all([
+      outcome(settle(season.id, endAt, 'partial-race-1')),
+      outcome(settle(season.id, endAt, 'partial-race-2')),
+    ]);
+    const codes = runs.map(okOrCode).sort().join(',');
+    assert.ok(
+      ['ok,ok', 'SEASON_NOT_ENDED,ok'].includes(codes),
+      `outcomes ${codes}`,
+    );
+    const exits = await db.futuresSeasonSettlement.groupBy({
+      by: ['tradingAccountId'],
+      where: { seasonId: season.id },
+      _count: { _all: true },
+    });
+    assert.equal(
+      exits.map((row) => row._count._all).join(','),
+      '1,1',
+      'each account exits exactly once',
+    );
+    const settledState = await financialState(season.id, [A, B]);
+    const a = await participantState(A);
+    const b = await participantState(B);
+    // A: 100 ÷ 2 × 1100; B: 100 ÷ 4 × 1200 (its pin). One instrument each.
+    assert.equal(
+      `${a.qualified}:${a.count}:${a.turnover}`,
+      'false:1:55000.00000000',
+    );
+    assert.equal(
+      `${b.qualified}:${b.count}:${b.turnover}`,
+      'false:1:30000.00000000',
+    );
+    assert.equal(`${a.account}:${b.account}`, 'closed:closed');
+    assert.equal(
+      await db.futuresPosition.count({
+        where: {
+          tradingAccountId: { in: [A.accountId, B.accountId] },
+          status: 'open',
+        },
+      }),
+      0,
+    );
+    assert.equal(
+      okOrCode(await outcome(settle(season.id, endAt, 'partial-replay'))),
+      'ok',
+    );
+    assert.equal(
+      await financialState(season.id, [A, B]),
+      settledState,
+      'a replay moves nothing',
+    );
+    return { failed: okOrCode(failed), codes, a, b };
+  },
+);
+
+/**
+ * A Futures contract the real execution path accepts for a NEW position: an
+ * offered symbol with a verified contract. Reuses an asset another suite left,
+ * but only ever creates (and later removes) its own instrument.
+ */
+async function offeredContract() {
+  // From the end of the catalog: the leading symbols (BTCUSDT, ETHUSDT, …) are
+  // what other suites in the same CI database create for themselves.
+  for (const symbol of [...BINANCE_FUTURES_SYMBOLS].reverse()) {
+    const asset = await db.asset.findUnique({
+      where: { market_symbol: { market: 'BINANCE', symbol } },
+    });
+    // An existing asset is reused only if a contract on it can verify.
+    if (
+      asset &&
+      (!asset.isActive ||
+        asset.assetType !== 'crypto' ||
+        asset.currencyCode !== 'USD' ||
+        asset.priceCurrency !== 'USD' ||
+        asset.settlementCurrency !== 'USD' ||
+        (await db.futuresInstrument.count({
+          where: { underlyingAssetId: asset.id },
+        })) > 0)
+    )
+      continue;
+    const underlying =
+      asset ??
+      (await db.asset.create({
+        data: {
+          symbol,
+          name: `fq ${symbol}`,
+          market: 'BINANCE',
+          assetType: 'crypto',
+          currencyCode: 'USD',
+          priceCurrency: 'USD',
+          settlementCurrency: 'USD',
+          isActive: true,
+        },
+      }));
+    if (!asset) created.assets.push(underlying.id);
+    const instrument = await db.futuresInstrument.create({
+      data: {
+        underlyingAssetId: underlying.id,
+        markVerifiedAt: at(await dbNow(), -60_000),
+        markContractJson: {
+          symbol,
+          pair: symbol,
+          baseAsset: symbol.slice(0, -4),
+          contractType: 'PERPETUAL',
+          status: 'TRADING',
+          quoteAsset: 'USDT',
+          marginAsset: 'USDT',
+          underlyingType: 'COIN',
+        },
+      },
+    });
+    created.instruments.push(instrument.id);
+    return { symbol, instrumentId: instrument.id };
+  }
+  throw new Error(
+    'Every offered Futures symbol already has an instrument in this database.',
+  );
+}
+
+/** Futures Last and Mark observed 1 s ago (the F1 fixture convention). */
+async function freshFuturesPrices(contract: {
+  symbol: string;
+  instrumentId: string;
+}) {
+  const observed = at(await dbNow(), -1000);
+  for (let shift = 0; shift < 5; shift += 1) {
+    const stamp = at(observed, -shift);
+    try {
+      await db.futuresLastPriceSnapshot.create({
+        data: {
+          instrumentId: contract.instrumentId,
+          symbol: contract.symbol,
+          source: 'binance_usdm_agg_trade_ws',
+          price: '100',
+          effectiveAt: stamp,
+          capturedAt: stamp,
+        },
+      });
+      await db.futuresMarkSnapshot.create({
+        data: {
+          instrumentId: contract.instrumentId,
+          symbol: contract.symbol,
+          source: 'binance_usdm_mark_ws',
+          price: '100',
+          effectiveAt: stamp,
+          capturedAt: stamp,
+        },
+      });
+      return;
+    } catch (error) {
+      if (!String(error).includes('Unique constraint')) throw error;
+    }
+  }
+}
+
+type TransactionOptions = {
+  maxWait?: number;
+  timeout?: number;
+  isolationLevel?: Prisma.TransactionIsolationLevel;
+};
+
+/** A member read through a Proxy; a method is still called on its owner. */
+function boundTo(owner: object, value: unknown): unknown {
+  return typeof value === 'function'
+    ? (...args: unknown[]): unknown =>
+        Reflect.apply(value as (...a: unknown[]) => unknown, owner, args)
+    : value;
+}
+
+/** The real client, except that every interactive transaction hands
+ * `wrap(tx)` to its work: a fault injected inside real PostgreSQL work. */
+function wrapTransactions(
+  wrap: (tx: Prisma.TransactionClient) => Prisma.TransactionClient,
+): PrismaService {
+  return new Proxy(db, {
+    get(target, key) {
+      if (key !== '$transaction')
+        return boundTo(target, Reflect.get(target, key));
+      return (work: unknown, options?: TransactionOptions) =>
+        typeof work === 'function'
+          ? target.$transaction(
+              (tx) =>
+                (
+                  work as (client: Prisma.TransactionClient) => Promise<unknown>
+                )(wrap(tx)),
+              options,
+            )
+          : target.$transaction(
+              work as Prisma.PrismaPromise<unknown>[],
+              options,
+            );
+    },
+  });
+}
+
+/** Inside transactions every USD/KRW lookup finds nothing: "no evidence
+ * held" without touching shared FX rows. */
+const withoutFxEvidence = () =>
+  wrapTransactions(
+    (tx) =>
+      new Proxy(tx, {
+        get(client, prop) {
+          const value: unknown = Reflect.get(client, prop);
+          if (prop === '$queryRaw') {
+            const query = value as (
+              strings: TemplateStringsArray,
+              ...values: unknown[]
+            ) => Promise<unknown>;
+            return (strings: TemplateStringsArray, ...values: unknown[]) =>
+              strings.join('').includes('fx_rate_snapshots')
+                ? Promise.resolve([])
+                : Reflect.apply(query, client, [strings, ...values]);
+          }
+          return boundTo(client, value);
+        },
+      }),
+  );
+
+scenario(
+  '13 a real Futures execution in a rule season pins its USD/KRW; without evidence it commits nothing',
+  async () => {
+    const now = await dbNow();
+    const season = await createSeason({
+      label: 'pin',
+      status: 'active',
+      startAt: at(now, -DAY),
+      endAt: at(now, 5 * DAY),
+      criteria: true,
+    });
+    const plain = await createSeason({
+      label: 'pin-plain',
+      status: 'active',
+      startAt: at(now, -DAY),
+      endAt: at(now, 5 * DAY),
+      criteria: false,
+    });
+    const contract = await offeredContract();
+    const M = await join(season.id, at(now, -DAY), 'N1', '1000000', {
+      futuresUsd: '1000',
+    });
+    const P = await join(plain.id, at(now, -DAY), 'N2', '1000000', {
+      futuresUsd: '1000',
+    });
+    await fx({
+      source: KOREA_EXIM,
+      rate: '1350',
+      effectiveAt: at(now, -10_000),
+      capturedAt: at(now, -10_000),
+    });
+    const futures = futuresFor(db);
+    const command = (operation: 'open' | 'close', positionId?: string) => ({
+      instrumentId: contract.instrumentId,
+      operation,
+      marginMode: 'isolated',
+      direction: 'long',
+      quantity: '1',
+      leverage: 5,
+      idempotencyKey: randomUUID(),
+      ...(positionId ? { positionId } : {}),
+    });
+    const ruleOf = async (executionId: string) => {
+      const row = await db.futuresExecution.findUniqueOrThrow({
+        where: { id: executionId },
+        include: { fxRateSnapshot: true },
+      });
+      const instant = row.executedAt.toISOString();
+      const asOf = (await findUsdKrwRatesAtOrBefore(db, [instant])).get(
+        instant,
+      );
+      return { row, asOf };
+    };
+
+    // Open: the pin is the settlement rule's evidence at executedAt.
+    await freshFuturesPrices(contract);
+    const openBody = command('open');
+    const opened = await futures.execute(M.userId, M.accountId, openBody);
+    const open = await ruleOf(opened.data.execution.id);
+    assert.ok(open.row.fxRateSnapshot, 'pinned in a rule season');
+    assert.equal(open.row.fxRateSnapshotId, open.asOf?.snapshotId);
+    const openKrw = open.row.notional
+      .div(open.row.leverage)
+      .mul(open.row.fxRateSnapshot.rate);
+    const progress = async () =>
+      (await ranking.getFinalQualification(M.userId, { seasonId: season.id }))
+        .data.recognizedTurnoverKrw;
+    assert.equal(await progress(), openKrw.toFixed(8));
+
+    // A row committed later but stamped before the execution changes what an
+    // as-of lookup returns — and does not re-price the pinned execution.
+    const late = await fx({
+      source: KOREA_EXIM,
+      rate: '1400',
+      effectiveAt: at(open.row.executedAt, -1),
+      capturedAt: at(open.row.executedAt, -1),
+    });
+    const relookup = (
+      await findUsdKrwRatesAtOrBefore(db, [open.row.executedAt.toISOString()])
+    ).get(open.row.executedAt.toISOString());
+    assert.equal(relookup?.snapshotId, late, 'the as-of lookup moved');
+    assert.equal(await progress(), openKrw.toFixed(8), 'turnover did not');
+    // Instants are UTC: a session in another time zone selects the same row.
+    const instant = open.row.executedAt.toISOString();
+    const seoulLookup = await db.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL TIME ZONE 'Asia/Seoul'`);
+      return (await findUsdKrwRatesAtOrBefore(tx, [instant])).get(instant);
+    });
+    assert.equal(seoulLookup?.snapshotId, late, 'time-zone independent');
+
+    // Retrying the same command replays it: still one execution.
+    const replayed = await futures.execute(M.userId, M.accountId, openBody);
+    assert.equal(replayed.data.execution.id, opened.data.execution.id);
+    assert.equal(
+      await db.futuresExecution.count({
+        where: { tradingAccountId: M.accountId },
+      }),
+      1,
+    );
+
+    // Close pins the evidence held at ITS execution.
+    await freshFuturesPrices(contract);
+    const closed = await futures.execute(
+      M.userId,
+      M.accountId,
+      command('close', opened.data.position.id),
+    );
+    const close = await ruleOf(closed.data.execution.id);
+    assert.equal(close.row.fxRateSnapshotId, close.asOf?.snapshotId);
+
+    // No evidence held: refused before any write, nothing changes.
+    await freshFuturesPrices(contract);
+    const stateBefore = await financialState(season.id, [M]);
+    const requestsBefore = await db.futuresExecuteRequest.count({
+      where: { tradingAccountId: M.accountId },
+    });
+    const refused = await outcome(
+      futuresFor(withoutFxEvidence()).execute(
+        M.userId,
+        M.accountId,
+        command('open'),
+      ),
+    );
+    assert.equal(okOrCode(refused), 'FUTURES_FX_EVIDENCE_UNAVAILABLE');
+    assert.equal(await financialState(season.id, [M]), stateBefore);
+    assert.equal(
+      `${await db.futuresExecution.count({ where: { tradingAccountId: M.accountId } })}:${await db.futuresExecuteRequest.count({ where: { tradingAccountId: M.accountId } })}`,
+      `2:${requestsBefore}`,
+    );
+
+    // A season without a rule needs no FX evidence at all.
+    const free = await futuresFor(withoutFxEvidence()).execute(
+      P.userId,
+      P.accountId,
+      command('open'),
+    );
+    const freeRow = await db.futuresExecution.findUniqueOrThrow({
+      where: { id: free.data.execution.id },
+    });
+    assert.equal(freeRow.fxRateSnapshotId, null);
+
+    // An ended season admits no new fill, so a settlement's eligibility
+    // judgement cannot be overtaken by one.
+    await db.season.update({
+      where: { id: season.id },
+      data: { status: 'ended' },
+    });
+    await freshFuturesPrices(contract);
+    assert.equal(
+      okOrCode(
+        await outcome(futures.execute(M.userId, M.accountId, command('open'))),
+      ),
+      'SEASON_NOT_ACTIVE',
+    );
+    return {
+      openPin: open.row.fxRateSnapshotId,
+      closePin: close.row.fxRateSnapshotId,
+      refused: okOrCode(refused),
+    };
+  },
+);
+
+scenario(
+  '14 readers verify a settled final result: empty is not damaged, on every scope',
+  async () => {
+    const now = await dbNow();
+    const startAt = at(now, -10 * DAY);
+    const endAt = at(now, -9 * HOUR);
+    const finalDate = new Date(`${formatKstRankingDate(endAt)}T00:00:00.000Z`);
+    const reads = async (userId: string, seasonId: string) =>
+      Promise.all(
+        ['all', 'friends', 'top10'].map(async (scope) => {
+          const read = await outcome(
+            ranking.getRanking(userId, { seasonId, rankType: 'final', scope }),
+          );
+          if (!read.ok) return read.code;
+          const data = (
+            read.value as {
+              data: { state: string; reason?: string; rankings: unknown[] };
+            }
+          ).data;
+          return `${data.state}:${data.reason ?? data.rankings.length}`;
+        }),
+      );
+
+    // Nobody qualified: a normal empty final ranking, on every scope.
+    const season = await createSeason({
+      label: 'verify',
+      status: 'ended',
+      startAt,
+      endAt,
+      criteria: true,
+    });
+    const market = await createMarket(at(startAt, HOUR));
+    const A = await join(season.id, startAt, 'V1', '1100000');
+    const B = await join(season.id, startAt, 'V2', '1000000');
+    const C = await join(season.id, startAt, 'V3', '900000');
+    await fill(A, market.krx[0], '100000', at(startAt, DAY));
+    assert.equal(
+      okOrCode(await outcome(settle(season.id, endAt, 'verify'))),
+      'ok',
+    );
+    const empty = 'unavailable:NO_QUALIFIED_PARTICIPANTS';
+    assert.equal(
+      (await reads(A.userId, season.id)).join(','),
+      [empty, empty, empty].join(','),
+    );
+
+    // An injected final row for a participant that did not qualify.
+    const injected = await db.seasonRanking.create({
+      data: {
+        seasonId: season.id,
+        seasonParticipantId: C.participantId,
+        tradingAccountId: C.accountId,
+        rankType: 'final',
+        rank: 1,
+        totalAssetKrw: '900000',
+        returnRate: '-10',
+        rankingDate: finalDate,
+        capturedAt: endAt,
+      },
+    });
+    const withInjectedRow = await reads(A.userId, season.id);
+    await db.seasonRanking.delete({ where: { id: injected.id } });
+    // A season account open again after settlement.
+    await db.tradingAccount.update({
+      where: { id: B.accountId },
+      data: { status: 'active', closedAt: null },
+    });
+    const withOpenAccount = await reads(A.userId, season.id);
+    await db.tradingAccount.update({
+      where: { id: B.accountId },
+      data: { status: 'closed', closedAt: endAt },
+    });
+    const damage = 'FINAL_RESULTS_INTEGRITY';
+    for (const observed of [withInjectedRow, withOpenAccount]) {
+      assert.equal(observed.join(','), [damage, damage, damage].join(','));
+    }
+    assert.equal(
+      (await reads(A.userId, season.id)).join(','),
+      [empty, empty, empty].join(','),
+      'healthy again',
+    );
+
+    // One qualifier whose final row disappears: damage, never "pending".
+    const one = await createSeason({
+      label: 'verify-one',
+      status: 'ended',
+      startAt,
+      endAt,
+      criteria: true,
+    });
+    const W = await join(one.id, startAt, 'V4', '900000');
+    const L = await join(one.id, startAt, 'V5', '1200000');
+    for (const [index, asset] of market.krx.slice(0, 5).entries()) {
+      await fill(
+        W,
+        asset,
+        index === 0 ? '2600000' : '100000',
+        at(startAt, DAY),
+      );
+    }
+    assert.equal(
+      okOrCode(await outcome(settle(one.id, endAt, 'verify-one'))),
+      'ok',
+    );
+    // all / friends (L has no friends: an empty page) / top10.
+    const healthyOne = 'available:1,available:0,available:1';
+    assert.equal((await reads(L.userId, one.id)).join(','), healthyOne);
+    const row = await db.seasonRanking.findFirstOrThrow({
+      where: { seasonId: one.id, rankType: 'final' },
+    });
+    await db.seasonRanking.delete({ where: { id: row.id } });
+    const withoutRow = await reads(L.userId, one.id);
+    await db.seasonRanking.create({ data: row });
+    assert.equal(withoutRow.join(','), [damage, damage, damage].join(','));
+    assert.equal((await reads(L.userId, one.id)).join(','), healthyOne);
+
+    // A final row on an eligibility season that is not settled yet.
+    const pending = await createSeason({
+      label: 'verify-pending',
+      status: 'ended',
+      startAt,
+      endAt,
+      criteria: true,
+    });
+    const Q = await join(pending.id, startAt, 'V6', '1000000');
+    assert.equal(
+      (await reads(Q.userId, pending.id)).join(','),
+      [
+        'unavailable:RANKING_UNAVAILABLE',
+        'unavailable:RANKING_UNAVAILABLE',
+        'unavailable:RANKING_UNAVAILABLE',
+      ].join(','),
+    );
+    const early = await db.seasonRanking.create({
+      data: {
+        seasonId: pending.id,
+        seasonParticipantId: Q.participantId,
+        tradingAccountId: Q.accountId,
+        rankType: 'final',
+        rank: 1,
+        totalAssetKrw: '1000000',
+        returnRate: '0',
+        rankingDate: finalDate,
+        capturedAt: endAt,
+      },
+    });
+    const beforeSettlement = await reads(Q.userId, pending.id);
+    await db.seasonRanking.delete({ where: { id: early.id } });
+    assert.equal(
+      beforeSettlement.join(','),
+      [damage, damage, damage].join(','),
+    );
+    return { withInjectedRow, withOpenAccount, withoutRow, beforeSettlement };
+  },
+);
+
+scenario(
+  '15 a rule season with no rankable participant settles: nobody judged, every account closed',
+  async () => {
+    const now = await dbNow();
+    const tierReason = async (seasonId: string, endAt: Date) => {
+      const run = await outcome(assignTiers(seasonId, endAt));
+      return run.ok
+        ? ((
+            run.value as {
+              data: { run: { resultPayloadJson: { reason?: string } } };
+            }
+          ).data.run.resultPayloadJson.reason ?? 'ok')
+        : run.code;
+    };
+
+    // (a) No participant at all.
+    const emptyEnd = at(now, -10 * HOUR);
+    const empty = await createSeason({
+      label: 'empty',
+      status: 'ended',
+      startAt: at(now, -10 * DAY),
+      endAt: emptyEnd,
+      criteria: true,
+    });
+    const dryKey = `fq:empty-dry:${empty.id}:${randomUUID()}`;
+    created.batchKeys.push(dryKey);
+    assert.equal(
+      okOrCode(
+        await outcome(
+          settlementJob().run({
+            seasonId: empty.id,
+            settlementDate: formatKstRankingDate(emptyEnd),
+            dryRun: true,
+            idempotencyKey: dryKey,
+          }),
+        ),
+      ),
+      'ok',
+    );
+    assert.equal(
+      (await db.season.findUniqueOrThrow({ where: { id: empty.id } })).status,
+      'ended',
+      'a dry run changes nothing',
+    );
+    assert.equal(
+      okOrCode(await outcome(settle(empty.id, emptyEnd, 'empty'))),
+      'ok',
+    );
+    assert.equal(
+      (await db.season.findUniqueOrThrow({ where: { id: empty.id } })).status,
+      'settled',
+    );
+    const outsider = await createUser('E0');
+    const emptyRead = await ranking.getRanking(outsider.id, {
+      seasonId: empty.id,
+      rankType: 'final',
+    });
+    assert.equal(
+      `${emptyRead.data.state}:${emptyRead.data.reason}:${emptyRead.data.myRanking.state}`,
+      'unavailable:NO_QUALIFIED_PARTICIPANTS:not_joined',
+    );
+    assert.equal(
+      await tierReason(empty.id, emptyEnd),
+      'NO_QUALIFIED_PARTICIPANTS',
+    );
+    assert.equal(
+      okOrCode(await outcome(settle(empty.id, emptyEnd, 'empty-replay'))),
+      'ok',
+    );
+
+    // (b) Every participant excluded; one still holds an open Futures
+    // position whose open predates FX pinning (never judged, so never needed).
+    const startAt = new Date('2018-08-01T00:00:00.000Z');
+    const endAt = new Date('2018-08-22T00:00:00.000Z');
+    const excludedSeason = await createSeason({
+      label: 'all-excluded',
+      status: 'ended',
+      startAt,
+      endAt,
+      criteria: true,
+    });
+    const market = await createMarket(new Date('2018-08-01T12:00:00.000Z'));
+    await finalExitPrice(market.btc, endAt);
+    const X = await join(excludedSeason.id, startAt, 'E1', '1000000', {
+      status: 'excluded',
+      futuresUsd: '200',
+    });
+    const Y = await join(excludedSeason.id, startAt, 'E2', '1000000', {
+      status: 'excluded',
+    });
+    await openFuturesPosition(X, market.btc, 2, {
+      executedAt: new Date('2018-08-02T00:00:00.000Z'),
+      legacy: true,
+    });
+    const moderation = async () =>
+      (
+        await db.seasonParticipant.findMany({
+          where: { seasonId: excludedSeason.id },
+          orderBy: { id: 'asc' },
+        })
+      )
+        .map(
+          (p) =>
+            `${p.participantStatus}:${p.excludedAt?.toISOString()}:${p.finalQualified}:${p.finalRank}`,
+        )
+        .join(',');
+    const moderationBefore = await moderation();
+    assert.equal(
+      okOrCode(await outcome(settle(excludedSeason.id, endAt, 'excluded'))),
+      'ok',
+    );
+    assert.equal(
+      await moderation(),
+      moderationBefore,
+      'sanctions kept, nobody judged',
+    );
+    const x = await participantState(X);
+    const y = await participantState(Y);
+    assert.equal(
+      `${x.account}:${x.accountClosedAt}:${y.account}`,
+      `closed:${endAt.toISOString()}:closed`,
+    );
+    assert.equal(
+      await db.futuresPosition.count({
+        where: { tradingAccountId: X.accountId, status: 'open' },
+      }),
+      0,
+      'the open position was finally settled',
+    );
+    assert.equal(
+      `${await settlementSnapshotCount(X)}:${await settlementSnapshotCount(Y)}:${(await finalRanks(excludedSeason.id)).length}`,
+      '0:0:0',
+    );
+    const settledState = await financialState(excludedSeason.id, [X, Y]);
+    assert.equal(
+      okOrCode(
+        await outcome(settle(excludedSeason.id, endAt, 'excluded-replay')),
+      ),
+      'ok',
+    );
+    assert.equal(
+      await financialState(excludedSeason.id, [X, Y]),
+      settledState,
+      'no second Futures exit on replay',
+    );
+    assert.equal(
+      await tierReason(excludedSeason.id, endAt),
+      'NO_QUALIFIED_PARTICIPANTS',
+    );
+
+    // (c) Unfinished financial processing still fails closed.
+    const reserved = await createSeason({
+      label: 'reserved',
+      status: 'ended',
+      startAt: at(now, -10 * DAY),
+      endAt: at(now, -11 * HOUR),
+      criteria: true,
+    });
+    const Z = await join(reserved.id, at(now, -10 * DAY), 'E3', '1000000', {
+      status: 'excluded',
+    });
+    await db.cashWallet.updateMany({
+      where: { tradingAccountId: Z.accountId, currencyCode: 'KRW' },
+      data: { reservedAmount: '1000' },
+    });
+    const reservedBefore = await financialState(reserved.id, [Z]);
+    assert.equal(
+      okOrCode(await outcome(settle(reserved.id, reserved.endAt, 'reserved'))),
+      'OPEN_LIMIT_ORDER_RESERVATIONS',
+    );
+    assert.equal(await financialState(reserved.id, [Z]), reservedBefore);
+
+    // (d) A season without a rule keeps its refusal.
+    const legacy = await createSeason({
+      label: 'empty-legacy',
+      status: 'ended',
+      startAt: at(now, -10 * DAY),
+      endAt: at(now, -12 * HOUR),
+      criteria: false,
+    });
+    assert.equal(
+      okOrCode(await outcome(settle(legacy.id, legacy.endAt, 'empty-legacy'))),
+      'NO_SETTLEMENT_PARTICIPANTS',
+    );
+    return { moderationBefore };
+  },
+);
+
+scenario(
+  '16 a failure after the Futures final exit rolls back the final write; the retry completes it once',
+  async () => {
+    const startAt = new Date('2018-10-01T00:00:00.000Z');
+    const endAt = new Date('2018-10-22T00:00:00.000Z');
+    const season = await createSeason({
+      label: 'after-exit',
+      status: 'ended',
+      startAt,
+      endAt,
+      criteria: true,
+    });
+    const market = await createMarket(new Date('2018-10-01T12:00:00.000Z'));
+    await finalExitPrice(market.btc, endAt);
+    const held = await fx({
+      source: KOREA_EXIM,
+      rate: '1250',
+      effectiveAt: new Date('2018-10-01T06:00:00.000Z'),
+      capturedAt: new Date('2018-10-01T06:00:00.000Z'),
+    });
+    const A = await join(season.id, startAt, 'F1', '1000000', {
+      futuresUsd: '200',
+    });
+    const B = await join(season.id, startAt, 'F2', '900000');
+    await openFuturesPosition(A, market.btc, 2, {
+      executedAt: new Date('2018-10-02T00:00:00.000Z'),
+      fxId: held,
+    });
+    for (const [index, asset] of market.krx.slice(0, 5).entries()) {
+      await fill(
+        B,
+        asset,
+        index === 0 ? '2600000' : '100000',
+        new Date('2018-10-03T00:00:00.000Z'),
+      );
+    }
+    // The final write fails at its first final-ranking row, after the Futures
+    // exit (separate, already committed transactions) went through.
+    const failing = wrapTransactions(
+      (tx) =>
+        new Proxy(tx, {
+          get(client, prop) {
+            const value: unknown = Reflect.get(client, prop);
+            if (prop === 'seasonRanking') {
+              return new Proxy(client.seasonRanking, {
+                get(delegate, method) {
+                  if (method === 'create')
+                    return () =>
+                      Promise.reject(new Error('injected final write failure'));
+                  return boundTo(delegate, Reflect.get(delegate, method));
+                },
+              });
+            }
+            return boundTo(client, value);
+          },
+        }),
+    );
+    const key = `fq:after-exit:${season.id}:${randomUUID()}`;
+    created.batchKeys.push(key);
+    const first = await outcome(
+      new SeasonSettlementJobService(
+        new BatchService(db),
+        failing,
+        valuation,
+        new FuturesSeasonSettlementService(db),
+      ).run({
+        seasonId: season.id,
+        settlementDate: formatKstRankingDate(endAt),
+        idempotencyKey: key,
+      }),
+    );
+    assert.notEqual(okOrCode(first), 'ok');
+    const a1 = await participantState(A);
+    assert.equal(
+      `${a1.qualified}:${a1.account}:${(await db.season.findUniqueOrThrow({ where: { id: season.id } })).status}`,
+      'null:active:ended',
+      'no verdict, account or status from the failed final write',
+    );
+    assert.equal(
+      await db.futuresSeasonSettlement.count({
+        where: { seasonId: season.id },
+      }),
+      1,
+      'the legitimately committed Futures exit is kept, not reverted',
+    );
+    const ledgerAfterExit = await db.walletTransaction.count({
+      where: { tradingAccountId: A.accountId },
+    });
+
+    assert.equal(
+      okOrCode(await outcome(settle(season.id, endAt, 'after-exit-retry'))),
+      'ok',
+    );
+    assert.equal(
+      `${await db.futuresSeasonSettlement.count({ where: { seasonId: season.id } })}:${await db.walletTransaction.count({ where: { tradingAccountId: A.accountId } })}`,
+      `1:${ledgerAfterExit}`,
+      'the retry neither exits nor charges again',
+    );
+    const a = await participantState(A);
+    const b = await participantState(B);
+    assert.equal(`${b.finalRank}:${b.qualified}`, '1:true');
+    // 100 ÷ 2 × 1250 from the pinned evidence; one instrument.
+    assert.equal(`${a.qualified}:${a.turnover}`, 'false:62500.00000000');
+    return { first: okOrCode(first), a, b };
+  },
+);
+
 // ------------------------------------------------------------------ cleanup
 
 async function cleanup() {
@@ -1641,9 +2846,13 @@ async function cleanup() {
   await db.futuresSeasonClose.deleteMany({ where: accounts });
   await db.futuresSeasonSettlement.deleteMany({ where: accounts });
   await db.futuresSeasonPrice.deleteMany({ where: seasons });
+  await db.futuresExecuteRequest.deleteMany({ where: accounts });
   await db.futuresExecution.deleteMany({ where: accounts });
   await db.futuresPosition.deleteMany({ where: accounts });
   await db.futuresLastPriceSnapshot.deleteMany({
+    where: { instrumentId: { in: created.instruments } },
+  });
+  await db.futuresMarkSnapshot.deleteMany({
     where: { instrumentId: { in: created.instruments } },
   });
   await db.futuresInstrument.deleteMany({

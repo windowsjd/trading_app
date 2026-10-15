@@ -560,7 +560,8 @@ export const FuturesExecutionScalarFieldEnum = {
   averageEntryPriceAfter: 'averageEntryPriceAfter',
   isolatedMarginAfter: 'isolatedMarginAfter',
   executedAt: 'executedAt',
-  createdAt: 'createdAt'
+  createdAt: 'createdAt',
+  fxRateSnapshotId: 'fxRateSnapshotId'
 } as const
 
 export type FuturesExecutionScalarFieldEnum = (typeof FuturesExecutionScalarFieldEnum)[keyof typeof FuturesExecutionScalarFieldEnum]

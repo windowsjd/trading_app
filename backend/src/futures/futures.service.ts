@@ -38,6 +38,7 @@ import {
 } from './futures-input';
 import { assertFuturesOperation, futuresTradingMode } from './futures.config';
 import { verifiedFuturesInstrument } from './futures-instrument-coverage';
+import { pinFuturesExecutionFxEvidence } from './futures-fx-evidence';
 import { settleFuturesCash } from './futures-settlement';
 import { FuturesPerformanceService } from './futures-performance.service';
 import { readFuturesMark } from './futures-mark';
@@ -537,6 +538,19 @@ export class FuturesService {
               ? 'Loss and fee cannot settle safely without liquidation.'
               : 'Available Futures collateral is insufficient for margin and fees.',
           );
+        // A season with a final-ranking eligibility rule converts this
+        // execution to KRW: its USD/KRW evidence is pinned now, before any
+        // write, or the whole command is refused (null elsewhere).
+        stage('futures_fx_evidence_selection', accountId);
+        const fxRateSnapshotId = await pinFuturesExecutionFxEvidence(tx, {
+          seasonId: isStandaloneAccountMode(lockedAccount.mode)
+            ? null
+            : lockedAccount.seasonParticipant!.season.id,
+          tradingAccountId: accountId,
+          executedAt: executeNow,
+        });
+        // Cash settlement below keeps reporting under its existing stage.
+        stage('futures_collateral_calculation', accountId);
         const executionId = randomUUID();
         const commandId = randomUUID();
         const { ledger } = await settleFuturesCash(
@@ -602,6 +616,7 @@ export class FuturesService {
             isolatedMarginAfter: position.isolatedMargin,
             executedAt: executeNow,
             createdAt: executeNow,
+            fxRateSnapshotId,
           },
         });
         stage('futures_ledger_write', accountId);

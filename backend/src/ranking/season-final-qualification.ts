@@ -25,10 +25,13 @@ import {
  *   - Futures: every user execution's `notional ÷ leverage` (open, increase,
  *     reduce, close; long and short; isolated and cross). Risk liquidations
  *     and the Season final exit are not `futures_executions` rows at all.
- *   - USD to KRW: Spot uses the order's own execution-time FX snapshot; a
- *     Futures execution, which pins no FX, uses the settlement FX rule at its
- *     execution instant (`findUsdKrwRatesAtOrBefore`). Missing or contradictory
- *     evidence is an integrity error, never "not qualified" and never a guess.
+ *   - USD to KRW: Spot uses the order's own execution-time FX snapshot. A
+ *     Futures execution uses the snapshot its execution transaction pinned
+ *     (`futures_executions.fx_rate_snapshot_id`, required in rule seasons);
+ *     only an execution committed before that pin existed falls back to the
+ *     settlement FX rule at its execution instant (`findUsdKrwRatesAtOrBefore`).
+ *     Missing or contradictory evidence is an integrity error, never "not
+ *     qualified" and never a guess.
  *
  * Distinct instruments: one per Spot `assetId` and one per Futures
  * `instrumentId`, so BTC Spot and BTC Futures are two.
@@ -245,6 +248,16 @@ async function readBatchActivity(
         notional: true,
         leverage: true,
         executedAt: true,
+        fxRateSnapshot: {
+          select: {
+            id: true,
+            baseCurrency: true,
+            quoteCurrency: true,
+            rate: true,
+            effectiveAt: true,
+            capturedAt: true,
+          },
+        },
       },
     }),
   ]);
@@ -329,13 +342,18 @@ async function readBatchActivity(
     );
   }
 
+  // Only executions without a pin (committed before executions pinned their
+  // evidence) are looked up by instant; a pinned rate is never re-derived.
+  const unpinnedInstants = [
+    ...new Set(
+      executions
+        .filter((execution) => !execution.fxRateSnapshot)
+        .map((execution) => execution.executedAt.toISOString()),
+    ),
+  ];
   const rates =
-    executions.length > 0
-      ? await findUsdKrwRatesAtOrBefore(client, [
-          ...new Set(
-            executions.map((execution) => execution.executedAt.toISOString()),
-          ),
-        ])
+    unpinnedInstants.length > 0
+      ? await findUsdKrwRatesAtOrBefore(client, unpinnedInstants)
       : new Map<string, { snapshotId: string; rate: Prisma.Decimal }>();
 
   for (const execution of executions) {
@@ -356,8 +374,25 @@ async function readBatchActivity(
       );
     }
 
-    const fx = rates.get(execution.executedAt.toISOString());
-    if (!fx) {
+    const pinned = execution.fxRateSnapshot;
+    if (
+      pinned &&
+      (pinned.baseCurrency !== CurrencyCode.USD ||
+        pinned.quoteCurrency !== CurrencyCode.KRW ||
+        !pinned.rate.gt(0) ||
+        pinned.effectiveAt.getTime() > execution.executedAt.getTime() ||
+        pinned.capturedAt.getTime() > execution.executedAt.getTime())
+    ) {
+      failActivity(
+        finalQualificationErrorCodes.FX_EVIDENCE_MISMATCH,
+        'A season Futures execution pins FX evidence that is not a positive USD/KRW rate held at its execution time.',
+        { ...entities, fxRateSnapshotId: pinned.id },
+      );
+    }
+
+    const rate =
+      pinned?.rate ?? rates.get(execution.executedAt.toISOString())?.rate;
+    if (!rate) {
       failActivity(
         finalQualificationErrorCodes.FX_EVIDENCE_MISSING,
         'A season Futures execution has no USD/KRW evidence at or before its execution time.',
@@ -368,7 +403,7 @@ async function readBatchActivity(
     add(
       execution.tradingAccountId,
       `futures:${execution.instrumentId}`,
-      execution.notional.div(execution.leverage).mul(fx.rate),
+      execution.notional.div(execution.leverage).mul(rate),
     );
   }
 

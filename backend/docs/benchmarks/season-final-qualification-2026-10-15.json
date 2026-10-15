@@ -1,0 +1,473 @@
+{
+  "environment": {
+    "postgres": "16.14 (embedded, loopback; timezone UTC, jit off, fsync off, shared_buffers 256MB)",
+    "node": "v24.14.1",
+    "cpu": "AMD Ryzen 9 9950X 16-Core Processor",
+    "availableParallelism": 32,
+    "memoryGiB": 30.2,
+    "production": "Render web service plan 1c-2g (1 vCPU, 2 GB), Singapore, managed PostgreSQL 17 — NOT measured; production statement latency adds network round trips",
+    "scope": "dedicated disposable database season_final_qualification_benchmark; synthetic fills inserted under the real CHECKs and triggers; warm cache; no Provider/Redis/HTTP; nothing else running during the 1,000/10,000 runs",
+    "distribution": "skewed: per participant 1% 3,000 fills, 9% 500, 30% 100, 60% 10 (mean 111); 30% Futures executions with pinned FX, 20% USD Spot with pinned FX, 50% KRW Spot. worst-batch: participants 1-50 (one read batch) 3,000 fills each, others 10",
+    "metrics": "ms = wall time; statements/rows = driver level; heapGrowthMb = peak heap above the post-GC start; peakRssMb includes the ~295 MB process baseline; maxSeasonLockMs = longest season row FOR UPDATE to COMMIT/ROLLBACK",
+    "command": "SEASON_FINAL_QUALIFICATION_BENCHMARK=1 NODE_ENV=test NODE_OPTIONS='--expose-gc' DATABASE_URL=<loopback>/season_final_qualification_benchmark SEASON_QUALIFICATION_BENCHMARK_SIZES=1000,10000 SEASON_QUALIFICATION_BENCHMARK_SETTLE_UP_TO=10000 [SEASON_QUALIFICATION_BENCHMARK_PARTS=reads,settlement,final] [SEASON_QUALIFICATION_BENCHMARK_PROFILE=worst-batch] pnpm exec tsx scripts/season-final-qualification-benchmark.ts"
+  },
+  "results": [
+    {
+      "participants": 1000,
+      "fixture": {
+        "fixtureSeconds": 3.3,
+        "orders": 77700,
+        "futuresExecutions": 33300
+      },
+      "seasonWideEligibility": {
+        "ms": 493.6,
+        "statements": 100,
+        "rows": 114409,
+        "maxRowsPerStatement": 5264,
+        "sqlMs": 494.3,
+        "byTable": {
+          "orders": 40,
+          "season_participants": 60,
+          "trading_accounts": 60,
+          "futures_executions": 20,
+          "fx_rate_snapshots": 40
+        },
+        "heapGrowthMb": 100.3,
+        "peakRssMb": 391.5
+      },
+      "plans": {
+        "ordersBatch": [
+          "Sort  (cost=2264.18..2274.41 rows=4093 width=88) (actual time=5.990..6.138 rows=5264 loops=1)",
+          "->  Hash Join  (cost=289.40..2018.62 rows=4093 width=88) (actual time=0.467..4.120 rows=5264 loops=1)",
+          "->  Hash Join  (cost=246.40..1944.37 rows=4093 width=71) (actual time=0.273..2.849 rows=5264 loops=1)",
+          "->  Bitmap Heap Scan on orders  (cost=210.90..1898.08 rows=4093 width=60) (actual time=0.160..1.943 rows=5264 loops=1)",
+          "->  Bitmap Index Scan on orders_trading_account_id_idempotency_key_key  (cost=0.00..209.75 rows=4152 width=0) (actual time=0.147..0.147 rows=5327 loops=1)",
+          "Index Cond: (trading_account_id = ANY ('{bench-a-1,bench-a-2,bench-a-3,bench-a-4,bench-a-5,bench-a-6,bench-a-7,bench-a-8,bench-a-9,bench-a-10,bench-a-11,bench-a-12,bench-a-13,bench-a-14,bench-a-15,bench-a-16,bench-a-17,bench-a-18,bench-a-19,bench-a-20,bench-a-21,bench-a-22,bench-a-23,bench-a-24,bench-a-25,bench-a-26,bench-a-27,bench-a-28,bench-a-29,bench-a-30,bench-a-31,bench-a-32,bench-a-33,bench-a-34,bench-a-35,bench-a-36,bench-a-37,bench-a-38,bench-a-39,bench-a-40,bench-a-41,bench-a-42,bench-a-43,bench-a-44,bench-a-45,bench-a-46,bench-a-47,bench-a-48,bench-a-49,bench-a-50}'::text[]))",
+          "->  Seq Scan on trading_accounts j0  (cost=0.00..23.00 rows=1000 width=11) (actual time=0.003..0.059 rows=1000 loops=1)",
+          "->  Seq Scan on season_participants j1  (cost=0.00..30.50 rows=1000 width=11) (actual time=0.003..0.124 rows=1000 loops=1)",
+          "Planning Time: 0.825 ms",
+          "Execution Time: 6.274 ms"
+        ],
+        "executionsBatch": [
+          "Sort  (cost=1537.67..1542.21 rows=1817 width=67) (actual time=1.904..1.968 rows=2244 loops=1)",
+          "->  Hash Join  (cost=314.33..1439.30 rows=1817 width=67) (actual time=0.444..1.308 rows=2244 loops=1)",
+          "->  Hash Join  (cost=271.33..1391.51 rows=1817 width=78) (actual time=0.283..0.925 rows=2244 loops=1)",
+          "->  Bitmap Heap Scan on futures_executions  (cost=235.83..1351.22 rows=1817 width=67) (actual time=0.184..0.341 rows=2244 loops=1)",
+          "->  Bitmap Index Scan on futures_executions_trading_account_id_executed_at_id_idx  (cost=0.00..235.25 rows=1817 width=0) (actual time=0.178..0.178 rows=2244 loops=1)",
+          "Index Cond: ((trading_account_id = ANY ('{bench-a-1,bench-a-2,bench-a-3,bench-a-4,bench-a-5,bench-a-6,bench-a-7,bench-a-8,bench-a-9,bench-a-10,bench-a-11,bench-a-12,bench-a-13,bench-a-14,bench-a-15,bench-a-16,bench-a-17,bench-a-18,bench-a-19,bench-a-20,bench-a-21,bench-a-22,bench-a-23,bench-a-24,bench-a-25,bench-a-26,bench-a-27,bench-a-28,bench-a-29,bench-a-30,bench-a-31,bench-a-32,bench-a-33,bench-a-34,bench-a-35,bench-a-36,bench-a-37,bench-a-38,bench-a-39,bench-a-40,bench-a-41,bench-a-42,bench-a-43,bench-a-44,bench-a-45,bench-a-46,bench-a-47,bench-a-48,bench-a-49,bench-a-50}'::text[])) AND (executed_at >= '2026-09-01 00:00:00'::timestamp without time zone) AND (executed_at < '2026-09-22 00:00:00'::timestamp without time zone))",
+          "->  Seq Scan on trading_accounts j0  (cost=0.00..23.00 rows=1000 width=11) (actual time=0.001..0.049 rows=1000 loops=1)",
+          "->  Seq Scan on season_participants j1  (cost=0.00..30.50 rows=1000 width=11) (actual time=0.003..0.104 rows=1000 loops=1)",
+          "Planning Time: 0.396 ms",
+          "Execution Time: 2.037 ms"
+        ]
+      },
+      "progressApi": {
+        "fills_10": {
+          "p50": 5.6,
+          "p95": 15.1,
+          "max": 15.1,
+          "statements": 11
+        },
+        "fills_100": {
+          "p50": 6.1,
+          "p95": 6.9,
+          "max": 6.9,
+          "statements": 11
+        },
+        "fills_500": {
+          "p50": 7.8,
+          "p95": 8.4,
+          "max": 8.4,
+          "statements": 11
+        },
+        "fills_3000": {
+          "p50": 18.2,
+          "p95": 19,
+          "max": 19,
+          "statements": 11
+        }
+      },
+      "concurrentHeavyProgress": {
+        "callers": 20,
+        "wallMs": 92.1,
+        "perCall": {
+          "p50": 59,
+          "p95": 91.9,
+          "max": 91.9
+        },
+        "statements": 220
+      },
+      "fxLookup": {
+        "instants_1": {
+          "ms": 2.4,
+          "statements": 1
+        },
+        "instants_100": {
+          "ms": 2.3,
+          "statements": 1
+        },
+        "instants_1000": {
+          "ms": 12.5,
+          "statements": 1
+        },
+        "plan": [
+          "Nested Loop  (cost=11.21..18550.28 rows=1000 width=51) (actual time=0.047..8.217 rows=1000 loops=1)",
+          "->  Function Scan on unnest u  (cost=0.00..10.00 rows=1000 width=32) (actual time=0.028..0.065 rows=1000 loops=1)",
+          "->  Limit  (cost=11.20..18.52 rows=1 width=43) (actual time=0.008..0.008 rows=1 loops=1000)",
+          "->  Index Scan Backward using fx_rate_snapshots_source_type_effective_at_idx on fx_rate_snapshots s  (cost=0.28..33.02 rows=3 width=43) (actual time=0.004..0.007 rows=2 loops=1000)"
+        ]
+      },
+      "legacyUnpinned": {
+        "seasonWide": {
+          "ms": 723.2,
+          "statements": 120,
+          "rows": 146667,
+          "maxRowsPerStatement": 5264,
+          "sqlMs": 641.4,
+          "byTable": {
+            "orders": 40,
+            "season_participants": 60,
+            "trading_accounts": 60,
+            "futures_executions": 20,
+            "fx_rate_snapshots": 60
+          },
+          "heapGrowthMb": 96.4,
+          "peakRssMb": 398.6
+        },
+        "heaviestUserProgress": {
+          "p50": 27.3,
+          "p95": 28.1,
+          "max": 28.1
+        }
+      },
+      "finalRankingRead": {
+        "verification": {
+          "ms": 7.9,
+          "statements": 8
+        },
+        "all": {
+          "p50": 14.9,
+          "p95": 18.6,
+          "max": 18.6,
+          "statements": 23
+        },
+        "top10": {
+          "p50": 14.2,
+          "p95": 15,
+          "max": 15,
+          "statements": 23
+        },
+        "friends": {
+          "p50": 15.9,
+          "p95": 17.5,
+          "max": 17.5,
+          "statements": 24
+        }
+      },
+      "settlementBeforeTimeoutFix": {
+        "outcome": "ok 100 qualified / 900 not",
+        "seasonStatus": "settled",
+        "ms": 4814.2,
+        "statements": 15265,
+        "sqlMs": 5181,
+        "peakRssMb": 469.6
+      },
+      "settlementAfterTimeoutFix": {
+        "outcome": "ok 100 qualified / 900 not",
+        "seasonStatus": "settled",
+        "ms": 5103.4,
+        "statements": 15265,
+        "sqlMs": 5230.7,
+        "maxSeasonLockMs": 1430.4,
+        "peakRssMb": 527.4
+      }
+    },
+    {
+      "participants": 10000,
+      "fixture": {
+        "fixtureSeconds": 30.1,
+        "orders": 777000,
+        "futuresExecutions": 333000
+      },
+      "seasonWideEligibility": {
+        "ms": 4584.3,
+        "statements": 1000,
+        "rows": 1143781,
+        "maxRowsPerStatement": 5264,
+        "sqlMs": 4901,
+        "byTable": {
+          "orders": 400,
+          "season_participants": 600,
+          "trading_accounts": 600,
+          "futures_executions": 200,
+          "fx_rate_snapshots": 400
+        },
+        "heapGrowthMb": 261,
+        "peakRssMb": 576.8
+      },
+      "plans": {
+        "ordersBatch": [
+          "Sort  (cost=12370.00..12382.73 rows=5090 width=90) (actual time=7.930..8.084 rows=5264 loops=1)",
+          "->  Hash Join  (cost=781.42..12056.62 rows=5090 width=90) (actual time=2.759..6.185 rows=5264 loops=1)",
+          "->  Hash Join  (cost=358.43..11594.80 rows=5090 width=74) (actual time=1.077..3.529 rows=5264 loops=1)",
+          "->  Index Scan using orders_trading_account_id_idempotency_key_key on orders  (cost=0.42..11223.43 rows=5090 width=62) (actual time=0.018..1.863 rows=5264 loops=1)",
+          "Index Cond: (trading_account_id = ANY ('{bench-a-1,bench-a-2,bench-a-3,bench-a-4,bench-a-5,bench-a-6,bench-a-7,bench-a-8,bench-a-9,bench-a-10,bench-a-11,bench-a-12,bench-a-13,bench-a-14,bench-a-15,bench-a-16,bench-a-17,bench-a-18,bench-a-19,bench-a-20,bench-a-21,bench-a-22,bench-a-23,bench-a-24,bench-a-25,bench-a-26,bench-a-27,bench-a-28,bench-a-29,bench-a-30,bench-a-31,bench-a-32,bench-a-33,bench-a-34,bench-a-35,bench-a-36,bench-a-37,bench-a-38,bench-a-39,bench-a-40,bench-a-41,bench-a-42,bench-a-43,bench-a-44,bench-a-45,bench-a-46,bench-a-47,bench-a-48,bench-a-49,bench-a-50}'::text[]))",
+          "->  Seq Scan on trading_accounts j0  (cost=0.00..233.00 rows=10000 width=12) (actual time=0.003..0.547 rows=10000 loops=1)",
+          "->  Seq Scan on season_participants j1  (cost=0.00..298.00 rows=10000 width=12) (actual time=0.003..1.095 rows=10000 loops=1)",
+          "Planning Time: 0.797 ms",
+          "Execution Time: 8.227 ms"
+        ],
+        "executionsBatch": [
+          "Sort  (cost=5937.17..5942.49 rows=2130 width=69) (actual time=4.523..4.589 rows=2244 loops=1)",
+          "->  Hash Join  (cost=781.42..5819.41 rows=2130 width=69) (actual time=2.784..3.933 rows=2244 loops=1)",
+          "->  Hash Join  (cost=358.42..5390.82 rows=2130 width=81) (actual time=1.015..1.952 rows=2244 loops=1)",
+          "->  Index Scan using futures_executions_trading_account_id_executed_at_id_idx on futures_executions  (cost=0.42..5027.23 rows=2130 width=69) (actual time=0.016..0.438 rows=2244 loops=1)",
+          "Index Cond: ((trading_account_id = ANY ('{bench-a-1,bench-a-2,bench-a-3,bench-a-4,bench-a-5,bench-a-6,bench-a-7,bench-a-8,bench-a-9,bench-a-10,bench-a-11,bench-a-12,bench-a-13,bench-a-14,bench-a-15,bench-a-16,bench-a-17,bench-a-18,bench-a-19,bench-a-20,bench-a-21,bench-a-22,bench-a-23,bench-a-24,bench-a-25,bench-a-26,bench-a-27,bench-a-28,bench-a-29,bench-a-30,bench-a-31,bench-a-32,bench-a-33,bench-a-34,bench-a-35,bench-a-36,bench-a-37,bench-a-38,bench-a-39,bench-a-40,bench-a-41,bench-a-42,bench-a-43,bench-a-44,bench-a-45,bench-a-46,bench-a-47,bench-a-48,bench-a-49,bench-a-50}'::text[])) AND (executed_at >= '2026-09-01 00:00:00'::timestamp without time zone) AND (executed_at < '2026-09-22 00:00:00'::timestamp without time zone))",
+          "->  Seq Scan on trading_accounts j0  (cost=0.00..233.00 rows=10000 width=12) (actual time=0.003..0.491 rows=10000 loops=1)",
+          "->  Seq Scan on season_participants j1  (cost=0.00..298.00 rows=10000 width=12) (actual time=0.003..1.118 rows=10000 loops=1)",
+          "Planning Time: 0.388 ms",
+          "Execution Time: 4.653 ms"
+        ]
+      },
+      "progressApi": {
+        "fills_10": {
+          "p50": 5.6,
+          "p95": 9.3,
+          "max": 9.3,
+          "statements": 11
+        },
+        "fills_100": {
+          "p50": 6,
+          "p95": 6.9,
+          "max": 6.9,
+          "statements": 11
+        },
+        "fills_500": {
+          "p50": 8,
+          "p95": 8.4,
+          "max": 8.4,
+          "statements": 11
+        },
+        "fills_3000": {
+          "p50": 18.4,
+          "p95": 19.3,
+          "max": 19.3,
+          "statements": 11
+        }
+      },
+      "concurrentHeavyProgress": {
+        "callers": 20,
+        "wallMs": 88.9,
+        "perCall": {
+          "p50": 59.1,
+          "p95": 88.8,
+          "max": 88.8
+        },
+        "statements": 220
+      },
+      "fxLookup": {
+        "instants_1": {
+          "ms": 1.7,
+          "statements": 1
+        },
+        "instants_100": {
+          "ms": 2.3,
+          "statements": 1
+        },
+        "instants_1000": {
+          "ms": 11.5,
+          "statements": 1
+        },
+        "plan": [
+          "Nested Loop  (cost=11.21..18550.28 rows=1000 width=51) (actual time=0.046..7.805 rows=1000 loops=1)",
+          "->  Function Scan on unnest u  (cost=0.00..10.00 rows=1000 width=32) (actual time=0.027..0.062 rows=1000 loops=1)",
+          "->  Limit  (cost=11.20..18.52 rows=1 width=43) (actual time=0.008..0.008 rows=1 loops=1000)",
+          "->  Index Scan Backward using fx_rate_snapshots_source_type_effective_at_idx on fx_rate_snapshots s  (cost=0.28..33.02 rows=3 width=43) (actual time=0.004..0.007 rows=2 loops=1000)"
+        ]
+      },
+      "legacyUnpinned": {
+        "seasonWide": {
+          "ms": 7527.8,
+          "statements": 1200,
+          "rows": 1466229,
+          "maxRowsPerStatement": 5264,
+          "sqlMs": 7100.1,
+          "byTable": {
+            "orders": 400,
+            "season_participants": 600,
+            "trading_accounts": 600,
+            "futures_executions": 200,
+            "fx_rate_snapshots": 600
+          },
+          "heapGrowthMb": 275,
+          "peakRssMb": 593
+        },
+        "heaviestUserProgress": {
+          "p50": 28.6,
+          "p95": 32.4,
+          "max": 32.4
+        }
+      },
+      "finalRankingRead": {
+        "verification": {
+          "ms": 21.1,
+          "statements": 8
+        },
+        "all": {
+          "p50": 48.9,
+          "p95": 61,
+          "max": 61,
+          "statements": 23
+        },
+        "top10": {
+          "p50": 48.8,
+          "p95": 54.8,
+          "max": 54.8,
+          "statements": 23
+        },
+        "friends": {
+          "p50": 62.1,
+          "p95": 70,
+          "max": 70,
+          "statements": 24
+        }
+      },
+      "settlementBeforeTimeoutFix": {
+        "outcome": "FAILED Http Exception",
+        "seasonStatus": "ended",
+        "ms": 42475.8,
+        "statements": 132811,
+        "sqlMs": 45066.2,
+        "peakRssMb": 633.7
+      },
+      "settlementAfterTimeoutFix": {
+        "outcome": "ok 1000 qualified / 9000 not",
+        "seasonStatus": "settled",
+        "ms": 50310.3,
+        "statements": 152065,
+        "sqlMs": 50304.5,
+        "maxSeasonLockMs": 13338.7,
+        "peakRssMb": 671.6
+      }
+    }
+  ],
+  "worstBatchReads1000": {
+    "participants": 1000,
+    "profile": "worst-batch",
+    "fixture": {
+      "fixtureSeconds": 4.1,
+      "orders": 111650,
+      "futuresExecutions": 47850
+    },
+    "seasonWideEligibility": {
+      "ms": 659.6,
+      "statements": 104,
+      "rows": 158396,
+      "maxRowsPerStatement": 103150,
+      "sqlMs": 567.9,
+      "maxSeasonLockMs": 0,
+      "byTable": {
+        "orders": 40,
+        "season_participants": 60,
+        "trading_accounts": 60,
+        "futures_executions": 20,
+        "fx_rate_snapshots": 44
+      },
+      "heapGrowthMb": 247.4,
+      "peakRssMb": 586.9
+    },
+    "plans": {
+      "ordersBatch": [
+        "Incremental Sort  (cost=169.92..17932.22 rows=103182 width=87) (actual time=1.624..60.099 rows=103150 loops=1)",
+        "->  Merge Join  (cost=153.46..13171.50 rows=103182 width=87) (actual time=0.474..34.598 rows=103150 loops=1)",
+        "->  Merge Join  (cost=153.16..173.16 rows=1000 width=22) (actual time=0.446..0.686 rows=891 loops=1)",
+        "->  Sort  (cost=72.83..75.33 rows=1000 width=11) (actual time=0.188..0.227 rows=891 loops=1)",
+        "->  Seq Scan on trading_accounts j0  (cost=0.00..23.00 rows=1000 width=11) (actual time=0.002..0.051 rows=1000 loops=1)",
+        "->  Sort  (cost=80.33..82.83 rows=1000 width=11) (actual time=0.256..0.284 rows=891 loops=1)",
+        "->  Seq Scan on season_participants j1  (cost=0.00..30.50 rows=1000 width=11) (actual time=0.002..0.097 rows=1000 loops=1)",
+        "->  Index Scan using orders_trading_account_id_status_idx on orders  (cost=0.30..11190.15 rows=103182 width=59) (actual time=0.017..18.232 rows=103150 loops=1)",
+        "Index Cond: ((trading_account_id = ANY ('{bench-a-1,bench-a-2,bench-a-3,bench-a-4,bench-a-5,bench-a-6,bench-a-7,bench-a-8,bench-a-9,bench-a-10,bench-a-11,bench-a-12,bench-a-13,bench-a-14,bench-a-15,bench-a-16,bench-a-17,bench-a-18,bench-a-19,bench-a-20,bench-a-21,bench-a-22,bench-a-23,bench-a-24,bench-a-25,bench-a-26,bench-a-27,bench-a-28,bench-a-29,bench-a-30,bench-a-31,bench-a-32,bench-a-33,bench-a-34,bench-a-35,bench-a-36,bench-a-37,bench-a-38,bench-a-39,bench-a-40,bench-a-41,bench-a-42,bench-a-43,bench-a-44,bench-a-45,bench-a-46,bench-a-47,bench-a-48,bench-a-49,bench-a-50}'::text[])) AND (status = ('executed'::cstring)::\"OrderStatus\"))",
+        "Planning Time: 0.607 ms",
+        "Execution Time: 62.318 ms"
+      ],
+      "executionsBatch": [
+        "Sort  (cost=7970.19..8080.73 rows=44218 width=66) (actual time=33.891..36.459 rows=44200 loops=1)",
+        "->  Hash Join  (cost=78.62..2741.75 rows=44218 width=66) (actual time=0.262..17.848 rows=44200 loops=1)",
+        "->  Hash Join  (cost=35.62..2582.19 rows=44218 width=77) (actual time=0.103..14.040 rows=44200 loops=1)",
+        "->  Seq Scan on futures_executions  (cost=0.12..2430.12 rows=44218 width=66) (actual time=0.004..9.254 rows=44200 loops=1)",
+        "->  Seq Scan on trading_accounts j0  (cost=0.00..23.00 rows=1000 width=11) (actual time=0.001..0.050 rows=1000 loops=1)",
+        "->  Seq Scan on season_participants j1  (cost=0.00..30.50 rows=1000 width=11) (actual time=0.004..0.104 rows=1000 loops=1)",
+        "Planning Time: 0.393 ms",
+        "Execution Time: 37.699 ms"
+      ]
+    },
+    "progressApi": {
+      "fills_10": {
+        "p50": 5.6,
+        "p95": 13.8,
+        "max": 13.8,
+        "statements": 11
+      },
+      "fills_3000": {
+        "p50": 19,
+        "p95": 21.3,
+        "max": 21.3,
+        "statements": 11
+      }
+    },
+    "concurrentHeavyProgress": {
+      "callers": 20,
+      "wallMs": 243.9,
+      "perCall": {
+        "p50": 150.5,
+        "p95": 243.7,
+        "max": 243.7
+      },
+      "statements": 220
+    },
+    "fxLookup": {
+      "instants_1": {
+        "ms": 3.1,
+        "statements": 1
+      },
+      "instants_100": {
+        "ms": 2.8,
+        "statements": 1
+      },
+      "instants_1000": {
+        "ms": 11.7,
+        "statements": 1
+      },
+      "plan": [
+        "Nested Loop  (cost=11.21..18550.28 rows=1000 width=51) (actual time=0.050..8.032 rows=1000 loops=1)",
+        "->  Function Scan on unnest u  (cost=0.00..10.00 rows=1000 width=32) (actual time=0.027..0.062 rows=1000 loops=1)",
+        "->  Limit  (cost=11.20..18.52 rows=1 width=43) (actual time=0.008..0.008 rows=1 loops=1000)",
+        "->  Index Scan Backward using fx_rate_snapshots_source_type_effective_at_idx on fx_rate_snapshots s  (cost=0.28..33.02 rows=3 width=43) (actual time=0.004..0.007 rows=2 loops=1000)"
+      ]
+    },
+    "legacyUnpinned": {
+      "seasonWide": {
+        "ms": 1048.8,
+        "statements": 124,
+        "rows": 205347,
+        "maxRowsPerStatement": 103150,
+        "sqlMs": 860.5,
+        "maxSeasonLockMs": 0,
+        "byTable": {
+          "orders": 40,
+          "season_participants": 60,
+          "trading_accounts": 60,
+          "futures_executions": 20,
+          "fx_rate_snapshots": 64
+        },
+        "heapGrowthMb": 240.1,
+        "peakRssMb": 610.1
+      },
+      "heaviestUserProgress": {
+        "p50": 27,
+        "p95": 28.1,
+        "max": 28.1
+      }
+    }
+  }
+}
