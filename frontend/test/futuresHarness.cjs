@@ -76,7 +76,15 @@ function futuresHarness(options = {}) {
     '../../features/conditional/conditionalSellApi': { getConditionalSellOrders: async id => ({ tradingAccountId: id,
       capabilities: { enabled: true, condition: { enabled: true, canCreate: true, canUseLimit: true }, protection: { enabled: true, canCreate: true, canUseLimit: true }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
       conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) },
-    '../../features/tradingAccount/api': { getTradingAccountOrders: async id => ({ tradingAccountId: id, orders: [], pagination: { offset: 0, limit: 100, total: 0, returned: 0, nextOffset: null } }) },
+    '../../features/tradingAccount/api': { getTradingAccountOrders: async id => ({ tradingAccountId: id, orders: [], pagination: { offset: 0, limit: 100, total: 0, returned: 0, nextOffset: null } }),
+      // The account's trade fee policy (the futures ratio slider keeps room for the fee).
+      getTradingAccount: async id => {
+        h.accountReads = (h.accountReads ?? 0) + 1;
+        if (h.feeFailure) throw h.feeFailure;
+        return { id, tradingAccountId: id, mode: 'general', status: 'active', feePolicy: { tradeFeeRate: h.tradeFeeRate ?? '0.001000', fxFeeRate: '0.001000' } };
+      } },
+    // The ratio slider's browser input (the native one needs gesture-handler).
+    '../order/QuantityRatioSlider': load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     '../../features/record/api': load(resolve(__dirname, '../src/features/record/api.ts'), { '../../services/api/client': { apiClient: {} }, './openOrder': require('../src/features/record/openOrder.ts') }),
     '../../features/futures/policy': load(resolve(__dirname, '../src/features/futures/policy.ts'), {}),
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts, selectedAccountId: h.accountId, isLoading: false, ...h.accountState }) },
@@ -120,6 +128,17 @@ function futuresHarness(options = {}) {
   h.selectInstrument = async id => { await h.press('futures-instrument-select'); await h.press(`futures-instrument-${id}`); };
   // The positions / pending / history views under the trade card.
   h.view = async view => h.press(`futures-view-${view}`);
+  // The USD order amount (a notional, never contracts).
+  h.amount = async value => h.change('futures-amount', value);
+  // Leverage through the field and its sheets: a preset row, else 직접 설정하기.
+  h.setLeverage = async value => {
+    await h.press('futures-leverage-select');
+    if (h.node(`futures-leverage-option-${value}`)) { await h.press(`futures-leverage-option-${value}`); return; }
+    await h.press('futures-leverage-custom');
+    await h.change('futures-leverage-input', String(value));
+    await h.press('futures-leverage-apply');
+  };
+  h.leverage = () => [h.node('futures-leverage-value')?.props.children].flat().join('');
   h.text = () => JSON.stringify(h.renderer.toJSON());
   h.api = api; h.client = client;
   h.close = async () => { await act(async () => h.renderer.unmount()); client.clear(); };

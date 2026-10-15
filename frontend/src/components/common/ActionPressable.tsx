@@ -84,6 +84,7 @@ function ButtonSurface({ children, pressed, enabled, reduced, ink, tone, style, 
   children: React.ReactNode; pressed: boolean; enabled: boolean; reduced: boolean; ink: InkRipple; tone?: RippleTone;
   style: ViewStyle; gradient?: ActionGradient;
 }) {
+  useInkReleaseWhileBlocked(ink, enabled);
   const progress = useRef(new Animated.Value(0)).current;
   // Press and release re-render this surface; one node keeps the native graph.
   const scale = useMemo(() => progress.interpolate({ inputRange: [0, 1], outputRange: [1, buttonFeedback.scale], extrapolate: 'clamp' }), [progress]);
@@ -107,10 +108,24 @@ function ButtonSurface({ children, pressed, enabled, reduced, ink, tone, style, 
       transform: [{ scale: reduced || !enabled ? 1 : scale }],
     }]}>
       {gradient ? <PrimaryButtonBackground shape={shape} gradient={gradient} /> : null}
-      {enabled ? <InkRippleLayer ripple={ink} color={palette.rippleColor} opacity={palette.rippleOpacity} style={[styles.clip, shape]} /> : null}
+      <InkRippleLayer ripple={ink} color={palette.rippleColor} opacity={palette.rippleOpacity} style={[styles.clip, shape]} />
       {children}
     </Animated.View>
   );
+}
+
+/**
+ * A press may turn its target busy or disabled before the ink has faded (an
+ * order button starts loading on release). The ink layer therefore stays
+ * mounted: unmounting detaches its Animated values, which stops the running
+ * fade/spread where they are, and the next enable would paint that frozen,
+ * half-spread ink again. A target that stops accepting input fades its ink.
+ */
+function useInkReleaseWhileBlocked(ink: InkRipple, enabled: boolean) {
+  const { release } = ink;
+  useEffect(() => {
+    if (!enabled) release();
+  }, [enabled, release]);
 }
 
 function clipShape(base: ViewStyle): ViewStyle {
@@ -143,6 +158,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, onPressIn
       : [style, styles.primary]
     : style;
   const enabled = !isBlocked(disabled, props) && !!onPress;
+  useInkReleaseWhileBlocked(ink, enabled);
   // Rows may contain other touchables, so native touch coordinates can belong
   // to a child; the row's own page offset gives the location inside it.
   const startInk = (event: GestureResponderEvent) => {
@@ -195,7 +211,7 @@ function FeedbackActionPressable({ children, style, disabled, onPress, onPressIn
           <>
             {underlay}
             {showPrimary ? <PrimaryButtonBackground shape={shape} /> : null}
-            {enabled && inked ? <InkRippleLayer ripple={ink} color={ripple.rippleColor} opacity={ripple.rippleOpacity} style={layer} /> : null}
+            {inked ? <InkRippleLayer ripple={ink} color={ripple.rippleColor} opacity={ripple.rippleOpacity} style={layer} /> : null}
             {enabled && !inked ? (
               <View
                 pointerEvents="none"

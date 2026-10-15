@@ -8,14 +8,15 @@ async function conditional(h: any, direction: 'long' | 'short', marginMode: 'cro
   await h.selectMethod('conditional');
   await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
   await h.choose(marginMode === 'cross' ? '교차(Cross)' : '격리(Isolated)');
-  await h.change('futures-leverage', '20');
-  await h.change('futures-quantity', '0.5');
+  await h.setLeverage(20);
   await h.choose(direction === 'long' ? '선물 Last가 감시가격 이상' : '선물 Last가 감시가격 이하');
   await h.change('futures-conditional-trigger-price', direction === 'long' ? '110' : '90');
   if (execution === 'limit') {
     await h.choose('발동 후 지정가 진입');
     await h.change('futures-conditional-limit-price', direction === 'long' ? '111' : '89');
   }
+  // 0.5 contracts at the basis: the watch price (시장가 after the trigger) or the limit.
+  await h.amount(execution === 'limit' ? (direction === 'long' ? '55.5' : '44.5') : (direction === 'long' ? '55' : '45'));
 }
 
 for (const accountId of ['A', 'B'])
@@ -48,8 +49,9 @@ for (const accountId of ['A', 'B'])
 test('a condition the current Last already meets is shown and cannot be registered', async t => {
   const h = futuresHarness(); await h.start(); t.after(h.close);
   await h.selectMethod('conditional');
-  await h.change('futures-quantity', '1');
+  await h.amount('100');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled', 'a trigger price is required');
+  assert.match(h.text(), /감시가격을 입력하면 계약 수량을 계산합니다/);
   await h.change('futures-conditional-trigger-price', '100');
   assert.equal(h.node('futures-conditional-already-met') !== undefined, true, 'Last 102 ≥ 100');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled');

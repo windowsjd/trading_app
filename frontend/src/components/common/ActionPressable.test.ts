@@ -35,7 +35,8 @@ describe('ActionPressable touch feedback', () => {
       const disabled = renderer.root.findByType('Pressable');
       assert.equal(disabled.props.disabled, true); assert.equal(disabled.props.onPress, undefined);
       assert.equal(disabled.props.accessibilityState.busy, state === 'loading');
-      assert.equal(inkLayer(renderer) === undefined, true, 'no ink on a disabled button');
+      // The layer stays mounted (a fade in progress must finish) but shows no ink.
+      assert.equal(ink(renderer).opacity.value.value, 0, 'no ink on a disabled button');
       assert.equal(flatten(disabled.props.style).opacity, state === 'loading' ? undefined : 0.45);
       const whales = renderer.root.findAll(isWhale);
       assert.equal(whales.length, state === 'loading' ? 1 : 0);
@@ -87,7 +88,7 @@ describe('ActionPressable touch feedback', () => {
     assert.equal(h.measures.length, 0);
     act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, disabled: true })));
     assert.equal(renderer.root.findByType('Pressable').props.onPress, undefined);
-    assert.equal(inkLayer(renderer) === undefined, true);
+    assert.equal(ink(renderer).opacity.value.value, 0, 'a disabled surface shows no ink');
   });
 
   for (const platform of ['android', 'ios', 'web']) {
@@ -149,7 +150,7 @@ describe('ActionPressable touch feedback', () => {
       for (const blocked of [{ disabled: true }, { 'aria-disabled': true }, { accessibilityState: { disabled: true } }]) {
         act(() => renderer.update(React.createElement(h.ActionPressable, { ...props, ...blocked })));
         assert.equal(button().props.disabled, true); assert.equal(button().props.onPress, undefined);
-        assert.equal(inkLayer(renderer) === undefined, true);
+        assert.equal(ink(renderer).opacity.value.value, 0, 'a blocked button shows no ink');
         assert.equal(renderer.root.findAllByType('Svg').length, 0);
       }
     });
@@ -168,6 +169,56 @@ describe('ActionPressable touch feedback', () => {
     act(() => button().props.onPressOut(event));
     assert.equal(scale() === before.scale && ink(renderer).opacity === before.ink, true, 'released');
   });
+
+  // React Native stops an Animated value's running animation when the last view
+  // using it unmounts (AnimatedValue.__detach → stopAnimation, RN and RN-web).
+  const detachingHarness = () => {
+    const h = interactionHarness();
+    const stopAll = (node: unknown, seen = new Set<unknown>()): void => {
+      if (!node || typeof node !== 'object' || seen.has(node)) return;
+      seen.add(node);
+      if (node instanceof h.native.Animated.Value) { (node as { stopAnimation(): void }).stopAnimation(); return; }
+      for (const value of Object.values(node)) stopAll(value, seen);
+    };
+    function DetachingView({ style, ...props }: { style: unknown }) {
+      const latest = React.useRef(style);
+      latest.current = style;
+      React.useEffect(() => () => stopAll(flatten(latest.current)), []);
+      return React.createElement('AnimatedView', { ...props, style });
+    }
+    h.native.Animated = { ...h.native.Animated, View: DetachingView };
+    const pressable = h.load('src/components/common/ActionPressable.tsx').default;
+    const CTA = h.load('src/components/common/CTAButton.tsx', { './ActionPressable': { default: pressable, __esModule: true } }).default;
+    return { h, CTA };
+  };
+
+  for (const releasedFirst of [true, false]) {
+    it(`a press that turns the order button busy (${releasedFirst ? 'after release' : 'while held'}) leaves no frozen ink when it is enabled again`, (t) => {
+      const { h, CTA } = detachingHarness();
+      const props = { label: '롱(Long) 진입', onPress() {}, ripple: 'subtle', style: { backgroundColor: '#d1110b' } };
+      const renderer = h.render(React.createElement(CTA, props));
+      t.after(() => act(() => renderer.unmount()));
+      layoutInk(renderer, 180, 48);
+      const layer = inkLayer(renderer);
+      act(() => renderer.root.findByType('Pressable').props.onPressIn(event));
+      assert.equal(ink(renderer).opacity.value.value, 1);
+      if (releasedFirst) act(() => renderer.root.findByType('Pressable').props.onPressOut(event));
+      // The request starts (409 later): loading blocks the button mid-fade.
+      act(() => renderer.update(React.createElement(CTA, { ...props, state: 'loading' })));
+      assert.equal(renderer.root.findAll(isWhale).length, 1);
+      assert.equal(inkLayer(renderer) === layer, true, 'the ink layer is not unmounted by the loading state');
+      h.finish();
+      act(() => renderer.update(React.createElement(CTA, props)));
+      assert.equal(renderer.root.findByType('Pressable').props.disabled, false);
+      assert.equal(ink(renderer).opacity.value.value, 0, 'no half-faded ink stays on the enabled button');
+      // The next press inks normally again.
+      act(() => renderer.root.findByType('Pressable').props.onPressIn(event));
+      assert.equal(ink(renderer).opacity.value.value, 1);
+      act(() => renderer.root.findByType('Pressable').props.onPressOut(event));
+      h.finish();
+      assert.equal(ink(renderer).opacity.value.value, 0);
+    });
+  }
 
   it('trade-executing buttons use a subtler ink of the same color', () => {
     for (const color of [0xffd1110b, 0xff0a5ac2, 0xff326fe5]) {

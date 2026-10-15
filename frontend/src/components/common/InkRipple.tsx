@@ -24,6 +24,8 @@ export function useInkRipple(reduced: boolean) {
   const y = useRef(new Animated.Value(0)).current;
   const spread = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(0)).current;
+  // Ink a press started and no release has faded yet.
+  const shown = useRef(false);
   const native = Platform.OS !== 'web';
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
@@ -38,6 +40,7 @@ export function useInkRipple(reduced: boolean) {
     x.setValue(origin.x - RIPPLE_BASE / 2);
     y.setValue(origin.y - RIPPLE_BASE / 2);
     fade.setValue(1);
+    shown.current = true;
     const cover = rippleScale(size.current, origin);
     if (reduced) {
       spread.setValue(cover);
@@ -53,8 +56,13 @@ export function useInkRipple(reduced: boolean) {
     }).start();
   }, [fade, native, reduced, spread, x, y]);
 
-  /** The spread keeps going while the ink fades, so a quick tap still reads. */
+  /**
+   * The spread keeps going while the ink fades, so a quick tap still reads.
+   * Releasing ink that is already fading (or never started) changes nothing.
+   */
   const release = useCallback(() => {
+    if (!shown.current) return;
+    shown.current = false;
     if (reduced) {
       fade.setValue(0);
       return;

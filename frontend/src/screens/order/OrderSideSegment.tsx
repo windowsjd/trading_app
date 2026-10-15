@@ -24,10 +24,12 @@ const INSET = 3;
  * only transform and opacity. Futures reuses the track for 롱/숏 (`labels`),
  * which take the same BUY/SELL colors as their positions.
  */
-export default function OrderSideSegment({ side, onChange, labels = LABEL, testIDs = TEST_ID, testID = 'order-side-segment', disabled = false }: {
+export default function OrderSideSegment({ side, onChange, labels = LABEL, accessibilityLabels = labels, testIDs = TEST_ID, testID = 'order-side-segment', disabled = false }: {
   side: OrderSide;
   onChange: (side: OrderSide) => void;
   labels?: Record<OrderSide, string>;
+  /** Spoken names when the visible labels are shortened (defaults to `labels`). */
+  accessibilityLabels?: Record<OrderSide, string>;
   testIDs?: Record<OrderSide, string>;
   testID?: string;
   /** A command in flight keeps the committed side. */
@@ -81,7 +83,7 @@ export default function OrderSideSegment({ side, onChange, labels = LABEL, testI
             feedback="selection"
             testID={testIDs[value]}
             accessibilityRole="tab"
-            accessibilityLabel={labels[value]}
+            accessibilityLabel={accessibilityLabels[value]}
             accessibilityState={{ selected, disabled }}
             aria-selected={selected}
             disabled={disabled}

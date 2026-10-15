@@ -343,6 +343,16 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   if (step.target === 'protection-editor') ready = ready && protection?.tpSlReady === true;
   if (step.target === 'futures-direction') ready = ready && form.direction === (session.quest === 'futuresShort' ? 'short' : 'long');
   if (step.target === 'futures-margin') ready = ready && (form.leverage ?? 0) > 1;
+  // Leverage is picked in a sheet over the form. The list points at its 2x row
+  // (one row, so the card never covers the choice it asks for); 직접 설정하기
+  // has an input and a slider, so the guide steps aside until it closes.
+  if (step.target === 'futures-margin' && form.leverageSheet === 'custom') return NONE;
+  if (step.target === 'futures-margin' && form.leverageSheet === 'list') {
+    const view = spotlight(session, screen, index, 'leverage-list', ['futures-leverage-suggested'],
+      card(step, { body: '1배보다 높은 레버리지를 선택해 주세요. 예를 들어 2배를 선택하면 돼요.' }));
+    if (view.kind === 'spotlight') view.card.stepLabel = `${index + 1}/${steps.length}`;
+    return view;
+  }
   if (screen === 'futures' && session.step < 5 && form.positionId) {
     hint = '이 종목에는 포지션이 이미 있어요. 기존 포지션을 전량 종료하거나 다른 종목을 선택한 뒤 새 포지션으로 실습해 주세요. One-way 정책은 그대로 적용돼요.';
   }

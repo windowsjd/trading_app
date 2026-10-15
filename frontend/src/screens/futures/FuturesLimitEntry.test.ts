@@ -37,9 +37,12 @@ for (const direction of ['long', 'short'])
 
 for (const direction of ['long', 'short'])
   test(`${direction} attachment compares the full 16+8 decimal price without Number rounding`, async t => {
-    const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
+    // One 1e-8 contract at this price is a $12M notional: the account must carry it.
+    const large = '100000000000';
+    const h = futuresHarness({ protectionEnabled: true, freeCollateral: large, crossBase: large, liquidationBuffer: large }); await h.start(); t.after(h.close); await draft(h);
     await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
     await h.change('futures-limit-price', '1234567890123456.12345678');
+    await h.amount('100000000');
     await h.press('protection-stop_loss-toggle');
     await h.input('손절 (Stop Loss) 조건 가격', direction === 'long' ? '1234567890123456.12345679' : '1234567890123456.12345677');
     await h.press('futures-limit-submit'); assert.equal(h.requests.length, 0);
@@ -59,7 +62,8 @@ test('server trigger rejection retains direction guidance and the authoritative 
 
 async function draft(h: any) {
   await h.selectMethod('limit');
-  await h.change('futures-quantity', '1.25');
+  // $125 at the 100 entry price is 1.25 contracts.
+  await h.amount('125');
   await h.change('futures-limit-price', '100');
 }
 for (const accountId of ['A', 'B'])
@@ -71,7 +75,7 @@ for (const accountId of ['A', 'B'])
           await draft(h);
           await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
           await h.choose(marginMode === 'cross' ? '교차(Cross)' : '격리(Isolated)');
-          await h.change('futures-leverage', String(leverage));
+          await h.setLeverage(leverage);
           await h.press('futures-limit-submit');
           assert.equal(h.requests.length, 1);
           assert.equal(h.requests[0].path, `/trading-accounts/${accountId}/futures/limit-orders`);

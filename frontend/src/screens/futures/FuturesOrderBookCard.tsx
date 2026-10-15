@@ -7,7 +7,8 @@ import AssetOrderLadder from '../../features/asset/AssetOrderLadder';
 import { useFuturesOrderBook } from '../../features/futures/useFuturesOrderBook';
 
 /**
- * The contract's own Binance USDⓈ-M ten-level book, in the Spot ladder.
+ * The contract's own Binance USDⓈ-M ten-level book, in the Spot ladder, as the
+ * right column beside the trade form (the spot order screen's layout).
  * Display only: virtual fills never use these quantities, and the middle
  * row is the Futures Last price this app executes against. Collapsing it
  * releases the subscription. Keyed by instrument by the caller.
@@ -41,29 +42,23 @@ export default function FuturesOrderBookCard({ instrumentId, lastPrice, active }
         </ActionPressable>
       </View>
       {open ? (
-        <>
-          <AssetOrderLadder
-            book={latestOrderBook?.assetId === instrumentId ? latestOrderBook : null}
-            statusMessage={statusMessage}
-            currentPrice={
-              <View style={styles.current} testID="futures-order-book-last">
-                <Text style={styles.label}>현재가 · 선물 Last</Text>
-                <Text selectable style={styles.price}>{lastPrice}</Text>
-              </View>
-            }
-          />
-          <Text style={styles.note}>
-            바이낸스 USDⓈ-M 실제 호가입니다. 가상 주문 체결은 이 잔량과 무관하며
-            선물 Last 가격을 기준으로 합니다.
-          </Text>
-        </>
+        <AssetOrderLadder
+          book={latestOrderBook?.assetId === instrumentId ? latestOrderBook : null}
+          statusMessage={statusMessage}
+          currentPrice={
+            <View style={styles.current} testID="futures-order-book-last">
+              <Text style={styles.label}>현재가 · 선물 Last</Text>
+              <Text selectable style={styles.price}>{lastPrice}</Text>
+            </View>
+          }
+        />
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { padding: 14, borderRadius: 12, backgroundColor: semantic.surface, gap: 10, minWidth: 0 },
+  card: { gap: 8, minWidth: 0 },
   header: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 4 },
   heading: { fontSize: 16, fontWeight: '700', lineHeight: 24, color: semantic.text, flexShrink: 1 },
   toggle: { minHeight: 44, minWidth: 44, paddingHorizontal: 10, borderRadius: 8, backgroundColor: semantic.raised, alignItems: 'center', justifyContent: 'center' },
@@ -71,5 +66,4 @@ const styles = StyleSheet.create({
   current: { paddingVertical: 14, gap: 4, minWidth: 0 },
   label: { fontSize: 11, color: semantic.muted },
   price: { fontSize: 19, fontWeight: '700', fontVariant: ['tabular-nums'], color: semantic.text },
-  note: { fontSize: 12, lineHeight: 18, color: semantic.secondary },
 });

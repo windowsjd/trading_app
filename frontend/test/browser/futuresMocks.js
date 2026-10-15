@@ -31,6 +31,12 @@ export const apiClient = {
         pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } } } };
     if (path.includes('/conditional-entries'))
       return { data: { success: true, data: futuresConditionalFixture(path.split('/')[2], path.includes('state=ended') ? 'ended' : 'open', params.get('conditional')) } };
+    // The account's fee policy (GET /trading-accounts/:id): the ratio slider keeps room for it.
+    if (/^\/trading-accounts\/[^/]+$/u.test(path)) {
+      const id = path.split('/')[2];
+      return { data: { success: true, data: { id, mode: id === 'B' ? 'season' : 'general', status: 'active', initialCapitalKrw: '0', openedAt: '', closedAt: null,
+        createdAt: '', updatedAt: '', season: null, feePolicy: { tradeFeeRate: params.get('fee') ?? '0.001000', fxFeeRate: '0.001000' } } } };
+    }
     if (state.kind === 'loading') return new Promise(() => {});
     if (state.kind === 'error') throw new Error('fixture unavailable');
     const id = path.split('/')[2];
@@ -39,7 +45,13 @@ export const apiClient = {
     if(path.endsWith('/orders')) return {data:{data:{tradingAccountId:id,orders:[],pagination:{limit:100,offset:0,total:0,returned:0,nextOffset:null}}}};
     return { data: { success: true, data: path.includes('instruments') ? fixture.catalog : path.includes('positions') ? fixture.positions : path.includes('liquidations') ? fixture.liquidations : path.includes('executions') ? fixture.executions : fixture.final } };
   },
-  async post(path, body) { state.requests.push({ path, body }); if(path.includes('/conditional-entries')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],duplicate:false,entry:{id:'entry',state:path.endsWith('/cancel')?'canceled':'watching',...body}}}}; if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture',
+  async post(path, body) { state.requests.push({ path, body });
+    // `?execute=409|network` (+ `executeDelay` ms): a clear refusal or a lost response for 시장가 commands.
+    if (path.endsWith('/execute') && params.get('execute')) {
+      await new Promise((resolve) => setTimeout(resolve, Number(params.get('executeDelay') ?? 0)));
+      if (params.get('execute') === '409') throw { response: { status: 409, data: { success: false, error: { code: 'INSUFFICIENT_FUTURES_FREE_COLLATERAL', message: 'Available Futures collateral is insufficient for margin and fees.' } } } };
+      if (params.get('execute') === 'network') throw new Error('Network Error');
+    } if(path.includes('/conditional-entries')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],duplicate:false,entry:{id:'entry',state:path.endsWith('/cancel')?'canceled':'watching',...body}}}}; if(path.includes('/protections')) return {data:{success:true,data:{tradingAccountId:path.split('/')[2],groupId:'group',status:'active'}}}; return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'fixture',
     // The execution shape the screen reports (quest command included), as in test/futuresHarness.cjs.
     execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 1),
       positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.2' } } } }; },

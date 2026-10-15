@@ -111,6 +111,21 @@ test('futures requires leverage, direction and manual full close of the same lif
   for(const patch of [{operation:'reduce',quantityAfter:'0.5'},{operation:'close',quantityAfter:'0',positionId:'foreign'},{operation:'liquidation',quantityAfter:'0'}])assert.equal(claimGuideCommand(opened,account,{...command,...patch}).claimed,false);
   assert.equal(claimGuideCommand(opened,account,{...command,operation:'close',quantityAfter:'0'}).session?.phase,'verifying');
 });
+test('futures leverage step: the spotlight follows the leverage sheets, then 다음 needs more than 1x',()=>{
+  const session={...startGuideSession(3,account,'futuresLong',questProgress(6))!,step:3};
+  assert.equal(TRADING_GUIDE_STEPS.futuresLong[3].target,'futures-margin');
+  const view=(form:Record<string,unknown>)=>resolveGuideView(session,'futures',{wallet:null,fx:null,transfer:null,
+    practice:{futures:{screen:'futures' as const,accountId:account,direction:'long',marginMode:'isolated',leverage:1,...form}}});
+  // One row (2x), so the card is placed beside it and never covers the choice.
+  const list=view({leverageSheet:'list'});
+  if(list.kind==='spotlight'){assert.deepEqual(list.targets,['futures-leverage-suggested']);assert.equal(list.card.next,null);assert.match(list.card.body,/1배보다 높은 레버리지/);assert.equal(list.card.stepLabel,'4/6');}else assert.fail('the 2x row is pointed at');
+  // 직접 설정하기 (input, slider, 설정하기): the guide steps aside until it closes.
+  assert.equal(view({leverageSheet:'custom',leverage:2}).kind,'none');
+  for(const [leverage,next] of [[1,'disabled'],[2,'enabled']] as const){
+    const closed=view({leverage});
+    if(closed.kind==='spotlight'){assert.deepEqual(closed.targets,['futures-margin']);assert.equal(closed.card.next,next);}else assert.fail('the controls are pointed at');
+  }
+});
 test('replay preserves completion and returns without fireworks only after new practice',()=>{
   const session=startGuideSession(4,account,'marketBuy',questProgress(6))!;
   assert.equal(observeGuideProgress(session,questProgress(6),false).phase,'guiding');

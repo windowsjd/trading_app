@@ -14,10 +14,11 @@ for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: detail
     if (action.props.state === 'enabled') {
       await h.press(`futures-position-A:position-${op}`);
       assert.equal(h.requests.length, 0);
-      assert.equal(h.node('futures-leverage') === undefined, true);
+      assert.equal(h.node('futures-leverage-select') === undefined, true, 'a position keeps its leverage');
       if (op !== 'close') {
-        assert.equal(h.node('futures-submit').props.state, 'disabled', 'selecting an operation still requires a valid quantity');
-        await h.change('futures-quantity', '0.5');
+        assert.equal(h.node('futures-submit').props.state, 'disabled', 'selecting an operation still requires a valid amount');
+        // $51 at Futures Last 102 is 0.5 contracts.
+        await h.amount('51');
       }
       assert.equal(h.node('futures-submit').props.state, 'enabled');
     }
@@ -88,10 +89,10 @@ test('a contract change starts at 시장가 with the entry draft cleared', async
   await h.start(); t.after(h.close);
   await h.selectMethod('limit');
   await h.change('futures-limit-price', '100');
-  await h.change('futures-quantity', '1');
+  await h.amount('100');
   await h.selectInstrument('hype');
   assert.equal(h.orderType(), '시장가');
-  assert.equal(h.node('futures-quantity').props.value, '');
+  assert.equal(h.node('futures-amount').props.value, '', 'another contract never inherits the amount');
   assert.equal(h.node('futures-limit-price') === undefined, true);
   await h.selectMethod('limit');
   assert.equal(h.node('futures-limit-price').props.value, '');
@@ -136,13 +137,16 @@ for (const accountId of ["A", "B"])
     for (const marginMode of ["격리(Isolated)", "교차(Cross)"])
       for (const leverage of [1, 37, 100])
         test(`${accountId} ${direction} ${marginMode} ${leverage}x opens through account API`, async (t) => {
-          const h = futuresHarness({ accountId });
+          // Mark = Last: no entry starts under maintenance (the Mark check has its own test).
+          const h = futuresHarness({ accountId, markPrice: "102" });
           await h.start();
           t.after(h.close);
           await h.choose(direction);
           await h.choose(marginMode);
-          await h.change("futures-leverage", String(leverage));
-          await h.change("futures-quantity", "1.25");
+          await h.setLeverage(leverage);
+          assert.equal(h.leverage(), `${leverage}x`);
+          // $127.50 at Futures Last 102 is 1.25 contracts.
+          await h.amount("127.5");
           assert.equal(h.node("futures-submit").props.state, "enabled");
           await h.press("futures-submit");
           assert.equal(h.requests.length, 1);
@@ -185,8 +189,8 @@ for (const op of ["increase", "reduce", "close"])
         close: "전량 종료(Close)",
       };
       await h.choose(labels[op]);
-      if (op !== "close") await h.change("futures-quantity", "0.5");
-      assert.equal(h.node("futures-leverage") === undefined, true);
+      if (op !== "close") await h.amount("51");
+      assert.equal(h.node("futures-leverage-select") === undefined, true);
       await h.press("futures-submit");
       assert.equal(h.requests[0].body.direction, "short");
       assert.equal(h.requests[0].body.leverage, 37);
@@ -199,11 +203,14 @@ for (const mode of ["ENABLED", "REDUCE_ONLY", "DISABLED"])
     const h = futuresHarness({ position: true, stale: true, mode });
     await h.start();
     t.after(h.close);
-    await h.change("futures-quantity", "0.5");
+    await h.amount("51");
     assert.equal(h.node("futures-submit").props.state, "disabled");
     assert.match(h.text(), /Mark 확인 불가/);
     assert.doesNotMatch(h.text(), /99\.5/);
     await h.choose("수량 감소(Reduce)");
+    // A reduce amount is entered for the reduce itself (an add amount never carries over).
+    assert.equal(h.node("futures-amount").props.value, "");
+    await h.amount("51");
     assert.equal(
       h.node("futures-submit").props.state,
       mode === "DISABLED" ? "disabled" : "enabled",
@@ -218,7 +225,7 @@ test("uncertain execution retries its committed idempotency key; duplicate click
   const h = futuresHarness();
   await h.start();
   t.after(h.close);
-  await h.change("futures-quantity", "1");
+  await h.amount("102");
   h.failure = new Error("network");
   h.gate = deferred();
   await h.press("futures-submit");
@@ -236,7 +243,7 @@ test("route-bound account and scope epoch suppress a late A mutation after A→B
   const h = futuresHarness();
   await h.start();
   t.after(h.close);
-  await h.change("futures-quantity", "1");
+  await h.amount("102");
   h.gate = deferred();
   await h.press("futures-submit");
   h.accountId = "B";
@@ -257,7 +264,7 @@ test("logout/login generation suppresses old success and cache invalidation", as
   const h = futuresHarness();
   await h.start();
   t.after(h.close);
-  await h.change("futures-quantity", "1");
+  await h.amount("102");
   h.gate = deferred();
   await h.press("futures-submit");
   h.session++;
@@ -290,7 +297,7 @@ test("uncertain open replays the original command after poll shows a position an
   const h = futuresHarness();
   await h.start();
   t.after(h.close);
-  await h.change("futures-quantity", "1");
+  await h.amount("102");
   h.failure = new Error("lost response");
   await h.press("futures-submit");
   h.options.position = true;
@@ -308,20 +315,20 @@ test("opening with no free collateral is flagged while typing; reduce and unknow
   const h = futuresHarness({ freeCollateral: "0.00000000" });
   await h.start();
   t.after(h.close);
-  await h.change("futures-quantity", "1");
-  assert.equal(h.node("futures-collateral-insufficient")?.props.children, "사용 가능한 선물 담보가 부족합니다.");
+  await h.amount("102");
+  assert.equal(h.node("futures-collateral-insufficient")?.props.children, "사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.");
   assert.equal(h.node("futures-submit").props.state, "disabled");
   await h.press("futures-submit");
   assert.equal(h.requests.length, 0, "the server is never asked for a certain rejection");
   const unknown = futuresHarness({ freeCollateral: null });
   await unknown.start();
   t.after(unknown.close);
-  await unknown.change("futures-quantity", "1");
+  await unknown.amount("102");
   assert.equal(unknown.node("futures-collateral-insufficient") === undefined, true, "unknown never counts as short");
   const reducing = futuresHarness({ position: true, freeCollateral: "0.00000000" });
   await reducing.start();
   t.after(reducing.close);
   await reducing.press("futures-position-A:position-reduce");
-  await reducing.change("futures-quantity", "0.5");
+  await reducing.amount("51");
   assert.equal(reducing.node("futures-collateral-insufficient") === undefined, true, "risk reduction needs no new collateral");
 });

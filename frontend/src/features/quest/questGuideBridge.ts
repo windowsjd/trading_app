@@ -28,6 +28,7 @@ export type QuestGuideTargetId =
   | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-method-protection' | 'order-input' | 'order-preview' | 'order-submit'
   | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
   | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
+  | 'futures-leverage-suggested'
   | 'wallet-viewport'
   | 'wallet-exchange'
   | 'wallet-transfer'
@@ -103,6 +104,8 @@ export type TradeGuideFacts = { [S in TradeGuideScreen]: {
   protectionEditing?: boolean; tpSlReady?: boolean; orderResolved?: boolean;
   direction?: string; leverage?: number; marginMode?: string; positionId?: string;
   positionDirection?: string;
+  /** The futures leverage sheet open over the form (preset list or 직접 설정하기). */
+  leverageSheet?: 'list' | 'custom';
 } }[TradeGuideScreen];
 export type QuestGuideFacts = WalletGuideFacts | FxGuideFacts | TransferGuideFacts | TradeGuideFacts;
 type FactsFor<S extends QuestGuideScreen> = Extract<QuestGuideFacts, { screen: S }>;

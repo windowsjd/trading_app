@@ -10,6 +10,8 @@ export default function QuantityRatioSlider({
   disabled,
   disabledReason,
   onChange,
+  steps = 100,
+  valueText = (step: number) => `${step}%`,
 }: QuantityRatioSliderProps) {
   const { colors } = useAppearance();
   return (
@@ -17,15 +19,15 @@ export default function QuantityRatioSlider({
       type="range"
       data-testid={testID}
       aria-label={accessibilityLabel}
-      aria-valuetext={`${Math.round(value * 100)}%`}
+      aria-valuetext={valueText(Math.round(value * steps))}
       title={disabledReason}
       min={0}
-      max={100}
+      max={steps}
       step={1}
-      value={Math.round(value * 100)}
+      value={Math.round(value * steps)}
       disabled={disabled}
       onChange={(event) => {
-        if (!disabled) onChange(event.currentTarget.valueAsNumber / 100);
+        if (!disabled) onChange(event.currentTarget.valueAsNumber / steps);
       }}
       style={{
         width: '100%',

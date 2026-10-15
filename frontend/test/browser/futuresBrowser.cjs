@@ -14,6 +14,8 @@ async function main() {
   const server = http.createServer((req,res) => { const file=req.url.startsWith('/bundle.js')?'bundle.js':'index.html'; res.setHeader('Content-Type',file==='bundle.js'?'text/javascript':'text/html'); res.end(fs.readFileSync(path.join(out,file))); }).listen(0,'127.0.0.1');
   await new Promise(resolve=>server.once('listening',resolve));
   const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE_PATH,args:['--no-sandbox']}).catch(error=>{server.close();throw error;}); const page=await browser.newPage(); const errors=[],results=[];
+  // Position operations: tabs, or a vertical choice list at large fonts in the narrow form column.
+  const operation=name=>page.getByRole('tab',{name,exact:true}).or(page.getByRole('radio',{name,exact:true}));
   page.on('pageerror', e=>errors.push(e.message)); const base=`http://127.0.0.1:${server.address().port}`;
   await page.route('**/*',r=>r.request().url().startsWith(base)?r.continue():r.abort());
   try {
@@ -28,26 +30,34 @@ async function main() {
       if(kind==='cross') { await page.getByTestId('futures-view-history').click(); await page.getByRole('tab',{name:'강제청산 기록',exact:true}).click(); await page.getByText('Mark 청산가',{exact:true}).waitFor(); }
       const overflow=await page.evaluate(()=>[...document.querySelectorAll('div,span')].flatMap(el=>{
         const r=el.getBoundingClientRect(),s=getComputedStyle(el); if (!r.width||!r.height) return [];
-        if (r.left < -1 || r.right > innerWidth+1) return [{text:el.textContent.slice(0,80),reason:'box',rect:[r.left,r.right]}];
+        // The book beside the form scrolls sideways (호가 좌우로 밀기): its rows may extend past the edge.
+        const inScroll=n=>{for(let a=n.parentElement;a&&a!==document.body;a=a.parentElement)if(['auto','scroll'].includes(getComputedStyle(a).overflowX))return true;return false;};
+        if ((r.left < -1 || r.right > innerWidth+1) && !inScroll(el)) return [{text:el.textContent.slice(0,80),reason:'box',rect:[r.left,r.right]}];
         if(el.childNodes.length===1 && el.firstChild.nodeType===Node.TEXT_NODE){const ranges=[...el.textContent.matchAll(/\S+/gu)].flatMap(m=>{const range=document.createRange();range.setStart(el.firstChild,m.index);range.setEnd(el.firstChild,m.index+m[0].length);return [...range.getClientRects()];});return ranges.filter(t=>t.left<r.left-1||t.right>r.right+1||(s.overflow==='hidden'&&(t.top<r.top-1||t.bottom>r.bottom+1))).map(t=>({text:el.textContent,reason:'glyph',rect:[t.left,t.right,r.left,r.right]}));}return [];
       }));
       assert.deepEqual(overflow,[],`${width}/${theme}/${fontScale}/${kind}`);
       if(kind==='cross') assert.equal(await page.getByText('예상 청산가',{exact:true}).count(),0);
-      if(kind==='stale'){await page.getByRole('tab',{name:'전량 종료(Close)',exact:true}).click();await page.getByTestId('futures-submit').scrollIntoViewIfNeeded();assert.notEqual(await page.getByTestId('futures-submit').getAttribute('aria-disabled'),'true');}
-      if(kind==='open'){await page.getByTestId('futures-quantity').fill('0.25');await page.getByTestId('futures-leverage').fill('100');await page.getByTestId('futures-submit').click();await page.getByText(/체결 완료/).waitFor();assert.equal(await page.evaluate(()=>window.futuresFixture.requests.length),1);}
+      if(kind==='stale'){await operation('전량 종료(Close)').click();await page.getByTestId('futures-submit').scrollIntoViewIfNeeded();assert.notEqual(await page.getByTestId('futures-submit').getAttribute('aria-disabled'),'true');}
+      if(kind==='open'){
+        // $25.50 at Futures Last 102 is 0.25 contracts; leverage comes from its sheet.
+        await page.getByTestId('futures-amount').fill('25.5');await page.getByTestId('futures-leverage-select').click();await page.getByTestId('futures-leverage-option-100').click();
+        await page.getByTestId('futures-leverage-sheet').waitFor({state:'detached'});
+        await page.getByTestId('futures-submit').click();await page.getByText(/체결 완료/).waitFor();
+        const requests=await page.evaluate(()=>window.futuresFixture.requests);assert.equal(requests.length,1);assert.equal(requests[0].body.quantity,'0.25');assert.equal(requests[0].body.leverage,100);
+      }
       const label=`${width}-${theme}-${fontScale}-${kind}`; results.push(label);
       if(width===320 && fontScale===2 && ['isolated','cross','stale','open'].includes(kind)) { await page.screenshot({path:path.join(out,label+'.png'),fullPage:true}); if(kind==='cross') { await page.getByText('Mark 청산가',{exact:true}).scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-history-viewport.png')}); } await page.evaluate(()=>scrollTo(0,0)); await page.getByTestId('futures-trade').scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-viewport.png')}); }
     }
     for(const mode of ['REDUCE_ONLY','DISABLED']) {
       await page.goto(`${base}/?kind=cross&mode=${mode}`); await page.getByTestId('futures-submit').waitFor();
-      await page.getByRole('tab',{name:'전량 종료(Close)',exact:true}).click();
+      await operation('전량 종료(Close)').click();
       assert.equal((await page.getByTestId('futures-submit').getAttribute('aria-disabled'))==='true',mode==='DISABLED');
     }
     await page.setViewportSize({width:320,height:568});
-    await page.goto(`${base}/?kind=open`); await page.getByTestId('futures-quantity').fill('0.25');
-    await page.getByTestId('futures-quantity').focus(); await page.setViewportSize({width:320,height:300});
-    await page.getByTestId('futures-quantity').scrollIntoViewIfNeeded();
-    assert.ok(await page.getByTestId('futures-quantity').isVisible());
+    await page.goto(`${base}/?kind=open`); await page.getByTestId('futures-amount').fill('25.5');
+    await page.getByTestId('futures-amount').focus(); await page.setViewportSize({width:320,height:300});
+    await page.getByTestId('futures-amount').scrollIntoViewIfNeeded();
+    assert.ok(await page.getByTestId('futures-amount').isVisible());
     await page.getByTestId('futures-submit').scrollIntoViewIfNeeded();
     await page.screenshot({path:path.join(out,'320-keyboard-resize.png')});
     await page.getByTestId('futures-submit').click(); await page.getByText(/체결 완료/).waitFor();

@@ -53,7 +53,7 @@ async function main(){
    const long=scenario.startsWith('limit-long'),sl=scenario.includes('-sl-');
    await pickLimit();
    await page.getByRole('tab',{name:long?'롱(Long)':'숏(Short)',exact:true}).click();
-   await page.getByTestId('futures-quantity').fill('1');await page.getByTestId('futures-limit-price').fill('100');
+   await page.getByTestId('futures-amount').fill('100');await page.getByTestId('futures-limit-price').fill('100');
    await page.getByTestId(`protection-${sl?'stop_loss':'take_profit'}-toggle`).click();
    await page.getByLabel(`${sl?'손절 (Stop Loss)':'익절 (Take Profit)'} 조건 가격`,{exact:true}).fill('100');
    await page.getByTestId('futures-limit-submit').click();
@@ -64,7 +64,10 @@ async function main(){
    await pickLimit();
    await page.getByRole('tab',{name:scenario==='limit-long'?'롱(Long)':'숏(Short)',exact:true}).click();
    await page.getByRole('tab',{name:scenario==='limit-long'?'교차(Cross)':'격리(Isolated)',exact:true}).click();
-   await page.getByTestId('futures-leverage').fill('100');await page.getByTestId('futures-quantity').fill('0.12345678');
+   await page.getByTestId('futures-leverage-select').click();await page.getByTestId('futures-leverage-option-100').click();
+   await page.waitForFunction(()=>!document.querySelector('[data-testid="futures-leverage-sheet"]'));
+   // A 16-digit USD amount: the long-number layout of the amount field.
+   await page.getByTestId('futures-amount').fill('9999999999999999');
    await page.getByTestId('futures-limit-price').fill('1234567890123456.12345678');
    for(const kind of ['stop_loss','take_profit']){
     const label=kind==='stop_loss'?'손절 (Stop Loss)':'익절 (Take Profit)';

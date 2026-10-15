@@ -99,7 +99,11 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
    await tab('마켓').click();await id('futures-screen').waitFor();
   }
   await next();await next();await page.getByRole('tab',{name:direction,exact:true}).click();await next();
-  await id('futures-leverage').fill('2');await next();await id('futures-quantity').fill('1');await id('futures-submit').click();
+  // 2x from the leverage sheet (the guide points into it), then $102 = 1 contract at Last 102.
+  await id('futures-leverage-select').click();await id('futures-leverage-option-2').waitFor();await page.waitForTimeout(450);
+  await page.screenshot({path:path.join(out,`${key}-leverage-spotlight.png`)});await id('futures-leverage-option-2').click();
+  await page.waitForFunction(()=>!document.querySelector('[data-testid="futures-leverage-sheet"]'));
+  await next();await id('futures-amount').fill('102');await id('futures-submit').click();
   await page.getByRole('button',{name:'전량 종료',exact:true}).filter({visible:true}).first().click();
   await id('futures-submit').click();await finish(key);
  }

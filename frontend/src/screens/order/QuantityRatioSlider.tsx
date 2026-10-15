@@ -11,6 +11,12 @@ export type QuantityRatioSliderProps = {
   disabled: boolean;
   disabledReason?: string;
   onChange: (ratio: number) => void;
+  /** Positions on the track (default 100: whole percents). */
+  steps?: number;
+  /** Spoken value of a position (default `n%`). */
+  valueText?: (step: number) => string;
+  /** One step for the accessibility actions (default `1%`). */
+  stepLabel?: string;
 };
 
 const THUMB_SIZE = 20;
@@ -21,10 +27,15 @@ export default function QuantityRatioSlider(props: QuantityRatioSliderProps) {
   const current = useRef(props);
   current.current = props;
   const trackWidth = Math.max(0, width - THUMB_SIZE);
+  const steps = props.steps ?? 100;
+  const step = Math.round(props.value * steps);
+  const valueText = props.valueText ?? ((value: number) => `${value}%`);
+  const stepLabel = props.stepLabel ?? '1%';
   const change = (ratio: number) => {
     if (!current.current.disabled) {
+      const total = current.current.steps ?? 100;
       current.current.onChange(
-        Math.max(0, Math.min(100, Math.round(ratio * 100))) / 100,
+        Math.max(0, Math.min(total, Math.round(ratio * total))) / total,
       );
     }
   };
@@ -58,19 +69,19 @@ export default function QuantityRatioSlider(props: QuantityRatioSliderProps) {
         accessibilityState={{ disabled: props.disabled }}
         accessibilityValue={{
           min: 0,
-          max: 100,
-          now: Math.round(props.value * 100),
-          text: `${Math.round(props.value * 100)}%`,
+          max: steps,
+          now: step,
+          text: valueText(step),
         }}
         accessibilityActions={[
-          { name: 'increment', label: '1% 늘리기' },
-          { name: 'decrement', label: '1% 줄이기' },
+          { name: 'increment', label: `${stepLabel} 늘리기` },
+          { name: 'decrement', label: `${stepLabel} 줄이기` },
         ]}
         onAccessibilityAction={({ nativeEvent }) => {
           if (nativeEvent.actionName === 'increment')
-            change(props.value + 0.01);
+            change((step + 1) / steps);
           if (nativeEvent.actionName === 'decrement')
-            change(props.value - 0.01);
+            change((step - 1) / steps);
         }}
         onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)}
         style={[styles.control, props.disabled && styles.disabled]}
