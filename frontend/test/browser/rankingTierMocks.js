@@ -43,8 +43,11 @@ function slotRanking(url) {
 export const apiClient = { get: async path => {
   transport.requests.push(path);
   let data;
-  if (path === '/me') data = { id: 'self', nickname: long ? `내${nickname}` : '내 트레이더', profileImageUrl: null };
-  else if (path === '/seasons/current') data = slot ? slotSeason : season;
+  // `?meDelay=ms`: the profile arrives that long after the rest (a card laid out before it).
+  if (path === '/me') {
+    if (params.get('meDelay')) await new Promise(resolve => setTimeout(resolve, Number(params.get('meDelay'))));
+    data = { id: 'self', nickname: long ? `내${nickname}` : '내 트레이더', profileImageUrl: null };
+  } else if (path === '/seasons/current') data = slot ? slotSeason : season;
   else if (path.startsWith('/ranking?') && slot) data = slotRanking(new URL(path, location.origin));
   else if (path.startsWith('/ranking?')) {
     const url = new URL(path, location.origin), scope = url.searchParams.get('scope');

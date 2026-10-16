@@ -3,9 +3,9 @@ import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { beforeEach, describe, it, type TestContext } from 'node:test';
 import {
-  DROP_KEYS, EASE_IN_OUT, EASE_OUT, PARTICLES, PARTICLE_OPACITY, STAGE_EMBLEM, STAGE_TIMING, STILL_FLOOR_OPACITY, SWAY_CURVE,
-  beamStops, cubicBezier, dropEasing, entranceDecision, keyframeCurve, loopPosition, rememberPresented, resetPresentedTier,
-  stageGeometry, stageLook, stageMotion, swing, type Curve,
+  DROP_KEYS, EASE_IN_OUT, EASE_OUT, PARTICLES, PARTICLE_OPACITY, STAGE_EMBLEM, STAGE_TIMING, STILL_FLOOR_OPACITY, SWAY_CURVE, SWAY_DEGREES,
+  beamPoints, beamStops, cubicBezier, dropEasing, emblemSlot, entranceDecision, keyframeCurve, loopPosition, rememberPresented, resetPresentedTier,
+  stageAnchor, stageGeometry, stageLook, stageMotion, swing, type Curve, type StageAnchor, type StageGeometry,
 } from './tierStage.ts';
 import { getHomeTier, type HomeTier } from './tierPresentation.ts';
 import { availableRankings } from '../../features/ranking/fixtures.ts';
@@ -67,28 +67,28 @@ describe('스포트라이트: 빛줄기 그라디언트', () => {
 });
 
 describe('스포트라이트: 시안 기하 (카드 폭 358, 엠블럼 132)', () => {
-  const frame = { cx: 268, cy: 87, bottom: 150 };
+  const anchor = { cx: 268, cy: 87, bottom: 150 };
 
-  it('E = 132: beam 260 wide on the emblem from the card top, floor 180×26 centered 8 above the visible bottom', () => {
-    const g = stageGeometry(STAGE_EMBLEM, frame, false);
+  it('E = 132: beam 260 wide centered on the emblem from the card top, floor 180×26 centered 8 above the visible bottom', () => {
+    const g = stageGeometry(STAGE_EMBLEM, anchor, false, 210);
     assert.equal(g.k, 1);
-    assert.deepEqual(g.beam, { left: 268 - 130, width: 260, height: null }, 'side by side: the whole card height');
+    assert.deepEqual([g.beam.left, g.beam.width, g.beam.length], [268 - 130, 260, 210], 'side by side: the whole card height');
     assert.deepEqual(g.floor, { left: 268 - 90, top: 150 - 8 - 13, width: 180, height: 26 });
-    assert.equal(g.floor.top + g.floor.height / 2, frame.bottom - 8);
-    assert.equal(g.floor.left + g.floor.width / 2, frame.cx);
+    assert.equal(g.floor.top + g.floor.height / 2, anchor.bottom - 8);
+    assert.equal(g.floor.left + g.floor.width / 2, anchor.cx);
     assert.equal(g.ringStroke, 2);
     // Large text puts the emblem above the information: the beam stops 0.6 emblem under it.
-    assert.equal(stageGeometry(STAGE_EMBLEM, frame, true).beam.height, 150 + 0.6 * 132);
+    assert.equal(stageGeometry(STAGE_EMBLEM, anchor, true, 210).beam.length, 150 + 0.6 * 132);
   });
 
   it('E = 132: nine particles at their offsets from the emblem center, rising 120 with their drift, cycle and first delay', () => {
     const expected = [[-30, 64, 3, 10, 6500, 0], [10, 74, 2, -12, 7500, 1300], [40, 54, 3, 8, 6000, 2400], [-10, 84, 2, -6, 8000, 3100],
       [60, 79, 2, -14, 7000, 4200], [-50, 74, 2, 14, 7200, 5000], [20, 44, 3, 6, 6800, 700], [75, 59, 2, -8, 8200, 2900], [-70, 64, 2, 10, 7800, 4700]];
-    const g = stageGeometry(STAGE_EMBLEM, frame, false);
+    const g = stageGeometry(STAGE_EMBLEM, anchor, false, 210);
     assert.equal(g.particles.length, 9);
     for (const [index, [x, y, size, dx, period, delay]] of expected.entries()) {
       const particle = g.particles[index];
-      assert.deepEqual([particle.left + particle.size / 2 - frame.cx, particle.top + particle.size / 2 - frame.cy], [x, y], `particle ${index + 1}`);
+      assert.deepEqual([particle.left + particle.size / 2 - anchor.cx, particle.top + particle.size / 2 - anchor.cy], [x, y], `particle ${index + 1}`);
       assert.deepEqual([particle.dot, particle.dx, particle.rise, particle.period, particle.delay], [size, dx, 120, period, delay], `particle ${index + 1}`);
       assert.equal(particle.size > particle.dot, true, 'room for the halo');
     }
@@ -100,22 +100,23 @@ describe('스포트라이트: 시안 기하 (카드 폭 358, 엠블럼 132)', ()
     assert.deepEqual(drop, { y: [-96, 6, -5, 0], scale: [1.25, 0.97, 1.01, 1], opacity: [0, 1, 1, 1] });
     assert.deepEqual(DROP_KEYS, [0, 0.52, 0.72, 1]);
     assert.deepEqual(STAGE_TIMING, { sway: 7000, pulse: 4500, drop: 850, ringDelay: 380, ring: 900, flash: 900 });
+    assert.equal(SWAY_DEGREES, 3.5);
   });
 
   it('E = 124 and 104: every length scales by k = E / 132; times and angles do not', () => {
-    const base = stageGeometry(STAGE_EMBLEM, frame, true);
+    const base = stageGeometry(STAGE_EMBLEM, anchor, true, 210);
     for (const size of [124, 104]) {
       const k = size / 132;
-      const g = stageGeometry(size, frame, true);
+      const g = stageGeometry(size, anchor, true, 210);
       assert.equal(g.k, k);
-      assert.equal(close(g.beam.width, 260 * k) && close(g.beam.left, frame.cx - 130 * k), true, `${size} beam`);
-      assert.equal(close(g.beam.height!, frame.bottom + 0.6 * size), true, `${size} stacked beam`);
+      assert.equal(close(g.beam.width, 260 * k) && close(g.beam.left, anchor.cx - 130 * k), true, `${size} beam`);
+      assert.equal(close(g.beam.length, anchor.bottom + 0.6 * size), true, `${size} stacked beam`);
       assert.deepEqual([g.floor.width, g.floor.height, g.ringStroke].map((value) => +value.toFixed(9)), [180 * k, 26 * k, 2 * k].map((value) => +value.toFixed(9)));
-      assert.equal(close(g.floor.top + g.floor.height / 2, frame.bottom - 8 * k), true, `${size} floor center`);
+      assert.equal(close(g.floor.top + g.floor.height / 2, anchor.bottom - 8 * k), true, `${size} floor center`);
       for (const [index, particle] of g.particles.entries()) {
         const source = base.particles[index];
-        assert.equal(close(particle.left + particle.size / 2 - frame.cx, PARTICLES[index].x * k)
-          && close(particle.top + particle.size / 2 - frame.cy, PARTICLES[index].y * k)
+        assert.equal(close(particle.left + particle.size / 2 - anchor.cx, PARTICLES[index].x * k)
+          && close(particle.top + particle.size / 2 - anchor.cy, PARTICLES[index].y * k)
           && close(particle.rise, 120 * k) && close(particle.dx, source.dx * k) && close(particle.dot, source.dot * k), true, `${size} particle ${index}`);
         assert.deepEqual([particle.period, particle.delay], [source.period, source.delay]);
       }
@@ -125,22 +126,126 @@ describe('스포트라이트: 시안 기하 (카드 폭 358, 엠블럼 132)', ()
     }
   });
 
-  it("the floor's baseline is the emblem's visible bottom (alpha bounds), not its slot's", () => {
-    const harness = interactionHarness();
-    const { tierEmblemVisibleBottom, EMBLEM_OPTICAL_SCALE } = harness.load('src/screens/home/TierEmblem.tsx');
+  it("TierEmblem's visible box is the silhouette's alpha bounds on its canvas, inside the slot", () => {
+    const { tierEmblemVisibleBox, tierEmblemWidth, EMBLEM_OPTICAL_SCALE } = emblemGeometry();
     for (const tier of TIERS) for (const size of [132, 124, 104]) {
       const asset = preparation[tier];
       const scale = size / 160 * EMBLEM_OPTICAL_SCALE[tier];
-      const canvas = asset.imageAt160 ?? { ...asset.displayAt160, top: 0 };
-      const expected = (canvas.top + asset.outputMetrics.bounds[3] * canvas.height / asset.outputSize[1]) * scale;
-      const bottom = tierEmblemVisibleBottom(tier, size);
-      assert.equal(close(bottom, expected, 9), true, `${tier} ${size}`);
-      // Inside the slot, close to (not at) its bottom.
-      const slot = asset.displayAt160.height * scale;
-      assert.equal(bottom < slot && bottom > slot * 0.95, true, `${tier} ${size}: ${bottom} of ${slot}`);
+      const canvas = asset.imageAt160 ?? { ...asset.displayAt160, left: 0, top: 0 };
+      const [left, top, right, bottom] = asset.outputMetrics.bounds, [width, height] = asset.outputSize;
+      const box = tierEmblemVisibleBox(tier, size);
+      assert.deepEqual([box.left, box.top, box.right, box.bottom].map((value) => +value.toFixed(9)), [
+        (canvas.left + left * canvas.width / width) * scale, (canvas.top + top * canvas.height / height) * scale,
+        (canvas.left + right * canvas.width / width) * scale, (canvas.top + bottom * canvas.height / height) * scale,
+      ].map((value) => +value.toFixed(9)), `${tier} ${size}`);
+      // Inside the slot, close to (not at) its edges.
+      const slot = { width: tierEmblemWidth(tier, size), height: asset.displayAt160.height * scale };
+      assert.equal(box.left >= 0 && box.top >= 0 && box.right <= slot.width && box.bottom < slot.height && box.bottom > slot.height * 0.95, true,
+        `${tier} ${size}: ${JSON.stringify(box)} in ${JSON.stringify(slot)}`);
     }
   });
 });
+
+describe('스포트라이트: 하나의 앵커 (보이는 엠블럼)', () => {
+  /** Each layer's reference point, from the geometry alone. */
+  const placed = (g: StageGeometry) => ({
+    beamCenter: g.beam.left + g.beam.width / 2,
+    pivot: [g.beam.left + g.beam.origin[0], g.beam.origin[1] - g.beam.over],
+    floor: [g.floor.left + g.floor.width / 2, g.floor.top + g.floor.height / 2],
+  });
+
+  it('the anchor is the visible silhouette, not the slot: a slot whose center is elsewhere moves nothing', () => {
+    // A 140×130 slot at (200, 30) whose silhouette sits left and high in it: slot center (270, 95), silhouette center (250, 92).
+    const visible = { left: 10, top: 4, right: 90, bottom: 120 };
+    const anchor = stageAnchor({ left: 200, top: 30 }, visible);
+    assert.deepEqual(anchor, { cx: 250, cy: 92, bottom: 150 });
+    for (const size of [124, 104]) {
+      const k = size / 132, g = stageGeometry(size, anchor, false, 210), at = placed(g);
+      assert.equal(close(at.beamCenter, 250, 9), true, `${size}: beam on the silhouette, not the slot's 270`);
+      assert.deepEqual(at.pivot.map((value) => +value.toFixed(9)), [250, 92], `${size}: swings about the silhouette's center`);
+      assert.deepEqual(at.floor.map((value) => +value.toFixed(9)), [250, +(150 - 8 * k).toFixed(9)], `${size}: floor under the silhouette`);
+      const first = g.particles[0];
+      assert.deepEqual([first.left + first.size / 2, first.top + first.size / 2].map((value) => +value.toFixed(9)),
+        [+(250 + PARTICLES[0].x * k).toFixed(9), +(92 + PARTICLES[0].y * k).toFixed(9)]);
+    }
+  });
+
+  it("cross-check: TierEmblem's rendered image node (home-tier-image) holds the silhouette where the anchor's box says", (t) => {
+    const ui = interactionHarness();
+    const { default: TierEmblem, tierEmblemVisibleBox } = ui.load('src/screens/home/TierEmblem.tsx');
+    for (const tier of TIERS) for (const size of [104, 124, 132]) {
+      const renderer = ui.render(React.createElement(TierEmblem, { tier, size }));
+      t.after(() => act(() => renderer.unmount()));
+      const image = flatten(renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID === 'home-tier-image')[0].props.style);
+      const [left, top, right, bottom] = preparation[tier].outputMetrics.bounds, [width, height] = preparation[tier].outputSize;
+      const fromNode = [image.left + left / width * image.width, image.top + top / height * image.height,
+        image.left + right / width * image.width, image.top + bottom / height * image.height];
+      const box = tierEmblemVisibleBox(tier, size);
+      const worst = Math.max(...[box.left, box.top, box.right, box.bottom].map((value, index) => Math.abs(value - fromNode[index])));
+      assert.equal(worst < 1e-9, true, `${tier} ${size}: ${worst}`);
+    }
+  });
+
+  it("TierCard's layout puts the slot at the column's top: side by side right and centered between the paddings, stacked at the top", () => {
+    const card = { width: 358, height: 209.6, padding: { horizontal: 12.53, top: 14, bottom: 14.32 } };
+    // A caption wider than the emblem widens the column; the slot stays centered in it.
+    assert.deepEqual(emblemSlot(card, { width: 140, height: 152 }, 133, false), { left: 358 - 12.53 - 140 + 3.5, top: 14 + (209.6 - 14 - 14.32 - 152) / 2 });
+    assert.deepEqual(emblemSlot({ ...card, height: 420 }, { width: 332.94, height: 152 }, 133, true), { left: 12.53 + (332.94 - 133) / 2, top: 14 });
+  });
+
+  it('six tiers × E 104/124, side by side and stacked: beam center line x = cx, pivot (cx, cy), glow (cx, visible bottom − 8k), ring on the glow', () => {
+    const { tierEmblemVisibleBox, tierEmblemWidth } = emblemGeometry();
+    for (const tier of TIERS) for (const size of [104, 124]) for (const stacked of [false, true]) {
+      const k = size / 132, width = size === 124 ? 358 : 288, label = `${tier} ${size} ${stacked ? 'stacked' : 'beside'}`;
+      const card = { width, height: stacked ? 400 : 210, padding: { horizontal: Math.max(12, width * 0.035), top: tier === 'whale' ? width * 0.06 + 10 : 14, bottom: 14.3 } };
+      const column = { width: stacked ? width - 2 * card.padding.horizontal : Math.ceil(tierEmblemWidth(tier, size)), height: 152 };
+      const slot = emblemSlot(card, column, tierEmblemWidth(tier, size), stacked);
+      const visible = tierEmblemVisibleBox(tier, size);
+      const anchor = stageAnchor(slot, visible);
+      // Independently: the silhouette's middle and bottom, from the slot's corner.
+      assert.equal(close(anchor.cx, slot.left + (visible.left + visible.right) / 2, 9) && close(anchor.cy, slot.top + (visible.top + visible.bottom) / 2, 9)
+        && close(anchor.bottom, slot.top + visible.bottom, 9), true, label);
+      const g = stageGeometry(size, anchor, stacked, card.height), at = placed(g);
+      assert.equal(Math.abs(at.beamCenter - anchor.cx) <= 1e-9, true, `${label}: beam center ${at.beamCenter} vs ${anchor.cx}`);
+      assert.equal(Math.hypot(at.pivot[0] - anchor.cx, at.pivot[1] - anchor.cy) <= 1e-9, true, `${label}: pivot`);
+      assert.equal(Math.abs(at.floor[0] - anchor.cx) <= 1 && Math.abs(at.floor[1] - (anchor.bottom - 8 * k)) <= 1, true, `${label}: glow ${at.floor}`);
+      assert.equal(close(at.floor[1], anchor.bottom - 8 * k, 9), true, `${label}: glow exactly 8k above the silhouette's bottom`);
+      assert.equal(g.beam.length, stacked ? anchor.bottom + 0.6 * size : card.height, label);
+    }
+  });
+
+  it('swinging ±3.5° about the emblem keeps it on the center line; the top edge stays above the card, the card keeps the trapezoid and gradient', () => {
+    const anchor = { cx: 279, cy: 93.6, bottom: 157 };
+    for (const size of [104, 124]) {
+      const g = stageGeometry(size, anchor, false, 210), { beam } = g, e = beam.over / beam.length * 100;
+      // In the card (0 at its top, 100 at the beam's end) the sides still cross the top at 38 and 62 and end at 0 and 100.
+      const points = beamPoints(e).split(' ').map((point) => point.split(',').map(Number));
+      const [[x1, y1], [x2, y2]] = points;
+      const atTop = (x: number, end: number) => x + (end - x) * e / (100 + e);
+      assert.equal(close(atTop(x1, 0), 38, 9) && close(atTop(x2, 100), 62, 9) && close(y1, -e, 9) && close(y2, -e, 9), true, `${size}: ${beamPoints(e)}`);
+      assert.deepEqual(points.slice(2), [[100, 100], [0, 100]]);
+      assert.equal(beamPoints(0), '38,0 62,0 100,100 0,100', 'the original trapezoid');
+      for (const degrees of [-SWAY_DEGREES, 0, SWAY_DEGREES]) {
+        const turn = degrees * Math.PI / 180, cos = Math.cos(turn), sin = Math.sin(turn);
+        // A point of the box (from its top-left) after the swing, in the card.
+        const swing = (x: number, y: number) => {
+          const [ox, oy] = beam.origin, dx = x - ox, dy = y - oy;
+          return [beam.left + ox + dx * cos - dy * sin, -beam.over + oy + dx * sin + dy * cos];
+        };
+        const [top, end] = [swing(beam.width / 2, 0), swing(beam.width / 2, beam.over + beam.length)];
+        const off = Math.abs((end[0] - top[0]) * (anchor.cy - top[1]) - (end[1] - top[1]) * (anchor.cx - top[0])) / Math.hypot(end[0] - top[0], end[1] - top[1]);
+        assert.equal(off <= 1e-9, true, `${size} ${degrees}°: the emblem is ${off} px off the center line`);
+        const corners = [x1, x2].map((x) => swing(x / 100 * beam.width, 0));
+        assert.equal(corners.every(([, y]) => y <= 0), true, `${size} ${degrees}°: the top edge reaches the card's top (${corners.map(([, y]) => y.toFixed(2))})`);
+      }
+    }
+  });
+});
+
+/** TierEmblem's geometry functions (its module pulls react-native, so it loads through the harness). */
+function emblemGeometry() {
+  return interactionHarness().load('src/screens/home/TierEmblem.tsx');
+}
 
 describe('스포트라이트: 움직임 곡선', () => {
   it('CSS cubic-bezier: ease-in-out is symmetric, ease-out starts fast, the drop curve overshoots nothing', () => {
@@ -314,8 +419,11 @@ const ancestry = (node: any, card: any) => {
   return chain.join(' < ');
 };
 
+type Silhouette = (tier: HomeTier, size: number) => { left: number; top: number; right: number; bottom: number };
 type StageOptions = { tier?: HomeTier; mode?: 'light' | 'dark'; reduced?: boolean; settled?: boolean; paused?: boolean;
-  context?: string; emblemSize?: number; fontScale?: number; spotlight?: boolean };
+  context?: string; emblemSize?: number; fontScale?: number; spotlight?: boolean;
+  /** Replaces TierEmblem's silhouette box (for TierCard and the stage alike). */
+  silhouette?: Silhouette };
 
 function stageHarness(t: TestContext, initial: StageOptions = {}) {
   const ui = interactionHarness();
@@ -328,11 +436,12 @@ function stageHarness(t: TestContext, initial: StageOptions = {}) {
     constructor(value: number) { super(value); values.push({ value: this, history: [value] }); }
     setValue(value: number) { values.find((entry) => entry.value === this)?.history.push(value); super.setValue(value); }
   }
-  const mocks = {
+  const mocks: Record<string, unknown> = {
     'react-native': { ...ui.native, Animated: { ...ui.native.Animated, Value } },
     'react-native-svg': SVG,
     '../../theme/useReducedMotion': { useReducedMotion: () => state.reduced, useReducedMotionSettled: () => state.settled },
   };
+  if (state.silhouette) mocks['./TierEmblem'] = { __esModule: true, ...ui.load('src/screens/home/TierEmblem.tsx', mocks), tierEmblemVisibleBox: state.silhouette };
   const TierCard = ui.load('src/screens/home/TierCard.tsx', mocks).default;
   const element = () => {
     const tier = getHomeTier(state.tier === 'whale' ? 'master' : state.tier, state.mode)!;
@@ -356,13 +465,44 @@ function stageHarness(t: TestContext, initial: StageOptions = {}) {
   h.has = (id: string) => h.hosts(id).length > 0;
   h.node = (id: string) => h.hosts(id)[0];
   h.emblem = () => h.node(`home-emblem-${state.tier}`);
-  /** The emblem column at (221, 29) in the card, the emblem slot at its top; as onLayout reports them. */
-  h.layout = (column = { x: 221, y: 29, width: 133, height: 152 }) => act(() => {
-    const emblem = h.emblem();
-    hostParent(emblem).props.onLayout?.({ nativeEvent: { layout: column } });
-    const slot = flatten((h.node('tier-card-emblem') ?? emblem).props.style);
-    emblem.props.onLayout?.({ nativeEvent: { layout: { x: (column.width - slot.width) / 2, y: 0, width: slot.width, height: slot.height } } });
+  /**
+   * onLayout as RN-Web reports it: the card (its own handler sets the paddings' width; the stage's
+   * root, which covers it, gives its size), and the emblem column's size with an x/y the light must
+   * not follow (RN-Web keeps a moved view's old place until its size changes). The defaults are the
+   * 390 dp card; `column: null` leaves the column unreported.
+   */
+  h.layout = ({ card = { width: 358, height: 210 }, column = { x: 0, y: 0, width: 133, height: 152 } }: {
+    card?: { width: number; height: number }; column?: { x: number; y: number; width: number; height: number } | null;
+  } = {}) => act(() => {
+    h.node('ranking-my-card').props.onLayout({ nativeEvent: { layout: { x: 16, y: 120, ...card } } });
+    h.node('tier-stage')?.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, ...card } } });
+    if (column) hostParent(h.emblem()).props.onLayout?.({ nativeEvent: { layout: column } });
   });
+  /** Only the stage's root reports a new card size: RN-Web says nothing for the card when only its padding grew. */
+  h.stageLayout = (card: { width: number; height: number }) => act(() => {
+    h.node('tier-stage').props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, ...card } } });
+  });
+  /** Where TierCard's rendered styles put the visible emblem: its paddings, the column at the right (or on top), the slot centered in it. */
+  h.expected = (card: { width: number; height: number }, column: { width: number; height: number }) => {
+    const style = flatten(h.node('ranking-my-card').props.style);
+    const stacked = style.flexDirection === 'column';
+    const { tierEmblemVisibleBox, tierEmblemWidth } = emblemGeometry();
+    const left = (stacked ? style.paddingHorizontal : card.width - style.paddingHorizontal - column.width)
+      + (column.width - tierEmblemWidth(state.tier, state.emblemSize)) / 2;
+    const top = stacked ? style.paddingTop : style.paddingTop + (card.height - style.paddingTop - style.paddingBottom - column.height) / 2;
+    const visible = (state.silhouette ?? tierEmblemVisibleBox)(state.tier, state.emblemSize);
+    return { cx: left + (visible.left + visible.right) / 2, cy: top + (visible.top + visible.bottom) / 2, bottom: top + visible.bottom };
+  };
+  /** Each layer's reference point as rendered: beam center line and pivot, floor and ring centers, particle centers. */
+  h.placed = () => {
+    const beam = flatten(h.node('tier-stage-beam').props.style), floor = flatten(h.node('tier-stage-floor').props.style);
+    const ring = h.has('tier-stage-ring') ? flatten(h.node('tier-stage-ring').props.style) : null;
+    return {
+      beam, beamCenter: beam.left + beam.width / 2, pivot: [beam.left + beam.transformOrigin[0], beam.top + beam.transformOrigin[1]],
+      floor: [floor.left + floor.width / 2, floor.top + floor.height / 2], ring: ring && [ring.left + ring.width / 2, ring.top + ring.height / 2],
+      particles: h.hosts('tier-stage-particle').map((node: any) => flatten(node.props.style)).map((style: any) => [style.left + style.width / 2, style.top + style.height / 2]),
+    };
+  };
   /** Started drops: the emblem's entrance (a timing to keyframe 3). */
   h.drops = () => ui.animations.filter((animation: any) => animation.options.toValue === 3).length;
   h.running = () => ui.animations.filter((animation: any) => animation.value.animation === animation);
@@ -413,27 +553,105 @@ describe('스포트라이트: TierCard', () => {
     assert.deepEqual(order, ['stage', 'info', 'emblem']);
   });
 
-  it('places the layers on the measured emblem (E = 124): beam, floor 8k above the visible bottom, particles', (t) => {
+  it('places every layer from one anchor, the visible emblem, through the card size, its paddings and the column size', (t) => {
     const h = stageHarness(t);
     h.layout();
-    const harness = interactionHarness();
-    const { tierEmblemVisibleBottom } = harness.load('src/screens/home/TierEmblem.tsx');
-    const slot = flatten(h.node('tier-card-emblem').props.style);
-    const left = 221 + (133 - slot.width) / 2;
-    const geometry = stageGeometry(124, { cx: left + slot.width / 2, cy: 29 + slot.height / 2, bottom: 29 + tierEmblemVisibleBottom('gold', 124) }, false);
-    const beam = flatten(h.node('tier-stage-beam').props.style);
-    assert.deepEqual([beam.left, beam.width, beam.top, beam.bottom, beam.transformOrigin], [geometry.beam.left, geometry.beam.width, 0, 0, 'top']);
-    const floor = flatten(h.node('tier-stage-floor').props.style);
-    assert.deepEqual([floor.left, floor.top, floor.width, floor.height], [geometry.floor.left, geometry.floor.top, geometry.floor.width, geometry.floor.height]);
-    const particles = h.hosts('tier-stage-particle').map((node: any) => flatten(node.props.style));
-    assert.deepEqual(particles.map((style: any) => [style.left, style.top, style.width]),
-      geometry.particles.map((particle) => [particle.left, particle.top, particle.size]));
+    const k = 124 / 132;
+    const expectOn = (anchor: StageAnchor, label: string, length: number) => {
+      const at = h.placed(), { beam } = at;
+      assert.equal(Math.abs(at.beamCenter - anchor.cx) <= 1e-9, true, `${label}: beam center ${at.beamCenter} vs ${anchor.cx}`);
+      assert.equal(Math.hypot(at.pivot[0] - anchor.cx, at.pivot[1] - anchor.cy) <= 1e-9, true, `${label}: pivot ${at.pivot}`);
+      assert.equal(Math.hypot(at.floor[0] - anchor.cx, at.floor[1] - (anchor.bottom - 8 * k)) <= 1e-9, true, `${label}: floor ${at.floor}`);
+      assert.equal(Math.hypot(at.ring![0] - at.floor[0], at.ring![1] - at.floor[1]) <= 1e-9, true, `${label}: ring on the floor`);
+      at.particles.forEach(([x, y]: number[], index: number) => assert.equal(
+        Math.hypot(x - anchor.cx - PARTICLES[index].x * k, y - anchor.cy - PARTICLES[index].y * k) <= 1e-9, true, `${label}: particle ${index + 1}`));
+      // The box: from above the card's top to the beam's end; the swing's pivot inside it.
+      assert.equal(beam.top < 0 && close(beam.top + beam.height, length, 9) && beam.bottom === undefined, true, `${label}: ${beam.top} + ${beam.height}`);
+      assert.deepEqual([beam.width, beam.transformOrigin.length, beam.transformOrigin[2]], [260 * k, 3, 0]);
+    };
+    const anchor = h.expected({ width: 358, height: 210 }, { width: 133, height: 152 });
+    expectOn(anchor, 'side by side', 210);
+    // The gradient spans the card's part (0–100 in user space), the box's extra top is above it, the trapezoid is the same.
+    const svg = h.node('tier-stage-beam').findAll((node: any) => node.type === 'Svg')[0];
+    const extension = -flatten(h.node('tier-stage-beam').props.style).top / 210 * 100;
+    assert.equal(svg.props.viewBox, `0 ${-extension} 100 ${100 + extension}`);
+    const gradient = svg.findAll((node: any) => node.type === 'LinearGradient')[0];
+    assert.deepEqual([gradient.props.x1, gradient.props.y1, gradient.props.x2, gradient.props.y2, gradient.props.gradientUnits], ['0', '0', '0', '100', 'userSpaceOnUse']);
+    assert.deepEqual(gradient.findAll((node: any) => node.type === 'Stop').map((stop: any) => [stop.props.offset, stop.props.stopOpacity]), [[0, 0.88], [0.52, 0.3], [1, 0]]);
+    assert.equal(svg.findAll((node: any) => node.type === 'Polygon')[0].props.points, beamPoints(extension));
+
+    // RN-Web reports the column's x/y from an older layout: nothing follows it.
+    h.layout({ column: { x: 183, y: 48, width: 133, height: 152 } });
+    expectOn(anchor, 'a stale column x/y', 210);
+    // The card resizes (narrower, taller) with no column event: the light follows the card's layout.
+    h.layout({ card: { width: 328, height: 236 }, column: null });
+    const resized = h.expected({ width: 328, height: 236 }, { width: 133, height: 152 });
+    assert.equal(Math.abs(resized.cx - anchor.cx) > 25 && Math.abs(resized.cy - anchor.cy) > 10, true, 'the emblem moved');
+    expectOn(resized, 'the card resized', 236);
+    // The card grows by its padding alone: only the stage's root says so, and the light follows.
+    h.stageLayout({ width: 328, height: 250 });
+    const padded = h.expected({ width: 328, height: 250 }, { width: 133, height: 152 });
+    assert.equal(close(padded.cy - resized.cy, 7, 9), true, 'the column moved down');
+    expectOn(padded, 'padding only', 250);
+
     // Large text: the emblem above the information, the beam stops 0.6 E under the emblem.
     h.update({ fontScale: 2 });
-    h.layout({ x: 12, y: 14, width: 334, height: 152 });
-    const stacked = flatten(h.node('tier-stage-beam').props.style);
-    assert.equal(close(stacked.height, 14 + tierEmblemVisibleBottom('gold', 124) + 0.6 * 124), true, String(stacked.height));
-    assert.equal(stacked.bottom === undefined, true);
+    const column = { x: 0, y: 0, width: 358 - 2 * Math.max(12, 358 * 0.035), height: 152 };
+    h.layout({ card: { width: 358, height: 430 }, column });
+    const stacked = h.expected({ width: 358, height: 430 }, column);
+    expectOn(stacked, 'stacked', stacked.bottom + 0.6 * 124);
+  });
+
+  it("the light follows the silhouette, not the slot: an emblem drawn off its slot's center takes every layer with it", (t) => {
+    const { tierEmblemVisibleBox, tierEmblemWidth } = emblemGeometry();
+    // The silhouette 12 px left of and 8 px above where its slot centers it, its bottom 6 px higher.
+    const silhouette: Silhouette = (tier, size) => {
+      const box = tierEmblemVisibleBox(tier, size);
+      return { left: box.left - 20, top: box.top - 10, right: box.right - 4, bottom: box.bottom - 6 };
+    };
+    const h = stageHarness(t, { silhouette });
+    h.layout();
+    const k = 124 / 132, anchor = h.expected({ width: 358, height: 210 }, { width: 133, height: 152 }), at = h.placed();
+    const slotCenter = 358 - Math.max(12, 358 * 0.035) - 133 + (133 - tierEmblemWidth('gold', 124)) / 2 + tierEmblemWidth('gold', 124) / 2;
+    assert.equal(Math.abs(slotCenter - anchor.cx - 12) < 1e-9, true, 'the silhouette really is off its slot');
+    assert.equal(Math.abs(at.beamCenter - anchor.cx) <= 1e-9, true, `beam center ${at.beamCenter}: silhouette ${anchor.cx}, slot ${slotCenter}`);
+    assert.equal(Math.hypot(at.pivot[0] - anchor.cx, at.pivot[1] - anchor.cy) <= 1e-9, true, `pivot ${at.pivot} vs (${anchor.cx}, ${anchor.cy})`);
+    assert.equal(Math.hypot(at.floor[0] - anchor.cx, at.floor[1] - (anchor.bottom - 8 * k)) <= 1e-9, true, `floor ${at.floor}`);
+    at.particles.forEach(([x, y]: number[], index: number) => assert.equal(
+      Math.hypot(x - anchor.cx - PARTICLES[index].x * k, y - anchor.cy - PARTICLES[index].y * k) <= 1e-9, true, `particle ${index + 1}`));
+  });
+
+  it('six tiers × E 104/124, side by side and stacked: the beam centered on the emblem, glow (cx, visible bottom − 8k)', (t) => {
+    for (const tier of TIERS) for (const emblemSize of [104, 124]) for (const fontScale of [1, 2]) {
+      const h = stageHarness(t, { tier, emblemSize, fontScale });
+      const k = emblemSize / 132, width = emblemSize === 124 ? 358 : 288, label = `${tier} ${emblemSize} ×${fontScale}`;
+      const { tierEmblemWidth } = emblemGeometry();
+      const card = { width, height: fontScale > 1.3 ? 420 : 210 };
+      const column = { x: 0, y: 0, width: fontScale > 1.3 ? width - 2 * Math.max(12, width * 0.035) : Math.ceil(tierEmblemWidth(tier, emblemSize)), height: 150 };
+      h.layout({ card, column });
+      const anchor = h.expected(card, column), at = h.placed();
+      assert.equal(Math.abs(at.beamCenter - anchor.cx) <= 1, true, `${label}: beam center ${at.beamCenter} vs ${anchor.cx}`);
+      assert.equal(Math.hypot(at.pivot[0] - anchor.cx, at.pivot[1] - anchor.cy) <= 1, true, `${label}: pivot`);
+      assert.equal(Math.abs(at.floor[0] - anchor.cx) <= 1 && Math.abs(at.floor[1] - (anchor.bottom - 8 * k)) <= 1, true, `${label}: floor ${at.floor} vs ${anchor.cx}, ${anchor.bottom - 8 * k}`);
+      act(() => h.renderer.unmount());
+      h.renderer = ui(h).render(React.createElement('View'));
+    }
+  });
+
+  it("TierCard's own layout is what the anchor assumes: the paddings it renders, the column right of the information (on top when stacked), the emblem first in it", (t) => {
+    const h = stageHarness(t);
+    h.layout();
+    const card = h.node('ranking-my-card'), column = hostParent(h.emblem());
+    const beside = flatten(card.props.style);
+    assert.deepEqual([beside.flexDirection, beside.alignItems, beside.paddingHorizontal, beside.paddingTop, beside.paddingBottom],
+      ['row', 'center', Math.max(12, 358 * 0.035), 14, Math.max(14, 358 * 0.04)]);
+    assert.deepEqual([flatten(column.props.style).alignItems, flatten(column.props.style).justifyContent, hostChildren(column)[0] === h.emblem()], ['center', undefined, true]);
+    const flow = () => hostChildren(card).filter((child: any) => flatten(child.props.style)?.position !== 'absolute');
+    assert.equal(flow().at(-1) === column && flatten(flow()[0].props.style).flex === 1, true, 'side by side: the information grows, the column ends the row');
+    h.update({ fontScale: 2 });
+    const stacked = flatten(card.props.style);
+    assert.deepEqual([stacked.flexDirection, stacked.alignItems], ['column', 'stretch']);
+    assert.equal(flow()[0] === hostParent(h.emblem()), true, 'stacked: the column comes first');
   });
 
   it('reduced motion: a still beam (0°) and floor glow only — no loops, particles, ring, flash, float, glint or entrance', (t) => {
@@ -652,10 +870,14 @@ async function rankingScreen(t: TestContext, { tier, mode, fontScale, spotlight 
   const card = node('ranking-my-card');
   // Measure the emblem so every layer renders around the information.
   const emblem = renderer.root.findAll((child: any) => typeof child.type === 'string' && String(child.props.testID ?? '').startsWith('home-emblem-'))[0];
-  if (spotlight && emblem) {
+  // Both renders lay the card out alike; with the spotlight the stage and the emblem column are sized too, so every layer renders.
+  if (card?.props.onLayout) {
     act(() => {
-      hostParent(emblem).props.onLayout({ nativeEvent: { layout: { x: 221, y: 29, width: 133, height: 152 } } });
-      emblem.props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 133, height: 130 } } });
+      card.props.onLayout({ nativeEvent: { layout: { x: 16, y: 120, width: 358, height: 210 } } });
+      if (spotlight && emblem) {
+        node('tier-stage').props.onLayout({ nativeEvent: { layout: { x: 0, y: 0, width: 358, height: 210 } } });
+        hostParent(emblem).props.onLayout({ nativeEvent: { layout: { x: 221, y: 29, width: 133, height: 152 } } });
+      }
     });
   }
   const info = hostParent(hostParent(node('ranking-my-figures')));

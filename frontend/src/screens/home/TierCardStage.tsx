@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Polygon, RadialGradient, Stop } from 'react-native-svg';
-import { Animated, Platform, View, type LayoutChangeEvent, type LayoutRectangle } from '../../theme/native';
+import { Animated, Platform, View, type LayoutChangeEvent } from '../../theme/native';
 import type { AppearanceMode } from '../../theme/appearance';
 import { useReducedMotion, useReducedMotionSettled } from '../../theme/useReducedMotion';
-import { tierEmblemVisibleBottom } from './TierEmblem';
+import { tierEmblemVisibleBox, tierEmblemWidth } from './TierEmblem';
 import type { HomeTier } from './tierPresentation';
 import {
-  BEAM_POINTS, EASE_OUT, LINEAR, PARTICLES, PARTICLE_OPACITY, STAGE_TIMING, STILL_FLOOR_OPACITY, SWAY_CURVE,
-  beamStops, dropEasing, entranceDecision, flashTint, floorAlpha, loopPosition, rememberPresented, rgba, stageGeometry, stageMotion, stageLook,
-  swing, type Curve, type StageGeometry, type StageLook,
+  EASE_OUT, LINEAR, PARTICLES, PARTICLE_OPACITY, STAGE_TIMING, STILL_FLOOR_OPACITY, SWAY_CURVE,
+  beamPoints, beamStops, dropEasing, emblemSlot, entranceDecision, flashTint, floorAlpha, loopPosition, rememberPresented, rgba, stageAnchor,
+  stageGeometry, stageMotion, stageLook, swing, type Curve, type Size, type StageCard, type StageGeometry, type StageLook,
 } from './tierStage';
 
 /** 내 순위 turns the spotlight on for its card. */
@@ -39,13 +39,15 @@ export type TierStage = {
   motion: boolean;
   /** The entrance is running: its flash and ring are drawn. */
   entering: boolean;
-  /** Null until the emblem has been measured in the card. */
+  /** Null until the card and the emblem column have been measured. */
   geometry: StageGeometry | null;
   values: Values;
   /** The emblem's own motion: the drop and, for the top tiers, the float. */
   emblemStyle: { opacity: Animated.AnimatedInterpolation<number>; transform: EmblemTransform[] };
+  /** The card's size, from the stage's own root (the card's box, without its padding in the way). */
+  onCardLayout: (event: LayoutChangeEvent) => void;
+  /** The emblem column's size (its place follows from the card's layout). */
   onColumnLayout: (event: LayoutChangeEvent) => void;
-  onEmblemLayout: (event: LayoutChangeEvent) => void;
 };
 
 const HIDDEN = {
@@ -74,17 +76,24 @@ function runLoop(value: Animated.Value, period: number, delay: number, elapsed: 
   return () => { stopped = true; animation.stop(); };
 }
 
-function sameLayout(a: LayoutRectangle | null, b: LayoutRectangle) {
-  return !!a && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
+/** A size from onLayout, kept only when it changed. */
+function useSize() {
+  const [size, setSize] = useState<Size | null>(null);
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    setSize((previous) => (previous?.width === width && previous.height === height ? previous : { width, height }));
+  }, []);
+  return [size, onLayout] as const;
 }
 
 /**
  * The spotlight's motion and measurements for TierCard. Null input turns it
  * off (the card renders as before). The drop's first frame is decided before
- * paint: an owed entrance starts hidden, never from the rest pose.
+ * paint: an owed entrance starts hidden, never from the rest pose. `padding`
+ * is what TierCard renders.
  */
 export function useTierStage(input: {
-  tier: HomeTier; mode: AppearanceMode; emblemSize: number; stacked: boolean; spotlight: TierSpotlight;
+  tier: HomeTier; mode: AppearanceMode; emblemSize: number; stacked: boolean; spotlight: TierSpotlight; padding: StageCard['padding'];
 } | null): TierStage | null {
   const reduced = useReducedMotion();
   const settled = useReducedMotionSettled();
@@ -163,24 +172,19 @@ export function useTierStage(input: {
     };
   }, [bobPeriod, motion, native, paused, tier, values]);
 
-  const [column, setColumn] = useState<LayoutRectangle | null>(null);
-  const [slot, setSlot] = useState<LayoutRectangle | null>(null);
-  const onColumnLayout = useCallback((event: LayoutChangeEvent) => {
-    const layout = event.nativeEvent.layout;
-    setColumn((previous) => (sameLayout(previous, layout) ? previous : layout));
-  }, []);
-  const onEmblemLayout = useCallback((event: LayoutChangeEvent) => {
-    const layout = event.nativeEvent.layout;
-    setSlot((previous) => (sameLayout(previous, layout) ? previous : layout));
-  }, []);
+  // Sizes only: RN-Web reports a view when its content box resizes (ResizeObserver), so its x/y can
+  // be an old place, and the card itself is not reported when only its padding grows. The stage's
+  // root covers the card with no padding of its own: every card size reaches it.
+  const [card, onCardLayout] = useSize();
+  const [column, onColumnLayout] = useSize();
+  const { horizontal = 0, top = 0, bottom = 0 } = input?.padding ?? {};
   const geometry = useMemo(() => {
-    if (!tier || !column || !slot) return null;
-    // The slot's place in the card: onLayout is relative to each parent, before any transform.
-    const left = column.x + slot.x, top = column.y + slot.y;
-    return stageGeometry(emblemSize, {
-      cx: left + slot.width / 2, cy: top + slot.height / 2, bottom: top + tierEmblemVisibleBottom(tier, emblemSize),
-    }, stacked);
-  }, [column, emblemSize, slot, stacked, tier]);
+    if (!tier || !card || !column) return null;
+    // One anchor, the emblem as it is seen: the slot's place from the card's layout,
+    // then the silhouette inside the slot from TierEmblem's own geometry.
+    const slot = emblemSlot({ ...card, padding: { horizontal, top, bottom } }, column, tierEmblemWidth(tier, emblemSize), stacked);
+    return stageGeometry(emblemSize, stageAnchor(slot, tierEmblemVisibleBox(tier, emblemSize)), stacked, card.height);
+  }, [bottom, card, column, emblemSize, horizontal, stacked, tier, top]);
 
   const emblemStyle = useMemo(() => {
     const { drop: keys, bob } = stageMotion(emblemSize);
@@ -193,13 +197,14 @@ export function useTierStage(input: {
   }, [bobPeriod, drop, emblemSize, motion, values.bob]);
 
   if (!look) return null;
-  return { look, motion, entering, geometry, values, onColumnLayout, onEmblemLayout, emblemStyle };
+  return { look, motion, entering, geometry, values, onCardLayout, onColumnLayout, emblemStyle };
 }
 
 /**
- * The light around the emblem, under the emblem and the card's text: a
- * swaying beam from the card's top (with the landing flash), the floor glow
- * the emblem stands on, the landing ring and rising particles. Decoration
+ * The light around the emblem, under the emblem and the card's text: a beam
+ * from the card's top swaying about the emblem's center (with the landing
+ * flash), the floor glow the emblem stands on, the landing ring and rising
+ * particles, all placed from one anchor (the emblem as it is seen). Decoration
  * only: no touches, hidden from screen readers. Reduced motion keeps a still
  * beam and floor glow.
  */
@@ -219,25 +224,34 @@ export default function TierCardStage({ stage }: { stage: TierStage }) {
       translateY: values.particles[index].interpolate({ inputRange: [0, 1], outputRange: [0, -particle.rise] }),
     })),
   }), [geometry, values]);
-  if (!geometry || !animated) return null;
+  // The root covers the card and measures it; the layers wait for the card and the emblem column.
+  const root = (layers?: React.ReactNode) => (
+    <View testID="tier-stage" pointerEvents="none" {...HIDDEN} onLayout={stage.onCardLayout} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+      {layers}
+    </View>
+  );
+  if (!geometry || !animated) return root();
 
   const { beam, floor, ringStroke } = geometry;
   const tint = rgba(look.tint, 1);
+  // The box's 0–100 runs the beam's length in the card; the part above the card's top is negative.
+  const extension = beam.over / beam.length * 100;
   const beamFill = (gradient: string, color: string) => (
-    <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+    <Svg width="100%" height="100%" viewBox={`0 ${-extension} 100 ${100 + extension}`} preserveAspectRatio="none">
       <Defs>
-        <LinearGradient id={gradient} x1="0" y1="0" x2="0" y2="1">
+        {/* In the card's span: the top's color continues above the card's top. */}
+        <LinearGradient id={gradient} x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
           {beamStops(look).map(([offset, alpha]) => <Stop key={offset} offset={offset} stopColor={color} stopOpacity={alpha} />)}
         </LinearGradient>
       </Defs>
-      <Polygon points={BEAM_POINTS} fill={`url(#${gradient})`} />
+      <Polygon points={beamPoints(extension)} fill={`url(#${gradient})`} />
     </Svg>
   );
-  return (
-    <View testID="tier-stage" pointerEvents="none" {...HIDDEN} style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+  return root(
+    <>
       <Animated.View testID="tier-stage-beam" style={{
-        position: 'absolute', top: 0, left: beam.left, width: beam.width, ...(beam.height === null ? { bottom: 0 } : { height: beam.height }),
-        transformOrigin: 'top', transform: [{ rotate: motion ? animated.sway : '0deg' }],
+        position: 'absolute', left: beam.left, top: -beam.over, width: beam.width, height: beam.over + beam.length,
+        transformOrigin: [...beam.origin, 0], transform: [{ rotate: motion ? animated.sway : '0deg' }],
       }}>
         {beamFill(`${id}-beam`, tint)}
         {entering ? (
@@ -289,6 +303,6 @@ export default function TierCardStage({ stage }: { stage: TierStage }) {
           </Svg>
         </Animated.View>
       )) : null}
-    </View>
+    </>,
   );
 }

@@ -3,9 +3,9 @@ import type { HomeTier } from './tierPresentation';
 
 /*
  * The spotlight on 내 순위's tier emblem (TierCardStage) as plain numbers:
- * each tier's light, where every layer sits around the measured emblem, the
- * motion curves, and when the entrance plays. Lengths are the mock-up's px
- * (a 358-wide card around a 132 emblem); the card scales them by
+ * each tier's light, where every layer sits around the emblem as it is seen,
+ * the motion curves, and when the entrance plays. Lengths are the mock-up's
+ * px (a 358-wide card around a 132 emblem); the card scales them by
  * k = emblem size / 132.
  */
 
@@ -57,8 +57,15 @@ export function flashTint([r, g, b]: Rgb): Rgb {
 export function beamStops(look: StageLook) {
   return [[0, look.heavy ? 0.78 : 0.88], [0.52, 0.3], [1, 0]] as const;
 }
-/** The beam's trapezoid in a 0–100 box: narrow at the top (38–62%), full width at the bottom. */
-export const BEAM_POINTS = '38,0 62,0 100,100 0,100';
+/**
+ * The beam's trapezoid in a 0–100 box: narrow at the card's top (38–62%), full
+ * width at its end. `extension` (in % of its length) continues the sides
+ * above the card's top, where the card clips them.
+ */
+export function beamPoints(extension = 0) {
+  const top = 38 + 0.38 * extension;
+  return `${top},${-extension} ${100 - top},${-extension} 100,100 0,100`;
+}
 /** The floor glow's center alpha; it is transparent from 70% of the CSS farthest-corner radius. */
 export const floorAlpha = (look: StageLook) => (look.heavy ? 0.7 : 0.85);
 /** Floor glow opacity while still (reduced motion): the middle of its pulse. */
@@ -87,14 +94,48 @@ export const STAGE_TIMING = {
   flash: 900,
 } as const;
 
-/** The emblem slot as measured in the card. */
-export type StageFrame = {
-  /** The slot's center. */
+/** The beam swings this far each way (in degrees), about the emblem's center. */
+export const SWAY_DEGREES = 3.5;
+
+/** A size, as onLayout reports it. */
+export type Size = { width: number; height: number };
+
+/** The card as TierCard lays it out: its size and the paddings it renders. */
+export type StageCard = Size & { padding: { horizontal: number; top: number; bottom: number } };
+
+/**
+ * Where TierCard's flex layout puts the emblem slot, from the card's top-left:
+ * at the top of the emblem column, centered across it. Side by side the column
+ * ends at the right padding and is centered between the top and bottom
+ * paddings; stacked (large text) it is the first row, at the top padding.
+ *
+ * Only sizes go in, and every platform reports a size whenever it changes. A
+ * view's onLayout x/y is not used: RN-Web measures a view only when its size
+ * changes (ResizeObserver), so a column the card moved without resizing it
+ * kept an old place, and the light stood beside the emblem.
+ */
+export function emblemSlot(card: StageCard, column: Size, slotWidth: number, stacked: boolean) {
+  const { horizontal, top, bottom } = card.padding;
+  const left = stacked ? horizontal : card.width - horizontal - column.width;
+  return {
+    left: left + (column.width - slotWidth) / 2,
+    top: stacked ? top : top + (card.height - top - bottom - column.height) / 2,
+  };
+}
+
+/** The emblem as it is seen, in the card's coordinates: every layer is placed from this one anchor. */
+export type StageAnchor = {
+  /** The center of the visible silhouette (its alpha bounds), not of the slot or of the image's canvas. */
   cx: number;
   cy: number;
-  /** Where the emblem's visible silhouette ends (alpha bounds), not the slot's bottom. */
+  /** Where the silhouette ends. */
   bottom: number;
 };
+
+/** The anchor from the slot's place in the card and the silhouette's edges in the slot (TierEmblem's geometry). */
+export function stageAnchor(slot: { left: number; top: number }, visible: { left: number; top: number; right: number; bottom: number }): StageAnchor {
+  return { cx: slot.left + (visible.left + visible.right) / 2, cy: slot.top + (visible.top + visible.bottom) / 2, bottom: slot.top + visible.bottom };
+}
 
 type Box = { left: number; top: number; width: number; height: number };
 
@@ -111,8 +152,12 @@ export function stageMotion(emblemSize: number) {
 }
 
 export type StageGeometry = ReturnType<typeof stageMotion> & {
-  /** From the card's top; `height` null runs to the card's bottom. */
-  beam: { left: number; width: number; height: number | null };
+  /**
+   * Its box starts `over` above the card's top and runs `length` into the card
+   * (the trapezoid and the gradient span that length). It swings about
+   * `origin` (from the box's top-left), the emblem's center.
+   */
+  beam: { left: number; width: number; over: number; length: number; origin: [number, number] };
   /** The floor glow, and the landing ring on the same ellipse. */
   floor: Box;
   ringStroke: number;
@@ -124,22 +169,32 @@ export type StageGeometry = ReturnType<typeof stageMotion> & {
 const HALO = 4;
 
 /**
- * Every layer in the card's coordinates. Side by side the beam runs the card's
- * whole height; with the emblem above the information (large text) it stops
- * 0.6 emblem below the emblem's visible bottom.
+ * Every layer in the card's coordinates, from the anchor. Side by side the
+ * beam runs the card's whole height (`cardHeight`); with the emblem above the
+ * information (large text) it stops 0.6 emblem below the emblem's visible
+ * bottom. Swinging about the emblem's center turns the beam's top edge, so the
+ * box starts far enough above the card that the edge's low corner still
+ * reaches the card's top; the card clips the rest.
  */
-export function stageGeometry(emblemSize: number, frame: StageFrame, stacked: boolean): StageGeometry {
+export function stageGeometry(emblemSize: number, anchor: StageAnchor, stacked: boolean, cardHeight: number): StageGeometry {
   const motion = stageMotion(emblemSize), k = motion.k;
-  const floorY = frame.bottom - 8 * k;
+  const width = 260 * k, angle = SWAY_DEGREES * Math.PI / 180;
+  // The top edge's half width at the card's top is 12% of the beam (38–62%).
+  const over = Math.ceil((anchor.cy * (1 - Math.cos(angle)) + 0.12 * width * Math.sin(angle)) / Math.cos(angle)) + 1;
+  const floorY = anchor.bottom - 8 * k;
   return {
     ...motion,
-    beam: { left: frame.cx - 130 * k, width: 260 * k, height: stacked ? frame.bottom + 0.6 * emblemSize : null },
-    floor: { left: frame.cx - 90 * k, top: floorY - 13 * k, width: 180 * k, height: 26 * k },
+    beam: {
+      left: anchor.cx - width / 2, width, over,
+      length: stacked ? anchor.bottom + 0.6 * emblemSize : cardHeight,
+      origin: [width / 2, over + anchor.cy],
+    },
+    floor: { left: anchor.cx - 90 * k, top: floorY - 13 * k, width: 180 * k, height: 26 * k },
     ringStroke: 2 * k,
     particles: PARTICLES.map((particle) => {
       const size = particle.size * HALO * k;
       return {
-        left: frame.cx + particle.x * k - size / 2, top: frame.cy + particle.y * k - size / 2, size,
+        left: anchor.cx + particle.x * k - size / 2, top: anchor.cy + particle.y * k - size / 2, size,
         dot: particle.size * k, dx: particle.dx * k, rise: 120 * k, period: particle.period, delay: particle.delay,
       };
     }),
@@ -219,7 +274,7 @@ export function keyframeCurve(stops: ReadonlyArray<readonly [number, number]>, e
 /** A there-and-back cycle: rest → `peak` at half time → rest, ease-in-out each way. */
 export const swing = (rest: number, peak: number) => keyframeCurve([[0, rest], [0.5, peak], [1, rest]], EASE_IN_OUT);
 
-export const SWAY_CURVE = swing(-3.5, 3.5);
+export const SWAY_CURVE = swing(-SWAY_DEGREES, SWAY_DEGREES);
 export const PARTICLE_OPACITY = keyframeCurve([[0, 0], [0.15, 0.95], [0.8, 0.5], [1, 0]], LINEAR);
 
 /**

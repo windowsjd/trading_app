@@ -1,0 +1,2750 @@
+{
+ "note": "내 순위 spotlight anchor follow-up (2026-10-16). Card px; tolerance 1 px. Measured on RN-Web (Chromium headless shell 1243, Playwright fake clock).",
+ "start": "main 153062de (clean)",
+ "before_head_quick_390_1x": {
+  "beam_line_off_emblem_center_px": {
+   "0deg": 0.899,
+   "pm3.5deg": 7.477
+  },
+  "glow_y_minus_spec_px": [
+   -25.004,
+   -9.673
+  ],
+  "histories": [
+   {
+    "tier": "gold",
+    "history": "360→390",
+    "moved": {
+     "x": 29.48,
+     "y": 8.64
+    },
+    "offAxis": 25.313,
+    "glow": {
+     "dx": -29.5,
+     "dy": -9.673
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "360→390",
+    "moved": {
+     "x": 29.48,
+     "y": 3.64
+    },
+    "offAxis": 25.251,
+    "glow": {
+     "dx": -29.48,
+     "dy": -4.094
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "360→390",
+    "moved": {
+     "x": 29.48,
+     "y": 9.13
+    },
+    "offAxis": 24.275,
+    "glow": {
+     "dx": -29.13,
+     "dy": -25.004
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "390→360",
+    "moved": {
+     "x": -29.48,
+     "y": -8.64
+    },
+    "offAxis": 33.731,
+    "glow": {
+     "dx": 29.984,
+     "dy": -1.032
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "390→360",
+    "moved": {
+     "x": -29.48,
+     "y": -3.64
+    },
+    "offAxis": 34.019,
+    "glow": {
+     "dx": 30.005,
+     "dy": -7.454
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "390→360",
+    "moved": {
+     "x": -29.48,
+     "y": -9.13
+    },
+    "offAxis": 34.716,
+    "glow": {
+     "dx": 30.355,
+     "dy": -15.879
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "320→390",
+    "moved": {
+     "x": 58.76,
+     "y": 10.16
+    },
+    "offAxis": 4.656,
+    "glow": {
+     "dx": 0.5,
+     "dy": -9.673
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "320→390",
+    "moved": {
+     "x": 57.15,
+     "y": -4.37
+    },
+    "offAxis": 4.732,
+    "glow": {
+     "dx": 0.52,
+     "dy": -11.094
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "320→390",
+    "moved": {
+     "x": 57.49,
+     "y": 4.04
+    },
+    "offAxis": 5.669,
+    "glow": {
+     "dx": 0.87,
+     "dy": -12.004
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "390→320",
+    "moved": {
+     "x": -58.76,
+     "y": -10.16
+    },
+    "offAxis": 3.452,
+    "glow": {
+     "dx": -0.25,
+     "dy": 10.008
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "390→320",
+    "moved": {
+     "x": -57.15,
+     "y": 4.37
+    },
+    "offAxis": 3.561,
+    "glow": {
+     "dx": -0.836,
+     "dy": 0.451
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "390→320",
+    "moved": {
+     "x": -57.49,
+     "y": -4.04
+    },
+    "offAxis": 4.492,
+    "glow": {
+     "dx": -0.15,
+     "dy": 4.349
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "late profile at 320",
+    "moved": {
+     "x": 0,
+     "y": 10.19
+    },
+    "offAxis": 3.609,
+    "glow": {
+     "dx": -0.25,
+     "dy": -14.992
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "late profile at 320",
+    "moved": {
+     "x": 0,
+     "y": 24.89
+    },
+    "offAxis": 3.838,
+    "glow": {
+     "dx": 0.164,
+     "dy": -31.549
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "late profile at 320",
+    "moved": {
+     "x": 0,
+     "y": 18.31
+    },
+    "offAxis": 4.338,
+    "glow": {
+     "dx": -0.15,
+     "dy": -34.651
+    }
+   }
+  ],
+  "failures": 685
+ },
+ "after_full": {
+  "layouts": 48,
+  "frames": 144,
+  "failures": 0,
+  "worst": {
+   "beam_line_px": 0.277,
+   "glow_dx_px": 0.26,
+   "glow_dy_px": 0.441,
+   "particles_px": 0.504,
+   "lit_top_middle_px": 0.592
+  },
+  "angles_measured": {
+   "-3.5": [
+    -3.5,
+    -3.498
+   ],
+   "0": [
+    -0.026,
+    0
+   ],
+   "3.5": [
+    3.498,
+    3.5
+   ]
+  },
+  "silhouette_alpha_bounds_from_png": {
+   "bronze": {
+    "bounds": [
+     101,
+     74,
+     1151,
+     1153
+    ],
+    "size": [
+     1254,
+     1254
+    ]
+   },
+   "silver": {
+    "bounds": [
+     99,
+     77,
+     1155,
+     1118
+    ],
+    "size": [
+     1254,
+     1254
+    ]
+   },
+   "gold": {
+    "bounds": [
+     66,
+     70,
+     1188,
+     1160
+    ],
+    "size": [
+     1254,
+     1254
+    ]
+   },
+   "platinum": {
+    "bounds": [
+     18,
+     66,
+     1237,
+     1202
+    ],
+    "size": [
+     1254,
+     1254
+    ]
+   },
+   "diamond": {
+    "bounds": [
+     5,
+     53,
+     1368,
+     1132
+    ],
+    "size": [
+     1377,
+     1142
+    ]
+   },
+   "whale": {
+    "bounds": [
+     6,
+     6,
+     573,
+     512
+    ],
+    "size": [
+     580,
+     518
+    ]
+   }
+  },
+  "reduced": [
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "reduced": true,
+    "offAxis": 0.241,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    }
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "reduced": true,
+    "offAxis": 0.074,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    }
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "reduced": true,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    }
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "reduced": true,
+    "offAxis": 0.18,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    }
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "reduced": true,
+    "offAxis": 0.25,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    }
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "reduced": true,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    }
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "reduced": true,
+    "offAxis": 0.063,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    }
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "reduced": true,
+    "offAxis": 0.124,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    }
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "reduced": true,
+    "offAxis": 0.164,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    }
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "reduced": true,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    }
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "reduced": true,
+    "offAxis": 0.26,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    }
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "reduced": true,
+    "offAxis": 0.214,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.207
+    }
+   }
+  ],
+  "histories": [
+   {
+    "tier": "gold",
+    "history": "360→390",
+    "moved": {
+     "x": 29.48,
+     "y": 8.64
+    },
+    "offAxis": 0.039,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "360→390",
+    "moved": {
+     "x": 29.48,
+     "y": 3.64
+    },
+    "offAxis": 0.022,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "360→390",
+    "moved": {
+     "x": 29.48,
+     "y": 9.13
+    },
+    "offAxis": 0.223,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.207
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "390→360",
+    "moved": {
+     "x": -29.48,
+     "y": -8.64
+    },
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.032
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "390→360",
+    "moved": {
+     "x": -29.48,
+     "y": -3.64
+    },
+    "offAxis": 0.002,
+    "glow": {
+     "dx": 0.005,
+     "dy": 0.046
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "390→360",
+    "moved": {
+     "x": -29.48,
+     "y": -9.13
+    },
+    "offAxis": 0.24,
+    "glow": {
+     "dx": 0.214,
+     "dy": -0.238
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "320→390",
+    "moved": {
+     "x": 58.76,
+     "y": 10.16
+    },
+    "offAxis": 0.039,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "320→390",
+    "moved": {
+     "x": 57.15,
+     "y": -4.37
+    },
+    "offAxis": 0.022,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "320→390",
+    "moved": {
+     "x": 57.49,
+     "y": 4.04
+    },
+    "offAxis": 0.223,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.207
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "390→320",
+    "moved": {
+     "x": -58.76,
+     "y": -10.16
+    },
+    "offAxis": 0.25,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "390→320",
+    "moved": {
+     "x": -57.15,
+     "y": 4.37
+    },
+    "offAxis": 0.166,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "390→320",
+    "moved": {
+     "x": -57.49,
+     "y": -4.04
+    },
+    "offAxis": 0.272,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    }
+   },
+   {
+    "tier": "gold",
+    "history": "late profile at 320",
+    "moved": {
+     "x": 0,
+     "y": 10.19
+    },
+    "offAxis": 0.249,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    }
+   },
+   {
+    "tier": "diamond",
+    "history": "late profile at 320",
+    "moved": {
+     "x": 0,
+     "y": 24.89
+    },
+    "offAxis": 0.162,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    }
+   },
+   {
+    "tier": "whale",
+    "history": "late profile at 320",
+    "moved": {
+     "x": 0,
+     "y": 18.31
+    },
+    "offAxis": 0.248,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    }
+   }
+  ],
+  "per_layout": [
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.248,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    },
+    "particles": 0.268
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.01,
+    "offAxis": 0.241,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    },
+    "particles": 0.268,
+    "litTop": -0.313
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.233,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    },
+    "particles": 0.268
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.021,
+    "glow": {
+     "dx": -0.022,
+     "dy": -0.028
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.003,
+    "offAxis": 0.022,
+    "glow": {
+     "dx": -0.022,
+     "dy": -0.028
+    },
+    "particles": 0.034,
+    "litTop": 0.543
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.023,
+    "glow": {
+     "dx": -0.022,
+     "dy": -0.028
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.057,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    },
+    "particles": 0.32
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.015,
+    "offAxis": 0.074,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    },
+    "particles": 0.32,
+    "litTop": -0.423
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.092,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    },
+    "particles": 0.32
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.019,
+    "glow": {
+     "dx": 0.019,
+     "dy": -0.004
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.019,
+    "offAxis": 0.019,
+    "glow": {
+     "dx": 0.019,
+     "dy": -0.004
+    },
+    "particles": 0.025,
+    "litTop": 0.183
+   },
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.019,
+    "glow": {
+     "dx": 0.019,
+     "dy": -0.004
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.248,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    },
+    "particles": 0.268
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.017,
+    "offAxis": 0.241,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    },
+    "particles": 0.268,
+    "litTop": -0.338
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.233,
+    "glow": {
+     "dx": -0.241,
+     "dy": 0.113
+    },
+    "particles": 0.268
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.021,
+    "glow": {
+     "dx": -0.022,
+     "dy": -0.028
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.024,
+    "offAxis": 0.022,
+    "glow": {
+     "dx": -0.022,
+     "dy": -0.028
+    },
+    "particles": 0.034,
+    "litTop": 0.381
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.023,
+    "glow": {
+     "dx": -0.022,
+     "dy": -0.028
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.057,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    },
+    "particles": 0.32
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.007,
+    "offAxis": 0.074,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    },
+    "particles": 0.32,
+    "litTop": -0.423
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.092,
+    "glow": {
+     "dx": -0.074,
+     "dy": -0.286
+    },
+    "particles": 0.32
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.019,
+    "glow": {
+     "dx": 0.019,
+     "dy": -0.004
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.017,
+    "offAxis": 0.019,
+    "glow": {
+     "dx": 0.019,
+     "dy": -0.004
+    },
+    "particles": 0.025,
+    "litTop": 0.108
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.019,
+    "glow": {
+     "dx": 0.019,
+     "dy": -0.004
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    },
+    "particles": 0.016
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.017,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    },
+    "particles": 0.016,
+    "litTop": 0.412
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    },
+    "particles": 0.016
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": -0.011
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.002,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": -0.011
+    },
+    "particles": 0.034,
+    "litTop": 0.534
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": -0.011
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.155,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    },
+    "particles": 0.434
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.002,
+    "offAxis": 0.18,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    },
+    "particles": 0.434,
+    "litTop": -0.144
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.204,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    },
+    "particles": 0.434
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.024,
+    "glow": {
+     "dx": 0.023,
+     "dy": -0.014
+    },
+    "particles": 0.038
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.019,
+    "offAxis": 0.023,
+    "glow": {
+     "dx": 0.023,
+     "dy": -0.014
+    },
+    "particles": 0.038,
+    "litTop": 0.2
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.023,
+    "glow": {
+     "dx": 0.023,
+     "dy": -0.014
+    },
+    "particles": 0.038
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    },
+    "particles": 0.016
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.002,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    },
+    "particles": 0.016,
+    "litTop": 0.4
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.016,
+     "dy": 0.004
+    },
+    "particles": 0.016
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": -0.011
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.012,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": -0.011
+    },
+    "particles": 0.034,
+    "litTop": 0.384
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": -0.011
+    },
+    "particles": 0.034
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.155,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    },
+    "particles": 0.434
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.022,
+    "offAxis": 0.18,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    },
+    "particles": 0.434,
+    "litTop": -0.194
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.204,
+    "glow": {
+     "dx": 0.18,
+     "dy": 0.393
+    },
+    "particles": 0.434
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.024,
+    "glow": {
+     "dx": 0.023,
+     "dy": -0.014
+    },
+    "particles": 0.038
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.017,
+    "offAxis": 0.023,
+    "glow": {
+     "dx": 0.023,
+     "dy": -0.014
+    },
+    "particles": 0.038,
+    "litTop": 0.113
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.023,
+    "glow": {
+     "dx": 0.023,
+     "dy": -0.014
+    },
+    "particles": 0.038
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.25,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    },
+    "particles": 0.25
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.003,
+    "offAxis": 0.25,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    },
+    "particles": 0.25,
+    "litTop": 0.191
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.249,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    },
+    "particles": 0.25
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.007
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.014,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.007
+    },
+    "particles": 0.025,
+    "litTop": 0.412
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.007
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.042,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    },
+    "particles": 0.171
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": 0,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    },
+    "particles": 0.171,
+    "litTop": 0.133
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.021,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    },
+    "particles": 0.171
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": 0.016,
+     "dy": -0.017
+    },
+    "particles": 0.031
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.005,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": 0.016,
+     "dy": -0.017
+    },
+    "particles": 0.031,
+    "litTop": 0.142
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.016,
+     "dy": -0.017
+    },
+    "particles": 0.031
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.25,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    },
+    "particles": 0.25
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.015,
+    "offAxis": 0.25,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    },
+    "particles": 0.25,
+    "litTop": 0.153
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.249,
+    "glow": {
+     "dx": -0.25,
+     "dy": 0.008
+    },
+    "particles": 0.25
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.007
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.01,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.007
+    },
+    "particles": 0.025,
+    "litTop": 0.412
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": -0.016,
+     "dy": -0.007
+    },
+    "particles": 0.025
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.042,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    },
+    "particles": 0.171
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.014,
+    "offAxis": 0.031,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    },
+    "particles": 0.171,
+    "litTop": 0.12
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.021,
+    "glow": {
+     "dx": -0.031,
+     "dy": 0.171
+    },
+    "particles": 0.171
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": 0.016,
+     "dy": -0.017
+    },
+    "particles": 0.031
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.012,
+    "offAxis": 0.016,
+    "glow": {
+     "dx": 0.016,
+     "dy": -0.017
+    },
+    "particles": 0.031,
+    "litTop": 0.092
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.016,
+     "dy": -0.017
+    },
+    "particles": 0.031
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.062,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    },
+    "particles": 0.074
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.002,
+    "offAxis": 0.063,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    },
+    "particles": 0.074,
+    "litTop": -0.022
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.064,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    },
+    "particles": 0.074
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.015,
+     "dy": 0
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.024,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.015,
+     "dy": 0
+    },
+    "particles": 0.021,
+    "litTop": 0.438
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.015,
+     "dy": 0
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.112,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    },
+    "particles": 0.229
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.014,
+    "offAxis": 0.124,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    },
+    "particles": 0.229,
+    "litTop": 0.251
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.136,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    },
+    "particles": 0.229
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.015,
+     "dy": 0.003
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.022,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.015,
+     "dy": 0.003
+    },
+    "particles": 0.021,
+    "litTop": 0.129
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.015,
+     "dy": 0.003
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.062,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    },
+    "particles": 0.074
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.009,
+    "offAxis": 0.063,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    },
+    "particles": 0.074,
+    "litTop": -0.009
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.064,
+    "glow": {
+     "dx": 0.063,
+     "dy": 0.015
+    },
+    "particles": 0.074
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.015,
+     "dy": 0
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": 0,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.015,
+     "dy": 0
+    },
+    "particles": 0.021,
+    "litTop": 0.4
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": -0.015,
+     "dy": 0
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.112,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    },
+    "particles": 0.229
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.015,
+    "offAxis": 0.124,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    },
+    "particles": 0.229,
+    "litTop": 0.263
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.136,
+    "glow": {
+     "dx": 0.124,
+     "dy": 0.191
+    },
+    "particles": 0.229
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.015,
+     "dy": 0.003
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.01,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.015,
+     "dy": 0.003
+    },
+    "particles": 0.021,
+    "litTop": 0.091
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.015,
+    "glow": {
+     "dx": 0.015,
+     "dy": 0.003
+    },
+    "particles": 0.021
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.166,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    },
+    "particles": 0.185
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.005,
+    "offAxis": 0.164,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    },
+    "particles": 0.185,
+    "litTop": 0.58
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.161,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    },
+    "particles": 0.185
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.007,
+    "glow": {
+     "dx": -0.008,
+     "dy": -0.018
+    },
+    "particles": 0.029
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.003,
+    "offAxis": 0.008,
+    "glow": {
+     "dx": -0.008,
+     "dy": -0.018
+    },
+    "particles": 0.029,
+    "litTop": 0.408
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.009,
+    "glow": {
+     "dx": -0.008,
+     "dy": -0.018
+    },
+    "particles": 0.029
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.027,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    },
+    "particles": 0.251
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": 0,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    },
+    "particles": 0.251,
+    "litTop": 0.153
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.005,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    },
+    "particles": 0.251
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.02,
+    "glow": {
+     "dx": 0.02,
+     "dy": -0.016
+    },
+    "particles": 0.03
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.017,
+    "offAxis": 0.02,
+    "glow": {
+     "dx": 0.02,
+     "dy": -0.016
+    },
+    "particles": 0.03,
+    "litTop": 0.097
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.02,
+    "glow": {
+     "dx": 0.02,
+     "dy": -0.016
+    },
+    "particles": 0.03
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.166,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    },
+    "particles": 0.185
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": 0,
+    "offAxis": 0.164,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    },
+    "particles": 0.185,
+    "litTop": 0.592
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.161,
+    "glow": {
+     "dx": 0.164,
+     "dy": -0.049
+    },
+    "particles": 0.185
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.007,
+    "glow": {
+     "dx": -0.008,
+     "dy": -0.018
+    },
+    "particles": 0.029
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.024,
+    "offAxis": 0.008,
+    "glow": {
+     "dx": -0.008,
+     "dy": -0.018
+    },
+    "particles": 0.029,
+    "litTop": 0.408
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.009,
+    "glow": {
+     "dx": -0.008,
+     "dy": -0.018
+    },
+    "particles": 0.029
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.027,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    },
+    "particles": 0.251
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.009,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    },
+    "particles": 0.251,
+    "litTop": 0.141
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.005,
+    "glow": {
+     "dx": -0.011,
+     "dy": 0.249
+    },
+    "particles": 0.251
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.02,
+    "glow": {
+     "dx": 0.02,
+     "dy": -0.016
+    },
+    "particles": 0.03
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": 0,
+    "offAxis": 0.02,
+    "glow": {
+     "dx": 0.02,
+     "dy": -0.016
+    },
+    "particles": 0.03,
+    "litTop": 0.109
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.02,
+    "glow": {
+     "dx": 0.02,
+     "dy": -0.016
+    },
+    "particles": 0.03
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.277,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    },
+    "particles": 0.379
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.002,
+    "offAxis": 0.26,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    },
+    "particles": 0.379,
+    "litTop": -0.21
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.242,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    },
+    "particles": 0.379
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": -0.01,
+     "dy": 0.021
+    },
+    "particles": 0.017
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.02,
+    "offAxis": 0.01,
+    "glow": {
+     "dx": -0.01,
+     "dy": 0.021
+    },
+    "particles": 0.017,
+    "litTop": -0.497
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.009,
+    "glow": {
+     "dx": -0.01,
+     "dy": 0.021
+    },
+    "particles": 0.017
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.226,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.207
+    },
+    "particles": 0.308
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.012,
+    "offAxis": 0.214,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.207
+    },
+    "particles": 0.308,
+    "litTop": -0.022
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.201,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.207
+    },
+    "particles": 0.308
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.01,
+    "glow": {
+     "dx": 0.011,
+     "dy": 0.012
+    },
+    "particles": 0.022
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.026,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": 0.011,
+     "dy": 0.012
+    },
+    "particles": 0.022,
+    "litTop": 0.215
+   },
+   {
+    "tier": "whale",
+    "mode": "light",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.012,
+    "glow": {
+     "dx": 0.011,
+     "dy": 0.012
+    },
+    "particles": 0.022
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.498,
+    "offAxis": 0.277,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    },
+    "particles": 0.379
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.026,
+    "offAxis": 0.26,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    },
+    "particles": 0.379,
+    "litTop": -0.26
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.242,
+    "glow": {
+     "dx": -0.26,
+     "dy": 0.286
+    },
+    "particles": 0.379
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": -0.01,
+     "dy": 0.021
+    },
+    "particles": 0.017
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.012,
+    "offAxis": 0.01,
+    "glow": {
+     "dx": -0.01,
+     "dy": 0.021
+    },
+    "particles": 0.017,
+    "litTop": -0.472
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.5,
+    "offAxis": 0.009,
+    "glow": {
+     "dx": -0.01,
+     "dy": 0.021
+    },
+    "particles": 0.017
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": -3.5,
+    "measuredAngle": -3.499,
+    "offAxis": 0.24,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.441
+    },
+    "particles": 0.504
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 0,
+    "measuredAngle": -0.003,
+    "offAxis": 0.214,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.441
+    },
+    "particles": 0.504,
+    "litTop": 0.003
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 1,
+    "angle": 3.5,
+    "measuredAngle": 3.498,
+    "offAxis": 0.187,
+    "glow": {
+     "dx": 0.198,
+     "dy": -0.441
+    },
+    "particles": 0.504
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": -3.5,
+    "measuredAngle": -3.5,
+    "offAxis": 0.01,
+    "glow": {
+     "dx": 0.011,
+     "dy": 0.012
+    },
+    "particles": 0.022
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 0,
+    "measuredAngle": -0.015,
+    "offAxis": 0.011,
+    "glow": {
+     "dx": 0.011,
+     "dy": 0.012
+    },
+    "particles": 0.022,
+    "litTop": 0.215
+   },
+   {
+    "tier": "whale",
+    "mode": "dark",
+    "width": 390,
+    "fontScale": 2,
+    "angle": 3.5,
+    "measuredAngle": 3.499,
+    "offAxis": 0.012,
+    "glow": {
+     "dx": 0.011,
+     "dy": 0.012
+    },
+    "particles": 0.022
+   }
+  ]
+ },
+ "mutations": {
+  "M1-slot-center": {
+   "unit_failed_tests": 1,
+   "browser_failures": 0,
+   "browser_kinds": {}
+  },
+  "M2-no-column-offset": {
+   "unit_failed_tests": 4,
+   "browser_failures": 328,
+   "browser_kinds": {
+    "beam center line # px from the emblem's center (at its heigh": 30,
+    "glow x # vs emblem #": 30,
+    "glow y # vs visible bottom − #k #": 30,
+    "particle # at (#, #) / k, not (#, #)": 234,
+    "lit top's middle # vs emblem # (# rows)": 4
+   }
+  },
+  "M3-onlayout-xy": {
+   "unit_failed_tests": 3,
+   "browser_failures": 281,
+   "browser_kinds": {
+    "beam center line # px from the emblem's center (at its heigh": 14,
+    "glow y # vs visible bottom − #k #": 29,
+    "particle # at (#, #) / k, not (#, #)": 234,
+    "glow x # vs emblem #": 4
+   }
+  },
+  "M4-pivot-card-top": {
+   "unit_failed_tests": 6,
+   "browser_failures": 22,
+   "browser_kinds": {
+    "beam center line # px from the emblem's center (at its heigh": 22
+   }
+  }
+ },
+ "layout_vs_head_rankingSpotlightBrowser": {
+  "layouts": 48,
+  "failures": 0,
+  "outside_card_pixels_changed": 0,
+  "min_contrast": 4.37
+ }
+}

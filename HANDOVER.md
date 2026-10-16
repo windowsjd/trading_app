@@ -32,6 +32,16 @@
   기존 `rankingTierBrowser.cjs`는 입장 도중 측정을 피하려고 페이지를 저모션으로 열게 바꿨다(quick PASS).
 - **NOT_RUN:** iOS·Android 실기기(native driver의 transformOrigin·SVG 그라디언트·둥근 자르기, 프레임 드롭), VoiceOver/TalkBack 음성,
   `rankingTierBrowser` 전체 행렬. 상세·시안 비교·수치: [내 순위 엠블럼 스포트라이트](frontend/docs/home-tier-card-spotlight-2026-10-16.md)
+- **후속 수정(같은 날): 빛이 엠블럼 중심에서 비켜 있었다.** 사용자 측정(Gold 390)은 빛줄기 30px 왼쪽, 글로우 23px 아래였다.
+  원인 ① 기준점을 열·엠블럼 상자의 onLayout x/y로 조립했는데 RN-Web onLayout(ResizeObserver)은 크기가 바뀔 때만 다시 재서,
+  열이 옮겨지기만 하면(첫 레이아웃 뒤 minHeight·패딩 적용, 폭 변경, 늦게 온 프로필) 예전 위치가 남았다. 웹 일반 로드에서도 글로우가
+  9.7–25px 위, 360→390 폭 변경 뒤 빛 29.5px 왼쪽이었다. ② 흔들림 축이 카드 윗변이라 ±3.5°에서 5–7px 비켜 갔다.
+  이제 모든 레이어가 **앵커 하나**(보이는 실루엣의 cx·cy·visibleBottom)에서 나온다. 실루엣은 `preparation.json` alpha bounds +
+  `EMBLEM_OPTICAL_SCALE`(`tierEmblemVisibleBox`), 슬롯 위치는 TierCard 레이아웃 규칙에 **크기만** 넣어 계산한다(`emblemSlot`).
+  카드 크기는 효과 루트(패딩 없는 inset 0 레이어)의 onLayout으로 잰다. 카드 자신의 onLayout은 패딩만 커지면 RN-Web에서 다시 오지 않는다(Whale 320에서 확인).
+  흔들림 축은 엠블럼 중심으로 옮겼다. 위 항목의 '글로우가 시안보다 5–13px 위'는 이 버그 상태의 관찰이었다.
+  검증: 단위 39개(변이 4개 모두 실패 확인), 신규 `rankingSpotlightAnchorBrowser.cjs`(48 레이아웃 × 3각도·저모션·레이아웃 이력),
+  `rankingSpotlightBrowser.cjs`의 HEAD(`153062de`) 대비 레이아웃 차이 0. 상세: 문서의 '앵커와 흔들림 축'.
 
 ## 2026-10-16 P0 보완·P1 전체 시장 DB 최적화 — 보존 DELETE 계획 고정·14일 가격 보존·Binance 조회 제거·캔들 재기록 방지·uuid(7)·경보 엔드포인트
 

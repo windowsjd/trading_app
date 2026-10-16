@@ -42,14 +42,16 @@ export default function TierCard({ tier, mode, emblemSize, caption, testID, spot
   const background = TIER_BACKGROUNDS[tier.id][mode];
   const corner = tier.id === 'whale' ? 0.05 : 0.04;
   const headingTop = tier.id === 'whale' ? 0.06 : 0;
+  const padding = { horizontal: Math.max(12, width * 0.035), top: Math.max(14, width * headingTop + 10), bottom: Math.max(14, width * corner) };
   const stacked = fontScale > 1.3;
   // Outside the background's tier/appearance key: Light/Dark keeps the motion running.
-  const stage = useTierStage(spotlight ? { tier: tier.id, mode, emblemSize, stacked, spotlight } : null);
+  // The light is placed from sizes and the paddings rendered here, never from a view's onLayout x/y.
+  const stage = useTierStage(spotlight ? { tier: tier.id, mode, emblemSize, stacked, spotlight, padding } : null);
   const emblem = stage ? (
     <View style={styles.emblem} onLayout={stage.onColumnLayout}>
       {/* Transforms move the emblem only: its slot, and the caption under it, keep their layout.
           The moving box is the emblem in the card, so it keeps the emblem's id and stays hidden. */}
-      <Animated.View key={tier.id} testID={`home-emblem-${tier.id}`} style={stage.emblemStyle} onLayout={stage.onEmblemLayout}
+      <Animated.View key={tier.id} testID={`home-emblem-${tier.id}`} style={stage.emblemStyle}
         accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden pointerEvents="none">
         <TierEmblem tier={tier.id} size={emblemSize} testID="tier-card-emblem" />
       </Animated.View>
@@ -65,9 +67,9 @@ export default function TierCard({ tier, mode, emblemSize, caption, testID, spot
     <View testID={testID} onLayout={({ nativeEvent }) => setWidth(nativeEvent.layout.width)} style={[styles.card, stacked && styles.stacked, {
       backgroundColor: tier.palette.backgroundColor,
       borderRadius: width * corner,
-      paddingHorizontal: Math.max(12, width * 0.035),
-      paddingTop: Math.max(14, width * headingTop + 10),
-      paddingBottom: Math.max(14, width * corner),
+      paddingHorizontal: padding.horizontal,
+      paddingTop: padding.top,
+      paddingBottom: padding.bottom,
       minHeight: width ? width / (background.width / background.height) : undefined,
     }]}>
       <TierCardBackground key={`${tier.id}-${mode}`} tier={tier.id} mode={mode} />
