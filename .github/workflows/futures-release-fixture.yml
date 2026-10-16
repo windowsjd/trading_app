@@ -62,6 +62,11 @@ jobs:
       - name: Generate Prisma and build existing harness
         env:
           DATABASE_URL: postgresql://load_test_runner:load-test-local-only@127.0.0.1:55431/trading_load_test
+          # The job-wide 1536 MB cap is for the fixture server and harness. The
+          # full `nest build` needs about 1.6 GB of heap since 3b4a7685 (base
+          # ead934cd needed about 1.5 GB), so the compiler gets the same 4 GB
+          # the CI workflow's build has by default on this runner.
+          NODE_OPTIONS: --max-old-space-size=4096
         run: |
           pnpm exec prisma generate
           git diff --exit-code -- src/generated/prisma

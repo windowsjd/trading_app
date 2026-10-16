@@ -318,8 +318,10 @@ export const BINANCE_FIXED_ASSET_UNIVERSE: readonly BinanceFixedAssetUniverseEnt
     },
     {
       symbol: 'ASTERUSDT',
-      priceTickSize: '0.00100000',
-      displayPriceDecimals: 3,
+      // Binance moved the tick from 0.001 (2026-09-19 research) to 0.0001;
+      // fallback re-reviewed against exchangeInfo on 2026-10-16.
+      priceTickSize: '0.00010000',
+      displayPriceDecimals: 4,
       baseAsset: 'ASTER',
       name: 'Aster',
       market: 'BINANCE',

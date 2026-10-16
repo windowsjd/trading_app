@@ -1,11 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ProviderHttpError } from '../provider.types';
 import { BinancePublicClient } from './binance-public.client';
 import {
   BINANCE_ASSET_MARKET,
   BINANCE_FIXED_ASSET_UNIVERSE,
   BINANCE_FIXED_SYMBOLS,
 } from './binance-fixed-asset-universe';
-import { readBinanceSymbolPricePrecision } from './binance-tick-size';
+import {
+  type BinanceSymbolPricePrecision,
+  readBinanceSymbolPricePrecision,
+} from './binance-tick-size';
 
 export type BinanceSymbolDisplayPrecision = {
   symbol: string;
@@ -47,6 +51,8 @@ export class BinanceSymbolMetadataService {
   private lastErrorCode: string | null = null;
   private nextRefreshAllowedAt = 0;
   private inFlight: Promise<boolean> | null = null;
+  /** Symbols exchangeInfo rejected on their own; they keep the fallback. */
+  private readonly unknownSymbols = new Set<string>();
 
   constructor(private readonly client: BinancePublicClient) {
     for (const entry of BINANCE_FIXED_ASSET_UNIVERSE) {
@@ -89,7 +95,7 @@ export class BinanceSymbolMetadataService {
 
     const symbols = [
       ...new Set([...BINANCE_FIXED_SYMBOLS, ...this.cache.keys()]),
-    ];
+    ].filter((symbol) => !this.unknownSymbols.has(symbol));
     this.inFlight = this.loadExchangeInfo(symbols).finally(() => {
       this.inFlight = null;
     });
@@ -128,8 +134,7 @@ export class BinanceSymbolMetadataService {
 
   private async loadExchangeInfo(symbols: readonly string[]): Promise<boolean> {
     try {
-      const { response } = await this.client.fetchExchangeInfo(symbols);
-      const precisions = readBinanceSymbolPricePrecision(response);
+      const precisions = await this.fetchPrecisions(symbols);
       if (precisions.length === 0) {
         this.recordFailure('BINANCE_EXCHANGE_INFO_EMPTY');
         return false;
@@ -149,6 +154,38 @@ export class BinanceSymbolMetadataService {
     } catch (error) {
       this.recordFailure(readErrorCode(error));
       return false;
+    }
+  }
+
+  /**
+   * Binance answers the whole `symbols=[…]` request with HTTP 400 (-1121
+   * Invalid symbol) when any one symbol is unknown. Delisted pairs stay listed
+   * with status BREAK, so this needs a symbol removed from exchangeInfo. Halve
+   * the batch so every other symbol still refreshes, and stop asking for a
+   * symbol rejected on its own. Any other failure fails the refresh as before.
+   */
+  private async fetchPrecisions(
+    symbols: readonly string[],
+  ): Promise<BinanceSymbolPricePrecision[]> {
+    try {
+      const { response } = await this.client.fetchExchangeInfo(symbols);
+      return readBinanceSymbolPricePrecision(response);
+    } catch (error) {
+      if (!(error instanceof ProviderHttpError) || error.httpStatus !== 400) {
+        throw error;
+      }
+      if (symbols.length === 1) {
+        this.unknownSymbols.add(symbols[0]);
+        this.logger.warn(
+          `Binance exchangeInfo rejected ${symbols[0]}; serving its fixed-universe fallback display decimals.`,
+        );
+        return [];
+      }
+      const middle = Math.ceil(symbols.length / 2);
+      return [
+        ...(await this.fetchPrecisions(symbols.slice(0, middle))),
+        ...(await this.fetchPrecisions(symbols.slice(middle))),
+      ];
     }
   }
 

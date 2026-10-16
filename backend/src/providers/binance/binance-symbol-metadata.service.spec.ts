@@ -1,3 +1,4 @@
+import { ProviderHttpError } from '../provider.types';
 import { BinanceSymbolMetadataService } from './binance-symbol-metadata.service';
 import {
   BINANCE_FIXED_ASSET_UNIVERSE,
@@ -154,6 +155,81 @@ describe('BinanceSymbolMetadataService', () => {
       lastRefreshOk: false,
       lastErrorCode: 'PROVIDER_HTTP_ERROR',
       cachedSymbolCount: 1,
+    });
+  });
+
+  it('keeps refreshing every other symbol when exchangeInfo rejects one symbol', async () => {
+    // Binance answers the whole batch with HTTP 400 (-1121) for one unknown symbol.
+    const fetchExchangeInfo = jest.fn((symbols: string[]) =>
+      symbols.includes('ASTERUSDT')
+        ? Promise.reject(
+            new ProviderHttpError(
+              'binance',
+              'PROVIDER_HTTP_ERROR',
+              'binance HTTP 400 (PROVIDER_HTTP_ERROR).',
+              undefined,
+              400,
+            ),
+          )
+        : Promise.resolve({
+            response: exchangeInfo(
+              symbols.map((symbol) => [symbol, '0.000000001']),
+            ),
+            receivedAt: new Date(),
+          }),
+    );
+    const { service } = createService(fetchExchangeInfo);
+
+    await expect(service.refresh()).resolves.toBe(true);
+
+    for (const symbol of BINANCE_FIXED_SYMBOLS) {
+      expect(service.getPrecision({ market: 'BINANCE', symbol })?.source).toBe(
+        symbol === 'ASTERUSDT' ? 'fixed_universe' : 'exchange_info',
+      );
+    }
+    expect(
+      service.getPrecision({ market: 'BINANCE', symbol: 'ASTERUSDT' })
+        ?.priceTickSize,
+    ).toBe('0.00010000');
+    expect(service.getStatus()).toMatchObject({
+      lastRefreshOk: true,
+      lastErrorCode: null,
+      cachedSymbolCount: BINANCE_FIXED_SYMBOLS.length - 1,
+    });
+    // Halving isolates one symbol in at most 1 + 2 * ceil(log2(100)) calls.
+    expect(fetchExchangeInfo.mock.calls.length).toBeLessThanOrEqual(15);
+
+    fetchExchangeInfo.mockClear();
+    await service.refresh();
+    expect(fetchExchangeInfo).toHaveBeenCalledTimes(1);
+    const requested = fetchExchangeInfo.mock.calls[0][0];
+    expect(requested.length).toBe(BINANCE_FIXED_SYMBOLS.length - 1);
+    expect(requested.includes('ASTERUSDT')).toBe(false);
+  });
+
+  it.each([
+    ['a server error', 500],
+    ['a timeout', undefined],
+  ])('does not split the batch after %s', async (_label, httpStatus) => {
+    const fetchExchangeInfo = jest
+      .fn()
+      .mockRejectedValue(
+        new ProviderHttpError(
+          'binance',
+          httpStatus === undefined ? 'PROVIDER_TIMEOUT' : 'PROVIDER_HTTP_ERROR',
+          'binance request failed.',
+          undefined,
+          httpStatus,
+        ),
+      );
+    const { service } = createService(fetchExchangeInfo);
+
+    await expect(service.refresh()).resolves.toBe(false);
+
+    expect(fetchExchangeInfo).toHaveBeenCalledTimes(1);
+    expect(service.getStatus()).toMatchObject({
+      lastRefreshOk: false,
+      cachedSymbolCount: 0,
     });
   });
 

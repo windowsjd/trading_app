@@ -39,6 +39,7 @@ describe('ProviderHttpClient safe failures', () => {
         provider,
         code: 'PROVIDER_HTTP_ERROR',
         message: `${provider} HTTP 503 (PROVIDER_HTTP_ERROR).`,
+        httpStatus: 503,
       });
       expect(text).not.toHaveBeenCalled();
       expect(cancel).toHaveBeenCalledTimes(1);
@@ -79,6 +80,7 @@ describe('ProviderHttpClient safe failures', () => {
     ).rejects.toMatchObject({
       code: 'PROVIDER_HTTP_ERROR',
       message: 'binance HTTP 500 (PROVIDER_HTTP_ERROR).',
+      httpStatus: 500,
     });
   });
 

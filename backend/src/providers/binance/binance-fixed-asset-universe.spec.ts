@@ -25,14 +25,43 @@ const entryOf = (entry: {
   settlementCurrency: 'USD',
 });
 
+// Fallback tick sizes re-reviewed after the frozen research artifacts were
+// written. Only the fallback precision may differ; identity fields may not.
+const REVIEWED_FALLBACK_TICKS: Record<
+  string,
+  { priceTickSize: string; displayPriceDecimals: number }
+> = {
+  // 2026-10-16 exchangeInfo: PRICE_FILTER.tickSize 0.00010000 (was 0.001).
+  ASTERUSDT: { priceTickSize: '0.00010000', displayPriceDecimals: 4 },
+};
+
 describe('BINANCE_FIXED_ASSET_UNIVERSE', () => {
   it('preserves all ten original contracts and appends exactly the researched top fifteen', () => {
     expect(BINANCE_FIXED_ASSET_UNIVERSE.length).toBe(100);
     expect(BINANCE_FIXED_ASSET_UNIVERSE.slice(0, 10)).toEqual(originalUniverse);
     expect(selection.selected.length).toBe(15);
     expect(BINANCE_FIXED_ASSET_UNIVERSE.slice(10, 25)).toEqual(
-      selection.selected.map(entryOf),
+      selection.selected.map((entry) => ({
+        ...entryOf(entry),
+        ...REVIEWED_FALLBACK_TICKS[entry.symbol],
+      })),
     );
+  });
+
+  it('changes only the fallback tick of re-reviewed symbols', () => {
+    for (const [symbol, reviewed] of Object.entries(REVIEWED_FALLBACK_TICKS)) {
+      const researched = selection.selected.find(
+        (entry) => entry.symbol === symbol,
+      );
+      const current = BINANCE_FIXED_ASSET_UNIVERSE.find(
+        (entry) => entry.symbol === symbol,
+      );
+      expect(researched === undefined).toBe(false);
+      expect(current === undefined).toBe(false);
+      expect(researched?.tickSize === reviewed.priceTickSize).toBe(false);
+      expect(current?.priceTickSize).toBe(reviewed.priceTickSize);
+      expect(current?.displayPriceDecimals).toBe(reviewed.displayPriceDecimals);
+    }
   });
 
   it('keeps those 25 unchanged and appends exactly the 75 selected by the 2026-10-16 YTD research', () => {

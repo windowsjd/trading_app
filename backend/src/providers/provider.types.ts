@@ -29,6 +29,8 @@ export class ProviderHttpError extends Error {
       retryAfterMs: number;
       usedWeight1m?: number;
     },
+    /** HTTP status of a non-2xx provider response (no body is kept). */
+    readonly httpStatus?: number,
   ) {
     super(message);
   }

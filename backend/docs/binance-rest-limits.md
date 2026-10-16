@@ -97,6 +97,17 @@ existing sync runs defer it, without retries or extra concurrency.
 - Cold 5m/1d/1w seeding of 100 new Spot assets is ≈ 2,600 weight; it is paced
   by the existing two-asset fan-out and defers when the minute is exhausted.
   Run it outside busy periods; do not raise concurrency for it.
+- Operator backfills share the server's minute counter but admit against their
+  own budget: a process takes a request only while the shared weight plus that
+  request stays within its own `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE`. Run
+  backfill scripts with a smaller budget than the server and one asset at a
+  time, e.g. `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE=480
+  MARKET_CANDLE_SYNC_ASSET_CONCURRENCY=1` against a server at 1200: the
+  backfill stops at 480 a minute and the server keeps at least 720 and one of
+  the two slots for Futures Last re-confirmation and Mark recovery (checked
+  2026-10-16 with two coordinators on one Redis: 480 then 720 admitted). With
+  equal budgets (both 600) a backfill starved Last re-confirmation for up to
+  90 s.
 - More instances: Mark, Last and Futures exchangeInfo run per process (≈ +40/min
   each, + up to 200 when Mark degrades); scheduled Ops jobs run once.
 

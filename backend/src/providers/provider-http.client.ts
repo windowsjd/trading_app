@@ -111,6 +111,7 @@ export class ProviderHttpClient implements OnModuleDestroy {
           outcome === 'limited'
             ? { status, retryAfterMs, usedWeight1m }
             : undefined,
+          response.status,
         );
       }
 

@@ -71,9 +71,11 @@ Futures-only underlyings (`BINANCE_FUTURES_ONLY_ASSETS`, never Spot): HYPE
 ENJ, KAITO, ESP, EDEN, NIL, PIXEL, ONG, 0G, ZBT, ONT. Display decimals come from
 the FAPI `PRICE_FILTER` in `FUTURES_DISPLAY_DECIMALS` (fresh exchangeInfo stays
 preferred). All 25 + 25 existing entries are still TRADING and policy-eligible;
-none was removed or edited. Observation, not changed: the ASTERUSDT Spot
-fallback tick is `0.001` while Binance now lists `0.0001` (live metadata wins
-at runtime; only a metadata outage shows 3 decimals).
+none was removed or replaced. The only later edit is a fallback precision: the
+ASTERUSDT Spot fallback tick moved from `0.001` (2026-09 research) to the
+`0.0001` Binance lists since then (re-checked 2026-10-16; the other 99 Spot
+fallbacks match `exchangeInfo`). The fallback is display-only and used only
+while live metadata is unavailable; order and fill arithmetic never read it.
 
 ## Registration and activation (production — not performed)
 
@@ -98,10 +100,12 @@ Deploying the code alone adds no product rows. Order:
    initial mode re-fetches feeds that are already complete, so one invocation
    with all 75 IDs spends every minute's budget on the same leading assets
    (verified locally at 600/min: no progress after 8 runs). Pass only the
-   assets without complete 5m coverage, and keep each minute's backfill to at
-   most half of the budget so Futures Last/Mark REST recovery keeps working
-   (at 1200: about 25 assets a minute; at 600 the local run starved Last
-   re-confirmation, gaps up to 90 s). 1d/1w for all 75 fits one run. A checkpoint left `running`
+   assets without complete 5m coverage, and run the script with
+   `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE=480 MARKET_CANDLE_SYNC_ASSET_CONCURRENCY=1`
+   while the server runs at 1200, so Futures Last/Mark REST recovery keeps at
+   least 720 weight and one slot every minute
+   ([binance-rest-limits.md](binance-rest-limits.md); at 600 for both the local
+   run starved Last re-confirmation, gaps up to 90 s). 1d/1w for all 75 fits one run. A checkpoint left `running`
    by an interrupted run fails later runs with `ACTIVE_SYNC_EXISTS`; re-run
    those asset IDs with `--no-resume`.
 4. Futures: `FUTURES_PROVISION_DRY_RUN_REDIS_URL=<loopback> pnpm
@@ -119,3 +123,58 @@ their Last/Mark) and deactivate the new Spot assets. After trades exist, Spot
 deactivation blocks the holders' sells (no Spot sell-only mode) — a product
 decision. The existing 25 + 25 rows, IDs, evidence and positions are never
 touched by any of these steps.
+
+## Operator check: Spot price freshness
+
+Policy (unchanged): a Spot market order needs a provider price received at most
+10 s earlier (whole seconds, so it is refused from 11 s); quotes need 60 s
+(refused from 61 s). Thin pairs get no `@ticker` frame while nobody trades, so
+their orders are refused (503 `PRICE_STALE`, shown as "최신 가격을 확인할 수
+없어 주문할 수 없습니다.") until the next trade. No REST refresh marks an old
+trade as new: REST ingestion is off while the Spot WebSocket is on.
+
+To measure how often each symbol is refused, run this read-only query
+(`BEGIN READ ONLY`, a `statement_timeout`; it reads index ranges of
+`asset_price_snapshots (asset_id, captured_at)` only). Change `60` to the
+window in minutes. `execute_refused_pct` is the share of the window in which a
+market order would have been refused.
+
+```sql
+WITH p AS (
+  SELECT (now() AT TIME ZONE 'UTC') - make_interval(mins => 60) AS t0,
+         (now() AT TIME ZONE 'UTC') AS t1
+), a AS (
+  SELECT id, symbol FROM assets
+  WHERE market = 'BINANCE' AND asset_type = 'crypto' AND is_active
+), r AS (
+  SELECT a.symbol, s.captured_at,
+         lead(s.captured_at) OVER (PARTITION BY a.id ORDER BY s.captured_at) AS next_at
+  FROM a CROSS JOIN p
+  JOIN LATERAL (
+    (SELECT captured_at FROM asset_price_snapshots
+      WHERE asset_id = a.id AND captured_at < p.t0 AND source_type = 'provider_api'
+        AND source_name IN ('binance_spot_ws_ticker', 'binance_public_rest_24hr_ticker')
+      ORDER BY captured_at DESC LIMIT 1)
+    UNION ALL
+    (SELECT captured_at FROM asset_price_snapshots
+      WHERE asset_id = a.id AND captured_at >= p.t0 AND captured_at < p.t1 AND source_type = 'provider_api'
+        AND source_name IN ('binance_spot_ws_ticker', 'binance_public_rest_24hr_ticker'))
+  ) s ON true
+)
+SELECT symbol,
+  count(*) FILTER (WHERE captured_at >= p.t0) AS rows_in_window,
+  round(100 * sum(greatest(0, extract(epoch FROM least(coalesce(next_at, p.t1), p.t1)
+    - greatest(captured_at + interval '11 seconds', p.t0)))) / extract(epoch FROM p.t1 - p.t0), 2) AS execute_refused_pct,
+  round(100 * sum(greatest(0, extract(epoch FROM least(coalesce(next_at, p.t1), p.t1)
+    - greatest(captured_at + interval '61 seconds', p.t0)))) / extract(epoch FROM p.t1 - p.t0), 2) AS quote_refused_pct,
+  round(extract(epoch FROM max(least(coalesce(next_at, p.t1), p.t1) - greatest(captured_at, p.t0)))::numeric, 1) AS longest_gap_s
+FROM r CROSS JOIN p
+GROUP BY symbol, p.t0, p.t1
+ORDER BY execute_refused_pct DESC, symbol;
+```
+
+2026-10-16 11:00 UTC, last 60 minutes, before the 75 additions: 币安人生USDT
+21.88 %, ASTERUSDT 6.58 %, NIGHTUSDT 2.64 %, AAVEUSDT 2.33 %, CHIPUSDT 1.75 %,
+seven more under 0.3 %, the other 17 symbols 0 %; no symbol reached the quote
+limit. The 2026-10-16 local 33-minute measurement of all 100 (49 above 1 %,
+BANKUSDT 59 %) is in the investigation report §16-2.
