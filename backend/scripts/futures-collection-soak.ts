@@ -71,6 +71,8 @@ Object.assign(process.env, {
   FUTURES_LAST_PRICE_RETENTION_ENABLED: 'true',
   FUTURES_MARK_RETENTION_ENABLED: 'true',
   CONDITIONAL_ORDERS_ENABLED: 'true',
+  // The soak registers legacy OCO groups (retired by default 2026-10-16).
+  LEGACY_OCO_REGISTRATION_ENABLED: 'true',
   PROVIDER_INGESTION_ENABLED: 'true',
   BINANCE_PUBLIC_MARKET_DATA_ENABLED: 'true',
   BINANCE_WEBSOCKET_STREAMING_ENABLED: 'true',

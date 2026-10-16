@@ -50,12 +50,13 @@ describe('Conditional BUY', () => {
       await h.mount(); t.after(h.close);
       assert.equal(h.node(submit) === undefined, true, 'the ordinary submit is replaced');
       assert.equal(h.node('conditional-submit').props.state, 'disabled');
-      await h.press('conditional-trigger-at_or_below');
       await h.input('conditional-trigger-price', '69000');
+      // 70,000 KRW now: a lower watch price waits for a fall.
+      assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 69000 KRW 이하 도달 시');
       await h.press('conditional-execution-limit');
       await h.input('conditional-limit-price', '68500');
       await h.input('conditional-size', '2');
-      assert.match(text(h), /감시 중에는 현금을 예약하지 않아요/);
+      assert.match(text(h), /감시 중에는 금액을 예약하지 않아요/);
       await h.press('conditional-submit'); await h.flush();
       assert.equal(h.requests.length, 1);
       assert.equal(h.requests[0].url, `/trading-accounts/${accountId}/conditional-buy-orders`);
@@ -79,9 +80,8 @@ describe('Conditional BUY', () => {
     h.conditionalList = capabilities()('general');
     h.method = 'conditional';
     await h.mount(); t.after(h.close);
-    assert.match(text(h), /Binance 현물 가격으로만 감시/);
-    await h.press('conditional-trigger-at_or_above');
     await h.input('conditional-trigger-price', '800.5');
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 800.5 USD 이상 도달 시', 'above 763.79');
     await h.input('conditional-size', '25');
     await h.press('conditional-submit'); await h.flush();
     const body = h.requests[0].body;
@@ -97,7 +97,6 @@ describe('Conditional BUY', () => {
     h.conditionalList = capabilities()('general');
     h.method = 'conditional';
     await h.mount(); t.after(h.close);
-    await h.press('conditional-trigger-at_or_below');
     await h.input('conditional-trigger-price', '700');
     await h.input('conditional-size', '10');
     h.conditionalFailure = new Error('socket hang up');
@@ -135,7 +134,6 @@ describe('Conditional BUY', () => {
       h.method = 'conditional';
       await h.mount();
       try {
-        await h.press('conditional-trigger-at_or_below');
         await h.input('conditional-trigger-price', '700');
         await h.input('conditional-size', '10');
         h.conditionalFailure = new Error('socket hang up');
@@ -161,7 +159,6 @@ describe('Conditional BUY', () => {
     h.conditionalList = capabilities()('general');
     h.method = 'conditional';
     await h.mount(); t.after(h.close);
-    await h.press('conditional-trigger-at_or_below');
     await h.input('conditional-trigger-price', '700');
     await h.input('conditional-size', '10');
     h.conditionalGate = deferred();
@@ -183,15 +180,72 @@ describe('Conditional BUY', () => {
     h.conditionalList = capabilities()('general');
     h.method = 'conditional';
     await h.mount(); t.after(h.close);
-    await h.press('conditional-trigger-at_or_below');
     await h.input('conditional-trigger-price', '700');
     await h.input('conditional-size', '10');
     h.conditionalFailure = { response: { status: 409, data: { error: { code: 'CONDITIONAL_BUY_ALREADY_MET' } } } };
     await h.press('conditional-submit'); await h.flush();
-    assert.match(text(h), /이미 감시 조건을 충족해 등록할 수 없습니다/);
+    assert.match(text(h), /이미 감시가격에 도달해 등록하지 않았습니다/);
     h.conditionalFailure = null;
     await h.press('conditional-submit'); await h.flush();
     assert.notEqual(h.requests[1].body.idempotencyKey, h.requests[0].body.idempotencyKey);
+    assert.equal(h.requests[1].body.triggerCondition, 'at_or_below', 'decided again from the current price');
+  });
+
+  it('이상/이하 is never chosen by hand: it follows the watch price; equal or no fresh price cannot register', async (t) => {
+    const h = inlineTradingHarness();
+    h.conditionalList = capabilities()('general');
+    h.method = 'conditional';
+    await h.mount(); t.after(h.close);
+    assert.equal(h.renderer.root.findAll((n: any) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('conditional-trigger-at_or')).length, 0);
+    await h.input('conditional-size', '10');
+    await h.input('conditional-trigger-price', '763.79');
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '현재가와 같은 가격은 감시가격으로 쓸 수 없어요.');
+    assert.equal(h.node('conditional-submit').props.state, 'disabled');
+    await h.input('conditional-trigger-price', '800');
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 800 USD 이상 도달 시');
+    await h.input('conditional-trigger-price', '700');
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 700 USD 이하 도달 시');
+    assert.equal(h.node('conditional-submit').props.state, 'enabled');
+    assert.equal(h.requests.length, 0);
+  });
+
+  it('without a fresh current price no direction is decided and nothing registers', async (t) => {
+    const h = inlineTradingHarness();
+    h.conditionalList = capabilities()('general');
+    h.method = 'conditional';
+    h.assets.bnb.price.priceCapturedAt = new Date(Date.now() - 3_600_000).toISOString();
+    await h.mount(); t.after(h.close);
+    await h.input('conditional-size', '10');
+    await h.input('conditional-trigger-price', '700');
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '현재가를 확인할 수 없어 감시 방향을 정할 수 없어요.');
+    assert.equal(h.node('conditional-submit').props.state, 'disabled');
+    await h.press('conditional-submit'); await h.flush();
+    assert.equal(h.requests.length, 0);
+  });
+
+  it('a price move never flips the decided direction silently; sending re-decides and asks again', async (t) => {
+    const h = inlineTradingHarness();
+    h.conditionalList = capabilities()('general');
+    h.method = 'conditional';
+    await h.mount(); t.after(h.close);
+    await h.input('conditional-size', '10');
+    await h.input('conditional-trigger-price', '780');
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 780 USD 이상 도달 시');
+    // The price rises past the watch price after the direction was decided.
+    const now = new Date().toISOString();
+    h.ticker = { type: 'asset_ticker', assetId: 'bnb', priceLocal: '790', priceCurrency: 'USD', priceKrw: null,
+      priceKrwState: 'unavailable', changeRate: '0.5', priceCapturedAt: now, priceEffectiveAt: now };
+    await h.update(); await h.flush();
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 780 USD 이상 도달 시', 'kept, not flipped');
+    assert.equal(h.node('conditional-already-met') !== undefined, true, 'the crossing is shown');
+    await h.press('conditional-submit'); await h.flush();
+    assert.equal(h.requests.length, 0, 'the stale direction is never sent');
+    assert.match(panelText(h.node('conditional-direction-changed')), /현재가가 바뀌어 감시 방향이 달라졌어요/);
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '감시 조건 · 780 USD 이하 도달 시', 're-decided from the latest price');
+    await h.press('conditional-submit'); await h.flush();
+    assert.equal(h.requests.length, 1);
+    assert.equal(h.requests[0].body.triggerCondition, 'at_or_below');
+    assert.equal(h.requests[0].body.triggerPrice, '780');
   });
 
   it('limit execution follows the server: unavailable means the choice is disabled', async (t) => {
@@ -233,14 +287,16 @@ describe('KRX LOC BUY', () => {
     return h;
   };
 
-  it('quote and create both carry limitOnClose; no attached TP/SL; acceptance is not a fill', async (t) => {
+  it('quote and create both carry limitOnClose; no 손절가/익절가; acceptance is not a fill', async (t) => {
     const h = locHarness(t);
     h.method = 'loc';
+    h.entryTpSlList = { tradingAccountId: 'general', capabilities: { spot: { enabled: true, canCreate: true }, futures: { enabled: false, canCreate: false },
+      canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 }, entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } };
     const events = recordEvents(t);
     await h.mount();
     assert.equal(h.orderType(), 'LOC 주문');
-    assert.equal(h.node('attached-entry-editor') === undefined, true);
-    assert.match(text(h), /접수는 체결이 아니에요/);
+    assert.equal(h.node('order-tp-sl-button') === undefined, true, 'LOC takes no 손절가/익절가');
+    assert.equal(panelText(h.node('loc-reservation')), '접수할 때 지정가 × 수량 + 수수료를 예약해요. 기한까지 체결되지 않으면 예약금이 해제돼요.');
     await h.input(limitPrice, '70000');
     await h.input(qty, '0.5');
     assert.equal(h.node(submit).props.state, 'disabled');
@@ -253,6 +309,7 @@ describe('KRX LOC BUY', () => {
       assert.equal(request.body.orderType, 'limit');
       assert.equal(request.body.side, 'buy');
       assert.equal('attachedProtection' in request.body, false);
+      assert.equal('entryTpSl' in request.body, false);
     }
     assert.equal(h.success().visible, true);
     assert.equal(h.success().payload.order.limitOnClose.status, 'pending');
@@ -265,8 +322,10 @@ describe('KRX LOC BUY', () => {
     h.quoteOverride = undefined;
     h.createOverride = undefined;
     h.method = 'limit';
+    h.entryTpSlList = { tradingAccountId: 'general', capabilities: { spot: { enabled: true, canCreate: true }, futures: { enabled: false, canCreate: false },
+      canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 }, entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } };
     await h.mount();
-    assert.equal(h.node('attached-entry-editor') !== undefined, true, 'ordinary limit keeps attached TP/SL');
+    assert.equal(h.node('order-tp-sl-button') !== undefined, true, 'an ordinary limit BUY offers 손절가/익절가');
     await h.input(limitPrice, '70000');
     await h.input(qty, '2');
     await h.press(submit); await h.flush();

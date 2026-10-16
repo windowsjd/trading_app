@@ -32,11 +32,12 @@ const holding = (
   realizedPnlKrw: '0',
   valuation,
 });
+/** Holding rows (not the 손절가/익절가 button or count inside a row). */
 const ids = (h: any) =>
   h.renderer.root
     .findAll(
       (n: any) =>
-        typeof n.type === 'string' && n.props.testID?.startsWith('holding-'),
+        typeof n.type === 'string' && n.props.testID?.startsWith('holding-') && !/-tp-sl(-summary)?$/.test(n.props.testID),
     )
     .map((n: any) => n.props.testID);
 const empty = (h: any) =>
@@ -45,13 +46,14 @@ const empty = (h: any) =>
     .map((n: any) => n.props.title)
     .join(' ');
 
-it('holding cards have no TP/SL control; an existing spot OCO protection stays listed, cancelable and in history under 대기 목록 › TP/SL', async t => {
+it('a holding card opens its 손절가/익절가 sheet (no inline editor); an existing spot OCO protection stays listed, cancelable and in history under 대기 목록 › TP/SL', async t => {
   const h=inlineTradingHarness(); h.holdings={general:[holding('bnb')]};
   const {conditionalFixture}=require('../../../test/conditionalFixtures.cjs');
   h.protections=conditionalFixture('general',{domain:'spot',active:true});
   await h.mount(); t.after(h.close); await h.flush();
   assert.equal(h.node('holding-bnb') !== undefined,true);
-  assert.equal(h.node('holding-protection-bnb') === undefined,true,'no TP/SL button on the card');
+  assert.equal(h.node('holding-bnb-tp-sl').props.label,'손절가/익절가 설정','one button on the card');
+  assert.equal(h.node('holding-protection-bnb') === undefined,true,'no old OCO button');
   assert.equal(h.node('protection-panel') === undefined,true,'no inline TP/SL editor');
   assert.doesNotMatch(text(h.node('account-holdings')),/TP\/SL 설정·관리|남은 보유 수량 전체를 보호/);
   await h.press('holdings-filter-pending');await h.flush();
@@ -400,6 +402,44 @@ const pendingIds = (h: any) => h.renderer.root.findAll((node: any) =>
 ).map((node: any) => node.props.testID);
 
 describe('pending limit orders in the real trading screen', () => {
+  it('a pending Spot BUY limit offers 손절가/익절가 by share of its fill; LOC and SELL rows do not', async t => {
+    const h = inlineTradingHarness();
+    h.orders = { general: [
+      pendingOrder('buy-1', 'buy', { quantity: '100', limitPrice: '700', asset: { id: 'bnb', symbol: 'BNBUSDT', name: 'BNB', market: 'BINANCE' } }),
+      pendingOrder('loc-1', 'buy', { currencyCode: 'KRW', limitOnClose: { status: 'pending' }, asset: { id: 'samsung', symbol: '005930', name: '삼성전자', market: 'KRX' } }),
+      pendingOrder('sell-1', 'sell', { asset: { id: 'eth', symbol: 'ETHUSDT', name: 'ETH', market: 'BINANCE' } }),
+    ] };
+    h.entryTpSlList = { tradingAccountId: 'general', capabilities: { spot: { enabled: true, canCreate: true }, futures: { enabled: false, canCreate: false },
+      canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 }, entry: null,
+      plans: [{ id: 'plan-1', entryType: 'spot_limit_order', entryId: 'buy-1', childOrderId: null, kind: 'stop_loss', triggerPrice: '600', ratioPercent: 100,
+        triggerCondition: 'at_or_below', status: 'pending', activatedQuantity: null, failureCode: null, terminalReason: null }],
+      pagination: { limit: 100, offset: 0, total: 1, returned: 1, nextOffset: null } };
+    h.entryTpSlEntry = (entryType: string, entryId: string) => ({ entryType, entryId, domain: 'spot', state: 'open', supported: true, assetId: 'bnb',
+      asset: { id: 'bnb', symbol: 'BNBUSDT', name: 'BNB', market: 'BINANCE', assetType: 'crypto' }, instrumentId: null, direction: 'long',
+      executionType: 'limit', entryPrice: '700', triggerPrice: null, limitPrice: '700', expectedQuantity: '100', amount: null, currencyCode: 'USD',
+      leverage: null, legacyProtection: false, childOrderId: null });
+    await h.mount(); t.after(h.close); await h.press('holdings-filter-pending');
+    for (let i = 0; i < 20 && pendingIds(h).length === 0; i += 1) await h.flush();
+    const button = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^pending-order-.*-tp-sl$/.test(n.props.testID ?? ''));
+    assert.equal(button.length, 1, 'only the ordinary BUY limit');
+    assert.equal(button[0].props.label, '손절가/익절가 설정');
+    const summary = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^pending-order-.*-tp-sl-summary$/.test(n.props.testID ?? ''));
+    assert.equal([summary[0]?.props.children].flat().join(''), '손절 1건');
+    await act(async () => button[0].props.onPress()); await h.flush();
+    assert.equal([h.node('tp-sl-entry-summary')?.props.children].flat().join(''), '지정가 매수 · 700 USD');
+    assert.equal([h.node('tp-sl-entry-quantity')?.props.children].flat().join(''), '체결 예정 수량 100 BNB');
+    assert.equal(h.node('tp-sl-plan-plan-1') !== undefined, true);
+    await h.press('tp-sl-take-profit-toggle');
+    await h.input('tp-sl-take-profit-trigger-price', '800');
+    await h.press('tp-sl-take-profit-ratio-50');
+    assert.equal([h.node('tp-sl-take-profit-quantity')?.props.children].flat().join(''), '체결 수량의 50% · 전량 체결 시 50 BNB');
+    await h.press('tp-sl-submit'); await h.flush();
+    const created = h.requests.filter((r: any) => r.url === '/trading-accounts/general/entry-tp-sl-plans');
+    assert.equal(created.length, 1);
+    assert.deepEqual({ ...created[0].body, idempotencyKey: undefined },
+      { entryType: 'spot_limit_order', entryId: 'buy-1', takeProfit: { triggerPrice: '800', ratio: 50 }, idempotencyKey: undefined });
+  });
+
   for (const [spot, futures] of [[0, 1], [1, 0], [0, 0]])
     it(`aggregates pending emptiness for Spot ${spot}/Futures ${futures} and keeps TP/SL independent`, async t => {
       const h = inlineTradingHarness();

@@ -3,13 +3,16 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const { futuresHarness } = createRequire(import.meta.url)('../../../test/futuresHarness.cjs');
 
-// Fixture: contract btc, Futures Last 102, flat unless `position`.
+const { act } = createRequire(import.meta.url)('react-test-renderer');
+const children = (node: any) => [node?.props.children].flat(Infinity).join('');
+
+// Fixture: contract btc, Futures Last 102, flat unless `position`. 이상/이하 is
+// never chosen: a watch price above Last waits for a rise, below for a fall.
 async function conditional(h: any, direction: 'long' | 'short', marginMode: 'cross' | 'isolated', execution: 'market' | 'limit') {
   await h.selectMethod('conditional');
   await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
   await h.choose(marginMode === 'cross' ? '교차(Cross)' : '격리(Isolated)');
   await h.setLeverage(20);
-  await h.choose(direction === 'long' ? '선물 Last가 감시가격 이상' : '선물 Last가 감시가격 이하');
   await h.change('futures-conditional-trigger-price', direction === 'long' ? '110' : '90');
   if (execution === 'limit') {
     await h.choose('발동 후 지정가 진입');
@@ -26,6 +29,8 @@ for (const accountId of ['A', 'B'])
         test(`조건주문 ${accountId}/${direction}/${marginMode}/${execution} registers the watch with the trade card's terms`, async t => {
           const h = futuresHarness({ accountId }); await h.start(); t.after(h.close);
           await conditional(h, direction, marginMode, execution);
+          assert.equal(children(h.node('futures-conditional-trigger-direction')),
+            direction === 'long' ? '감시 조건 · 선물 Last 110 USD 이상 도달 시' : '감시 조건 · 선물 Last 90 USD 이하 도달 시');
           assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
           assert.match(h.node('futures-conditional-summary').props.children, direction === 'long' ? /\$110 이상가 되면 롱\(Long\)/ : /\$90 이하가 되면 숏\(Short\)/);
           await h.press('futures-conditional-submit');
@@ -46,28 +51,66 @@ for (const accountId of ['A', 'B'])
           assert.equal(h.requests.some((r: { path: string }) => r.path.endsWith('/execute') || r.path.includes('limit-orders')), false);
         });
 
-test('a condition the current Last already meets is shown and cannot be registered', async t => {
+test('이상/이하 follows the watch price against Futures Last; no manual choice, equal or unknown Last cannot register', async t => {
   const h = futuresHarness(); await h.start(); t.after(h.close);
   await h.selectMethod('conditional');
+  assert.equal(h.renderer.root.findAll((n: any) => n.props?.testID === 'futures-conditional-trigger').length === 0, true, 'no 이상/이하 selector');
   await h.amount('100');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled', 'a trigger price is required');
   assert.match(h.text(), /감시가격을 입력하면 계약 수량을 계산합니다/);
-  await h.change('futures-conditional-trigger-price', '100');
-  assert.equal(h.node('futures-conditional-already-met') !== undefined, true, 'Last 102 ≥ 100');
-  assert.equal(h.node('futures-conditional-submit').props.state, 'disabled');
-  await h.choose('선물 Last가 감시가격 이하');
-  assert.equal(h.node('futures-conditional-already-met') === undefined, true, 'Last 102 > 100');
-  assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
   await h.change('futures-conditional-trigger-price', '102');
-  assert.equal(h.node('futures-conditional-already-met') !== undefined, true, 'equality meets the condition');
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '선물 Last와 같은 가격은 감시가격으로 쓸 수 없어요.', 'equal to Last 102');
+  assert.equal(h.node('futures-conditional-submit').props.state, 'disabled');
+  await h.change('futures-conditional-trigger-price', '100');
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '감시 조건 · 선물 Last 100 USD 이하 도달 시', 'below Last 102');
+  assert.match(children(h.node('futures-conditional-summary')), /\$100 이하가 되면 롱\(Long\)/);
+  assert.equal(h.node('futures-conditional-already-met') === undefined, true);
+  assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
+  await h.change('futures-conditional-trigger-price', '102.5');
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '감시 조건 · 선물 Last 102.5 USD 이상 도달 시', 'above Last 102');
   await h.change('futures-conditional-trigger-price', '1.123456789');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled', 'more than 8 decimals');
+  assert.equal(h.node('futures-conditional-trigger-direction') === undefined, true);
   await h.change('futures-conditional-trigger-price', '95');
   await h.choose('발동 후 지정가 진입');
   assert.equal(h.node('futures-conditional-submit').props.state, 'disabled', 'limit execution needs its price');
   await h.change('futures-conditional-limit-price', '94');
   assert.equal(h.node('futures-conditional-submit').props.state, 'enabled');
   assert.equal(h.requests.length, 0);
+});
+
+test('without a fresh Futures Last no direction is decided and nothing registers', async t => {
+  const h = futuresHarness({ missingReference: true }); await h.start(); t.after(h.close);
+  await h.selectMethod('conditional');
+  await h.amount('100');
+  await h.change('futures-conditional-trigger-price', '110');
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '선물 Last를 확인할 수 없어 감시 방향을 정할 수 없어요.');
+  assert.equal(h.node('futures-conditional-submit').props.state, 'disabled');
+  await h.press('futures-conditional-submit');
+  assert.equal(h.requests.length, 0);
+});
+
+test('a Last move never flips the decided direction silently; sending re-decides and asks again', async t => {
+  const h = futuresHarness(); await h.start(); t.after(h.close);
+  await h.selectMethod('conditional');
+  await h.amount('100');
+  await h.change('futures-conditional-trigger-price', '105');
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '감시 조건 · 선물 Last 105 USD 이상 도달 시');
+  // Futures Last rises past the watch price after the direction was decided.
+  h.options.referencePrice = '107';
+  await act(async () => { await h.client.refetchQueries(); });
+  await h.flush();
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '감시 조건 · 선물 Last 105 USD 이상 도달 시', 'kept, not flipped');
+  assert.equal(h.node('futures-conditional-already-met') !== undefined, true, 'the crossing is shown');
+  await h.press('futures-conditional-submit');
+  assert.equal(h.requests.length, 0, 'the stale direction is never sent');
+  assert.match(children(h.node('futures-conditional-direction-changed')), /선물 Last가 바뀌어 감시 방향이 달라졌어요/);
+  assert.equal(children(h.node('futures-conditional-trigger-direction')), '감시 조건 · 선물 Last 105 USD 이하 도달 시', 're-decided from the latest Last');
+  await h.press('futures-conditional-submit');
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].body.triggerCondition, 'at_or_below');
+  assert.equal(h.requests[0].body.triggerPrice, '105');
+  assert.equal(h.node('futures-conditional-direction-changed') === undefined, true);
 });
 
 test('the server capability gates a new 조건주문; existing rows stay readable', async t => {
@@ -86,7 +129,8 @@ test('server refusals map to their reasons; a lost response replays the same key
   await conditional(h, 'long', 'isolated', 'market');
   h.failure = { response: { status: 409, data: { success: false, error: { code: 'FUTURES_CONDITIONAL_ENTRY_ALREADY_MET', message: 'met' } } } };
   await h.press('futures-conditional-submit');
-  assert.match(h.text(), /이미 조건을 충족해 접수하지 않았습니다/);
+  assert.match(h.text(), /이미 감시가격을 지나 접수하지 않았습니다/);
+  assert.equal(h.requests[0].body.triggerCondition, 'at_or_above');
   h.failure = new Error('network');
   await h.press('futures-conditional-submit');
   assert.equal(h.node('futures-conditional-submit').props.label, '동일 조건주문 요청 확인');

@@ -3,16 +3,18 @@ import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts'
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import QuestTarget from '../../features/quest/QuestTarget';
 import { semantic } from '../../theme/tokens';
-import { getProtections } from '../../features/conditional/api';
-import { ProtectionEditor, draftLegs, emptyProtection, protectionInputError } from '../../features/conditional/ProtectionEditor';
 import Decimal from 'decimal.js';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import OrderSideSegment, { type OrderSide } from './OrderSideSegment';
 import OrderTypeSelect from './OrderTypeSelect';
 import ConditionalBuyForm from './ConditionalBuyForm';
 import SellIntentForm from './SellIntentForm';
-import SellProtectionForm from './SellProtectionForm';
 import OrderNumberInput from './OrderNumberInput';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import { TpSlDraftSheet } from '../../features/conditional/tpsl/TpSlSheet';
+import { getDraftTpSlError } from '../../features/conditional/tpsl/DraftTpSl';
+import { getAccountEntryTpSlPlans, type EntryTpSlDraftDto } from '../../features/conditional/entryTpSlApi';
+import { tpSlCountSummary } from '../../features/conditional/tpSlModel';
 import {
   DEFAULT_ORDER_METHOD,
   getConditionalBuyGate,
@@ -311,8 +313,16 @@ export function OrderForm({
   const orderType = getOrderTypeForMethod(orderMethod) ?? 'market';
   const limitOnClose = orderMethod === 'loc';
   const [limitPrice, setLimitPrice] = useState('');
-  const [protectionDraft, setProtectionDraft] = useState(emptyProtection);
-  const protectionQuery = useQuery({ queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'spot', assetId), queryFn: ({ signal }) => getProtections(accountId, 'spot', assetId, false, signal), enabled: accountKnown && side === 'buy' && orderMethod === 'limit', retry: false });
+  // 손절가/익절가 plans sent with a new BUY Limit (they activate on its fill).
+  const [tpSlDrafts, setTpSlDrafts] = useState<EntryTpSlDraftDto[]>([]);
+  const [tpSlSheetOpen, setTpSlSheetOpen] = useState(false);
+  const tpSlCapabilityQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.entryTpSl.list(accountId, 'open'),
+    queryFn: ({ signal }) => getAccountEntryTpSlPlans(accountId, 'open', signal),
+    enabled: accountKnown && side === 'buy' && orderMethod === 'limit',
+    staleTime: 30_000,
+    retry: false,
+  });
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
   const [diagnosticRuntime, setDiagnosticRuntime] = useState<RuntimeFacts | null>(null);
@@ -330,14 +340,14 @@ export function OrderForm({
     revision: number;
     seasonUi: boolean;
     payload: Parameters<typeof quoteTradingAccountOrder>[1];
-    attachedProtection?: import('../../features/conditional/api').ProtectionLeg[];
+    entryTpSl?: EntryTpSlDraftDto[];
   };
   const orderActionRef = useRef<QuotedAction<
     OrderRequest,
     OrderQuoteDto
   > | null>(null);
   const submitLockRef = useRef(false);
-  const attachedPermission = useRef(false);
+  const tpSlPermission = useRef(false);
   const quoteRevisionRef = useRef(0);
   const scopeRef = useRef({ key: '', epoch: 0, mounted: true });
   const scopeKey = `${accountId}:${selectedAccountId ?? ''}:${accountKnown}:${assetId}:${side}`;
@@ -397,7 +407,7 @@ export function OrderForm({
               : { quantity: quote.quantity }),
             quoteId: quote.quoteId,
             idempotencyKey: key,
-            ...(request.attachedProtection ? { attachedProtection: request.attachedProtection } : {}),
+            ...(request.entryTpSl ? { entryTpSl: request.entryTpSl } : {}),
             ...(request.payload.orderType === 'limit'
               ? { orderType: 'limit' as const, limitPrice: quote.limitPrice }
               : {}),
@@ -408,7 +418,7 @@ export function OrderForm({
               ? { requestedQuantity: quote.quantityAdjustment.requestedQuantity }
               : {}),
           }),
-        isCurrent: () => isActionCurrent(action.request) && (!action.request.attachedProtection?.length || attachedPermission.current),
+        isCurrent: () => isActionCurrent(action.request) && (!action.request.entryTpSl?.length || tpSlPermission.current),
       }),
     retry: false,
     onSettled: () => {
@@ -429,7 +439,7 @@ export function OrderForm({
             orderType: action.request.payload.limitOnClose ? 'loc' : action.request.payload.orderType ?? 'market', summary: '주문 결과가 서버에서 확인됐어요.' });
           if (!claimed) setSuccessState(captureOrderSuccess(data.result, data.quote));
           setOrderInput('');
-          setProtectionDraft(emptyProtection());
+          setTpSlDrafts([]);
           setQuotedPreview(null);
           setFieldError(null);
           setDomainError(null);
@@ -535,7 +545,8 @@ export function OrderForm({
     setLimitPrice('');
     setOrderMethod(DEFAULT_ORDER_METHOD);
     setMethodSheetOpen(false);
-    setProtectionDraft(emptyProtection());
+    setTpSlDrafts([]);
+    setTpSlSheetOpen(false);
     setFieldError(null);
     setDomainError(null);
     setDiagnosticError(null);
@@ -592,7 +603,6 @@ export function OrderForm({
     assetType: asset?.assetType,
     side,
     conditional: getConditionalSellGate({ ...sellIntentsQuery, data: sellIntentData }, asset?.assetType, 'condition'),
-    protection: getConditionalSellGate({ ...sellIntentsQuery, data: sellIntentData }, asset?.assetType, 'protection'),
     loc: getLimitOnCloseSellGate({ ...orderCapabilitiesQuery, data: capabilityData }, asset?.assetType),
   });
   const selectedMethodOption = methodOptions.find((option) => option.method === orderMethod) ?? null;
@@ -689,11 +699,14 @@ export function OrderForm({
   const positionAvailable = getAccountPositionAvailableQuantity(positionQuery.data, assetId);
   const positionReserved = findAccountPosition(positionQuery.data, assetId)?.reservedQuantity ?? null;
   const sellCapacity = positionAvailable ?? positionQuantity;
-  const automationForm = orderMethod === 'conditional' || orderMethod === 'protection';
-  // Attached TP/SL belongs to an ordinary limit BUY only; never to LOC.
-  const attachedEditorVisible = side === 'buy' && orderMethod === 'limit';
-  const attachedAvailable = !protectionQuery.isError && protectionQuery.data?.tradingAccountId === accountId && !!protectionQuery.data.capabilities.canCreateSpot && !!protectionQuery.data.capabilities.canUseSpotLimit;
-  attachedPermission.current = attachedAvailable;
+  const automationForm = orderMethod === 'conditional';
+  // 손절가/익절가 plans belong to an ordinary KRX/crypto limit BUY only; never to LOC.
+  const tpSlCapabilities = !tpSlCapabilityQuery.isError && tpSlCapabilityQuery.data?.tradingAccountId === accountId
+    ? tpSlCapabilityQuery.data.capabilities.spot : null;
+  const tpSlMarket = asset?.assetType === 'domestic_stock' || asset?.assetType === 'crypto';
+  const tpSlVisible = side === 'buy' && orderMethod === 'limit' && tpSlMarket && (!!tpSlCapabilities?.enabled || tpSlDrafts.length > 0);
+  const tpSlAvailable = !!tpSlCapabilities?.canCreate;
+  tpSlPermission.current = tpSlAvailable;
 
 
   /**
@@ -871,12 +884,13 @@ export function OrderForm({
   // A crypto stop-loss/take-profit is the TP/SL practice step (QUEST 04), so it
   // opens with that step, as on the server.
   const advancedGate = learning.gate('allTrading');
+  // A crypto 손절가/익절가 opens with the TP/SL practice step (QUEST 04).
   const protectionGate = learning.gate(asset?.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
   const tradeGate = automationForm || limitOnClose ? advancedGate
     : learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
   const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
   const methodGate = (method: OrderMethod) =>
-    method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : method === 'protection' ? protectionGate : advancedGate;
+    method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : advancedGate;
   // The ordinary submit serves market/limit/LOC.
   const canExecute =
     methodReady &&
@@ -969,9 +983,10 @@ export function OrderForm({
     setDiagnosticRuntime(null);
     // An uncertain create response retains this exact quote/key for a user
     // retry. It never silently obtains a second executable order.
-    const attached = attachedEditorVisible ? draftLegs(protectionDraft) : [];
-    if (attached.length && !attachedPermission.current) { setFieldError('현재 운영 상태에서는 익절·손절을 등록할 수 없습니다.'); return; }
-    if (!orderActionRef.current && attached.length && protectionInputError(protectionDraft)) { setFieldError(protectionInputError(protectionDraft)); return; }
+    const plans = side === 'buy' && orderMethod === 'limit' ? tpSlDrafts : [];
+    if (!orderActionRef.current && plans.length && !tpSlPermission.current) { setFieldError('현재 손절가/익절가를 함께 등록할 수 없어요. 설정을 지우고 주문해 주세요.'); return; }
+    const plansError = !orderActionRef.current && plans.length ? getDraftTpSlError(plans, 'long', limitPrice.trim()) : null;
+    if (plansError) { setFieldError(`손절가/익절가 설정을 확인해 주세요. ${plansError}`); return; }
     orderActionRef.current ??= {
       request: {
         accountId,
@@ -979,7 +994,7 @@ export function OrderForm({
         epoch: scopeRef.current.epoch,
         revision: quoteRevisionRef.current,
         seasonUi: capabilities?.isSeason ?? false,
-        ...(attached.length ? { attachedProtection: attached } : {}),
+        ...(plans.length ? { entryTpSl: plans } : {}),
         payload: {
           assetId,
           side,
@@ -1049,7 +1064,7 @@ export function OrderForm({
         setOrderMethod(next);
         setOrderInput('');
         setLimitPrice('');
-        setProtectionDraft(emptyProtection());
+        setTpSlDrafts([]);
       });
     });
   };
@@ -1076,7 +1091,6 @@ export function OrderForm({
           limit: limitGate.locked ? limitGate.message : null,
           conditional: advancedGate.locked ? advancedGate.message : null,
           loc: advancedGate.locked ? advancedGate.message : null,
-          protection: protectionGate.locked ? protectionGate.message : null,
         }}
       /></QuestTarget>
       {orderMethod === 'conditional' && side === 'buy' ? (
@@ -1102,24 +1116,8 @@ export function OrderForm({
           holding={positionQuery.isLoading || positionUnavailable ? null : positionQuantity}
           available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
           reserved={positionReserved}
-          currentPrice={displayPrice.priceLocal}
+          currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
           learning={advancedGate}
-          onInputFocus={onInputFocus}
-          onInputBlur={onInputBlur}
-        />
-      ) : null}
-      {orderMethod === 'protection' && side === 'sell' ? (
-        <SellProtectionForm
-          accountId={accountId}
-          asset={asset}
-          capabilities={sellIntentData?.capabilities ?? null}
-          blockedReason={sellSettingBlockedReason}
-          holding={positionQuery.isLoading || positionUnavailable ? null : positionQuantity}
-          available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
-          reserved={positionReserved}
-          liveRows={sellIntentData?.conditionalOrders ?? null}
-          currentPrice={displayPrice.priceLocal}
-          learning={protectionGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
         />
@@ -1168,22 +1166,11 @@ export function OrderForm({
       </View>
       {limitOnClose ? (
         <View style={styles.notice} testID="loc-order-notice">
-          {(side === 'buy' ? [
-            '이번 한국주식 정규장의 확정 종가가 지정가격 이하이면 그 종가로 매수해요. 지정가격보다 비싸게 사지 않아요.',
-            '정규장 중에만 등록할 수 있고, 이 세션 하루만 유효해요. 다음 거래일로 넘어가지 않아요.',
-            '접수할 때 지정가 주문과 같은 방식으로 필요한 금액(지정가 × 수량 + 수수료)을 예약해요.',
-            '접수는 체결이 아니에요. 종가를 확정해 확인한 뒤에만 체결되므로 마감 후 상당한 시간이 걸릴 수 있어요.',
-            '기한까지 체결되지 않으면 주문이 종료되고 예약금이 해제돼요. 익절·손절은 함께 설정할 수 없어요.',
-          ] : [
-            '이번 한국주식 정규장의 확정 종가가 지정가격 이상이면 그 종가로 매도해요. 지정가격보다 싸게 팔지 않아요.',
-            '정규장 중에만 등록할 수 있고, 이 세션 하루만 유효해요. 다음 거래일로 넘어가지 않아요.',
-            '접수할 때 매도 수량만큼 보유 수량을 예약해요. 다른 주문이 이미 예약한 수량은 다시 예약하지 않아요.',
-            '입력 수량이 매도 가능 수량보다 많으면 서버가 매도 가능 수량만 접수하고, 접수 결과에 요청·접수 수량을 함께 보여줘요.',
-            '접수는 체결이 아니에요. 종가를 확정해 확인한 뒤에만 체결되므로 마감 후 상당한 시간이 걸릴 수 있어요.',
-            '기한까지 체결되지 않으면 주문이 종료되고 예약 수량이 해제돼요.',
-          ]).map((line) => (
-            <Text key={line} style={styles.noticeLine}>· {line}</Text>
-          ))}
+          <Text testID="loc-reservation" style={styles.noticeLine}>
+            {side === 'buy'
+              ? '접수할 때 지정가 × 수량 + 수수료를 예약해요. 기한까지 체결되지 않으면 예약금이 해제돼요.'
+              : '접수할 때 매도 수량만큼 보유 수량을 예약해요. 기한까지 체결되지 않으면 예약 수량이 해제돼요.'}
+          </Text>
           {side === 'sell' && positionAvailable !== null && Number(orderInput) > Number(positionAvailable)
             && Number(orderInput) <= Number(positionQuantity) && Number(positionAvailable) >= 1 ? (
             <Text testID="loc-sell-adjust-notice" style={styles.warningText}>
@@ -1195,14 +1182,6 @@ export function OrderForm({
               대상 세션 {locPreview.sessionDate} · 정규장 마감 {formatKstDateTime(locPreview.sessionCloseAt)} · 판정 기한 {formatKstDateTime(locPreview.evidenceDeadlineAt)}
             </Text>
           ) : null}
-        </View>
-      ) : null}
-      {attachedEditorVisible ? (
-        <View style={styles.group} testID="attached-entry-editor">
-          <Text style={styles.label}>체결 후 익절/손절 (선택)</Text>
-          {!attachedAvailable ? <Text style={styles.helper}>현재 운영 상태에서는 새 보호 조건을 등록할 수 없습니다.</Text> : null}
-          <Text style={styles.helper}>새 보유 종목을 여는 진입 주문에 설정합니다. 진입 체결 전에는 조건을 감시하지 않습니다.</Text>
-          <ProtectionEditor value={protectionDraft} onChange={(draft) => resetInput(() => setProtectionDraft(draft))} disabled={pending || !attachedAvailable} canLimit={attachedAvailable} onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
         </View>
       ) : null}
       {isAmountBuy ? (
@@ -1278,6 +1257,29 @@ export function OrderForm({
               ? `보유 ${formatDisplayDecimal(positionQuantity)} · 매도 가능 ${formatDisplayDecimal(positionAvailable)} (다른 주문 예약 ${formatDisplayDecimal(positionReserved)})`
               : `보유 ${formatDisplayDecimal(positionQuantity)}`}
         </Text>
+      ) : null}
+      {/* After the amount controls: plans ride on the new limit BUY (activated by its fill). */}
+      {tpSlVisible ? (
+        <View style={styles.group} testID="order-tp-sl">
+          <TpSlButton testID="order-tp-sl-button" summary={tpSlCountSummary(tpSlDrafts)} disabled={pending}
+            learningHint={protectionGate.locked ? protectionGate.message : null}
+            onPress={() => protectionGate.guard(() => setTpSlSheetOpen(true))} />
+          {!tpSlAvailable ? <Text style={styles.helper}>현재 손절가/익절가를 새로 등록할 수 없어요.</Text> : null}
+          <TpSlDraftSheet
+            visible={tpSlSheetOpen && !pending && enabled}
+            onClose={() => setTpSlSheetOpen(false)}
+            scopeKey={`${accountId}:${assetId}`}
+            drafts={tpSlDrafts}
+            onChange={(drafts) => resetInput(() => setTpSlDrafts(drafts))}
+            direction="long"
+            entryPrice={limitPriceInvalidReason ? null : limitPrice.trim()}
+            expectedQuantity={isAmountBuy ? estimatedQuantity ?? null : inputInvalidReason ? null : orderInput.trim()}
+            scale={6}
+            unit={asset.assetType === 'crypto' ? (asset.symbol ?? '').replace(/USDT$/u, '') : '주'}
+            currency={asset.settlementCurrency ?? ''}
+            blockedReason={tpSlAvailable ? null : '현재 손절가/익절가를 새로 등록할 수 없어요.'}
+          />
+        </View>
       ) : null}
       {methodUnavailableReason && !automationForm ? (
         <Text testID="order-method-unavailable" style={styles.errorText}>{methodUnavailableReason}</Text>

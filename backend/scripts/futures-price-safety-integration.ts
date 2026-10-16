@@ -48,6 +48,9 @@ process.env.FUTURES_MARK_INGESTION_ENABLED = 'true';
 process.env.FUTURES_LAST_PRICE_INGESTION_ENABLED = 'true';
 process.env.FUTURES_LAST_PRICE_RETENTION_ENABLED = 'true';
 process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+// New OCO groups are retired by default (2026-10-16); this runner keeps
+// covering the legacy OCO engine behind the compatibility flag.
+process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
 const locks = new OpsJobLockService(db),
   runs = new OpsJobRunService(db);
 const retention = () => new FuturesLastPriceRetentionService(db, locks, runs);

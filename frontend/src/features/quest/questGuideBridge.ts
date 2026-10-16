@@ -25,7 +25,7 @@ export type QuestGuideTargetId =
   | 'market-viewport' | 'market-tabs' | 'market-assets' | 'market-list-header'
   | 'asset-viewport' | 'asset-price' | 'asset-buy' | 'asset-sell' | 'asset-holdings' | 'asset-protection'
   | 'protection-editor' | 'protection-submit' | 'limit-review'
-  | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-method-protection' | 'order-input' | 'order-preview' | 'order-submit'
+  | 'order-viewport' | 'order-type' | 'order-method-market' | 'order-method-limit' | 'order-input' | 'order-preview' | 'order-submit'
   | 'futures-viewport' | 'futures-funding' | 'futures-instrument' | 'futures-direction'
   | 'futures-margin' | 'futures-input' | 'futures-submit' | 'futures-position'
   | 'futures-leverage-suggested'
@@ -217,7 +217,7 @@ export function getQuestGuideTarget(id: QuestGuideTargetId): QuestGuideMeasurabl
 
 export function revealQuestGuideTarget(screen: QuestGuideScreen, id: QuestGuideTargetId) {
   // Rows of the 주문방식 sheet float above the screen; scrolling it moves nothing they need.
-  if (id === 'order-method-market' || id === 'order-method-limit' || id === 'order-method-protection') return;
+  if (id === 'order-method-market' || id === 'order-method-limit') return;
   const node = getQuestGuideTarget(id);
   const reveal = reveals.get(screen);
   if (node && reveal) reveal(node);

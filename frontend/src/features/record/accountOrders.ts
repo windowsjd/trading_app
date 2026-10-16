@@ -58,6 +58,7 @@ export function toRecordOrderItem(row: AccountOrderRow): RecordOrderItemDto {
     assetId: str(asset?.id) ?? str(row.assetId),
     symbol: str(asset?.symbol) ?? str(row.symbol),
     name: str(asset?.name) ?? str(row.name),
+    market: str(asset?.market),
     side: (str(row.side) ?? 'buy') as RecordOrderItemDto['side'],
     orderType: str(row.orderType),
     status: str(row.status),

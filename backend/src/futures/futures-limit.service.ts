@@ -11,6 +11,12 @@ import {
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
 import { reserveAvailableCash } from '../wallets/cash-wallet-atomic';
 import { createProtectionInTransaction } from '../conditional/conditional-registration';
+import { parseEntryTpSlDrafts } from '../conditional/entry-tp-sl-policy';
+import {
+  createEntryTpSlPlansInTransaction,
+  resolveEntryRoot,
+} from '../conditional/entry-tp-sl-state';
+import { assertFuturesTpSlEnabled } from './futures-tp-sl-policy';
 import {
   conditionalHash,
   conditionalTradable,
@@ -60,11 +66,14 @@ export function parseFuturesEntry(body: unknown) {
           'limitPrice',
           'idempotencyKey',
           'attachedProtection',
+          'entryTpSl',
         ].includes(k),
     )
   )
     futuresError('INVALID_FUTURES_REQUEST', 'Invalid Futures entry.', 400);
-  const { limitPrice, attachedProtection, ...command } = row;
+  const { limitPrice, attachedProtection, entryTpSl, ...command } = row;
+  if (attachedProtection !== undefined && entryTpSl !== undefined)
+    futuresError('INVALID_FUTURES_REQUEST', 'Invalid Futures entry.', 400);
   const request = parseFuturesCommand({ ...command, operation: 'open' });
   if (
     typeof limitPrice !== 'string' ||
@@ -83,6 +92,10 @@ export function parseFuturesEntry(body: unknown) {
       attachedProtection === undefined
         ? []
         : parseProtectionLegs(attachedProtection),
+    // Present only when sent, so legacy create hashes are unchanged.
+    ...(entryTpSl === undefined
+      ? {}
+      : { entryTpSl: parseEntryTpSlDrafts(entryTpSl) }),
   };
 }
 export function presentFuturesEntry(row: FuturesLimitOrder) {
@@ -293,6 +306,26 @@ export class FuturesLimitService {
           legs: request.legs,
           now,
         });
+      // The entry's stop-loss/take-profit plans, atomic with it: they
+      // activate only on its fill, on the new lifetime.
+      if (request.entryTpSl) {
+        assertFuturesTpSlEnabled();
+        const root = await resolveEntryRoot(
+          tx,
+          accountId,
+          'futures_limit_order',
+          order.id,
+          true,
+        );
+        await createEntryTpSlPlansInTransaction(tx, {
+          accountId,
+          root: root!,
+          intents: request.entryTpSl,
+          idempotencyKey: (index) => `entry:${order.id}:${index}`,
+          requestHash,
+          now,
+        });
+      }
       if (conditional) {
         await assertFuturesConditionalEntryWindow(tx, conditional.triggeredAt);
         await linkFuturesConditionalEntry(

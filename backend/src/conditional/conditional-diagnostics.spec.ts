@@ -15,7 +15,11 @@ import {
 import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
 it('records the observed missing conditional reference without financial values', async () => {
   const previous = process.env.CONDITIONAL_ORDERS_ENABLED;
+  const previousLegacy = process.env.LEGACY_OCO_REGISTRATION_ENABLED;
   process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+  // The legacy OCO registration path is retired by default (2026-10-16);
+  // its diagnostics stay covered behind the compatibility flag.
+  process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
   try {
     const tx = {
       protectionGroup: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -65,5 +69,35 @@ it('records the observed missing conditional reference without financial values'
   } finally {
     if (previous === undefined) delete process.env.CONDITIONAL_ORDERS_ENABLED;
     else process.env.CONDITIONAL_ORDERS_ENABLED = previous;
+    if (previousLegacy === undefined)
+      delete process.env.LEGACY_OCO_REGISTRATION_ENABLED;
+    else process.env.LEGACY_OCO_REGISTRATION_ENABLED = previousLegacy;
+  }
+});
+
+it('refuses new OCO groups unless the legacy compatibility flag is on', async () => {
+  const previousLegacy = process.env.LEGACY_OCO_REGISTRATION_ENABLED;
+  delete process.env.LEGACY_OCO_REGISTRATION_ENABLED;
+  try {
+    const tx = { $queryRaw: jest.fn() };
+    await expect(
+      createProtectionInTransaction(tx as never, {
+        accountId: 'account-1',
+        assetId: 'asset-1',
+        domain: 'futures',
+        positionId: 'position-1',
+        legs: [
+          { kind: 'stop_loss', childOrderType: 'market', triggerPrice: '90' },
+        ],
+        now: new Date(),
+      }),
+    ).rejects.toMatchObject({
+      response: { error: { code: 'PROTECTION_REGISTRATION_RETIRED' } },
+    });
+    expect(tx.$queryRaw).not.toHaveBeenCalled();
+  } finally {
+    if (previousLegacy === undefined)
+      delete process.env.LEGACY_OCO_REGISTRATION_ENABLED;
+    else process.env.LEGACY_OCO_REGISTRATION_ENABLED = previousLegacy;
   }
 });

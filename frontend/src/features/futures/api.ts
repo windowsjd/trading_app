@@ -294,7 +294,12 @@ export async function executeFutures(id: string, command: FuturesCommand) {
   return assertAccountScope(url, id, response.data.data);
 }
 
-export type FuturesLimitCommand = Omit<FuturesCommand, 'operation' | 'positionId'> & { limitPrice: string; attachedProtection?: ProtectionLeg[] };
+export type FuturesLimitCommand = Omit<FuturesCommand, 'operation' | 'positionId'> & {
+  limitPrice: string;
+  attachedProtection?: ProtectionLeg[];
+  /** 손절가/익절가 plans registered with the entry (activate on its fill). */
+  entryTpSl?: import('../conditional/entryTpSlApi').EntryTpSlDraftDto[];
+};
 export type FuturesLimitOrder = {
   id: string; tradingAccountId: string; instrumentId: string; direction: Direction;
   marginMode: MarginMode; leverage: number; quantity: string; limitPrice: string;

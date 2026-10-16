@@ -8,6 +8,7 @@ import {
   protectionInclude,
 } from '../conditional/conditional-state';
 import { closeConditionalSellsOnFlatPosition } from '../conditional/conditional-sell-state';
+import { activateSpotEntryTpSlPlans } from '../conditional/entry-tp-sl-state';
 import {
   HttpException,
   HttpStatus,
@@ -876,6 +877,17 @@ export class LimitOrderExecutionService {
         order.id,
         transactionNow,
       );
+      // A limit BUY fills completely: its stop-loss/take-profit plans (or
+      // those of the conditional BUY that created it) become settings for
+      // their share of this order's quantity.
+      if (order.side === OrderSide.buy)
+        await activateSpotEntryTpSlPlans(tx, {
+          accountId: tradingAccountId,
+          assetId: order.assetId,
+          orderId: order.id,
+          executedQuantity: order.quantity,
+          now: transactionNow,
+        });
       // A SELL fill that left the holding flat ends every live SELL intent
       // on it here, so a later re-buy never inherits them.
       if (order.side === OrderSide.sell)

@@ -277,6 +277,7 @@ enum OpsJobName {
   futures_candle_sync
   futures_conditional_entries
   asset_price_snapshot_retention
+  futures_tp_sl_settings
 }
 
 enum MarketCandleSyncMode {
@@ -488,6 +489,8 @@ model TradingAccount {
   futuresExecuteRequests        FuturesExecuteRequest[]
   futuresLimitOrders            FuturesLimitOrder[]
   futuresConditionalEntries     FuturesConditionalEntry[]
+  futuresTpSlSettings           FuturesTpSlSetting[]
+  entryTpSlPlans                EntryTpSlPlan[]
   futuresLiquidations           FuturesLiquidation[]
   futuresSeasonSettlement       FuturesSeasonSettlement?
   protectionGroups              ProtectionGroup[]
@@ -729,6 +732,7 @@ model Asset {
   conditionalSellOrders    ConditionalSellOrder[]
   limitOnCloseOrders       LimitOnCloseOrder[]
   sessionCloseEvidences    SessionClosePriceEvidence[]
+  entryTpSlPlans           EntryTpSlPlan[]
 
   @@unique([market, symbol])
   @@index([assetType, market])
@@ -935,6 +939,7 @@ model FuturesInstrument {
   limitOrders        FuturesLimitOrder[]
   conditionalEntries FuturesConditionalEntry[]
   marketCandles      FuturesMarketCandle[]
+  tpSlSettings       FuturesTpSlSetting[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -1001,6 +1006,7 @@ model FuturesPosition {
   liquidationClose FuturesLiquidationClose?
   seasonClose      FuturesSeasonClose?
   protectionGroups ProtectionGroup[]
+  tpSlSettings     FuturesTpSlSetting[]
 
   @@unique([id, tradingAccountId, instrumentId])
   @@index([tradingAccountId, status, instrumentId])
@@ -1056,6 +1062,8 @@ model FuturesExecution {
   protectionChild    ProtectionChild?
   limitOrder         FuturesLimitOrder?
   conditionalEntry   FuturesConditionalEntry?
+  tpSlSetting        FuturesTpSlSetting?
+  entryTpSlPlanFills EntryTpSlPlan[]
 
   @@unique([id, tradingAccountId])
   @@index([tradingAccountId, executedAt, id])
@@ -1117,6 +1125,7 @@ model FuturesLimitOrder {
   execution        FuturesExecution?        @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
   protection       ProtectionGroup?
   conditionalEntry FuturesConditionalEntry?
+  entryTpSlPlans   EntryTpSlPlan[]
 
   @@unique([executionId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey])
@@ -1334,6 +1343,8 @@ model Order {
   conditionalBuy       ConditionalBuyOrder?
   conditionalSell      ConditionalSellOrder?
   limitOnClose         LimitOnCloseOrder?
+  entryTpSlPlans       EntryTpSlPlan[]           @relation("EntryTpSlPlanOrder")
+  entryTpSlPlanFills   EntryTpSlPlan[]           @relation("EntryTpSlPlanFillOrder")
 
   beginnerQuestAcknowledgements BeginnerQuestAcknowledgement[]
 
@@ -1405,6 +1416,7 @@ model ConditionalBuyOrder {
   order                Order?              @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
   registrationSnapshot AssetPriceSnapshot? @relation("ConditionalBuyRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
   triggerSnapshot      AssetPriceSnapshot? @relation("ConditionalBuyTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+  entryTpSlPlans       EntryTpSlPlan[]
 
   @@unique([orderId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey])
@@ -1457,6 +1469,7 @@ model FuturesConditionalEntry {
   limitOrder           FuturesLimitOrder?        @relation(fields: [limitOrderId], references: [id], onDelete: Restrict)
   registrationSnapshot FuturesLastPriceSnapshot  @relation("FuturesConditionalEntryRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
   triggerSnapshot      FuturesLastPriceSnapshot? @relation("FuturesConditionalEntryTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+  entryTpSlPlans       EntryTpSlPlan[]
 
   @@unique([executionId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey])
@@ -1536,6 +1549,7 @@ model ConditionalSellOrder {
   order                Order?              @relation(fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
   registrationSnapshot AssetPriceSnapshot? @relation("ConditionalSellRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
   triggerSnapshot      AssetPriceSnapshot? @relation("ConditionalSellTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+  entryTpSlPlan        EntryTpSlPlan?
 
   @@unique([orderId, tradingAccountId])
   @@unique([tradingAccountId, idempotencyKey, kind])
@@ -1547,6 +1561,136 @@ model ConditionalSellOrder {
   @@index([registrationSnapshotId])
   @@index([triggerSnapshotId])
   @@map("conditional_sell_orders")
+}
+
+// Independent stop-loss / take-profit on ONE open Futures position lifetime
+// (docs/independent-tp-sl-entry-plans-contract.md). Reservation-free and
+// reduce-only: once its Futures Last trigger is recorded it reduces (or, for
+// the whole remainder, closes) the position through the existing
+// FuturesService for min(target, position quantity) at that moment; that
+// FuturesExecution (never this row) is the financial evidence. Settings of one
+// position may target more than the position together (stop-losses and
+// take-profits are bounded per kind). Live rows end in the transaction that
+// closes the lifetime. Reuses the Conditional BUY status enum; SQL CHECKs are
+// migration only.
+model FuturesTpSlSetting {
+  id                     String               @id @default(uuid(7))
+  tradingAccountId       String               @map("trading_account_id")
+  instrumentId           String               @map("instrument_id")
+  positionId             String               @map("position_id")
+  // The lifetime's direction (fixed for the lifetime): decides each kind's side.
+  direction              FuturesDirection
+  kind                   ProtectionKind
+  triggerPrice           Decimal              @map("trigger_price") @db.Decimal(24, 8)
+  // The user's target quantity (contracts of the underlying).
+  quantity               Decimal              @db.Decimal(24, 8)
+  status                 ConditionalBuyStatus @default(watching)
+  executionId            String?              @unique @map("execution_id")
+  // Null for settings activated from an entry plan at the entry's fill.
+  registrationSnapshotId String?              @map("registration_snapshot_id")
+  triggerSnapshotId      String?              @map("trigger_snapshot_id")
+  triggerEvidenceJson    Json?                @map("trigger_evidence_json")
+  triggeredAt            DateTime?            @map("triggered_at")
+  attemptCount           Int                  @default(0) @map("attempt_count")
+  lastAttemptAt          DateTime?            @map("last_attempt_at")
+  failureCode            String?              @map("failure_code")
+  terminalReason         String?              @map("terminal_reason")
+  // One create command; a stop-loss/take-profit pair shares it.
+  idempotencyKey         String               @map("idempotency_key")
+  requestHash            String               @map("request_hash")
+  createdAt              DateTime             @default(now()) @map("created_at")
+  endedAt                DateTime?            @map("ended_at")
+  updatedAt              DateTime             @updatedAt @map("updated_at")
+
+  tradingAccount       TradingAccount            @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  instrument           FuturesInstrument         @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  position             FuturesPosition           @relation(fields: [positionId, tradingAccountId, instrumentId], references: [id, tradingAccountId, instrumentId], onDelete: Restrict)
+  execution            FuturesExecution?         @relation(fields: [executionId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  registrationSnapshot FuturesLastPriceSnapshot? @relation("FuturesTpSlRegistrationSnapshot", fields: [registrationSnapshotId], references: [id], onDelete: Restrict)
+  triggerSnapshot      FuturesLastPriceSnapshot? @relation("FuturesTpSlTriggerSnapshot", fields: [triggerSnapshotId], references: [id], onDelete: Restrict)
+  entryPlan            EntryTpSlPlan?
+
+  @@unique([executionId, tradingAccountId])
+  @@unique([tradingAccountId, idempotencyKey, kind])
+  @@index([status, id])
+  @@index([tradingAccountId, createdAt, id])
+  @@index([positionId, status])
+  @@index([instrumentId])
+  @@index([registrationSnapshotId])
+  @@index([triggerSnapshotId])
+  @@map("futures_tp_sl_settings")
+}
+
+enum EntryTpSlPlanStatus {
+  pending
+  activated
+  failed
+  canceled
+}
+
+// A stop-loss / take-profit attached to a PENDING ENTRY before any fill
+// (docs/independent-tp-sl-entry-plans-contract.md): a Spot limit BUY, a Spot
+// conditional BUY, a Futures limit entry or a Futures conditional entry.
+// A plan never triggers and reserves nothing. The entry's own fill
+// transaction turns it into an independent setting for ratioPercent of the
+// quantity that entry actually filled (`activated`, linked to the setting and
+// the fill record), or records why it could not (`failed`). An entry that
+// ends without a fill ends its plans (`canceled`). A conditional entry keeps
+// its plans when it creates its limit order: they stay linked to the
+// conditional row and follow that order. Exactly one entry link (SQL CHECK).
+model EntryTpSlPlan {
+  id                        String              @id @default(uuid(7))
+  tradingAccountId          String              @map("trading_account_id")
+  domain                    ProtectionDomain
+  // Spot asset, or the Futures instrument's underlying asset.
+  assetId                   String              @map("asset_id")
+  orderId                   String?             @map("order_id")
+  conditionalBuyOrderId     String?             @map("conditional_buy_order_id")
+  futuresLimitOrderId       String?             @map("futures_limit_order_id")
+  futuresConditionalEntryId String?             @map("futures_conditional_entry_id")
+  kind                      ProtectionKind
+  triggerPrice              Decimal             @map("trigger_price") @db.Decimal(24, 8)
+  // Whole percent (1–100) of the quantity the entry actually fills.
+  ratioPercent              Int                 @map("ratio_percent")
+  status                    EntryTpSlPlanStatus @default(pending)
+  // Activation evidence: the entry's executed quantity, the resulting target
+  // and the fill record (Spot Order / FuturesExecution).
+  basisQuantity             Decimal?            @map("basis_quantity") @db.Decimal(24, 8)
+  activatedQuantity         Decimal?            @map("activated_quantity") @db.Decimal(24, 8)
+  fillOrderId               String?             @map("fill_order_id")
+  fillExecutionId           String?             @map("fill_execution_id")
+  conditionalSellOrderId    String?             @unique @map("conditional_sell_order_id")
+  futuresTpSlSettingId      String?             @unique @map("futures_tp_sl_setting_id")
+  failureCode               String?             @map("failure_code")
+  terminalReason            String?             @map("terminal_reason")
+  idempotencyKey            String              @map("idempotency_key")
+  requestHash               String              @map("request_hash")
+  createdAt                 DateTime            @default(now()) @map("created_at")
+  endedAt                   DateTime?           @map("ended_at")
+  updatedAt                 DateTime            @updatedAt @map("updated_at")
+
+  tradingAccount          TradingAccount           @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  asset                   Asset                    @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  order                   Order?                   @relation("EntryTpSlPlanOrder", fields: [orderId, tradingAccountId], references: [id, tradingAccountId], onDelete: Restrict)
+  conditionalBuyOrder     ConditionalBuyOrder?     @relation(fields: [conditionalBuyOrderId], references: [id], onDelete: Restrict)
+  futuresLimitOrder       FuturesLimitOrder?       @relation(fields: [futuresLimitOrderId], references: [id], onDelete: Restrict)
+  futuresConditionalEntry FuturesConditionalEntry? @relation(fields: [futuresConditionalEntryId], references: [id], onDelete: Restrict)
+  fillOrder               Order?                   @relation("EntryTpSlPlanFillOrder", fields: [fillOrderId], references: [id], onDelete: Restrict)
+  fillExecution           FuturesExecution?        @relation(fields: [fillExecutionId], references: [id], onDelete: Restrict)
+  conditionalSellOrder    ConditionalSellOrder?    @relation(fields: [conditionalSellOrderId], references: [id], onDelete: Restrict)
+  futuresTpSlSetting      FuturesTpSlSetting?      @relation(fields: [futuresTpSlSettingId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, idempotencyKey, kind])
+  @@index([status, id])
+  @@index([tradingAccountId, status, createdAt])
+  @@index([orderId])
+  @@index([conditionalBuyOrderId])
+  @@index([futuresLimitOrderId])
+  @@index([futuresConditionalEntryId])
+  @@index([assetId])
+  @@index([fillOrderId])
+  @@index([fillExecutionId])
+  @@map("entry_tp_sl_plans")
 }
 
 enum LimitOnCloseStatus {
@@ -2252,6 +2396,8 @@ model FuturesLastPriceSnapshot {
   protectionTriggers            ProtectionChild[]
   conditionalEntryRegistrations FuturesConditionalEntry[] @relation("FuturesConditionalEntryRegistrationSnapshot")
   conditionalEntryTriggers      FuturesConditionalEntry[] @relation("FuturesConditionalEntryTriggerSnapshot")
+  tpSlRegistrations             FuturesTpSlSetting[]      @relation("FuturesTpSlRegistrationSnapshot")
+  tpSlTriggers                  FuturesTpSlSetting[]      @relation("FuturesTpSlTriggerSnapshot")
 
   @@unique([instrumentId, source, capturedAt])
   @@index([instrumentId, effectiveAt, capturedAt])

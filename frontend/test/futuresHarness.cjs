@@ -12,9 +12,8 @@ function futuresHarness(options = {}) {
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = client.invalidateQueries.bind(client);
   client.invalidateQueries = config => { h.invalidations.push(config?.queryKey ?? []); return invalidate(config); };
-  const api = load(resolve(__dirname, '../src/features/futures/api.ts'), {
-    '../../services/api/client': { apiClient: {
-      get: async path => {
+  const transport = { apiClient: {
+      get: async (path, config) => {
         const id = path.split('/')[2]; h.reads.push(path);
         if (h.readGate) await h.readGate.promise;
         if (h.readFailure) throw h.readFailure;
@@ -27,6 +26,26 @@ function futuresHarness(options = {}) {
           return { data: { success: true, data: h.futuresCandles?.(instrumentId) ?? futuresCandlesFixture(instrumentId) } };
         }
         const f = futuresFixture(h.wrongScope ?? id, h.options);
+        // 손절가/익절가 plans on pending entries: closed unless a test opens them.
+        if (path.includes('entry-tp-sl-plans')) {
+          // One entry's plans (the sheet) or the account's open/ended plans (lists).
+          const entryId = config?.params?.entryId;
+          const all = h.entryTpSlPlans ?? [];
+          const plans = entryId ? all.filter((plan) => plan.entryId === entryId || plan.childOrderId === entryId)
+            : all.filter((plan) => (config?.params?.state === 'ended') === (plan.status !== 'pending'));
+          return { data: { success: true, data: { tradingAccountId: h.wrongScope ?? id,
+            capabilities: h.entryTpSlCapabilities ?? { spot: { enabled: false, canCreate: false }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 },
+            entry: entryId ? h.entryTpSlEntry?.(entryId) ?? null : null, plans,
+            pagination: { limit: 100, offset: 0, total: plans.length, returned: plans.length, nextOffset: null } } } };
+        }
+        // Independent position 손절가/익절가: capabilities + rows per state (open/ended).
+        if (path.includes('tp-sl-settings')) {
+          const state = config?.params?.state === 'ended' ? 'ended' : 'open';
+          const settings = h.futuresTpSl?.[state] ?? [];
+          return { data: { success: true, data: { tradingAccountId: h.wrongScope ?? id,
+            capabilities: h.futuresTpSlCapabilities ?? { enabled: true, canCreate: true, canCancel: true, maxLivePerAccount: 30 }, settings,
+            pagination: { limit: 100, offset: 0, total: settings.length, returned: settings.length, nextOffset: null } } } };
+        }
         // Futures conditional entries: capabilities + rows per state (open/ended).
         if (path.includes('conditional-entries')) {
           const state = path.includes('state=ended') ? 'ended' : 'open';
@@ -46,10 +65,29 @@ function futuresHarness(options = {}) {
         if (h.failure) throw h.failure;
         if (path.includes('conditional-entries')) return { data: { success: true, data: { tradingAccountId: path.split('/')[2], duplicate: false,
           entry: { id: 'entry', state: path.endsWith('/cancel') ? 'canceled' : 'watching', ...body } } } };
+        if (path.includes('entry-tp-sl-plans')) {
+          const accountId = path.split('/')[2];
+          if (path.endsWith('/cancel')) return { data: { success: true, data: { tradingAccountId: accountId, duplicate: false,
+            plan: { id: path.split('/')[4], status: 'canceled', terminalReason: 'user_canceled' } } } };
+          const plan = (kind, leg) => ({ id: `plan-${kind}`, entryType: body.entryType, entryId: body.entryId, childOrderId: null, domain: 'futures',
+            kind, triggerPrice: leg.triggerPrice, ratioPercent: leg.ratio, status: 'pending', triggerCondition: 'at_or_above' });
+          return { data: { success: true, data: { tradingAccountId: accountId, duplicate: false, entry: h.entryTpSlEntry?.(body.entryId) ?? null,
+            plans: [...(body.stopLoss ? [plan('stop_loss', body.stopLoss)] : []), ...(body.takeProfit ? [plan('take_profit', body.takeProfit)] : [])] } } };
+        }
+        if (path.includes('tp-sl-settings')) {
+          const row = (kind, leg) => ({ id: `tp-sl-${kind}`, tradingAccountId: path.split('/')[2], positionId: body.positionId, kind,
+            triggerPrice: leg.triggerPrice, quantity: leg.quantity, state: 'watching', status: 'watching' });
+          return { data: { success: true, data: path.endsWith('/cancel')
+            ? { tradingAccountId: path.split('/')[2], duplicate: false, setting: { id: path.split('/')[5], state: 'canceled', status: 'canceled' } }
+            : { tradingAccountId: path.split('/')[2], duplicate: false,
+              settings: [...(body.stopLoss ? [row('stop_loss', body.stopLoss)] : []), ...(body.takeProfit ? [row('take_profit', body.takeProfit)] : [])] } } };
+        }
         return { data: { success: true, data: { tradingAccountId: path.split('/')[2], commandId: 'command', execution: { positionId: body.positionId ?? 'position', direction: body.direction ?? 'long', leverage: Number(body.leverage ?? 37), positionAfter: { quantity: body.operation === 'close' ? '0.00000000' : body.quantity ?? '1.00000000' }, operation: body.operation, feeAmount: '0.1' } } } };
       },
-    } },
-  });
+    } };
+  const api = load(resolve(__dirname, '../src/features/futures/api.ts'), { '../../services/api/client': transport });
+  const tpSlApi = load(resolve(__dirname, '../src/features/futures/tpSlApi.ts'), { '../../services/api/client': transport });
+  const entryTpSlApi = load(resolve(__dirname, '../src/features/conditional/entryTpSlApi.ts'), { '../../services/api/client': transport });
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
   native.useWindowDimensions = () => options.dimensions ?? { width: 390, height: 844, fontScale: 1 };
   Object.assign(native, { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
@@ -68,6 +106,8 @@ function futuresHarness(options = {}) {
     './AdminDiagnosticPanel': { default: () => null, __esModule: true },
     '@react-navigation/native': { useIsFocused: () => true }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
     '../../features/futures/api': api,
+    '../../features/futures/tpSlApi': tpSlApi,
+    '../../features/conditional/entryTpSlApi': entryTpSlApi,
     '../../features/conditional/api': conditionalApi,
     // 대기 주문 › 조건주문 also lists Spot watches; inert, account-scoped pages.
     '../../features/conditional/conditionalBuyApi': { getConditionalBuyOrders: async id => ({ tradingAccountId: id,

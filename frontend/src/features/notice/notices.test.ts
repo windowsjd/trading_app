@@ -29,8 +29,40 @@ it('every linked notice id resolves, and the execution gap notice explains simul
   assert.equal(findNotice(undefined) === undefined, true);
 });
 
-it('the return-rate notice is newest and states the cumulative-principal policy with its examples', () => {
-  assert.equal(notices[0].id, NOTICE_IDS.returnRateCalculation);
+it('the order-method notice is newest and states how each method fills', () => {
+  assert.equal(notices[0].id, NOTICE_IDS.orderMethodsAndExecution);
+  const notice = findNotice(NOTICE_IDS.orderMethodsAndExecution)!;
+  assert.equal(notice.title, '주문방식 및 체결 기준 안내');
+  assert.equal(notice.publishedOn, '2026-10-16');
+  assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문 (한국주식)', '손절가/익절가 설정', '선물']);
+  const text = notice.sections.flatMap((section) => [section.heading, ...section.paragraphs]).join('\n');
+  for (const required of [
+    '실제 거래소로 전송되지 않고',
+    '화면에서 본 가격과 최종 체결가격은 다를 수 있으며',
+    '주문 접수는 체결이 아닙니다',
+    '감시 방향(이상·이하)은 직접 고르지 않습니다',
+    '매수·매도(선물은 롱·숏) 모두 같은 비교 원칙을 사용합니다',
+    '미국 주식 조건주문은 아직 이용할 수 없습니다',
+    '감시가격은 체결을 보장하는 가격이 아닙니다',
+    '방향이 달라졌으면 등록하지 않고',
+    '감시 중에는 현금·수량·담보를 예약하지 않습니다',
+    '그 종가로 전량 체결됩니다',
+    '익절가와 손절가는 서로 독립적입니다',
+    '같은 종류(익절 또는 손절) 설정의 합은 100%를 넘을 수 없습니다',
+    '익절 0.12 BTC·0.28 BTC, 손절 0.4 BTC',
+    '「활성화 실패」',
+    '새 TP/SL(OCO)은 등록할 수 없으며',
+    '선물 Last(최근 체결 가격)를 기준으로',
+    '평가손익, 증거금 확인, 강제청산은 Mark 가격을 기준으로',
+    '포지션을 줄이거나 종료하기만 합니다',
+    '강제청산을 막아 주지는 않습니다',
+  ]) {
+    assert.equal(text.includes(required), true, required);
+  }
+});
+
+it('the return-rate notice follows and states the cumulative-principal policy with its examples', () => {
+  assert.equal(notices[1].id, NOTICE_IDS.returnRateCalculation);
   const notice = findNotice(NOTICE_IDS.returnRateCalculation)!;
   assert.equal(notice.title, '일반모드·초보모드 수익률 계산 방식 안내');
   assert.equal(notice.publishedOn, '2026-10-14');

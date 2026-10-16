@@ -9,6 +9,7 @@ import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy
 import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { conditionalTradable } from '../conditional/conditional-policy';
+import { endEntryTpSlPlansOfEndedEntries } from '../conditional/entry-tp-sl-state';
 import { futuresError } from './futures-error';
 import {
   assertFuturesOperation,
@@ -244,15 +245,17 @@ export class FuturesConditionalEntryService {
           'The entry order was already created; manage the limit entry or position instead.',
         );
       if (row.status === 'watching' || row.status === 'triggered') {
+        const now = await this.futures.dbNow(tx);
         const updated = await tx.futuresConditionalEntry.update({
           where: { id },
           data: {
             status: 'canceled',
             terminalReason: 'user_canceled',
-            endedAt: await this.futures.dbNow(tx),
+            endedAt: now,
           },
           include: ENTRY_INCLUDE,
         });
+        await endEntryTpSlPlansOfEndedEntries(tx, accountId, now);
         return this.response(accountId, updated, false);
       }
       return this.response(accountId, row, true);
@@ -524,6 +527,7 @@ export class FuturesConditionalEntryService {
             : {}),
         },
       });
+      if (terminal) await endEntryTpSlPlansOfEndedEntries(tx, accountId, now);
     });
   }
 
@@ -535,7 +539,7 @@ export class FuturesConditionalEntryService {
     now: Date,
     failureCode?: string,
   ) {
-    await tx.futuresConditionalEntry.updateMany({
+    const ended = await tx.futuresConditionalEntry.updateMany({
       where: { id, ...liveFuturesConditionalEntry },
       data: {
         status,
@@ -544,6 +548,13 @@ export class FuturesConditionalEntryService {
         ...(failureCode ? { failureCode } : {}),
       },
     });
+    if (ended.count) {
+      const row = await tx.futuresConditionalEntry.findUniqueOrThrow({
+        where: { id },
+        select: { tradingAccountId: true },
+      });
+      await endEntryTpSlPlansOfEndedEntries(tx, row.tradingAccountId, now);
+    }
   }
 
   private response(accountId: string, row: EntryRecord, duplicate: boolean) {

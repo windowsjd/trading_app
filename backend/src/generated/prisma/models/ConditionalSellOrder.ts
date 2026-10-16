@@ -410,6 +410,7 @@ export type ConditionalSellOrderWhereInput = {
   order?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
   registrationSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   triggerSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
+  entryTpSlPlan?: Prisma.XOR<Prisma.EntryTpSlPlanNullableScalarRelationFilter, Prisma.EntryTpSlPlanWhereInput> | null
 }
 
 export type ConditionalSellOrderOrderByWithRelationInput = {
@@ -446,6 +447,7 @@ export type ConditionalSellOrderOrderByWithRelationInput = {
   order?: Prisma.OrderOrderByWithRelationInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotOrderByWithRelationInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanOrderByWithRelationInput
 }
 
 export type ConditionalSellOrderWhereUniqueInput = Prisma.AtLeast<{
@@ -487,6 +489,7 @@ export type ConditionalSellOrderWhereUniqueInput = Prisma.AtLeast<{
   order?: Prisma.XOR<Prisma.OrderNullableScalarRelationFilter, Prisma.OrderWhereInput> | null
   registrationSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
   triggerSnapshot?: Prisma.XOR<Prisma.AssetPriceSnapshotNullableScalarRelationFilter, Prisma.AssetPriceSnapshotWhereInput> | null
+  entryTpSlPlan?: Prisma.XOR<Prisma.EntryTpSlPlanNullableScalarRelationFilter, Prisma.EntryTpSlPlanWhereInput> | null
 }, "id" | "orderId" | "orderId_tradingAccountId" | "tradingAccountId_idempotencyKey_kind">
 
 export type ConditionalSellOrderOrderByWithAggregationInput = {
@@ -585,6 +588,7 @@ export type ConditionalSellOrderCreateInput = {
   order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateInput = {
@@ -615,6 +619,7 @@ export type ConditionalSellOrderUncheckedCreateInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUpdateInput = {
@@ -645,6 +650,7 @@ export type ConditionalSellOrderUpdateInput = {
   order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateInput = {
@@ -675,6 +681,7 @@ export type ConditionalSellOrderUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderCreateManyInput = {
@@ -1145,6 +1152,22 @@ export type EnumConditionalSellStatusFieldUpdateOperationsInput = {
   set?: $Enums.ConditionalSellStatus
 }
 
+export type ConditionalSellOrderCreateNestedOneWithoutEntryTpSlPlanInput = {
+  create?: Prisma.XOR<Prisma.ConditionalSellOrderCreateWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUncheckedCreateWithoutEntryTpSlPlanInput>
+  connectOrCreate?: Prisma.ConditionalSellOrderCreateOrConnectWithoutEntryTpSlPlanInput
+  connect?: Prisma.ConditionalSellOrderWhereUniqueInput
+}
+
+export type ConditionalSellOrderUpdateOneWithoutEntryTpSlPlanNestedInput = {
+  create?: Prisma.XOR<Prisma.ConditionalSellOrderCreateWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUncheckedCreateWithoutEntryTpSlPlanInput>
+  connectOrCreate?: Prisma.ConditionalSellOrderCreateOrConnectWithoutEntryTpSlPlanInput
+  upsert?: Prisma.ConditionalSellOrderUpsertWithoutEntryTpSlPlanInput
+  disconnect?: Prisma.ConditionalSellOrderWhereInput | boolean
+  delete?: Prisma.ConditionalSellOrderWhereInput | boolean
+  connect?: Prisma.ConditionalSellOrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.ConditionalSellOrderUpdateToOneWithWhereWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUpdateWithoutEntryTpSlPlanInput>, Prisma.ConditionalSellOrderUncheckedUpdateWithoutEntryTpSlPlanInput>
+}
+
 export type ConditionalSellOrderCreateWithoutTradingAccountInput = {
   id?: string
   kind: $Enums.ConditionalSellKind
@@ -1172,6 +1195,7 @@ export type ConditionalSellOrderCreateWithoutTradingAccountInput = {
   order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateWithoutTradingAccountInput = {
@@ -1201,6 +1225,7 @@ export type ConditionalSellOrderUncheckedCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderCreateOrConnectWithoutTradingAccountInput = {
@@ -1289,6 +1314,7 @@ export type ConditionalSellOrderCreateWithoutAssetInput = {
   order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateWithoutAssetInput = {
@@ -1318,6 +1344,7 @@ export type ConditionalSellOrderUncheckedCreateWithoutAssetInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderCreateOrConnectWithoutAssetInput = {
@@ -1373,6 +1400,7 @@ export type ConditionalSellOrderCreateWithoutRegistrationSnapshotInput = {
   position: Prisma.PositionCreateNestedOneWithoutConditionalSellOrdersInput
   order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateWithoutRegistrationSnapshotInput = {
@@ -1402,6 +1430,7 @@ export type ConditionalSellOrderUncheckedCreateWithoutRegistrationSnapshotInput 
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderCreateOrConnectWithoutRegistrationSnapshotInput = {
@@ -1441,6 +1470,7 @@ export type ConditionalSellOrderCreateWithoutTriggerSnapshotInput = {
   position: Prisma.PositionCreateNestedOneWithoutConditionalSellOrdersInput
   order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateWithoutTriggerSnapshotInput = {
@@ -1470,6 +1500,7 @@ export type ConditionalSellOrderUncheckedCreateWithoutTriggerSnapshotInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderCreateOrConnectWithoutTriggerSnapshotInput = {
@@ -1541,6 +1572,7 @@ export type ConditionalSellOrderCreateWithoutPositionInput = {
   order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateWithoutPositionInput = {
@@ -1570,6 +1602,7 @@ export type ConditionalSellOrderUncheckedCreateWithoutPositionInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderCreateOrConnectWithoutPositionInput = {
@@ -1625,6 +1658,7 @@ export type ConditionalSellOrderCreateWithoutOrderInput = {
   position: Prisma.PositionCreateNestedOneWithoutConditionalSellOrdersInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderUncheckedCreateWithoutOrderInput = {
@@ -1653,6 +1687,7 @@ export type ConditionalSellOrderUncheckedCreateWithoutOrderInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedCreateNestedOneWithoutConditionalSellOrderInput
 }
 
 export type ConditionalSellOrderCreateOrConnectWithoutOrderInput = {
@@ -1698,6 +1733,7 @@ export type ConditionalSellOrderUpdateWithoutOrderInput = {
   position?: Prisma.PositionUpdateOneRequiredWithoutConditionalSellOrdersNestedInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateWithoutOrderInput = {
@@ -1712,6 +1748,143 @@ export type ConditionalSellOrderUncheckedUpdateWithoutOrderInput = {
   quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
   status?: Prisma.EnumConditionalSellStatusFieldUpdateOperationsInput | $Enums.ConditionalSellStatus
+  executionAvailableQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  registrationSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
+}
+
+export type ConditionalSellOrderCreateWithoutEntryTpSlPlanInput = {
+  id?: string
+  kind: $Enums.ConditionalSellKind
+  triggerCondition: $Enums.ConditionalSellTrigger
+  triggerPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType: $Enums.OrderType
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode: $Enums.CurrencyCode
+  status?: $Enums.ConditionalSellStatus
+  executionAvailableQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Date | string | null
+  attemptCount?: number
+  lastAttemptAt?: Date | string | null
+  failureCode?: string | null
+  terminalReason?: string | null
+  idempotencyKey: string
+  requestHash: string
+  createdAt?: Date | string
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutConditionalSellOrdersInput
+  asset: Prisma.AssetCreateNestedOneWithoutConditionalSellOrdersInput
+  position: Prisma.PositionCreateNestedOneWithoutConditionalSellOrdersInput
+  order?: Prisma.OrderCreateNestedOneWithoutConditionalSellInput
+  registrationSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellRegistrationsInput
+  triggerSnapshot?: Prisma.AssetPriceSnapshotCreateNestedOneWithoutConditionalSellTriggersInput
+}
+
+export type ConditionalSellOrderUncheckedCreateWithoutEntryTpSlPlanInput = {
+  id?: string
+  tradingAccountId: string
+  assetId: string
+  positionId: string
+  kind: $Enums.ConditionalSellKind
+  triggerCondition: $Enums.ConditionalSellTrigger
+  triggerPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType: $Enums.OrderType
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode: $Enums.CurrencyCode
+  status?: $Enums.ConditionalSellStatus
+  orderId?: string | null
+  executionAvailableQuantity?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  registrationSnapshotId?: string | null
+  triggerSnapshotId?: string | null
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Date | string | null
+  attemptCount?: number
+  lastAttemptAt?: Date | string | null
+  failureCode?: string | null
+  terminalReason?: string | null
+  idempotencyKey: string
+  requestHash: string
+  createdAt?: Date | string
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+}
+
+export type ConditionalSellOrderCreateOrConnectWithoutEntryTpSlPlanInput = {
+  where: Prisma.ConditionalSellOrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.ConditionalSellOrderCreateWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUncheckedCreateWithoutEntryTpSlPlanInput>
+}
+
+export type ConditionalSellOrderUpsertWithoutEntryTpSlPlanInput = {
+  update: Prisma.XOR<Prisma.ConditionalSellOrderUpdateWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUncheckedUpdateWithoutEntryTpSlPlanInput>
+  create: Prisma.XOR<Prisma.ConditionalSellOrderCreateWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUncheckedCreateWithoutEntryTpSlPlanInput>
+  where?: Prisma.ConditionalSellOrderWhereInput
+}
+
+export type ConditionalSellOrderUpdateToOneWithWhereWithoutEntryTpSlPlanInput = {
+  where?: Prisma.ConditionalSellOrderWhereInput
+  data: Prisma.XOR<Prisma.ConditionalSellOrderUpdateWithoutEntryTpSlPlanInput, Prisma.ConditionalSellOrderUncheckedUpdateWithoutEntryTpSlPlanInput>
+}
+
+export type ConditionalSellOrderUpdateWithoutEntryTpSlPlanInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.EnumConditionalSellKindFieldUpdateOperationsInput | $Enums.ConditionalSellKind
+  triggerCondition?: Prisma.EnumConditionalSellTriggerFieldUpdateOperationsInput | $Enums.ConditionalSellTrigger
+  triggerPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  status?: Prisma.EnumConditionalSellStatusFieldUpdateOperationsInput | $Enums.ConditionalSellStatus
+  executionAvailableQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutConditionalSellOrdersNestedInput
+  asset?: Prisma.AssetUpdateOneRequiredWithoutConditionalSellOrdersNestedInput
+  position?: Prisma.PositionUpdateOneRequiredWithoutConditionalSellOrdersNestedInput
+  order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
+  registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
+  triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+}
+
+export type ConditionalSellOrderUncheckedUpdateWithoutEntryTpSlPlanInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  assetId?: Prisma.StringFieldUpdateOperationsInput | string
+  positionId?: Prisma.StringFieldUpdateOperationsInput | string
+  kind?: Prisma.EnumConditionalSellKindFieldUpdateOperationsInput | $Enums.ConditionalSellKind
+  triggerCondition?: Prisma.EnumConditionalSellTriggerFieldUpdateOperationsInput | $Enums.ConditionalSellTrigger
+  triggerPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  status?: Prisma.EnumConditionalSellStatusFieldUpdateOperationsInput | $Enums.ConditionalSellStatus
+  orderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   executionAvailableQuantity?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   registrationSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1784,6 +1957,7 @@ export type ConditionalSellOrderUpdateWithoutTradingAccountInput = {
   order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateWithoutTradingAccountInput = {
@@ -1813,6 +1987,7 @@ export type ConditionalSellOrderUncheckedUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -1900,6 +2075,7 @@ export type ConditionalSellOrderUpdateWithoutAssetInput = {
   order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateWithoutAssetInput = {
@@ -1929,6 +2105,7 @@ export type ConditionalSellOrderUncheckedUpdateWithoutAssetInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateManyWithoutAssetInput = {
@@ -2045,6 +2222,7 @@ export type ConditionalSellOrderUpdateWithoutRegistrationSnapshotInput = {
   position?: Prisma.PositionUpdateOneRequiredWithoutConditionalSellOrdersNestedInput
   order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateWithoutRegistrationSnapshotInput = {
@@ -2074,6 +2252,7 @@ export type ConditionalSellOrderUncheckedUpdateWithoutRegistrationSnapshotInput 
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateManyWithoutRegistrationSnapshotInput = {
@@ -2132,6 +2311,7 @@ export type ConditionalSellOrderUpdateWithoutTriggerSnapshotInput = {
   position?: Prisma.PositionUpdateOneRequiredWithoutConditionalSellOrdersNestedInput
   order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateWithoutTriggerSnapshotInput = {
@@ -2161,6 +2341,7 @@ export type ConditionalSellOrderUncheckedUpdateWithoutTriggerSnapshotInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateManyWithoutTriggerSnapshotInput = {
@@ -2248,6 +2429,7 @@ export type ConditionalSellOrderUpdateWithoutPositionInput = {
   order?: Prisma.OrderUpdateOneWithoutConditionalSellNestedInput
   registrationSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellRegistrationsNestedInput
   triggerSnapshot?: Prisma.AssetPriceSnapshotUpdateOneWithoutConditionalSellTriggersNestedInput
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateWithoutPositionInput = {
@@ -2277,6 +2459,7 @@ export type ConditionalSellOrderUncheckedUpdateWithoutPositionInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlan?: Prisma.EntryTpSlPlanUncheckedUpdateOneWithoutConditionalSellOrderNestedInput
 }
 
 export type ConditionalSellOrderUncheckedUpdateManyWithoutPositionInput = {
@@ -2344,6 +2527,7 @@ export type ConditionalSellOrderSelect<ExtArgs extends runtime.Types.Extensions.
   order?: boolean | Prisma.ConditionalSellOrder$orderArgs<ExtArgs>
   registrationSnapshot?: boolean | Prisma.ConditionalSellOrder$registrationSnapshotArgs<ExtArgs>
   triggerSnapshot?: boolean | Prisma.ConditionalSellOrder$triggerSnapshotArgs<ExtArgs>
+  entryTpSlPlan?: boolean | Prisma.ConditionalSellOrder$entryTpSlPlanArgs<ExtArgs>
 }, ExtArgs["result"]["conditionalSellOrder"]>
 
 export type ConditionalSellOrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2456,6 +2640,7 @@ export type ConditionalSellOrderInclude<ExtArgs extends runtime.Types.Extensions
   order?: boolean | Prisma.ConditionalSellOrder$orderArgs<ExtArgs>
   registrationSnapshot?: boolean | Prisma.ConditionalSellOrder$registrationSnapshotArgs<ExtArgs>
   triggerSnapshot?: boolean | Prisma.ConditionalSellOrder$triggerSnapshotArgs<ExtArgs>
+  entryTpSlPlan?: boolean | Prisma.ConditionalSellOrder$entryTpSlPlanArgs<ExtArgs>
 }
 export type ConditionalSellOrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -2483,6 +2668,7 @@ export type $ConditionalSellOrderPayload<ExtArgs extends runtime.Types.Extension
     order: Prisma.$OrderPayload<ExtArgs> | null
     registrationSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
     triggerSnapshot: Prisma.$AssetPriceSnapshotPayload<ExtArgs> | null
+    entryTpSlPlan: Prisma.$EntryTpSlPlanPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2912,6 +3098,7 @@ export interface Prisma__ConditionalSellOrderClient<T, Null = never, ExtArgs ext
   order<T extends Prisma.ConditionalSellOrder$orderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ConditionalSellOrder$orderArgs<ExtArgs>>): Prisma.Prisma__OrderClient<runtime.Types.Result.GetResult<Prisma.$OrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   registrationSnapshot<T extends Prisma.ConditionalSellOrder$registrationSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ConditionalSellOrder$registrationSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   triggerSnapshot<T extends Prisma.ConditionalSellOrder$triggerSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ConditionalSellOrder$triggerSnapshotArgs<ExtArgs>>): Prisma.Prisma__AssetPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$AssetPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  entryTpSlPlan<T extends Prisma.ConditionalSellOrder$entryTpSlPlanArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.ConditionalSellOrder$entryTpSlPlanArgs<ExtArgs>>): Prisma.Prisma__EntryTpSlPlanClient<runtime.Types.Result.GetResult<Prisma.$EntryTpSlPlanPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3423,6 +3610,25 @@ export type ConditionalSellOrder$triggerSnapshotArgs<ExtArgs extends runtime.Typ
    */
   include?: Prisma.AssetPriceSnapshotInclude<ExtArgs> | null
   where?: Prisma.AssetPriceSnapshotWhereInput
+}
+
+/**
+ * ConditionalSellOrder.entryTpSlPlan
+ */
+export type ConditionalSellOrder$entryTpSlPlanArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EntryTpSlPlan
+   */
+  select?: Prisma.EntryTpSlPlanSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EntryTpSlPlan
+   */
+  omit?: Prisma.EntryTpSlPlanOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EntryTpSlPlanInclude<ExtArgs> | null
+  where?: Prisma.EntryTpSlPlanWhereInput
 }
 
 /**

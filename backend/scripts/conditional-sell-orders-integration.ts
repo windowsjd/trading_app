@@ -65,6 +65,9 @@ process.env.LOC_ORDERS_ENABLED = 'false';
 process.env.CONDITIONAL_BUY_ORDERS_ENABLED = 'false';
 // Whole-position OCO protection on, for the conflict policy.
 process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+// New OCO groups are retired by default (2026-10-16); this runner keeps
+// covering the legacy OCO engine behind the compatibility flag.
+process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
 process.env.LIMIT_ORDER_ENABLED = 'true';
 process.env.SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED = 'true';
 

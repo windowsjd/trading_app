@@ -6,7 +6,11 @@ existing execution/Conditional paths. API base remains `/api/v1`.
 
 - `POST trading-accounts/:accountId/futures/limit-orders`: instrumentId,
   direction, marginMode, integer leverage 1–100, quantity, limitPrice,
-  idempotencyKey, optional `attachedProtection` legs in the existing format.
+  idempotencyKey, optional `attachedProtection` legs in the existing format
+  (retired 2026-10-16: refused `PROTECTION_REGISTRATION_RETIRED`), optional
+  `entryTpSl` plans that become independent Futures stop-loss/take-profit
+  settings at the actual fill
+  ([independent-tp-sl-entry-plans-contract.md](independent-tp-sl-entry-plans-contract.md)).
 - `GET .../limit-orders`: account-owned pending entries; bounded pagination.
 - `POST .../limit-orders/:orderId/cancel`: idempotent terminal cancel. Read and
   cancel remain available with trading disabled and after Season end.

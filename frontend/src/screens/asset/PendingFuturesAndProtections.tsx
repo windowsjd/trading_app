@@ -13,12 +13,16 @@ import { getSessionGeneration, isCurrentSession } from '../../services/api/sessi
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatDisplayDecimal } from '../../utils/format';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
+import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
 
 export default function PendingFuturesAndProtections({ accountId, focused, protections = false, seasonUi, onCount }: { accountId: string; focused: boolean; protections?: boolean; seasonUi: boolean; onCount?: (count: number | undefined) => void }) {
   const { selectedAccountId } = useTradingAccount();
   const client = useQueryClient();
   const query = useQuery({ queryKey: protections ? QUERY_KEYS.tradingAccount.protections.pending(accountId) : QUERY_KEYS.tradingAccount.futures.pending(accountId), queryFn: async ({ signal }) => protections ? getPendingProtections(accountId, signal) : getFuturesLimitOrders(accountId, signal), enabled: focused && selectedAccountId === accountId, refetchInterval: focused ? 4000 : false });
   const [failure, setFailure] = useState<unknown>(null), [busy, setBusy] = useState<string | null>(null);
+  const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
   const alive = useRef(true), locked = useRef(false), selected = useRef(selectedAccountId);
   selected.current = selectedAccountId;
   const session = getSessionGeneration();
@@ -27,6 +31,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   const current = () => alive.current && selected.current === accountId && isCurrentSession(session);
   const data = !query.isError && query.data?.tradingAccountId === accountId ? query.data : undefined;
   const count = data && 'orders' in data ? data.orders.length : undefined;
+  const plans = useEntryTpSlSummaries(accountId, focused && !protections && !!count);
   useEffect(() => { onCount?.(count); }, [count, onCount]);
   const permission = useRef(false);
   permission.current = focused && !!data && ('orders' in data || data.capabilities.canCancel);
@@ -55,16 +60,26 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
   if (!data) return <Text style={styles.hint}>대기 내역 확인 중…</Text>;
   const pendingGroups = 'groups' in data ? data.groups.filter(g => g.status === 'holding' || g.status === 'active') : [];
   const empty = 'orders' in data ? !data.orders.length : !pendingGroups.length;
-  const canMonitor = (domain: 'spot' | 'futures') => 'groups' in data && data.capabilities.enabled && (domain === 'futures' ? data.capabilities.canCreateFutures : data.capabilities.canCreateSpot);
-  if (!protections && empty) return <View testID="pending-futures" />;
+  // New OCO registration is retired (canCreate* false); watching existing groups is not.
+  const canMonitor = (domain: 'spot' | 'futures') => 'groups' in data && data.capabilities.enabled && (domain === 'futures'
+    ? data.capabilities.canMonitorFutures ?? data.capabilities.canCreateFutures
+    : data.capabilities.canMonitorSpot ?? data.capabilities.canCreateSpot);
+  const sheet = <TpSlSheet target={focused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />;
+  // An entry that just filled leaves the list; its open sheet stays to say so.
+  if (!protections && empty) return <View testID="pending-futures">{sheet}</View>;
   return <View style={styles.list} testID={protections ? 'pending-protections' : 'pending-futures'}>
-    {'groups' in data && !data.capabilities.enabled ? <Text style={styles.hint}>현재 TP/SL 조건 감시가 중지되어 있습니다. 기존 보호 내역을 확인할 수 있습니다.</Text> : null}
-    {empty ? <Text style={styles.hint}>{protections ? '대기 중인 TP/SL이 없습니다.' : '대기 중인 선물 진입 주문이 없습니다.'}</Text> : null}
+    {protections ? <Text accessibilityRole="header" style={styles.heading}>기존 TP/SL(OCO)</Text> : null}
+    {'groups' in data && !data.capabilities.enabled ? <Text style={styles.hint}>현재 기존 TP/SL(OCO) 조건 감시가 중지되어 있습니다. 보호 내역은 확인할 수 있습니다.</Text> : null}
+    {empty ? <Text style={styles.hint}>{protections ? '대기 중인 기존 TP/SL(OCO)이 없습니다.' : '대기 중인 선물 진입 주문이 없습니다.'}</Text> : null}
     {'orders' in data ? data.orders.map(o => <View key={o.id} style={styles.card}>
       <Text style={styles.name}>{o.instrument.underlying.name} · {o.instrument.underlying.symbol}</Text>
       <Text style={styles.text}>선물 지정가 · {o.direction === 'long' ? 'Long' : 'Short'} · {o.marginMode === 'cross' ? 'Cross' : 'Isolated'} · {o.leverage}x</Text>
       <Text style={styles.text}>진입 ${formatDisplayDecimal(o.limitPrice)} · 수량 {formatDisplayDecimal(o.quantity)}</Text>
       <Text style={styles.hint}>체결 대기 · 예약 담보 ${formatDisplayDecimal(o.reservedAmount)}</Text>
+      {plans.capabilities?.futures.enabled || plans.summary(o.id) ? (
+        <TpSlButton testID={`pending-futures-${o.id}-tp-sl`} summary={plans.summary(o.id)}
+          onPress={() => setTpSlTarget({ type: 'entry', accountId, entryType: 'futures_limit_order', entryId: o.id })} />
+      ) : null}
       <CTAButton label="진입 주문 취소" state={busy ? 'disabled' : 'enabled'} onPress={() => void cancel(o.id)} />
     </View>) : pendingGroups.map(g => <View key={g.id} style={styles.card}>
       <Text style={styles.name}>{g.asset?.name ?? '보호 종목'} · {g.asset?.symbol ?? ''}</Text>
@@ -79,6 +94,7 @@ export default function PendingFuturesAndProtections({ accountId, focused, prote
     </View>)}
     {failure ? <ErrorNotice error={failure} message="취소 여부를 확인하지 못했습니다. 같은 요청으로 다시 시도해주세요." /> : null}
     {protections ? <ProtectionHistory accountId={accountId} focused={focused} /> : null}
+    {protections ? null : sheet}
   </View>;
 }
 
@@ -95,7 +111,7 @@ function ProtectionHistory({ accountId, focused }: { accountId: string; focused:
   return <View style={styles.list}>
     <ActionPressable accessibilityRole="button" testID="protection-history-toggle" accessibilityState={{ expanded: open }} aria-expanded={open}
       onPress={() => setOpen(value => !value)} style={styles.history}>
-      <Text style={styles.text}>{open ? '종료된 TP/SL 이력 닫기' : '종료된 TP/SL 이력 보기'}</Text>
+      <Text style={styles.text}>{open ? '종료된 기존 TP/SL(OCO) 이력 닫기' : '종료된 기존 TP/SL(OCO) 이력 보기'}</Text>
     </ActionPressable>
     {open ? <View style={styles.list} testID="protection-history">
       {query.isError ? <ErrorNotice error={query.error} message="TP/SL 이력을 불러오지 못했습니다." />
@@ -113,4 +129,4 @@ function ProtectionHistory({ accountId, focused }: { accountId: string; focused:
     </View> : null}
   </View>;
 }
-const styles = StyleSheet.create({ history: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, list: { gap: 10, minWidth: 0 }, card: { gap: 8, borderWidth: 1, borderColor: semantic.border, borderRadius: 12, padding: 14, minWidth: 0 }, name: { fontSize: 17, color: semantic.text, fontWeight: '700', flexShrink: 1 }, text: { fontSize: 14, color: semantic.text, flexShrink: 1 }, hint: { fontSize: 13, color: semantic.secondary, flexShrink: 1 } });
+const styles = StyleSheet.create({ heading: { fontSize: 16, lineHeight: 24, fontWeight: '700', color: semantic.text }, history: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, list: { gap: 10, minWidth: 0 }, card: { gap: 8, borderWidth: 1, borderColor: semantic.border, borderRadius: 12, padding: 14, minWidth: 0 }, name: { fontSize: 17, color: semantic.text, fontWeight: '700', flexShrink: 1 }, text: { fontSize: 14, color: semantic.text, flexShrink: 1 }, hint: { fontSize: 13, color: semantic.secondary, flexShrink: 1 } });

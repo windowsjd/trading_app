@@ -201,8 +201,53 @@ export function useAssetOrderBook({ assetId }) {
   };
 }
 const response = (data) => ({ data: { success: true, data } });
+// `?plans=enabled`: 손절가/익절가 plans may be added to pending entries (Spot and Futures).
+const plansEnabled = params.get('plans') === 'enabled';
+const plansPage = (rows) => ({ limit: 100, offset: 0, total: rows.length, returned: rows.length, nextOffset: null });
+const planCapabilities = () => ({ spot: { enabled: plansEnabled, canCreate: plansEnabled }, futures: { enabled: plansEnabled, canCreate: plansEnabled },
+  canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 });
+const planRows = () => params.get('planRows') === '1' ? [
+  { id: 'plan-tp', entryType: 'spot_limit_order', entryId: 'buy', childOrderId: null, domain: 'spot', assetId: 'SUI', direction: 'long', kind: 'take_profit',
+    triggerCondition: 'at_or_above', triggerPrice: '1234567890123457.12345678', ratioPercent: 30, status: 'pending', basisQuantity: null, activatedQuantity: null,
+    fillOrderId: null, fillExecutionId: null, settingId: null, failureCode: null, terminalReason: null, createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString() },
+  { id: 'plan-failed', entryType: 'spot_limit_order', entryId: 'old', childOrderId: null, domain: 'spot', assetId: 'SUI', direction: 'long', kind: 'stop_loss',
+    triggerCondition: 'at_or_below', triggerPrice: '0.5', ratioPercent: 100, status: 'failed', basisQuantity: '123456789.123456', activatedQuantity: null,
+    fillOrderId: 'old', fillExecutionId: null, settingId: null, failureCode: 'ENTRY_TP_SL_TOTAL_EXCEEDS_HOLDING', terminalReason: 'activation_failed',
+    createdAt: new Date().toISOString(), endedAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+] : [];
+const spotEntry = (entryId) => ({ entryType: 'spot_limit_order', entryId, domain: 'spot', state: 'open', supported: true, assetId: 'SUI',
+  asset: { id: 'SUI', symbol: 'SUIUSDT', name: assets.find((a) => a.id === 'SUI').name, market: 'BINANCE', assetType: 'crypto' }, instrumentId: null,
+  direction: 'long', executionType: 'limit', entryPrice: '1234567890123456.12345678', triggerPrice: null, limitPrice: '1234567890123456.12345678',
+  expectedQuantity: '123456789.12345678', amount: null, currencyCode: 'USD', leverage: null, legacyProtection: false, childOrderId: null });
 export const apiClient = {
   async get(path, options = {}) {
+    if (path.endsWith('/entry-tp-sl-plans')) {
+      const query = options.params ?? {};
+      const rows = planRows();
+      if (query.entryId) return response({ tradingAccountId: state.accountId, capabilities: planCapabilities(), entry: spotEntry(query.entryId),
+        plans: rows.filter((row) => row.entryId === query.entryId), pagination: plansPage([]) });
+      const listed = rows.filter((row) => (query.state === 'ended') === (row.status !== 'pending'));
+      return response({ tradingAccountId: state.accountId, capabilities: planCapabilities(), entry: null, plans: listed, pagination: plansPage(listed) });
+    }
+    if (path.includes('/futures/tp-sl-settings')) {
+      // `?futuresTpSlRows=1`: live and ended settings on the fixture position (Long).
+      const f = futuresFixture(state.accountId, { large: true, position: true });
+      const instrument = f.catalog.instruments[0];
+      const setting = (id, kind, triggerPrice, quantity, stateName, extra = {}) => ({ id, tradingAccountId: state.accountId, instrumentId: instrument.id, instrument,
+        positionId: state.accountId + ':position', direction: 'long', kind, triggerCondition: kind === 'take_profit' ? 'at_or_above' : 'at_or_below',
+        triggerPrice, quantity, status: stateName === 'filled' ? 'ordered' : stateName, state: stateName,
+        position: { quantity: '2.00000000', executableQuantity: quantity }, execution: null, quantityLimited: false, trigger: null, entryPlanId: null,
+        attemptCount: 0, lastAttemptAt: null, failureCode: null, terminalReason: null, createdAt: new Date().toISOString(), endedAt: null, updatedAt: new Date().toISOString(), ...extra });
+      const rows = params.get('futuresTpSlRows') === '1' ? [
+        setting('tp-1', 'take_profit', '110.12345678', '0.50000000', 'watching'),
+        setting('tp-2', 'take_profit', '125.5', '1.00000000', 'watching'),
+        setting('sl-1', 'stop_loss', '95.87654321', '1.00000000', 'triggered'),
+      ] : [];
+      return response({ tradingAccountId: state.accountId, capabilities: { enabled: plansEnabled, canCreate: plansEnabled, canCancel: true, maxLivePerAccount: 30 },
+        settings: (options.params ?? {}).state === 'ended' ? [] : rows, pagination: plansPage(rows) });
+    }
+    if (path === '/fx/rates/current')
+      return response({ state: 'available', baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1400', validUntil: new Date(Date.now() + 60000).toISOString() });
     // Contract 4h chart (market data, not account-scoped).
     if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
     if(path.endsWith('/protections')) {
@@ -310,11 +355,12 @@ export const apiClient = {
     if (path.includes('/futures/conditional-entries'))
       return response(futuresConditionalFixture(state.accountId, path.includes('state=ended') ? 'ended' : 'open', params.get('conditional')));
     if(path.includes('/futures/')) {
-      const f=futuresFixture(state.accountId,{large:true});
+      // `?futuresPosition=1`: one open (large) position with its card and 손절가/익절가 sheet.
+      const f=futuresFixture(state.accountId,{large:true,position:params.get('futuresPosition')==='1'});
       if(path.includes('limit-orders')) return response({...scoped,orders:pendingFutures ? ['long','short'].map((direction,i)=>({id:'entry-'+direction,direction,marginMode:i?'cross':'isolated',leverage:100,quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',reservedAmount:'12345678901234.12345678',instrument:f.catalog.instruments[0]})) : [],pagination});
       return response(path.includes('/instruments')?f.catalog:path.includes('/positions')?f.positions:path.includes('/executions')?f.executions:path.includes('/liquidations')?f.liquidations:f.final);
     }
-    if(path.endsWith('/orders')) return response({...scoped,orders:pendingSpot ? ['buy','sell','child'].map((id)=>({id,orderId:id,asset:{id:'SUI',symbol:'SUIUSDT',name:assets.find(a=>a.id==='SUI').name},side:id==='buy'?'buy':'sell',orderType:'limit',status:'submitted',quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',currencyCode:'USD',conditionalChildId:id==='child'?'child':null})) : [],pagination:{...pagination,total:pendingSpot?3:0,returned:pendingSpot?3:0}});
+    if(path.endsWith('/orders')) return response({...scoped,orders:pendingSpot ? ['buy','sell','child'].map((id)=>({id,orderId:id,asset:{id:'SUI',symbol:'SUIUSDT',name:assets.find(a=>a.id==='SUI').name,market:'BINANCE'},side:id==='buy'?'buy':'sell',orderType:'limit',status:'submitted',quantity:'123456789.12345678',limitPrice:'1234567890123456.12345678',currencyCode:'USD',conditionalChildId:id==='child'?'child':null})) : [],pagination:{...pagination,total:pendingSpot?3:0,returned:pendingSpot?3:0}});
     if (path.endsWith('/portfolio')) return response({
       ...scoped, mode: account.mode, sectionErrors: [],
       summary: {
@@ -357,7 +403,13 @@ export const apiClient = {
                 } : {}),
                 averageCost: '0.5',
                 currencyCode: 'USD',
-                valuation: { state: 'unavailable' },
+                // `?valuation=1`: a live valuation (the sheet's 매도 가능 금액).
+                valuation: params.get('valuation') === '1' ? (() => {
+                  const held = assets.find((a) => a.id === state.assetId);
+                  return { state: 'available', currentPrice: held.price.currentPrice, priceCurrency: held.priceCurrency ?? 'USD',
+                    assetPriceSnapshotId: 'snapshot', priceEffectiveAt: new Date().toISOString(), priceCapturedAt: new Date().toISOString(),
+                    priceSource: null, positionValue: '1', positionValueKrw: '1400', unrealizedPnl: '0', unrealizedPnlKrw: '0', returnRate: '0' };
+                })() : { state: 'unavailable', reason: 'fixture', message: 'fixture' },
               },
             ]
           : [],
@@ -393,6 +445,11 @@ export const apiClient = {
         ...sellRow(`new-${kind}-${i}`, kind, 'watching'), triggerPrice: leg.triggerPrice, executionType: leg.executionType,
         limitPrice: leg.limitPrice ?? null, quantity: leg.quantity, position: null })) });
     }
+    if (path.endsWith('/entry-tp-sl-plans'))
+      return response({ tradingAccountId: state.accountId, duplicate: false, entry: spotEntry(body.entryId),
+        plans: [['stop_loss', body.stopLoss], ['take_profit', body.takeProfit]].filter((leg) => leg[1]).map(([kind, leg]) => ({
+          id: `new-${kind}`, entryType: body.entryType, entryId: body.entryId, childOrderId: null, domain: 'spot', assetId: 'SUI', direction: 'long', kind,
+          triggerCondition: kind === 'stop_loss' ? 'at_or_below' : 'at_or_above', triggerPrice: leg.triggerPrice, ratioPercent: leg.ratio, status: 'pending' })) });
     if (path.includes('/conditional-sell-orders/') && path.endsWith('/cancel'))
       return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrder: null });
     // Futures conditional entries: registration and cancel answer the watch.

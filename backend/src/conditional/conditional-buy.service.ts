@@ -33,6 +33,7 @@ import {
   liveConditionalBuy,
   openConditionalBuy,
 } from './conditional-buy-state';
+import { endEntryTpSlPlansOfEndedEntries } from './entry-tp-sl-state';
 
 const CONDITIONAL_BUY_INCLUDE = {
   asset: {
@@ -279,6 +280,7 @@ export class ConditionalBuyService {
           },
           include: CONDITIONAL_BUY_INCLUDE,
         });
+        await endEntryTpSlPlansOfEndedEntries(tx, accountId, now);
         return this.response(accountId, updated, false);
       }
       return this.response(accountId, row, true);
@@ -532,6 +534,8 @@ export class ConditionalBuyService {
             : {}),
         },
       });
+      if (terminal)
+        await endEntryTpSlPlansOfEndedEntries(tx, row.tradingAccountId, now);
     });
   }
 
@@ -543,7 +547,7 @@ export class ConditionalBuyService {
     now: Date,
     failureCode?: string,
   ) {
-    await tx.conditionalBuyOrder.updateMany({
+    const ended = await tx.conditionalBuyOrder.updateMany({
       where: { id, ...liveConditionalBuy },
       data: {
         status,
@@ -552,6 +556,13 @@ export class ConditionalBuyService {
         ...(failureCode ? { failureCode } : {}),
       },
     });
+    if (ended.count) {
+      const row = await tx.conditionalBuyOrder.findUniqueOrThrow({
+        where: { id },
+        select: { tradingAccountId: true },
+      });
+      await endEntryTpSlPlansOfEndedEntries(tx, row.tradingAccountId, now);
+    }
   }
 
   private response(

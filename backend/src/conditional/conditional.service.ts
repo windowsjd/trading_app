@@ -19,6 +19,7 @@ import {
   conditionalKey,
   conditionalTradable,
   isTriggered,
+  legacyOcoRegistrationEnabled,
   parseProtectionLegs,
 } from './conditional-policy';
 import { createProtectionInTransaction } from './conditional-registration';
@@ -289,8 +290,14 @@ export class ConditionalService {
       this.prisma.protectionGroup.count({ where }),
       this.now(this.prisma),
     ]);
-    const tradable =
+    // New groups are retired unless the legacy compatibility flag is on;
+    // existing groups keep their cancel/trigger/history paths. Whether they
+    // are still watched never depended on registration: `canMonitor*` keep
+    // saying it after `canCreate*` turned false.
+    const monitored =
       conditionalTradable(account, clock) && conditionalEnabled();
+    const tradable = monitored && legacyOcoRegistrationEnabled();
+    const futuresOpen = futuresTradingMode() !== 'DISABLED';
     return {
       success: true,
       data: {
@@ -298,7 +305,9 @@ export class ConditionalService {
         capabilities: {
           enabled: conditionalEnabled(),
           canCreateSpot: tradable,
-          canCreateFutures: tradable && futuresTradingMode() !== 'DISABLED',
+          canCreateFutures: tradable && futuresOpen,
+          canMonitorSpot: monitored,
+          canMonitorFutures: monitored && futuresOpen,
           canCancel: true,
           canUseSpotLimit:
             conditionalEnabled() &&

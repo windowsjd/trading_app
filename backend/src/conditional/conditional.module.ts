@@ -13,12 +13,16 @@ import { ConditionalBuyWorker } from './conditional-buy-worker.service';
 import { ConditionalSellService } from './conditional-sell.service';
 import { ConditionalSellController } from './conditional-sell.controller';
 import { ConditionalSellWorker } from './conditional-sell-worker.service';
+import { EntryTpSlService } from './entry-tp-sl.service';
+import { EntryTpSlController } from './entry-tp-sl.controller';
+import { EntryTpSlSweeper } from './entry-tp-sl-sweeper.service';
 @Module({
   imports: [OrdersModule, FuturesModule, TradingAccountsModule],
   controllers: [
     ConditionalController,
     ConditionalBuyController,
     ConditionalSellController,
+    EntryTpSlController,
   ],
   providers: [
     ConditionalService,
@@ -27,6 +31,8 @@ import { ConditionalSellWorker } from './conditional-sell-worker.service';
     ConditionalBuyWorker,
     ConditionalSellService,
     ConditionalSellWorker,
+    EntryTpSlService,
+    EntryTpSlSweeper,
     OpsJobLockService,
     OpsJobRunService,
   ],

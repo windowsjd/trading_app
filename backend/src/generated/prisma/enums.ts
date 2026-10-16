@@ -361,7 +361,8 @@ export const OpsJobName = {
   market_candle_long_sync: 'market_candle_long_sync',
   futures_candle_sync: 'futures_candle_sync',
   futures_conditional_entries: 'futures_conditional_entries',
-  asset_price_snapshot_retention: 'asset_price_snapshot_retention'
+  asset_price_snapshot_retention: 'asset_price_snapshot_retention',
+  futures_tp_sl_settings: 'futures_tp_sl_settings'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -526,6 +527,16 @@ export const ConditionalSellStatus = {
 } as const
 
 export type ConditionalSellStatus = (typeof ConditionalSellStatus)[keyof typeof ConditionalSellStatus]
+
+
+export const EntryTpSlPlanStatus = {
+  pending: 'pending',
+  activated: 'activated',
+  failed: 'failed',
+  canceled: 'canceled'
+} as const
+
+export type EntryTpSlPlanStatus = (typeof EntryTpSlPlanStatus)[keyof typeof EntryTpSlPlanStatus]
 
 
 export const LimitOnCloseStatus = {

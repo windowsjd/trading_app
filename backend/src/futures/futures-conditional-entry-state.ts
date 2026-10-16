@@ -1,4 +1,5 @@
 import { Prisma } from '../generated/prisma/client';
+import { endEntryTpSlPlansOfEndedEntries } from '../conditional/entry-tp-sl-state';
 import { futuresError } from './futures-error';
 import { futuresConditionalEntryWindowExpired } from './futures-conditional-entry-policy';
 
@@ -39,6 +40,9 @@ export async function cancelLiveFuturesConditionalEntriesInTransaction(
     where: { tradingAccountId, ...liveFuturesConditionalEntry },
     data: { status: 'canceled', terminalReason: reason, endedAt: now },
   });
+  // Their stop-loss/take-profit plans end with them.
+  if (result.count)
+    await endEntryTpSlPlansOfEndedEntries(tx, tradingAccountId, now);
   return result.count;
 }
 

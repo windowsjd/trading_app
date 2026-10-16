@@ -42,6 +42,8 @@ function listHarness() {
     failEnded: null as ((offset: number) => unknown) | null,
     gates: {} as Record<string, Promise<void>>,
     cancelError: null as unknown,
+    plansEnabled: false,
+    plans: [] as Row[],
     ui,
   };
   ui.native.Alert = { alert: (title: string, message: string, buttons: Row[]) => h.alerts.push({ title, message, buttons }) };
@@ -85,6 +87,18 @@ function listHarness() {
     },
     '../../components/states/AdminDiagnosticPanel': { default: Diagnostic, __esModule: true },
     './AdminDiagnosticPanel': { default: Diagnostic, __esModule: true },
+    // 손절가/익절가 plans of live watches: closed and empty unless a test opens them.
+    '../../features/conditional/entryTpSlApi': {
+      getAccountEntryTpSlPlans: async (accountId: string) => ({ tradingAccountId: accountId,
+        capabilities: { spot: { enabled: h.plansEnabled, canCreate: h.plansEnabled }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 },
+        entry: null, plans: h.plans, pagination: { limit: 100, offset: 0, total: h.plans.length, returned: h.plans.length, nextOffset: null } }),
+      getEntryTpSlPlans: async () => { throw new Error('the sheet is not opened here'); },
+      createEntryTpSlPlans: async () => { throw new Error('not used here'); },
+      cancelEntryTpSlPlan: async () => { throw new Error('not used here'); },
+    },
+    // A row's 손절가/익절가 sheet reads the account context (learning gates).
+    '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({
+      accounts: [], selectedAccountId: h.accountId, selectedAccount: null, isLoading: false }) },
   }).default;
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   h.accountId = 'general';
@@ -123,6 +137,24 @@ function oldOpenBehindHistory(h: any, accountId = 'general') {
     i % 4 === 0 ? { order: { orderId: `oe${i}`, status: 'executed', executedAt: '2026-10-13T02:00:00.000Z', executedPrice: '68000.00000000' } } : {}));
   h.rows[accountId] = [...old, ...ended];
 }
+
+describe('Conditional BUY list: 손절가/익절가 of live watches', () => {
+  it('watching and order-pending rows offer it; one plan set per watch, also counted on the order it created; ended rows never', async (t) => {
+    const h = listHarness();
+    h.plansEnabled = true;
+    h.rows.general = [row('w1', 'watching'), row('p1', 'order_pending'), row('f1', 'filled', { order: { orderId: 'of1', status: 'executed', executedAt: '2026-10-13T02:00:00.000Z', executedPrice: '68000.00000000' } })];
+    h.plans = [
+      { id: 'tp', entryType: 'spot_conditional_buy', entryId: 'w1', childOrderId: null, kind: 'take_profit', status: 'pending' },
+      { id: 'sl', entryType: 'spot_conditional_buy', entryId: 'p1', childOrderId: 'o-p1', kind: 'stop_loss', status: 'pending' },
+    ];
+    await h.mount(); t.after(h.close);
+    assert.equal(h.has('conditional-order-w1-tp-sl'), true);
+    assert.equal(h.textOf('conditional-order-w1-tp-sl-summary'), '익절 1건');
+    assert.equal(h.has('conditional-order-p1-tp-sl'), true);
+    assert.equal(h.textOf('conditional-order-p1-tp-sl-summary'), '손절 1건');
+    assert.equal(h.has('conditional-order-f1-tp-sl'), false, 'a filled watch takes no new plan');
+  });
+});
 
 describe('Conditional BUY list: open rows are complete, ended history pages', () => {
   it('old watching/triggered/order_pending rows behind 32 newer ended rows are all listed and cancelable', async (t) => {

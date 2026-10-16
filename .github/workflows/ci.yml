@@ -192,6 +192,10 @@ jobs:
       # LOC SELL: several settings on one holding never sell or reserve more
       # than the unreserved holding; races, flat holding, lifecycle.
       CONDITIONAL_SELL_DB_INTEGRATION: "1"
+      # Independent stop-loss/take-profit: Futures partial reduce-only
+      # settings, plans on pending entries activated only by their own fill,
+      # retired OCO registration; races, lifecycle and modes.
+      INDEPENDENT_TP_SL_DB_INTEGRATION: "1"
       # TC-D05: one committed account state per valuation while real Spot,
       # FX, transfer and Futures commands commit between its SELECTs.
       VALUATION_CONSISTENCY_DB_INTEGRATION: "1"
@@ -247,6 +251,7 @@ jobs:
           src/conditional/conditional.integration.spec.ts
           src/conditional/conditional-buy.integration.spec.ts
           src/conditional/conditional-sell.integration.spec.ts
+          src/conditional/independent-tp-sl.integration.spec.ts
           src/orders/limit-on-close.integration.spec.ts
           src/futures/futures-limit.integration.spec.ts
           src/futures/futures-conditional-entry.integration.spec.ts

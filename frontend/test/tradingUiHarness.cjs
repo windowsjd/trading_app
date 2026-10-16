@@ -116,6 +116,10 @@ function createTradingUiHarness(screenName) {
         if (resource === 'orderCapabilities') return { ...base, ...h.capabilityQuery, data: h.capabilityQuery?.data ?? { tradingAccountId: h.account.id,
           limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: { tradingAccountId: 'account-1', capabilities: { enabled: false, canCreateSpot: false, canUseSpotLimit: false, canCancel: true }, groups: [] } };
+        // 손절가/익절가 plans on pending entries: closed and empty.
+        if (resource === 'entryTpSl') return { ...base, data: { tradingAccountId: h.account.id,
+          capabilities: { spot: { enabled: false, canCreate: false }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 },
+          entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
         if (resource === 'positions' || resource === 'holdings') return { ...base, ...h.positionQuery,
           data: h.positionQuery.data ? { tradingAccountId: h.account.id, ...h.positionQuery.data } : undefined };
         if (resource === 'fx-rate') return { ...base, ...h.rateQuery };

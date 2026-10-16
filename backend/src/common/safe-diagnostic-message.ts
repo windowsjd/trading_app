@@ -6,6 +6,33 @@ import { STATUS_CODES } from 'node:http';
  * This catalog affects diagnostic projection, not public API codes or branching.
  */
 const SAFE_MESSAGES = new Set<string>([
+  // Independent TP/SL: Futures settings, entry plans, OCO retirement (2026-10-16).
+  'New TP/SL protection uses independent stop-loss and take-profit settings.',
+  'Futures stop-loss and take-profit settings are currently disabled.',
+  'Enter positive prices and quantities with at most eight fractional digits.',
+  'Provide a position and a stop-loss, a take-profit, or both.',
+  'An open Futures position is required.',
+  'Cancel the existing TP/SL protection before adding stop-loss or take-profit settings.',
+  'Too many active Futures stop-loss and take-profit settings.',
+  'The quantity exceeds the open position.',
+  'Active settings of the same kind would exceed the open position.',
+  'The current Futures Last already meets this setting.',
+  'Stop-loss or take-profit setting not found.',
+  'The stop-loss or take-profit setting changed before execution.',
+  'The stop-loss or take-profit trigger is too old to execute.',
+  'Choose a whole percent from 1 to 100.',
+  'Provide an entry and a stop-loss, a take-profit, or both.',
+  'Stop-loss and take-profit prices must be on the protective side of the entry price.',
+  'Stop-loss and take-profit plans attach to a pending BUY limit, conditional BUY or Futures entry.',
+  'The entry already filled; set stop-loss and take-profit on the holding or position.',
+  'Stop-loss and take-profit settings are available for Korean stocks and crypto.',
+  'Cancel the attached TP/SL protection before adding stop-loss or take-profit plans.',
+  'Too many pending stop-loss and take-profit plans.',
+  'A pending plan of the same kind already uses this price.',
+  'Plans of the same kind would exceed the entry quantity.',
+  'The entry was not found.',
+  'Stop-loss or take-profit plan not found.',
+  'Stop-loss and take-profit plans attach only to a Spot BUY Limit entry.',
   // Season final-ranking eligibility evidence faults (2026-10-15).
   'Season final ranking eligibility criteria are invalid.',
   'An executed season fill has no execution time.',

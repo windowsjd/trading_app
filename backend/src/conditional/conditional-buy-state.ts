@@ -1,6 +1,7 @@
 import { createApiError } from '../common/api-error';
 import { Prisma } from '../generated/prisma/client';
 import { conditionalBuyWindowExpired } from './conditional-buy-policy';
+import { endEntryTpSlPlansOfEndedEntries } from './entry-tp-sl-state';
 
 /** Watching or triggered-but-not-yet-ordered. Nothing else can act. */
 export const liveConditionalBuy = {
@@ -38,6 +39,9 @@ export async function cancelLiveConditionalBuysInTransaction(
     where: { tradingAccountId, ...liveConditionalBuy },
     data: { status: 'canceled', terminalReason: reason, endedAt: now },
   });
+  // Their stop-loss/take-profit plans end with them.
+  if (result.count)
+    await endEntryTpSlPlansOfEndedEntries(tx, tradingAccountId, now);
   return result.count;
 }
 

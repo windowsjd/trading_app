@@ -1,5 +1,6 @@
 import { createApiError } from '../common/api-error';
 import { Prisma } from '../generated/prisma/client';
+import { closeFuturesTpSlForPosition } from '../futures/futures-tp-sl-state';
 import { assertConditionalEnabled } from './conditional-policy';
 
 export const liveProtection = {
@@ -28,6 +29,9 @@ export async function finishProtection(
   });
 }
 
+/** Every path that ends a Futures lifetime (full close, liquidation, Season
+ * final settlement) calls this in its closing transaction: the lifetime's OCO
+ * groups complete and its independent stop-loss/take-profit settings end. */
 export async function finishFuturesProtection(
   tx: Prisma.TransactionClient,
   positionId: string,
@@ -40,6 +44,7 @@ export async function finishFuturesProtection(
   });
   for (const group of groups)
     await finishProtection(tx, group.id, 'completed', reason, now);
+  await closeFuturesTpSlForPosition(tx, positionId, reason, now);
 }
 
 /** Normal cancel and lifecycle cleanup share the reservation-release core. */

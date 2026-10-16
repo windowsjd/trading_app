@@ -2,38 +2,33 @@ import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import React from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useIsFocused } from '@react-navigation/native';
 import { View, Text, StyleSheet, useWindowDimensions } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
 import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
-import { QUERY_KEYS } from '../../constants/queryKeys';
-import { getProtections, type ProtectionGroup } from '../../features/conditional/api';
 import type { FuturesPosition, FuturesCapabilities, Operation } from '../../features/futures/api';
 import { futuresHolding, getFuturesPositionDisplay } from '../../features/futures/positionDisplay';
 import { formatAssetPrice, formatDisplayDecimal, formatMoneyDecimal, getFinancialDirection } from '../../utils/format';
 import CTAButton from '../../components/common/CTAButton';
-import ProtectionPanel from '../../features/conditional/ProtectionPanel';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
 
 type Props = { position: FuturesPosition; accountId: string; evaluatedAt: string; now: number;
   disabled: boolean; capabilities: FuturesCapabilities; onSelect: (operation: Exclude<Operation, 'open'>) => void;
-  /** Whether this card shows its TP/SL panel (one card at a time). */
-  protectionOpen: boolean;
-  /** Opens or closes this position's TP/SL panel in the card. */
-  onProtection: () => void;
-  onInputFocus?: (input: View | null) => void; onInputBlur?: () => void };
+  /** `익절 2건 · 손절 1건` of this lifetime's live settings; null when none/unknown. */
+  tpSlSummary: string | null;
+  /** Opens this position's 손절가/익절가 bottom sheet. */
+  onTpSl: () => void };
 
 /**
  * One open futures position: what it is (contract, direction, margin mode,
- * leverage), how it performs on Mark, its size and prices, its TP/SL and
- * realized result, and the actions that select it in the trade form. A
- * liquidation price is individual to an isolated position only. TP/SL is set,
- * changed and canceled here, in the existing protection panel of this
- * position — never through the trade form's 조건주문 (a new-position entry).
+ * leverage), how it performs on Mark, its size and prices, its 손절가/익절가
+ * and realized result, and the actions that select it in the trade form. A
+ * liquidation price is individual to an isolated position only. 손절가/익절가
+ * is set, listed and canceled in this position's bottom sheet — never through
+ * the trade form's 조건주문 (a new-position entry).
  */
 export default function FuturesPositionCard({ position: p, accountId, evaluatedAt, now,
-  disabled, capabilities, onSelect, protectionOpen, onProtection, onInputFocus, onInputBlur }: Props) {
+  disabled, capabilities, onSelect, tpSlSummary, onTpSl }: Props) {
   const { width, fontScale } = useWindowDimensions();
   const learning = useLearningAccess(accountId).gate('allTrading');
   const guide = useQuestGuide();
@@ -78,11 +73,7 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
       </> : null}
     </View>
     {isolated ? null : <Text style={styles.caption}>선물 USD 지갑의 공동 담보를 사용합니다. 교차 담보와 청산 위험은 공동 평가 영역에서 확인해주세요.</Text>}
-    <ProtectionSummary position={p} accountId={accountId} price={price} disabled={disabled} open={protectionOpen} onProtection={onProtection} />
-    {protectionOpen ? (
-      <ProtectionPanel accountId={accountId} assetId={p.instrument.underlying.assetId} domain="futures" positionId={p.id}
-        currency="USD" onInputFocus={onInputFocus} onInputBlur={onInputBlur} />
-    ) : null}
+    <TpSlButton testID={`futures-position-${p.id}-protection`} summary={tpSlSummary} onPress={onTpSl} />
     <View style={styles.line} testID={`futures-position-${p.id}-realized`}>
       <Text style={styles.lineLabel}>누적 실현 손익 · USD</Text>
       <Text selectable style={[styles.lineValue, realizedDirection !== 'neutral' && { color: financial[realizedDirection] }]}>
@@ -97,44 +88,6 @@ export default function FuturesPositionCard({ position: p, accountId, evaluatedA
           ? 'disabled' : 'enabled'} onPress={() => op === 'increase' ? learning.guard(() => onSelect(op)) : onSelect(op)} />)}
     </View>
   </View>;
-}
-
-/**
- * The position's live TP/SL group at a glance (TP / SL triggers). Its button
- * opens this card's protection panel (register, change, cancel, history); this
- * line only reads the same account-scoped protection list.
- */
-function ProtectionSummary({ position: p, accountId, price, disabled, open, onProtection }: {
-  position: FuturesPosition; accountId: string; price: (value: string | null | undefined) => string;
-  disabled: boolean; open: boolean; onProtection: () => void;
-}) {
-  const focused = useIsFocused();
-  const assetId = p.instrument.underlying.assetId;
-  const query = useQuery({
-    queryKey: QUERY_KEYS.tradingAccount.protections.list(accountId, 'futures', assetId),
-    queryFn: ({ signal }) => getProtections(accountId, 'futures', assetId, false, signal),
-    enabled: focused, refetchInterval: focused ? 4000 : false, retry: false,
-  });
-  const data = !query.isError && query.data?.tradingAccountId === accountId ? query.data : undefined;
-  const group = data?.groups.find(g => g.status === 'active' || g.status === 'holding');
-  const status = query.isError ? '확인 불가' : !data ? '확인 중' : group ? protectionText(group, price) : '미설정';
-  return <View style={styles.protection}>
-    <View style={styles.protectionCopy}>
-      <Text style={styles.caption}>TP/SL · 익절 / 손절</Text>
-      <Text testID={`futures-position-${p.id}-protection-status`} selectable style={styles.protectionValue}>{status}</Text>
-    </View>
-    <CTAButton variant="secondary" testID={`futures-position-${p.id}-protection`} label={open ? 'TP/SL 접기' : group ? 'TP/SL 관리' : 'TP/SL 설정'}
-      style={styles.protectionAction} state={disabled && !open ? 'disabled' : 'enabled'} onPress={onProtection} />
-  </View>;
-}
-
-function protectionText(group: ProtectionGroup, price: (value: string | null | undefined) => string) {
-  if (group.status === 'holding') return '진입 체결 대기';
-  const trigger = (kind: 'take_profit' | 'stop_loss') => {
-    const leg = group.legs.find(item => item.kind === kind);
-    return leg ? price(leg.triggerPrice) : '--';
-  };
-  return `${trigger('take_profit')} / ${trigger('stop_loss')}`;
 }
 
 /** Fixed columns keep a short last row aligned with the rows above it. */
@@ -160,10 +113,6 @@ const styles = StyleSheet.create({
   stacked: { flexDirection: 'column', alignItems: 'stretch' },
   value: { fontSize: 15, lineHeight: 22, color: semantic.text, fontVariant: ['tabular-nums'] },
   notice: { fontSize: 12, lineHeight: 19, color: semantic.warning },
-  protection: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 8, minWidth: 0 },
-  protectionCopy: { flexGrow: 1, flexShrink: 1, flexBasis: 140, minWidth: 0, gap: 2 },
-  protectionValue: { fontSize: 14, lineHeight: 21, fontWeight: '600', color: semantic.text, fontVariant: ['tabular-nums'] },
-  protectionAction: { flexGrow: 0, flexShrink: 0, minHeight: 40, paddingHorizontal: 14 },
   line: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', columnGap: 12, rowGap: 2,
     minWidth: 0, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: semantic.border },
   lineLabel: { flexShrink: 1, fontSize: 13, lineHeight: 19, color: semantic.secondary },

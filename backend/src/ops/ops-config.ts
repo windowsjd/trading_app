@@ -243,6 +243,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.conditional_sell_orders]: false, // Dedicated bounded SELL intent worker.
       [OpsJobName.futures_conditional_entries]: false, // Dedicated bounded Futures conditional entry worker.
       [OpsJobName.asset_price_snapshot_retention]: false, // Dedicated bounded retention worker.
+      [OpsJobName.futures_tp_sl_settings]: false, // Dedicated bounded Futures TP/SL worker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

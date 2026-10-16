@@ -7,7 +7,13 @@ import {
   linkFuturesConditionalEntry,
   lockTriggeredFuturesConditionalEntry,
 } from './futures-conditional-entry-state';
+import {
+  assertFuturesTpSlExecutionWindow,
+  linkFuturesTpSlExecution,
+  lockTriggeredFuturesTpSl,
+} from './futures-tp-sl-state';
 import { presentFuturesPerformance } from './futures-position-display';
+import { activateFuturesEntryTpSlPlans } from '../conditional/entry-tp-sl-state';
 import { createApiError } from '../common/api-error';
 import { HttpStatus, Injectable, Optional } from '@nestjs/common';
 import {
@@ -97,6 +103,7 @@ export class FuturesService {
     conditionalChildId?: string,
     limitEntryId?: string,
     conditionalEntryId?: string,
+    tpSlSettingId?: string,
   ): Promise<FuturesExecuteResult> {
     requireUser(userId);
     stage('futures_ownership', accountId);
@@ -308,6 +315,17 @@ export class FuturesService {
             status: 'open',
           },
         });
+        // A triggered independent stop-loss/take-profit (reduce or close of
+        // its own lifetime) is locked after every existing fence and linked
+        // to the execution below in this transaction.
+        const tpSl = tpSlSettingId
+          ? await lockTriggeredFuturesTpSl(tx, tpSlSettingId, accountId, {
+              positionId: current?.id ?? null,
+              operation: request.operation,
+              direction: request.direction,
+              quantity: request.quantity,
+            })
+          : null;
         const protection = current
           ? await tx.protectionGroup.findFirst({
               where: { futuresPositionId: current.id, ...liveProtection },
@@ -630,6 +648,18 @@ export class FuturesService {
               terminalReason: 'executed',
             },
           });
+        // Linked before the lifetime-close hook below, which ends every
+        // OTHER live setting of a lifetime this execution closed.
+        if (tpSl) {
+          await assertFuturesTpSlExecutionWindow(tx, tpSl.triggeredAt);
+          await linkFuturesTpSlExecution(
+            tx,
+            tpSl.id,
+            accountId,
+            execution.id,
+            executeNow,
+          );
+        }
         if (position.status === 'closed')
           await finishFuturesProtection(
             tx,
@@ -685,6 +715,17 @@ export class FuturesService {
               activatedAt: executeNow,
             },
           });
+          // The entry's stop-loss/take-profit plans (or its conditional
+          // entry's) become settings on the new lifetime for their share of
+          // the executed quantity.
+          await activateFuturesEntryTpSlPlans(tx, {
+            accountId,
+            position,
+            executionId,
+            executedQuantity: new Prisma.Decimal(request.quantity),
+            entry: { limitOrderId: entry.id },
+            now: executeNow,
+          });
         } else {
           await tx.futuresExecuteRequest.create({
             data: {
@@ -710,6 +751,14 @@ export class FuturesService {
               { executionId },
               executeNow,
             );
+            await activateFuturesEntryTpSlPlans(tx, {
+              accountId,
+              position,
+              executionId,
+              executedQuantity: new Prisma.Decimal(request.quantity),
+              entry: { conditionalEntryId: conditional.id },
+              now: executeNow,
+            });
           }
         }
         return result;

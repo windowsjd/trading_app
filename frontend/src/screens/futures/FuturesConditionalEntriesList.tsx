@@ -22,6 +22,9 @@ import { useTradingAccount } from '../../features/tradingAccount/TradingAccountC
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
 import { formatAssetPrice, formatDisplayDecimal, formatKstDateTime } from '../../utils/format';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
+import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
 
 /**
  * The account's Futures conditional entries with their real state: open rows
@@ -47,6 +50,7 @@ export default function FuturesConditionalEntriesList({ accountId, isFocused, se
     enabled: isFocused && bound, refetchInterval: isFocused ? 15000 : false, retry: false,
   });
   const [failure, setFailure] = useState<unknown>(null), [busy, setBusy] = useState<string | null>(null);
+  const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
   const alive = useRef(true), locked = useRef(false), selected = useRef(selectedAccountId);
   selected.current = selectedAccountId;
   const session = getSessionGeneration();
@@ -54,6 +58,7 @@ export default function FuturesConditionalEntriesList({ accountId, isFocused, se
   const current = () => alive.current && selected.current === accountId && isCurrentSession(session);
   // Never another account's rows (account switch, late responses).
   const openRows = !open.isError && open.data?.tradingAccountId === accountId ? open.data.entries : undefined;
+  const plans = useEntryTpSlSummaries(accountId, isFocused && bound && !!openRows?.length);
   const endedRows = !ended.isError && ended.data?.tradingAccountId === accountId ? ended.data.entries : undefined;
   const openIds = openRows?.map((row) => `${row.id}:${row.state}`).join(',');
   const previous = useRef<string | undefined>(undefined);
@@ -90,17 +95,24 @@ export default function FuturesConditionalEntriesList({ accountId, isFocused, se
       <Text style={styles.hint}>현재 새 선물 조건주문은 등록할 수 없습니다. 기존 조건주문은 확인하고 취소할 수 있습니다.</Text>
     ) : null}
     {!openRows.length ? <Text style={styles.hint}>감시 중인 선물 조건주문이 없습니다.</Text> : null}
-    {openRows.map((row) => <EntryRow key={row.id} row={row} busy={busy !== null} onCancel={() => void cancel(row)} />)}
+    {openRows.map((row) => <EntryRow key={row.id} row={row} busy={busy !== null} onCancel={() => void cancel(row)}
+      tpSlSummary={plans.summary(row.id)}
+      onTpSl={plans.capabilities?.futures.enabled || plans.summary(row.id)
+        ? () => setTpSlTarget({ type: 'entry', accountId, entryType: 'futures_conditional_entry', entryId: row.id }) : undefined} />)}
     {failure ? <ErrorNotice error={failure} message="취소 여부를 확인하지 못했습니다. 최신 상태를 확인한 뒤 다시 시도해주세요." /> : null}
     {ended.isError ? <ErrorNotice error={ended.error} message="종료된 선물 조건주문을 불러오지 못했습니다." /> : null}
     {endedRows?.length ? <>
       <Text style={styles.subheading}>최근 종료</Text>
       {endedRows.map((row) => <EntryRow key={row.id} row={row} busy={false} onCancel={() => undefined} />)}
     </> : null}
+    <TpSlSheet target={isFocused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
   </View>;
 }
 
-function EntryRow({ row, busy, onCancel }: { row: FuturesConditionalEntry; busy: boolean; onCancel: () => void }) {
+function EntryRow({ row, busy, onCancel, tpSlSummary = null, onTpSl }: {
+  row: FuturesConditionalEntry; busy: boolean; onCancel: () => void;
+  tpSlSummary?: string | null; onTpSl?: () => void;
+}) {
   const price = (value: string) => formatAssetPrice(value, 'USD', row.instrument.underlying.displayPriceDecimals);
   const path = getFuturesConditionalCancelPath(row);
   const reason = getFuturesConditionalEndReason(row);
@@ -125,6 +137,7 @@ function EntryRow({ row, busy, onCancel }: { row: FuturesConditionalEntry; busy:
     ) : null}
     {reason ? <Text style={styles.hint}>{reason}</Text> : null}
     <Text style={styles.hint}>등록 {formatKstDateTime(row.createdAt)}{row.trigger ? ` · 발동 ${formatKstDateTime(row.trigger.triggeredAt)}` : ''}</Text>
+    {onTpSl ? <TpSlButton testID={`futures-conditional-${row.id}-tp-sl`} summary={tpSlSummary} onPress={onTpSl} /> : null}
     {path ? (
       <CTAButton variant="secondary" testID={`futures-conditional-${row.id}-cancel`}
         label={path.kind === 'entry' ? '조건주문 취소' : '지정가 주문 취소'} state={busy ? 'disabled' : 'enabled'} onPress={onCancel} />

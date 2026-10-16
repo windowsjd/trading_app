@@ -237,9 +237,13 @@ async function prepareLearningFixture(
   const flags = {
     limit: process.env.LIMIT_ORDER_ENABLED,
     protection: process.env.CONDITIONAL_ORDERS_ENABLED,
+    legacyOco: process.env.LEGACY_OCO_REGISTRATION_ENABLED,
   };
   process.env.LIMIT_ORDER_ENABLED = 'true';
   process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+  // The practiced QUEST 04 fixture is a legacy OCO group (retired for new
+  // registrations by default since 2026-10-16; existing evidence still counts).
+  process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
   const asset = await db.asset.create({
     data: {
       symbol: `LEARN-${randomUUID()}`,
@@ -296,6 +300,9 @@ async function prepareLearningFixture(
     if (flags.protection === undefined)
       delete process.env.CONDITIONAL_ORDERS_ENABLED;
     else process.env.CONDITIONAL_ORDERS_ENABLED = flags.protection;
+    if (flags.legacyOco === undefined)
+      delete process.env.LEGACY_OCO_REGISTRATION_ENABLED;
+    else process.env.LEGACY_OCO_REGISTRATION_ENABLED = flags.legacyOco;
     // Keep the rate while ExchangeTransaction references it; cleanup below owns it.
   }
   return rate.id;

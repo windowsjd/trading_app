@@ -254,6 +254,8 @@ export type FuturesLastPriceSnapshotWhereInput = {
   protectionTriggers?: Prisma.ProtectionChildListRelationFilter
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryListRelationFilter
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryListRelationFilter
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingListRelationFilter
+  tpSlTriggers?: Prisma.FuturesTpSlSettingListRelationFilter
 }
 
 export type FuturesLastPriceSnapshotOrderByWithRelationInput = {
@@ -272,6 +274,8 @@ export type FuturesLastPriceSnapshotOrderByWithRelationInput = {
   protectionTriggers?: Prisma.ProtectionChildOrderByRelationAggregateInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryOrderByRelationAggregateInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryOrderByRelationAggregateInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingOrderByRelationAggregateInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingOrderByRelationAggregateInput
 }
 
 export type FuturesLastPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
@@ -294,6 +298,8 @@ export type FuturesLastPriceSnapshotWhereUniqueInput = Prisma.AtLeast<{
   protectionTriggers?: Prisma.ProtectionChildListRelationFilter
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryListRelationFilter
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryListRelationFilter
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingListRelationFilter
+  tpSlTriggers?: Prisma.FuturesTpSlSettingListRelationFilter
 }, "id" | "instrumentId_source_capturedAt">
 
 export type FuturesLastPriceSnapshotOrderByWithAggregationInput = {
@@ -343,6 +349,8 @@ export type FuturesLastPriceSnapshotCreateInput = {
   protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateInput = {
@@ -360,6 +368,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUpdateInput = {
@@ -377,6 +387,8 @@ export type FuturesLastPriceSnapshotUpdateInput = {
   protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateInput = {
@@ -394,6 +406,8 @@ export type FuturesLastPriceSnapshotUncheckedUpdateInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotCreateManyInput = {
@@ -605,6 +619,38 @@ export type FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNest
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateToOneWithWhereWithoutConditionalEntryTriggersInput, Prisma.FuturesLastPriceSnapshotUpdateWithoutConditionalEntryTriggersInput>, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutConditionalEntryTriggersInput>
 }
 
+export type FuturesLastPriceSnapshotCreateNestedOneWithoutTpSlRegistrationsInput = {
+  create?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlRegistrationsInput>
+  connectOrCreate?: Prisma.FuturesLastPriceSnapshotCreateOrConnectWithoutTpSlRegistrationsInput
+  connect?: Prisma.FuturesLastPriceSnapshotWhereUniqueInput
+}
+
+export type FuturesLastPriceSnapshotCreateNestedOneWithoutTpSlTriggersInput = {
+  create?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlTriggersInput>
+  connectOrCreate?: Prisma.FuturesLastPriceSnapshotCreateOrConnectWithoutTpSlTriggersInput
+  connect?: Prisma.FuturesLastPriceSnapshotWhereUniqueInput
+}
+
+export type FuturesLastPriceSnapshotUpdateOneWithoutTpSlRegistrationsNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlRegistrationsInput>
+  connectOrCreate?: Prisma.FuturesLastPriceSnapshotCreateOrConnectWithoutTpSlRegistrationsInput
+  upsert?: Prisma.FuturesLastPriceSnapshotUpsertWithoutTpSlRegistrationsInput
+  disconnect?: Prisma.FuturesLastPriceSnapshotWhereInput | boolean
+  delete?: Prisma.FuturesLastPriceSnapshotWhereInput | boolean
+  connect?: Prisma.FuturesLastPriceSnapshotWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateToOneWithWhereWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUpdateWithoutTpSlRegistrationsInput>, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlRegistrationsInput>
+}
+
+export type FuturesLastPriceSnapshotUpdateOneWithoutTpSlTriggersNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlTriggersInput>
+  connectOrCreate?: Prisma.FuturesLastPriceSnapshotCreateOrConnectWithoutTpSlTriggersInput
+  upsert?: Prisma.FuturesLastPriceSnapshotUpsertWithoutTpSlTriggersInput
+  disconnect?: Prisma.FuturesLastPriceSnapshotWhereInput | boolean
+  delete?: Prisma.FuturesLastPriceSnapshotWhereInput | boolean
+  connect?: Prisma.FuturesLastPriceSnapshotWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateToOneWithWhereWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUpdateWithoutTpSlTriggersInput>, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlTriggersInput>
+}
+
 export type EnumFuturesLastPriceSourceFieldUpdateOperationsInput = {
   set?: $Enums.FuturesLastPriceSource
 }
@@ -639,6 +685,8 @@ export type FuturesLastPriceSnapshotCreateWithoutInstrumentInput = {
   protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateWithoutInstrumentInput = {
@@ -655,6 +703,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateWithoutInstrumentInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotCreateOrConnectWithoutInstrumentInput = {
@@ -712,6 +762,8 @@ export type FuturesLastPriceSnapshotCreateWithoutExecutionsInput = {
   protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateWithoutExecutionsInput = {
@@ -728,6 +780,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateWithoutExecutionsInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotCreateOrConnectWithoutExecutionsInput = {
@@ -760,6 +814,8 @@ export type FuturesLastPriceSnapshotUpdateWithoutExecutionsInput = {
   protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateWithoutExecutionsInput = {
@@ -776,6 +832,8 @@ export type FuturesLastPriceSnapshotUncheckedUpdateWithoutExecutionsInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotCreateWithoutProtectionTriggersInput = {
@@ -792,6 +850,8 @@ export type FuturesLastPriceSnapshotCreateWithoutProtectionTriggersInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateWithoutProtectionTriggersInput = {
@@ -808,6 +868,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateWithoutProtectionTriggersInpu
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotCreateOrConnectWithoutProtectionTriggersInput = {
@@ -840,6 +902,8 @@ export type FuturesLastPriceSnapshotUpdateWithoutProtectionTriggersInput = {
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateWithoutProtectionTriggersInput = {
@@ -856,6 +920,8 @@ export type FuturesLastPriceSnapshotUncheckedUpdateWithoutProtectionTriggersInpu
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotCreateWithoutConditionalEntryRegistrationsInput = {
@@ -872,6 +938,8 @@ export type FuturesLastPriceSnapshotCreateWithoutConditionalEntryRegistrationsIn
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutLastPriceSnapshotInput
   protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateWithoutConditionalEntryRegistrationsInput = {
@@ -888,6 +956,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateWithoutConditionalEntryRegist
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
   protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotCreateOrConnectWithoutConditionalEntryRegistrationsInput = {
@@ -909,6 +979,8 @@ export type FuturesLastPriceSnapshotCreateWithoutConditionalEntryTriggersInput =
   seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutLastPriceSnapshotInput
   protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateWithoutConditionalEntryTriggersInput = {
@@ -925,6 +997,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateWithoutConditionalEntryTrigge
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
   protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotCreateOrConnectWithoutConditionalEntryTriggersInput = {
@@ -957,6 +1031,8 @@ export type FuturesLastPriceSnapshotUpdateWithoutConditionalEntryRegistrationsIn
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutLastPriceSnapshotNestedInput
   protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateWithoutConditionalEntryRegistrationsInput = {
@@ -973,6 +1049,8 @@ export type FuturesLastPriceSnapshotUncheckedUpdateWithoutConditionalEntryRegist
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
   protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUpsertWithoutConditionalEntryTriggersInput = {
@@ -1000,6 +1078,8 @@ export type FuturesLastPriceSnapshotUpdateWithoutConditionalEntryTriggersInput =
   seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutLastPriceSnapshotNestedInput
   protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateWithoutConditionalEntryTriggersInput = {
@@ -1016,6 +1096,184 @@ export type FuturesLastPriceSnapshotUncheckedUpdateWithoutConditionalEntryTrigge
   seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
   protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+}
+
+export type FuturesLastPriceSnapshotCreateWithoutTpSlRegistrationsInput = {
+  id?: string
+  symbol: string
+  providerProduct?: string
+  currencyCode?: $Enums.CurrencyCode
+  source: $Enums.FuturesLastPriceSource
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLastPricesInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutLastPriceSnapshotInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutLastPriceSnapshotInput
+  protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
+}
+
+export type FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlRegistrationsInput = {
+  id?: string
+  instrumentId: string
+  symbol: string
+  providerProduct?: string
+  currencyCode?: $Enums.CurrencyCode
+  source: $Enums.FuturesLastPriceSource
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
+  protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+}
+
+export type FuturesLastPriceSnapshotCreateOrConnectWithoutTpSlRegistrationsInput = {
+  where: Prisma.FuturesLastPriceSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlRegistrationsInput>
+}
+
+export type FuturesLastPriceSnapshotCreateWithoutTpSlTriggersInput = {
+  id?: string
+  symbol: string
+  providerProduct?: string
+  currencyCode?: $Enums.CurrencyCode
+  source: $Enums.FuturesLastPriceSource
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLastPricesInput
+  executions?: Prisma.FuturesExecutionCreateNestedManyWithoutLastPriceSnapshotInput
+  seasonPrices?: Prisma.FuturesSeasonPriceCreateNestedManyWithoutLastPriceSnapshotInput
+  protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+}
+
+export type FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlTriggersInput = {
+  id?: string
+  instrumentId: string
+  symbol: string
+  providerProduct?: string
+  currencyCode?: $Enums.CurrencyCode
+  source: $Enums.FuturesLastPriceSource
+  price: runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt: Date | string
+  capturedAt: Date | string
+  executions?: Prisma.FuturesExecutionUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedCreateNestedManyWithoutLastPriceSnapshotInput
+  protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+}
+
+export type FuturesLastPriceSnapshotCreateOrConnectWithoutTpSlTriggersInput = {
+  where: Prisma.FuturesLastPriceSnapshotWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlTriggersInput>
+}
+
+export type FuturesLastPriceSnapshotUpsertWithoutTpSlRegistrationsInput = {
+  update: Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlRegistrationsInput>
+  create: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlRegistrationsInput>
+  where?: Prisma.FuturesLastPriceSnapshotWhereInput
+}
+
+export type FuturesLastPriceSnapshotUpdateToOneWithWhereWithoutTpSlRegistrationsInput = {
+  where?: Prisma.FuturesLastPriceSnapshotWhereInput
+  data: Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateWithoutTpSlRegistrationsInput, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlRegistrationsInput>
+}
+
+export type FuturesLastPriceSnapshotUpdateWithoutTpSlRegistrationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  providerProduct?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  source?: Prisma.EnumFuturesLastPriceSourceFieldUpdateOperationsInput | $Enums.FuturesLastPriceSource
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLastPricesNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutLastPriceSnapshotNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutLastPriceSnapshotNestedInput
+  protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
+}
+
+export type FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlRegistrationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  providerProduct?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  source?: Prisma.EnumFuturesLastPriceSourceFieldUpdateOperationsInput | $Enums.FuturesLastPriceSource
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
+  protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+}
+
+export type FuturesLastPriceSnapshotUpsertWithoutTpSlTriggersInput = {
+  update: Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlTriggersInput>
+  create: Prisma.XOR<Prisma.FuturesLastPriceSnapshotCreateWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUncheckedCreateWithoutTpSlTriggersInput>
+  where?: Prisma.FuturesLastPriceSnapshotWhereInput
+}
+
+export type FuturesLastPriceSnapshotUpdateToOneWithWhereWithoutTpSlTriggersInput = {
+  where?: Prisma.FuturesLastPriceSnapshotWhereInput
+  data: Prisma.XOR<Prisma.FuturesLastPriceSnapshotUpdateWithoutTpSlTriggersInput, Prisma.FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlTriggersInput>
+}
+
+export type FuturesLastPriceSnapshotUpdateWithoutTpSlTriggersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  providerProduct?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  source?: Prisma.EnumFuturesLastPriceSourceFieldUpdateOperationsInput | $Enums.FuturesLastPriceSource
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLastPricesNestedInput
+  executions?: Prisma.FuturesExecutionUpdateManyWithoutLastPriceSnapshotNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUpdateManyWithoutLastPriceSnapshotNestedInput
+  protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+}
+
+export type FuturesLastPriceSnapshotUncheckedUpdateWithoutTpSlTriggersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  providerProduct?: Prisma.StringFieldUpdateOperationsInput | string
+  currencyCode?: Prisma.EnumCurrencyCodeFieldUpdateOperationsInput | $Enums.CurrencyCode
+  source?: Prisma.EnumFuturesLastPriceSourceFieldUpdateOperationsInput | $Enums.FuturesLastPriceSource
+  price?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  effectiveAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  capturedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  executions?: Prisma.FuturesExecutionUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
+  seasonPrices?: Prisma.FuturesSeasonPriceUncheckedUpdateManyWithoutLastPriceSnapshotNestedInput
+  protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
+  conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotCreateWithoutSeasonPricesInput = {
@@ -1032,6 +1290,8 @@ export type FuturesLastPriceSnapshotCreateWithoutSeasonPricesInput = {
   protectionTriggers?: Prisma.ProtectionChildCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedCreateWithoutSeasonPricesInput = {
@@ -1048,6 +1308,8 @@ export type FuturesLastPriceSnapshotUncheckedCreateWithoutSeasonPricesInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedCreateNestedManyWithoutFuturesLastPriceSnapshotInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedCreateNestedManyWithoutTriggerSnapshotInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutRegistrationSnapshotInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedCreateNestedManyWithoutTriggerSnapshotInput
 }
 
 export type FuturesLastPriceSnapshotCreateOrConnectWithoutSeasonPricesInput = {
@@ -1080,6 +1342,8 @@ export type FuturesLastPriceSnapshotUpdateWithoutSeasonPricesInput = {
   protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateWithoutSeasonPricesInput = {
@@ -1096,6 +1360,8 @@ export type FuturesLastPriceSnapshotUncheckedUpdateWithoutSeasonPricesInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotCreateManyInstrumentInput = {
@@ -1123,6 +1389,8 @@ export type FuturesLastPriceSnapshotUpdateWithoutInstrumentInput = {
   protectionTriggers?: Prisma.ProtectionChildUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateWithoutInstrumentInput = {
@@ -1139,6 +1407,8 @@ export type FuturesLastPriceSnapshotUncheckedUpdateWithoutInstrumentInput = {
   protectionTriggers?: Prisma.ProtectionChildUncheckedUpdateManyWithoutFuturesLastPriceSnapshotNestedInput
   conditionalEntryRegistrations?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
   conditionalEntryTriggers?: Prisma.FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
+  tpSlRegistrations?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutRegistrationSnapshotNestedInput
+  tpSlTriggers?: Prisma.FuturesTpSlSettingUncheckedUpdateManyWithoutTriggerSnapshotNestedInput
 }
 
 export type FuturesLastPriceSnapshotUncheckedUpdateManyWithoutInstrumentInput = {
@@ -1163,6 +1433,8 @@ export type FuturesLastPriceSnapshotCountOutputType = {
   protectionTriggers: number
   conditionalEntryRegistrations: number
   conditionalEntryTriggers: number
+  tpSlRegistrations: number
+  tpSlTriggers: number
 }
 
 export type FuturesLastPriceSnapshotCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1171,6 +1443,8 @@ export type FuturesLastPriceSnapshotCountOutputTypeSelect<ExtArgs extends runtim
   protectionTriggers?: boolean | FuturesLastPriceSnapshotCountOutputTypeCountProtectionTriggersArgs
   conditionalEntryRegistrations?: boolean | FuturesLastPriceSnapshotCountOutputTypeCountConditionalEntryRegistrationsArgs
   conditionalEntryTriggers?: boolean | FuturesLastPriceSnapshotCountOutputTypeCountConditionalEntryTriggersArgs
+  tpSlRegistrations?: boolean | FuturesLastPriceSnapshotCountOutputTypeCountTpSlRegistrationsArgs
+  tpSlTriggers?: boolean | FuturesLastPriceSnapshotCountOutputTypeCountTpSlTriggersArgs
 }
 
 /**
@@ -1218,6 +1492,20 @@ export type FuturesLastPriceSnapshotCountOutputTypeCountConditionalEntryTriggers
   where?: Prisma.FuturesConditionalEntryWhereInput
 }
 
+/**
+ * FuturesLastPriceSnapshotCountOutputType without action
+ */
+export type FuturesLastPriceSnapshotCountOutputTypeCountTpSlRegistrationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesTpSlSettingWhereInput
+}
+
+/**
+ * FuturesLastPriceSnapshotCountOutputType without action
+ */
+export type FuturesLastPriceSnapshotCountOutputTypeCountTpSlTriggersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.FuturesTpSlSettingWhereInput
+}
+
 
 export type FuturesLastPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1235,6 +1523,8 @@ export type FuturesLastPriceSnapshotSelect<ExtArgs extends runtime.Types.Extensi
   protectionTriggers?: boolean | Prisma.FuturesLastPriceSnapshot$protectionTriggersArgs<ExtArgs>
   conditionalEntryRegistrations?: boolean | Prisma.FuturesLastPriceSnapshot$conditionalEntryRegistrationsArgs<ExtArgs>
   conditionalEntryTriggers?: boolean | Prisma.FuturesLastPriceSnapshot$conditionalEntryTriggersArgs<ExtArgs>
+  tpSlRegistrations?: boolean | Prisma.FuturesLastPriceSnapshot$tpSlRegistrationsArgs<ExtArgs>
+  tpSlTriggers?: boolean | Prisma.FuturesLastPriceSnapshot$tpSlTriggersArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesLastPriceSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresLastPriceSnapshot"]>
 
@@ -1284,6 +1574,8 @@ export type FuturesLastPriceSnapshotInclude<ExtArgs extends runtime.Types.Extens
   protectionTriggers?: boolean | Prisma.FuturesLastPriceSnapshot$protectionTriggersArgs<ExtArgs>
   conditionalEntryRegistrations?: boolean | Prisma.FuturesLastPriceSnapshot$conditionalEntryRegistrationsArgs<ExtArgs>
   conditionalEntryTriggers?: boolean | Prisma.FuturesLastPriceSnapshot$conditionalEntryTriggersArgs<ExtArgs>
+  tpSlRegistrations?: boolean | Prisma.FuturesLastPriceSnapshot$tpSlRegistrationsArgs<ExtArgs>
+  tpSlTriggers?: boolean | Prisma.FuturesLastPriceSnapshot$tpSlTriggersArgs<ExtArgs>
   _count?: boolean | Prisma.FuturesLastPriceSnapshotCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesLastPriceSnapshotIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1302,6 +1594,8 @@ export type $FuturesLastPriceSnapshotPayload<ExtArgs extends runtime.Types.Exten
     protectionTriggers: Prisma.$ProtectionChildPayload<ExtArgs>[]
     conditionalEntryRegistrations: Prisma.$FuturesConditionalEntryPayload<ExtArgs>[]
     conditionalEntryTriggers: Prisma.$FuturesConditionalEntryPayload<ExtArgs>[]
+    tpSlRegistrations: Prisma.$FuturesTpSlSettingPayload<ExtArgs>[]
+    tpSlTriggers: Prisma.$FuturesTpSlSettingPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1713,6 +2007,8 @@ export interface Prisma__FuturesLastPriceSnapshotClient<T, Null = never, ExtArgs
   protectionTriggers<T extends Prisma.FuturesLastPriceSnapshot$protectionTriggersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLastPriceSnapshot$protectionTriggersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProtectionChildPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   conditionalEntryRegistrations<T extends Prisma.FuturesLastPriceSnapshot$conditionalEntryRegistrationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLastPriceSnapshot$conditionalEntryRegistrationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesConditionalEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   conditionalEntryTriggers<T extends Prisma.FuturesLastPriceSnapshot$conditionalEntryTriggersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLastPriceSnapshot$conditionalEntryTriggersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesConditionalEntryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tpSlRegistrations<T extends Prisma.FuturesLastPriceSnapshot$tpSlRegistrationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLastPriceSnapshot$tpSlRegistrationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesTpSlSettingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tpSlTriggers<T extends Prisma.FuturesLastPriceSnapshot$tpSlTriggersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLastPriceSnapshot$tpSlTriggersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$FuturesTpSlSettingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2269,6 +2565,54 @@ export type FuturesLastPriceSnapshot$conditionalEntryTriggersArgs<ExtArgs extend
   take?: number
   skip?: number
   distinct?: Prisma.FuturesConditionalEntryScalarFieldEnum | Prisma.FuturesConditionalEntryScalarFieldEnum[]
+}
+
+/**
+ * FuturesLastPriceSnapshot.tpSlRegistrations
+ */
+export type FuturesLastPriceSnapshot$tpSlRegistrationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesTpSlSetting
+   */
+  select?: Prisma.FuturesTpSlSettingSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesTpSlSetting
+   */
+  omit?: Prisma.FuturesTpSlSettingOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesTpSlSettingInclude<ExtArgs> | null
+  where?: Prisma.FuturesTpSlSettingWhereInput
+  orderBy?: Prisma.FuturesTpSlSettingOrderByWithRelationInput | Prisma.FuturesTpSlSettingOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesTpSlSettingWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesTpSlSettingScalarFieldEnum | Prisma.FuturesTpSlSettingScalarFieldEnum[]
+}
+
+/**
+ * FuturesLastPriceSnapshot.tpSlTriggers
+ */
+export type FuturesLastPriceSnapshot$tpSlTriggersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesTpSlSetting
+   */
+  select?: Prisma.FuturesTpSlSettingSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the FuturesTpSlSetting
+   */
+  omit?: Prisma.FuturesTpSlSettingOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.FuturesTpSlSettingInclude<ExtArgs> | null
+  where?: Prisma.FuturesTpSlSettingWhereInput
+  orderBy?: Prisma.FuturesTpSlSettingOrderByWithRelationInput | Prisma.FuturesTpSlSettingOrderByWithRelationInput[]
+  cursor?: Prisma.FuturesTpSlSettingWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.FuturesTpSlSettingScalarFieldEnum | Prisma.FuturesTpSlSettingScalarFieldEnum[]
 }
 
 /**

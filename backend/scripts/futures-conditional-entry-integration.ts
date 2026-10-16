@@ -48,6 +48,10 @@ if (
 process.env.FUTURES_TRADING_MODE = 'ENABLED';
 process.env.FUTURES_CONDITIONAL_ENTRY_ENABLED = 'true';
 process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+// The position-TP/SL separation scenario registers a whole-position OCO
+// group: new ones are retired by default since 2026-10-16, so this legacy
+// contract opts back in explicitly.
+process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
 const access = new TradingAccountAccessService(db);
 const limits = new FuturesLimitService(db, access, app.futures);
 const entries = new FuturesConditionalEntryService(

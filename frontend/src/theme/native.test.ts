@@ -113,8 +113,10 @@ for (const width of [320, 360, 390]) {
     assert.equal(h.node('order-limit-price-input').props.value, '0.000000123456789');
   });
 
-  test(`${width}px limit buy keeps the quote column beside the order inputs and its TP/SL editor`, async (t) => {
+  test(`${width}px limit buy keeps the quote column beside the order inputs and its 손절가/익절가 button`, async (t) => {
     const h = inlineTradingHarness(); h.dimensions = { width, height: 700, fontScale: 1.5 };
+    h.entryTpSlList = { tradingAccountId: 'general', capabilities: { spot: { enabled: true, canCreate: true }, futures: { enabled: false, canCreate: false },
+      canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 }, entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } };
     await h.mount(); t.after(h.close);
     const columns = () => {
       const row = h.node('asset-trading-columns');
@@ -126,11 +128,11 @@ for (const width of [320, 360, 390]) {
     const sideBySide = { row: 'row', stacked: false, price: '1/-', book: true };
     assert.deepEqual(columns(), sideBySide, 'market buy');
     await h.selectOrderType('limit');
-    // The TP/SL editor appears for a limit buy and is no reason to move the book.
-    assert.equal(h.node('attached-entry-editor') !== undefined, true);
+    // The 손절가/익절가 button appears for a limit buy and is no reason to move the book.
+    assert.equal(h.node('order-tp-sl-button') !== undefined, true);
     assert.deepEqual(columns(), sideBySide, 'limit buy');
     await h.press('asset-detail-sell-button');
-    assert.equal(h.node('attached-entry-editor') === undefined, true);
+    assert.equal(h.node('order-tp-sl-button') === undefined, true);
     assert.deepEqual(columns(), sideBySide, 'limit sell');
     await h.selectOrderType('market');
     assert.deepEqual(columns(), sideBySide, 'market sell');

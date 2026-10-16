@@ -2,6 +2,13 @@
 
 Current contract: server capability defaults OFF; production activation is a separate operation. API remains `/api/v1`.
 
+> 2026-10-16: **new** OCO groups are no longer registered (`POST /protections`
+> and `attachedProtection` → `409 PROTECTION_REGISTRATION_RETIRED` unless
+> `LEGACY_OCO_REGISTRATION_ENABLED=true`, a legacy-test-only switch). Groups
+> registered before keep their trigger, fill, cancel and history paths below;
+> nothing is converted. New stop-loss/take-profit everywhere is independent:
+> [independent-tp-sl-entry-plans-contract.md](independent-tp-sl-entry-plans-contract.md).
+
 Conditional BUY watches and Limit-on-Close are a separate contract and flag
 ([Conditional BUY / LOC](conditional-buy-and-loc-contract.md));
 `CONDITIONAL_ORDERS_ENABLED` never enables them. The same holds for the

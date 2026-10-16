@@ -133,7 +133,7 @@ const methods = (h: any) => ['market', 'limit', 'conditional', 'loc', 'protectio
   .filter((method) => h.node(`order-method-${method}`) !== undefined);
 
 describe('주문방식 field and sheet', () => {
-  it('starts at 시장가: one full-width field with a small 주문방식 선택하기 hint; nothing submits until the draft is valid', async (t) => {
+  it('starts at 시장가: one full-width field, the method on the left and a large ▼ on the right, no extra hint; nothing submits until the draft is valid', async (t) => {
     const h = inlineTradingHarness();
     h.method = null;
     await h.mount(); t.after(h.close);
@@ -141,11 +141,18 @@ describe('주문방식 field and sheet', () => {
     assert.equal(field.props.accessibilityRole, 'button');
     assert.ok(flatten(field.props.style).minHeight >= 44);
     assert.equal(h.orderType(), '시장가');
-    assert.equal(field.props.accessibilityLabel, '주문방식 시장가, 주문방식 선택하기');
-    // The hint sits after the value, in the field's own row, as two wrappable words.
-    const hint = h.node('order-type-select-hint');
-    assert.equal(hint.findAll((n: any) => n.type === 'Text').map((n: any) => [n.props.children].flat().join('')).join(' '), '주문방식 선택하기');
+    assert.equal(field.props.accessibilityLabel, '주문방식 시장가');
+    assert.equal(field.props.accessibilityHint, '주문방식 목록을 엽니다');
     assert.equal(flatten(field.props.style).flexDirection, 'row');
+    assert.equal(flatten(field.props.style).justifyContent, 'space-between');
+    // 「주문방식 선택하기」 is gone; the value comes first and the triangle last.
+    assert.equal(h.node('order-type-select-hint') === undefined, true);
+    const hosts = field.findAll((n: any) => typeof n.type === 'string' && typeof n.props.testID === 'string')
+      .map((n: any) => n.props.testID).filter((id: string) => id !== TEST_IDS.order.typeSelect);
+    assert.deepEqual(hosts, ['order-type-select-value', 'order-type-select-chevron']);
+    const triangle = flatten(h.node('order-type-select-chevron').props.style);
+    assert.deepEqual([triangle.borderLeftWidth, triangle.borderTopWidth], [7, 9], 'the larger ▼ (14 × 9)');
+    assert.equal(JSON.stringify(h.renderer.toJSON()).includes('주문방식 선택하기'), false);
     // The market draft is ready and empty: no limit price, no unselected notice.
     assert.equal(h.node(TEST_IDS.order.quantityInput).props.value, '');
     assert.equal(h.node(TEST_IDS.order.limitPriceInput) === undefined, true);
@@ -195,7 +202,7 @@ describe('주문방식 field and sheet', () => {
         assert.equal(h.node(`order-method-${method}-badge`).props.children, badge);
       }
     });
-    it(`${assetType} SELL lists 시장가 and three server-gated methods (US 준비 중), never a new 지정가`, async (t) => {
+    it(`${assetType} SELL lists 시장가 and two server-gated methods (US 준비 중), never a new 지정가 or 손절가/익절가`, async (t) => {
       const h = inlineTradingHarness();
       h.method = null;
       h.assetId = 'samsung';
@@ -203,9 +210,9 @@ describe('주문방식 field and sheet', () => {
       await h.mount(); t.after(h.close);
       await h.press(sell);
       await h.press(TEST_IDS.order.typeSelect);
-      assert.deepEqual(methods(h), ['market', 'conditional', 'loc', 'protection']);
+      assert.deepEqual(methods(h), ['market', 'conditional', 'loc']);
       // KRX follows the (default off) server gates; US waits for a data provider.
-      for (const method of ['conditional', 'loc', 'protection']) {
+      for (const method of ['conditional', 'loc']) {
         assert.equal(h.node(`order-method-${method}`).props.disabled, true, method);
         assert.equal(h.node(`order-method-${method}-badge`).props.children, assetType === 'us_stock' ? '준비 중' : '이용 불가');
       }

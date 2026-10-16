@@ -50,6 +50,7 @@ export async function runSeasonLifecycleLeaseIntegration(
     conditionalBuyOrder: prisma.conditionalBuyOrder,
     conditionalSellOrder: prisma.conditionalSellOrder,
     futuresConditionalEntry: prisma.futuresConditionalEntry,
+    futuresTpSlSetting: prisma.futuresTpSlSetting,
     order: {
       findMany: (args: Prisma.OrderFindManyArgs) => {
         selections += 1;

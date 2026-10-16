@@ -5,6 +5,7 @@ import { Prisma } from '../generated/prisma/client';
 import { assertOrderInputPolicy } from '../orders/order-input-policy';
 import {
   assertConditionalEnabled,
+  assertProtectionRegistrationOpen,
   assertTriggerDirections,
   conditionalTradable,
   type ProtectionLegInput,
@@ -16,7 +17,10 @@ import { liveProtection } from './conditional-state';
 import { countLiveConditionalSells } from './conditional-sell-state';
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 
-/** Caller owns the existing account/lifecycle fence. Registration never reserves. */
+/** Caller owns the existing account/lifecycle fence. Registration never
+ * reserves. Every caller is a NEW registration (position, Spot BUY Limit
+ * attachment, Futures limit entry attachment) and runs after its own
+ * idempotent replay, so the retirement check here is the single gate. */
 export async function createProtectionInTransaction(
   tx: Prisma.TransactionClient,
   input: {
@@ -31,6 +35,7 @@ export async function createProtectionInTransaction(
     now: Date;
   },
 ) {
+  assertProtectionRegistrationOpen();
   assertConditionalEnabled(input.domain);
   if (
     input.domain === 'spot' &&

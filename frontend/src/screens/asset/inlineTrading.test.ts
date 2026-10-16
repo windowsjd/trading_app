@@ -14,7 +14,7 @@ const sell = TEST_IDS.assetDetail.sellButton;
 
 describe('Order screen lifecycle with real React and query mutations', () => {
   for (const accountId of ['general', 'season'])
-    it(`${accountId} sell offers no new limit: 시장가, plus server-gated condition and stop/take`, async (t) => {
+    it(`${accountId} sell offers no new limit: 시장가, plus a server-gated condition (손절가/익절가 lives on the holding)`, async (t) => {
       const h = inlineTradingHarness();
       h.accountId = accountId;
       await h.mount();
@@ -23,11 +23,10 @@ describe('Order screen lifecycle with real React and query mutations', () => {
       await h.press('order-type-select');
       assert.equal(h.node('order-method-limit') === undefined, true);
       assert.equal(h.node('order-method-market').props.disabled, false);
-      // The server's SELL flags are off by default: shown, not selectable.
-      for (const method of ['conditional', 'protection']) {
-        assert.equal(h.node(`order-method-${method}`).props.disabled, true, method);
-        assert.equal(h.node(`order-method-${method}-badge`).props.children, '이용 불가');
-      }
+      // The server's SELL flag is off by default: shown, not selectable.
+      assert.equal(h.node('order-method-conditional').props.disabled, true);
+      assert.equal(h.node('order-method-conditional-badge').props.children, '이용 불가');
+      assert.equal(h.node('order-method-protection') === undefined, true, '손절가/익절가 is not a 주문방식');
       // crypto has no LOC at all
       assert.equal(h.node('order-method-loc') === undefined, true);
     });

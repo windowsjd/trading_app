@@ -417,6 +417,8 @@ export const ModelName = {
   ConditionalBuyOrder: 'ConditionalBuyOrder',
   FuturesConditionalEntry: 'FuturesConditionalEntry',
   ConditionalSellOrder: 'ConditionalSellOrder',
+  FuturesTpSlSetting: 'FuturesTpSlSetting',
+  EntryTpSlPlan: 'EntryTpSlPlan',
   LimitOnCloseOrder: 'LimitOnCloseOrder',
   SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
@@ -459,7 +461,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2902,6 +2904,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.ConditionalSellOrderCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.ConditionalSellOrderCountAggregateOutputType> | number
+        }
+      }
+    }
+    FuturesTpSlSetting: {
+      payload: Prisma.$FuturesTpSlSettingPayload<ExtArgs>
+      fields: Prisma.FuturesTpSlSettingFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesTpSlSettingFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesTpSlSettingFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesTpSlSettingFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesTpSlSettingFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesTpSlSettingFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesTpSlSettingCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesTpSlSettingCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesTpSlSettingCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesTpSlSettingDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>
+        }
+        update: {
+          args: Prisma.FuturesTpSlSettingUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesTpSlSettingDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesTpSlSettingUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesTpSlSettingUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesTpSlSettingUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesTpSlSettingPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesTpSlSettingAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesTpSlSetting>
+        }
+        groupBy: {
+          args: Prisma.FuturesTpSlSettingGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesTpSlSettingGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesTpSlSettingCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesTpSlSettingCountAggregateOutputType> | number
+        }
+      }
+    }
+    EntryTpSlPlan: {
+      payload: Prisma.$EntryTpSlPlanPayload<ExtArgs>
+      fields: Prisma.EntryTpSlPlanFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.EntryTpSlPlanFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.EntryTpSlPlanFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>
+        }
+        findFirst: {
+          args: Prisma.EntryTpSlPlanFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.EntryTpSlPlanFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>
+        }
+        findMany: {
+          args: Prisma.EntryTpSlPlanFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>[]
+        }
+        create: {
+          args: Prisma.EntryTpSlPlanCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>
+        }
+        createMany: {
+          args: Prisma.EntryTpSlPlanCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.EntryTpSlPlanCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>[]
+        }
+        delete: {
+          args: Prisma.EntryTpSlPlanDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>
+        }
+        update: {
+          args: Prisma.EntryTpSlPlanUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>
+        }
+        deleteMany: {
+          args: Prisma.EntryTpSlPlanDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.EntryTpSlPlanUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.EntryTpSlPlanUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>[]
+        }
+        upsert: {
+          args: Prisma.EntryTpSlPlanUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EntryTpSlPlanPayload>
+        }
+        aggregate: {
+          args: Prisma.EntryTpSlPlanAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateEntryTpSlPlan>
+        }
+        groupBy: {
+          args: Prisma.EntryTpSlPlanGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EntryTpSlPlanGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.EntryTpSlPlanCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EntryTpSlPlanCountAggregateOutputType> | number
         }
       }
     }
@@ -5647,6 +5797,66 @@ export const ConditionalSellOrderScalarFieldEnum = {
 export type ConditionalSellOrderScalarFieldEnum = (typeof ConditionalSellOrderScalarFieldEnum)[keyof typeof ConditionalSellOrderScalarFieldEnum]
 
 
+export const FuturesTpSlSettingScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  positionId: 'positionId',
+  direction: 'direction',
+  kind: 'kind',
+  triggerPrice: 'triggerPrice',
+  quantity: 'quantity',
+  status: 'status',
+  executionId: 'executionId',
+  registrationSnapshotId: 'registrationSnapshotId',
+  triggerSnapshotId: 'triggerSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesTpSlSettingScalarFieldEnum = (typeof FuturesTpSlSettingScalarFieldEnum)[keyof typeof FuturesTpSlSettingScalarFieldEnum]
+
+
+export const EntryTpSlPlanScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  domain: 'domain',
+  assetId: 'assetId',
+  orderId: 'orderId',
+  conditionalBuyOrderId: 'conditionalBuyOrderId',
+  futuresLimitOrderId: 'futuresLimitOrderId',
+  futuresConditionalEntryId: 'futuresConditionalEntryId',
+  kind: 'kind',
+  triggerPrice: 'triggerPrice',
+  ratioPercent: 'ratioPercent',
+  status: 'status',
+  basisQuantity: 'basisQuantity',
+  activatedQuantity: 'activatedQuantity',
+  fillOrderId: 'fillOrderId',
+  fillExecutionId: 'fillExecutionId',
+  conditionalSellOrderId: 'conditionalSellOrderId',
+  futuresTpSlSettingId: 'futuresTpSlSettingId',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type EntryTpSlPlanScalarFieldEnum = (typeof EntryTpSlPlanScalarFieldEnum)[keyof typeof EntryTpSlPlanScalarFieldEnum]
+
+
 export const LimitOnCloseOrderScalarFieldEnum = {
   orderId: 'orderId',
   tradingAccountId: 'tradingAccountId',
@@ -6854,6 +7064,20 @@ export type ListEnumConditionalSellStatusFieldRefInput<$PrismaModel> = FieldRefI
 
 
 /**
+ * Reference to a field of type 'EntryTpSlPlanStatus'
+ */
+export type EnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EntryTpSlPlanStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'EntryTpSlPlanStatus[]'
+ */
+export type ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EntryTpSlPlanStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'LimitOnCloseStatus'
  */
 export type EnumLimitOnCloseStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LimitOnCloseStatus'>
@@ -7246,6 +7470,8 @@ export type GlobalOmitConfig = {
   conditionalBuyOrder?: Prisma.ConditionalBuyOrderOmit
   futuresConditionalEntry?: Prisma.FuturesConditionalEntryOmit
   conditionalSellOrder?: Prisma.ConditionalSellOrderOmit
+  futuresTpSlSetting?: Prisma.FuturesTpSlSettingOmit
+  entryTpSlPlan?: Prisma.EntryTpSlPlanOmit
   limitOnCloseOrder?: Prisma.LimitOnCloseOrderOmit
   sessionClosePriceEvidence?: Prisma.SessionClosePriceEvidenceOmit
   beginnerQuestAcknowledgement?: Prisma.BeginnerQuestAcknowledgementOmit

@@ -400,6 +400,20 @@ function inlineTradingHarness() {
           capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
           conditionalOrders: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } } };
         if (resource === 'conditionalSellOrders') return { ...base, data: h.sellList ?? defaultSellList(id) };
+        // Trusted USD/KRW for a KRW holding's 매도 가능 금액: unknown unless a test sets it.
+        if (scope === 'wallet' && resource === 'fx-rate') return { ...base, data: h.fxRate };
+        // 손절가/익절가 plans on pending entries: closed and empty unless a test sets them.
+        if (resource === 'entryTpSl') {
+          const list = h.entryTpSlList ?? { tradingAccountId: id,
+            capabilities: { spot: { enabled: false, canCreate: false }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 },
+            entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } };
+          // One entry's sheet: its facts and plans (`h.entryTpSlEntry(type, id)`).
+          if (options.queryKey[3] === 'entry') {
+            const entry = h.entryTpSlEntry?.(options.queryKey[4], options.queryKey[5]) ?? null;
+            return { ...base, data: { ...list, entry, plans: list.plans.filter((plan) => plan.entryId === options.queryKey[5] || plan.childOrderId === options.queryKey[5]) } };
+          }
+          return { ...base, data: list };
+        }
         if (resource === 'orderCapabilities') return { ...base, data: h.orderCapabilities ?? { tradingAccountId: id,
           limitOrder: { enabled: true, autoExecutionEnabled: false }, limitOnClose: { enabled: false, markets: ['KRX'], sides: ['buy'], attachedProtection: false } } };
         if (resource === 'protections') return { ...base, data: h.protections ?? { tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { total: 0, limit: 30, offset: 0, hasNext: false } } };
@@ -511,6 +525,22 @@ function inlineTradingHarness() {
     '../../components/common/CTAButton': {
       default: 'CTAButton',
       __esModule: true,
+    },
+    // 손절가/익절가 plans: reads go through the query mock; writes are recorded.
+    '../../features/conditional/entryTpSlApi': {
+      getEntryTpSlPlans: async () => { throw new Error('read through the query mock'); },
+      getAccountEntryTpSlPlans: async () => { throw new Error('read through the query mock'); },
+      createEntryTpSlPlans: async (accountId, body) => {
+        h.requests.push({ url: `/trading-accounts/${accountId}/entry-tp-sl-plans`, body });
+        if (h.entryTpSlFailure) throw h.entryTpSlFailure;
+        const plan = (kind, leg) => ({ id: `plan-${kind}`, entryType: body.entryType, entryId: body.entryId, kind, triggerPrice: leg.triggerPrice, ratioPercent: leg.ratio, status: 'pending' });
+        return { tradingAccountId: accountId, duplicate: false, entry: null,
+          plans: [...(body.stopLoss ? [plan('stop_loss', body.stopLoss)] : []), ...(body.takeProfit ? [plan('take_profit', body.takeProfit)] : [])] };
+      },
+      cancelEntryTpSlPlan: async (accountId, planId) => {
+        h.requests.push({ url: `/trading-accounts/${accountId}/entry-tp-sl-plans/${planId}/cancel`, body: {} });
+        return { tradingAccountId: accountId, duplicate: false, plan: { id: planId, status: 'canceled' } };
+      },
     },
     './OrderSuccessBottomSheet': {
       default: 'OrderSuccessBottomSheet',

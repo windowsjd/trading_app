@@ -403,7 +403,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.CONDITIONAL_SELL_LIMIT_EXCEEDED:
       return '감시 중인 매도 설정이 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_ALREADY_MET:
-      return '현재 가격이 이미 감시 조건을 충족해 등록할 수 없습니다. 감시가격을 다시 확인해주세요.';
+      return '현재 가격이 이미 감시가격에 도달해 등록하지 않았습니다. 표시된 감시 조건과 가격을 확인한 뒤 다시 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_POSITION_UNAVAILABLE:
       return '보유 수량이 없어 매도 설정을 등록할 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_SELL_QUANTITY_EXCEEDS_HOLDING:
@@ -426,6 +426,45 @@ export function getErrorMessageFromCode(
       return '감시가격, 지정가격 또는 수량을 다시 확인해주세요.';
     case ERROR_CODE.PROTECTION_CONFLICT:
       return '이 종목의 기존 TP/SL(OCO) 보호와 함께 사용할 수 없습니다. 대기 목록의 TP/SL에서 기존 보호를 확인하고 취소한 뒤 다시 시도해주세요.';
+    case ERROR_CODE.PROTECTION_REGISTRATION_RETIRED:
+      return '기존 TP/SL(OCO) 방식은 새로 등록할 수 없습니다. 손절가/익절가 설정을 이용해주세요. 이미 등록된 TP/SL은 그대로 감시되고 취소할 수 있습니다.';
+    case ERROR_CODE.INVALID_FUTURES_TP_SL:
+    case ERROR_CODE.INVALID_ENTRY_TP_SL:
+      return '손절가/익절가 입력값을 다시 확인해주세요.';
+    case ERROR_CODE.FUTURES_TP_SL_DISABLED:
+      return '현재 운영 상태에서는 선물 손절가/익절가를 새로 등록할 수 없습니다.';
+    case ERROR_CODE.FUTURES_TP_SL_POSITION_UNAVAILABLE:
+      return '열린 포지션이 없어 손절가/익절가를 등록할 수 없습니다.';
+    case ERROR_CODE.FUTURES_TP_SL_LIMIT_EXCEEDED:
+      return '감시 중인 선물 손절가/익절가가 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
+    case ERROR_CODE.FUTURES_TP_SL_QUANTITY_EXCEEDS_POSITION:
+      return '설정 수량은 현재 포지션 수량을 넘을 수 없습니다.';
+    case ERROR_CODE.FUTURES_TP_SL_TOTAL_EXCEEDS_POSITION:
+      return '감시 중인 같은 종류(익절 또는 손절) 설정과 합친 수량이 포지션 수량을 넘어 등록할 수 없습니다. 비율을 줄이거나 기존 설정을 확인해주세요.';
+    case ERROR_CODE.FUTURES_TP_SL_DUPLICATE_PRICE:
+    case ERROR_CODE.ENTRY_TP_SL_DUPLICATE_PRICE:
+      return '같은 가격으로 등록된 같은 종류의 설정이 이미 있습니다. 다른 가격을 입력해주세요.';
+    case ERROR_CODE.FUTURES_TP_SL_ALREADY_MET:
+      return '현재 선물 Last가 이미 이 가격에 도달해 등록하지 않았습니다. 가격을 확인한 뒤 다시 등록해주세요.';
+    case ERROR_CODE.FUTURES_TP_SL_NOT_FOUND:
+    case ERROR_CODE.ENTRY_TP_SL_NOT_FOUND:
+      return '손절가/익절가 설정을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 확인해주세요.';
+    case ERROR_CODE.ENTRY_TP_SL_INVALID_TRIGGER:
+      return '익절가·손절가 방향이 주문 가격과 맞지 않습니다. 매수와 Long은 익절가를 더 높게, 손절가를 더 낮게 입력해주세요(Short는 반대).';
+    case ERROR_CODE.ENTRY_TP_SL_ENTRY_UNSUPPORTED:
+      return '이 주문에는 손절가/익절가를 미리 설정할 수 없습니다.';
+    case ERROR_CODE.ENTRY_TP_SL_ENTRY_FILLED:
+      return '이미 체결된 주문입니다. 보유 종목이나 포지션에서 손절가/익절가를 설정해주세요.';
+    case ERROR_CODE.ENTRY_TP_SL_ENTRY_NOT_OPEN:
+      return '대기 중인 주문이 아니어서 손절가/익절가를 설정할 수 없습니다.';
+    case ERROR_CODE.ENTRY_TP_SL_MARKET_NOT_SUPPORTED:
+      return '손절가/익절가 설정은 한국주식·암호화폐 현물과 선물에서만 이용할 수 있습니다.';
+    case ERROR_CODE.ENTRY_TP_SL_LIMIT_EXCEEDED:
+      return '체결을 기다리는 손절가/익절가가 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
+    case ERROR_CODE.ENTRY_TP_SL_TOTAL_EXCEEDS_ENTRY:
+      return '같은 종류(익절 또는 손절) 설정의 비율 합계는 100%를 넘을 수 없습니다.';
+    case ERROR_CODE.ENTRY_TP_SL_ENTRY_NOT_FOUND:
+      return '주문을 찾을 수 없습니다. 목록을 새로고침한 뒤 다시 확인해주세요.';
     case ERROR_CODE.LOC_SESSION_AFTER_SEASON_END:
       return '시즌 종료 전에 마감되는 정규장에서만 LOC 주문을 등록할 수 있습니다.';
     case ERROR_CODE.LOC_ATTACHED_PROTECTION_NOT_SUPPORTED:
@@ -445,7 +484,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.CONDITIONAL_PRICE_UNAVAILABLE:
       return '감시에 사용할 최신 시세가 없어 등록할 수 없습니다. 한국주식은 정규장 중에 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_BUY_ALREADY_MET:
-      return '현재 가격이 이미 감시 조건을 충족해 등록할 수 없습니다. 감시가격을 다시 확인해주세요.';
+      return '현재 가격이 이미 감시가격에 도달해 등록하지 않았습니다. 다시 정해진 감시 조건을 확인한 뒤 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_IDEMPOTENCY_CONFLICT:
       return '같은 요청이 다른 내용으로 처리 중입니다. 대기 목록의 조건주문을 확인해주세요.';
     case ERROR_CODE.INVALID_CONDITIONAL_BUY:

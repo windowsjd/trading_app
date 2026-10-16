@@ -28,7 +28,20 @@ import {
   linkConditionalSellOrder,
   lockTriggeredConditionalSell,
 } from '../conditional/conditional-sell-state';
-import { resolveSellExecutionQuantity } from '../conditional/conditional-sell-policy';
+import {
+  assertConditionalSellKindEnabled,
+  resolveSellExecutionQuantity,
+} from '../conditional/conditional-sell-policy';
+import {
+  activateSpotEntryTpSlPlans,
+  createEntryTpSlPlansInTransaction,
+  resolveEntryRoot,
+} from '../conditional/entry-tp-sl-state';
+import {
+  entryTpSlDraftsCanonical,
+  parseEntryTpSlDrafts,
+  type EntryTpSlIntent,
+} from '../conditional/entry-tp-sl-policy';
 import { readLimitOnCloseConfig } from './limit-on-close.config';
 import {
   resolveLimitOnCloseRegistration,
@@ -192,6 +205,8 @@ export type OrdersQuery = {
 
 export type OrderRequestBody = {
   attachedProtection?: unknown;
+  /** Additive: stop-loss/take-profit plans of a Spot BUY Limit entry. */
+  entryTpSl?: unknown;
   /** Additive LOC flag: `true` on a KRX stock BUY or SELL limit (server-gated). */
   limitOnClose?: unknown;
   /**
@@ -263,6 +278,7 @@ type ParsedOrderRequest = {
   /** Internal worker capability, never parsed from HTTP. */
   conditionalSellOrderId?: string;
   attachedProtection?: ProtectionLegInput[];
+  entryTpSl?: EntryTpSlIntent[];
   limitOnClose?: true;
   /** LOC SELL create only (display data, ≥ quantity). */
   requestedQuantity?: Prisma.Decimal;
@@ -2210,6 +2226,34 @@ export class OrdersService {
             legs: request.attachedProtection,
             now: transactionNow,
           });
+        // The entry's stop-loss/take-profit plans, atomic with it: they
+        // activate only when this order fills (for its filled quantity).
+        if (request.entryTpSl) {
+          const orderId = response.data.order.orderId;
+          assertConditionalSellKindEnabled('stop_loss');
+          await assertBeginnerLearningAccess(
+            tx,
+            input.context,
+            quote.asset.assetType === AssetType.crypto
+              ? 'spotProtection'
+              : 'allTrading',
+          );
+          const root = await resolveEntryRoot(
+            tx,
+            tradingAccountId,
+            'spot_limit_order',
+            orderId,
+            true,
+          );
+          await createEntryTpSlPlansInTransaction(tx, {
+            accountId: tradingAccountId,
+            root: root!,
+            intents: request.entryTpSl,
+            idempotencyKey: (index) => `entry:${orderId}:${index}`,
+            requestHash: idempotency.requestHash,
+            now: transactionNow,
+          });
+        }
         // Last statement: no lock wait during the reservation above carries a
         // conditional BUY past its execution window (the create rolls back).
         if (triggeredWatch)
@@ -4044,6 +4088,16 @@ export class OrdersService {
       order.id,
       plan.executedAt,
     );
+    // Stop-loss/take-profit plans of THIS entry (or of the conditional BUY
+    // that created it) become settings for their share of the quantity
+    // actually executed — a one-shot ERS partial included.
+    await activateSpotEntryTpSlPlans(tx, {
+      accountId: tradingAccountId,
+      assetId: order.assetId,
+      orderId: order.id,
+      executedQuantity: plan.quantity,
+      now: plan.executedAt,
+    });
     setAdminDiagnosticContext({
       failureStage: 'order_portfolio_snapshot',
       evidence: { financialGuard: { guardName: 'portfolio_snapshot' } },
@@ -6267,6 +6321,10 @@ export class OrdersService {
         ? { attachedProtection: request.attachedProtection }
         : {}),
       // Legacy requests keep their exact hash bytes.
+      ...(request.entryTpSl
+        ? { entryTpSl: entryTpSlDraftsCanonical(request.entryTpSl) }
+        : {}),
+      // Legacy requests keep their exact hash bytes.
       ...(request.limitOnClose ? { limitOnClose: true } : {}),
       ...(request.requestedQuantity
         ? {
@@ -6309,10 +6367,23 @@ export class OrdersService {
         'Attached protection is supported only on Spot BUY Limit entries.',
         400,
       );
+    const entryTpSl =
+      body.entryTpSl === undefined
+        ? undefined
+        : parseEntryTpSlDrafts(body.entryTpSl);
+    if (
+      entryTpSl &&
+      (side !== 'buy' || orderType !== 'limit' || attachedProtection)
+    )
+      throw createApiError(
+        'INVALID_ATTACHED_ENTRY',
+        'Stop-loss and take-profit plans attach only to a Spot BUY Limit entry.',
+        400,
+      );
     const limitOnClose = this.parseLimitOnClose(body.limitOnClose, {
       side,
       orderType,
-      attachedProtection: !!attachedProtection,
+      attachedProtection: !!attachedProtection || !!entryTpSl,
     });
     if (
       this.hasProvidedValue(body.amount) &&
@@ -6378,6 +6449,7 @@ export class OrdersService {
       quantity,
       amount,
       attachedProtection,
+      ...(entryTpSl ? { entryTpSl } : {}),
       ...(limitOnClose ? { limitOnClose } : {}),
       ...(requestedQuantity ? { requestedQuantity } : {}),
       limitPrice: this.parsePositiveDecimalField(

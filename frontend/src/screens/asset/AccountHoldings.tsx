@@ -20,6 +20,11 @@ import SegmentedControl from '../../components/common/SegmentedControl';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import SectionSkeleton from '../../components/states/SectionSkeleton';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
+import { getConditionalSellOrders } from '../../features/conditional/conditionalSellApi';
+import { getOpenConditionalSellOrders } from '../../features/conditional/conditionalSellLists';
+import { tpSlCountSummary } from '../../features/conditional/tpSlModel';
 import PendingOrders from './PendingOrders';
 
 type Props = {
@@ -27,8 +32,7 @@ type Props = {
   account: TradingAccountDto | null;
   assetId: string;
   isFocused: boolean;
-  // Kept for callers; the holding card has no inputs since TP/SL moved to the
-  // SELL 주문방식 (손절가/익절가 설정).
+  // Kept for callers; the card's 손절가/익절가 inputs live in its bottom sheet.
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
   /** Order screen: a holding of another asset switches the order to it. */
@@ -67,6 +71,15 @@ export default function AccountHoldings({
 
   const ownPosition = visible.find(p => p.assetId === assetId);
   useTradingGuideFacts({ screen: 'holdings', accountId: accountId ?? '', assetId, holdingsVisible: isFocused && filter !== 'pending' && !query.isError && !!ownPosition && ownPosition.valuation.state !== 'unavailable' }, isFocused);
+  // Live independent 손절가/익절가 per holding (the count beside each button).
+  const tpSlQuery = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId ?? '', 'protection'),
+    queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId ?? '', 'protection', getConditionalSellOrders, signal),
+    enabled: !!accountId && isFocused && filter !== 'pending' && visible.some(isTpSlMarket),
+    refetchInterval: isFocused ? 4000 : false,
+  });
+  const tpSlRows = !tpSlQuery.isError && tpSlQuery.data?.tradingAccountId === accountId ? tpSlQuery.data.conditionalOrders : null;
+  const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
 
   return (
     <View style={styles.section} testID="account-holdings">
@@ -128,29 +141,42 @@ export default function AccountHoldings({
       ) : (
         visible.map((position) => (
           <HoldingRow key={`${accountId}:${position.assetId}`} position={position} guideTarget={isFocused && position.assetId === assetId}
+            tpSlSummary={tpSlRows ? tpSlCountSummary(tpSlRows.filter(row => row.assetId === position.assetId && (row.state === 'watching' || row.state === 'triggered'))) : null}
+            onTpSl={accountId && isTpSlMarket(position) ? () => setTpSlTarget({ type: 'spot_holding', accountId, assetId: position.assetId }) : undefined}
             onSelect={onSelectAsset && position.assetId !== assetId ? () => onSelectAsset(position.assetId) : undefined} />
         ))
       )}
+      <TpSlSheet target={isFocused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
     </View>
   );
 }
 
+/** Independent 손절가/익절가 exist for KRX stocks and crypto Spot only. */
+function isTpSlMarket(position: Pick<PositionItemDto, 'assetType'>) {
+  return position.assetType === 'domestic_stock' || position.assetType === 'crypto';
+}
+
 /**
- * One holding. New spot TP/SL is set from the SELL 주문방식 (손절가/익절가 설정);
+ * One holding with its 손절가/익절가 설정 (the bottom sheet of this holding);
  * existing OCO protections stay viewable and cancelable under 대기 목록 › TP/SL.
  */
-function HoldingRow({ position, guideTarget, onSelect }: {
+function HoldingRow({ position, guideTarget, tpSlSummary, onTpSl, onSelect }: {
   guideTarget: boolean;
   position: PositionItemDto;
+  tpSlSummary: string | null;
+  onTpSl?: () => void;
   onSelect?: () => void;
 }) {
   // The summary is the item's touch surface (to the card's edges).
+  // With the 손절가/익절가 button below, the touch surface stops above it.
   const summary = <PositionAssetRow position={position} testID={`spot-card-${position.assetId}`} onPress={onSelect}
-    style={onSelect ? styles.pressableSummary : undefined}
+    style={onSelect ? onTpSl ? [styles.pressableSummary, styles.pressableAboveAction] : styles.pressableSummary : undefined}
     accessibilityHint={onSelect ? '이 종목의 주문 화면으로 전환합니다' : undefined} />;
+  const tpSl = onTpSl ? <TpSlButton testID={`holding-${position.assetId}-tp-sl`} summary={tpSlSummary} onPress={onTpSl} /> : null;
   return (
     <View style={styles.row} testID={`holding-${position.assetId}`}>
       {guideTarget ? <QuestTarget id="asset-holdings">{summary}</QuestTarget> : summary}
+      {tpSl && guideTarget ? <QuestTarget id="asset-protection">{tpSl}</QuestTarget> : tpSl}
     </View>
   );
 }
@@ -185,6 +211,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     borderRadius: 12,
   },
+  pressableAboveAction: { marginBottom: 0, paddingBottom: 8, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
   value: {
     fontSize: 14,
     color: semantic.secondary,

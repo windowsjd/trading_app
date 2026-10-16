@@ -20,7 +20,9 @@ import OrderSideSegment from '../order/OrderSideSegment';
 import OrderTypeSelect from '../order/OrderTypeSelect';
 import OrderNumberInput, { orderInputStyle } from '../order/OrderNumberInput';
 import React, { useEffect, useRef, useState } from "react";
-import ProtectionPanel from "../../features/conditional/ProtectionPanel";
+import TpSlSheet, { type TpSlTarget } from "../../features/conditional/tpsl/TpSlSheet";
+import { tpSlCountSummary } from "../../features/conditional/tpSlModel";
+import { getFuturesTpSlSettings } from "../../features/futures/tpSlApi";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -174,7 +176,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [conditionalDraft, setConditionalDraft] = useState<FuturesConditionalDraft>(emptyFuturesConditionalDraft);
   const [conditionalBusy, setConditionalBusy] = useState(false);
   // The one position card whose TP/SL panel is open.
-  const [protectionPositionId, setProtectionPositionId] = useState<string | null>(null);
+  const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
   const [operation, setOperation] = useState<Operation>("open");
   const [failure, setFailure] = useState<unknown>(null);
   const [collateralAttempted, setCollateralAttempted] = useState(false);
@@ -230,6 +232,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     refetchInterval: 4000,
     retry: false,
   });
+  // Live independent 손절가/익절가 of the open lifetimes (counts on the cards).
+  const tpSl = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.futures.tpSl(accountId, 'open'),
+    queryFn: ({ signal }) => getFuturesTpSlSettings(accountId, 'open', signal),
+    enabled: bound && focused,
+    refetchInterval: 4000,
+    retry: false,
+  });
+  const tpSlRows = !tpSl.isError && tpSl.data?.tradingAccountId === accountId ? tpSl.data.settings : null;
   const final = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.futures.finalSettlement(accountId),
     queryFn: ({ signal }) => getFuturesFinalSettlement(accountId, signal),
@@ -836,6 +847,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     ) : null}
                     {method === 'conditional' ? (
                       <FuturesConditionalFields draft={conditionalDraft} onChange={setConditionalDraft} disabled={locked}
+                        lastPrice={referenceFresh ? reference ?? null : null}
                         onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
                     ) : method === 'limit' ? (
                       <View style={styles.group}>
@@ -896,14 +908,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     ) : null}
                     {method === 'limit' ? (
                       <FuturesLimitEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
-                        assetId={instrument.underlying.assetId} direction={direction} marginMode={marginMode} leverage={leverage}
+                        unit={instrument.underlying.symbol.replace(/USDT$/u, '')} direction={direction} marginMode={marginMode} leverage={leverage}
                         quantity={selectedQuantity} amount={amount} limitPrice={limitPrice}
                         allowed={bound && focused && covered && data.capabilities.canOpen && markFresh && !inputError && !riskBlocked && !pendingResult}
                         collateralError={collateralShort ? COLLATERAL_SHORT : null}
-                        onBusy={setLimitBusy} onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
+                        onBusy={setLimitBusy} />
                     ) : method === 'conditional' ? (
                       <FuturesConditionalEntryForm key={`${accountId}:${instrument.id}`} accountId={accountId} instrumentId={instrument.id}
                         direction={direction} marginMode={marginMode} leverage={leverage} quantity={selectedQuantity} draft={conditionalDraft}
+                        onDraftChange={setConditionalDraft}
                         lastPrice={referenceFresh ? reference ?? null : null} displayDecimals={instrument.underlying.displayPriceDecimals}
                         allowed={bound && focused && covered && data.capabilities.canOpen && referenceFresh && !inputError && !pendingResult
                           && conditionalGate.state === 'ready' && conditionalGate.enabled}
@@ -957,15 +970,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             </View>
           ) : null}
         </View>
-        {instrument && !position ? (
-          // Completed TP/SL history stays readable after the position is flat.
-          <ProtectionPanel
-            accountId={accountId}
-            assetId={instrument.underlying.assetId}
-            domain="futures"
-            currency="USD"
-          />
-        ) : null}
         <View ref={questGuideTarget('futures-funding')} collapsable={false} style={styles.card} testID="futures-wallet">
           <View style={styles.cardHeader}>
             <Text accessibilityRole="header" style={styles.heading}>선물 지갑</Text>
@@ -1022,9 +1026,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     choose(p.instrumentId); setOperation(op);
                     focusTrade();
                   }}
-                  protectionOpen={protectionPositionId === p.id}
-                  onProtection={() => setProtectionPositionId((id) => (id === p.id ? null : p.id))}
-                  onInputFocus={inputScroll.onInputFocus} onInputBlur={inputScroll.onInputBlur} />
+                  tpSlSummary={tpSlRows ? tpSlCountSummary(tpSlRows.filter((row) => row.positionId === p.id)) : null}
+                  onTpSl={() => setTpSlTarget({ type: 'futures_position', accountId, positionId: p.id })} />
               ))
             )
           ) : listView === 'pending' ? (
@@ -1061,6 +1064,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
           </View>
         ) : null}
       </ScrollView>
+      <TpSlSheet target={focused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
       <FuturesInstrumentSheet
         visible={instrumentSheetOpen && !locked}
         instruments={allInstruments}

@@ -310,31 +310,36 @@ function tradingGuideView(session: GuideSession, focused: FocusedGuideScreen, fa
   }
   const holding = facts.practice?.holdings;
   const review = facts.practice?.limitReview;
-  // Holdings are listed under the order form; without a visible holding the
-  // practice quantity is prepared here with a normal market buy.
-  // The TP/SL practice is a SELL setting: without a holding the form is blocked.
-  const holdingStep = session.quest === 'protection' ? form.blocked === true : ['asset-holdings', 'asset-protection'].includes(step.target);
+  // Holdings (and the TP/SL button on them) are listed under the order form;
+  // without a visible holding the practice quantity is prepared here with a
+  // normal market buy.
+  const holdingStep = ['asset-holdings', 'asset-protection'].includes(step.target);
   if (screen === 'order' && ['protection', 'marketSell'].includes(session.quest) && holdingStep
     && holding?.accountId === session.accountId && holding.assetId === session.assetId && holding.holdingsVisible === false) {
     return message(session, screen, 'prepare-holding', card({ title: '실습 수량 준비', body: '아래 보유종목에서 현재 종목의 보유수량과 수익률을 확인해 주세요. 보유수량이 없다면 매수를 선택해 시장가로 다시 매수한 뒤 이어서 진행할 수 있어요.' }));
   }
-  if (form.blocked) return message(session, screen, 'operationally-unavailable', card({ title: '거래 가능 상태 확인', body: '현재는 화면에 안내된 거래 제한이 적용돼요. 휴장·시세 미준비·운영 중지 상태를 확인해 주세요. 퀘스트 목록으로 돌아가 다른 실습을 선택할 수도 있어요.' }, { actions: ['back', 'exit'] }));
+  // The TP/SL practice runs in the holding's sheet and is gated by the sheet's
+  // own state; the order form above it belongs to another method.
+  const blocked = session.quest === 'protection'
+    ? protection?.accountId === session.accountId && protection.assetId === session.assetId && protection.blocked === true
+    : form.blocked;
+  if (blocked) return message(session, screen, 'operationally-unavailable', card({ title: '거래 가능 상태 확인', body: '현재는 화면에 안내된 거래 제한이 적용돼요. 휴장·시세 미준비·운영 중지 상태를 확인해 주세요. 퀘스트 목록으로 돌아가 다른 실습을 선택할 수도 있어요.' }, { actions: ['back', 'exit'] }));
   let ready = !!step.next;
   let hint: string | null = null;
   // Only the order form's own steps depend on the chosen side and type.
   if (screen === 'order' && step.target.startsWith('order-')) {
-    const wantedSide = session.quest === 'marketSell' || session.quest === 'protection' ? 'sell' : 'buy';
-    const wantedType = session.quest === 'limitBuy' ? 'limit' : session.quest === 'protection' ? 'protection' : 'market';
+    const wantedSide = session.quest === 'marketSell' ? 'sell' : 'buy';
+    const wantedType = session.quest === 'limitBuy' ? 'limit' : 'market';
     if (form.side !== wantedSide || form.orderType !== wantedType) {
-      const label = wantedType === 'limit' ? '지정가를' : wantedType === 'protection' ? '손절가/익절가 설정을' : '시장가를';
-      // Forms start at 시장가; another practiced method is picked from 주문방식 선택하기.
+      const label = wantedType === 'limit' ? '지정가를' : '시장가를';
+      // Forms start at 시장가; another practiced method is picked from the 주문방식 field.
       if (form.side === wantedSide && form.methodSheetOpen) {
         return spotlight(session, screen, index, 'choose-order', [`order-method-${wantedType}`],
           card({ title: '주문 방식 확인', body: `목록에서 ${label} 선택해 주세요.` }));
       }
       return spotlight(session, screen, index, 'choose-order', ['order-type'], card({ title: '주문 방식 확인', body: form.side !== wantedSide
         ? `${wantedSide === 'buy' ? '매수' : '매도'} · ${label} 선택해 주세요.`
-        : `주문방식 선택하기를 눌러 ${label} 선택해 주세요.` }));
+        : `주문방식을 눌러 ${label} 선택해 주세요.` }));
     }
     if (step.target === 'order-input') ready = ready && form.amountValid === true;
   }

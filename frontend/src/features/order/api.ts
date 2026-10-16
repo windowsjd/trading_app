@@ -165,6 +165,8 @@ export interface OrderQuoteDto {
 
 export type CreateOrderRequestDto = OrderQuoteRequestDto & {
   attachedProtection?: import('../conditional/api').ProtectionLeg[];
+  /** BUY Limit only: 손절가/익절가 plans registered with the entry. */
+  entryTpSl?: import('../conditional/entryTpSlApi').EntryTpSlDraftDto[];
   /** LOC SELL only, display data: what was asked when less was accepted. */
   requestedQuantity?: QuantityString;
   quoteId: string;

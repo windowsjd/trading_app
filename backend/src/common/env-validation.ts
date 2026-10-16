@@ -8,7 +8,10 @@ import { readProfileImageStorageConfig } from '../auth/profile-image.config';
 import { validateFuturesConfig } from '../futures/futures.config';
 import { futuresMarkRetentionConfig } from '../futures/futures-mark-retention.config';
 import { futuresLastPriceRetentionConfig } from '../futures/futures-last-price-retention.config';
-import { conditionalEnabled } from '../conditional/conditional.config';
+import {
+  conditionalEnabled,
+  legacyOcoRegistrationEnabled,
+} from '../conditional/conditional.config';
 import { conditionalBuyEnabled } from '../conditional/conditional-buy.config';
 import {
   conditionalSellEnabled,
@@ -60,6 +63,7 @@ export function validateEnv(
   collect(errors, () => readDatabaseStorageMonitorConfig(env));
   collect(errors, () => assetPriceSnapshotRetentionConfig(env));
   collect(errors, () => conditionalEnabled(env));
+  collect(errors, () => legacyOcoRegistrationEnabled(env));
   collect(errors, () => conditionalBuyEnabled(env));
   collect(errors, () => conditionalSellEnabled(env));
   collect(errors, () => independentTpSlEnabled(env));

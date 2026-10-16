@@ -5,9 +5,12 @@
  * The list is product policy per market and side; whether a NEW conditional
  * or LOC order may be created is the server's answer (capabilities), never a
  * client constant. Items that are not built yet stay visible as 준비 중 and can
- * be neither selected nor submitted. Pure module: runs under `node --test`.
+ * be neither selected nor submitted. How each method fills is explained once,
+ * in 전체 > 공지사항 (주문방식 및 체결 기준 안내), not in the sheet. 손절가/익절가
+ * is not an order method: it is set from a holding, a position or a pending
+ * entry (2026-10-16). Pure module: runs under `node --test`.
  */
-export type OrderMethod = 'market' | 'limit' | 'conditional' | 'loc' | 'protection';
+export type OrderMethod = 'market' | 'limit' | 'conditional' | 'loc';
 
 export type OrderMethodAvailability =
   | { state: 'available' }
@@ -18,7 +21,6 @@ export type OrderMethodAvailability =
 export type OrderMethodOption = {
   method: OrderMethod;
   label: string;
-  description: string;
   availability: OrderMethodAvailability;
 };
 
@@ -33,16 +35,13 @@ export const ORDER_METHOD_LABEL: Record<OrderMethod, string> = {
   limit: '지정가',
   conditional: '조건주문',
   loc: 'LOC 주문',
-  protection: '손절가/익절가 설정',
 };
 
 /**
  * Every new form starts at 시장가: it is offered and available on both sides
- * of every market, and choosing it never needed a learning step. The field's
- * small hint says the method can be changed.
+ * of every market, and choosing it never needed a learning step.
  */
 export const DEFAULT_ORDER_METHOD: OrderMethod = 'market';
-export const ORDER_METHOD_HINT = '주문방식 선택하기';
 
 const AVAILABLE: OrderMethodAvailability = { state: 'available' };
 const PREPARING: OrderMethodAvailability = { state: 'preparing' };
@@ -56,8 +55,8 @@ function fromGate(gate: ServerGate): OrderMethodAvailability {
     : { state: 'unavailable', reason: gate.reason ?? '현재 운영 상태에서 이용할 수 없어요.' };
 }
 
-function option(method: OrderMethod, description: string, availability: OrderMethodAvailability): OrderMethodOption {
-  return { method, label: ORDER_METHOD_LABEL[method], description, availability };
+function option(method: OrderMethod, availability: OrderMethodAvailability): OrderMethodOption {
+  return { method, label: ORDER_METHOD_LABEL[method], availability };
 }
 
 export function getOrderMethodOptions(input: {
@@ -67,36 +66,19 @@ export function getOrderMethodOptions(input: {
   conditional: ServerGate;
   /** The side's own LOC gate (LOC BUY or LOC SELL). */
   loc: ServerGate;
-  /** SELL only: independent stop-loss/take-profit gate. */
-  protection?: ServerGate;
 }): OrderMethodOption[] {
   const { assetType, side } = input;
   const krx = assetType === 'domestic_stock';
   const us = assetType === 'us_stock';
   const crypto = assetType === 'crypto';
-  if (side === 'buy') {
-    const options = [
-      option('market', '현재 거래 가능한 가격으로 매수를 시도합니다.', AVAILABLE),
-      option('limit', '지정한 가격 이하에서 매수를 시도합니다.', AVAILABLE),
-    ];
-    if (krx || us || crypto)
-      // US Conditional BUY/LOC wait for a chosen data provider: listed, never enabled.
-      options.push(option('conditional', '감시가격에 도달하면 설정한 방식으로 주문합니다.', us ? PREPARING : fromGate(input.conditional)));
-    if (krx || us)
-      options.push(option('loc', '정규장 마감가격이 지정가격 이하이면 종가로 매수합니다.', us ? PREPARING : fromGate(input.loc)));
-    return options;
-  }
-  // New sell limit is not offered here; already accepted sell limits keep
-  // their server fill, list and cancel paths. US SELL automation waits for an
-  // approved quote/close data provider: listed, never enabled.
-  const options = [option('market', '현재 거래 가능한 가격으로 매도를 시도합니다.', AVAILABLE)];
-  if (krx || us || crypto)
-    options.push(option('conditional', '감시가격에 도달하면 설정한 방식으로 매도합니다.', us ? PREPARING : fromGate(input.conditional)));
-  if (krx || us)
-    options.push(option('loc', '정규장 마감가격이 지정가격 이상이면 종가로 매도합니다.', us ? PREPARING : fromGate(input.loc)));
-  if (krx || us || crypto)
-    options.push(option('protection', '익절가·손절가에 도달하면 정한 수량을 시장가로 매도합니다.',
-      us ? PREPARING : fromGate(input.protection ?? { state: 'loading' })));
+  // New sell limit is not offered on the SELL side; already accepted sell
+  // limits keep their server fill, list and cancel paths. US conditional/LOC
+  // wait for an approved quote/close data provider: listed, never enabled.
+  const options = side === 'buy'
+    ? [option('market', AVAILABLE), option('limit', AVAILABLE)]
+    : [option('market', AVAILABLE)];
+  if (krx || us || crypto) options.push(option('conditional', us ? PREPARING : fromGate(input.conditional)));
+  if (krx || us) options.push(option('loc', us ? PREPARING : fromGate(input.loc)));
   return options;
 }
 
@@ -110,14 +92,12 @@ export function getOrderMethodOptions(input: {
  */
 export function getFuturesOrderMethodOptions(hasPosition: boolean, conditional: ServerGate): OrderMethodOption[] {
   return [
-    option('market', hasPosition
-      ? '현재 거래 가능한 가격으로 포지션 수량을 늘리거나 줄이거나 전량 종료합니다.'
-      : '현재 거래 가능한 가격으로 새 포지션에 진입합니다.', AVAILABLE),
-    option('limit', '롱은 지정가 이하, 숏은 지정가 이상에서 새 포지션에 진입합니다. 체결 전까지 담보를 예약합니다.', hasPosition
+    option('market', AVAILABLE),
+    option('limit', hasPosition
       ? { state: 'unavailable', reason: '지정가는 새 포지션 진입에만 쓸 수 있어요. 보유 포지션은 시장가로 조정해 주세요.' }
       : AVAILABLE),
-    option('conditional', '선물 Last가 감시가격에 도달하면 롱·숏 새 포지션에 진입합니다. 등록할 때는 담보를 예약하지 않습니다.', hasPosition
-      ? { state: 'unavailable', reason: '조건주문은 새 포지션 진입에만 쓸 수 있어요. 보유 포지션의 손절·익절은 포지션 카드의 TP/SL에서 설정해 주세요.' }
+    option('conditional', hasPosition
+      ? { state: 'unavailable', reason: '조건주문은 새 포지션 진입에만 쓸 수 있어요. 보유 포지션의 손절·익절은 포지션 카드의 손절가/익절가 설정에서 해 주세요.' }
       : fromGate(conditional)),
   ];
 }

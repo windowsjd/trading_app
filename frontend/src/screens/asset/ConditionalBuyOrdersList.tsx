@@ -30,6 +30,9 @@ import { cancelTradingAccountOrder } from '../../features/tradingAccount/api';
 import { invalidateAfterOrderCancel } from '../../features/tradingAccount/invalidation';
 import { getApiErrorCode, getErrorMessageFromCode } from '../../services/api/errorMapper';
 import { formatDisplayDecimal, formatKstDateTime, getAssetNameDisplay } from '../../utils/format';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
+import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
 
 /** Ended history page size; the open list is always read completely. */
 const ENDED_PAGE = 30;
@@ -72,6 +75,7 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
     request.accountId === scope.current.accountId && request.epoch === scope.current.epoch;
   // The original error only; its public copy is mapped where it is shown.
   const [failure, setFailure] = useState<{ cause: unknown } | null>(null);
+  const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
 
   const open = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.open(accountId),
@@ -83,6 +87,7 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
       ? 4000 : false,
     refetchIntervalInBackground: false,
   });
+  const tpSlPlans = useEntryTpSlSummaries(accountId, isFocused && (open.data?.conditionalOrders.length ?? 0) > 0);
   const ended = useInfiniteQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.ended(accountId),
     queryFn: async ({ pageParam, signal }) => assertEndedConditionalBuyPage(
@@ -153,6 +158,7 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
   if (!openData) return <SectionSkeleton lines={3} />;
   const endedPages = ended.data?.pages.filter((page) => page.tradingAccountId === accountId) ?? [];
   const rows = mergeConditionalBuyLists(openData.conditionalOrders, endedPages);
+  const plans = tpSlPlans;
   const canceling = cancel.isPending && cancel.variables && isCurrent(cancel.variables) ? cancel.variables.row.id : null;
   const renderRow = (row: ConditionalBuyOrderDto) => {
     const path = getConditionalBuyCancelPath(row);
@@ -190,6 +196,12 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
           </Text>
         ) : null}
         {reason ? <Text style={styles.label}>{reason}</Text> : null}
+        {/* A live watch or its pending limit order takes plans that activate on the real fill. */}
+        {(row.state === 'watching' || row.state === 'triggered' || row.state === 'order_pending')
+          && (plans.capabilities?.spot.enabled || plans.summary(row.id)) ? (
+          <TpSlButton testID={`conditional-order-${row.id}-tp-sl`} summary={plans.summary(row.id)}
+            onPress={() => setTpSlTarget({ type: 'entry', accountId, entryType: 'spot_conditional_buy', entryId: row.id })} />
+        ) : null}
         {path ? (
           <ActionPressable
             testID={`conditional-order-${row.id}-cancel`}
@@ -263,6 +275,7 @@ export default function ConditionalBuyOrdersList({ accountId, isFocused, seasonU
           </ActionPressable>
         ) : null}
       </View>
+      <TpSlSheet target={isFocused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
     </View>
   );
 }

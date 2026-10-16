@@ -8,8 +8,28 @@ import {
 } from '../generated/prisma/client';
 import type { OwnedTradingAccount } from '../trading-accounts/trading-account-access.service';
 import { futuresTradingMode } from '../futures/futures.config';
-import { conditionalEnabled } from './conditional.config';
-export { conditionalEnabled } from './conditional.config';
+import {
+  conditionalEnabled,
+  legacyOcoRegistrationEnabled,
+} from './conditional.config';
+export {
+  conditionalEnabled,
+  legacyOcoRegistrationEnabled,
+} from './conditional.config';
+
+/**
+ * New whole-position OCO groups are retired (2026-10-16); new stop-loss/
+ * take-profit registrations use the independent settings and entry plans.
+ * Existing groups keep their execution, cancel and history paths.
+ */
+export function assertProtectionRegistrationOpen() {
+  if (!legacyOcoRegistrationEnabled())
+    throw createApiError(
+      'PROTECTION_REGISTRATION_RETIRED',
+      'New TP/SL protection uses independent stop-loss and take-profit settings.',
+      409,
+    );
+}
 
 export function assertConditionalEnabled(domain: 'spot' | 'futures') {
   if (!conditionalEnabled())

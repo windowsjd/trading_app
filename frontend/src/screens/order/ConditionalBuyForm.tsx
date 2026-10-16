@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
-import ActionPressable from '../../components/common/ActionPressable';
 import CTAButton from '../../components/common/CTAButton';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import ErrorNotice from '../../components/states/ErrorNotice';
@@ -13,15 +12,15 @@ import {
   type ConditionalBuyCreateDto,
   type ConditionalBuyExecutionType,
   type ConditionalBuyOrderDto,
-  type ConditionalBuyTriggerCondition,
 } from '../../features/conditional/conditionalBuyApi';
 import {
   EXECUTION_TYPE_LABEL,
   TRIGGER_CONDITION_LABEL,
   getConditionalBuyDraftError,
   getConditionalBuyResultNotice,
-  isConditionAlreadyMet,
 } from '../../features/conditional/conditionalBuyDisplay';
+import { getTriggerDirectionText, isTriggerDirectionValid } from '../../features/conditional/autoDirection';
+import { useTriggerDirection } from '../../features/conditional/useTriggerDirection';
 import { emitOrderFillEvent } from '../../features/order/fillEvents';
 import { BUY_COLOR } from '../../features/order/sideColors';
 import { getApiErrorCode, getApiErrorInfo, getErrorMessageFromCode } from '../../services/api/errorMapper';
@@ -33,14 +32,14 @@ type LearningGate = { allowed: boolean; locked: boolean; message: string | null;
 
 type Request = { accountId: string; epoch: number; body: ConditionalBuyCreateDto };
 
-const CONDITIONS: ConditionalBuyTriggerCondition[] = ['at_or_above', 'at_or_below'];
-
 const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 대기 목록의 조건주문을 먼저 확인해 주세요. 같은 내용으로 다시 누르면 중복 없이 다시 확인해요.';
 
 /**
  * New Conditional BUY (KRX stocks, crypto Spot). The watch price and the
- * limit price are separate fields; nothing is reserved while watching, and a
- * registration is never presented as a fill. The server re-checks every rule.
+ * limit price are separate fields; 이상/이하 follows the watch price against
+ * the current price (never chosen by hand); nothing is reserved while
+ * watching, and a registration is never presented as a fill. The server
+ * re-checks every rule.
  */
 export default function ConditionalBuyForm({
   accountId,
@@ -59,7 +58,7 @@ export default function ConditionalBuyForm({
   /** Account/asset gates the order form already resolved. */
   blockedReason: string | null;
   buyAvailable: string | null;
-  /** The screen's current price, only for the "already met" hint. */
+  /** The screen's fresh current price: the reference for 이상/이하. */
   currentPrice: string | null;
   learning: LearningGate;
   onInputFocus?: (input: View | null) => void;
@@ -68,8 +67,10 @@ export default function ConditionalBuyForm({
   const queryClient = useQueryClient();
   const crypto = asset.assetType === 'crypto';
   const currency = asset.settlementCurrency ?? '';
-  const [condition, setCondition] = useState<ConditionalBuyTriggerCondition | null>(null);
   const [triggerPrice, setTriggerPrice] = useState('');
+  const trigger = useTriggerDirection(triggerPrice, currentPrice);
+  const condition = trigger.condition;
+  const [directionNotice, setDirectionNotice] = useState<string | null>(null);
   const [executionType, setExecutionType] = useState<ConditionalBuyExecutionType>('market');
   const [limitPrice, setLimitPrice] = useState('');
   const [size, setSize] = useState('');
@@ -100,7 +101,6 @@ export default function ConditionalBuyForm({
         actionRef.current = null;
         setRegistered(result.conditionalOrder);
         setError(null);
-        setCondition(null);
         setTriggerPrice('');
         setLimitPrice('');
         setSize('');
@@ -113,6 +113,9 @@ export default function ConditionalBuyForm({
       const info = getApiErrorInfo(cause);
       const uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
       if (!uncertain) actionRef.current = null;
+      // The server's own price had already crossed the watch price: decide
+      // the direction again from the latest price before another try.
+      if (info.serverCode === 'CONDITIONAL_BUY_ALREADY_MET') trigger.reset();
       setError({ cause, uncertain });
     },
   });
@@ -125,14 +128,20 @@ export default function ConditionalBuyForm({
     scopeRef.current.epoch += 1;
     setRegistered(null);
     setError(null);
+    setDirectionNotice(null);
   };
 
   const canUseLimit = capabilities?.canUseLimit === true;
+  // No usable current price, or a watch price equal to it: no direction yet.
+  const directionError = trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
+    ? getTriggerDirectionText(trigger.direction, triggerPrice, currency) : null;
   // A limit choice that became unavailable falls back to nothing, not to market.
   const draftError = getConditionalBuyDraftError({
-    assetType: asset.assetType, triggerCondition: condition, triggerPrice, executionType, limitPrice, size,
-  }) ?? (executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
-  const alreadyMet = isConditionAlreadyMet(condition, triggerPrice, currentPrice);
+    assetType: asset.assetType, triggerPrice, executionType, limitPrice, size,
+  }) ?? directionError ?? (executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
+  const directionText = getTriggerDirectionText(trigger.direction, triggerPrice, currency);
+  // The market moved past the watch price after the direction was decided.
+  const crossed = !!condition && !!currentPrice && !isTriggerDirectionValid(condition, triggerPrice, currentPrice);
   const createBlocked = !capabilities?.canCreate ? '현재 조건주문을 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(triggerPrice.trim() || size.trim() || limitPrice.trim());
@@ -145,8 +154,14 @@ export default function ConditionalBuyForm({
       learning.guard(() => undefined);
       return;
     }
-    if (!canSubmit) return;
+    if (!canSubmit || !condition) return;
     setError(null);
+    // Never send a direction the latest price no longer supports.
+    if (!actionRef.current) {
+      const changed = trigger.recheck(currentPrice);
+      if (changed) { setDirectionNotice(changed); return; }
+    }
+    setDirectionNotice(null);
     actionRef.current ??= {
       accountId,
       epoch: scopeRef.current.epoch,
@@ -166,29 +181,6 @@ export default function ConditionalBuyForm({
   return (
     <View style={styles.form} testID="conditional-buy-form">
       <View style={styles.group}>
-        <Text style={styles.label}>감시 조건</Text>
-        <View accessibilityRole="radiogroup" accessibilityLabel="감시 조건" style={styles.choices}>
-          {CONDITIONS.map((value) => {
-            const selected = condition === value;
-            return (
-              <ActionPressable
-                key={value}
-                testID={`conditional-trigger-${value}`}
-                accessibilityRole="radio"
-                accessibilityLabel={`감시가격 ${TRIGGER_CONDITION_LABEL[value]}`}
-                accessibilityState={{ selected, checked: selected, disabled: pending }}
-                aria-selected={selected}
-                disabled={pending}
-                onPress={() => edit(() => setCondition(value))}
-                style={[styles.choice, selected && styles.choiceSelected]}
-              >
-                <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>감시가격 {TRIGGER_CONDITION_LABEL[value]}</Text>
-              </ActionPressable>
-            );
-          })}
-        </View>
-      </View>
-      <View style={styles.group}>
         <Text style={styles.label}>감시가격 ({currency})</Text>
         <OrderNumberInput
           testID="conditional-trigger-price"
@@ -202,9 +194,15 @@ export default function ConditionalBuyForm({
           onFieldFocus={onInputFocus}
           onBlur={onInputBlur}
         />
-        {alreadyMet ? (
+        {directionText ? (
+          <Text testID="conditional-trigger-direction" accessibilityLiveRegion="polite"
+            style={trigger.direction.state === 'ready' ? styles.direction : styles.error}>
+            {trigger.direction.state === 'ready' ? `감시 조건 · ${directionText}` : directionText}
+          </Text>
+        ) : null}
+        {crossed ? (
           <Text testID="conditional-already-met" style={styles.warning}>
-            현재가가 이미 이 조건을 충족해 등록이 거부될 수 있어요.
+            현재가가 감시가격을 지났어요. 등록할 때 감시 방향을 다시 확인해요.
           </Text>
         ) : null}
       </View>
@@ -243,7 +241,6 @@ export default function ConditionalBuyForm({
             onFieldFocus={onInputFocus}
             onBlur={onInputBlur}
           />
-          <Text style={styles.helper}>감시가격과 별개예요. 조건 충족 후 이 가격으로 지정가 매수가 접수돼요.</Text>
         </View>
       ) : null}
       <View style={styles.group}>
@@ -260,32 +257,17 @@ export default function ConditionalBuyForm({
           onFieldFocus={onInputFocus}
           onBlur={onInputBlur}
         />
-        <Text style={styles.helper}>
-          {crypto
-            ? '수수료를 제외한 매수 원금이에요. 실제 수량은 발동 시점 가격으로 서버가 정해요.'
-            : executionType === 'limit' ? '지정가 발동은 정수 수량만 가능해요.' : '발동 시 이 수량으로 시장가 매수를 시도해요.'}
-        </Text>
+        {crypto ? <Text style={styles.helper}>수수료를 제외한 매수 원금이에요.</Text>
+          : executionType === 'limit' ? <Text style={styles.helper}>지정가 발동은 정수 수량만 가능해요.</Text> : null}
       </View>
       <Text style={styles.helper}>
         현재 주문 가능 {buyAvailable !== null ? formatCurrency(buyAvailable, currency) : '-'} · 감시 중에는 금액을 예약하지 않아요
       </Text>
-      <View style={styles.policy} testID="conditional-policy">
-        {[
-          '감시가격에 도달하면 설정한 방식으로 일반 매수 주문을 한 번 만들어요. 조건 충족은 체결이 아니에요.',
-          '시장가 발동은 그때의 시장가로 실행되고, 지정가 발동은 지정가 주문으로 접수된 뒤 기존 자동 체결 정책을 따라요.',
-          '감시 중에는 현금을 예약하지 않아요. 발동 시점의 잔액 부족·시세 부족·장 상태 때문에 실패할 수 있어요.',
-          '조건 충족 후 30초 안에 주문을 만들지 못하면 실패로 끝나요.',
-          crypto ? '암호화폐는 Binance 현물 가격으로만 감시해요.' : '한국주식은 정규장 시간의 신선한 시세로만 감시해요. 등록도 정규장 중에 할 수 있어요.',
-          '등록할 때 이미 조건을 충족한 가격이면 등록되지 않아요.',
-          capabilities ? `계정당 감시 중인 조건주문은 최대 ${capabilities.maxLivePerAccount}개예요.` : null,
-        ].filter((line): line is string => !!line).map((line) => (
-          <Text key={line} style={styles.policyLine}>· {line}</Text>
-        ))}
-      </View>
       {blockedReason || createBlocked ? (
         <Text testID="conditional-blocked" style={styles.error}>{blockedReason ?? createBlocked}</Text>
       ) : null}
-      {typed && draftError ? <Text testID="conditional-input-error" style={styles.error}>{draftError}</Text> : null}
+      {typed && draftError && draftError !== directionError ? <Text testID="conditional-input-error" style={styles.error}>{draftError}</Text> : null}
+      {directionNotice ? <Text testID="conditional-direction-changed" accessibilityLiveRegion="polite" style={styles.warning}>{directionNotice}</Text> : null}
       {error ? (
         <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : getErrorMessageFromCode(getApiErrorCode(error.cause))}
           testID="conditional-error" style={styles.error} />
@@ -321,25 +303,7 @@ const styles = {
   helper: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
   warning: { fontSize: 12, lineHeight: 17, color: semantic.warning },
   error: { fontSize: 12, lineHeight: 17, color: semantic.error },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  choice: {
-    flexGrow: 1,
-    flexBasis: 120,
-    minHeight: 40,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    backgroundColor: semantic.raised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  choiceSelected: { backgroundColor: semantic.selected, borderColor: semantic.selected },
-  choiceText: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: semantic.text, textAlign: 'center' },
-  choiceTextSelected: { color: semantic.onAccent },
-  policy: { gap: 4, padding: 10, borderRadius: 10, backgroundColor: semantic.raised },
-  policyLine: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
+  direction: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: semantic.info },
   resultTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
 } as const;
 

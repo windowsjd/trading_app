@@ -1,6 +1,7 @@
 import { type FuturesLimitOrder, Prisma } from '../generated/prisma/client';
 import { releaseReservedCash } from '../wallets/cash-wallet-atomic';
 import { finishProtection } from '../conditional/conditional-state';
+import { endEntryTpSlPlansForFuturesLimitOrder } from '../conditional/entry-tp-sl-state';
 import { futuresError } from './futures-error';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
 
@@ -77,6 +78,9 @@ export async function cancelFuturesEntriesInTransaction(
     });
     if (group?.status === 'holding')
       await finishProtection(tx, group.id, 'canceled', reason, now);
+    // An entry that ends unfilled ends its stop-loss/take-profit plans (also
+    // those of the conditional entry that created it).
+    await endEntryTpSlPlansForFuturesLimitOrder(tx, order.id, now);
   }
   return orders.length;
 }

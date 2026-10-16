@@ -144,9 +144,9 @@ function positiveDecimal(value: string, scale: number) {
   return DECIMAL(scale).test(trimmed) && Number(trimmed) > 0;
 }
 
+/** 이상/이하 is not part of the draft: it follows the watch price (autoDirection). */
 export type ConditionalBuyDraft = {
   assetType: string | null | undefined;
-  triggerCondition: ConditionalBuyTriggerCondition | null;
   triggerPrice: string;
   executionType: ConditionalBuyExecutionType;
   limitPrice: string;
@@ -156,7 +156,6 @@ export type ConditionalBuyDraft = {
 
 /** Mirrors the server's input parser; the server still decides. */
 export function getConditionalBuyDraftError(draft: ConditionalBuyDraft): string | null {
-  if (!draft.triggerCondition) return '감시 조건을 선택해주세요.';
   if (!draft.triggerPrice.trim()) return '감시가격을 입력해주세요.';
   if (!positiveDecimal(draft.triggerPrice, 8)) return '감시가격은 0보다 큰 숫자와 소수점 이하 최대 8자리로 입력해주세요.';
   if (draft.executionType === 'limit') {
@@ -173,20 +172,4 @@ export function getConditionalBuyDraftError(draft: ConditionalBuyDraft): string 
       return '지정가로 발동하는 주식 조건주문은 정수 수량만 가능합니다.';
   }
   return null;
-}
-
-/**
- * True when the last price on screen already meets the condition. Only a hint:
- * registration is judged by the server's own eligible evidence.
- */
-export function isConditionAlreadyMet(
-  condition: ConditionalBuyTriggerCondition | null,
-  triggerPrice: string,
-  currentPrice: string | null | undefined,
-) {
-  if (!condition || !currentPrice || !positiveDecimal(triggerPrice, 8)) return false;
-  const current = Number(currentPrice);
-  const trigger = Number(triggerPrice.trim());
-  if (!Number.isFinite(current) || current <= 0) return false;
-  return condition === 'at_or_above' ? current >= trigger : current <= trigger;
 }

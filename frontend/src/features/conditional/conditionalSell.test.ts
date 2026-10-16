@@ -8,7 +8,6 @@ import {
   getConditionalSellResultNotice,
   getConditionalSellStateLabel,
   getSellLegDraftError,
-  isSellConditionAlreadyMet,
 } from './conditionalSellDisplay.ts';
 import {
   ConditionalSellListContractError,
@@ -109,12 +108,6 @@ describe('SELL leg draft (hint; the server decides)', () => {
     assert.match(getSellLegDraftError({ ...leg, executionType: 'limit' }, { assetType: 'crypto', holding: '10' })!, /지정가격을 입력/);
     assert.match(getSellLegDraftError({ ...leg, triggerPrice: '0' }, { assetType: 'crypto', holding: '10', label: '손절' })!, /^손절 감시가격은/);
     assert.match(getSellLegDraftError({ ...leg, quantity: '0.1234567' }, { assetType: 'crypto', holding: '10' })!, /최대 6자리/);
-  });
-  it('already-met hint on both directions', () => {
-    assert.equal(isSellConditionAlreadyMet('at_or_below', '100', '99'), true);
-    assert.equal(isSellConditionAlreadyMet('at_or_below', '100', '101'), false);
-    assert.equal(isSellConditionAlreadyMet('at_or_above', '100', '100'), true);
-    assert.equal(isSellConditionAlreadyMet('at_or_above', '100', null), false);
   });
 });
 

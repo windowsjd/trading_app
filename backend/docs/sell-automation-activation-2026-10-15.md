@@ -18,6 +18,13 @@ approved), and OCO links to conditional orders or LOC (none exist).
 Contracts: [conditional-buy-and-loc-contract.md](conditional-buy-and-loc-contract.md),
 [conditional-sell-and-loc-sell-contract.md](conditional-sell-and-loc-sell-contract.md).
 
+> 2026-10-16 (new code, neither deployed nor activated by that change): independent Futures stop-loss/take-profit
+> and plans on pending entries add `FUTURES_TP_SL_ORDERS_ENABLED=false`, and
+> new OCO registration is retired by `LEGACY_OCO_REGISTRATION_ENABLED=false`
+> (both default; production values were not changed). Plans on pending Spot
+> BUY entries follow `INDEPENDENT_TP_SL_ORDERS_ENABLED`. See
+> [independent-tp-sl-entry-plans-contract.md](independent-tp-sl-entry-plans-contract.md).
+
 ## Dependencies
 
 - All five flags are strict `true`/`false`; startup rejects other values.

@@ -1017,6 +1017,23 @@ export type EnumConditionalSellStatusWithAggregatesFilter<$PrismaModel = never> 
   _max?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
 }
 
+export type EnumEntryTpSlPlanStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.EntryTpSlPlanStatus | Prisma.EnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel> | $Enums.EntryTpSlPlanStatus
+}
+
+export type EnumEntryTpSlPlanStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.EntryTpSlPlanStatus | Prisma.EnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumEntryTpSlPlanStatusWithAggregatesFilter<$PrismaModel> | $Enums.EntryTpSlPlanStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel>
+}
+
 export type EnumLimitOnCloseStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.LimitOnCloseStatus | Prisma.EnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
   in?: $Enums.LimitOnCloseStatus[] | Prisma.ListEnumLimitOnCloseStatusFieldRefInput<$PrismaModel>
@@ -2368,6 +2385,23 @@ export type NestedEnumConditionalSellStatusWithAggregatesFilter<$PrismaModel = n
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumConditionalSellStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.EntryTpSlPlanStatus | Prisma.EnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel> | $Enums.EntryTpSlPlanStatus
+}
+
+export type NestedEnumEntryTpSlPlanStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.EntryTpSlPlanStatus | Prisma.EnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.EntryTpSlPlanStatus[] | Prisma.ListEnumEntryTpSlPlanStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumEntryTpSlPlanStatusWithAggregatesFilter<$PrismaModel> | $Enums.EntryTpSlPlanStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumEntryTpSlPlanStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumLimitOnCloseStatusFilter<$PrismaModel = never> = {

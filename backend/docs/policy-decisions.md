@@ -678,3 +678,29 @@ preserves financial atomicity without exchange-style fill event infrastructure.
   열린 Futures 포지션이 있는 동안에는 DISABLED여도 ingestion을 유지한다.
 - 한계: 체결·trigger 판단은 저장된 관측(종목당 초당 최대 1건, worker 1초 polling) 기준이다.
   그보다 짧은 가격 도달은 놓칠 수 있으며 범위/캔들 기반 체결 정책은 추가하지 않았다.
+
+## 독립형 손절가/익절가 통일·체결 후 활성화·OCO 신규 등록 종료 (2026-10-16, current)
+
+- [계약](independent-tp-sl-entry-plans-contract.md): 현물 보유, 선물 포지션, 체결 대기 진입의 새
+  손절가/익절가는 모두 독립형 부분 수량 설정이다. 익절·손절은 서로 취소하지 않고, 같은 종류는
+  가격 중복 없이 합계 ≤ 보유/포지션(대기 진입은 비율 ≤ 100%)이며, 시장가로만 실행하고 발동 시
+  수량을 다시 계산한다. 근거: 사용자가 가격·수량을 나눠 관리하되 실제 보유보다 많이 팔거나
+  줄이지 않는다.
+- 선물 설정은 reduce-only(`reduce`/`close`)로 기존 FuturesService 실행 코어를 쓰며 Futures Last로
+  발동·체결하고 Mark는 위험·청산 전용으로 둔다. 손절가는 청산을 보장하지 않는다. 근거: 체결
+  가격 정책(Futures Last)과 위험 정책(Mark)을 섞지 않는다.
+- 대기 진입의 계획은 실제 체결 트랜잭션 안에서, 그 체결의 수량 × 비율(내림)로만 활성화한다.
+  보유 규칙에 맞지 않으면 `failed`로 남기고 체결을 되돌리지 않으며, 진입이 끝나면 계획도 끝낸다.
+  조건주문과 그 주문이 만든 지정가 주문은 계획 하나를 공유한다. 근거: 아직 없는 보유를 미리
+  보호하거나 다른 주문의 체결로 설정을 키우면 안 된다.
+- 새 OCO(`protection_groups`) 등록은 `LEGACY_OCO_REGISTRATION_ENABLED=false`로 단일 지점에서
+  거부하고(`PROTECTION_REGISTRATION_RETIRED`), 기존 그룹의 발동·체결·취소·이력은 유지하며 자동
+  변환하지 않는다. 근거: 두 보호 모델이 같은 보유를 동시에 새로 늘리지 않게 하되 기존 사용자
+  보호는 끊지 않는다.
+- 일반 조건주문(현물 매수·매도, 선물 진입)의 이상/이하는 앱이 감시가격과 현재 기준가격(현물 신선한
+  현재가, 선물 Futures Last)을 비교해 정하고, 같거나 기준가가 없으면 등록하지 않는다. 제출 직전
+  다시 확인해 방향이 바뀌면 보내지 않고 재확인을 요구한다. API의 `triggerCondition`과 서버의
+  `*_ALREADY_MET` 판정은 그대로다. 근거: 사용자가 반대 방향을 잘못 골라 즉시 발동하거나 영영
+  발동하지 않는 주문을 막는다.
+- 새 플래그 `FUTURES_TP_SL_ORDERS_ENABLED`(기본 false). 현물은 기존
+  `INDEPENDENT_TP_SL_ORDERS_ENABLED`를 그대로 쓴다.

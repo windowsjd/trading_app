@@ -22,6 +22,9 @@ import { ProvidersModule } from '../providers/providers.module';
 import { FuturesConditionalEntryController } from './futures-conditional-entry.controller';
 import { FuturesConditionalEntryService } from './futures-conditional-entry.service';
 import { FuturesConditionalEntryWorker } from './futures-conditional-entry-worker.service';
+import { FuturesTpSlController } from './futures-tp-sl.controller';
+import { FuturesTpSlService } from './futures-tp-sl.service';
+import { FuturesTpSlWorker } from './futures-tp-sl-worker.service';
 
 @Module({
   imports: [
@@ -34,6 +37,7 @@ import { FuturesConditionalEntryWorker } from './futures-conditional-entry-worke
     FuturesController,
     FuturesLimitController,
     FuturesConditionalEntryController,
+    FuturesTpSlController,
   ],
   exports: [
     FuturesService,
@@ -48,6 +52,8 @@ import { FuturesConditionalEntryWorker } from './futures-conditional-entry-worke
     FuturesLimitWorker,
     FuturesConditionalEntryService,
     FuturesConditionalEntryWorker,
+    FuturesTpSlService,
+    FuturesTpSlWorker,
     FuturesLiquidationService,
     FuturesRiskWorker,
     FuturesMarkIngestion,

@@ -206,6 +206,16 @@ export type FuturesConditionalEntry = Prisma.FuturesConditionalEntryModel
  */
 export type ConditionalSellOrder = Prisma.ConditionalSellOrderModel
 /**
+ * Model FuturesTpSlSetting
+ * 
+ */
+export type FuturesTpSlSetting = Prisma.FuturesTpSlSettingModel
+/**
+ * Model EntryTpSlPlan
+ * 
+ */
+export type EntryTpSlPlan = Prisma.EntryTpSlPlanModel
+/**
  * Model LimitOnCloseOrder
  * 
  */

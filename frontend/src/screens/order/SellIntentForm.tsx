@@ -14,7 +14,6 @@ import {
   type ConditionalSellExecutionType,
   type ConditionalSellLegDto,
   type ConditionalSellOrderDto,
-  type ConditionalSellTriggerCondition,
 } from '../../features/conditional/conditionalSellApi';
 import {
   SELL_EXECUTION_TYPE_LABEL,
@@ -22,9 +21,10 @@ import {
   getConditionalSellKindLabel,
   getConditionalSellResultNotice,
   getSellLegDraftError,
-  isSellConditionAlreadyMet,
   type SellLegDraft,
 } from '../../features/conditional/conditionalSellDisplay';
+import { getTriggerDirectionText, isTriggerDirectionValid } from '../../features/conditional/autoDirection';
+import { useTriggerDirection } from '../../features/conditional/useTriggerDirection';
 import { emitOrderFillEvent } from '../../features/order/fillEvents';
 import { SELL_COLOR } from '../../features/order/sideColors';
 import { getApiErrorCode, getApiErrorInfo, getErrorMessageFromCode } from '../../services/api/errorMapper';
@@ -35,7 +35,6 @@ import OrderNumberInput, { orderInputStyle } from './OrderNumberInput';
 type LearningGate = { allowed: boolean; locked: boolean; message: string | null; guard: (work: () => void) => void };
 type Request = { accountId: string; epoch: number; body: ConditionalSellCreateDto };
 
-const CONDITIONS: ConditionalSellTriggerCondition[] = ['at_or_above', 'at_or_below'];
 const EMPTY_LEG: SellLegDraft = { triggerPrice: '', executionType: 'market', limitPrice: '', quantity: '' };
 const ID = 'sell-condition';
 
@@ -43,12 +42,12 @@ const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 대기 목
 
 /**
  * A new SELL condition on an open KRX/crypto Spot holding (조건주문 매도):
- * a watch price and direction, market or limit execution and its own target
- * quantity. Nothing is reserved while watching; several settings may target
- * more than the holding, and a firing one sells at most the unreserved
- * remainder at that moment. The form only explains that — the server sizes
- * and validates everything. Stop-loss/take-profit settings have their own
- * form (SellProtectionForm).
+ * a watch price (이상/이하 follows it against the current price, never chosen
+ * by hand), market or limit execution and its own target quantity. Nothing
+ * is reserved while watching; several settings may target more than the
+ * holding, and a firing one sells at most the unreserved remainder at that
+ * moment — the server sizes and validates everything. 손절가/익절가 are set
+ * from the holding card's sheet, not here.
  */
 export default function SellIntentForm({
   accountId,
@@ -73,7 +72,7 @@ export default function SellIntentForm({
   /** Holding minus other orders' reservations; null when the server did not say. */
   available: string | null;
   reserved: string | null;
-  /** The screen's current price, only for "already met" hints. */
+  /** The screen's fresh current price: the reference for 이상/이하. */
   currentPrice: string | null;
   learning: LearningGate;
   onInputFocus?: (input: View | null) => void;
@@ -84,8 +83,10 @@ export default function SellIntentForm({
   const stock = asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock';
   const family = capabilities?.condition;
   const canUseLimit = family?.canUseLimit === true;
-  const [condition, setCondition] = useState<ConditionalSellTriggerCondition | null>(null);
   const [leg, setLeg] = useState<SellLegDraft>(EMPTY_LEG);
+  const trigger = useTriggerDirection(leg.triggerPrice, currentPrice);
+  const condition = trigger.condition;
+  const [directionNotice, setDirectionNotice] = useState<string | null>(null);
   const [registered, setRegistered] = useState<ConditionalSellOrderDto[] | null>(null);
   // The original error only; its public copy is mapped where it is shown.
   const [error, setError] = useState<{ cause: unknown; uncertain: boolean } | null>(null);
@@ -113,7 +114,6 @@ export default function SellIntentForm({
         actionRef.current = null;
         setRegistered(result.conditionalOrders);
         setError(null);
-        setCondition(null);
         setLeg(EMPTY_LEG);
       }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.conditionalSell.all(request.accountId) });
@@ -123,6 +123,9 @@ export default function SellIntentForm({
       const info = getApiErrorInfo(cause);
       const uncertain = !info.hasResponse || (info.status ?? 0) >= 500;
       if (!uncertain) actionRef.current = null;
+      // The server's own price had already crossed the watch price: decide
+      // the direction again from the latest price before another try.
+      if (info.serverCode === 'CONDITIONAL_SELL_ALREADY_MET') trigger.reset();
       setError({ cause, uncertain });
     },
   });
@@ -135,14 +138,19 @@ export default function SellIntentForm({
     scopeRef.current.epoch += 1;
     setRegistered(null);
     setError(null);
+    setDirectionNotice(null);
   };
   const patchLeg = (patch: Partial<SellLegDraft>) => edit(() => setLeg((previous) => ({ ...previous, ...patch })));
 
   const legError = getSellLegDraftError(leg, { assetType: asset.assetType, holding })
     ?? (leg.executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
-  const draftError = !condition ? '감시 조건을 선택해주세요.' : legError;
-  // Hints only: registration is judged by the server's own fresh evidence.
-  const alreadyMet = isSellConditionAlreadyMet(condition, leg.triggerPrice, currentPrice);
+  // No usable current price, or a watch price equal to it: no direction yet.
+  const directionError = trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
+    ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency) : null;
+  const draftError = legError ?? directionError;
+  const directionText = getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency);
+  // The market moved past the watch price after the direction was decided.
+  const crossed = !!condition && !!currentPrice && !isTriggerDirectionValid(condition, leg.triggerPrice, currentPrice);
   const createBlocked = !family?.canCreate ? '현재 조건주문 매도를 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(leg.triggerPrice.trim() || leg.quantity.trim() || leg.limitPrice.trim());
@@ -161,6 +169,12 @@ export default function SellIntentForm({
     }
     if (!canSubmit || !condition) return;
     setError(null);
+    // Never send a direction the latest price no longer supports.
+    if (!actionRef.current) {
+      const changed = trigger.recheck(currentPrice);
+      if (changed) { setDirectionNotice(changed); return; }
+    }
+    setDirectionNotice(null);
     actionRef.current ??= {
       accountId,
       epoch: scopeRef.current.epoch,
@@ -196,6 +210,17 @@ export default function SellIntentForm({
             onFieldFocus={onInputFocus}
             onBlur={onInputBlur}
           />
+          {directionText ? (
+            <Text testID="sell-trigger-direction" accessibilityLiveRegion="polite"
+              style={trigger.direction.state === 'ready' ? styles.direction : styles.error}>
+              {trigger.direction.state === 'ready' ? `감시 조건 · ${directionText}` : directionText}
+            </Text>
+          ) : null}
+          {crossed ? (
+            <Text testID="sell-intent-already-met" style={styles.warning}>
+              현재가가 감시가격을 지났어요. 등록할 때 감시 방향을 다시 확인해요.
+            </Text>
+          ) : null}
         </View>
         <View style={styles.group}>
           <Text style={styles.label}>발동 시 주문방식</Text>
@@ -228,7 +253,6 @@ export default function SellIntentForm({
               onFieldFocus={onInputFocus}
               onBlur={onInputBlur}
             />
-            <Text style={styles.helper}>감시가격과 별개예요. 조건 충족 후 이 가격으로 지정가 매도가 접수돼요.</Text>
           </View>
         ) : null}
         <View style={styles.group}>
@@ -271,64 +295,21 @@ export default function SellIntentForm({
 
   return (
     <View style={styles.form} testID="sell-condition-form">
-          <View style={styles.group}>
-            <Text style={styles.label}>감시 조건</Text>
-            <View accessibilityRole="radiogroup" accessibilityLabel="감시 조건" style={styles.choices}>
-              {CONDITIONS.map((value) => {
-                const selected = condition === value;
-                return (
-                  <ActionPressable
-                    key={value}
-                    testID={`sell-trigger-${value}`}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`감시가격 ${SELL_TRIGGER_CONDITION_LABEL[value]} 시 매도`}
-                    accessibilityState={{ selected, checked: selected, disabled: pending }}
-                    aria-selected={selected}
-                    disabled={pending}
-                    onPress={() => edit(() => setCondition(value))}
-                    style={[styles.choice, selected && styles.choiceSelected]}
-                  >
-                    <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>
-                      감시가격 {SELL_TRIGGER_CONDITION_LABEL[value]}
-                    </Text>
-                  </ActionPressable>
-                );
-              })}
-            </View>
-          </View>
-          {fields()}
-      {alreadyMet ? (
-        <Text testID="sell-intent-already-met" style={styles.warning}>
-          현재가가 이미 이 조건을 충족해 등록이 거부될 수 있어요.
-        </Text>
-      ) : null}
+      {fields()}
       <Text testID="sell-intent-holding" style={styles.helper}>
         보유 {holding !== null ? formatDisplayDecimal(holding) : '-'}
         {available !== null ? ` · 매도 가능 ${formatDisplayDecimal(available)}` : ''}
         {reserved !== null && Number(reserved) > 0 ? ` (다른 주문 예약 ${formatDisplayDecimal(reserved)})` : ''}
         {' · 감시 중에는 수량을 예약하지 않아요'}
       </Text>
-      <View style={styles.policy} testID="sell-intent-policy">
-        {[
-          '감시가격에 도달하면 일반 매도 주문을 한 번 만들어요. 조건 충족은 체결이 아니에요.',
-          '같은 종목에 여러 매도 설정을 둘 수 있고, 설정 수량의 합이 보유 수량보다 많아도 돼요.',
-          '실제 매도 수량은 발동 시점의 매도 가능 수량(보유 − 다른 주문 예약)을 넘지 않아요. 남은 수량이 없으면 매도하지 않고 끝나요.',
-          '보유 수량을 모두 팔면 남은 매도 설정은 함께 끝나요. 다시 사도 이전 설정은 이어지지 않아요.',
-          '시장가 발동은 그때의 시장가로 실행되고, 지정가 발동은 지정가 매도로 접수된 뒤 기존 자동 체결 정책을 따라요.',
-          '조건 충족 후 30초 안에 주문을 만들지 못하면 실패로 끝나요.',
-          asset.assetType === 'crypto' ? '암호화폐는 Binance 현물 가격으로만 감시해요.' : '한국주식은 정규장 시간의 신선한 시세로만 감시해요. 등록도 정규장 중에 할 수 있어요.',
-          '등록할 때 이미 조건을 충족한 가격이면 등록되지 않아요.',
-          '기존 TP/SL(OCO) 보호가 있는 종목에는 함께 설정할 수 없어요.',
-          capabilities ? `계정당 감시 중인 매도 설정은 최대 ${capabilities.maxLivePerAccount}개예요.` : null,
-        ].filter((line): line is string => !!line).map((line) => (
-          <Text key={line} style={styles.policyLine}>· {line}</Text>
-        ))}
-      </View>
       {blockedReason || createBlocked ? (
         <Text testID="sell-intent-blocked" style={styles.error}>{blockedReason ?? createBlocked}</Text>
       ) : null}
-      {typed && draftError ? (
+      {typed && draftError && draftError !== directionError ? (
         <Text testID="sell-intent-input-error" style={styles.error}>{draftError}</Text>
+      ) : null}
+      {directionNotice ? (
+        <Text testID="sell-direction-changed" accessibilityLiveRegion="polite" style={styles.warning}>{directionNotice}</Text>
       ) : null}
       {error ? (
         <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : getErrorMessageFromCode(getApiErrorCode(error.cause))}
@@ -378,23 +359,7 @@ const styles = {
   helper: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
   warning: { fontSize: 12, lineHeight: 17, color: semantic.warning },
   error: { fontSize: 12, lineHeight: 17, color: semantic.error },
-  choices: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  choice: {
-    flexGrow: 1,
-    flexBasis: 120,
-    minHeight: 40,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    backgroundColor: semantic.raised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  choiceSelected: { backgroundColor: semantic.selected, borderColor: semantic.selected },
-  choiceText: { fontSize: 13, lineHeight: 18, fontWeight: '600', color: semantic.text, textAlign: 'center' },
-  choiceTextSelected: { color: semantic.onAccent },
+  direction: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: semantic.info },
   quantityHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 4 },
   chip: {
     minHeight: 32,
@@ -408,8 +373,6 @@ const styles = {
     justifyContent: 'center',
   },
   chipText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: semantic.text },
-  policy: { gap: 4, padding: 10, borderRadius: 10, backgroundColor: semantic.raised },
-  policyLine: { fontSize: 12, lineHeight: 17, color: semantic.secondary },
   resultTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
 } as const;
 

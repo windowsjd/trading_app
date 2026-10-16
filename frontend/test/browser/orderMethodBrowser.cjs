@@ -97,17 +97,17 @@ async function run() {
         await page.getByTestId('order-type-select').waitFor();
       };
       const field = () => page.getByTestId('order-type-select');
-      // A new form reads 시장가; the hint sits inside the field at its right
-      // edge — beside the value, or wrapped under it — and is never cut.
+      // A new form reads 시장가 on the left; a large ▼ sits at the field's right
+      // edge inside it; no 「주문방식 선택하기」 hint (2026-10-16).
       const defaultField = async () => {
         assert.equal(await page.getByTestId('order-type-select-value').innerText(), '시장가', `default method (${tag})`);
-        assert.equal((await page.getByTestId('order-type-select-hint').innerText()).replace(/\s+/g, ' '), '주문방식 선택하기');
+        assert.equal(await page.getByTestId('order-type-select-hint').count(), 0, `no hint (${tag})`);
         const box = await field().boundingBox();
-        const hint = await page.getByTestId('order-type-select-hint').boundingBox();
+        const triangle = await page.getByTestId('order-type-select-chevron').boundingBox();
         const value = await page.getByTestId('order-type-select-value').boundingBox();
-        assert.ok(hint.x >= box.x && hint.x + hint.width <= box.x + box.width + 1 && hint.y >= box.y && hint.y + hint.height <= box.y + box.height + 1, `hint inside the field (${tag})`);
-        assert.ok(box.x + box.width - (hint.x + hint.width) <= 40, `hint at the field's right (${tag})`);
-        assert.ok(hint.x >= value.x + value.width - 1 || hint.y >= value.y + value.height - 1, `hint after the value (${tag})`);
+        assert.ok(triangle.x >= box.x && triangle.x + triangle.width <= box.x + box.width + 1 && triangle.y >= box.y && triangle.y + triangle.height <= box.y + box.height + 1, `▼ inside the field (${tag})`);
+        assert.ok(box.x + box.width - (triangle.x + triangle.width) <= 28, `▼ at the field's right (${tag})`);
+        assert.ok(triangle.x >= value.x + value.width - 1, `▼ after the value (${tag})`);
       };
       // Every row of the open sheet can be brought fully inside the sheet card and the viewport.
       const sheetReachable = async (methods) => {
@@ -125,8 +125,8 @@ async function run() {
       };
       const row = (method) => page.getByTestId(`order-method-${method}`);
 
-      // 1. Crypto BUY: 시장가 by default with the small 주문방식 선택하기 hint on the
-      // field's right, then the sheet with a server-gated 조건주문.
+      // 1. Crypto BUY: 시장가 by default with the ▼ on the field's right, then
+      // the sheet with a server-gated 조건주문.
       await go('asset=SUI&conditional=enabled&longName=1');
       await defaultField();
       assert.equal(await page.getByTestId('order-quantity-input').count(), 1, 'the market draft is ready');
@@ -140,8 +140,9 @@ async function run() {
       // 2. Conditional form with watch and limit prices.
       await row('conditional').click();
       await page.getByTestId('conditional-buy-form').waitFor();
-      await page.getByTestId('conditional-trigger-at_or_below').click();
+      // 이상/이하 follows the watch price against SUI 0.8592 (no selector).
       await page.getByTestId('conditional-trigger-price').fill('0.81234567');
+      assert.equal(await page.getByTestId('conditional-trigger-direction').innerText(), '감시 조건 · 0.81234567 USD 이하 도달 시', `direction (${tag})`);
       await page.getByTestId('conditional-execution-limit').click();
       await page.getByTestId('conditional-limit-price').fill('0.80123456');
       await page.getByTestId('conditional-size').fill('1234567.12345678');
@@ -155,7 +156,6 @@ async function run() {
         await go(`asset=SUI&conditional=enabled&longName=1&conditionalResult=${result}`);
         await field().click();
         await row('conditional').click();
-        await page.getByTestId('conditional-trigger-at_or_below').click();
         await page.getByTestId('conditional-trigger-price').fill('0.81234567');
         await page.getByTestId('conditional-execution-limit').click();
         await page.getByTestId('conditional-limit-price').fill('0.80123456');
@@ -178,20 +178,22 @@ async function run() {
       await sheetReachable(['market', 'limit', 'conditional', 'loc']);
       await row('loc').click();
       await page.getByTestId('loc-order-notice').waitFor();
-      assert.equal(await page.getByTestId('attached-entry-editor').count(), 0);
+      assert.equal(await page.getByTestId('order-tp-sl-button').count(), 0, `LOC takes no 손절가/익절가 (${tag})`);
       await page.getByTestId('order-limit-price-input').fill('70000');
       await page.getByTestId('order-quantity-input').fill('2');
       await shot('krx-loc');
 
-      // 4. KRX SELL: market plus the server-gated 조건주문/LOC/손절·익절 rows; no direct limit.
+      // 4. KRX SELL: market plus the server-gated 조건주문/LOC rows; no direct limit and
+      // no 손절가/익절가 row (it lives on the holding card).
       await go('krx=1&asset=SAMSUNG&longName=1');
       await page.getByTestId('asset-detail-sell-button').click();
       await defaultField();
       await field().click();
-      await row('protection').waitFor();
+      await row('loc').waitFor();
       assert.equal(await row('limit').count(), 0, 'no new sell limit');
+      assert.equal(await row('protection').count(), 0, 'no 손절가/익절가 주문방식');
       await shot('krx-sell-sheet');
-      await sheetReachable(['market', 'conditional', 'loc', 'protection']);
+      await sheetReachable(['market', 'conditional', 'loc']);
       await page.getByTestId('order-method-sheet-close').click();
 
       // 5. The account's conditional orders with every state.

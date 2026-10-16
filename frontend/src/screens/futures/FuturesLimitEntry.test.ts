@@ -3,61 +3,109 @@ import { createRequire } from 'node:module';
 import { test } from 'node:test';
 const { futuresHarness, deferred } = createRequire(import.meta.url)('../../../test/futuresHarness.cjs');
 
+// 손절가/익절가 plans of a new Limit entry: market-only settings activated by
+// the entry's actual fill for their share of it (sent as `entryTpSl`).
+const OPEN_PLANS = { spot: { enabled: false, canCreate: false }, futures: { enabled: true, canCreate: true }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 };
+const LABEL: Record<string, string> = { stop_loss: '손절', take_profit: '익절' };
+const ID: Record<string, string> = { stop_loss: 'tp-sl-stop-loss', take_profit: 'tp-sl-take-profit' };
+const words = (node: any) => [node?.props.children].flat(Infinity).filter((part: unknown) => typeof part === 'string').join('');
+/** Below the entry for a Long stop-loss / Short take-profit, above otherwise. */
+const protective = (direction: string, kind: string) => (direction === 'long') === (kind === 'stop_loss') ? '90' : '110';
+
+async function planSheet(h: any, kinds: string[], price: (kind: string) => string, ratio = 50) {
+  await h.press('futures-limit-tp-sl-button');
+  for (const kind of kinds) {
+    await h.press(`${ID[kind]}-toggle`);
+    await h.change(`${ID[kind]}-trigger-price`, price(kind));
+    await h.press(`${ID[kind]}-ratio-${ratio}`);
+  }
+}
+
 for (const direction of ['long', 'short'])
   for (const kinds of [['stop_loss'], ['take_profit'], ['stop_loss', 'take_profit']])
-    for (const child of ['market', 'limit'])
-      test(`${direction} valid ${kinds.join('/')} ${child} attachment submits unchanged`, async t => {
-        const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
-        await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
-        for (const kind of kinds) {
-          const sl = kind === 'stop_loss'; const below = (direction === 'long') === sl;
-          const label = sl ? '손절 (Stop Loss)' : '익절 (Take Profit)';
-          await h.press(`protection-${kind}-toggle`); await h.input(`${label} 조건 가격`, below ? '90' : '110');
-          if (child === 'limit') { await h.press(`protection-${kind}-limit`); await h.input(`${label} 실행 지정가`, '100'); }
-        }
-        await h.press('futures-limit-submit');
-        assert.equal(h.requests.length, 1);
-        assert.equal(h.requests[0].body.attachedProtection.length, kinds.length);
-        assert.equal(h.requests[0].body.attachedProtection.every((leg: any) => leg.childOrderType === child), true);
-      });
+    test(`${direction} valid ${kinds.join('/')} plans submit with the entry, market only`, async t => {
+      const h = futuresHarness(); h.entryTpSlCapabilities = OPEN_PLANS; await h.start(); t.after(h.close); await draft(h);
+      await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
+      await planSheet(h, kinds, (kind) => protective(direction, kind));
+      assert.equal(h.node('tp-sl-take-profit-execution') === undefined && h.node('tp-sl-stop-loss-limit-price') === undefined, true, 'no execution choice');
+      await h.press('tp-sl-submit');
+      await h.press('tp-sl-sheet-close');
+      assert.equal(words(h.node('futures-limit-tp-sl-button-summary')).length > 0, true);
+      await h.press('futures-limit-submit');
+      assert.equal(h.requests.length, 1);
+      assert.equal('attachedProtection' in h.requests[0].body, false, 'no new OCO attachment');
+      // The sheet adds the kinds in its own order: 익절 then 손절.
+      assert.deepEqual(h.requests[0].body.entryTpSl, ['take_profit', 'stop_loss'].filter((kind) => kinds.includes(kind))
+        .map((kind) => ({ kind, triggerPrice: protective(direction, kind), ratio: 50 })));
+      assert.match(h.text(), /손절가\/익절가는 체결 후 활성화됩니다/);
+    });
 
 for (const direction of ['long', 'short'])
   for (const kind of ['stop_loss', 'take_profit'])
     for (const trigger of ['100', (direction === 'long') === (kind === 'stop_loss') ? '110' : '90'])
-      test(`${direction}/${kind} rejects invalid trigger ${trigger} before transport`, async t => {
-        const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
+      test(`${direction}/${kind} plan at ${trigger} is refused against the 100 entry before transport`, async t => {
+        const h = futuresHarness(); h.entryTpSlCapabilities = OPEN_PLANS; await h.start(); t.after(h.close); await draft(h);
         await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
-        const sl = kind === 'stop_loss'; const below = (direction === 'long') === sl;
-        await h.press(`protection-${kind}-toggle`);
-        await h.input(`${sl ? '손절 (Stop Loss)' : '익절 (Take Profit)'} 조건 가격`, trigger);
-        await h.press('futures-limit-submit');
+        await planSheet(h, [kind], () => trigger);
+        const below = (direction === 'long') === (kind === 'stop_loss');
+        assert.equal(words(h.node('tp-sl-draft-error')), `${LABEL[kind]}가는 진입 가격보다 ${below ? '낮게' : '높게'} 입력해주세요.`);
+        assert.equal(h.node('tp-sl-submit').props.state, 'disabled');
         assert.equal(h.requests.length, 0);
-        assert.match(h.text(), new RegExp(`${direction.toUpperCase()} ${sl ? '손절가' : '익절가'}는 진입 지정가보다 ${below ? '낮아야' : '높아야'} 합니다`));
       });
 
 for (const direction of ['long', 'short'])
-  test(`${direction} attachment compares the full 16+8 decimal price without Number rounding`, async t => {
+  test(`${direction} plans that no longer fit a changed entry price stop the submit before transport`, async t => {
+    const h = futuresHarness(); h.entryTpSlCapabilities = OPEN_PLANS; await h.start(); t.after(h.close); await draft(h);
+    await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
+    await planSheet(h, ['stop_loss'], () => protective(direction, 'stop_loss'));
+    await h.press('tp-sl-submit'); await h.press('tp-sl-sheet-close');
+    // The entry moves past the stop-loss: Long 90 → entry 80, Short 110 → entry 120.
+    await h.change('futures-limit-price', direction === 'long' ? '80' : '120');
+    await h.press('futures-limit-submit');
+    assert.equal(h.requests.length, 0);
+    assert.match(words(h.node('futures-limit-notice')), /^손절가\/익절가 설정을 확인해 주세요\. 손절가는 진입 가격보다/);
+  });
+
+for (const direction of ['long', 'short'])
+  test(`${direction} plan prices compare the full 16+8 decimal entry without Number rounding`, async t => {
     // One 1e-8 contract at this price is a $12M notional: the account must carry it.
     const large = '100000000000';
-    const h = futuresHarness({ protectionEnabled: true, freeCollateral: large, crossBase: large, liquidationBuffer: large }); await h.start(); t.after(h.close); await draft(h);
+    const h = futuresHarness({ freeCollateral: large, crossBase: large, liquidationBuffer: large }); h.entryTpSlCapabilities = OPEN_PLANS;
+    await h.start(); t.after(h.close); await draft(h);
     await h.choose(direction === 'long' ? '롱(Long)' : '숏(Short)');
     await h.change('futures-limit-price', '1234567890123456.12345678');
     await h.amount('100000000');
-    await h.press('protection-stop_loss-toggle');
-    await h.input('손절 (Stop Loss) 조건 가격', direction === 'long' ? '1234567890123456.12345679' : '1234567890123456.12345677');
-    await h.press('futures-limit-submit'); assert.equal(h.requests.length, 0);
-    await h.input('손절 (Stop Loss) 조건 가격', direction === 'long' ? '1234567890123456.12345677' : '1234567890123456.12345679');
+    await planSheet(h, ['stop_loss'], () => direction === 'long' ? '1234567890123456.12345679' : '1234567890123456.12345677', 100);
+    assert.equal(h.node('tp-sl-submit').props.state, 'disabled', 'one unit on the wrong side');
+    await h.change('tp-sl-stop-loss-trigger-price', direction === 'long' ? '1234567890123456.12345677' : '1234567890123456.12345679');
+    assert.equal(h.node('tp-sl-submit').props.state, 'enabled');
+    await h.press('tp-sl-submit'); await h.press('tp-sl-sheet-close');
     await h.press('futures-limit-submit'); assert.equal(h.requests.length, 1);
+    assert.equal(h.requests[0].body.entryTpSl[0].triggerPrice, direction === 'long' ? '1234567890123456.12345677' : '1234567890123456.12345679');
   });
 
-test('server trigger rejection retains direction guidance and the authoritative failure', async t => {
-  const h = futuresHarness({ protectionEnabled: true }); await h.start(); t.after(h.close); await draft(h);
-  await h.press('protection-stop_loss-toggle'); await h.input('손절 (Stop Loss) 조건 가격', '90');
-  h.failure = { response: { status: 409, data: { success: false, error: { code: 'PROTECTION_ALREADY_TRIGGERED', message: 'Trigger prices must be strictly beyond the current reference price.' } } } };
+test('a server plan refusal shows its mapped reason and keeps the authoritative failure', async t => {
+  const h = futuresHarness(); h.entryTpSlCapabilities = OPEN_PLANS; await h.start(); t.after(h.close); await draft(h);
+  await planSheet(h, ['stop_loss'], () => '90');
+  await h.press('tp-sl-submit'); await h.press('tp-sl-sheet-close');
+  h.failure = { response: { status: 409, data: { success: false, error: { code: 'ENTRY_TP_SL_INVALID_TRIGGER', message: 'raw server text' } } } };
   await h.press('futures-limit-submit');
   assert.equal(h.requests.length, 1);
-  assert.match(h.text(), /LONG 조건 가격을 확인해주세요/);
-  assert.match(h.text(), /SL < 진입 지정가 < TP/);
+  assert.match(h.text(), /익절가·손절가 방향이 주문 가격과 맞지 않습니다/);
+  assert.doesNotMatch(h.text(), /raw server text/);
+});
+
+test('switched-off plans keep the drafts visible and stop a retained submit callback', async t => {
+  const h = futuresHarness(); h.entryTpSlCapabilities = OPEN_PLANS; await h.start(); t.after(h.close); await draft(h);
+  await planSheet(h, ['stop_loss'], () => '90');
+  await h.press('tp-sl-submit'); await h.press('tp-sl-sheet-close');
+  const submit = h.node('futures-limit-submit').props.onPress;
+  h.entryTpSlCapabilities = { ...OPEN_PLANS, futures: { enabled: false, canCreate: false } };
+  await h.client.invalidateQueries(); await h.flush();
+  assert.equal(h.node('futures-limit-tp-sl-button') !== undefined, true);
+  assert.match(h.text(), /현재 손절가\/익절가를 새로 등록할 수 없어요/);
+  await submit(); await h.flush();
+  assert.equal(h.requests.length, 0);
 });
 
 async function draft(h: any) {
@@ -84,32 +132,6 @@ for (const accountId of ['A', 'B'])
           assert.equal(h.invalidations.some((key: string[]) => key.join('/') === `tradingAccount/futures/${accountId}`), true);
           assert.equal(h.invalidations.some((key: string[]) => key.includes('protections') && key.includes(accountId)), true);
         });
-
-for (const kinds of [['stop_loss'], ['take_profit'], ['stop_loss', 'take_profit']])
-  test(`Limit attaches ${kinds.join('/')} through the existing Protection editor`, async t => {
-    const h = futuresHarness({protectionEnabled:true}); await h.start(); t.after(h.close); await draft(h);
-    const legs = [];
-    for (const kind of kinds) {
-      const sl = kind === 'stop_loss';
-      await h.press(`protection-${kind}-toggle`);
-      await h.input(`${sl ? '손절 (Stop Loss)' : '익절 (Take Profit)'} 조건 가격`, sl ? '90' : '110');
-      if (sl) { await h.press('protection-stop_loss-limit'); await h.input('손절 (Stop Loss) 실행 지정가', '89'); }
-      legs.push({kind, triggerPrice:sl ? '90' : '110', childOrderType:sl ? 'limit' : 'market', ...(sl ? {childLimitPrice:'89'} : {})});
-    }
-    await h.press('futures-limit-submit');
-    assert.deepEqual(h.requests[0].body.attachedProtection, legs);
-  });
-
-test('disabled capabilities keep TP/SL visible and stop a retained attached submit callback', async t => {
-  const h = futuresHarness({protectionEnabled:true}); await h.start(); t.after(h.close); await draft(h);
-  await h.press('protection-stop_loss-toggle'); await h.input('손절 (Stop Loss) 조건 가격', '90');
-  const submit = h.node('futures-limit-submit').props.onPress;
-  h.protectionOptions = {enabled:false}; await h.client.invalidateQueries(); await h.flush();
-  assert.equal(h.node('protection-stop_loss-toggle') !== undefined, true);
-  assert.match(h.text(), /새 보호 조건을 등록할 수 없습니다/);
-  await submit(); await h.flush();
-  assert.equal(h.requests.length, 0);
-});
 
 for (const mode of ['REDUCE_ONLY', 'DISABLED'])
   test(`${mode} stops new Limit entry after capability refetch`, async t => {

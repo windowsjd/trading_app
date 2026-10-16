@@ -149,6 +149,8 @@ export interface RecordOrderItemDto {
   assetId?: string;
   symbol?: string;
   name?: string;
+  /** Account-scoped reads: the asset's market (KRX, BINANCE, US exchanges). */
+  market?: string;
   side: 'buy' | 'sell';
   orderType?: 'market' | 'limit' | (string & {});
   status?: 'submitted' | 'executed' | 'canceled' | 'rejected' | (string & {});

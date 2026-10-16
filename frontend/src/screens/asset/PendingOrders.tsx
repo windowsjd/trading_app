@@ -2,6 +2,7 @@ import PendingFuturesAndProtections from './PendingFuturesAndProtections';
 import ConditionalBuyOrdersList from './ConditionalBuyOrdersList';
 import ConditionalSellOrdersList from './ConditionalSellOrdersList';
 import FuturesConditionalEntriesList from '../futures/FuturesConditionalEntriesList';
+import { EntryTpSlPlansList, FuturesTpSlList } from './TpSlPendingLists';
 import { financial } from '../../theme/financialColors';
 import { semantic } from '../../theme/tokens';
 import React, { useEffect, useRef, useState } from 'react';
@@ -26,6 +27,16 @@ import { getAccountPendingOrders } from '../../features/record/accountOrders';
 import { getTradingAccountOrders } from '../../features/tradingAccount/api';
 import { getIntegrityErrorMessage } from '../../features/tradingAccount/integrityErrors';
 import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invalidation';
+import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
+import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
+import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
+import type { RecordOrderItemDto } from '../../features/record/api';
+
+/** A pending entry that takes 손절가/익절가 plans: an ordinary KRX/crypto BUY Limit (never LOC). */
+function takesEntryTpSl(item: RecordOrderItemDto) {
+  return item.side === 'buy' && item.orderType === 'limit' && !item.limitOnClose
+    && (item.market === 'KRX' || item.market === 'BINANCE');
+}
 
 type Props = {
   accountId: string;
@@ -56,8 +67,11 @@ export function BoundPendingOrders(props: Props) {
         <FuturesConditionalEntriesList key={`futures-conditional:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} seasonUi={props.seasonUi} />
       </>
       : <>
-        <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />
         {props.conditional ? <ConditionalSellOrdersList key={`sell-protection:${props.accountId}`} accountId={props.accountId} family="protection" isFocused={props.isFocused} seasonUi={props.seasonUi} /> : null}
+        {props.conditional ? <FuturesTpSlList key={`futures-tp-sl:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} /> : null}
+        {props.conditional ? <EntryTpSlPlansList key={`entry-tp-sl:${props.accountId}`} accountId={props.accountId} isFocused={props.isFocused} /> : null}
+        {/* Existing whole-position OCO protections (registered before 2026-10-16) and their history. */}
+        <PendingFuturesAndProtections key={`protection:${props.accountId}`} accountId={props.accountId} focused={props.isFocused} seasonUi={props.seasonUi} protections />
       </>}
   </View>;
 }
@@ -78,6 +92,7 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
     ids: new Set(),
   });
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
+  const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', setAppState);
@@ -94,6 +109,7 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
   // The account ID is part of the key and checked again at the display boundary.
   const data = query.data?.tradingAccountId === accountId ? query.data : undefined;
   const count = !query.isError && data ? data.items.filter(item => !item.conditionalChildId).length : undefined;
+  const plans = useEntryTpSlSummaries(accountId, isFocused && !!data?.items.some(takesEntryTpSl));
   useEffect(() => { onCount?.(count); }, [count, onCount]);
   const integrityMessage = query.isError
     ? getIntegrityErrorMessage(query.error)
@@ -143,8 +159,10 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
   }
   if (!data) return <SectionSkeleton lines={4} />;
   const items = data.items.filter(item => !item.conditionalChildId);
+  const sheet = <TpSlSheet target={isFocused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />;
+  // An entry that just filled leaves the list; its open sheet stays to say so.
   if (items.length === 0) {
-    return null;
+    return sheet;
   }
 
   return (
@@ -181,9 +199,18 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
                 {formatOrderBookDecimal(item.quantity)}
               </Text>
             </View>
+            {(() => {
+              const orderId = item.orderId ?? item.id;
+              const summary = orderId ? plans.summary(orderId) : null;
+              return orderId && takesEntryTpSl(item) && (plans.capabilities?.spot.enabled || summary) ? (
+                <TpSlButton testID={`pending-order-${display.key}-tp-sl`} summary={summary}
+                  onPress={() => setTpSlTarget({ type: 'entry', accountId, entryType: 'spot_limit_order', entryId: orderId })} />
+              ) : null;
+            })()}
           </View>
         );
       })}
+      {sheet}
     </View>
   );
 }

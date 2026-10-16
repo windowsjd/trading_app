@@ -25,29 +25,70 @@ for (const mode of ['ENABLED', 'REDUCE_ONLY', 'DISABLED']) test(`${mode}: detail
   }
 });
 
-test('the card TP/SL entrance opens that position\'s TP/SL panel in the card: one panel manages the existing group, never a duplicate registration', async t => {
+const words = (node: any) => [node?.props.children].flat(Infinity).filter((part: unknown) => typeof part === 'string').join('');
+
+test('the card 손절가/익절가 설정 opens that position\'s sheet; an existing OCO group shows there with its cancel and blocks new settings', async t => {
   const h = futuresHarness({ position: true, protectionEnabled: true });
-  h.protectionOptions = { active: true };
+  // A whole-position group registered before 2026-10-16 on this lifetime.
+  h.protectionOptions = { active: true, positionId: 'A:position' };
   await h.start(); t.after(h.close);
-  const panels = () => h.renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === 'protection-panel').length;
-  // The card reads the live group at a glance: TP / SL triggers.
-  assert.equal(h.node('futures-position-A:position-protection-status').props.children, '$123,456,789.12 / $90,000');
-  assert.equal(h.node('futures-position-A:position-protection').props.label, 'TP/SL 관리');
-  assert.equal(panels(), 0);
-  await h.press('futures-position-A:position-protection');
-  // TP/SL is managed in the position card; the trade form keeps its method.
-  assert.equal(h.orderType(), '시장가');
-  assert.equal(panels(), 1);
-  const inCard = h.node('futures-position-A:position').findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'protection-panel').length;
-  assert.equal(inCard, 1);
-  assert.equal(h.node('futures-position-A:position-protection').props.label, 'TP/SL 접기');
-  assert.equal(h.node('protection-stop_loss-toggle') === undefined, true);
-  assert.equal(h.renderer.root.findAllByType('CTAButton').some(n => n.props.label === '보호 조건 취소'), true);
-  assert.equal(h.node('futures-conditional-fields') === undefined, true, 'TP/SL is not a new-position 조건주문');
+  const card = 'futures-position-A:position-protection';
+  assert.equal(h.node(card).props.label, '손절가/익절가 설정');
+  assert.equal(h.node('tp-sl-futures-position') === undefined, true);
+  await h.press(card);
+  assert.equal(h.orderType(), '시장가', 'the trade form keeps its method');
+  assert.equal(h.node('tp-sl-futures-position') !== undefined, true, 'the position sheet is open');
+  assert.equal(h.node('tp-sl-legacy-oco') !== undefined, true, 'the existing OCO group is shown');
+  assert.equal(h.node('tp-sl-legacy-oco-cancel').props.label, '기존 TP/SL(OCO) 취소');
+  assert.match(words(h.node('tp-sl-blocked')), /기존 TP\/SL\(OCO\) 보호가 있어 함께 설정할 수 없어요/);
+  assert.equal(h.node('tp-sl-take-profit-toggle').props.disabled, true, 'no new setting next to the group');
+  assert.equal(h.node('tp-sl-submit').props.state, 'disabled');
+  assert.equal(h.node('futures-conditional-fields') === undefined, true, '손절가/익절가 is not a new-position 조건주문');
   assert.equal(h.requests.length, 0);
+  await h.press('tp-sl-legacy-oco-cancel');
+  assert.equal(h.requests.length, 1);
+  assert.match(h.requests[0].path, /^\/trading-accounts\/A\/protections\/[^/]+\/cancel$/);
+});
+
+test('a Long position registers independent partial 손절가/익절가 on Futures Last: shares become contract quantities to reduce', async t => {
+  const h = futuresHarness({ position: true });
+  await h.start(); t.after(h.close);
   await h.press('futures-position-A:position-protection');
-  assert.equal(panels(), 0);
-  assert.equal(h.requests.length, 0);
+  assert.match(words(h.node('tp-sl-position')), /포지션 수량 2 BTC/);
+  await h.press('tp-sl-take-profit-toggle');
+  await h.change('tp-sl-take-profit-trigger-price', '110');
+  await h.press('tp-sl-take-profit-ratio-25');
+  assert.match(words(h.node('tp-sl-take-profit-quantity')), /^감소 수량 0\.5 BTC/);
+  await h.press('tp-sl-stop-loss-toggle');
+  await h.change('tp-sl-stop-loss-trigger-price', '95');
+  await h.press('tp-sl-stop-loss-ratio-100');
+  assert.match(words(h.node('tp-sl-stop-loss-quantity')), /^감소 수량 2 BTC/);
+  assert.equal(h.node('tp-sl-take-profit-warning') === undefined && h.node('tp-sl-stop-loss-warning') === undefined, true);
+  await h.press('tp-sl-submit');
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].path, '/trading-accounts/A/futures/tp-sl-settings');
+  assert.deepEqual({ ...h.requests[0].body, idempotencyKey: '<key>' }, {
+    positionId: 'A:position', takeProfit: { triggerPrice: '110', quantity: '0.5' }, stopLoss: { triggerPrice: '95', quantity: '2' }, idempotencyKey: '<key>',
+  });
+  assert.match(h.requests[0].body.idempotencyKey, /^futures_tp_sl_/);
+  assert.equal(words(h.node('tp-sl-registered')), '익절가와 손절가를 등록했어요.');
+  // Nothing opened, increased or flipped the position: the only request was the settings.
+  assert.equal(h.requests.some((r: { path: string }) => r.path.endsWith('/execute')), false);
+});
+
+test('a Short position watches the other sides: a take-profit above Futures Last is flagged as already reached', async t => {
+  const h = futuresHarness({ position: true, direction: 'short' });
+  await h.start(); t.after(h.close);
+  await h.press('futures-position-A:position-protection');
+  await h.press('tp-sl-take-profit-toggle');
+  assert.equal(h.node('tp-sl-take-profit-trigger-price').props.placeholder, '현재가보다 낮은 가격');
+  await h.change('tp-sl-take-profit-trigger-price', '110');
+  await h.press('tp-sl-take-profit-ratio-50');
+  assert.match(words(h.node('tp-sl-take-profit-warning')), /이미 이 가격에 도달/);
+  await h.change('tp-sl-take-profit-trigger-price', '90');
+  assert.equal(h.node('tp-sl-take-profit-warning') === undefined, true);
+  await h.press('tp-sl-stop-loss-toggle');
+  assert.equal(h.node('tp-sl-stop-loss-trigger-price').props.placeholder, '현재가보다 높은 가격');
 });
 
 test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 조건주문; flat 조건주문 is a new-position entry, held 지정가/조건주문 explain why they wait', async t => {
@@ -55,7 +96,7 @@ test('주문방식 starts at 시장가 and offers only 시장가, 지정가 and 
   const flat = futuresHarness({ protectionEnabled: true });
   await flat.start(); t.after(flat.close);
   assert.equal(flat.orderType(), '시장가');
-  assert.equal(flat.node('order-type-select').props.accessibilityLabel, '주문방식 시장가, 주문방식 선택하기');
+  assert.equal(flat.node('order-type-select').props.accessibilityLabel, '주문방식 시장가');
   await flat.press('order-type-select');
   assert.deepEqual(methods(flat), ['market', 'limit', 'conditional']);
   assert.equal(flat.node('order-method-conditional').props.disabled, false);

@@ -333,6 +333,7 @@ export type FuturesLimitOrderWhereInput = {
   execution?: Prisma.XOR<Prisma.FuturesExecutionNullableScalarRelationFilter, Prisma.FuturesExecutionWhereInput> | null
   protection?: Prisma.XOR<Prisma.ProtectionGroupNullableScalarRelationFilter, Prisma.ProtectionGroupWhereInput> | null
   conditionalEntry?: Prisma.XOR<Prisma.FuturesConditionalEntryNullableScalarRelationFilter, Prisma.FuturesConditionalEntryWhereInput> | null
+  entryTpSlPlans?: Prisma.EntryTpSlPlanListRelationFilter
 }
 
 export type FuturesLimitOrderOrderByWithRelationInput = {
@@ -359,6 +360,7 @@ export type FuturesLimitOrderOrderByWithRelationInput = {
   execution?: Prisma.FuturesExecutionOrderByWithRelationInput
   protection?: Prisma.ProtectionGroupOrderByWithRelationInput
   conditionalEntry?: Prisma.FuturesConditionalEntryOrderByWithRelationInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanOrderByRelationAggregateInput
 }
 
 export type FuturesLimitOrderWhereUniqueInput = Prisma.AtLeast<{
@@ -390,6 +392,7 @@ export type FuturesLimitOrderWhereUniqueInput = Prisma.AtLeast<{
   execution?: Prisma.XOR<Prisma.FuturesExecutionNullableScalarRelationFilter, Prisma.FuturesExecutionWhereInput> | null
   protection?: Prisma.XOR<Prisma.ProtectionGroupNullableScalarRelationFilter, Prisma.ProtectionGroupWhereInput> | null
   conditionalEntry?: Prisma.XOR<Prisma.FuturesConditionalEntryNullableScalarRelationFilter, Prisma.FuturesConditionalEntryWhereInput> | null
+  entryTpSlPlans?: Prisma.EntryTpSlPlanListRelationFilter
 }, "id" | "executionId" | "executionId_tradingAccountId" | "tradingAccountId_idempotencyKey">
 
 export type FuturesLimitOrderOrderByWithAggregationInput = {
@@ -463,6 +466,7 @@ export type FuturesLimitOrderCreateInput = {
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
   protection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUncheckedCreateInput = {
@@ -486,6 +490,7 @@ export type FuturesLimitOrderUncheckedCreateInput = {
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUpdateInput = {
@@ -509,6 +514,7 @@ export type FuturesLimitOrderUpdateInput = {
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
   protection?: Prisma.ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateInput = {
@@ -532,6 +538,7 @@ export type FuturesLimitOrderUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderCreateManyInput = {
@@ -846,6 +853,22 @@ export type FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesLimitOrderUpdateToOneWithWhereWithoutConditionalEntryInput, Prisma.FuturesLimitOrderUpdateWithoutConditionalEntryInput>, Prisma.FuturesLimitOrderUncheckedUpdateWithoutConditionalEntryInput>
 }
 
+export type FuturesLimitOrderCreateNestedOneWithoutEntryTpSlPlansInput = {
+  create?: Prisma.XOR<Prisma.FuturesLimitOrderCreateWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUncheckedCreateWithoutEntryTpSlPlansInput>
+  connectOrCreate?: Prisma.FuturesLimitOrderCreateOrConnectWithoutEntryTpSlPlansInput
+  connect?: Prisma.FuturesLimitOrderWhereUniqueInput
+}
+
+export type FuturesLimitOrderUpdateOneWithoutEntryTpSlPlansNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesLimitOrderCreateWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUncheckedCreateWithoutEntryTpSlPlansInput>
+  connectOrCreate?: Prisma.FuturesLimitOrderCreateOrConnectWithoutEntryTpSlPlansInput
+  upsert?: Prisma.FuturesLimitOrderUpsertWithoutEntryTpSlPlansInput
+  disconnect?: Prisma.FuturesLimitOrderWhereInput | boolean
+  delete?: Prisma.FuturesLimitOrderWhereInput | boolean
+  connect?: Prisma.FuturesLimitOrderWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesLimitOrderUpdateToOneWithWhereWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUpdateWithoutEntryTpSlPlansInput>, Prisma.FuturesLimitOrderUncheckedUpdateWithoutEntryTpSlPlansInput>
+}
+
 export type FuturesLimitOrderCreateWithoutTradingAccountInput = {
   id?: string
   direction: $Enums.FuturesDirection
@@ -866,6 +889,7 @@ export type FuturesLimitOrderCreateWithoutTradingAccountInput = {
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
   protection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUncheckedCreateWithoutTradingAccountInput = {
@@ -888,6 +912,7 @@ export type FuturesLimitOrderUncheckedCreateWithoutTradingAccountInput = {
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderCreateOrConnectWithoutTradingAccountInput = {
@@ -960,6 +985,7 @@ export type FuturesLimitOrderCreateWithoutInstrumentInput = {
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
   protection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUncheckedCreateWithoutInstrumentInput = {
@@ -982,6 +1008,7 @@ export type FuturesLimitOrderUncheckedCreateWithoutInstrumentInput = {
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderCreateOrConnectWithoutInstrumentInput = {
@@ -1030,6 +1057,7 @@ export type FuturesLimitOrderCreateWithoutExecutionInput = {
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
   protection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUncheckedCreateWithoutExecutionInput = {
@@ -1051,6 +1079,7 @@ export type FuturesLimitOrderUncheckedCreateWithoutExecutionInput = {
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderCreateOrConnectWithoutExecutionInput = {
@@ -1089,6 +1118,7 @@ export type FuturesLimitOrderUpdateWithoutExecutionInput = {
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
   protection?: Prisma.ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateWithoutExecutionInput = {
@@ -1110,6 +1140,7 @@ export type FuturesLimitOrderUncheckedUpdateWithoutExecutionInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderCreateWithoutProtectionInput = {
@@ -1132,6 +1163,7 @@ export type FuturesLimitOrderCreateWithoutProtectionInput = {
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
   conditionalEntry?: Prisma.FuturesConditionalEntryCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUncheckedCreateWithoutProtectionInput = {
@@ -1154,6 +1186,7 @@ export type FuturesLimitOrderUncheckedCreateWithoutProtectionInput = {
   endedAt?: Date | string | null
   updatedAt?: Date | string
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderCreateOrConnectWithoutProtectionInput = {
@@ -1192,6 +1225,7 @@ export type FuturesLimitOrderUpdateWithoutProtectionInput = {
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateWithoutProtectionInput = {
@@ -1214,6 +1248,7 @@ export type FuturesLimitOrderUncheckedUpdateWithoutProtectionInput = {
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderCreateWithoutConditionalEntryInput = {
@@ -1236,6 +1271,7 @@ export type FuturesLimitOrderCreateWithoutConditionalEntryInput = {
   instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
   protection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderUncheckedCreateWithoutConditionalEntryInput = {
@@ -1258,6 +1294,7 @@ export type FuturesLimitOrderUncheckedCreateWithoutConditionalEntryInput = {
   endedAt?: Date | string | null
   updatedAt?: Date | string
   protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesLimitOrderInput
 }
 
 export type FuturesLimitOrderCreateOrConnectWithoutConditionalEntryInput = {
@@ -1296,6 +1333,7 @@ export type FuturesLimitOrderUpdateWithoutConditionalEntryInput = {
   instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
   protection?: Prisma.ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateWithoutConditionalEntryInput = {
@@ -1318,6 +1356,115 @@ export type FuturesLimitOrderUncheckedUpdateWithoutConditionalEntryInput = {
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
+}
+
+export type FuturesLimitOrderCreateWithoutEntryTpSlPlansInput = {
+  id?: string
+  direction: $Enums.FuturesDirection
+  marginMode: $Enums.FuturesMarginMode
+  leverage: number
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  status?: $Enums.OrderStatus
+  idempotencyKey: string
+  requestHash: string
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  terminalReason?: string | null
+  createdAt?: Date | string
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesLimitOrdersInput
+  instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutLimitOrdersInput
+  execution?: Prisma.FuturesExecutionCreateNestedOneWithoutLimitOrderInput
+  protection?: Prisma.ProtectionGroupCreateNestedOneWithoutParentFuturesOrderInput
+  conditionalEntry?: Prisma.FuturesConditionalEntryCreateNestedOneWithoutLimitOrderInput
+}
+
+export type FuturesLimitOrderUncheckedCreateWithoutEntryTpSlPlansInput = {
+  id?: string
+  tradingAccountId: string
+  instrumentId: string
+  direction: $Enums.FuturesDirection
+  marginMode: $Enums.FuturesMarginMode
+  leverage: number
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  status?: $Enums.OrderStatus
+  idempotencyKey: string
+  requestHash: string
+  executionId?: string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  terminalReason?: string | null
+  createdAt?: Date | string
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+  protection?: Prisma.ProtectionGroupUncheckedCreateNestedOneWithoutParentFuturesOrderInput
+  conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedCreateNestedOneWithoutLimitOrderInput
+}
+
+export type FuturesLimitOrderCreateOrConnectWithoutEntryTpSlPlansInput = {
+  where: Prisma.FuturesLimitOrderWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesLimitOrderCreateWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUncheckedCreateWithoutEntryTpSlPlansInput>
+}
+
+export type FuturesLimitOrderUpsertWithoutEntryTpSlPlansInput = {
+  update: Prisma.XOR<Prisma.FuturesLimitOrderUpdateWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUncheckedUpdateWithoutEntryTpSlPlansInput>
+  create: Prisma.XOR<Prisma.FuturesLimitOrderCreateWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUncheckedCreateWithoutEntryTpSlPlansInput>
+  where?: Prisma.FuturesLimitOrderWhereInput
+}
+
+export type FuturesLimitOrderUpdateToOneWithWhereWithoutEntryTpSlPlansInput = {
+  where?: Prisma.FuturesLimitOrderWhereInput
+  data: Prisma.XOR<Prisma.FuturesLimitOrderUpdateWithoutEntryTpSlPlansInput, Prisma.FuturesLimitOrderUncheckedUpdateWithoutEntryTpSlPlansInput>
+}
+
+export type FuturesLimitOrderUpdateWithoutEntryTpSlPlansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  marginMode?: Prisma.EnumFuturesMarginModeFieldUpdateOperationsInput | $Enums.FuturesMarginMode
+  leverage?: Prisma.IntFieldUpdateOperationsInput | number
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesLimitOrdersNestedInput
+  instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutLimitOrdersNestedInput
+  execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
+  protection?: Prisma.ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput
+  conditionalEntry?: Prisma.FuturesConditionalEntryUpdateOneWithoutLimitOrderNestedInput
+}
+
+export type FuturesLimitOrderUncheckedUpdateWithoutEntryTpSlPlansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  marginMode?: Prisma.EnumFuturesMarginModeFieldUpdateOperationsInput | $Enums.FuturesMarginMode
+  leverage?: Prisma.IntFieldUpdateOperationsInput | number
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  limitPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  reservedAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  status?: Prisma.EnumOrderStatusFieldUpdateOperationsInput | $Enums.OrderStatus
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  executionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  responsePayloadJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
+  conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderCreateManyTradingAccountInput = {
@@ -1360,6 +1507,7 @@ export type FuturesLimitOrderUpdateWithoutTradingAccountInput = {
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
   protection?: Prisma.ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateWithoutTradingAccountInput = {
@@ -1382,6 +1530,7 @@ export type FuturesLimitOrderUncheckedUpdateWithoutTradingAccountInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -1444,6 +1593,7 @@ export type FuturesLimitOrderUpdateWithoutInstrumentInput = {
   execution?: Prisma.FuturesExecutionUpdateOneWithoutLimitOrderNestedInput
   protection?: Prisma.ProtectionGroupUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateWithoutInstrumentInput = {
@@ -1466,6 +1616,7 @@ export type FuturesLimitOrderUncheckedUpdateWithoutInstrumentInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   protection?: Prisma.ProtectionGroupUncheckedUpdateOneWithoutParentFuturesOrderNestedInput
   conditionalEntry?: Prisma.FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesLimitOrderNestedInput
 }
 
 export type FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentInput = {
@@ -1488,6 +1639,35 @@ export type FuturesLimitOrderUncheckedUpdateManyWithoutInstrumentInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+
+/**
+ * Count Type FuturesLimitOrderCountOutputType
+ */
+
+export type FuturesLimitOrderCountOutputType = {
+  entryTpSlPlans: number
+}
+
+export type FuturesLimitOrderCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  entryTpSlPlans?: boolean | FuturesLimitOrderCountOutputTypeCountEntryTpSlPlansArgs
+}
+
+/**
+ * FuturesLimitOrderCountOutputType without action
+ */
+export type FuturesLimitOrderCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesLimitOrderCountOutputType
+   */
+  select?: Prisma.FuturesLimitOrderCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * FuturesLimitOrderCountOutputType without action
+ */
+export type FuturesLimitOrderCountOutputTypeCountEntryTpSlPlansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.EntryTpSlPlanWhereInput
+}
 
 
 export type FuturesLimitOrderSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1514,6 +1694,8 @@ export type FuturesLimitOrderSelect<ExtArgs extends runtime.Types.Extensions.Int
   execution?: boolean | Prisma.FuturesLimitOrder$executionArgs<ExtArgs>
   protection?: boolean | Prisma.FuturesLimitOrder$protectionArgs<ExtArgs>
   conditionalEntry?: boolean | Prisma.FuturesLimitOrder$conditionalEntryArgs<ExtArgs>
+  entryTpSlPlans?: boolean | Prisma.FuturesLimitOrder$entryTpSlPlansArgs<ExtArgs>
+  _count?: boolean | Prisma.FuturesLimitOrderCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresLimitOrder"]>
 
 export type FuturesLimitOrderSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -1592,6 +1774,8 @@ export type FuturesLimitOrderInclude<ExtArgs extends runtime.Types.Extensions.In
   execution?: boolean | Prisma.FuturesLimitOrder$executionArgs<ExtArgs>
   protection?: boolean | Prisma.FuturesLimitOrder$protectionArgs<ExtArgs>
   conditionalEntry?: boolean | Prisma.FuturesLimitOrder$conditionalEntryArgs<ExtArgs>
+  entryTpSlPlans?: boolean | Prisma.FuturesLimitOrder$entryTpSlPlansArgs<ExtArgs>
+  _count?: boolean | Prisma.FuturesLimitOrderCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesLimitOrderIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -1612,6 +1796,7 @@ export type $FuturesLimitOrderPayload<ExtArgs extends runtime.Types.Extensions.I
     execution: Prisma.$FuturesExecutionPayload<ExtArgs> | null
     protection: Prisma.$ProtectionGroupPayload<ExtArgs> | null
     conditionalEntry: Prisma.$FuturesConditionalEntryPayload<ExtArgs> | null
+    entryTpSlPlans: Prisma.$EntryTpSlPlanPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2031,6 +2216,7 @@ export interface Prisma__FuturesLimitOrderClient<T, Null = never, ExtArgs extend
   execution<T extends Prisma.FuturesLimitOrder$executionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLimitOrder$executionArgs<ExtArgs>>): Prisma.Prisma__FuturesExecutionClient<runtime.Types.Result.GetResult<Prisma.$FuturesExecutionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   protection<T extends Prisma.FuturesLimitOrder$protectionArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLimitOrder$protectionArgs<ExtArgs>>): Prisma.Prisma__ProtectionGroupClient<runtime.Types.Result.GetResult<Prisma.$ProtectionGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   conditionalEntry<T extends Prisma.FuturesLimitOrder$conditionalEntryArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLimitOrder$conditionalEntryArgs<ExtArgs>>): Prisma.Prisma__FuturesConditionalEntryClient<runtime.Types.Result.GetResult<Prisma.$FuturesConditionalEntryPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  entryTpSlPlans<T extends Prisma.FuturesLimitOrder$entryTpSlPlansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLimitOrder$entryTpSlPlansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EntryTpSlPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2533,6 +2719,30 @@ export type FuturesLimitOrder$conditionalEntryArgs<ExtArgs extends runtime.Types
    */
   include?: Prisma.FuturesConditionalEntryInclude<ExtArgs> | null
   where?: Prisma.FuturesConditionalEntryWhereInput
+}
+
+/**
+ * FuturesLimitOrder.entryTpSlPlans
+ */
+export type FuturesLimitOrder$entryTpSlPlansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EntryTpSlPlan
+   */
+  select?: Prisma.EntryTpSlPlanSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EntryTpSlPlan
+   */
+  omit?: Prisma.EntryTpSlPlanOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EntryTpSlPlanInclude<ExtArgs> | null
+  where?: Prisma.EntryTpSlPlanWhereInput
+  orderBy?: Prisma.EntryTpSlPlanOrderByWithRelationInput | Prisma.EntryTpSlPlanOrderByWithRelationInput[]
+  cursor?: Prisma.EntryTpSlPlanWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.EntryTpSlPlanScalarFieldEnum | Prisma.EntryTpSlPlanScalarFieldEnum[]
 }
 
 /**

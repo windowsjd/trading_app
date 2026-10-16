@@ -84,6 +84,8 @@ export const ModelName = {
   ConditionalBuyOrder: 'ConditionalBuyOrder',
   FuturesConditionalEntry: 'FuturesConditionalEntry',
   ConditionalSellOrder: 'ConditionalSellOrder',
+  FuturesTpSlSetting: 'FuturesTpSlSetting',
+  EntryTpSlPlan: 'EntryTpSlPlan',
   LimitOnCloseOrder: 'LimitOnCloseOrder',
   SessionClosePriceEvidence: 'SessionClosePriceEvidence',
   BeginnerQuestAcknowledgement: 'BeginnerQuestAcknowledgement',
@@ -832,6 +834,66 @@ export const ConditionalSellOrderScalarFieldEnum = {
 } as const
 
 export type ConditionalSellOrderScalarFieldEnum = (typeof ConditionalSellOrderScalarFieldEnum)[keyof typeof ConditionalSellOrderScalarFieldEnum]
+
+
+export const FuturesTpSlSettingScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  instrumentId: 'instrumentId',
+  positionId: 'positionId',
+  direction: 'direction',
+  kind: 'kind',
+  triggerPrice: 'triggerPrice',
+  quantity: 'quantity',
+  status: 'status',
+  executionId: 'executionId',
+  registrationSnapshotId: 'registrationSnapshotId',
+  triggerSnapshotId: 'triggerSnapshotId',
+  triggerEvidenceJson: 'triggerEvidenceJson',
+  triggeredAt: 'triggeredAt',
+  attemptCount: 'attemptCount',
+  lastAttemptAt: 'lastAttemptAt',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type FuturesTpSlSettingScalarFieldEnum = (typeof FuturesTpSlSettingScalarFieldEnum)[keyof typeof FuturesTpSlSettingScalarFieldEnum]
+
+
+export const EntryTpSlPlanScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  domain: 'domain',
+  assetId: 'assetId',
+  orderId: 'orderId',
+  conditionalBuyOrderId: 'conditionalBuyOrderId',
+  futuresLimitOrderId: 'futuresLimitOrderId',
+  futuresConditionalEntryId: 'futuresConditionalEntryId',
+  kind: 'kind',
+  triggerPrice: 'triggerPrice',
+  ratioPercent: 'ratioPercent',
+  status: 'status',
+  basisQuantity: 'basisQuantity',
+  activatedQuantity: 'activatedQuantity',
+  fillOrderId: 'fillOrderId',
+  fillExecutionId: 'fillExecutionId',
+  conditionalSellOrderId: 'conditionalSellOrderId',
+  futuresTpSlSettingId: 'futuresTpSlSettingId',
+  failureCode: 'failureCode',
+  terminalReason: 'terminalReason',
+  idempotencyKey: 'idempotencyKey',
+  requestHash: 'requestHash',
+  createdAt: 'createdAt',
+  endedAt: 'endedAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type EntryTpSlPlanScalarFieldEnum = (typeof EntryTpSlPlanScalarFieldEnum)[keyof typeof EntryTpSlPlanScalarFieldEnum]
 
 
 export const LimitOnCloseOrderScalarFieldEnum = {

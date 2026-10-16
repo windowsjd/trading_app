@@ -53,6 +53,9 @@ if (
 )
   throw new Error('Explicit disposable Conditional PG opt-in required');
 process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+// New OCO groups are retired by default (2026-10-16); this runner keeps
+// covering the legacy OCO engine behind the compatibility flag.
+process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
 process.env.FUTURES_TRADING_MODE = 'ENABLED';
 process.env.FUTURES_RISK_ENGINE_ENABLED = 'true';
 process.env.LIMIT_ORDER_ENABLED = 'true';

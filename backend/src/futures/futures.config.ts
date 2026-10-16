@@ -68,12 +68,24 @@ export function futuresConditionalEntryEnabled(
     throw new Error('FUTURES_CONDITIONAL_ENTRY_ENABLED must be true or false');
   return value === 'true';
 }
+/** Independent Futures stop-loss / take-profit settings and Futures entry
+ * plans (new registrations and triggers only; read, cancel, lifecycle cleanup
+ * and an entry plan's activation at its entry's fill stay available).
+ * Strict true/false; omitted is false. */
+export function futuresTpSlEnabled(env: NodeJS.ProcessEnv = process.env) {
+  const value = env.FUTURES_TP_SL_ORDERS_ENABLED ?? 'false';
+  if (!['true', 'false'].includes(value))
+    // @diagnosticSurface internal: Startup rejects invalid fixed feature configuration before serving requests.
+    throw new Error('FUTURES_TP_SL_ORDERS_ENABLED must be true or false');
+  return value === 'true';
+}
 export function validateFuturesConfig(env: NodeJS.ProcessEnv = process.env) {
   const mode = futuresTradingMode(env);
   const risk = futuresRiskConfig(env);
   const last = futuresLastPriceConfig(env);
   futuresMarketDataConfig(env);
   futuresConditionalEntryEnabled(env);
+  futuresTpSlEnabled(env);
   if (mode === 'ENABLED' && (!risk.enabled || !risk.ingestion))
     throw new Error(
       'FUTURES_TRADING_MODE ENABLED requires FUTURES_RISK_ENGINE_ENABLED and FUTURES_MARK_INGESTION_ENABLED',

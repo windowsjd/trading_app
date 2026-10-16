@@ -35,6 +35,9 @@ if (
 // Isolated subprocess fixtures only; application/default configuration is untouched.
 process.env.LIMIT_ORDER_ENABLED = 'true';
 process.env.CONDITIONAL_ORDERS_ENABLED = 'true';
+// New OCO groups are retired by default (2026-10-16); this runner keeps
+// covering the legacy OCO engine behind the compatibility flag.
+process.env.LEGACY_OCO_REGISTRATION_ENABLED = 'true';
 process.env.INDEPENDENT_TP_SL_ORDERS_ENABLED = 'true';
 process.env.CONDITIONAL_SELL_ORDERS_ENABLED = 'true';
 process.env.FUTURES_TRADING_MODE = 'ENABLED';

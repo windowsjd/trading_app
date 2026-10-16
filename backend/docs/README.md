@@ -25,6 +25,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/conditional-buy-and-loc-contract.md` — Conditional BUY watches (KRX/crypto Spot) and KRX Limit-on-Close with final close evidence; US extension contract; default OFF
    - `docs/conditional-sell-and-loc-sell-contract.md` — SELL conditions, independent stop-loss/take-profit (market only, per-family totals since 2026-10-15) and KRX LOC SELL; default OFF
    - `docs/sell-automation-activation-2026-10-15.md` — activation of Conditional BUY/SELL, TP/SL and LOC BUY/SELL: flags, dependencies, observed production state and the production checks NOT yet performed
+   - `docs/independent-tp-sl-entry-plans-contract.md` — 2026-10-16: independent partial stop-loss/take-profit on holdings, Futures positions and pending entries (plans activated by the actual fill), retirement of new OCO registration, automatic 이상/이하 of conditional orders; default OFF
    - `docs/futures-f31-contract.md` — user fill counts, immutable final reads, endAt cutoff and Mark retention
    - `docs/records-api-contract.md`
    - `docs/rewards-api-contract.md`

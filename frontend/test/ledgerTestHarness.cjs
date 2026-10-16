@@ -20,6 +20,17 @@ const withNativeDefaults = (native) => native && (!native.Animated || !native.Pl
   ? { Platform: { OS: 'android' }, ...native, Animated: native.Animated ?? stillAnimated }
   : native;
 
+// Screens import app modules as '../../<dir>/<path>' and tests key their
+// mocks that way; modules in nested folders (features/conditional/tpsl)
+// reach the same modules through deeper relative paths. Only those nested
+// modules are re-keyed: every other file keeps its own specifiers.
+const SRC = resolve(__dirname, '../src') + '/';
+function srcKey(file, name) {
+  if (!name.startsWith('.') || !file.startsWith(SRC) || file.slice(SRC.length).split('/').length < 4) return name;
+  const target = resolve(dirname(file), name);
+  return target.startsWith(SRC) ? '../../' + target.slice(SRC.length) : name;
+}
+
 function load(file, mocks) {
   const module = { exports: {} };
   const code = ts.transpileModule(readFileSync(file, 'utf8'), {
@@ -28,6 +39,8 @@ function load(file, mocks) {
   }).outputText;
   const localRequire = (name) => {
     if (Object.hasOwn(mocks, name)) return mocks[name];
+    const key = srcKey(file, name);
+    if (key !== name && Object.hasOwn(mocks, key)) return mocks[key];
     if (name === 'react-native-svg') return { __esModule: true, default: 'Svg',
       ...Object.fromEntries(['Path', 'Circle', 'Rect', 'Defs', 'LinearGradient', 'Stop', 'G', 'Line', 'Polygon'].map(value => [value, value])) };
     // New guide hooks share the screen's account/transport boundaries. Resolve
@@ -40,11 +53,11 @@ function load(file, mocks) {
       }
     }
     if (name.endsWith('/useLearningAccess') || name.endsWith('/useTradingGuideFacts')) return load(resolve(dirname(file), name + '.ts'), mocks);
-    if (name.endsWith('/conditional/api') || (file.includes('/features/conditional/') && name === './api')) {
+    if (key.endsWith('/conditional/api') || (file.includes('/features/conditional/') && name === './api')) {
       return mocks['../../features/conditional/api'] ?? { getProtections: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreateSpot: false, canCreateFutures: false, canUseSpotLimit: false, canCancel: true }, groups: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) };
     }
     // Conditional BUY transport: screens that exercise it pass their own mock.
-    if (name.endsWith('/conditional/conditionalBuyApi') || (file.includes('/features/conditional/') && name === './conditionalBuyApi')) {
+    if (key.endsWith('/conditional/conditionalBuyApi') || (file.includes('/features/conditional/') && name === './conditionalBuyApi')) {
       return mocks['../../features/conditional/conditionalBuyApi'] ?? {
         getConditionalBuyOrders: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreate: false, canCancel: true, canUseLimit: false, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 }, conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }),
         getConditionalBuyOrder: async () => { throw new Error('conditional detail not mocked'); },
@@ -54,7 +67,7 @@ function load(file, mocks) {
     }
     // SELL intent transport (conditions, stop-loss/take-profit): disabled and
     // empty unless a screen test passes its own mock.
-    if (name.endsWith('/conditional/conditionalSellApi') || (file.includes('/features/conditional/') && name === './conditionalSellApi')) {
+    if (key.endsWith('/conditional/conditionalSellApi') || (file.includes('/features/conditional/') && name === './conditionalSellApi')) {
       return mocks['../../features/conditional/conditionalSellApi'] ?? {
         getConditionalSellOrders: async id => ({ tradingAccountId: id, capabilities: { enabled: false, condition: { enabled: false, canCreate: false, canUseLimit: false }, protection: { enabled: false, canCreate: false, canUseLimit: false }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 }, conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }),
         getConditionalSellOrder: async () => { throw new Error('conditional sell detail not mocked'); },
@@ -62,11 +75,35 @@ function load(file, mocks) {
         cancelConditionalSellOrder: async () => { throw new Error('conditional sell cancel not mocked'); },
       };
     }
+    // 손절가/익절가 plans on pending entries: disabled and empty unless a
+    // screen test passes its own mock.
+    if (key.endsWith('/conditional/entryTpSlApi') || (file.includes('/features/conditional/') && name === './entryTpSlApi')) {
+      return mocks['../../features/conditional/entryTpSlApi'] ?? {
+        getEntryTpSlPlans: async (id, entry) => ({ tradingAccountId: id, capabilities: { spot: { enabled: false, canCreate: false }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 }, entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null }, requested: entry }),
+        getAccountEntryTpSlPlans: async id => ({ tradingAccountId: id, capabilities: { spot: { enabled: false, canCreate: false }, futures: { enabled: false, canCreate: false }, canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 }, entry: null, plans: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } }),
+        createEntryTpSlPlans: async () => { throw new Error('entry TP/SL create not mocked'); },
+        cancelEntryTpSlPlan: async () => { throw new Error('entry TP/SL cancel not mocked'); },
+      };
+    }
+    // Independent Futures 손절가/익절가 transport: disabled and empty by default.
+    if (key.endsWith('/futures/tpSlApi') || (file.includes('/features/futures/') && name === './tpSlApi')) {
+      return mocks['../../features/futures/tpSlApi'] ?? {
+        getFuturesTpSlSettings: async id => ({ tradingAccountId: id, capabilities: { enabled: false, canCreate: false, canCancel: true, maxLivePerAccount: 30 }, settings: [], pagination: { limit: 100, offset: 0, total: 0, returned: 0, nextOffset: null } }),
+        createFuturesTpSlSettings: async () => { throw new Error('futures TP/SL create not mocked'); },
+        cancelFuturesTpSlSetting: async () => { throw new Error('futures TP/SL cancel not mocked'); },
+      };
+    }
     // Home reads the shared USD/KRW rate to order spot and futures together.
     // Screens that exercise FX mock this boundary themselves.
-    if (name.endsWith('/features/wallet/api')) {
+    if (key.endsWith('/features/wallet/api')) {
       return mocks['../../features/wallet/api'] ?? { getCurrentFxRate: async () => ({ state: 'available', baseCurrency: 'USD',
         quoteCurrency: 'KRW', rate: '1350', validUntil: new Date(Date.now() + 60_000).toISOString() }) };
+    }
+    // The ratio slider's native build needs gesture-handler; screen tests pass
+    // its browser input. Shared sheets outside the order screen get the same.
+    if (name.endsWith('/QuantityRatioSlider') && !file.includes('/src/screens/order/')) {
+      return mocks['./QuantityRatioSlider'] ?? mocks['../order/QuantityRatioSlider']
+        ?? load(resolve(__dirname, '../src/screens/order/QuantityRatioSlider.web.tsx'), {});
     }
     if (name.endsWith('.png')) return { uri: resolve(dirname(file), name) };
     if (name.endsWith('.json')) return require(resolve(dirname(file), name));
@@ -85,7 +122,14 @@ function load(file, mocks) {
     if (name.endsWith('/hooks/useFocusedInputScroll')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/usePortfolioFocusRecovery')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/useFuturesHoldings')) return load(resolve(dirname(file), name + '.ts'), mocks);
-    if (file.includes('/features/futures/') && name === './api') return mocks['../../features/futures/api'] ?? load(resolve(dirname(file), 'api.ts'), mocks);
+    if (key === '../../features/futures/api' || (file.includes('/features/futures/') && name === './api')) {
+      if (mocks['../../features/futures/api']) return mocks['../../features/futures/api'];
+      if (mocks['../../services/api/client']) return load(resolve(dirname(file), name + '.ts'), mocks);
+      // Spot screens still load the shared 손절가/익절가 sheet (and its Futures
+      // part); without a transport mock nothing there may reach the network.
+      return new Proxy({}, { get: (_, prop) => prop === '__esModule' ? true
+        : async () => { throw new Error(`futures api ${String(prop)} not mocked`); } });
+    }
     // The ranking tab's 순위 안내 hook shares the screen's ranking transport.
     if (name.endsWith('/useRankingInsights')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (file.includes('/features/ranking/') && name === './api') return mocks['../../features/ranking/api'] ?? load(resolve(dirname(file), 'api.ts'), mocks);

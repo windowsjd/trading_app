@@ -221,19 +221,3 @@ export function getSellLegDraftError(
     return `${prefix}수량은 현재 보유 수량(${fmt(input.holding)})을 넘을 수 없어요.`;
   return null;
 }
-
-/**
- * True when the last price on screen already meets the condition. Only a
- * hint: registration is judged by the server's own eligible evidence.
- */
-export function isSellConditionAlreadyMet(
-  condition: ConditionalSellTriggerCondition | null,
-  triggerPrice: string,
-  currentPrice: string | null | undefined,
-) {
-  if (!condition || !currentPrice || !positiveDecimal(triggerPrice, 8)) return false;
-  const current = Number(currentPrice);
-  const trigger = Number(triggerPrice.trim());
-  if (!Number.isFinite(current) || current <= 0) return false;
-  return condition === 'at_or_above' ? current >= trigger : current <= trigger;
-}

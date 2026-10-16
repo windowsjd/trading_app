@@ -64,6 +64,8 @@ export function applyTestEnvironment(m: Manifest, c: Credentials) {
     FUTURES_MARK_INGESTION_ENABLED: 'true',
     FUTURES_LAST_PRICE_INGESTION_ENABLED: 'true',
     CONDITIONAL_ORDERS_ENABLED: 'true',
+    // The load mix registers legacy OCO groups (retired by default 2026-10-16).
+    LEGACY_OCO_REGISTRATION_ENABLED: 'true',
     CANDLE_LIVE_STREAMING_ENABLED: 'true',
     CANDLE_LIVE_BINANCE_ENABLED: 'true',
     CANDLE_LIVE_KIS_ENABLED: 'false',

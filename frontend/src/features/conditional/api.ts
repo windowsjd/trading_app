@@ -50,6 +50,9 @@ export type Protections = {
     enabled: boolean;
     canCreateSpot: boolean;
     canCreateFutures: boolean;
+    /** Existing groups are still watched (absent from servers before 2026-10-16). */
+    canMonitorSpot?: boolean;
+    canMonitorFutures?: boolean;
     canCancel: boolean;
     canUseSpotLimit: boolean;
   };

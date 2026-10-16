@@ -58,32 +58,32 @@ test('marketSell: 판매하기 on the detail, then holdings and the sell form on
   assert.equal(holdings.kind,'spotlight');if(holdings.kind==='spotlight')assert.deepEqual(holdings.targets,['asset-holdings']);
   assert.equal(followGuideFocus({...atOrder,step:3},'order').step,3);
 });
-test('protection: the SELL 주문방식 손절가/익절가 설정 of the practiced asset, then its editor and 확인',()=>{
+test('protection: the practiced holding card’s 손절가/익절가 설정, then its sheet editor and 등록하기',()=>{
   const session=startGuideSession(6,account,'protection',questProgress(3))!;
   assert.equal(followGuideFocus(session,'order').step,0);
   const holdings={screen:'holdings' as const,accountId:account,assetId:session.assetId,holdingsVisible:true};
-  const facts=(order:Record<string,unknown>,protection:Record<string,unknown>|null=null)=>({wallet:null,fx:null,transfer:null,
-    practice:{order:orderForm({assetId:session.assetId,side:'sell',...order}),holdings,...(protection?{protection:{screen:'protection' as const,accountId:account,assetId:session.assetId,...protection}}:{})}});
-  // The sell form starts at 시장가: the field, then the sheet row.
-  const field=resolveGuideView(session,'order',facts({orderType:'market'}));
-  assert.equal(field.kind,'spotlight');
-  if(field.kind==='spotlight'){assert.deepEqual(field.targets,['order-type']);assert.match(field.card.body,/주문방식 선택하기를 눌러 손절가\/익절가 설정을 선택/);}
-  const sheet=resolveGuideView(session,'order',facts({orderType:'market',methodSheetOpen:true}));
-  if(sheet.kind==='spotlight')assert.deepEqual(sheet.targets,['order-method-protection']);else assert.fail('the sheet row is pointed at');
-  // The buy side is the wrong side for this practice.
-  const buy=resolveGuideView(session,'order',facts({side:'buy',orderType:'market'}));
-  if(buy.kind==='spotlight')assert.match(buy.card.body,/매도 · 손절가\/익절가 설정을 선택/);else assert.fail('side is explained');
-  // The chosen method mounts the editor: its readiness gates 다음, then 확인.
+  const facts=(order:Record<string,unknown>,protection:Record<string,unknown>|null=null,visible=true)=>({wallet:null,fx:null,transfer:null,
+    practice:{order:orderForm({assetId:session.assetId,side:'sell',...order}),holdings:{...holdings,holdingsVisible:visible},...(protection?{protection:{screen:'protection' as const,accountId:account,assetId:session.assetId,...protection}}:{})}});
+  // 손절가/익절가 is no 주문방식: the guide points at the holding card’s button, whatever the form shows.
+  for(const order of [{orderType:'market'},{orderType:'market',methodSheetOpen:true},{side:'buy',orderType:'market'},{orderType:'market',blocked:true}]){
+    const view=resolveGuideView(session,'order',facts(order));
+    assert.equal(view.kind,'spotlight');
+    if(view.kind==='spotlight'){assert.deepEqual(view.targets,['asset-protection']);assert.match(view.card.body,/보유종목 카드에서 손절가\/익절가 설정을 눌러/);assert.equal(view.card.next??null,null,'pressing the button moves on, not 다음');}
+  }
+  // The open sheet mounts the editor: its readiness gates 다음, then 등록하기.
   for(const ready of [false,true]){
-    const editor=resolveGuideView(session,'order',facts({orderType:'protection'},{protectionEditing:true,tpSlReady:ready}));
+    const editor=resolveGuideView(session,'order',facts({orderType:'market'},{protectionEditing:true,tpSlReady:ready}));
     assert.equal(editor.kind,'spotlight');
     if(editor.kind==='spotlight'){assert.deepEqual(editor.targets,['protection-editor']);assert.equal(editor.card.next,ready?'enabled':'disabled');}
   }
-  const submit=resolveGuideView({...session,step:2},'order',facts({orderType:'protection'},{protectionEditing:true,tpSlReady:true}));
-  if(submit.kind==='spotlight')assert.deepEqual(submit.targets,['protection-submit']);else assert.fail('확인 is pointed at');
-  // Without a holding the form is blocked: prepare the practice quantity first.
-  const prepare=resolveGuideView(session,'order',{...facts({orderType:'market',blocked:true}),practice:{...facts({orderType:'market',blocked:true}).practice,holdings:{...holdings,holdingsVisible:false}}});
+  const submit=resolveGuideView({...session,step:2},'order',facts({orderType:'market'},{protectionEditing:true,tpSlReady:true}));
+  if(submit.kind==='spotlight'){assert.deepEqual(submit.targets,['protection-submit']);assert.match(submit.card.body,/등록하기를 눌러/);}else assert.fail('등록하기 is pointed at');
+  // Without a visible holding there is no card to press: prepare the practice quantity first.
+  const prepare=resolveGuideView(session,'order',facts({orderType:'market'},null,false));
   assert.equal(prepare.kind,'message');if(prepare.kind==='message')assert.equal(prepare.card.title,'실습 수량 준비');
+  // The sheet’s own gate (not the form’s) stops the practice.
+  const blocked=resolveGuideView(session,'order',facts({orderType:'market'},{protectionEditing:true,tpSlReady:false,blocked:true}));
+  assert.equal(blocked.kind,'message');if(blocked.kind==='message')assert.equal(blocked.card.title,'거래 가능 상태 확인');
   // One stop-loss or take-profit is a registration; another asset is not this practice.
   const command={kind:'protection' as const,accountId:account,assetId:session.assetId!,summary:'등록'};
   assert.equal(claimGuideCommand(session,account,command).session?.phase,'verifying');
@@ -157,7 +157,7 @@ test('a new guide resumes from the ledger, never from a remembered step: no repe
 test('no guide copy offers a resume that no longer exists',()=>{
   assert.doesNotMatch(JSON.stringify(TRADING_GUIDE_STEPS),/이어하기/);
 });
-test('another practiced method: the guide opens 주문방식 선택하기 and then points at the practiced row', () => {
+test('another practiced method: the guide opens the 주문방식 field and then points at the practiced row', () => {
   const views = (quest: 'marketBuy' | 'limitBuy' | 'marketSell', form: Record<string, unknown>) => {
     const started = startGuideSession(1, account, quest, questProgress(6));
     assert.ok(started, quest);
@@ -171,7 +171,7 @@ test('another practiced method: the guide opens 주문방식 선택하기 and th
     assert.equal(closed.kind, 'spotlight');
     if (closed.kind === 'spotlight') {
       assert.deepEqual(closed.targets, ['order-type']);
-      assert.match(closed.card.body, new RegExp(`주문방식 선택하기를 눌러 ${label}`));
+      assert.match(closed.card.body, new RegExp(`주문방식을 눌러 ${label}`));
     }
     const open = views(quest, { orderType: undefined, methodSheetOpen: true });
     if (open.kind === 'spotlight') assert.deepEqual(open.targets, [row]);
@@ -188,11 +188,11 @@ test('another practiced method: the guide opens 주문방식 선택하기 and th
   else assert.fail('the chosen method explains itself on the field');
   if (chosen.kind === 'spotlight') assert.equal(chosen.card.next, 'enabled');
   // Forms start at 시장가: a market practice reads its step at once, while the
-  // limit practice is sent to 주문방식 선택하기 from that default.
+  // limit practice is sent to the 주문방식 field from that default.
   const fromDefault = views('limitBuy', { orderType: 'market', methodSheetOpen: false });
   if (fromDefault.kind === 'spotlight') {
     assert.deepEqual(fromDefault.targets, ['order-type']);
-    assert.match(fromDefault.card.body, /주문방식 선택하기를 눌러 지정가/);
+    assert.match(fromDefault.card.body, /주문방식을 눌러 지정가/);
   } else assert.fail('the limit practice points at the field');
   const sellDefault = views('marketSell', { orderType: 'market' });
   if (sellDefault.kind === 'spotlight') assert.equal(sellDefault.card.next, 'enabled');

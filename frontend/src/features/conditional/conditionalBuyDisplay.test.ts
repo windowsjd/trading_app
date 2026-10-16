@@ -6,7 +6,6 @@ import {
   getConditionalBuyEndReason,
   getConditionalBuyResultNotice,
   getConditionalBuyStateLabel,
-  isConditionAlreadyMet,
   isLiveConditionalBuy,
   type ConditionalBuyDraft,
 } from './conditionalBuyDisplay.ts';
@@ -55,12 +54,11 @@ describe('Conditional BUY state', () => {
 
 describe('Conditional BUY draft', () => {
   const draft = (overrides: Partial<ConditionalBuyDraft> = {}): ConditionalBuyDraft => ({
-    assetType: 'domestic_stock', triggerCondition: 'at_or_below', triggerPrice: '69000', executionType: 'market', limitPrice: '', size: '2', ...overrides,
+    assetType: 'domestic_stock', triggerPrice: '69000', executionType: 'market', limitPrice: '', size: '2', ...overrides,
   });
 
-  it('needs a chosen condition and a watch price; the limit price is a separate field', () => {
+  it('needs a watch price (its 이상/이하 is automatic); the limit price is a separate field', () => {
     assert.equal(getConditionalBuyDraftError(draft()), null);
-    assert.match(getConditionalBuyDraftError(draft({ triggerCondition: null })) ?? '', /감시 조건/);
     assert.match(getConditionalBuyDraftError(draft({ triggerPrice: '' })) ?? '', /감시가격/);
     assert.match(getConditionalBuyDraftError(draft({ triggerPrice: '0' })) ?? '', /감시가격/);
     assert.match(getConditionalBuyDraftError(draft({ executionType: 'limit' })) ?? '', /지정가격을 입력/);
@@ -73,14 +71,6 @@ describe('Conditional BUY draft', () => {
     assert.match(getConditionalBuyDraftError(draft({ size: '0.1234567' })) ?? '', /6자리/);
     assert.equal(getConditionalBuyDraftError(draft({ assetType: 'crypto', triggerPrice: '0.12345678', size: '25.12345678' })), null);
     assert.match(getConditionalBuyDraftError(draft({ assetType: 'crypto', size: '' })) ?? '', /매수 금액/);
-  });
-
-  it('hints when the screen price already meets the condition (the server still decides)', () => {
-    assert.equal(isConditionAlreadyMet('at_or_below', '69000', '68000'), true);
-    assert.equal(isConditionAlreadyMet('at_or_below', '69000', '70000'), false);
-    assert.equal(isConditionAlreadyMet('at_or_above', '71000', '71000'), true, 'equality triggers');
-    assert.equal(isConditionAlreadyMet('at_or_above', '71000', null), false);
-    assert.equal(isConditionAlreadyMet(null, '71000', '72000'), false);
   });
 });
 

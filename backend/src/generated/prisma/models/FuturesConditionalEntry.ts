@@ -410,6 +410,7 @@ export type FuturesConditionalEntryWhereInput = {
   limitOrder?: Prisma.XOR<Prisma.FuturesLimitOrderNullableScalarRelationFilter, Prisma.FuturesLimitOrderWhereInput> | null
   registrationSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput>
   triggerSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotNullableScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput> | null
+  entryTpSlPlans?: Prisma.EntryTpSlPlanListRelationFilter
 }
 
 export type FuturesConditionalEntryOrderByWithRelationInput = {
@@ -446,6 +447,7 @@ export type FuturesConditionalEntryOrderByWithRelationInput = {
   limitOrder?: Prisma.FuturesLimitOrderOrderByWithRelationInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotOrderByWithRelationInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotOrderByWithRelationInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanOrderByRelationAggregateInput
 }
 
 export type FuturesConditionalEntryWhereUniqueInput = Prisma.AtLeast<{
@@ -487,6 +489,7 @@ export type FuturesConditionalEntryWhereUniqueInput = Prisma.AtLeast<{
   limitOrder?: Prisma.XOR<Prisma.FuturesLimitOrderNullableScalarRelationFilter, Prisma.FuturesLimitOrderWhereInput> | null
   registrationSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput>
   triggerSnapshot?: Prisma.XOR<Prisma.FuturesLastPriceSnapshotNullableScalarRelationFilter, Prisma.FuturesLastPriceSnapshotWhereInput> | null
+  entryTpSlPlans?: Prisma.EntryTpSlPlanListRelationFilter
 }, "id" | "executionId" | "limitOrderId" | "executionId_tradingAccountId" | "tradingAccountId_idempotencyKey">
 
 export type FuturesConditionalEntryOrderByWithAggregationInput = {
@@ -585,6 +588,7 @@ export type FuturesConditionalEntryCreateInput = {
   limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
   registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateInput = {
@@ -615,6 +619,7 @@ export type FuturesConditionalEntryUncheckedCreateInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUpdateInput = {
@@ -645,6 +650,7 @@ export type FuturesConditionalEntryUpdateInput = {
   limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateInput = {
@@ -675,6 +681,7 @@ export type FuturesConditionalEntryUncheckedUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryCreateManyInput = {
@@ -1038,6 +1045,22 @@ export type FuturesConditionalEntryUncheckedUpdateOneWithoutLimitOrderNestedInpu
   update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesConditionalEntryUpdateToOneWithWhereWithoutLimitOrderInput, Prisma.FuturesConditionalEntryUpdateWithoutLimitOrderInput>, Prisma.FuturesConditionalEntryUncheckedUpdateWithoutLimitOrderInput>
 }
 
+export type FuturesConditionalEntryCreateNestedOneWithoutEntryTpSlPlansInput = {
+  create?: Prisma.XOR<Prisma.FuturesConditionalEntryCreateWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUncheckedCreateWithoutEntryTpSlPlansInput>
+  connectOrCreate?: Prisma.FuturesConditionalEntryCreateOrConnectWithoutEntryTpSlPlansInput
+  connect?: Prisma.FuturesConditionalEntryWhereUniqueInput
+}
+
+export type FuturesConditionalEntryUpdateOneWithoutEntryTpSlPlansNestedInput = {
+  create?: Prisma.XOR<Prisma.FuturesConditionalEntryCreateWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUncheckedCreateWithoutEntryTpSlPlansInput>
+  connectOrCreate?: Prisma.FuturesConditionalEntryCreateOrConnectWithoutEntryTpSlPlansInput
+  upsert?: Prisma.FuturesConditionalEntryUpsertWithoutEntryTpSlPlansInput
+  disconnect?: Prisma.FuturesConditionalEntryWhereInput | boolean
+  delete?: Prisma.FuturesConditionalEntryWhereInput | boolean
+  connect?: Prisma.FuturesConditionalEntryWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.FuturesConditionalEntryUpdateToOneWithWhereWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUpdateWithoutEntryTpSlPlansInput>, Prisma.FuturesConditionalEntryUncheckedUpdateWithoutEntryTpSlPlansInput>
+}
+
 export type FuturesConditionalEntryCreateNestedManyWithoutRegistrationSnapshotInput = {
   create?: Prisma.XOR<Prisma.FuturesConditionalEntryCreateWithoutRegistrationSnapshotInput, Prisma.FuturesConditionalEntryUncheckedCreateWithoutRegistrationSnapshotInput> | Prisma.FuturesConditionalEntryCreateWithoutRegistrationSnapshotInput[] | Prisma.FuturesConditionalEntryUncheckedCreateWithoutRegistrationSnapshotInput[]
   connectOrCreate?: Prisma.FuturesConditionalEntryCreateOrConnectWithoutRegistrationSnapshotInput | Prisma.FuturesConditionalEntryCreateOrConnectWithoutRegistrationSnapshotInput[]
@@ -1149,6 +1172,7 @@ export type FuturesConditionalEntryCreateWithoutTradingAccountInput = {
   limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
   registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateWithoutTradingAccountInput = {
@@ -1178,6 +1202,7 @@ export type FuturesConditionalEntryUncheckedCreateWithoutTradingAccountInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryCreateOrConnectWithoutTradingAccountInput = {
@@ -1266,6 +1291,7 @@ export type FuturesConditionalEntryCreateWithoutInstrumentInput = {
   limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
   registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateWithoutInstrumentInput = {
@@ -1295,6 +1321,7 @@ export type FuturesConditionalEntryUncheckedCreateWithoutInstrumentInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryCreateOrConnectWithoutInstrumentInput = {
@@ -1350,6 +1377,7 @@ export type FuturesConditionalEntryCreateWithoutExecutionInput = {
   limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
   registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateWithoutExecutionInput = {
@@ -1378,6 +1406,7 @@ export type FuturesConditionalEntryUncheckedCreateWithoutExecutionInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryCreateOrConnectWithoutExecutionInput = {
@@ -1423,6 +1452,7 @@ export type FuturesConditionalEntryUpdateWithoutExecutionInput = {
   limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateWithoutExecutionInput = {
@@ -1451,6 +1481,7 @@ export type FuturesConditionalEntryUncheckedUpdateWithoutExecutionInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryCreateWithoutLimitOrderInput = {
@@ -1480,6 +1511,7 @@ export type FuturesConditionalEntryCreateWithoutLimitOrderInput = {
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutConditionalEntryInput
   registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateWithoutLimitOrderInput = {
@@ -1509,6 +1541,7 @@ export type FuturesConditionalEntryUncheckedCreateWithoutLimitOrderInput = {
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryCreateOrConnectWithoutLimitOrderInput = {
@@ -1554,6 +1587,7 @@ export type FuturesConditionalEntryUpdateWithoutLimitOrderInput = {
   execution?: Prisma.FuturesExecutionUpdateOneWithoutConditionalEntryNestedInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateWithoutLimitOrderInput = {
@@ -1570,6 +1604,143 @@ export type FuturesConditionalEntryUncheckedUpdateWithoutLimitOrderInput = {
   limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   status?: Prisma.EnumConditionalBuyStatusFieldUpdateOperationsInput | $Enums.ConditionalBuyStatus
   executionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  registrationSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
+  triggerSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
+}
+
+export type FuturesConditionalEntryCreateWithoutEntryTpSlPlansInput = {
+  id?: string
+  direction: $Enums.FuturesDirection
+  marginMode: $Enums.FuturesMarginMode
+  leverage: number
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerCondition: $Enums.ConditionalBuyTrigger
+  triggerPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType: $Enums.OrderType
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  status?: $Enums.ConditionalBuyStatus
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Date | string | null
+  attemptCount?: number
+  lastAttemptAt?: Date | string | null
+  failureCode?: string | null
+  terminalReason?: string | null
+  idempotencyKey: string
+  requestHash: string
+  createdAt?: Date | string
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+  tradingAccount: Prisma.TradingAccountCreateNestedOneWithoutFuturesConditionalEntriesInput
+  instrument: Prisma.FuturesInstrumentCreateNestedOneWithoutConditionalEntriesInput
+  execution?: Prisma.FuturesExecutionCreateNestedOneWithoutConditionalEntryInput
+  limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
+  registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
+  triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+}
+
+export type FuturesConditionalEntryUncheckedCreateWithoutEntryTpSlPlansInput = {
+  id?: string
+  tradingAccountId: string
+  instrumentId: string
+  direction: $Enums.FuturesDirection
+  marginMode: $Enums.FuturesMarginMode
+  leverage: number
+  quantity: runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerCondition: $Enums.ConditionalBuyTrigger
+  triggerPrice: runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType: $Enums.OrderType
+  limitPrice?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  status?: $Enums.ConditionalBuyStatus
+  executionId?: string | null
+  limitOrderId?: string | null
+  registrationSnapshotId: string
+  triggerSnapshotId?: string | null
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Date | string | null
+  attemptCount?: number
+  lastAttemptAt?: Date | string | null
+  failureCode?: string | null
+  terminalReason?: string | null
+  idempotencyKey: string
+  requestHash: string
+  createdAt?: Date | string
+  endedAt?: Date | string | null
+  updatedAt?: Date | string
+}
+
+export type FuturesConditionalEntryCreateOrConnectWithoutEntryTpSlPlansInput = {
+  where: Prisma.FuturesConditionalEntryWhereUniqueInput
+  create: Prisma.XOR<Prisma.FuturesConditionalEntryCreateWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUncheckedCreateWithoutEntryTpSlPlansInput>
+}
+
+export type FuturesConditionalEntryUpsertWithoutEntryTpSlPlansInput = {
+  update: Prisma.XOR<Prisma.FuturesConditionalEntryUpdateWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUncheckedUpdateWithoutEntryTpSlPlansInput>
+  create: Prisma.XOR<Prisma.FuturesConditionalEntryCreateWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUncheckedCreateWithoutEntryTpSlPlansInput>
+  where?: Prisma.FuturesConditionalEntryWhereInput
+}
+
+export type FuturesConditionalEntryUpdateToOneWithWhereWithoutEntryTpSlPlansInput = {
+  where?: Prisma.FuturesConditionalEntryWhereInput
+  data: Prisma.XOR<Prisma.FuturesConditionalEntryUpdateWithoutEntryTpSlPlansInput, Prisma.FuturesConditionalEntryUncheckedUpdateWithoutEntryTpSlPlansInput>
+}
+
+export type FuturesConditionalEntryUpdateWithoutEntryTpSlPlansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  marginMode?: Prisma.EnumFuturesMarginModeFieldUpdateOperationsInput | $Enums.FuturesMarginMode
+  leverage?: Prisma.IntFieldUpdateOperationsInput | number
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerCondition?: Prisma.EnumConditionalBuyTriggerFieldUpdateOperationsInput | $Enums.ConditionalBuyTrigger
+  triggerPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  status?: Prisma.EnumConditionalBuyStatusFieldUpdateOperationsInput | $Enums.ConditionalBuyStatus
+  triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  triggeredAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  attemptCount?: Prisma.IntFieldUpdateOperationsInput | number
+  lastAttemptAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  failureCode?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  terminalReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  idempotencyKey?: Prisma.StringFieldUpdateOperationsInput | string
+  requestHash?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  tradingAccount?: Prisma.TradingAccountUpdateOneRequiredWithoutFuturesConditionalEntriesNestedInput
+  instrument?: Prisma.FuturesInstrumentUpdateOneRequiredWithoutConditionalEntriesNestedInput
+  execution?: Prisma.FuturesExecutionUpdateOneWithoutConditionalEntryNestedInput
+  limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
+  registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
+  triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+}
+
+export type FuturesConditionalEntryUncheckedUpdateWithoutEntryTpSlPlansInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  tradingAccountId?: Prisma.StringFieldUpdateOperationsInput | string
+  instrumentId?: Prisma.StringFieldUpdateOperationsInput | string
+  direction?: Prisma.EnumFuturesDirectionFieldUpdateOperationsInput | $Enums.FuturesDirection
+  marginMode?: Prisma.EnumFuturesMarginModeFieldUpdateOperationsInput | $Enums.FuturesMarginMode
+  leverage?: Prisma.IntFieldUpdateOperationsInput | number
+  quantity?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  triggerCondition?: Prisma.EnumConditionalBuyTriggerFieldUpdateOperationsInput | $Enums.ConditionalBuyTrigger
+  triggerPrice?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  executionType?: Prisma.EnumOrderTypeFieldUpdateOperationsInput | $Enums.OrderType
+  limitPrice?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  status?: Prisma.EnumConditionalBuyStatusFieldUpdateOperationsInput | $Enums.ConditionalBuyStatus
+  executionId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  limitOrderId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   registrationSnapshotId?: Prisma.StringFieldUpdateOperationsInput | string
   triggerSnapshotId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   triggerEvidenceJson?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
@@ -1612,6 +1783,7 @@ export type FuturesConditionalEntryCreateWithoutRegistrationSnapshotInput = {
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutConditionalEntryInput
   limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryTriggersInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateWithoutRegistrationSnapshotInput = {
@@ -1641,6 +1813,7 @@ export type FuturesConditionalEntryUncheckedCreateWithoutRegistrationSnapshotInp
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryCreateOrConnectWithoutRegistrationSnapshotInput = {
@@ -1680,6 +1853,7 @@ export type FuturesConditionalEntryCreateWithoutTriggerSnapshotInput = {
   execution?: Prisma.FuturesExecutionCreateNestedOneWithoutConditionalEntryInput
   limitOrder?: Prisma.FuturesLimitOrderCreateNestedOneWithoutConditionalEntryInput
   registrationSnapshot: Prisma.FuturesLastPriceSnapshotCreateNestedOneWithoutConditionalEntryRegistrationsInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryUncheckedCreateWithoutTriggerSnapshotInput = {
@@ -1709,6 +1883,7 @@ export type FuturesConditionalEntryUncheckedCreateWithoutTriggerSnapshotInput = 
   createdAt?: Date | string
   endedAt?: Date | string | null
   updatedAt?: Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedCreateNestedManyWithoutFuturesConditionalEntryInput
 }
 
 export type FuturesConditionalEntryCreateOrConnectWithoutTriggerSnapshotInput = {
@@ -1809,6 +1984,7 @@ export type FuturesConditionalEntryUpdateWithoutTradingAccountInput = {
   limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateWithoutTradingAccountInput = {
@@ -1838,6 +2014,7 @@ export type FuturesConditionalEntryUncheckedUpdateWithoutTradingAccountInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateManyWithoutTradingAccountInput = {
@@ -1925,6 +2102,7 @@ export type FuturesConditionalEntryUpdateWithoutInstrumentInput = {
   limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateWithoutInstrumentInput = {
@@ -1954,6 +2132,7 @@ export type FuturesConditionalEntryUncheckedUpdateWithoutInstrumentInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateManyWithoutInstrumentInput = {
@@ -2070,6 +2249,7 @@ export type FuturesConditionalEntryUpdateWithoutRegistrationSnapshotInput = {
   execution?: Prisma.FuturesExecutionUpdateOneWithoutConditionalEntryNestedInput
   limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
   triggerSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneWithoutConditionalEntryTriggersNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateWithoutRegistrationSnapshotInput = {
@@ -2099,6 +2279,7 @@ export type FuturesConditionalEntryUncheckedUpdateWithoutRegistrationSnapshotInp
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateManyWithoutRegistrationSnapshotInput = {
@@ -2157,6 +2338,7 @@ export type FuturesConditionalEntryUpdateWithoutTriggerSnapshotInput = {
   execution?: Prisma.FuturesExecutionUpdateOneWithoutConditionalEntryNestedInput
   limitOrder?: Prisma.FuturesLimitOrderUpdateOneWithoutConditionalEntryNestedInput
   registrationSnapshot?: Prisma.FuturesLastPriceSnapshotUpdateOneRequiredWithoutConditionalEntryRegistrationsNestedInput
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateWithoutTriggerSnapshotInput = {
@@ -2186,6 +2368,7 @@ export type FuturesConditionalEntryUncheckedUpdateWithoutTriggerSnapshotInput = 
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   endedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  entryTpSlPlans?: Prisma.EntryTpSlPlanUncheckedUpdateManyWithoutFuturesConditionalEntryNestedInput
 }
 
 export type FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotInput = {
@@ -2217,6 +2400,35 @@ export type FuturesConditionalEntryUncheckedUpdateManyWithoutTriggerSnapshotInpu
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
 
+
+/**
+ * Count Type FuturesConditionalEntryCountOutputType
+ */
+
+export type FuturesConditionalEntryCountOutputType = {
+  entryTpSlPlans: number
+}
+
+export type FuturesConditionalEntryCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  entryTpSlPlans?: boolean | FuturesConditionalEntryCountOutputTypeCountEntryTpSlPlansArgs
+}
+
+/**
+ * FuturesConditionalEntryCountOutputType without action
+ */
+export type FuturesConditionalEntryCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the FuturesConditionalEntryCountOutputType
+   */
+  select?: Prisma.FuturesConditionalEntryCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * FuturesConditionalEntryCountOutputType without action
+ */
+export type FuturesConditionalEntryCountOutputTypeCountEntryTpSlPlansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.EntryTpSlPlanWhereInput
+}
 
 
 export type FuturesConditionalEntrySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2253,6 +2465,8 @@ export type FuturesConditionalEntrySelect<ExtArgs extends runtime.Types.Extensio
   limitOrder?: boolean | Prisma.FuturesConditionalEntry$limitOrderArgs<ExtArgs>
   registrationSnapshot?: boolean | Prisma.FuturesLastPriceSnapshotDefaultArgs<ExtArgs>
   triggerSnapshot?: boolean | Prisma.FuturesConditionalEntry$triggerSnapshotArgs<ExtArgs>
+  entryTpSlPlans?: boolean | Prisma.FuturesConditionalEntry$entryTpSlPlansArgs<ExtArgs>
+  _count?: boolean | Prisma.FuturesConditionalEntryCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["futuresConditionalEntry"]>
 
 export type FuturesConditionalEntrySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -2365,6 +2579,8 @@ export type FuturesConditionalEntryInclude<ExtArgs extends runtime.Types.Extensi
   limitOrder?: boolean | Prisma.FuturesConditionalEntry$limitOrderArgs<ExtArgs>
   registrationSnapshot?: boolean | Prisma.FuturesLastPriceSnapshotDefaultArgs<ExtArgs>
   triggerSnapshot?: boolean | Prisma.FuturesConditionalEntry$triggerSnapshotArgs<ExtArgs>
+  entryTpSlPlans?: boolean | Prisma.FuturesConditionalEntry$entryTpSlPlansArgs<ExtArgs>
+  _count?: boolean | Prisma.FuturesConditionalEntryCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type FuturesConditionalEntryIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   tradingAccount?: boolean | Prisma.TradingAccountDefaultArgs<ExtArgs>
@@ -2392,6 +2608,7 @@ export type $FuturesConditionalEntryPayload<ExtArgs extends runtime.Types.Extens
     limitOrder: Prisma.$FuturesLimitOrderPayload<ExtArgs> | null
     registrationSnapshot: Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs>
     triggerSnapshot: Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs> | null
+    entryTpSlPlans: Prisma.$EntryTpSlPlanPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2821,6 +3038,7 @@ export interface Prisma__FuturesConditionalEntryClient<T, Null = never, ExtArgs 
   limitOrder<T extends Prisma.FuturesConditionalEntry$limitOrderArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesConditionalEntry$limitOrderArgs<ExtArgs>>): Prisma.Prisma__FuturesLimitOrderClient<runtime.Types.Result.GetResult<Prisma.$FuturesLimitOrderPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   registrationSnapshot<T extends Prisma.FuturesLastPriceSnapshotDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesLastPriceSnapshotDefaultArgs<ExtArgs>>): Prisma.Prisma__FuturesLastPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   triggerSnapshot<T extends Prisma.FuturesConditionalEntry$triggerSnapshotArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesConditionalEntry$triggerSnapshotArgs<ExtArgs>>): Prisma.Prisma__FuturesLastPriceSnapshotClient<runtime.Types.Result.GetResult<Prisma.$FuturesLastPriceSnapshotPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  entryTpSlPlans<T extends Prisma.FuturesConditionalEntry$entryTpSlPlansArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.FuturesConditionalEntry$entryTpSlPlansArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$EntryTpSlPlanPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3332,6 +3550,30 @@ export type FuturesConditionalEntry$triggerSnapshotArgs<ExtArgs extends runtime.
    */
   include?: Prisma.FuturesLastPriceSnapshotInclude<ExtArgs> | null
   where?: Prisma.FuturesLastPriceSnapshotWhereInput
+}
+
+/**
+ * FuturesConditionalEntry.entryTpSlPlans
+ */
+export type FuturesConditionalEntry$entryTpSlPlansArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the EntryTpSlPlan
+   */
+  select?: Prisma.EntryTpSlPlanSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the EntryTpSlPlan
+   */
+  omit?: Prisma.EntryTpSlPlanOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.EntryTpSlPlanInclude<ExtArgs> | null
+  where?: Prisma.EntryTpSlPlanWhereInput
+  orderBy?: Prisma.EntryTpSlPlanOrderByWithRelationInput | Prisma.EntryTpSlPlanOrderByWithRelationInput[]
+  cursor?: Prisma.EntryTpSlPlanWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.EntryTpSlPlanScalarFieldEnum | Prisma.EntryTpSlPlanScalarFieldEnum[]
 }
 
 /**

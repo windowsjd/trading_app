@@ -22,6 +22,14 @@ import {
   cancelLiveConditionalSellsInTransaction,
   liveConditionalSell,
 } from '../conditional/conditional-sell-state';
+import {
+  endEntryTpSlPlansForSpotOrder,
+  endEntryTpSlPlansOfEndedEntries,
+} from '../conditional/entry-tp-sl-state';
+import {
+  cancelLiveFuturesTpSlInTransaction,
+  liveFuturesTpSl,
+} from '../futures/futures-tp-sl-state';
 import { limitOnCloseOrderCanceled } from './limit-on-close-state';
 import {
   CurrencyCode,
@@ -515,6 +523,19 @@ export class LimitOrderCancelService {
       conditionalBuyLifecycleReason(input.reason),
       input.canceledAt,
     );
+    // Reservation-free Futures stop-loss/take-profit settings, same fence;
+    // then any entry plan whose entry ended above.
+    await cancelLiveFuturesTpSlInTransaction(
+      tx,
+      input.tradingAccountId,
+      conditionalBuyLifecycleReason(input.reason),
+      input.canceledAt,
+    );
+    await endEntryTpSlPlansOfEndedEntries(
+      tx,
+      input.tradingAccountId,
+      input.canceledAt,
+    );
     return {
       canceledOrderCount,
       releasedReservationCount: canceledOrderCount,
@@ -814,6 +835,45 @@ export class LimitOrderCancelService {
         await cancelLiveFuturesConditionalEntriesInTransaction(
           tx,
           watch.tradingAccountId,
+          'season_ended',
+          input.now,
+        );
+      });
+    }
+    // Reservation-free Futures stop-loss/take-profit settings of ended
+    // seasons, same fence.
+    const tpSlSettings = await this.prisma.futuresTpSlSetting.findMany({
+      where: {
+        ...liveFuturesTpSl,
+        tradingAccount: {
+          mode: 'season',
+          seasonParticipant: {
+            season: { status: { in: ['ended', 'settled'] } },
+          },
+        },
+      },
+      distinct: ['tradingAccountId'],
+      select: {
+        tradingAccountId: true,
+        tradingAccount: {
+          select: { seasonParticipant: { select: { id: true } } },
+        },
+      },
+      orderBy: { tradingAccountId: 'asc' },
+      take: batchSize,
+    });
+    for (const setting of tpSlSettings) {
+      if (input.isLockOwned && !input.isLockOwned())
+        // @diagnosticSurface internal: Existing Ops runner records lease loss and retries lifecycle cleanup.
+        throw new Error('Ops job lock ownership was lost.');
+      await this.prisma.$transaction(async (tx) => {
+        await lockSeasonTradingContext(tx, {
+          seasonParticipantId: setting.tradingAccount.seasonParticipant!.id,
+          participantWrite: true,
+        });
+        await cancelLiveFuturesTpSlInTransaction(
+          tx,
+          setting.tradingAccountId,
           'season_ended',
           input.now,
         );
@@ -1145,6 +1205,9 @@ export class LimitOrderCancelService {
       input.cancelReason,
       input.canceledAt,
     );
+    // An entry that ends unfilled ends its stop-loss/take-profit plans
+    // (also those of the conditional BUY that created it).
+    await endEntryTpSlPlansForSpotOrder(tx, input.orderId, input.canceledAt);
     await limitOnCloseOrderCanceled(
       tx,
       input.orderId,

@@ -1,5 +1,12 @@
 # SELL intents (condition, independent stop-loss / take-profit) and KRX LOC SELL (2026-10-13, current; TP/SL rules 2026-10-15)
 
+> 2026-10-16: the app sets Spot stop-loss/take-profit from the holding card's
+> 「손절가/익절가 설정」 bottom sheet (no longer a SELL 주문방식), pending BUY
+> entries can carry plans that become these settings at the actual fill, and
+> the 이상/이하 of a SELL condition is decided automatically from the watch
+> price vs the current price. Futures positions use the same model:
+> [independent-tp-sl-entry-plans-contract.md](independent-tp-sl-entry-plans-contract.md).
+
 > 2026-10-15: new independent stop-loss/take-profit settings execute at
 > **market only**, the live settings of one family (stop-losses, or
 > take-profits) target at most the holding, and one family never repeats a

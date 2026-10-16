@@ -1,5 +1,14 @@
 # Futures Conditional Entry v1 (2026-10-14, current)
 
+> 2026-10-16: the app no longer offers a manual 이상/이하 — a watch price above
+> the fresh Futures Last is `at_or_above`, below is `at_or_below`, equal or no
+> fresh Last cannot be registered, and a direction the latest Last no longer
+> supports is re-decided and confirmed again before sending (the request
+> field and `FUTURES_CONDITIONAL_ENTRY_ALREADY_MET` are unchanged). A watching
+> entry, or the limit entry it created, can carry stop-loss/take-profit plans
+> that activate at the actual fill:
+> [independent-tp-sl-entry-plans-contract.md](independent-tp-sl-entry-plans-contract.md).
+
 A reservation-free watch that opens ONE new USDⓈ-M synthetic perpetual
 position when the contract's verified **Futures Last** price reaches a trigger.
 It is a new-position entry only: it never increases, reduces, closes or flips an

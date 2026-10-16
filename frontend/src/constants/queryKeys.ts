@@ -351,6 +351,13 @@ export const QUERY_KEYS = {
       ended: (id: string, kind: 'condition' | 'protection') =>
         ['tradingAccount', 'conditionalSellOrders', id, 'ended', kind] as const,
     },
+    /** 손절가/익절가 plans on pending entries (one entry, or the account's). */
+    entryTpSl: {
+      all: (id: string) => ['tradingAccount', 'entryTpSl', id] as const,
+      entry: (id: string, entryType: string, entryId: string) =>
+        ['tradingAccount', 'entryTpSl', id, 'entry', entryType, entryId] as const,
+      list: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'entryTpSl', id, 'list', state] as const,
+    },
     /** Read-only server create gates (limit / LOC) for one account. */
     orderCapabilities: (id: string) => ['tradingAccount', 'orderCapabilities', id] as const,
     futures: {
@@ -361,6 +368,8 @@ export const QUERY_KEYS = {
       history: (id: string, kind: 'executions' | 'liquidations', offset: number) => ['tradingAccount', 'futures', id, kind, offset] as const,
       finalSettlement: (id: string) => ['tradingAccount', 'futures', id, 'final-settlement'] as const,
       conditionalEntries: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'futures', id, 'conditional-entries', state] as const,
+      /** Independent 손절가/익절가 settings on open lifetimes. */
+      tpSl: (id: string, state: 'open' | 'ended') => ['tradingAccount', 'futures', id, 'tp-sl', state] as const,
     },
     /** Everything account-scoped; the logout-time clear target. */
     all: ['tradingAccount'] as const,
