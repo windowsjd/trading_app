@@ -1,5 +1,7 @@
 # 공통 Press·Navigation Motion 인수인계
 
+> `useReducedMotionSettled()`(OS 저모션 설정 확정 여부, 2026-10-16): [내 순위 엠블럼 스포트라이트](home-tier-card-spotlight-2026-10-16.md#저모션포커스접근성).
+
 2026-10-05 색상 보완: 기존 Primary Blue의 밝기와 브랜드 인상을 유지하면서
 끝색을 `#4C32E5`로 조정해 Blue–Indigo 계열로 통일한다. 아래 색상 기준에 반영했으며
 시작색, 흰 foreground, 수평 방향, 버튼 geometry와 press feedback은 유지한다.

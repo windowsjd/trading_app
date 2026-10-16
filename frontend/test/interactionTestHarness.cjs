@@ -54,7 +54,7 @@ function interactionHarness(platform = 'android') {
   h.insets = { top: 24, bottom: 34 };
   h.load = (file, mocks = {}) => load(resolve(file), {
     'react-native': h.native,
-    '../../theme/useReducedMotion': { useReducedMotion: () => h.reduced },
+    '../../theme/useReducedMotion': { useReducedMotion: () => h.reduced, useReducedMotionSettled: () => true },
     'react-native-svg': { default: 'Svg', Path: 'Path', Defs: 'Defs', LinearGradient: 'LinearGradient', Rect: 'Rect', Stop: 'Stop', __esModule: true },
     ...mocks,
   });

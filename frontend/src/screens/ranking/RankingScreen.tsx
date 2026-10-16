@@ -280,6 +280,8 @@ export default function RankingScreen({ navigation }: Props) {
               me={meQuery.data}
               myRanking={myRanking}
               rankType={rankType}
+              seasonId={seasonId}
+              focused={isFocused}
               viewState={viewState}
               onJoin={() => rootNavigation.navigate('SeasonJoin')}
             />
@@ -339,12 +341,16 @@ function MyRankingCard({
   me,
   myRanking,
   rankType,
+  seasonId,
+  focused,
   viewState,
   onJoin,
 }: {
   me?: MeDto;
   myRanking: MyRankingDto | null;
   rankType?: RankingRankType;
+  seasonId?: string;
+  focused: boolean;
   viewState: string;
   onJoin: () => void;
 }) {
@@ -371,7 +377,7 @@ function MyRankingCard({
   }
 
   const availableRanking = myRanking?.state === 'available' ? myRanking : null;
-  return <MyStandingCard me={me} ranking={availableRanking} rankType={rankType} />;
+  return <MyStandingCard me={me} ranking={availableRanking} rankType={rankType} seasonId={seasonId} focused={focused} />;
 }
 
 /**
@@ -381,7 +387,9 @@ function MyRankingCard({
  * of my ranking row, as the list shows them. Without a known tier the same
  * column sits on a plain card.
  */
-function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extract<MyRankingDto, { state: 'available' }> | null; rankType?: RankingRankType }) {
+function MyStandingCard({ me, ranking, rankType, seasonId, focused }: {
+  me?: MeDto; ranking: Extract<MyRankingDto, { state: 'available' }> | null; rankType?: RankingRankType; seasonId?: string; focused: boolean;
+}) {
   const { mode, financialPreference } = useAppearance();
   const { width } = useWindowDimensions();
   const tier = getHomeTier(getRankingTier(ranking, rankType), mode);
@@ -425,7 +433,10 @@ function MyStandingCard({ me, ranking, rankType }: { me?: MeDto; ranking: Extrac
   return (
     <View style={styles.myCard}>
       <TierCard testID="ranking-my-card" tier={tier} mode={mode} emblemSize={width < 360 ? 104 : 124}
-        caption={<Text testID="ranking-my-tier" style={[styles.tierCaption, foreground]}>{tier.name}</Text>}>
+        caption={<Text testID="ranking-my-tier" style={[styles.tierCaption, foreground]}>{tier.name}</Text>}
+        // The tier is read from this publication's season and rank type for me: a tier change within them
+        // replays the emblem's entrance; another season, daily → final or another account only re-anchors it.
+        spotlight={{ context: `${seasonId}|${rankType}|${ranking?.seasonParticipantId}`, paused: !focused }}>
         {content}
       </TierCard>
     </View>

@@ -42,7 +42,9 @@ const CARD = { light: ['rgb(255, 255, 255)', 'rgb(229, 232, 235)'], dark: ['rgb(
   // screenshots taller than the viewport come out blank below the scroll view.
   const visit = async (mode, palette, query, width, deviceScaleFactor = 1) => {
     if (page) await page.context().close();
-    page = await browser.newPage({ viewport: { width, height: 1600 }, deviceScaleFactor });
+    // 내 순위's spotlight holds still (reduced motion: a still beam and floor glow, no drop-in), so
+    // layout and two-capture contrast are measured on a settled card; rankingSpotlightBrowser.cjs checks the motion.
+    page = await browser.newPage({ viewport: { width, height: 1600 }, deviceScaleFactor, reducedMotion: 'reduce' });
     page.on('pageerror', e => errors.push(e.message));
     await page.route('**/*', route => route.request().url().startsWith(base) || route.request().url().startsWith('data:') ? route.continue() : route.abort());
     await page.addInitScript(({ mode, palette }) => {

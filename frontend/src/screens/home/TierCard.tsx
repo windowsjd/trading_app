@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, useWindowDimensions, type TextStyle } from '../../theme/native';
+import { Animated, StyleSheet, View, useWindowDimensions, type TextStyle } from '../../theme/native';
 import type { AppearanceMode } from '../../theme/appearance';
 import type { getHomeTier } from './tierPresentation';
 import TierCardBackground from './TierCardBackground';
+import TierCardStage, { useTierStage, type TierSpotlight } from './TierCardStage';
 import TierEmblem from './TierEmblem';
 import { TIER_BACKGROUNDS } from './tierBackgrounds';
 
@@ -23,13 +24,17 @@ export function tierForeground(tier: TierPresentation, mode: AppearanceMode): Te
  * own aspect ratio and corner proportion, information on the left and the
  * emblem on the right. Large fonts put the emblem above the information so
  * nothing is clipped; the card grows with its content.
+ *
+ * `spotlight` (내 순위) adds light around the emblem and moves the emblem
+ * itself; the information and the caption render exactly as without it.
  */
-export default function TierCard({ tier, mode, emblemSize, caption, testID, children }: {
+export default function TierCard({ tier, mode, emblemSize, caption, testID, spotlight, children }: {
   tier: TierPresentation;
   mode: AppearanceMode;
   emblemSize: number;
   caption?: React.ReactNode;
   testID?: string;
+  spotlight?: TierSpotlight;
   children: React.ReactNode;
 }) {
   const { fontScale } = useWindowDimensions();
@@ -38,7 +43,19 @@ export default function TierCard({ tier, mode, emblemSize, caption, testID, chil
   const corner = tier.id === 'whale' ? 0.05 : 0.04;
   const headingTop = tier.id === 'whale' ? 0.06 : 0;
   const stacked = fontScale > 1.3;
-  const emblem = (
+  // Outside the background's tier/appearance key: Light/Dark keeps the motion running.
+  const stage = useTierStage(spotlight ? { tier: tier.id, mode, emblemSize, stacked, spotlight } : null);
+  const emblem = stage ? (
+    <View style={styles.emblem} onLayout={stage.onColumnLayout}>
+      {/* Transforms move the emblem only: its slot, and the caption under it, keep their layout.
+          The moving box is the emblem in the card, so it keeps the emblem's id and stays hidden. */}
+      <Animated.View key={tier.id} testID={`home-emblem-${tier.id}`} style={stage.emblemStyle} onLayout={stage.onEmblemLayout}
+        accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden pointerEvents="none">
+        <TierEmblem tier={tier.id} size={emblemSize} testID="tier-card-emblem" />
+      </Animated.View>
+      {caption}
+    </View>
+  ) : (
     <View style={styles.emblem}>
       <TierEmblem tier={tier.id} size={emblemSize} />
       {caption}
@@ -54,6 +71,7 @@ export default function TierCard({ tier, mode, emblemSize, caption, testID, chil
       minHeight: width ? width / (background.width / background.height) : undefined,
     }]}>
       <TierCardBackground key={`${tier.id}-${mode}`} tier={tier.id} mode={mode} />
+      {stage ? <TierCardStage stage={stage} /> : null}
       {stacked ? emblem : null}
       <View style={[styles.info, !stacked && styles.infoBeside]}>{children}</View>
       {stacked ? null : emblem}

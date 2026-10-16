@@ -10,6 +10,29 @@
 
 ---
 
+## 2026-10-16 내 순위 티어 카드 엠블럼 스포트라이트 (빛줄기·바닥 글로우·입자·입장)
+
+- **기능 구현 의도:** 랭킹 탭 `내 순위` 카드의 티어 엠블럼에 스포트라이트(위에서 내려오는 원뿔 빛, 발밑 바닥 글로우, 떠오르는 입자 9개),
+  상위 티어의 약한 떠 있음(bob), 처음 보일 때·티어가 바뀔 때의 입장(drop-in)을 더한다. 카드의 모든 글자·위치·접근성은 그대로다.
+  승급·강등 구분 연출, 티어 저장, 햅틱, 새 라이브러리는 범위 밖이다.
+- 시작 `main`=`c398d8af`, clean. frontend만, 커밋·push·배포 없음.
+- 구조: 순수 로직 `src/screens/home/tierStage.ts`, 효과 레이어·훅 `TierCardStage.tsx`, `TierCard`의 opt-in `spotlight`(`MyStandingCard`만 켬).
+  꺼져 있으면 JSX가 이전과 같다. 엠블럼은 `TierCard` 안의 `Animated.View`로 움직인다. 이 상자가 `home-emblem-<tier>` id와 숨김 속성을 가지고,
+  안쪽 `TierEmblem`은 `tier-card-emblem`이다(기존 단언 수정 없이 통과). `TierEmblem`에는 보이는 하단 계산 함수만 더했다.
+  `useReducedMotion.ts`에 `useReducedMotionSettled()`를 더했다(기존 반환 불변). 공용 harness 두 곳의 저모션 mock에도 같은 export를 더했다.
+- **입장 재생:** 모듈 메모리 `{ tier, context }`. 맥락 = `seasonId|rankType|seasonParticipantId`(publication의 선택 키 + 계정).
+  최초 표시와 같은 맥락의 티어 변경(강등 포함)만 재생한다. 맥락 전환(다른 시즌, daily → final, 다른 계정)은 조용히 갱신만 한다.
+  재포커스·리마운트·라이트/다크·글꼴·같은 티어의 숫자 변화에는 재생하지 않는다. 재생 여부는 애니메이션이 실제로 시작될 때만 소모한다.
+  OS 저모션 설정 확정 전에는 엠블럼을 숨긴 채 기다리고, 저모션이면 최종 상태로 보인다.
+- **판단:** 글린트(흰 tintColor 덮개)는 정점에서 검은 원판을 회색으로 띄워 납작해 보여 생략했다. screen 대신 일반 알파라서 밝은 면의 빛줄기가
+  시안의 평균 87%였다. 그래서 밝은 면(Light, Whale 제외)만 시작 알파를 .78 → .88(+0.1)로 올렸다. 플래시는 시안 측정상 착지가 아니라
+  0ms부터 시작한다. 바닥 글로우 높이는 프롬프트 수치(보이는 하단 − 8k)를 지켜 시안보다 5–13px 위에 있다(캡션과 겹치지 않음).
+- 검증: 신규 단위 31개와 변이 11개 확인, 기존 ranking·tier 테스트 수정 없이 PASS, `npm run check` PASS(2,815/2,815), `export:web`·Android export PASS.
+  신규 `rankingSpotlightBrowser.cjs`: HEAD 사본과 48개 레이아웃 차이 0, 카드 밖 픽셀 0, 대비 기준 유지, 저모션 12·입장 12·재생 안 함 PASS.
+  기존 `rankingTierBrowser.cjs`는 입장 도중 측정을 피하려고 페이지를 저모션으로 열게 바꿨다(quick PASS).
+- **NOT_RUN:** iOS·Android 실기기(native driver의 transformOrigin·SVG 그라디언트·둥근 자르기, 프레임 드롭), VoiceOver/TalkBack 음성,
+  `rankingTierBrowser` 전체 행렬. 상세·시안 비교·수치: [내 순위 엠블럼 스포트라이트](frontend/docs/home-tier-card-spotlight-2026-10-16.md)
+
 ## 2026-10-16 P0 보완·P1 전체 시장 DB 최적화 — 보존 DELETE 계획 고정·14일 가격 보존·Binance 조회 제거·캔들 재기록 방지·uuid(7)·경보 엔드포인트
 
 - 시작 `main`=`origin/main`=`70f51455`(CI 1 job 실패). main 작업 트리에서 개발 → 검증 뒤 브랜치 `p1/db-optimization-20261016` 커밋·push·PR #7(CI 확인용, 전 job 통과) → 사용자 지시로 **모든 커밋을 로컬 `main`으로 fast-forward**하고 로컬 브랜치를 지웠다. **origin/main push(=Render 배포)·운영 DB 쓰기·운영 env 변경은 하지 않았다.**

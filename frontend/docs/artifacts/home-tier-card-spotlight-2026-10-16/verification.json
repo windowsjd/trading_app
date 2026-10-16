@@ -1,0 +1,973 @@
+{
+ "date": "2026-10-16",
+ "startHead": "c398d8af",
+ "browser": {
+  "runner": "test/browser/rankingSpotlightBrowser.cjs (RN-Web, Chromium headless shell 1243, Playwright fake clock)",
+  "layoutsVsHead": 48,
+  "matrix": "6 tiers × Light/Dark × 320/390 dp × text 1/2×",
+  "failures": 0,
+  "pageErrors": 0,
+  "layoutDiff": "card size, every text box, avatar, emblem slot, emblem image and tier name identical to the HEAD copy (0.001 px)",
+  "pixelsChangedOutsideCard": "0/434992 (antialiased 1.5 px edge excluded)",
+  "infoTextContrast": {
+   "measured": 336,
+   "changedOver002": 9,
+   "minNow": 4.37,
+   "minHead": 4.37,
+   "largestDrop": {
+    "text": "10,450,000원",
+    "size": 16,
+    "ratio": 9.28,
+    "samples": 426,
+    "head": 10.981,
+    "tier": "silver",
+    "mode": "dark",
+    "width": 320,
+    "fontScale": 1,
+    "drop": 1.7010000000000005
+   }
+  },
+  "captionContrast": {
+   "measured": 48,
+   "minNow": 4.685,
+   "minHead": 5.114
+  },
+  "reducedMotion": [
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "master",
+    "mode": "light",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   },
+   {
+    "tier": "master",
+    "mode": "dark",
+    "still": true,
+    "layers": {
+     "particles": 0,
+     "ring": 0,
+     "flash": 0,
+     "beam": 1,
+     "floor": 1
+    }
+   }
+  ],
+  "entrance": [
+   {
+    "tier": "bronze",
+    "mode": "light",
+    "frames": [
+     {
+      "at": 60,
+      "y": -57.33,
+      "scale": 1.154,
+      "opacity": 0.342883,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -5.15,
+      "scale": 1.0015,
+      "opacity": 0.887433,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.49,
+      "scale": 0.9733,
+      "opacity": 0.988057,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.56,
+      "scale": 0.9702,
+      "opacity": 0.999217,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.5,
+      "scale": 1.0054,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -1.01,
+      "scale": 1.0022,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": 0,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "bronze",
+    "mode": "dark",
+    "frames": [
+     {
+      "at": 60,
+      "y": -53.91,
+      "scale": 1.144,
+      "opacity": 0.378571,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -6.83,
+      "scale": 1.0064,
+      "opacity": 0.869888,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.21,
+      "scale": 0.9742,
+      "opacity": 0.985128,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.59,
+      "scale": 0.9701,
+      "opacity": 0.999467,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -2.96,
+      "scale": 1.0033,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -0.87,
+      "scale": 1.0019,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": 0,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "silver",
+    "mode": "light",
+    "frames": [
+     {
+      "at": 60,
+      "y": -56.75,
+      "scale": 1.1523,
+      "opacity": 0.348889,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -4.99,
+      "scale": 1.0011,
+      "opacity": 0.889068,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.52,
+      "scale": 0.9733,
+      "opacity": 0.988324,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.57,
+      "scale": 0.9702,
+      "opacity": 0.999263,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.54,
+      "scale": 1.0055,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -0.99,
+      "scale": 1.0021,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": 0,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "silver",
+    "mode": "dark",
+    "frames": [
+     {
+      "at": 60,
+      "y": -60.83,
+      "scale": 1.1642,
+      "opacity": 0.306381,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -6.13,
+      "scale": 1.0044,
+      "opacity": 0.877171,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.33,
+      "scale": 0.9738,
+      "opacity": 0.986356,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.6,
+      "scale": 0.9701,
+      "opacity": 0.999604,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.2,
+      "scale": 1.0042,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -1.17,
+      "scale": 1.0025,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": 0,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "gold",
+    "mode": "light",
+    "frames": [
+     {
+      "at": 60,
+      "y": -62.01,
+      "scale": 1.1677,
+      "opacity": 0.294045,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -6.48,
+      "scale": 1.0054,
+      "opacity": 0.873575,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.27,
+      "scale": 0.974,
+      "opacity": 0.985752,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.59,
+      "scale": 0.9701,
+      "opacity": 0.999538,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.08,
+      "scale": 1.0038,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -1.23,
+      "scale": 1.0026,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": 0,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "gold",
+    "mode": "dark",
+    "frames": [
+     {
+      "at": 60,
+      "y": -55.04,
+      "scale": 1.1473,
+      "opacity": 0.36677,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -7.19,
+      "scale": 1.0075,
+      "opacity": 0.866107,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.59,
+      "scale": 0.9731,
+      "opacity": 0.989101,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.58,
+      "scale": 0.9702,
+      "opacity": 0.99939,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -2.84,
+      "scale": 1.0028,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -0.92,
+      "scale": 1.0019,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": 0,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "platinum",
+    "mode": "light",
+    "frames": [
+     {
+      "at": 60,
+      "y": -62.02,
+      "scale": 1.1677,
+      "opacity": 0.294045,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -6.56,
+      "scale": 1.0054,
+      "opacity": 0.873575,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.05,
+      "scale": 0.974,
+      "opacity": 0.985752,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.23,
+      "scale": 0.9701,
+      "opacity": 0.999538,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.67,
+      "scale": 1.0038,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -2.28,
+      "scale": 1.0026,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": -2.15,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "platinum",
+    "mode": "dark",
+    "frames": [
+     {
+      "at": 60,
+      "y": -61.43,
+      "scale": 1.1659,
+      "opacity": 0.300223,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -6.39,
+      "scale": 1.0049,
+      "opacity": 0.875384,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.08,
+      "scale": 0.9739,
+      "opacity": 0.986057,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.23,
+      "scale": 0.9701,
+      "opacity": 0.999572,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.73,
+      "scale": 1.004,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -2.26,
+      "scale": 1.0026,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": -2.15,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "diamond",
+    "mode": "light",
+    "frames": [
+     {
+      "at": 60,
+      "y": -55.63,
+      "scale": 1.149,
+      "opacity": 0.360833,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -4.78,
+      "scale": 1.0002,
+      "opacity": 0.892278,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.33,
+      "scale": 0.9731,
+      "opacity": 0.988846,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.22,
+      "scale": 0.9702,
+      "opacity": 0.999349,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -4.24,
+      "scale": 1.0059,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -2.02,
+      "scale": 1.002,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": -2.19,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "diamond",
+    "mode": "dark",
+    "frames": [
+     {
+      "at": 60,
+      "y": -53.93,
+      "scale": 1.144,
+      "opacity": 0.378571,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -6.91,
+      "scale": 1.0064,
+      "opacity": 0.869888,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4,
+      "scale": 0.9742,
+      "opacity": 0.985128,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.23,
+      "scale": 0.9701,
+      "opacity": 0.999467,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.54,
+      "scale": 1.0033,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -1.96,
+      "scale": 1.0019,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": -2.14,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "master",
+    "mode": "light",
+    "frames": [
+     {
+      "at": 60,
+      "y": -59.08,
+      "scale": 1.1591,
+      "opacity": 0.324729,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -5.69,
+      "scale": 1.0029,
+      "opacity": 0.882399,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.26,
+      "scale": 0.9736,
+      "opacity": 0.987227,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.34,
+      "scale": 0.9701,
+      "opacity": 0.999692,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.76,
+      "scale": 1.0048,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -1.83,
+      "scale": 1.0023,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": -1.54,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   },
+   {
+    "tier": "master",
+    "mode": "dark",
+    "frames": [
+     {
+      "at": 60,
+      "y": -56.77,
+      "scale": 1.1523,
+      "opacity": 0.348889,
+      "ring": true
+     },
+     {
+      "at": 200,
+      "y": -5.06,
+      "scale": 1.0011,
+      "opacity": 0.889068,
+      "ring": true
+     },
+     {
+      "at": 330,
+      "y": 4.36,
+      "scale": 0.9733,
+      "opacity": 0.988324,
+      "ring": true
+     },
+     {
+      "at": 420,
+      "y": 5.32,
+      "scale": 0.9702,
+      "opacity": 0.999263,
+      "ring": true
+     },
+     {
+      "at": 520,
+      "y": -3.95,
+      "scale": 1.0055,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 700,
+      "y": -1.73,
+      "scale": 1.0021,
+      "opacity": 1,
+      "ring": true
+     },
+     {
+      "at": 1000,
+      "y": -1.55,
+      "scale": 1,
+      "opacity": 1,
+      "ring": true
+     }
+    ],
+    "rest": {
+     "opacity": 1,
+     "scale": 1,
+     "ring": false,
+     "flash": false
+    }
+   }
+  ],
+  "noReplay": [
+   {
+    "step": "refocus",
+    "opacity": "1",
+    "y": 0,
+    "ring": false
+   },
+   {
+    "step": "dark",
+    "opacity": "1",
+    "y": 0,
+    "ring": false
+   },
+   {
+    "step": "light",
+    "opacity": "1",
+    "y": 0,
+    "ring": false
+   }
+  ]
+ },
+ "beamGainVsMockup": {
+  "method": "mean luminance gain over the bare background art, 6×6 px at (emblem center + dx, y), mock-up/app at 3 s",
+  "afterLightAlpha088": {
+   "bronze light": "59/62 52/49 69/73",
+   "silver light": "33/36 27/29 37/42",
+   "gold light": "68/69 68/68 67/65",
+   "platinum light": "47/42 47/47 38/36",
+   "diamond light": "53/44 52/43 55/48",
+   "bronze dark": "118/117 115/110 124/125",
+   "silver dark": "70/61 85/74 54/45",
+   "gold dark": "116/112 119/115 108/97",
+   "platinum dark": "95/95 68/77 94/91",
+   "diamond dark": "110/105 107/102 113/109",
+   "whale light": "142/140 120/116 133/131",
+   "whale dark": "164/163 154/152 160/159"
+  },
+  "beforeLightAlpha078": {
+   "bronze light": "59/55 52/43 69/65",
+   "silver light": "33/32 27/26 37/37",
+   "gold light": "68/61 68/60 67/57",
+   "platinum light": "47/37 47/42 38/32",
+   "diamond light": "53/39 52/39 55/43"
+  }
+ },
+ "mutationsCaught": [
+  "entrance replays on every tab focus",
+  "replays on Light/Dark",
+  "consumption keyed with the mode",
+  "loops start under reduced motion",
+  "effect layers exposed to screen readers",
+  "moving emblem box exposed",
+  "context switch replays",
+  "opacity on the information column",
+  "wrapper inside the information column",
+  "animated wrapper around the information column",
+  "caption wrapped"
+ ]
+}

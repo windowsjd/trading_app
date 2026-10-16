@@ -24,6 +24,17 @@ export function tierEmblemWidth(tier: HomeTier, size: number) {
   return preparation[tier].displayAt160.width * (size / 160 * EMBLEM_OPTICAL_SCALE[tier]);
 }
 
+/**
+ * How far below the slot's top the visible silhouette ends at `size`: the last
+ * row of the prepared alpha bounds, placed as TierEmblem places the canvas.
+ */
+export function tierEmblemVisibleBottom(tier: HomeTier, size: number) {
+  const asset = preparation[tier];
+  const image = 'imageAt160' in asset ? asset.imageAt160 : { ...asset.displayAt160, left: 0, top: 0 };
+  const bottom = asset.outputMetrics.bounds[3] / asset.outputSize[1];
+  return (image.top + bottom * image.height) * (size / 160 * EMBLEM_OPTICAL_SCALE[tier]);
+}
+
 export default function TierEmblem({ tier, size, testID = `home-emblem-${tier}`, imageTestID = 'home-tier-image' }: {
   tier: HomeTier;
   size: number;
