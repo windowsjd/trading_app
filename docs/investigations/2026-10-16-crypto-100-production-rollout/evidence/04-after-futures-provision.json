@@ -1,0 +1,837 @@
+{
+ "app": "ok",
+ "status": "degraded",
+ "reasons": [
+  "MARKET_CALENDAR_PROVISIONAL"
+ ],
+ "alerts": [],
+ "database": "ok",
+ "redis": "ok",
+ "scheduler": {
+  "enabled": true,
+  "timezone": "Asia/Seoul",
+  "jobs": {
+   "futures_liquidation": false,
+   "futures_mark_retention": false,
+   "conditional_orders": false,
+   "futures_limit_matching": false,
+   "futures_last_price_retention": false,
+   "conditional_buy_orders": false,
+   "limit_on_close_settlement": false,
+   "conditional_sell_orders": false,
+   "futures_conditional_entries": false,
+   "asset_price_snapshot_retention": false,
+   "futures_tp_sl_settings": false,
+   "crypto_order_book_retention": false,
+   "provider_fx_ingest": true,
+   "provider_binance_ingest": false,
+   "provider_kis_ingest": false,
+   "daily_portfolio_snapshot": true,
+   "season_ranking_generation": false,
+   "season_lifecycle_transition": false,
+   "season_settlement": false,
+   "reward_marker": false,
+   "market_candle_retention": false,
+   "market_candle_sync": true,
+   "market_candle_reconciliation": true,
+   "market_candle_long_sync": false,
+   "futures_candle_sync": false,
+   "limit_order_matching": true,
+   "limit_order_matcher": false,
+   "limit_order_candle_reconciliation": false
+  }
+ },
+ "marketCalendar": {
+  "requiredFromYear": 2025,
+  "requiredThroughYear": 2027,
+  "markets": [
+   {
+    "market": "KRX",
+    "coveredYears": [
+     2025,
+     2026,
+     2027
+    ],
+    "auditedYears": [
+     2025,
+     2026
+    ],
+    "missingYears": [],
+    "provisionalYears": [
+     2027
+    ]
+   },
+   {
+    "market": "US",
+    "coveredYears": [
+     2025,
+     2026,
+     2027
+    ],
+    "auditedYears": [
+     2025,
+     2026,
+     2027
+    ],
+    "missingYears": [],
+    "provisionalYears": []
+   }
+  ],
+  "datasetsPresent": 6,
+  "complete": true,
+  "productionReady": false
+ },
+ "assetTicker": {
+  "clients": 0,
+  "sent": 0,
+  "coalesced": 0,
+  "dropped": 0,
+  "pendingTickers": 0,
+  "clientsWithPendingTickers": 0,
+  "maxPendingTickersPerClient": 0,
+  "pendingTickerLimitPerClient": 64
+ },
+ "marketSessionOverride": {
+  "mode": "required",
+  "state": "ready",
+  "loaded": true,
+  "loadedAt": "2026-10-16T11:38:54.010Z",
+  "lastRefreshFailedAt": null,
+  "activeOverrideCount": 0
+ },
+ "kisWebSocketStreaming": {
+  "enabled": true,
+  "running": true,
+  "state": "reconnecting",
+  "connected": false,
+  "connecting": false,
+  "reconnecting": true,
+  "subscribedSymbolCount": 0,
+  "subscriptionSkips": [
+   {
+    "symbol": "NAS:NVDA",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:TSLA",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:AMD",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:AAPL",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:AMZN",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:MSFT",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:GOOGL",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:META",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:PLTR",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:INTC",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:SOFI",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:RIVN",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:MARA",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:WBD",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:CSCO",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:MU",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:QCOM",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:PYPL",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:MSTR",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NAS:SMCI",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NYS:F",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NYS:BAC",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NYS:PFE",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NYS:T",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   },
+   {
+    "symbol": "NYS:UBER",
+    "reason": "KIS_US_DELAYED_DISABLED"
+   }
+  ],
+  "lastStartedAt": "2026-10-16T11:14:53.683Z",
+  "lastConnectedAt": null,
+  "lastDisconnectedAt": null,
+  "lastMessageAt": null,
+  "lastTradeAt": null,
+  "lastHeartbeatAt": null,
+  "lastSnapshotAt": null,
+  "reconnectCount": 54,
+  "nextReconnectAt": "2026-10-16T11:39:55.476Z",
+  "nextReconnectDelayMs": 30000,
+  "receivedFrames": 0,
+  "receivedTrades": 0,
+  "acknowledged": 0,
+  "created": 0,
+  "skipped": 0,
+  "failed": 0,
+  "latestPriceCount": 0,
+  "eventListenerCount": 1,
+  "lastErrorCode": "KIS_WATCHLIST_EMPTY",
+  "lastErrorMessage": "KIS WebSocket watchlist has no subscribable symbols."
+ },
+ "binanceWebSocketStreaming": {
+  "enabled": true,
+  "running": true,
+  "state": "connected",
+  "connected": true,
+  "connecting": false,
+  "reconnecting": false,
+  "subscribedSymbolCount": 100,
+  "subscribedStreams": [
+   "btcusdt@ticker",
+   "ethusdt@ticker",
+   "bnbusdt@ticker",
+   "xrpusdt@ticker",
+   "solusdt@ticker",
+   "trxusdt@ticker",
+   "dogeusdt@ticker",
+   "zecusdt@ticker",
+   "xlmusdt@ticker",
+   "linkusdt@ticker",
+   "suiusdt@ticker",
+   "nightusdt@ticker",
+   "nearusdt@ticker",
+   "pepeusdt@ticker",
+   "adausdt@ticker",
+   "taousdt@ticker",
+   "wldusdt@ticker",
+   "enausdt@ticker",
+   "avaxusdt@ticker",
+   "uniusdt@ticker",
+   "chipusdt@ticker",
+   "ltcusdt@ticker",
+   "asterusdt@ticker",
+   "币安人生usdt@ticker",
+   "trumpusdt@ticker",
+   "pumpusdt@ticker",
+   "xplusdt@ticker",
+   "aaveusdt@ticker",
+   "bchusdt@ticker",
+   "dashusdt@ticker",
+   "reusdt@ticker",
+   "sentusdt@ticker",
+   "ondousdt@ticker",
+   "fetusdt@ticker",
+   "penguusdt@ticker",
+   "hbarusdt@ticker",
+   "filusdt@ticker",
+   "arbusdt@ticker",
+   "zamausdt@ticker",
+   "wlfiusdt@ticker",
+   "fogousdt@ticker",
+   "icpusdt@ticker",
+   "dotusdt@ticker",
+   "kiteusdt@ticker",
+   "opnusdt@ticker",
+   "aptusdt@ticker",
+   "virtualusdt@ticker",
+   "allousdt@ticker",
+   "injusdt@ticker",
+   "zrousdt@ticker",
+   "renderusdt@ticker",
+   "bonkusdt@ticker",
+   "shibusdt@ticker",
+   "bankusdt@ticker",
+   "giggleusdt@ticker",
+   "dexeusdt@ticker",
+   "polusdt@ticker",
+   "qntusdt@ticker",
+   "bardusdt@ticker",
+   "wifusdt@ticker",
+   "tutusdt@ticker",
+   "axsusdt@ticker",
+   "megausdt@ticker",
+   "seiusdt@ticker",
+   "ensousdt@ticker",
+   "brevusdt@ticker",
+   "ordiusdt@ticker",
+   "strkusdt@ticker",
+   "stousdt@ticker",
+   "zenusdt@ticker",
+   "saharausdt@ticker",
+   "opusdt@ticker",
+   "babyusdt@ticker",
+   "biousdt@ticker",
+   "robousdt@ticker",
+   "chzusdt@ticker",
+   "tiausdt@ticker",
+   "spkusdt@ticker",
+   "gramusdt@ticker",
+   "pythusdt@ticker",
+   "luncusdt@ticker",
+   "pendleusdt@ticker",
+   "crvusdt@ticker",
+   "promusdt@ticker",
+   "plumeusdt@ticker",
+   "ethfiusdt@ticker",
+   "aerousdt@ticker",
+   "sagausdt@ticker",
+   "aceusdt@ticker",
+   "cakeusdt@ticker",
+   "homeusdt@ticker",
+   "synusdt@ticker",
+   "zkpusdt@ticker",
+   "ldousdt@ticker",
+   "jtousdt@ticker",
+   "eigenusdt@ticker",
+   "algousdt@ticker",
+   "arusdt@ticker",
+   "berausdt@ticker",
+   "marscoinusdt@ticker",
+   "btcusdt@depth10",
+   "ethusdt@depth10",
+   "bnbusdt@depth10",
+   "xrpusdt@depth10",
+   "solusdt@depth10",
+   "trxusdt@depth10",
+   "dogeusdt@depth10",
+   "zecusdt@depth10",
+   "xlmusdt@depth10",
+   "linkusdt@depth10",
+   "suiusdt@depth10",
+   "nightusdt@depth10",
+   "nearusdt@depth10",
+   "pepeusdt@depth10",
+   "adausdt@depth10",
+   "taousdt@depth10",
+   "wldusdt@depth10",
+   "enausdt@depth10",
+   "avaxusdt@depth10",
+   "uniusdt@depth10",
+   "chipusdt@depth10",
+   "ltcusdt@depth10",
+   "asterusdt@depth10",
+   "币安人生usdt@depth10",
+   "trumpusdt@depth10",
+   "pumpusdt@depth10",
+   "bchusdt@depth10",
+   "filusdt@depth10",
+   "aaveusdt@depth10",
+   "xplusdt@depth10",
+   "dashusdt@depth10",
+   "reusdt@depth10",
+   "sentusdt@depth10",
+   "ondousdt@depth10",
+   "fetusdt@depth10",
+   "penguusdt@depth10",
+   "hbarusdt@depth10",
+   "arbusdt@depth10",
+   "zamausdt@depth10",
+   "wlfiusdt@depth10",
+   "fogousdt@depth10",
+   "icpusdt@depth10",
+   "dotusdt@depth10",
+   "kiteusdt@depth10",
+   "opnusdt@depth10",
+   "aptusdt@depth10",
+   "virtualusdt@depth10",
+   "allousdt@depth10",
+   "injusdt@depth10",
+   "zrousdt@depth10",
+   "renderusdt@depth10",
+   "bonkusdt@depth10",
+   "shibusdt@depth10",
+   "bankusdt@depth10",
+   "giggleusdt@depth10",
+   "dexeusdt@depth10",
+   "polusdt@depth10",
+   "qntusdt@depth10",
+   "bardusdt@depth10",
+   "wifusdt@depth10",
+   "tutusdt@depth10",
+   "axsusdt@depth10",
+   "megausdt@depth10",
+   "seiusdt@depth10",
+   "ensousdt@depth10",
+   "brevusdt@depth10",
+   "ordiusdt@depth10",
+   "strkusdt@depth10",
+   "stousdt@depth10",
+   "zenusdt@depth10",
+   "saharausdt@depth10",
+   "opusdt@depth10",
+   "babyusdt@depth10",
+   "biousdt@depth10",
+   "robousdt@depth10",
+   "chzusdt@depth10",
+   "tiausdt@depth10",
+   "spkusdt@depth10",
+   "gramusdt@depth10",
+   "pythusdt@depth10",
+   "luncusdt@depth10",
+   "pendleusdt@depth10",
+   "crvusdt@depth10",
+   "promusdt@depth10",
+   "plumeusdt@depth10",
+   "ethfiusdt@depth10",
+   "aerousdt@depth10",
+   "sagausdt@depth10",
+   "aceusdt@depth10",
+   "cakeusdt@depth10",
+   "homeusdt@depth10",
+   "synusdt@depth10",
+   "zkpusdt@depth10",
+   "ldousdt@depth10",
+   "jtousdt@depth10",
+   "eigenusdt@depth10",
+   "algousdt@depth10",
+   "arusdt@depth10",
+   "berausdt@depth10",
+   "marscoinusdt@depth10"
+  ],
+  "lastStartedAt": "2026-10-16T11:14:53.681Z",
+  "lastConnectedAt": "2026-10-16T11:14:54.568Z",
+  "lastDisconnectedAt": null,
+  "lastMessageAt": "2026-10-16T11:39:35.930Z",
+  "lastTickerAt": "2026-10-16T11:39:35.830Z",
+  "lastSnapshotAt": "2026-10-16T11:39:35.577Z",
+  "reconnectCount": 0,
+  "nextReconnectAt": null,
+  "nextReconnectDelayMs": null,
+  "receivedFrames": 224388,
+  "receivedTickers": 99724,
+  "acknowledged": 1,
+  "created": 22003,
+  "skipped": 77721,
+  "failed": 0,
+  "latestPriceCount": 100,
+  "eventListenerCount": 1,
+  "lastErrorCode": null,
+  "lastErrorMessage": null
+ },
+ "tiingo": {
+  "provider": "tiingo",
+  "requested": true,
+  "enabled": true,
+  "configError": null,
+  "trialMode": true,
+  "persistence": "disabled",
+  "allowedSymbols": [
+   "AAPL"
+  ],
+  "streamEnabled": true,
+  "liquidityStreamEnabled": true,
+  "marketSegment": "pre_market",
+  "checkedAt": "2026-10-16T11:39:35.957Z",
+  "state": "enabled",
+  "mapping": {
+   "targets": [
+    {
+     "symbol": "AAPL",
+     "assetId": "3ddcfc04-5f0e-4fdc-b72c-5345ca6372a9",
+     "market": "NAS"
+    }
+   ],
+   "unmapped": [],
+   "loadedAt": "2026-10-16T11:29:54.163Z",
+   "lastLoadFailed": false
+  },
+  "rest": {
+   "networkRequests": 0,
+   "sharedRequests": 0,
+   "successes": 0,
+   "failuresByCode": {},
+   "lastSuccessAt": null,
+   "lastFailureAt": null,
+   "lastErrorCode": null,
+   "lastFailureEndpoint": null,
+   "lastHttpStatus": null,
+   "authState": "unknown",
+   "rateLimitedUntil": null,
+   "budget": {
+    "minuteUsed": 0,
+    "minuteLimit": 30,
+    "hourUsed": 0,
+    "hourLimit": 600,
+    "perSymbolMinuteLimit": 20
+   }
+  },
+  "stream": {
+   "reference": {
+    "channel": "reference",
+    "thresholdLevel": 6,
+    "state": "subscribed",
+    "tickers": [
+     "AAPL"
+    ],
+    "connectedAt": "2026-10-16T11:35:09.712Z",
+    "subscribedAt": "2026-10-16T11:35:09.955Z",
+    "disconnectedAt": "2026-10-16T11:35:07.829Z",
+    "lastMessageAt": "2026-10-16T11:39:31.608Z",
+    "lastHeartbeatAt": "2026-10-16T11:39:09.956Z",
+    "lastDataAt": "2026-10-16T11:39:31.608Z",
+    "reconnectCount": 11,
+    "consecutiveFailures": 0,
+    "nextReconnectAt": null,
+    "lastCloseCode": 4000,
+    "lastErrorCode": "TIINGO_WS_CLOSED",
+    "lastErrorAt": "2026-10-16T11:35:07.829Z",
+    "counters": {
+     "frames": 44,
+     "heartbeats": 16,
+     "subscribeAcks": 12,
+     "dataMessages": 16,
+     "accepted": 14,
+     "duplicates": 1,
+     "outOfOrder": 1,
+     "foreignTickers": 0,
+     "parseErrors": 0,
+     "ignored": 0,
+     "errorMessages": 0
+    }
+   },
+   "liquidity": {
+    "channel": "liquidity",
+    "thresholdLevel": 4,
+    "state": "subscribed",
+    "tickers": [
+     "AAPL"
+    ],
+    "connectedAt": "2026-10-16T11:33:20.299Z",
+    "subscribedAt": "2026-10-16T11:33:20.541Z",
+    "disconnectedAt": "2026-10-16T11:33:18.436Z",
+    "lastMessageAt": "2026-10-16T11:39:31.604Z",
+    "lastHeartbeatAt": "2026-10-16T11:39:20.544Z",
+    "lastDataAt": "2026-10-16T11:39:31.604Z",
+    "reconnectCount": 4,
+    "consecutiveFailures": 0,
+    "nextReconnectAt": null,
+    "lastCloseCode": 4000,
+    "lastErrorCode": "TIINGO_WS_CLOSED",
+    "lastErrorAt": "2026-10-16T11:33:18.436Z",
+    "counters": {
+     "frames": 61,
+     "heartbeats": 14,
+     "subscribeAcks": 5,
+     "dataMessages": 42,
+     "accepted": 39,
+     "duplicates": 3,
+     "outOfOrder": 0,
+     "foreignTickers": 0,
+     "parseErrors": 0,
+     "ignored": 0,
+     "errorMessages": 0
+    }
+   }
+  },
+  "symbols": [
+   {
+    "symbol": "AAPL",
+    "reference": {
+     "accepted": 14,
+     "duplicates": 1,
+     "outOfOrder": 1,
+     "bySegment": {
+      "pre_market": 14,
+      "regular": 0,
+      "after_hours": 0,
+      "overnight": 0,
+      "non_trading_day": 0
+     },
+     "lastEffectiveAt": "2026-10-16T11:39:31.482Z",
+     "lastCapturedAt": "2026-10-16T11:39:31.607Z",
+     "lastOrigin": "ws",
+     "lastSegment": "pre_market",
+     "lastRegularEffectiveAt": null
+    },
+    "liquidity": {
+     "accepted": 39,
+     "duplicates": 3,
+     "outOfOrder": 0,
+     "bySegment": {
+      "pre_market": 39,
+      "regular": 0,
+      "after_hours": 0,
+      "overnight": 0,
+      "non_trading_day": 0
+     },
+     "lastEffectiveAt": "2026-10-16T11:39:31.482Z",
+     "lastCapturedAt": "2026-10-16T11:39:31.603Z",
+     "lastSegment": "pre_market"
+    },
+    "assetId": "3ddcfc04-5f0e-4fdc-b72c-5345ca6372a9",
+    "market": "NAS",
+    "referenceAgeMs": 4350,
+    "liquidityAgeMs": 4354,
+    "referenceDataState": "flowing"
+   }
+  ],
+  "quotes": {
+   "displayAvailable": 0,
+   "displayUnavailable": 0,
+   "lastUnavailableCode": null,
+   "lastUnavailableAt": null,
+   "publishedPriceEvents": 14,
+   "publishedQuoteEvents": 39,
+   "lastSnapshotRefreshAt": null,
+   "lastSnapshotErrorCode": null,
+   "lastSessionClose": null,
+   "lastSessionCloseErrorCode": null
+  },
+  "candles": {
+   "intradayReads": 0,
+   "dailyReads": 0,
+   "restRequests": 0,
+   "cachedSessions": 0,
+   "lastRead": null
+  },
+  "lastFailure": {
+   "stage": "ws_reference",
+   "code": "TIINGO_WS_CLOSED",
+   "at": "2026-10-16T11:35:07.829Z"
+  }
+ },
+ "liveCandle": {
+  "enabled": false,
+  "pubSub": "disabled",
+  "health": {
+   "providers": {
+    "binance": {
+     "state": "disabled",
+     "owner": false,
+     "delayed": false,
+     "connectedAt": null,
+     "lastFrameAt": null,
+     "lastHeartbeatAt": null,
+     "lastControlFrameAt": null,
+     "lastEventAt": null,
+     "reconnectCount": 0,
+     "subscriptionsRequested": 0,
+     "subscriptionsActive": 0,
+     "subscriptionsFailed": 0,
+     "eventLagMs": null,
+     "lastErrorCode": null
+    },
+    "kis": {
+     "state": "disabled",
+     "owner": false,
+     "delayed": true,
+     "connectedAt": null,
+     "lastFrameAt": null,
+     "lastHeartbeatAt": null,
+     "lastControlFrameAt": null,
+     "lastEventAt": null,
+     "reconnectCount": 0,
+     "subscriptionsRequested": 0,
+     "subscriptionsActive": 0,
+     "subscriptionsFailed": 0,
+     "eventLagMs": null,
+     "lastErrorCode": null
+    },
+    "koscom": {
+     "state": "disabled",
+     "owner": false,
+     "delayed": false,
+     "connectedAt": null,
+     "lastFrameAt": null,
+     "lastHeartbeatAt": null,
+     "lastControlFrameAt": null,
+     "lastEventAt": null,
+     "reconnectCount": 0,
+     "subscriptionsRequested": 0,
+     "subscriptionsActive": 0,
+     "subscriptionsFailed": 0,
+     "eventLagMs": null,
+     "lastErrorCode": null
+    }
+   },
+   "liveCandle": {
+    "eventsAccepted": 0,
+    "eventsRejected": 0,
+    "eventsDuplicate": 0,
+    "eventsOutOfOrder": 0,
+    "finalizeSuccess": 0,
+    "finalizeFailure": 0,
+    "incompleteBuckets": 0,
+    "redisLuaFailure": 0,
+    "pubSubPublishFailure": 0,
+    "recoveryRepairSuccess": 0,
+    "recoveryRepairFailure": 0,
+    "activeBuckets": 0,
+    "reconcilePendingDue": 0,
+    "lastFinalizeLatencyMs": null
+   }
+  },
+  "reconciliationDependencyWarnings": []
+ },
+ "reconciliation": [
+  {
+   "market": "KRX",
+   "state": "disabled",
+   "lastSuccessfulAt": null
+  },
+  {
+   "market": "US",
+   "state": "disabled",
+   "lastSuccessfulAt": null
+  },
+  {
+   "market": "CRYPTO",
+   "state": "fresh",
+   "lastSuccessfulAt": "2026-10-16T11:38:07.560Z"
+  }
+ ],
+ "marketCandleRetention": {
+  "state": "disabled",
+  "lastSuccessfulAt": null
+ },
+ "futuresMark": {
+  "enabled": true,
+  "targets": 100,
+  "staleTargets": 0,
+  "missingTargets": 0,
+  "oldestStoredAgeMs": 1957,
+  "lastFrameAgeMs": 858,
+  "socketOpen": true,
+  "consecutivePersistFailures": 0,
+  "lastPersistFailure": null,
+  "recoveryInFlight": false,
+  "consecutiveRecoveryFailures": 0
+ },
+ "futuresRetention": {
+  "mark": {
+   "enabled": true,
+   "consecutiveFailures": 0,
+   "failing": false,
+   "saturatedRuns": 0,
+   "backlog": false,
+   "lastSucceededAt": "2026-10-16T11:39:24.780Z",
+   "lastFailedAt": null,
+   "lastFailureKind": null
+  },
+  "last": {
+   "enabled": true,
+   "consecutiveFailures": 0,
+   "failing": false,
+   "saturatedRuns": 0,
+   "backlog": false,
+   "lastSucceededAt": "2026-10-16T11:38:54.794Z",
+   "lastFailedAt": null,
+   "lastFailureKind": null
+  }
+ },
+ "assetPriceRetention": {
+  "enabled": true,
+  "retentionDays": 14,
+  "consecutiveFailures": 2,
+  "failing": false,
+  "saturatedRuns": 2,
+  "backlog": false,
+  "lastSucceededAt": "2026-10-16T11:25:27.683Z",
+  "lastFailedAt": "2026-10-16T11:35:14.270Z",
+  "lastFailureKind": "statement_timeout"
+ },
+ "cryptoOrderBookHistory": {
+  "recorder": {
+   "enabled": false,
+   "trackedProducts": {
+    "spot": 0,
+    "futures": 0
+   },
+   "pendingRows": 0,
+   "writeInFlight": false,
+   "counts": {
+    "invalid": 0,
+    "late": 0,
+    "closedMinutes": 0,
+    "staleMinutes": 0,
+    "inserted": 0,
+    "duplicates": 0,
+    "superseded": 0,
+    "rejected": 0
+   },
+   "lastInsertedAt": null,
+   "consecutiveWriteFailures": 0,
+   "lastWriteFailure": null
+  },
+  "retention": {
+   "enabled": false,
+   "retentionHours": 336,
+   "lastResult": null,
+   "consecutiveFailures": 0,
+   "failing": false,
+   "saturatedRuns": 0,
+   "backlog": false,
+   "lastSucceededAt": null,
+   "lastFailedAt": null,
+   "lastFailureKind": null
+  }
+ },
+ "databaseStorage": {
+  "enabled": true,
+  "capacityConfigured": true,
+  "databaseBytes": 9751959219,
+  "walReserveBytes": 1342177280,
+  "sampledAt": "2026-10-16T11:34:54.059Z",
+  "sampleStale": false,
+  "usedPercent": 11.1,
+  "level": "ok",
+  "growthBytesPerDay": null,
+  "growthWindowHours": null,
+  "daysUntil80Percent": null,
+  "daysUntilFull": null,
+  "lastSampleFailureKind": null
+ },
+ "currentTime": "2026-10-16T11:39:35.957Z"
+}

@@ -1,0 +1,19 @@
+database: <user>@<render-pg>:(default)/trading_app_fbbk
+mode=initial dryRun=false window=2026-09-11T11:34:45.265Z → 2026-10-16T11:34:45.265Z feeds=5m
+PARTIAL  ACEUSDT    status=failed stop=provider_error rows=6000 covered=[2026-09-11T11:34:45.265Z, 2026-10-02T07:35:00.000Z) error=PROVIDER_CALL_FAILED
+PARTIAL  AEROUSDT   status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  ALGOUSDT   status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  ARUSDT     status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  BERAUSDT   status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  CAKEUSDT   status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  EIGENUSDT  status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  ETHFIUSDT  status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  HOMEUSDT   status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+COVERED  JTOUSDT    status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  LDOUSDT    status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  MARSCOINUSDT status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  SAGAUSDT   status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  SYNUSDT    status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  ZKPUSDT    status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+
+assets=15/15 feeds=15 coverageComplete=6 completedWithIncompleteCoverage=0 failed=9

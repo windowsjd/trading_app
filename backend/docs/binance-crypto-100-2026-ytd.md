@@ -77,52 +77,78 @@ ASTERUSDT Spot fallback tick moved from `0.001` (2026-09 research) to the
 fallbacks match `exchangeInfo`). The fallback is display-only and used only
 while live metadata is unavailable; order and fill arithmetic never read it.
 
-## Registration and activation (production — not performed)
+## Registration and activation (production — performed 2026-10-16)
 
-Deploying the code alone adds no product rows. Order:
+Run against the Render service `srv-da84cg8u01pc73cjasa0` and its PostgreSQL 17
+(100 GB disk) on 2026-10-16 UTC; the code was `27c74787`. Report:
+[2026-10-16-crypto-100-production-rollout](../../docs/investigations/2026-10-16-crypto-100-production-rollout/report.md).
+Order and results, for a later re-run or audit:
 
-1. Deploy (migration `20261016200000` is additive: two empty tables, one Ops
-   job name). Check `BINANCE_CRYPTO_SYMBOLS` is unset or blank on every
-   instance: a pinned list keeps the ticker socket on that list. At deploy, the
-   Spot ticker socket already subscribes all 100, and PUMP/AAVE/BCH/FIL become
-   Spot-visible (their rows exist); run their Spot candle backfill (step 3)
-   right away.
-2. Spot: `node --import tsx scripts/seed-binance-fixed-asset-universe.ts`
-   (dry-run: 71 create, 29 unchanged), then `--apply` (one transaction, live
-   exchangeInfo validation of all 100 first). Ticker snapshots start within
-   30 s (asset mapping TTL). **Restart the service once**: depth10 targets are
-   read when the Spot socket connects.
-3. Spot candles for the new assets: `scripts/candle-baseline-sync.ts --apply
-   --days 365 --target 1d --target 1w --asset-id …` and `--days 35 --target 5m`,
-   then the long-range 4h backfill ([long-range-4h-candles.md](long-range-4h-candles.md)).
-   Cold seeding ≈ 2,600 REST weight, paced by the shared coordinator; run it
-   outside busy periods. The 5m baseline costs about 22 weight per asset and
-   initial mode re-fetches feeds that are already complete, so one invocation
-   with all 75 IDs spends every minute's budget on the same leading assets
-   (verified locally at 600/min: no progress after 8 runs). Pass only the
-   assets without complete 5m coverage, and run the script with
+1. Deploy (migration `20261016200000` was applied with `3b4a7685` at 09:49Z;
+   additive). `BINANCE_CRYPTO_SYMBOLS` is unset. At that deploy the Spot ticker
+   socket subscribed all 100 and PUMP/AAVE/BCH/FIL became Spot-visible.
+2. Service variables: `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE=1200`,
+   `ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED=true`,
+   `DATABASE_STORAGE_MONITOR_ENABLED=true`, `DATABASE_STORAGE_CAPACITY_GB=100`.
+3. Spot: `node --import tsx scripts/seed-binance-fixed-asset-universe.ts`
+   (dry-run 71 create / 29 unchanged), then `--apply` (100/100 validated against
+   exchangeInfo, 71 created, verification 100/100). **Restart once** (a deploy):
+   depth10 targets are read when the Spot socket connects (29 → 100).
+4. Spot candles for the 75 additions (71 new + PUMP/AAVE/BCH/FIL):
+   `scripts/candle-baseline-sync.ts --apply --days 365 --target 1d --target 1w
+   --asset-id …` (150 feeds) and `--days 35 --target 5m` in batches of 15,
+   re-running only feeds that did not complete (initial mode re-fetches complete
+   feeds, so one invocation with all 75 IDs never finishes). Run the script with
    `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE=480 MARKET_CANDLE_SYNC_ASSET_CONCURRENCY=1`
-   while the server runs at 1200, so Futures Last/Mark REST recovery keeps at
-   least 720 weight and one slot every minute
-   ([binance-rest-limits.md](binance-rest-limits.md); at 600 for both the local
-   run starved Last re-confirmation, gaps up to 90 s). 1d/1w for all 75 fits one run. A checkpoint left `running`
-   by an interrupted run fails later runs with `ACTIVE_SYNC_EXISTS`; re-run
-   those asset IDs with `--no-resume`.
-4. Futures: `FUTURES_PROVISION_DRY_RUN_REDIS_URL=<loopback> pnpm
-   futures:provision-instruments --dry-run` (expected: assets create 20,
-   maintain 80; instruments create 75, maintain 25), then `--apply` with
-   `FUTURES_PROVISION_EXPECTED_TARGET`. Last, Mark and book/ticker sockets pick
-   up the new targets within 30 s and resubscribe by themselves.
-5. Futures candles for the new contracts (futures candle sync / long-range 4h).
-6. Verify: Spot list 100, Futures catalog 100, prices/books for a sample of new
-   symbols, `/readiness` (`futuresMark.targets = 100`, no stale), REST budget.
+   while the server runs at 1200: refused requests (`PROVIDER_CALL_FAILED`) are
+   the backfill yielding to the server; Futures Last kept a maximum gap of
+   7.1 s during the 12-minute 5m backfill
+   ([binance-rest-limits.md](binance-rest-limits.md)). No Spot 4h backfill:
+   long-range Spot/KRX 4h upkeep (`SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED`) is
+   off in production, so the existing 25 have no native 4h rows either. Regular
+   5m/1d/1w upkeep of every active Spot coin is the crypto reconciliation (300 s);
+   `SCHEDULER_MARKET_CANDLE_SYNC_ASSET_IDS` was left unchanged. A checkpoint left
+   `running` by an interrupted run fails later runs with `ACTIVE_SYNC_EXISTS`;
+   re-run those asset IDs with `--no-resume`.
+5. Futures: `FUTURES_PROVISION_DRY_RUN_REDIS_URL=<loopback> pnpm
+   futures:provision-instruments --dry-run` (assets create 20 / maintain 80;
+   instruments create 75 / maintain 25; blockers 0), then `--apply` with
+   `FUTURES_PROVISION_EXPECTED_TARGET` (Spot assets and financial rows modified:
+   0). Last, Mark and book/ticker sockets re-read the targets within 30 s
+   (`futuresMark.targets` 25 → 100, stale 0).
+6. Futures candles: before this rollout no contract had any
+   `futures_market_candles` row (the futures chart showed its empty state).
+   `scripts/candle-long-backfill.ts --market futures --apply` with the backfill
+   budget (twice; the second run fetched only what the first left) stored the
+   96-day 4h history of all 100 contracts (57,394 rows), then
+   `SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED=true` keeps the last two days and the
+   open bucket current (1 call per contract a minute, weight 1).
+7. Order-book history: `CRYPTO_ORDER_BOOK_HISTORY_ENABLED=true` and
+   `CRYPTO_ORDER_BOOK_RETENTION_ENABLED=true` (one deploy). First 21 minutes:
+   100 + 100 products tracked, 97.4 % of closed product-minutes stored, no
+   duplicate, rejected or failed write; the retention job runs every 5 minutes.
+8. Price retention on this database: the default 1000-row batches hit the fixed
+   5 s statement timeout on cold pages, so production runs
+   `ASSET_PRICE_SNAPSHOT_RETENTION_BATCH_SIZE=250` and
+   `ASSET_PRICE_SNAPSHOT_RETENTION_MAX_BATCHES=80` (the same 20,000 rows examined
+   per run). Kept rows are re-checked after every restart and once a day (the
+   cursors live in memory); until VACUUM removes the rows deleted before them,
+   those checks walk dead index entries and can time out for a few runs. One
+   plain `VACUUM (ANALYZE) asset_price_snapshots` (68 s, autovacuum cost delay)
+   cleared the first backlog's dead entries on 2026-10-16.
 
 Rollback: before the first user trade in a new product, revert the catalog
 code (new contracts leave the Futures catalog and entry; open lifetimes keep
 their Last/Mark) and deactivate the new Spot assets. After trades exist, Spot
 deactivation blocks the holders' sells (no Spot sell-only mode) — a product
-decision. The existing 25 + 25 rows, IDs, evidence and positions are never
-touched by any of these steps.
+decision; there is no buy-only stop for one Spot asset either. The existing
+25 + 25 rows, IDs, evidence and positions are never touched by any of these
+steps. Each switch turned on above stops on its own, with a deploy:
+`CRYPTO_ORDER_BOOK_HISTORY_ENABLED=false` (keep the retention on for 14 days to
+empty the tables; no financial path reads them),
+`SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED=false` (chart display only),
+`ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED=false` (rows already deleted are not
+restored; every row a financial record or reader needs was kept).
 
 ## Operator check: Spot price freshness
 

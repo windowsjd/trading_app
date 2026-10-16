@@ -1,0 +1,9 @@
+2026-10-16T12:00:15.022Z start
+2026-10-16T12:00:15.098Z NOTICE vacuuming "trading_app_fbbk.public.asset_price_snapshots"
+2026-10-16T12:00:39.738Z NOTICE launched 1 parallel vacuum worker for index vacuuming (planned: 1)
+2026-10-16T12:01:12.870Z NOTICE finished vacuuming "trading_app_fbbk.public.asset_price_snapshots": index scans: 1 pages: 0 removed, 463125 remain, 155686 scanned (33.62% of total) tuples: 17877 removed, 3696532 remain, 0 are dead but not yet removable removable cutoff: 12700139, which was 1101 XIDs old when operation ended frozen: 23937 pages from table (5.17% of total) had 171361 tuples frozen index scan needed: 57585 pages fr
+2026-10-16T12:01:12.871Z NOTICE vacuuming "trading_app_fbbk.pg_toast.pg_toast_16680"
+2026-10-16T12:01:12.882Z NOTICE finished vacuuming "trading_app_fbbk.pg_toast.pg_toast_16680": index scans: 0 pages: 0 removed, 4 remain, 4 scanned (100.00% of total) tuples: 0 removed, 15 remain, 0 are dead but not yet removable removable cutoff: 12701240, which was 0 XIDs old when operation ended new relfrozenxid: 12701240, which is 12695094 XIDs ahead of previous value new relminmxid: 134742, which is 134741 MXIDs ahead of pr
+2026-10-16T12:01:12.882Z NOTICE analyzing "public.asset_price_snapshots"
+2026-10-16T12:01:20.976Z NOTICE "asset_price_snapshots": scanned 30000 of 463179 pages, containing 241652 live rows and 0 dead rows; 30000 rows in sample, 3730938 estimated total rows
+2026-10-16T12:01:22.981Z done in 68 s

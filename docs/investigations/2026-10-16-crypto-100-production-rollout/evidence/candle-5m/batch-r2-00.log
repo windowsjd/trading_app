@@ -1,0 +1,16 @@
+database: <user>@<render-pg>:(default)/trading_app_fbbk
+mode=initial dryRun=false window=2026-09-11T11:35:59.241Z → 2026-10-16T11:35:59.241Z feeds=5m
+COVERED  ACEUSDT    status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  AEROUSDT   status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  ALGOUSDT   status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  ARUSDT     status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  BERAUSDT   status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  CAKEUSDT   status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  EIGENUSDT  status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  ETHFIUSDT  status=completed stop=target_reached rows=10053 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  HOMEUSDT   status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:34:45.265Z, 2026-10-16T11:34:45.265Z) 
+COVERED  SHIBUSDT   status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  VIRTUALUSDT status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  ZROUSDT    status=completed stop=target_reached rows=10052 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+
+assets=12/12 feeds=12 coverageComplete=12 completedWithIncompleteCoverage=0 failed=0

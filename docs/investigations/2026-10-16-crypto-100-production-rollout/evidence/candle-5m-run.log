@@ -1,0 +1,15 @@
+11:25:43 round=1 batch=batch-r1-00 assets=15
+  exit=0 assets=15/15 feeds=15 coverageComplete=15 completedWithIncompleteCoverage=0 failed=0
+11:28:04 round=1 batch=batch-r1-01 assets=15
+  exit=1 assets=15/15 feeds=15 coverageComplete=12 completedWithIncompleteCoverage=0 failed=3
+11:29:57 round=1 batch=batch-r1-02 assets=15
+  exit=0 assets=15/15 feeds=15 coverageComplete=15 completedWithIncompleteCoverage=0 failed=0
+11:32:23 round=1 batch=batch-r1-03 assets=15
+  exit=0 assets=15/15 feeds=15 coverageComplete=15 completedWithIncompleteCoverage=0 failed=0
+11:34:43 round=1 batch=batch-r1-04 assets=15
+  exit=1 assets=15/15 feeds=15 coverageComplete=6 completedWithIncompleteCoverage=0 failed=9
+11:35:55 after round 1 pending=12
+11:35:55 round=2 batch=batch-r2-00 assets=12
+  exit=0 assets=12/12 feeds=12 coverageComplete=12 completedWithIncompleteCoverage=0 failed=0
+11:37:46 after round 2 pending=0
+DONE

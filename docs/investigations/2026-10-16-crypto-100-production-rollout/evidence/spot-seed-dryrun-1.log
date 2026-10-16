@@ -1,0 +1,159 @@
+Target DB: <user>@<render-pg>:(default)/trading_app_fbbk
+Mode: dry-run
+Binance REST base URL: https://api.binance.com
+Registration targets: 100
+(node:1207035) Warning: SECURITY WARNING: The SSL modes 'prefer', 'require', and 'verify-ca' are treated as aliases for 'verify-full'.
+In the next major version (pg-connection-string v3.0.0 and pg v9.0.0), these modes will adopt standard libpq semantics, which have weaker security guarantees.
+
+To prepare for this change:
+- If you want the current behavior, explicitly use 'sslmode=verify-full'
+- If you want libpq compatibility now, use 'uselibpqcompat=true&sslmode=require'
+
+See https://www.postgresql.org/docs/current/libpq-ssl.html for libpq SSL mode definitions.
+(Use `node --trace-warnings ...` to show where the warning was created)
+Provider validation: OK — 100/100 symbols TRADING Spot USDT (base https://api.binance.com)
+Binance fixed asset universe: 100 target(s) — create=71, update=0, unchanged=29 (dry-run, no writes)
+  + create BINANCE:XPLUSDT (Plasma)
+  + create BINANCE:DASHUSDT (Dash)
+  + create BINANCE:REUSDT (Re)
+  + create BINANCE:SENTUSDT (Sentient)
+  + create BINANCE:ONDOUSDT (Ondo)
+  + create BINANCE:FETUSDT (Artificial Superintelligence Alliance)
+  + create BINANCE:PENGUUSDT (Pudgy Penguins)
+  + create BINANCE:HBARUSDT (Hedera Hashgraph)
+  + create BINANCE:ARBUSDT (Arbitrum)
+  + create BINANCE:ZAMAUSDT (ZAMA)
+  + create BINANCE:WLFIUSDT (World Liberty Financial)
+  + create BINANCE:FOGOUSDT (FOGO)
+  + create BINANCE:ICPUSDT (Internet Computer)
+  + create BINANCE:DOTUSDT (Polkadot)
+  + create BINANCE:KITEUSDT (KITE)
+  + create BINANCE:OPNUSDT (OPINION)
+  + create BINANCE:APTUSDT (Aptos)
+  + create BINANCE:VIRTUALUSDT (Virtuals Protocol)
+  + create BINANCE:ALLOUSDT (Allora)
+  + create BINANCE:INJUSDT (Injective)
+  + create BINANCE:ZROUSDT (LayerZero)
+  + create BINANCE:RENDERUSDT (Render)
+  + create BINANCE:BONKUSDT (Bonk)
+  + create BINANCE:SHIBUSDT (SHIBA INU)
+  + create BINANCE:BANKUSDT (Lorenzo Protocol)
+  + create BINANCE:GIGGLEUSDT (Giggle Fund)
+  + create BINANCE:DEXEUSDT (DeXe)
+  + create BINANCE:POLUSDT (Polygon Ecosystem Token)
+  + create BINANCE:QNTUSDT (Quant)
+  + create BINANCE:BARDUSDT (Lombard)
+  + create BINANCE:WIFUSDT (Dogwifhat)
+  + create BINANCE:TUTUSDT (Tutorial)
+  + create BINANCE:AXSUSDT (Axie Infinity)
+  + create BINANCE:MEGAUSDT (MEGA)
+  + create BINANCE:SEIUSDT (Sei)
+  + create BINANCE:ENSOUSDT (Enso)
+  + create BINANCE:BREVUSDT (Brevis)
+  + create BINANCE:ORDIUSDT (ORDI)
+  + create BINANCE:STRKUSDT (Starknet Token)
+  + create BINANCE:STOUSDT (StakeStone)
+  + create BINANCE:ZENUSDT (Horizen)
+  + create BINANCE:SAHARAUSDT (Sahara AI)
+  + create BINANCE:OPUSDT (Optimism)
+  + create BINANCE:BABYUSDT (Babylon)
+  + create BINANCE:BIOUSDT (Bio Protocol)
+  + create BINANCE:ROBOUSDT (Fabric Protocol)
+  + create BINANCE:CHZUSDT (Chiliz)
+  + create BINANCE:TIAUSDT (Celestia)
+  + create BINANCE:SPKUSDT (Spark)
+  + create BINANCE:GRAMUSDT (Gram)
+  + create BINANCE:PYTHUSDT (Pyth Network)
+  + create BINANCE:LUNCUSDT (Terra Classic)
+  + create BINANCE:PENDLEUSDT (Pendle)
+  + create BINANCE:CRVUSDT (Curve)
+  + create BINANCE:PROMUSDT (Prometeus)
+  + create BINANCE:PLUMEUSDT (PLUME)
+  + create BINANCE:ETHFIUSDT (ether.fi)
+  + create BINANCE:AEROUSDT (Aerodrome)
+  + create BINANCE:SAGAUSDT (Saga)
+  + create BINANCE:ACEUSDT (Fusionist)
+  + create BINANCE:CAKEUSDT (PancakeSwap)
+  + create BINANCE:HOMEUSDT (Defi App)
+  + create BINANCE:SYNUSDT (Synapse)
+  + create BINANCE:ZKPUSDT (zkPass)
+  + create BINANCE:LDOUSDT (Lido DAO)
+  + create BINANCE:JTOUSDT (JITO)
+  + create BINANCE:EIGENUSDT (EigenLayer)
+  + create BINANCE:ALGOUSDT (Algorand)
+  + create BINANCE:ARUSDT (Arweave)
+  + create BINANCE:BERAUSDT (BERACHAIN)
+  + create BINANCE:MARSCOINUSDT (MarsCoin)
+Verification: 29/100 active with correct contract
+  ! BINANCE:XPLUSDT missing
+  ! BINANCE:DASHUSDT missing
+  ! BINANCE:REUSDT missing
+  ! BINANCE:SENTUSDT missing
+  ! BINANCE:ONDOUSDT missing
+  ! BINANCE:FETUSDT missing
+  ! BINANCE:PENGUUSDT missing
+  ! BINANCE:HBARUSDT missing
+  ! BINANCE:ARBUSDT missing
+  ! BINANCE:ZAMAUSDT missing
+  ! BINANCE:WLFIUSDT missing
+  ! BINANCE:FOGOUSDT missing
+  ! BINANCE:ICPUSDT missing
+  ! BINANCE:DOTUSDT missing
+  ! BINANCE:KITEUSDT missing
+  ! BINANCE:OPNUSDT missing
+  ! BINANCE:APTUSDT missing
+  ! BINANCE:VIRTUALUSDT missing
+  ! BINANCE:ALLOUSDT missing
+  ! BINANCE:INJUSDT missing
+  ! BINANCE:ZROUSDT missing
+  ! BINANCE:RENDERUSDT missing
+  ! BINANCE:BONKUSDT missing
+  ! BINANCE:SHIBUSDT missing
+  ! BINANCE:BANKUSDT missing
+  ! BINANCE:GIGGLEUSDT missing
+  ! BINANCE:DEXEUSDT missing
+  ! BINANCE:POLUSDT missing
+  ! BINANCE:QNTUSDT missing
+  ! BINANCE:BARDUSDT missing
+  ! BINANCE:WIFUSDT missing
+  ! BINANCE:TUTUSDT missing
+  ! BINANCE:AXSUSDT missing
+  ! BINANCE:MEGAUSDT missing
+  ! BINANCE:SEIUSDT missing
+  ! BINANCE:ENSOUSDT missing
+  ! BINANCE:BREVUSDT missing
+  ! BINANCE:ORDIUSDT missing
+  ! BINANCE:STRKUSDT missing
+  ! BINANCE:STOUSDT missing
+  ! BINANCE:ZENUSDT missing
+  ! BINANCE:SAHARAUSDT missing
+  ! BINANCE:OPUSDT missing
+  ! BINANCE:BABYUSDT missing
+  ! BINANCE:BIOUSDT missing
+  ! BINANCE:ROBOUSDT missing
+  ! BINANCE:CHZUSDT missing
+  ! BINANCE:TIAUSDT missing
+  ! BINANCE:SPKUSDT missing
+  ! BINANCE:GRAMUSDT missing
+  ! BINANCE:PYTHUSDT missing
+  ! BINANCE:LUNCUSDT missing
+  ! BINANCE:PENDLEUSDT missing
+  ! BINANCE:CRVUSDT missing
+  ! BINANCE:PROMUSDT missing
+  ! BINANCE:PLUMEUSDT missing
+  ! BINANCE:ETHFIUSDT missing
+  ! BINANCE:AEROUSDT missing
+  ! BINANCE:SAGAUSDT missing
+  ! BINANCE:ACEUSDT missing
+  ! BINANCE:CAKEUSDT missing
+  ! BINANCE:HOMEUSDT missing
+  ! BINANCE:SYNUSDT missing
+  ! BINANCE:ZKPUSDT missing
+  ! BINANCE:LDOUSDT missing
+  ! BINANCE:JTOUSDT missing
+  ! BINANCE:EIGENUSDT missing
+  ! BINANCE:ALGOUSDT missing
+  ! BINANCE:ARUSDT missing
+  ! BINANCE:BERAUSDT missing
+  ! BINANCE:MARSCOINUSDT missing
+Result: OK (mode=dry-run)

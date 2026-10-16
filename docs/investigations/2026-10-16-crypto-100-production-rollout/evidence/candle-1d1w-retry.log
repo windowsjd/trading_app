@@ -1,0 +1,8 @@
+database: <user>@<render-pg>:(default)/trading_app_fbbk
+mode=initial dryRun=false window=2025-10-16T11:25:16.072Z → 2026-10-16T11:25:16.072Z feeds=1d,1w
+COVERED  ZKPUSDT    status=completed stop=target_reached rows=283 covered=[2025-10-16T11:21:22.791Z, 2026-10-16T11:21:22.791Z) 
+COVERED  ZKPUSDT    status=completed stop=target_reached rows=41 covered=[2025-10-16T11:21:22.791Z, 2026-10-16T11:21:22.791Z) 
+COVERED  ZROUSDT    status=completed stop=target_reached rows=365 covered=[2025-10-16T11:21:22.791Z, 2026-10-16T11:21:22.791Z) 
+COVERED  ZROUSDT    status=completed stop=target_reached rows=52 covered=[2025-10-16T11:21:22.791Z, 2026-10-16T11:21:22.791Z) 
+
+assets=2/2 feeds=4 coverageComplete=4 completedWithIncompleteCoverage=0 failed=0

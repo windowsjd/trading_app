@@ -1,0 +1,4580 @@
+{
+ "label": "after",
+ "at": "2026-10-16T11:55:11.817Z",
+ "results": {
+  "server": {
+   "ms": 149,
+   "rows": [
+    {
+     "now": "2026-10-16T11:55:11.325Z",
+     "version": "17.11 (Debian 17.11-1.pgdg12+2)"
+    }
+   ]
+  },
+  "migrations_last": {
+   "ms": 152,
+   "rows": [
+    {
+     "migration_name": "20261016200000_add_crypto_order_book_history",
+     "started_at": "2026-10-16T09:49:59.566Z",
+     "finished_at": "2026-10-16T09:49:59.636Z",
+     "rolled_back_at": null,
+     "applied_steps_count": 1
+    },
+    {
+     "migration_name": "20261016180000_add_futures_tp_sl_and_entry_plans",
+     "started_at": "2026-10-16T03:17:01.367Z",
+     "finished_at": "2026-10-16T03:17:01.474Z",
+     "rolled_back_at": null,
+     "applied_steps_count": 1
+    },
+    {
+     "migration_name": "20261016120000_add_asset_price_snapshot_retention",
+     "started_at": "2026-10-15T21:39:51.432Z",
+     "finished_at": "2026-10-15T21:39:51.461Z",
+     "rolled_back_at": null,
+     "applied_steps_count": 1
+    },
+    {
+     "migration_name": "20261015200000_pin_futures_execution_fx_evidence",
+     "started_at": "2026-10-15T11:06:00.168Z",
+     "finished_at": "2026-10-15T11:06:00.214Z",
+     "rolled_back_at": null,
+     "applied_steps_count": 1
+    }
+   ]
+  },
+  "migrations_summary": {
+   "ms": 149,
+   "rows": [
+    {
+     "total": 81,
+     "unfinished": 0,
+     "rolled_back": 0
+    }
+   ]
+  },
+  "crypto_assets": {
+   "ms": 152,
+   "rows": [
+    {
+     "symbol": "BTCUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:57.797Z"
+    },
+    {
+     "symbol": "ETHUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:57.873Z"
+    },
+    {
+     "symbol": "BNBUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:57.948Z"
+    },
+    {
+     "symbol": "XRPUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.022Z"
+    },
+    {
+     "symbol": "SOLUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.097Z"
+    },
+    {
+     "symbol": "TRXUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.171Z"
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.246Z"
+    },
+    {
+     "symbol": "ZECUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.321Z"
+    },
+    {
+     "symbol": "XLMUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.395Z"
+    },
+    {
+     "symbol": "LINKUSDT",
+     "is_active": true,
+     "created_at": "2026-08-28T05:40:58.470Z"
+    },
+    {
+     "symbol": "SUIUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:35.577Z"
+    },
+    {
+     "symbol": "NIGHTUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:35.656Z"
+    },
+    {
+     "symbol": "NEARUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:35.734Z"
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:35.812Z"
+    },
+    {
+     "symbol": "ADAUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:35.889Z"
+    },
+    {
+     "symbol": "TAOUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:35.966Z"
+    },
+    {
+     "symbol": "WLDUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.042Z"
+    },
+    {
+     "symbol": "ENAUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.120Z"
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.198Z"
+    },
+    {
+     "symbol": "UNIUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.276Z"
+    },
+    {
+     "symbol": "CHIPUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.353Z"
+    },
+    {
+     "symbol": "LTCUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.430Z"
+    },
+    {
+     "symbol": "ASTERUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.506Z"
+    },
+    {
+     "symbol": "币安人生USDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.584Z"
+    },
+    {
+     "symbol": "TRUMPUSDT",
+     "is_active": true,
+     "created_at": "2026-09-19T12:10:36.666Z"
+    },
+    {
+     "symbol": "HYPEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-12T10:21:09.502Z"
+    },
+    {
+     "symbol": "PUMPUSDT",
+     "is_active": true,
+     "created_at": "2026-10-12T10:21:09.593Z"
+    },
+    {
+     "symbol": "BCHUSDT",
+     "is_active": true,
+     "created_at": "2026-10-12T10:21:09.676Z"
+    },
+    {
+     "symbol": "FILUSDT",
+     "is_active": true,
+     "created_at": "2026-10-12T10:21:09.754Z"
+    },
+    {
+     "symbol": "AAVEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-12T10:21:09.830Z"
+    },
+    {
+     "symbol": "XPLUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.536Z"
+    },
+    {
+     "symbol": "DASHUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.614Z"
+    },
+    {
+     "symbol": "REUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.689Z"
+    },
+    {
+     "symbol": "SENTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.764Z"
+    },
+    {
+     "symbol": "ONDOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.839Z"
+    },
+    {
+     "symbol": "FETUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.914Z"
+    },
+    {
+     "symbol": "PENGUUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:03.990Z"
+    },
+    {
+     "symbol": "HBARUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.066Z"
+    },
+    {
+     "symbol": "ARBUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.142Z"
+    },
+    {
+     "symbol": "ZAMAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.217Z"
+    },
+    {
+     "symbol": "WLFIUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.292Z"
+    },
+    {
+     "symbol": "FOGOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.367Z"
+    },
+    {
+     "symbol": "ICPUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.442Z"
+    },
+    {
+     "symbol": "DOTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.518Z"
+    },
+    {
+     "symbol": "KITEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.592Z"
+    },
+    {
+     "symbol": "OPNUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.670Z"
+    },
+    {
+     "symbol": "APTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.745Z"
+    },
+    {
+     "symbol": "VIRTUALUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.819Z"
+    },
+    {
+     "symbol": "ALLOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.895Z"
+    },
+    {
+     "symbol": "INJUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:04.971Z"
+    },
+    {
+     "symbol": "ZROUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.048Z"
+    },
+    {
+     "symbol": "RENDERUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.124Z"
+    },
+    {
+     "symbol": "BONKUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.199Z"
+    },
+    {
+     "symbol": "SHIBUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.274Z"
+    },
+    {
+     "symbol": "BANKUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.350Z"
+    },
+    {
+     "symbol": "GIGGLEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.426Z"
+    },
+    {
+     "symbol": "DEXEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.501Z"
+    },
+    {
+     "symbol": "POLUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.576Z"
+    },
+    {
+     "symbol": "QNTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.652Z"
+    },
+    {
+     "symbol": "BARDUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.729Z"
+    },
+    {
+     "symbol": "WIFUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.805Z"
+    },
+    {
+     "symbol": "TUTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.886Z"
+    },
+    {
+     "symbol": "AXSUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:05.961Z"
+    },
+    {
+     "symbol": "MEGAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.037Z"
+    },
+    {
+     "symbol": "SEIUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.114Z"
+    },
+    {
+     "symbol": "ENSOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.196Z"
+    },
+    {
+     "symbol": "BREVUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.277Z"
+    },
+    {
+     "symbol": "ORDIUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.352Z"
+    },
+    {
+     "symbol": "STRKUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.427Z"
+    },
+    {
+     "symbol": "STOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.503Z"
+    },
+    {
+     "symbol": "ZENUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.578Z"
+    },
+    {
+     "symbol": "SAHARAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.653Z"
+    },
+    {
+     "symbol": "OPUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.729Z"
+    },
+    {
+     "symbol": "BABYUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.804Z"
+    },
+    {
+     "symbol": "BIOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.879Z"
+    },
+    {
+     "symbol": "ROBOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:06.955Z"
+    },
+    {
+     "symbol": "CHZUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.030Z"
+    },
+    {
+     "symbol": "TIAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.106Z"
+    },
+    {
+     "symbol": "SPKUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.181Z"
+    },
+    {
+     "symbol": "GRAMUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.256Z"
+    },
+    {
+     "symbol": "PYTHUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.331Z"
+    },
+    {
+     "symbol": "LUNCUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.405Z"
+    },
+    {
+     "symbol": "PENDLEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.480Z"
+    },
+    {
+     "symbol": "CRVUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.556Z"
+    },
+    {
+     "symbol": "PROMUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.631Z"
+    },
+    {
+     "symbol": "PLUMEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.707Z"
+    },
+    {
+     "symbol": "ETHFIUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.783Z"
+    },
+    {
+     "symbol": "AEROUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.858Z"
+    },
+    {
+     "symbol": "SAGAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:07.933Z"
+    },
+    {
+     "symbol": "ACEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.008Z"
+    },
+    {
+     "symbol": "CAKEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.083Z"
+    },
+    {
+     "symbol": "HOMEUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.159Z"
+    },
+    {
+     "symbol": "SYNUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.234Z"
+    },
+    {
+     "symbol": "ZKPUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.309Z"
+    },
+    {
+     "symbol": "LDOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.384Z"
+    },
+    {
+     "symbol": "JTOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.460Z"
+    },
+    {
+     "symbol": "EIGENUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.535Z"
+    },
+    {
+     "symbol": "ALGOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.610Z"
+    },
+    {
+     "symbol": "ARUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.685Z"
+    },
+    {
+     "symbol": "BERAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.760Z"
+    },
+    {
+     "symbol": "MARSCOINUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:13:08.835Z"
+    },
+    {
+     "symbol": "LSKUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:03.611Z"
+    },
+    {
+     "symbol": "ETCUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:03.689Z"
+    },
+    {
+     "symbol": "SANDUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:03.765Z"
+    },
+    {
+     "symbol": "DUSKUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:03.841Z"
+    },
+    {
+     "symbol": "ORCAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:03.918Z"
+    },
+    {
+     "symbol": "NOMUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:03.994Z"
+    },
+    {
+     "symbol": "MOVRUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.075Z"
+    },
+    {
+     "symbol": "HEIUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.152Z"
+    },
+    {
+     "symbol": "GALAUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.228Z"
+    },
+    {
+     "symbol": "ATOMUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.305Z"
+    },
+    {
+     "symbol": "ENJUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.382Z"
+    },
+    {
+     "symbol": "KAITOUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.461Z"
+    },
+    {
+     "symbol": "ESPUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.537Z"
+    },
+    {
+     "symbol": "EDENUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.614Z"
+    },
+    {
+     "symbol": "NILUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.689Z"
+    },
+    {
+     "symbol": "PIXELUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.769Z"
+    },
+    {
+     "symbol": "ONGUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.845Z"
+    },
+    {
+     "symbol": "0GUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.922Z"
+    },
+    {
+     "symbol": "ZBTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:04.998Z"
+    },
+    {
+     "symbol": "ONTUSDT",
+     "is_active": true,
+     "created_at": "2026-10-16T11:39:05.074Z"
+    }
+   ]
+  },
+  "futures_instruments": {
+   "ms": 150,
+   "rows": [
+    {
+     "symbol": "BTCUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:09.907Z"
+    },
+    {
+     "symbol": "ETHUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:09.986Z"
+    },
+    {
+     "symbol": "SOLUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.062Z"
+    },
+    {
+     "symbol": "ZECUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.138Z"
+    },
+    {
+     "symbol": "XRPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.214Z"
+    },
+    {
+     "symbol": "HYPEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.290Z"
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.367Z"
+    },
+    {
+     "symbol": "BNBUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.443Z"
+    },
+    {
+     "symbol": "SUIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.520Z"
+    },
+    {
+     "symbol": "NEARUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.596Z"
+    },
+    {
+     "symbol": "ADAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.672Z"
+    },
+    {
+     "symbol": "WLDUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.748Z"
+    },
+    {
+     "symbol": "TAOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.825Z"
+    },
+    {
+     "symbol": "ENAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.901Z"
+    },
+    {
+     "symbol": "LINKUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:10.977Z"
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.053Z"
+    },
+    {
+     "symbol": "UNIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.129Z"
+    },
+    {
+     "symbol": "PUMPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.204Z"
+    },
+    {
+     "symbol": "BCHUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.280Z"
+    },
+    {
+     "symbol": "TRUMPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.356Z"
+    },
+    {
+     "symbol": "FILUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.432Z"
+    },
+    {
+     "symbol": "AAVEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.508Z"
+    },
+    {
+     "symbol": "LTCUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.584Z"
+    },
+    {
+     "symbol": "ASTERUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.659Z"
+    },
+    {
+     "symbol": "XLMUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-12T10:21:11.736Z"
+    },
+    {
+     "symbol": "DASHUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.152Z"
+    },
+    {
+     "symbol": "ONDOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.231Z"
+    },
+    {
+     "symbol": "DOTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.308Z"
+    },
+    {
+     "symbol": "ARBUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.385Z"
+    },
+    {
+     "symbol": "BANKUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.461Z"
+    },
+    {
+     "symbol": "PENGUUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.538Z"
+    },
+    {
+     "symbol": "AXSUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.615Z"
+    },
+    {
+     "symbol": "XPLUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.691Z"
+    },
+    {
+     "symbol": "WLFIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.768Z"
+    },
+    {
+     "symbol": "TRXUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.845Z"
+    },
+    {
+     "symbol": "QNTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:05.924Z"
+    },
+    {
+     "symbol": "INJUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.000Z"
+    },
+    {
+     "symbol": "WIFUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.076Z"
+    },
+    {
+     "symbol": "FETUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.152Z"
+    },
+    {
+     "symbol": "HBARUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.228Z"
+    },
+    {
+     "symbol": "ENSOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.304Z"
+    },
+    {
+     "symbol": "CHIPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.380Z"
+    },
+    {
+     "symbol": "APTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.456Z"
+    },
+    {
+     "symbol": "ALLOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.531Z"
+    },
+    {
+     "symbol": "VIRTUALUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.608Z"
+    },
+    {
+     "symbol": "STOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.684Z"
+    },
+    {
+     "symbol": "ICPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.761Z"
+    },
+    {
+     "symbol": "LSKUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.837Z"
+    },
+    {
+     "symbol": "OPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.913Z"
+    },
+    {
+     "symbol": "DEXEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:06.990Z"
+    },
+    {
+     "symbol": "CRVUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.066Z"
+    },
+    {
+     "symbol": "ORDIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.142Z"
+    },
+    {
+     "symbol": "ZROUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.218Z"
+    },
+    {
+     "symbol": "TUTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.294Z"
+    },
+    {
+     "symbol": "BERAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.370Z"
+    },
+    {
+     "symbol": "REUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.452Z"
+    },
+    {
+     "symbol": "SYNUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.529Z"
+    },
+    {
+     "symbol": "STRKUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.605Z"
+    },
+    {
+     "symbol": "TIAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.682Z"
+    },
+    {
+     "symbol": "ETCUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.762Z"
+    },
+    {
+     "symbol": "SANDUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.839Z"
+    },
+    {
+     "symbol": "ACEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.915Z"
+    },
+    {
+     "symbol": "RENDERUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:07.991Z"
+    },
+    {
+     "symbol": "JTOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.067Z"
+    },
+    {
+     "symbol": "DUSKUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.142Z"
+    },
+    {
+     "symbol": "ORCAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.219Z"
+    },
+    {
+     "symbol": "NOMUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.295Z"
+    },
+    {
+     "symbol": "KITEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.370Z"
+    },
+    {
+     "symbol": "GIGGLEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.447Z"
+    },
+    {
+     "symbol": "BIOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.523Z"
+    },
+    {
+     "symbol": "SAHARAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.599Z"
+    },
+    {
+     "symbol": "ALGOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.675Z"
+    },
+    {
+     "symbol": "MOVRUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.675Z"
+    },
+    {
+     "symbol": "0GUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.751Z"
+    },
+    {
+     "symbol": "SENTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.752Z"
+    },
+    {
+     "symbol": "ETHFIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.829Z"
+    },
+    {
+     "symbol": "POLUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.829Z"
+    },
+    {
+     "symbol": "SEIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.905Z"
+    },
+    {
+     "symbol": "PENDLEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.907Z"
+    },
+    {
+     "symbol": "HOMEUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.981Z"
+    },
+    {
+     "symbol": "ZBTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:08.984Z"
+    },
+    {
+     "symbol": "HEIUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.057Z"
+    },
+    {
+     "symbol": "ONTUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.061Z"
+    },
+    {
+     "symbol": "GALAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.135Z"
+    },
+    {
+     "symbol": "SAGAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.137Z"
+    },
+    {
+     "symbol": "ATOMUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.211Z"
+    },
+    {
+     "symbol": "OPNUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.288Z"
+    },
+    {
+     "symbol": "ZENUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.364Z"
+    },
+    {
+     "symbol": "ENJUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.440Z"
+    },
+    {
+     "symbol": "CHZUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.517Z"
+    },
+    {
+     "symbol": "LDOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.593Z"
+    },
+    {
+     "symbol": "ZAMAUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.671Z"
+    },
+    {
+     "symbol": "KAITOUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.747Z"
+    },
+    {
+     "symbol": "ESPUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.823Z"
+    },
+    {
+     "symbol": "PROMUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.900Z"
+    },
+    {
+     "symbol": "EDENUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:09.976Z"
+    },
+    {
+     "symbol": "NILUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:10.052Z"
+    },
+    {
+     "symbol": "PIXELUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:10.129Z"
+    },
+    {
+     "symbol": "ONGUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:10.205Z"
+    },
+    {
+     "symbol": "MARSCOINUSDT",
+     "is_active": true,
+     "product_type": "synthetic_perpetual",
+     "settlement_currency": "USD",
+     "mark_verified": true,
+     "created_at": "2026-10-16T11:39:10.281Z"
+    }
+   ]
+  },
+  "spot_candle_coverage": {
+   "ms": 3155,
+   "rows": [
+    {
+     "symbol": "AAVEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "AAVEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "AAVEUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ACEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ACEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ACEUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ADAUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "ADAUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ADAUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "AEROUSDT",
+     "interval": "1d",
+     "n": 92,
+     "min_open": "2026-07-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "AEROUSDT",
+     "interval": "1w",
+     "n": 14,
+     "min_open": "2026-07-13T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "AEROUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ALGOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ALGOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ALGOUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ALLOUSDT",
+     "interval": "1d",
+     "n": 340,
+     "min_open": "2025-11-11T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ALLOUSDT",
+     "interval": "1w",
+     "n": 49,
+     "min_open": "2025-11-10T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ALLOUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "APTUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "APTUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "APTUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ARBUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ARBUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ARBUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ARUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ARUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ARUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ASTERUSDT",
+     "interval": "1d",
+     "n": 375,
+     "min_open": "2025-10-06T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "ASTERUSDT",
+     "interval": "1w",
+     "n": 54,
+     "min_open": "2025-10-06T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ASTERUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "AXSUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "AXSUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "AXSUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BABYUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BABYUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BABYUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BANKUSDT",
+     "interval": "1d",
+     "n": 338,
+     "min_open": "2025-11-13T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BANKUSDT",
+     "interval": "1w",
+     "n": 49,
+     "min_open": "2025-11-10T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BANKUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BARDUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BARDUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BARDUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BCHUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BCHUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BCHUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BERAUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BERAUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BERAUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BIOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BIOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BIOUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BNBUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "BNBUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BNBUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BONKUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BONKUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BONKUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BREVUSDT",
+     "interval": "1d",
+     "n": 284,
+     "min_open": "2026-01-06T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "BREVUSDT",
+     "interval": "1w",
+     "n": 41,
+     "min_open": "2026-01-05T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BREVUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "BTCUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "BTCUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "BTCUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "CAKEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "CAKEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "CAKEUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "CHIPUSDT",
+     "interval": "1d",
+     "n": 178,
+     "min_open": "2026-04-21T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "CHIPUSDT",
+     "interval": "1w",
+     "n": 26,
+     "min_open": "2026-04-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "CHIPUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "CHZUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "CHZUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "CHZUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "CRVUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "CRVUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "CRVUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "DASHUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "DASHUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "DASHUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "DEXEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "DEXEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "DEXEUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "DOTUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "DOTUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "DOTUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "EIGENUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "EIGENUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "EIGENUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ENAUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "ENAUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ENAUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ENSOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ENSOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ENSOUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ETHFIUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ETHFIUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ETHFIUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ETHUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "ETHUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ETHUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "FETUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "FETUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "FETUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "FILUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "FILUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "FILUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "FOGOUSDT",
+     "interval": "1d",
+     "n": 275,
+     "min_open": "2026-01-15T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "FOGOUSDT",
+     "interval": "1w",
+     "n": 40,
+     "min_open": "2026-01-12T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "FOGOUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "GIGGLEUSDT",
+     "interval": "1d",
+     "n": 357,
+     "min_open": "2025-10-25T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "GIGGLEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "GIGGLEUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "GRAMUSDT",
+     "interval": "1d",
+     "n": 107,
+     "min_open": "2026-07-02T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "GRAMUSDT",
+     "interval": "1w",
+     "n": 16,
+     "min_open": "2026-06-29T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "GRAMUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "HBARUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "HBARUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "HBARUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "HOMEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "HOMEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "HOMEUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ICPUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ICPUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ICPUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "INJUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "INJUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "INJUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "JTOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "JTOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "JTOUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "KITEUSDT",
+     "interval": "1d",
+     "n": 348,
+     "min_open": "2025-11-03T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "KITEUSDT",
+     "interval": "1w",
+     "n": 50,
+     "min_open": "2025-11-03T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "KITEUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "LDOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "LDOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "LDOUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "LINKUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "LINKUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "LINKUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "LTCUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "LTCUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "LTCUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "LUNCUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "LUNCUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "LUNCUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "MARSCOINUSDT",
+     "interval": "1d",
+     "n": 43,
+     "min_open": "2026-09-04T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "MARSCOINUSDT",
+     "interval": "1w",
+     "n": 7,
+     "min_open": "2026-08-31T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "MARSCOINUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "MEGAUSDT",
+     "interval": "1d",
+     "n": 170,
+     "min_open": "2026-04-30T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "MEGAUSDT",
+     "interval": "1w",
+     "n": 25,
+     "min_open": "2026-04-27T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "MEGAUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "NEARUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "NEARUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "NEARUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "NIGHTUSDT",
+     "interval": "1d",
+     "n": 219,
+     "min_open": "2026-03-11T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "NIGHTUSDT",
+     "interval": "1w",
+     "n": 32,
+     "min_open": "2026-03-09T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "NIGHTUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ONDOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ONDOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ONDOUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "OPNUSDT",
+     "interval": "1d",
+     "n": 226,
+     "min_open": "2026-03-05T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "OPNUSDT",
+     "interval": "1w",
+     "n": 33,
+     "min_open": "2026-03-02T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "OPNUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "OPUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "OPUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "OPUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ORDIUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ORDIUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ORDIUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PENDLEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "PENDLEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PENDLEUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PENGUUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "PENGUUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PENGUUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PEPEUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PLUMEUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "PLUMEUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PLUMEUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "POLUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "POLUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "POLUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PROMUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "PROMUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PROMUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PUMPUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "PUMPUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PUMPUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "PYTHUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "PYTHUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "PYTHUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "QNTUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "QNTUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "QNTUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "RENDERUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "RENDERUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "RENDERUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "REUSDT",
+     "interval": "1d",
+     "n": 121,
+     "min_open": "2026-06-18T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "REUSDT",
+     "interval": "1w",
+     "n": 18,
+     "min_open": "2026-06-15T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "REUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ROBOUSDT",
+     "interval": "1d",
+     "n": 227,
+     "min_open": "2026-03-04T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ROBOUSDT",
+     "interval": "1w",
+     "n": 33,
+     "min_open": "2026-03-02T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ROBOUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SAGAUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SAGAUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SAGAUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SAHARAUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SAHARAUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SAHARAUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SEIUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SEIUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SEIUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SENTUSDT",
+     "interval": "1d",
+     "n": 268,
+     "min_open": "2026-01-22T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SENTUSDT",
+     "interval": "1w",
+     "n": 39,
+     "min_open": "2026-01-19T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SENTUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SHIBUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SHIBUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SHIBUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SOLUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "SOLUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SOLUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SPKUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SPKUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SPKUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "STOUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "STOUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "STOUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "STRKUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "STRKUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "STRKUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SUIUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "SUIUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SUIUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "SYNUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "SYNUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "SYNUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "TAOUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "TAOUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "TAOUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "TIAUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "TIAUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "TIAUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "TRUMPUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "TRUMPUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "TRUMPUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "TRXUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "TRXUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "TRXUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "TUTUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "TUTUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "TUTUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "UNIUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "UNIUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "UNIUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "VIRTUALUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "VIRTUALUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "VIRTUALUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "WIFUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "WIFUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "WIFUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "WLDUSDT",
+     "interval": "1d",
+     "n": 391,
+     "min_open": "2025-09-20T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "WLDUSDT",
+     "interval": "1w",
+     "n": 56,
+     "min_open": "2025-09-22T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "WLDUSDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "WLFIUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "WLFIUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "WLFIUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "XLMUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "XLMUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "XLMUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "XPLUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "XPLUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "XPLUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "XRPUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "XRPUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "XRPUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ZAMAUSDT",
+     "interval": "1d",
+     "n": 257,
+     "min_open": "2026-02-02T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZAMAUSDT",
+     "interval": "1w",
+     "n": 37,
+     "min_open": "2026-02-02T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZAMAUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ZECUSDT",
+     "interval": "1d",
+     "n": 58,
+     "min_open": "2026-08-19T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZECUSDT",
+     "interval": "1w",
+     "n": 8,
+     "min_open": "2026-08-24T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZECUSDT",
+     "interval": "5m",
+     "n": 16999,
+     "min_open": "2026-08-18T11:10:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ZENUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZENUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZENUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ZKPUSDT",
+     "interval": "1d",
+     "n": 283,
+     "min_open": "2026-01-07T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZKPUSDT",
+     "interval": "1w",
+     "n": 41,
+     "min_open": "2026-01-05T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZKPUSDT",
+     "interval": "5m",
+     "n": 10082,
+     "min_open": "2026-09-11T11:35:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "ZROUSDT",
+     "interval": "1d",
+     "n": 365,
+     "min_open": "2025-10-17T00:00:00.000Z",
+     "max_open": "2026-10-16T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZROUSDT",
+     "interval": "1w",
+     "n": 52,
+     "min_open": "2025-10-20T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "ZROUSDT",
+     "interval": "5m",
+     "n": 10083,
+     "min_open": "2026-09-11T11:30:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    },
+    {
+     "symbol": "币安人生USDT",
+     "interval": "1d",
+     "n": 282,
+     "min_open": "2026-01-07T00:00:00.000Z",
+     "max_open": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "symbol": "币安人生USDT",
+     "interval": "1w",
+     "n": 41,
+     "min_open": "2026-01-05T00:00:00.000Z",
+     "max_open": "2026-10-12T00:00:00.000Z"
+    },
+    {
+     "symbol": "币安人生USDT",
+     "interval": "5m",
+     "n": 17850,
+     "min_open": "2026-08-15T12:15:00.000Z",
+     "max_open": "2026-10-16T11:40:00.000Z"
+    }
+   ]
+  },
+  "futures_candle_coverage": {
+   "ms": 322,
+   "rows": [
+    {
+     "symbol": "0GUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "AAVEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ACEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ADAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ALGOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ALLOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "APTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ARBUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ASTERUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ATOMUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "AVAXUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "AXSUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "BANKUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "BCHUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "BERAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "BIOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "BNBUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "BTCUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "CHIPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "CHZUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "CRVUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "DASHUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "DEXEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "DOTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "DUSKUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "EDENUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ENAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ENJUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ENSOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ESPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ETCUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ETHFIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ETHUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "FETUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "FILUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "GALAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "GIGGLEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "HBARUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "HEIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "HOMEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "HYPEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ICPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "INJUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "JTOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "KAITOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "KITEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "LDOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "LINKUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "LSKUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "LTCUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "MARSCOINUSDT",
+     "interval": "4h",
+     "n": 271,
+     "min_open": "2026-09-01T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "MOVRUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "NEARUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "NILUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "NOMUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ONDOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ONGUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ONTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "OPNUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "OPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ORCAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ORDIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "PENDLEUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "PENGUUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "PIXELUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "POLUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "PROMUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "PUMPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "QNTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "RENDERUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "REUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SAGAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SAHARAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SANDUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SEIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SENTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SOLUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "STOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "STRKUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SUIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "SYNUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "TAOUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "TIAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "TRUMPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "TRXUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "TUTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "UNIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "VIRTUALUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "WIFUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "WLDUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "WLFIUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "XLMUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "XPLUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "XRPUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ZAMAUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ZBTUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ZECUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ZENUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    },
+    {
+     "symbol": "ZROUSDT",
+     "interval": "4h",
+     "n": 577,
+     "min_open": "2026-07-12T08:00:00.000Z",
+     "max_open": "2026-10-16T08:00:00.000Z"
+    }
+   ]
+  },
+  "sync_states_crypto": {
+   "ms": 602,
+   "rows": [
+    {
+     "feed": "1d",
+     "status": "canceled",
+     "mode": "repair",
+     "n": 5,
+     "last_update": "2026-10-08T11:25:08.779Z"
+    },
+    {
+     "feed": "1d",
+     "status": "completed",
+     "mode": "incremental",
+     "n": 136,
+     "last_update": "2026-09-09T15:29:32.548Z"
+    },
+    {
+     "feed": "1d",
+     "status": "completed",
+     "mode": "initial",
+     "n": 90,
+     "last_update": "2026-10-16T11:25:24.262Z"
+    },
+    {
+     "feed": "1d",
+     "status": "completed",
+     "mode": "repair",
+     "n": 9252,
+     "last_update": "2026-10-16T11:49:00.587Z"
+    },
+    {
+     "feed": "1d",
+     "status": "failed",
+     "mode": "repair",
+     "n": 15076,
+     "last_update": "2026-10-10T07:36:35.018Z"
+    },
+    {
+     "feed": "1w",
+     "status": "canceled",
+     "mode": "incremental",
+     "n": 4,
+     "last_update": "2026-10-12T00:05:54.306Z"
+    },
+    {
+     "feed": "1w",
+     "status": "completed",
+     "mode": "incremental",
+     "n": 7403,
+     "last_update": "2026-10-16T11:49:00.694Z"
+    },
+    {
+     "feed": "1w",
+     "status": "completed",
+     "mode": "initial",
+     "n": 90,
+     "last_update": "2026-10-16T11:25:25.961Z"
+    },
+    {
+     "feed": "1w",
+     "status": "completed",
+     "mode": "repair",
+     "n": 921,
+     "last_update": "2026-10-12T00:06:35.464Z"
+    },
+    {
+     "feed": "1w",
+     "status": "failed",
+     "mode": "repair",
+     "n": 188,
+     "last_update": "2026-10-05T00:15:58.803Z"
+    },
+    {
+     "feed": "5m",
+     "status": "canceled",
+     "mode": "repair",
+     "n": 24,
+     "last_update": "2026-10-13T05:48:01.449Z"
+    },
+    {
+     "feed": "5m",
+     "status": "completed",
+     "mode": "incremental",
+     "n": 57,
+     "last_update": "2026-10-16T09:52:18.340Z"
+    },
+    {
+     "feed": "5m",
+     "status": "completed",
+     "mode": "initial",
+     "n": 90,
+     "last_update": "2026-10-16T11:37:45.977Z"
+    },
+    {
+     "feed": "5m",
+     "status": "completed",
+     "mode": "repair",
+     "n": 54393,
+     "last_update": "2026-10-16T11:49:34.779Z"
+    },
+    {
+     "feed": "5m",
+     "status": "failed",
+     "mode": "repair",
+     "n": 56642,
+     "last_update": "2026-10-16T03:15:58.826Z"
+    }
+   ]
+  },
+  "crypto_holdings": {
+   "ms": 149,
+   "rows": [
+    {
+     "symbol": "ADAUSDT",
+     "holders": 1
+    },
+    {
+     "symbol": "BNBUSDT",
+     "holders": 1
+    },
+    {
+     "symbol": "BTCUSDT",
+     "holders": 2
+    },
+    {
+     "symbol": "NIGHTUSDT",
+     "holders": 1
+    }
+   ]
+  },
+  "orders_status": {
+   "ms": 153,
+   "rows": [
+    {
+     "asset_type": "crypto",
+     "status": "executed",
+     "n": 5
+    },
+    {
+     "asset_type": "domestic_stock",
+     "status": "executed",
+     "n": 3
+    }
+   ]
+  },
+  "status_conditional_buy_orders": {
+   "ms": 149,
+   "rows": []
+  },
+  "status_conditional_sell_orders": {
+   "ms": 150,
+   "rows": []
+  },
+  "status_limit_on_close_orders": {
+   "ms": 149,
+   "rows": []
+  },
+  "status_entry_tp_sl_plans": {
+   "ms": 148,
+   "rows": []
+  },
+  "status_futures_limit_orders": {
+   "ms": 150,
+   "rows": [
+    {
+     "status": "canceled",
+     "n": 1
+    }
+   ]
+  },
+  "status_futures_conditional_entries": {
+   "ms": 149,
+   "rows": []
+  },
+  "status_futures_tp_sl_settings": {
+   "ms": 151,
+   "rows": []
+  },
+  "futures_positions_open": {
+   "ms": 152,
+   "rows": [
+    {
+     "symbol": "BTCUSDT",
+     "status": "closed",
+     "n": 2
+    },
+    {
+     "symbol": "DOGEUSDT",
+     "status": "closed",
+     "n": 1
+    }
+   ]
+  },
+  "ops_jobs_24h": {
+   "ms": 171,
+   "rows": [
+    {
+     "job_name": "asset_price_snapshot_retention",
+     "status": "failed",
+     "n": 6,
+     "last_started": "2026-10-16T11:53:35.793Z"
+    },
+    {
+     "job_name": "asset_price_snapshot_retention",
+     "status": "succeeded",
+     "n": 3,
+     "last_started": "2026-10-16T11:45:09.068Z"
+    },
+    {
+     "job_name": "crypto_order_book_retention",
+     "status": "succeeded",
+     "n": 2,
+     "last_started": "2026-10-16T11:54:05.793Z"
+    },
+    {
+     "job_name": "daily_portfolio_snapshot",
+     "status": "succeeded",
+     "n": 2,
+     "last_started": "2026-10-15T15:00:27.375Z"
+    },
+    {
+     "job_name": "futures_candle_sync",
+     "status": "failed",
+     "n": 1,
+     "last_started": "2026-10-16T11:43:13.720Z"
+    },
+    {
+     "job_name": "futures_candle_sync",
+     "status": "succeeded",
+     "n": 4,
+     "last_started": "2026-10-16T11:53:20.815Z"
+    },
+    {
+     "job_name": "futures_last_price_retention",
+     "status": "succeeded",
+     "n": 1444,
+     "last_started": "2026-10-16T11:54:20.707Z"
+    },
+    {
+     "job_name": "futures_mark_retention",
+     "status": "succeeded",
+     "n": 1448,
+     "last_started": "2026-10-16T11:54:50.707Z"
+    },
+    {
+     "job_name": "market_candle_reconciliation",
+     "status": "failed",
+     "n": 26,
+     "last_started": "2026-10-16T11:31:54.129Z"
+    },
+    {
+     "job_name": "market_candle_reconciliation",
+     "status": "succeeded",
+     "n": 214,
+     "last_started": "2026-10-16T11:49:20.817Z"
+    },
+    {
+     "job_name": "market_candle_sync",
+     "status": "failed",
+     "n": 20,
+     "last_started": "2026-10-15T21:11:22.349Z"
+    },
+    {
+     "job_name": "market_candle_sync",
+     "status": "succeeded",
+     "n": 111,
+     "last_started": "2026-10-16T11:48:54.078Z"
+    },
+    {
+     "job_name": "provider_fx_ingest",
+     "status": "succeeded",
+     "n": 30,
+     "last_started": "2026-10-16T11:48:21.087Z"
+    }
+   ]
+  },
+  "order_book_history_rows": {
+   "ms": 150,
+   "rows": [
+    {
+     "spot": 666,
+     "futures": 692
+    }
+   ]
+  },
+  "wallets_ledger_counts": {
+   "ms": 150,
+   "rows": [
+    {
+     "wallet_tx": 63,
+     "orders": 8,
+     "futures_positions": 3,
+     "positions": 8
+    }
+   ]
+  }
+ }
+}

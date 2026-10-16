@@ -1,0 +1,118 @@
+-- analyze 897 ms
+Aggregate  (cost=2529.95..2529.96 rows=1 width=16) (actual rows=1 loops=1)
+  Buffers: shared hit=52099 read=9693 dirtied=2
+  CTE scan
+    ->  Limit  (cost=1.68..1153.87 rows=1000 width=45) (actual rows=1000 loops=1)
+          Buffers: shared hit=1004
+          ->  Incremental Sort  (cost=1.68..28055.26 rows=24348 width=45) (actual rows=1000 loops=1)
+                Sort Key: m_1.effective_at, m_1.id
+                Presorted Key: m_1.effective_at
+                Full-sort Groups: 32  Sort Method: quicksort  Average Memory: 27kB  Peak Memory: 27kB
+                Buffers: shared hit=1004
+                ->  Index Scan using asset_price_snapshots_asset_id_effective_at_idx on asset_price_snapshots m_1  (cost=0.56..26965.06 rows=24348 width=45) (actual rows=1001 loops=1)
+                      Index Cond: ((asset_id = '0f6eab2d-ac3d-41c8-b38a-33a11371d700'::text) AND (effective_at < '2026-10-02 11:19:20.462'::timestamp without time zone))
+                      Buffers: shared hit=995
+  InitPlan 2
+    ->  Aggregate  (cost=22.50..22.51 rows=1 width=8) (actual rows=1 loops=1)
+          ->  CTE Scan on scan  (cost=0.00..20.00 rows=1000 width=0) (actual rows=1000 loops=1)
+  InitPlan 3
+    ->  CTE Scan on scan s  (cost=0.00..20.00 rows=1000 width=32) (actual rows=1000 loops=1)
+          Buffers: shared hit=1004
+  ->  Nested Loop  (cost=657.06..1333.57 rows=1 width=0) (actual rows=997 loops=1)
+        Join Filter: EXISTS(SubPlan 22)
+        Rows Removed by Join Filter: 1
+        Buffers: shared hit=52099 read=9693 dirtied=2
+        ->  Bitmap Heap Scan on asset_price_snapshots m  (cost=656.91..776.75 rows=1 width=117) (actual rows=998 loops=1)
+              Recheck Cond: ((id = ANY ((InitPlan 3).col1)) AND (asset_id = '0f6eab2d-ac3d-41c8-b38a-33a11371d700'::text) AND (effective_at < '2026-10-02 11:19:20.462'::timestamp without time zone))
+              Filter: ((captured_at < '2026-10-02 11:19:20.462'::timestamp without time zone) AND (source_type <> 'admin_manual'::"AssetPriceSourceType") AND (created_at < '2026-10-14 11:19:20.462'::timestamp without time zone) AND (captured_at < '2026-10-14 11:19:20.462'::timestamp without time zone) AND (NOT (ANY (id = (hashed SubPlan 9).col1))) AND (NOT EXISTS(SubPlan 12)) AND (NOT (ANY (id = (hashed SubPlan 5).col1))) AND (NOT EXISTS(SubPlan 6)) AND (NOT EXISTS(SubPlan 10)) AND (NOT EXISTS(SubPlan 14)) AND (NOT EXISTS(SubPlan 16)) AND (NOT EXISTS(SubPlan 18)) AND (NOT EXISTS(SubPlan 20)) AND (((SubPlan 23) IS NULL) OR ((SubPlan 25) >= '20'::bigint)))
+              Rows Removed by Filter: 2
+              Heap Blocks: exact=957
+              Buffers: shared hit=44126 read=9693 dirtied=2
+              ->  BitmapAnd  (cost=656.91..656.91 rows=1 width=0) (actual rows=0 loops=1)
+                    Buffers: shared hit=4023 read=1171
+                    ->  Bitmap Index Scan on asset_price_snapshots_pkey  (cost=0.00..16.62 rows=10 width=0) (actual rows=1000 loops=1)
+                          Index Cond: (id = ANY ((InitPlan 3).col1))
+                          Buffers: shared hit=3909 read=1031
+                    ->  Bitmap Index Scan on asset_price_snapshots_asset_id_effective_at_idx  (cost=0.00..640.03 rows=24348 width=0) (actual rows=17011 loops=1)
+                          Index Cond: ((asset_id = '0f6eab2d-ac3d-41c8-b38a-33a11371d700'::text) AND (effective_at < '2026-10-02 11:19:20.462'::timestamp without time zone))
+                          Buffers: shared hit=114 read=140
+              SubPlan 9
+                ->  Seq Scan on futures_executions r_2  (cost=0.00..1.08 rows=8 width=32) (actual rows=8 loops=1)
+                      Buffers: shared hit=1
+              SubPlan 12
+                ->  Index Only Scan using futures_season_prices_asset_price_snapshot_id_idx on futures_season_prices r_4  (cost=0.15..3.48 rows=2 width=0) (actual rows=0 loops=1000)
+                      Index Cond: (asset_price_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=2000
+              SubPlan 5
+                ->  Seq Scan on orders r  (cost=0.00..4.08 rows=8 width=32) (actual rows=8 loops=1)
+                      Buffers: shared hit=4
+              SubPlan 6
+                ->  Index Only Scan using quotes_asset_price_snapshot_id_idx on quotes r_1  (cost=0.14..2.36 rows=1 width=0) (actual rows=0 loops=999)
+                      Index Cond: (asset_price_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=998 read=1
+              SubPlan 10
+                ->  Index Only Scan using protection_children_asset_price_snapshot_id_idx on protection_children r_3  (cost=0.14..2.36 rows=1 width=0) (actual rows=0 loops=999)
+                      Index Cond: (asset_price_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=998 read=1
+              SubPlan 14
+                ->  Index Only Scan using conditional_buy_orders_registration_snapshot_id_idx on conditional_buy_orders r_5  (cost=0.14..2.36 rows=1 width=0) (actual rows=0 loops=999)
+                      Index Cond: (registration_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=1998
+              SubPlan 16
+                ->  Index Only Scan using conditional_buy_orders_trigger_snapshot_id_idx on conditional_buy_orders r_6  (cost=0.14..2.36 rows=1 width=0) (actual rows=0 loops=999)
+                      Index Cond: (trigger_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=1998
+              SubPlan 18
+                ->  Index Only Scan using conditional_sell_orders_registration_snapshot_id_idx on conditional_sell_orders r_7  (cost=0.14..2.36 rows=1 width=0) (actual rows=0 loops=999)
+                      Index Cond: (registration_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=1998
+              SubPlan 20
+                ->  Index Only Scan using conditional_sell_orders_trigger_snapshot_id_idx on conditional_sell_orders r_8  (cost=0.14..2.36 rows=1 width=0) (actual rows=0 loops=999)
+                      Index Cond: (trigger_snapshot_id = m.id)
+                      Heap Fetches: 0
+                      Buffers: shared hit=1998
+              SubPlan 23
+                ->  Aggregate  (cost=14.53..14.54 rows=1 width=8) (actual rows=1 loops=999)
+                      Buffers: shared hit=999
+                      ->  Seq Scan on seasons s_1  (cost=0.00..14.25 rows=113 width=8) (actual rows=1 loops=999)
+                            Filter: (end_at >= m.effective_at)
+                            Buffers: shared hit=999
+              SubPlan 25
+                ->  Aggregate  (cost=84.70..84.71 rows=1 width=8) (actual rows=1 loops=999)
+                      Buffers: shared hit=26154 read=8520 dirtied=2
+                      ->  Limit  (cost=15.10..84.45 rows=20 width=4) (actual rows=20 loops=999)
+                            Buffers: shared hit=26154 read=8520 dirtied=2
+                            ->  Subquery Scan on n_1  (cost=15.10..559.55 rows=157 width=4) (actual rows=20 loops=999)
+                                  Filter: ((NOT (n_1.source_name IS DISTINCT FROM m.source_name)) AND (n_1.price > '0'::numeric) AND (n_1.source_type = m.source_type))
+                                  Rows Removed by Filter: 10
+                                  Buffers: shared hit=26154 read=8520 dirtied=2
+                                  ->  Limit  (cost=15.10..551.31 rows=471 width=41) (actual rows=30 loops=999)
+                                        Buffers: shared hit=26154 read=8520 dirtied=2
+                                        InitPlan 24
+                                          ->  Aggregate  (cost=14.53..14.54 rows=1 width=8) (actual rows=1 loops=999)
+                                                Buffers: shared hit=999
+                                                ->  Seq Scan on seasons s_2  (cost=0.00..14.25 rows=113 width=8) (actual rows=1 loops=999)
+                                                      Filter: (end_at >= m.effective_at)
+                                                      Buffers: shared hit=999
+                                        ->  Index Scan using asset_price_snapshots_asset_id_effective_at_idx on asset_price_snapshots n_2  (cost=0.56..536.77 rows=471 width=41) (actual rows=30 loops=999)
+                                              Index Cond: ((asset_id = m.asset_id) AND (effective_at > m.effective_at) AND (effective_at <= (InitPlan 24).col1))
+                                              Buffers: shared hit=25155 read=8520 dirtied=2
+        ->  Index Scan using assets_pkey on assets a  (cost=0.14..2.36 rows=1 width=41) (actual rows=1 loops=998)
+              Index Cond: (id = '0f6eab2d-ac3d-41c8-b38a-33a11371d700'::text)
+              Buffers: shared hit=1996
+        SubPlan 22
+          ->  Index Scan using asset_price_snapshots_asset_id_effective_at_idx on asset_price_snapshots n  (cost=0.58..554.45 rows=1 width=0) (actual rows=1 loops=998)
+                Index Cond: ((asset_id = m.asset_id) AND (effective_at >= m.effective_at) AND (effective_at < timezone('UTC'::text, timezone(CASE WHEN (a.asset_type = 'us_stock'::"AssetType") THEN 'America/New_York'::text ELSE 'Asia/Seoul'::text END, (((timezone(CASE WHEN (a.asset_type = 'us_stock'::"AssetType") THEN 'America/New_York'::text ELSE 'Asia/Seoul'::text END, timezone('UTC'::text, m.effective_at)))::date + 1))::timestamp without time zone))) AND (effective_at >= m.effective_at))
+                Filter: ((NOT (source_name IS DISTINCT FROM m.source_name)) AND (source_type = m.source_type) AND (ROW(effective_at, captured_at, id) > ROW(m.effective_at, m.captured_at, m.id)) AND ((timezone(CASE WHEN (a.asset_type = 'us_stock'::"AssetType") THEN 'America/New_York'::text ELSE 'Asia/Seoul'::text END, timezone('UTC'::text, effective_at)))::date = (timezone(CASE WHEN (a.asset_type = 'us_stock'::"AssetType") THEN 'America/New_York'::text ELSE 'Asia/Seoul'::text END, timezone('UTC'::text, m.effective_at)))::date))
+                Rows Removed by Filter: 1
+                Buffers: shared hit=5977
+Planning:
+  Buffers: shared hit=1671
+Planning Time: 8.252 ms
+Execution Time: 761.929 ms

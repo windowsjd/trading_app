@@ -1,0 +1,19 @@
+database: <user>@<render-pg>:(default)/trading_app_fbbk
+mode=initial dryRun=false window=2026-09-11T11:25:45.244Z → 2026-10-16T11:25:45.244Z feeds=5m
+COVERED  AAVEUSDT   status=completed stop=target_reached rows=10040 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  ARBUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  BCHUSDT    status=completed stop=target_reached rows=10039 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  DASHUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  FETUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  FILUSDT    status=completed stop=target_reached rows=10039 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  HBARUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  ONDOUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  PENGUUSDT  status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  PUMPUSDT   status=completed stop=target_reached rows=10039 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  REUSDT     status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  SENTUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  WLFIUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  XPLUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+COVERED  ZAMAUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:25:45.244Z, 2026-10-16T11:25:45.244Z) 
+
+assets=15/15 feeds=15 coverageComplete=15 completedWithIncompleteCoverage=0 failed=0

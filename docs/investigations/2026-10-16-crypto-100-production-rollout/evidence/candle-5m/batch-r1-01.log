@@ -1,0 +1,19 @@
+database: <user>@<render-pg>:(default)/trading_app_fbbk
+mode=initial dryRun=false window=2026-09-11T11:28:06.293Z → 2026-10-16T11:28:06.293Z feeds=5m
+COVERED  ALLOUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  APTUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  BANKUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  BONKUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  DOTUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  FOGOUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  GIGGLEUSDT status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  ICPUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  INJUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  KITEUSDT   status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  OPNUSDT    status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+COVERED  RENDERUSDT status=completed stop=target_reached rows=10054 covered=[2026-09-11T11:28:06.293Z, 2026-10-16T11:28:06.293Z) 
+PARTIAL  SHIBUSDT   status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  VIRTUALUSDT status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+PARTIAL  ZROUSDT    status=failed stop=provider_error rows=0 covered=[-, -) error=PROVIDER_CALL_FAILED
+
+assets=15/15 feeds=15 coverageComplete=12 completedWithIncompleteCoverage=0 failed=3

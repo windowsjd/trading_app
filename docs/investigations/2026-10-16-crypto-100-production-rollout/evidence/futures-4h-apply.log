@@ -1,0 +1,114 @@
+database: <user>@<render-pg>:(default)/trading_app_fbbk
+markets=futures apply=true days=96 sessions=97
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:54 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"ef062188-e253-4c06-ac59-c5e99e669898","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:55 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"b9dcf939-04dc-413c-a06b-4ae97c6419b5","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:55 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"697bbf69-8b5f-4089-83f3-62f3009ad95c","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:55 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"2c26d182-21be-470d-9f1f-a61f2190ea17","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:56 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"d0506fc7-e4e7-4ce3-8eac-1c05b65eb31c","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:56 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"51d018df-15dc-4bfe-b991-6005297797bf","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:56 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"a552372d-8879-4a42-8c86-2ff22c339f21","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:57 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"9d9a7a3a-4824-45f8-8416-c9703cd417bc","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+[33m[Nest] 1239924  - [39m10/16/2026, 8:44:57 PM [33m   WARN[39m [38;5;3m[MarketCandleLongSyncService] [39m[33m{"event":"long_candle_series_failed","market":"futures","seriesId":"47399b10-3105-4d16-97a3-95b4917820ed","safeCause":{"category":"unexpected_error","errorType":"Error"}}[39m
+
+[futures] mode=backfill dryRun=false window=2026-07-12T08:00:00.000Z → 2026-10-16T08:00:00.000Z (96 days)
+SYNCED      0GUSDT     expected=576 missing=576 written=577 calls=2
+SYNCED      AAVEUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ACEUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ADAUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ALGOUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ALLOUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      APTUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ARBUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ASTERUSDT  expected=576 missing=576 written=577 calls=2
+SYNCED      ATOMUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      AVAXUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      AXSUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      BANKUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      BCHUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      BERAUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      BIOUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      BNBUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      BTCUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      CHIPUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      CHZUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      CRVUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      DASHUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      DEXEUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      DOGEUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      DOTUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      DUSKUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      EDENUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ENAUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ENJUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ENSOUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ESPUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ETCUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ETHFIUSDT  expected=576 missing=576 written=577 calls=2
+SYNCED      ETHUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      FETUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      FILUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      GALAUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      GIGGLEUSDT expected=576 missing=576 written=577 calls=2
+SYNCED      HBARUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      HEIUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      HOMEUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      HYPEUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ICPUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      INJUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      JTOUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      KAITOUSDT  expected=576 missing=576 written=577 calls=2
+SYNCED      KITEUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      LDOUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      LINKUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      LSKUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      LTCUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      MARSCOINUSDT expected=576 missing=576 written=271 calls=1
+SYNCED      MOVRUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      NEARUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      NILUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      NOMUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ONDOUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ONGUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      ONTUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      OPNUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      OPUSDT     expected=576 missing=576 written=577 calls=2
+SYNCED      ORCAUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      ORDIUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      PENDLEUSDT expected=576 missing=576 written=577 calls=2
+SYNCED      PENGUUSDT  expected=576 missing=576 written=577 calls=2
+SYNCED      PIXELUSDT  expected=576 missing=576 written=577 calls=2
+SYNCED      POLUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      PROMUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      PUMPUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      QNTUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      RENDERUSDT expected=576 missing=576 written=577 calls=2
+SYNCED      REUSDT     expected=576 missing=576 written=577 calls=2
+SYNCED      SAGAUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      SAHARAUSDT expected=576 missing=576 written=577 calls=2
+SYNCED      SANDUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      SEIUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      SENTUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      SOLUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      STOUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      STRKUSDT   expected=576 missing=576 written=577 calls=2
+SYNCED      SUIUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      SYNUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      TAOUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      TIAUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      TRUMPUSDT  expected=576 missing=576 written=577 calls=2
+SYNCED      TRXUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      TUTUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      UNIUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      VIRTUALUSDT expected=576 missing=576 written=577 calls=2
+SYNCED      WIFUSDT    expected=576 missing=576 written=577 calls=2
+SYNCED      WLDUSDT    expected=576 missing=576 written=577 calls=2
+PARTIAL     WLFIUSDT   expected=576 missing=576 written=499 calls=1 error=PROVIDER_RATE_LIMITED
+FAILED      XLMUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      XPLUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      XRPUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      ZAMAUSDT   expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      ZBTUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      ZECUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      ZENUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+FAILED      ZROUSDT    expected=576 missing=576 written=0 calls=0 error=PROVIDER_RATE_LIMITED
+totals series=100 written=52700 calls=182 held=0 pending=0 failed=9 notStarted=0 stop=- runFailed=true
