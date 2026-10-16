@@ -200,10 +200,11 @@ export default function WalletTransactionsScreen({ route }: Props) {
           <View style={styles.header}>
             <Text style={styles.title}>지갑 원장</Text>
             {/* Whose ledger this is. Without it, two accounts' histories are
-                indistinguishable once the numbers are on screen. */}
+                indistinguishable once the numbers are on screen. The account's
+                status (운영 중 …) stays on the home, ranking and season screens. */}
             {accountDisplay ? (
-              <Text style={styles.accountHeader}>
-                {accountDisplay.title} · {accountDisplay.statusLabel}
+              <Text testID="wallet-transactions-account" style={styles.accountHeader}>
+                {accountDisplay.title}
               </Text>
             ) : null}
 
@@ -258,21 +259,34 @@ export default function WalletTransactionsScreen({ route }: Props) {
         }
         renderItem={({ item }) => {
           const display = getLedgerRowDisplay(item);
+          const summary = `${item.currencyCode} · ${display.direction}`;
+          // Each figure sits on the line of what it belongs to: the amount
+          // beside the title, the balance beside the asset or transfer (or the
+          // currency and direction when there is neither).
+          const detail = display.asset ?? display.transfer ?? summary;
+          const extra = [
+            display.wallet,
+            display.quantity,
+            detail === summary ? null : summary,
+            item.txType === 'ad_reward' ? '외부 가상자금 유입' : null,
+          ].filter((line): line is string => !!line);
           return (
             <View testID={TEST_IDS.walletTransactions.item(item.id)} style={styles.rowCard}>
-              <Text style={styles.itemTitle}>{display.title}</Text>
-              {display.transfer ? <Text style={styles.asset}>{display.transfer}</Text> : null}
-              {display.wallet ? <Text style={styles.helper}>{display.wallet}</Text> : null}
-              {display.asset ? <Text style={styles.asset}>{display.asset}</Text> : null}
-              {display.quantity ? <Text style={styles.asset}>{display.quantity}</Text> : null}
-              <Text style={styles.helper}>{item.currencyCode} · {display.direction}</Text>
-              {item.txType === 'ad_reward' ? (
-                <Text style={styles.helper}>외부 가상자금 유입</Text>
+              <View style={styles.line} testID={`${TEST_IDS.walletTransactions.item(item.id)}-amount-line`}>
+                <Text style={[styles.itemTitle, styles.lineStart]}>{display.title}</Text>
+                <Text style={[styles.amount, styles.lineEnd, item.direction === 'credit' ? styles.creditAmount : styles.debitAmount]}>
+                  {display.amount}
+                </Text>
+              </View>
+              <View style={styles.line} testID={`${TEST_IDS.walletTransactions.item(item.id)}-balance-line`}>
+                <Text style={[detail === summary ? styles.helper : styles.asset, styles.lineStart]}>{detail}</Text>
+                <Text style={[styles.balance, styles.lineEnd]}>{display.balance}</Text>
+              </View>
+              {extra.length ? (
+                <View style={styles.extra}>
+                  {extra.map((line) => <Text key={line} style={styles.helper}>{line}</Text>)}
+                </View>
               ) : null}
-              <Text style={[styles.amount, item.direction === 'credit' ? styles.creditAmount : styles.debitAmount]}>
-                {display.amount}
-              </Text>
-              <Text style={styles.balance}>{display.balance}</Text>
               <Text style={styles.helper}>{display.date}</Text>
             </View>
           );
@@ -348,8 +362,16 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: semantic.surface,
     marginBottom: 10,
-    gap: 12,
+    gap: 8,
   },
+  // Left text and right figure share a baseline. When both do not fit, the
+  // figure wraps under the text, still right-aligned, instead of clipping or
+  // squeezing a short title into a mid-word break (large fonts); a text longer
+  // than the line wraps on its own line.
+  line: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 12, rowGap: 2 },
+  lineStart: { flexGrow: 1, flexShrink: 1, minWidth: 0 },
+  lineEnd: { flexShrink: 1, minWidth: 0, marginLeft: 'auto' },
+  extra: { gap: 2 },
   asset: { fontSize: 15, lineHeight: 22, color: semantic.text, flexShrink: 1 },
   balance: { fontSize: 14, color: semantic.secondary, textAlign: 'right' },
   itemTitle: { fontSize: 15, fontWeight: '700' },

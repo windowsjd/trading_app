@@ -97,7 +97,10 @@ export type FuturesHolding = Pick<FuturesPosition,
   assetId: string; name: string; symbol: string;
   markEvidence: PriceTimes | null;
 };
-export type FuturesPositions = {
+/** Device clock when a polled read was sent; its freshness is judged on the
+ * server's clock from there (futuresServerNow), never on the device clock. */
+type SentAt = { clientRequestedAt?: number };
+export type FuturesPositions = SentAt & {
   tradingAccountId: string;
   evaluatedAt: string;
   capabilities: FuturesCapabilities;
@@ -122,7 +125,7 @@ export type FuturesPositions = {
     } | null;
   };
 };
-export type FuturesInstruments = {
+export type FuturesInstruments = SentAt & {
   tradingAccountId: string;
   evaluatedAt: string;
   capabilities: FuturesCapabilities;
@@ -263,10 +266,18 @@ async function read<T>(
   });
   return assertAccountScope(url, id, response.data.data);
 }
+async function sentRead<T extends SentAt>(
+  id: string,
+  suffix: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  const clientRequestedAt = Date.now();
+  return { ...(await read<T>(id, suffix, signal)), clientRequestedAt };
+}
 export const getFuturesInstruments = (id: string, signal?: AbortSignal) =>
-  read<FuturesInstruments>(id, "instruments", signal);
+  sentRead<FuturesInstruments>(id, "instruments", signal);
 export const getFuturesPositions = (id: string, signal?: AbortSignal) =>
-  read<FuturesPositions>(id, "positions", signal);
+  sentRead<FuturesPositions>(id, "positions", signal);
 export const getFuturesHistory = (
   id: string,
   kind: "executions" | "liquidations",

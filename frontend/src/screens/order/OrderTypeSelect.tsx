@@ -1,8 +1,10 @@
 import LearningLock from '../../features/quest/LearningLock';
 import QuestTarget from '../../features/quest/QuestTarget';
 import React from 'react';
+import Svg, { Path } from 'react-native-svg';
 import { ScrollView, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
+import { useAppearance } from '../../theme/appearance';
 import ActionPressable from '../../components/common/ActionPressable';
 import DisclosureTriangle from '../../components/common/DisclosureTriangle';
 import InlineBottomSheet from '../../components/common/InlineBottomSheet';
@@ -18,12 +20,21 @@ import {
 
 export type { OrderMethod } from '../../features/order/orderMethods';
 
-/** Icon glyph and tint per method (font-safe glyphs, themed circle). */
-const ICON: Record<OrderMethod, { glyph: string; tone: 'success' | 'info' | 'warning' | 'muted' }> = {
-  market: { glyph: '→', tone: 'success' },
-  limit: { glyph: '↓', tone: 'info' },
-  conditional: { glyph: '◎', tone: 'info' },
-  loc: { glyph: '◑', tone: 'warning' },
+/**
+ * One line icon and tint per method, drawn in a themed circle: 시장가 a
+ * lightning bolt (now), 지정가 a target (the chosen price), 조건주문 a bell
+ * (alert at the watch price), LOC a clock (the regular-session close). 24-unit
+ * paths, stroked in the method's tone from the appearance palette (SVG props
+ * take real colors, not the StyleSheet's semantic sentinels).
+ */
+const ICON: Record<OrderMethod, { path: string; tone: 'success' | 'info' | 'warning' | 'muted' }> = {
+  market: { path: 'M13.5 2.5 5 13.5h6.5L10.5 21.5 19 10.5h-6.5l1-8z', tone: 'success' },
+  limit: {
+    path: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 7.5a4.5 4.5 0 1 0 0 9a4.5 4.5 0 1 0 0-9z M12 11.5a.5.5 0 1 0 0 1a.5.5 0 1 0 0-1z',
+    tone: 'info',
+  },
+  conditional: { path: 'M6 9.5a6 6 0 0 1 12 0c0 5.5 2.5 7.5 2.5 7.5h-17S6 15 6 9.5z M10 20.5a2 2 0 0 0 4 0', tone: 'info' },
+  loc: { path: 'M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18z M12 7.5V12l3 2', tone: 'warning' },
 };
 
 /** Sheet rows the beginner guide may point at (QUEST 03, 05, 06). */
@@ -98,6 +109,7 @@ function MethodRow({ option, selected, learningHint, onSelect }: {
   const badge = getAvailabilityLabel(option.availability);
   const reason = option.availability.state === 'unavailable' ? option.availability.reason : null;
   const icon = ICON[option.method];
+  const { colors } = useAppearance();
   const row = (
     <ActionPressable
       testID={`order-method-${option.method}`}
@@ -109,8 +121,11 @@ function MethodRow({ option, selected, learningHint, onSelect }: {
       onPress={() => onSelect(option.method)}
       style={[styles.row, selected && styles.rowSelected]}
     >
-      <View style={[styles.icon, styles[`${icon.tone}Icon`], !selectable && styles.dim]}>
-        <Text style={[styles.iconText, styles[`${icon.tone}Glyph`]]}>{icon.glyph}</Text>
+      <View testID={`order-method-${option.method}-icon`} style={[styles.icon, styles[`${icon.tone}Icon`], !selectable && styles.dim]}>
+        <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors[icon.tone]} strokeWidth={2}
+          strokeLinecap="round" strokeLinejoin="round" focusable={false} aria-hidden>
+          <Path d={icon.path} />
+        </Svg>
       </View>
       <View style={styles.rowCopy}>
         <View style={styles.titleLine}>
@@ -164,11 +179,6 @@ const styles = {
   infoIcon: { backgroundColor: semantic.infoSurface },
   warningIcon: { backgroundColor: semantic.warningSurface },
   mutedIcon: { backgroundColor: semantic.raised },
-  iconText: { fontSize: 16, lineHeight: 20, fontWeight: '800' },
-  successGlyph: { color: semantic.success },
-  infoGlyph: { color: semantic.info },
-  warningGlyph: { color: semantic.warning },
-  mutedGlyph: { color: semantic.muted },
   dim: { opacity: 0.45 },
   rowCopy: { flex: 1, minWidth: 0, gap: 2 },
   titleLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2 },

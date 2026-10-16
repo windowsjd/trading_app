@@ -7,12 +7,15 @@ import {
   StyleSheet,
   SafeAreaView,
   FlatList,
+  ScrollView,
   Pressable,
   Alert,
   AppState,
   type AppStateStatus,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+import SegmentedControl from '../../components/common/SegmentedControl';
+import FuturesHistory from '../futures/FuturesHistory';
 import {
   useInfiniteQuery,
   useMutation,
@@ -65,11 +68,14 @@ import WhaleLoader from '../../components/states/WhaleLoader';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TradeHistory'>;
 type Filter = 'all' | 'buy' | 'sell';
+type Market = 'spot' | 'futures';
 
 export default function TradeHistoryScreen({ route }: Props) {
   const recordScope = route.params;
   const isAccountScope = 'accountId' in recordScope;
   const [filter, setFilter] = useState<Filter>('all');
+  // 현물 orders and 선물 executions/liquidations: two existing record APIs.
+  const [market, setMarket] = useState<Market>('spot');
   const queryClient = useQueryClient();
   const {
     accounts,
@@ -184,7 +190,9 @@ export default function TradeHistoryScreen({ route }: Props) {
       }),
     getNextPageParam: (lastPage) => lastPage.pagination.nextOffset ?? undefined,
     initialPageParam: 0,
-    enabled: hasAccount,
+    // The 선물 view reads its own records; the order list (and its open-limit
+    // polling) waits until 현물 is shown again.
+    enabled: hasAccount && market === 'spot',
     refetchInterval: (query) => {
       const pages = query.state.data?.pages ?? [];
       const pageItems = pages.flatMap((page) => toRecordOrderItems(page));
@@ -198,7 +206,7 @@ export default function TradeHistoryScreen({ route }: Props) {
     },
     refetchIntervalInBackground: false,
   });
-  const refresh = usePullToRefresh([{ ...ordersQuery, enabled: hasAccount }]);
+  const refresh = usePullToRefresh([{ ...ordersQuery, enabled: hasAccount && market === 'spot' }]);
 
   /**
    * De-duplicated by orderId, like the portfolio and ledger lists (작업 10
@@ -263,7 +271,7 @@ export default function TradeHistoryScreen({ route }: Props) {
 
   if (
     accountLookup.state === 'loading' ||
-    (hasAccount && viewState === 'record_orders_loading')
+    (hasAccount && market === 'spot' && viewState === 'record_orders_loading')
   ) {
     return <FullPageLoading message="거래 내역을 불러오는 중입니다." />;
   }
@@ -300,6 +308,35 @@ export default function TradeHistoryScreen({ route }: Props) {
         }
         onRetry={() => void refetchAccounts()}
       />
+    );
+  }
+
+  const accountLine = accountDisplay ? (
+    <Text style={styles.accountHeader}>
+      {accountDisplay.title} · {accountDisplay.statusLabel}
+    </Text>
+  ) : null;
+  const marketSwitch = (
+    <SegmentedControl testID="trade-history-market" accessibilityLabel="거래 내역 종류" value={market} onChange={setMarket}
+      style={styles.marketSwitch}
+      options={[
+        { key: 'spot', label: '현물', testID: 'trade-history-spot' },
+        { key: 'futures', label: '선물', testID: 'trade-history-futures' },
+      ]} />
+  );
+
+  // 선물: the account's executions and forced liquidations (existing futures
+  // history API, 20 a page). Keyed by account so no other account's page or
+  // view survives a change of the pinned subject.
+  if (market === 'futures') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView testID="trade-history-futures-screen" contentContainerStyle={styles.content}>
+          {accountLine}
+          {marketSwitch}
+          {hasAccount ? <FuturesHistory key={accountId} accountId={accountId} /> : null}
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -354,11 +391,8 @@ export default function TradeHistoryScreen({ route }: Props) {
             {/* Which account owns every order below. The route pins this
                 subject, so changing the global account selection elsewhere
                 cannot retarget this history or its cancel button. */}
-            {accountDisplay ? (
-              <Text style={styles.accountHeader}>
-                {accountDisplay.title} · {accountDisplay.statusLabel}
-              </Text>
-            ) : null}
+            {accountLine}
+            {marketSwitch}
             {cancelMutation.isError && cancelMutation.variables && isCurrentCancel(cancelMutation.variables) ? (
               <View>
                 <Text style={styles.itemTitle}>주문 취소 실패</Text>
@@ -436,7 +470,7 @@ export default function TradeHistoryScreen({ route }: Props) {
                     </>
                   ) : <Text style={styles.helper}>수량 {display.quantity}</Text>}
                   <Text style={styles.helper}>
-                    {display.hasNoExecutionResult ? '지정가' : display.isPartialExecution ? '평균 체결가' : '실제 체결가격'}{' '}
+                    {display.hasNoExecutionResult ? '지정가' : display.isPartialExecution ? '평균 체결가' : '체결가'}{' '}
                     {display.hasNoExecutionResult
                       ? (display.limitPrice ?? display.price)
                       : display.price}{' '}
@@ -467,13 +501,13 @@ export default function TradeHistoryScreen({ route }: Props) {
                         </Text>
                       ) : null}
                       <Text style={styles.helper}>
-                        실제 총액 {display.grossAmount}
+                        총액 {display.grossAmount}
                       </Text>
                       <Text style={styles.helper}>
-                        실제 수수료 {display.feeAmount}
+                        수수료 {display.feeAmount}
                       </Text>
                       <Text style={styles.itemTitle}>
-                        {display.side === 'sell' ? '실제 수령액' : '실제 차감액'} {display.netAmount}
+                        {display.side === 'sell' ? '수령액' : '차감액'} {display.netAmount}
                       </Text>
                     </>
                   )}
@@ -545,6 +579,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   content: { padding: 16, paddingBottom: 24 },
+  marketSwitch: { marginBottom: 12 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   chip: {
     borderWidth: 1,

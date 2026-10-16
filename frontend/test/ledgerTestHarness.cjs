@@ -31,6 +31,10 @@ function srcKey(file, name) {
   return target.startsWith(SRC) ? '../../' + target.slice(SRC.length) : name;
 }
 
+// Status tones from PALETTES.light (theme/appearance.tsx) for SVG icons, whose
+// props take palette colors rather than the StyleSheet's semantic sentinels.
+const LIGHT_TONES = { success: '#166534', info: '#245b76', warning: '#725400', muted: '#697583' };
+
 function load(file, mocks) {
   const module = { exports: {} };
   const code = ts.transpileModule(readFileSync(file, 'utf8'), {
@@ -114,7 +118,7 @@ function load(file, mocks) {
     if (name.endsWith('/theme/native')) return withNativeDefaults(mocks['react-native']);
     if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
     if (name.endsWith('/theme/useReducedMotion')) return { useReducedMotion: () => false, useReducedMotionSettled: () => true };
-    if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', financialPreference: 'red_blue', financialColors: require('../src/theme/financialColors.ts').getFinancialColors('light'), mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd' }, setPreference() {} }) };
+    if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', financialPreference: 'red_blue', financialColors: require('../src/theme/financialColors.ts').getFinancialColors('light'), mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd', ...LIGHT_TONES }, setPreference() {} }) };
     // Interaction animation is a native boundary here; its real component has
     // separate render tests. Keep screen/query/gesture tests focused on actions.
     if (name.endsWith('/ActionPressable')) return { default: 'Pressable', __esModule: true };

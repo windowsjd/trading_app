@@ -10,7 +10,6 @@ import FuturesConditionalEntryForm, {
   type FuturesConditionalDraft,
 } from './FuturesConditionalEntryForm';
 import FuturesCandleChart from './FuturesCandleChart';
-import FuturesHistory from './FuturesHistory';
 import FuturesInstrumentSheet from './FuturesInstrumentSheet';
 import FuturesAmountField from './FuturesAmountField';
 import FuturesLeverageSelect, { type FuturesLeverageSheet } from './FuturesLeverageSelect';
@@ -58,6 +57,7 @@ import {
   freshFuturesEvidence,
   freshFuturesReference,
   futuresPriceBasisLabel,
+  futuresServerNow,
   futuresActionAllowed,
   futuresInputError,
   positionCommand,
@@ -106,7 +106,7 @@ export default function FuturesScreen(props: FuturesScreenProps) {
   return <BoundFuturesScreen key={`${props.route.params.accountId}:${props.route.params.instrumentId ?? ""}:${getSessionGeneration()}`} {...props} />;
 }
 
-type ListView = 'positions' | 'pending' | 'history';
+type ListView = 'positions' | 'pending';
 /** RN and RN-web ScrollView: the content container (absent from RN's legacy typings). */
 type InnerViewScroll = { getInnerViewRef?: () => View | null };
 
@@ -115,8 +115,8 @@ type InnerViewScroll = { getInnerViewRef?: () => View | null };
  * contract header (picker, 무기한, chart), its Last and Mark prices, then one
  * row with the trade form on the left (롱/숏, margin mode and leverage,
  * 주문방식, the USD order amount and its ratio, submit) and the contract's book
- * on the right — side by side on every phone width — then the futures wallet
- * and the positions/pending/history views. The amount is the position's USD
+ * on the right — side by side on every phone width — then the positions and
+ * pending views (records are in the central 거래 내역). The amount is the position's USD
  * notional; it becomes the contract quantity the existing commands take.
  * Futures keeps its own financial rules: execution on Futures Last, valuation
  * and liquidation on Mark, an individual liquidation price for isolated
@@ -355,12 +355,17 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       ? "increase"
       : operation
     : "open";
-  const timely = freshFuturesEvaluation(data.evaluatedAt, clock);
+  // Each read is judged on its own server clock (evaluatedAt + time since the
+  // request was sent), not on the device clock: a device a second or two ahead
+  // of the server made a fresh Mark flash "Mark 확인 불가" before every poll.
+  const positionsNow = futuresServerNow(data, clock);
+  const instrumentsNow = futuresServerNow(instruments.data, clock);
+  const timely = freshFuturesEvaluation(data.evaluatedAt, positionsNow);
   const crossFresh = data.positions
     .filter((p) => p.marginMode === "cross")
     .every(
       (p) =>
-        p.markState === "fresh" && freshFuturesEvidence(p.markEvidence, clock),
+        p.markState === "fresh" && freshFuturesEvidence(p.markEvidence, positionsNow),
     );
   const markFresh =
     !!futuresPrice(position ? position.markPrice : instrument?.markPrice) &&
@@ -368,10 +373,10 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     crossFresh &&
     (position
       ? position.markState === "fresh" &&
-        freshFuturesEvidence(position.markEvidence, clock)
-      : freshFuturesEvaluation(instruments.data?.evaluatedAt, clock) &&
+        freshFuturesEvidence(position.markEvidence, positionsNow)
+      : freshFuturesEvaluation(instruments.data?.evaluatedAt, instrumentsNow) &&
         instrument?.markState === "fresh" &&
-        freshFuturesEvidence(instrument.markEvidence, clock));
+        freshFuturesEvidence(instrument.markEvidence, instrumentsNow));
   const reference = position
     ? position.referencePrice
     : instrument?.referencePrice;
@@ -381,7 +386,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       position
         ? position.referencePriceEvidence
         : instrument?.referencePriceEvidence,
-      clock,
+      position ? positionsNow : instrumentsNow,
     );
   const selectedLeverage = position ? String(position.leverage) : leverage;
   const orderDirection = position?.direction ?? direction;
@@ -648,9 +653,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   // (the spoken names keep Long/Short).
   const compactSides = width < 220 * fontScale + 80;
   const compact = width < 600;
-  const accountLabel = binding.account.mode === "beginner" ? "초보모드" : binding.account.mode === "general"
-    ? "일반모드"
-    : (binding.account.season?.seasonName ?? "시즌 투자");
   return (
     <KeyboardAvoidingView
       style={styles.screen}
@@ -701,20 +703,17 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             </ActionPressable>
           ) : null}
         </View>
-        <Text style={styles.muted}>
-          {instrument ? `${instrument.underlying.name} · ` : ''}{accountLabel} · USD 가상 무기한 계약
-        </Text>
         {instrument ? (
           <>
             <View style={styles.prices} testID="futures-prices">
               <View style={[styles.priceCell, stackedControls && styles.full]}>
-                <Text style={styles.priceLabel}>현재가 · 선물 Last 거래 기준</Text>
+                <Text style={styles.priceLabel} accessibilityLabel="현재가 Last">Last</Text>
                 <Text selectable style={styles.price} testID="futures-last-price">
                   {referenceFresh ? price(reference, instrument) : "시세 확인 불가"}
                 </Text>
               </View>
               <View style={[styles.priceCell, stackedControls && styles.full]}>
-                <Text style={styles.priceLabel}>Mark Price · 평가/청산 기준</Text>
+                <Text style={styles.priceLabel} accessibilityLabel="Mark 가격">Mark</Text>
                 <Text selectable style={styles.price} testID="futures-mark-price">
                   {markFresh ? price(position?.markPrice ?? instrument.markPrice, instrument) : "Mark 확인 불가"}
                 </Text>
@@ -891,6 +890,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                         ratioReason={ratioReason}
                         onRatio={applyRatio}
                         available={availableText}
+                        availableTarget={questGuideTarget('futures-funding')}
                         onInputFocus={inputScroll.onInputFocus}
                         onInputBlur={inputScroll.onInputBlur}
                       />
@@ -970,20 +970,6 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             </View>
           ) : null}
         </View>
-        <View ref={questGuideTarget('futures-funding')} collapsable={false} style={styles.card} testID="futures-wallet">
-          <View style={styles.cardHeader}>
-            <Text accessibilityRole="header" style={styles.heading}>선물 지갑</Text>
-            <Text style={[styles.modeBadge, data.capabilities.tradingMode !== 'ENABLED' && styles.modeBadgeLimited]}>
-              {modeLabel[data.capabilities.tradingMode]}
-            </Text>
-          </View>
-          <Text style={styles.muted}>교차 담보도 선물 USD 지갑만 사용합니다.</Text>
-          <View style={styles.metrics}>
-            <Metric columns={stackedControls ? 1 : 3} label="선물 USD 현금" value={usd(data.collateral.balanceAmount)} />
-            <Metric columns={stackedControls ? 1 : 3} label="격리 할당 담보" value={usd(data.collateral.totalMarginUsed)} />
-            <Metric columns={stackedControls ? 1 : 3} label="사용 가능 담보" value={timely && crossFresh ? usd(data.collateral.freeCollateral) : "평가 대기"} />
-          </View>
-        </View>
         {data.cross.positionIds.length > 0 ? (
           <View style={styles.card} testID="futures-cross">
             <Text style={styles.heading}>교차(Cross) 공동 담보</Text>
@@ -1006,20 +992,19 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         ) : null}
         <View style={styles.section} testID="futures-lists">
           <Text accessibilityRole="header" style={styles.sectionTitle} testID="futures-lists-title">
-            {listView === 'pending' ? '대기 주문' : listView === 'history' ? '선물 기록' : `포지션 ${data.positions.length}`}
+            {listView === 'pending' ? '대기 주문' : `포지션 ${data.positions.length}`}
           </Text>
           <SegmentedControl testID="futures-lists-view" accessibilityLabel="선물 목록 보기" compact value={listView} onChange={setListView}
             options={[
               { key: 'positions', label: '포지션', testID: 'futures-view-positions' },
               { key: 'pending', label: '대기 주문', testID: 'futures-view-pending' },
-              { key: 'history', label: '기록', testID: 'futures-view-history' },
             ]} />
           {listView === 'positions' ? (
             !data.positions.length ? (
               <Text style={styles.muted}>보유 중인 선물 포지션이 없습니다.</Text>
             ) : (
               data.positions.map((p) => (
-                <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={clock}
+                <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={positionsNow}
                   disabled={locked} capabilities={data.capabilities}
                   onSelect={op => {
                     if (submitLock.current || pendingResult || limitBusy || conditionalBusy) return;
@@ -1030,10 +1015,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                   onTpSl={() => setTpSlTarget({ type: 'futures_position', accountId, positionId: p.id })} />
               ))
             )
-          ) : listView === 'pending' ? (
-            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} conditional />
           ) : (
-            <FuturesHistory key={accountId} accountId={accountId} instruments={allInstruments} />
+            <PendingOrders key={accountId} accountId={accountId} isFocused={focused} seasonUi={binding.account.mode === "season"} conditional />
           )}
         </View>
         {!final.isError && final.data?.settlement ? (
@@ -1182,10 +1165,7 @@ const styles = StyleSheet.create({
   notice: { fontSize: 14, lineHeight: 23, color: semantic.text },
   card: { padding: 14, borderRadius: 12, backgroundColor: semantic.surface, gap: 10, minWidth: 0 },
   unbound: { margin: 16 },
-  cardHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 4 },
   heading: { fontSize: 16, fontWeight: "700", lineHeight: 24, color: semantic.text },
-  modeBadge: { fontSize: 11, lineHeight: 15, fontWeight: '600', color: semantic.success, backgroundColor: semantic.successSurface, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 5, overflow: 'hidden' },
-  modeBadgeLimited: { color: semantic.warning, backgroundColor: semantic.warningSurface },
   muted: { color: semantic.secondary, fontSize: 13, lineHeight: 20, flexShrink: 1 },
   metrics: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 10 },
   metric: { minWidth: 0, gap: 2 },

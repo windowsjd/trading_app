@@ -263,6 +263,34 @@ describe('wallet ledger contract and real screen integration', () => {
     const currencyChip = chips(h, '통화')[0];
     assert.equal(currencyChip.type(currencyChip.props).props.accessibilityState.selected, true);
   });
+
+  it('puts each figure on the line of what it belongs to; the header names the account without its status', () => {
+    const h = createLedgerHarness({ data: page() });
+    const list = listOf(h);
+    const header = labels(list.props.ListHeaderComponent);
+    assert.equal(header.includes('선택 계정'), true);
+    assert.equal(header.some((label) => typeof label === 'string' && label.includes('운영 중')), false);
+    const line = (rendered, kind) => elements(rendered, 'View').find((node) => String(node.props.testID).endsWith(`-${kind}-line`));
+    const buy = list.props.renderItem({ item: list.props.data[2] });
+    // A trade: 매수 | - 1,000,000원, then the asset | 잔액, then quantity and currency · direction.
+    assert.deepEqual(labels(line(buy, 'amount')), ['매수', '- 1,000,000원']);
+    assert.deepEqual(labels(line(buy, 'balance')), ['삼성전자 · 005930', '잔액 9,000,000원']);
+    const extra = labels(buy).slice(4);
+    assert.equal(extra.includes('10주') && extra.includes('KRW · 출금'), true);
+    assert.equal(extra.at(-1), '2026-09-02 09:00', 'the time closes the card');
+    // Without an asset or transfer the currency and direction sit beside the balance.
+    const fx = list.props.renderItem({ item: list.props.data[0] });
+    assert.equal(labels(line(fx, 'balance'))[0], 'KRW · 출금');
+    assert.equal(labels(fx).filter((label) => label === 'KRW · 출금').length, 1, 'no repeated line');
+    // Lines wrap rather than clip: a long name or figure moves the figure under it, right-aligned.
+    for (const kind of ['amount', 'balance']) {
+      const style = line(buy, kind).props.style;
+      assert.equal(style.flexDirection === 'row' && style.flexWrap === 'wrap', true, kind);
+      const [start, end] = elements(line(buy, kind), 'Text').map((text) => Object.assign({}, ...[text.props.style].flat()));
+      assert.equal(start.flexShrink === 1 && start.minWidth === 0, true);
+      assert.equal(end.marginLeft === 'auto' && end.flexShrink === 1, true);
+    }
+  });
 });
 
 describe('ledger executed quantity contract', () => {

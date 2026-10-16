@@ -130,6 +130,11 @@ describe('selected account Wallet and shared Home holdings', () => {
         assert.equal(caption.props.accessible, false);
         assert.equal(surface.props.accessible, false);
       }
+      // 이체 (a wallet sending), 환전 (arrows closing a circle), 원장 (an open
+      // book) and 주문 내역 (a receipt) never share an icon.
+      const iconPaths = ['wallet-transfer', 'wallet-exchange', 'wallet-ledger', 'wallet-orders']
+        .map(id => elements(find(group, id), 'Path')[0].props.d);
+      assert.equal(new Set(iconPaths).size, 4, 'each wallet action has its own icon');
       assert.ok(nodes.indexOf(find(wallet, 'wallet-orders-label')) < nodes.indexOf(find(wallet, 'wallet-composition')));
       // 이체 opens a bottom sheet over Wallet instead of navigating to a page.
       const sheet = find(wallet, 'wallet-transfer-sheet');

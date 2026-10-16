@@ -61,7 +61,9 @@ stale/empty/loading/error states, server trading modes, account binding, 100x,
 long prices/signed PnL and glyph bounds. Additional checks cover a 320×300 focused
 input/submit viewport and a desktop capture. Output defaults to
 `/tmp/trading-f3-browser` (`FUTURES_BROWSER_OUTPUT` overrides). The viewport resize
-is Web evidence, not a physical Android/iOS keyboard test.
+is Web evidence, not a physical Android/iOS keyboard test. Execution and
+liquidation history left the Futures screen on 2026-10-16 (거래내역 → 선물, see
+`recordBrowser.cjs` `futures`); the screen's lists are 포지션 | 대기 주문.
 
 Login/Home recovery uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/portfolioRecoveryBrowser.cjs`. Production AppProviders, login,
@@ -191,6 +193,16 @@ It checks the secondary history CTAs and primary profit CTA at font scales 1/1.5
 in both appearances and financial palettes.
 The motion handover records the pre-existing 320px/2×-font history amount overflow
 found by that broader run, including reproduction against the starting HEAD.
+Since 2026-10-16 the default also runs `futures` (거래내역 → 선물: 체결 and 강제청산
+records from the existing futures history API, 다음/이전 paging, labels without the
+실제 prefix, back to 현물) and `ledger` (지갑 원장: the header names the account
+without its status; each figure shares its line's baseline with the text it
+belongs to or wraps under it right-aligned; short titles never break; glyphs stay
+inside the card), 96 layouts each (`futures`/`ledger` select them alone; the spot
+list the `futures` pass returns to is measured by `history`). `history` still
+reports that overflow: 320/360px × 2× × the 16-digit `long` amounts, 8 layouts,
+identical at 7fe9bd3a with the old 실제 labels (the right-aligned amount column
+cannot shrink an unbreakable number below its web min-content).
 
 `tradingBrowser.cjs` bundles the current chart-first detail and separate Order route, React Query cache,
 account-bound API wrappers, quote/create flow, shared SVG renderer and web
@@ -443,9 +455,11 @@ These RN Web checks do not replace Android/iOS device acceptance.
 Order methods (order UI 2nd phase) use `orderMethodBrowser.cjs` on the trading
 fixture with `?viewport=1` (a device-sized root, so bottom sheets anchor to the
 visible edge) inside the same `ScreenSheetHost` layer MainTabs provides. It
-checks 224 screens: 320/360/390/430px × Light/Dark × font scales 1/2 × the
+checks 360 screens: 320/360/390/430px × Light/Dark × font scales 1/1.5/2 × the
 unselected 주문방식 field, crypto/KRX BUY and KRX SELL sheets (every row
-reachable inside the sheet), Conditional BUY entry and registration, same-key
+reachable inside the sheet; on the KRX sheet each method's own line icon —
+시장가 bolt, 지정가 target, 조건주문 bell, LOC clock — stroked in the palette
+tone, never a StyleSheet sentinel, inside its circle and left of the name), Conditional BUY entry and registration, same-key
 replay answers (`conditionalResult=<state>`), KRX LOC entry, the account's
 conditional list (`conditionalRows=1` every state; `conditionalRows=many` old
 open rows behind 35 ended rows, 더 보기 and a lost cancel with

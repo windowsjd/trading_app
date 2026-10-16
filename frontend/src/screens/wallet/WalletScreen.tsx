@@ -126,7 +126,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-transfer',
       label: '이체하기',
-      iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
+      // A wallet with money leaving it for another wallet.
+      iconPath: 'M18 9.5V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-1.5 M11 12.5h10 M18 9.5l3 3-3 3',
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-transfer'),
@@ -136,7 +137,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-exchange',
       label: '환전하기',
-      iconPath: 'M4 7h16m-4-4 4 4-4 4 M20 17H4m4-4-4 4 4 4',
+      // Two currencies trading places: arrows closing a circle.
+      iconPath: 'M3.5 12a8.5 8.5 0 0 1 14.5-6l2 2 M20 3.5V8h-4.5 M20.5 12a8.5 8.5 0 0 1-14.5 6l-2-2 M4 20.5V16h4.5',
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-exchange'),
@@ -145,7 +147,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
     {
       testID: 'wallet-ledger',
       label: '원장 보기',
-      iconPath: 'M6 3h14v18H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Z M8 3v18 M11 8h6 M11 12h6 M11 16h4',
+      // An open ledger book.
+      iconPath: 'M2.5 5.5c2.7-1.2 6-1.1 9.5 1.3v13c-3.5-2.4-6.8-2.5-9.5-1.3z M21.5 5.5c-2.7-1.2-6-1.1-9.5 1.3v13c3.5-2.4 6.8-2.5 9.5-1.3z',
       disabled: false,
       hidden: false,
       questTarget: undefined,

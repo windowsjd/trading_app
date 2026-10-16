@@ -55,13 +55,13 @@ export default function FuturesMarginModeField({ value, onChange, disabled }: {
               <View style={styles.term}>
                 <Text accessibilityRole="header" style={styles.termTitle}>격리 (Isolated)</Text>
                 <Text style={styles.termText}>
-                  해당 포지션에 배정된 증거금을 기준으로 위험을 관리합니다. 다른 교차 포지션의 공동 담보와 구분됩니다.
+                  이 포지션에 사용할 증거금을 따로 정해두는 방식입니다. 다른 교차 포지션과 담보를 공유하지 않습니다.
                 </Text>
               </View>
               <View style={styles.term}>
                 <Text accessibilityRole="header" style={styles.termTitle}>교차 (Cross)</Text>
                 <Text style={styles.termText}>
-                  선물 지갑의 공동 담보를 교차 포지션들이 함께 사용합니다. 다른 교차 포지션의 손익과 위험도 사용 가능 담보에 영향을 줄 수 있습니다.
+                  여러 교차 포지션이 선물 지갑의 담보를 함께 사용하는 방식입니다. 한 포지션의 손익이 다른 교차 포지션에도 영향을 줄 수 있습니다.
                 </Text>
               </View>
             </View>

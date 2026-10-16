@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
 import { financial } from '../../theme/financialColors.ts';
+import { semantic } from '../../theme/tokens.ts';
 const require = createRequire(import.meta.url);
 const { inlineTradingHarness, act } = require('../../../test/inlineTradingHarness.cjs');
 const { interactionHarness, flatten, React } = require('../../../test/interactionTestHarness.cjs');
@@ -218,6 +219,32 @@ describe('주문방식 field and sheet', () => {
       }
     });
   }
+
+  it('each method has its own line icon (bolt, target, bell, clock); no arrow or circle glyphs, no 손절가/익절가 row', async (t) => {
+    const h = inlineTradingHarness();
+    h.method = null;
+    h.assetId = 'samsung';
+    h.assets.samsung.assetType = 'domestic_stock';
+    await h.mount(); t.after(h.close);
+    await h.press(TEST_IDS.order.typeSelect);
+    assert.deepEqual(methods(h), ['market', 'limit', 'conditional', 'loc']);
+    const paths = methods(h).map((method) => {
+      const icon = h.node(`order-method-${method}-icon`);
+      assert.equal(icon !== undefined, true, method);
+      const drawn = icon.findAll((n: any) => n.type === 'Path');
+      assert.equal(drawn.length, 1, method);
+      assert.equal(icon.findAll((n: any) => n.type === 'Text').length, 0, `${method}: no text glyph`);
+      // SVG props are not resolved by the themed StyleSheet: a semantic
+      // sentinel (#0f00xx) would draw a near-black stroke in both appearances.
+      const stroke = String(icon.findAll((n: any) => n.type === 'Svg')[0]?.props.stroke);
+      assert.equal(/^#[0-9a-f]{6}$/i.test(stroke) && !Object.values(semantic).includes(stroke as never), true, `${method}: palette stroke ${stroke}`);
+      return drawn[0].props.d;
+    });
+    assert.equal(new Set(paths).size, 4);
+    const sheet = JSON.stringify(h.node('order-method-sheet') ? h.renderer.toJSON() : null);
+    assert.equal(/[→↓◎◑]/.test(sheet), false, 'the character glyphs are gone');
+    assert.equal(h.node('order-method-protection') === undefined, true, '손절가/익절가 stays off the method list');
+  });
 
   it('the backdrop, the close button and Android back close the sheet without choosing', async (t) => {
     const h = inlineTradingHarness();

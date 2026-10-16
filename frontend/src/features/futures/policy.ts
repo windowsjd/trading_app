@@ -60,6 +60,24 @@ export function positionCommand(
     idempotencyKey: key,
   };
 }
+/**
+ * The server's clock for one polled read: its evaluatedAt plus the device time
+ * elapsed since the request was sent. The device clock is used only as a
+ * stopwatch, so its offset from the server cannot age a fresh Mark or make a
+ * new response look like the future; and since the request was sent before the
+ * server evaluated it, every age read this way is at least the server's. A read
+ * without its send time (or a malformed evaluatedAt) keeps the device clock.
+ */
+export function futuresServerNow(
+  read: { evaluatedAt: string; clientRequestedAt?: number } | null | undefined,
+  deviceNow: number,
+) {
+  const evaluated = read ? Date.parse(read.evaluatedAt) : NaN;
+  if (!read || read.clientRequestedAt === undefined || !Number.isFinite(evaluated))
+    return deviceNow;
+  return evaluated + Math.max(0, deviceNow - read.clientRequestedAt);
+}
+
 export function freshFuturesEvaluation(
   evaluatedAt: string | undefined,
   now: number,

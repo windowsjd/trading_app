@@ -9,6 +9,7 @@ import { TradingAccountProvider } from '../../src/features/tradingAccount/Tradin
 import Detail from '../../src/screens/record/RecordSeasonDetailScreen';
 import Profit from '../../src/screens/record/RecordProfitAnalysisScreen';
 import History from '../../src/screens/history/TradeHistoryScreen';
+import Ledger from '../../src/screens/home/WalletTransactionsScreen';
 import { transport } from './recordMocks';
 const params = new URLSearchParams(location.search);
 const Stack = createNativeStackNavigator();
@@ -20,6 +21,7 @@ function App() {
     <Stack.Screen name="detail" component={Detail} initialParams={{ seasonId: 'record-0' }} />
     <Stack.Screen name="profit" component={Profit} initialParams={{ seasonId: 'record-0' }} />
     <Stack.Screen name="history" component={History} initialParams={{ seasonId: 'record-0' }} />
+    <Stack.Screen name="ledger" component={Ledger} initialParams={{ currencyCode: params.get('currency') ?? 'KRW' }} />
   </Stack.Navigator></NavigationContainer>;
 }
 createRoot(document.getElementById('root')).render(<SafeAreaProvider initialMetrics={{ frame: { x: 0, y: 0, width: innerWidth, height: innerHeight }, insets: { top: 0, bottom: 0, left: 0, right: 0 } }}>

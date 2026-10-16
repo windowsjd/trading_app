@@ -19,7 +19,7 @@ const ids = (node: any) => node.children.filter((child: any) => typeof child !==
 const contains = (h: H, parent: string, child: string) =>
   h.node(parent).findAll((n: any) => typeof n.type === 'string' && n.props.testID === child).length;
 
-test('the form and the book sit side by side on every phone width; wallet and lists stay full width', async t => {
+test('the form and the book sit side by side on every phone width; the lists stay full width', async t => {
   for (const dimensions of [{ width: 320, height: 640, fontScale: 2 }, { width: 360, height: 760, fontScale: 1.5 }, { width: 430, height: 932, fontScale: 1 }]) {
     const h = futuresHarness({ dimensions });
     await h.start(); t.after(h.close);
@@ -28,7 +28,7 @@ test('the form and the book sit side by side on every phone width; wallet and li
     assert.deepEqual(ids(row), ['futures-trade', 'futures-price-column']);
     assert.equal(contains(h, 'futures-price-column', 'futures-order-book-card'), 1, 'the book is the right column');
     assert.equal(contains(h, 'futures-trade', 'futures-order-book-card'), 0);
-    for (const full of ['futures-wallet', 'futures-lists']) assert.equal(contains(h, 'futures-trading-columns', full), 0, full);
+    assert.equal(contains(h, 'futures-trading-columns', 'futures-lists'), 0, 'futures-lists');
     // The book keeps its collapse toggle and Futures Last row.
     assert.equal(h.node('futures-order-book-toggle').props.accessibilityState.expanded, true);
     assert.equal(h.node('futures-order-book-last') !== undefined, true);
@@ -44,8 +44,8 @@ test('removed copy: the book note and the 시장가 price box; 주문가능 show
   assert.equal(text(h, 'futures-available-collateral'), '주문가능 9,995 USD');
   assert.equal(h.node('futures-amount').props.placeholder, 'USD 금액');
   assert.match(h.text(), /주문 금액 \(USD\)/);
-  // The wallet card keeps its own terms; Last and Mark stay distinct.
-  assert.match(h.text(), /사용 가능 담보/);
+  // No separate wallet card repeats it; Last and Mark stay distinct.
+  assert.equal(/사용 가능 담보|선물 USD 현금/.test(h.text()), false);
   assert.match(text(h, 'futures-last-price'), /102/);
   assert.match(text(h, 'futures-mark-price'), /101/);
   const unknown = futuresHarness({ freeCollateral: null });
@@ -283,13 +283,14 @@ test('leverage: presets, 직접 설정하기 for any integer 1–100, cancel kee
 test('증거금 모드 ⓘ explains 격리 and 교차 only in its help sheet; the switch is unchanged', async t => {
   const h = futuresHarness();
   await h.start(); t.after(h.close);
-  assert.doesNotMatch(h.text(), /공동 담보를 교차 포지션들이 함께 사용합니다/);
+  assert.doesNotMatch(h.text(), /교차 포지션이 선물 지갑의 담보를 함께 사용하는 방식입니다/);
   const info = h.node('futures-margin-info');
   assert.equal(info.props.accessibilityLabel, '증거금 모드 설명');
   assert.equal(info.props.hitSlop, 10, 'a small mark with a 44pt target');
   await h.press('futures-margin-info');
-  assert.match(text(h, 'futures-margin-info-body') + h.text(), /해당 포지션에 배정된 증거금을 기준으로 위험을 관리합니다/);
-  assert.match(h.text(), /선물 지갑의 공동 담보를 교차 포지션들이 함께 사용합니다/);
+  // The approved beginner wording (option A), word for word.
+  assert.match(text(h, 'futures-margin-info-body') + h.text(), /이 포지션에 사용할 증거금을 따로 정해두는 방식입니다\. 다른 교차 포지션과 담보를 공유하지 않습니다\./);
+  assert.match(h.text(), /여러 교차 포지션이 선물 지갑의 담보를 함께 사용하는 방식입니다\. 한 포지션의 손익이 다른 교차 포지션에도 영향을 줄 수 있습니다\./);
   await h.choose('교차(Cross)');
   await h.amount('102');
   await h.press('futures-submit');

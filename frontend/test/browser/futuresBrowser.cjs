@@ -27,7 +27,8 @@ async function main() {
       await page.evaluate(value=>window.futuresAppearance.setPreference(value),theme);
       await page.waitForFunction(value=>window.futuresAppearance.mode===value,theme);
       await page.waitForTimeout(70);
-      if(kind==='cross') { await page.getByTestId('futures-view-history').click(); await page.getByRole('tab',{name:'강제청산 기록',exact:true}).click(); await page.getByText('Mark 청산가',{exact:true}).waitFor(); }
+      // 2026-10-16: 체결·강제청산 기록 moved to 거래내역 > 선물 (recordBrowser futures screen); the lists are 포지션 | 대기 주문.
+      if(kind==='cross') { assert.equal(await page.getByTestId('futures-view-history').count(),0); await page.getByTestId('futures-view-pending').waitFor(); }
       const overflow=await page.evaluate(()=>[...document.querySelectorAll('div,span')].flatMap(el=>{
         const r=el.getBoundingClientRect(),s=getComputedStyle(el); if (!r.width||!r.height) return [];
         // The book beside the form scrolls sideways (호가 좌우로 밀기): its rows may extend past the edge.
@@ -46,7 +47,7 @@ async function main() {
         const requests=await page.evaluate(()=>window.futuresFixture.requests);assert.equal(requests.length,1);assert.equal(requests[0].body.quantity,'0.25');assert.equal(requests[0].body.leverage,100);
       }
       const label=`${width}-${theme}-${fontScale}-${kind}`; results.push(label);
-      if(width===320 && fontScale===2 && ['isolated','cross','stale','open'].includes(kind)) { await page.screenshot({path:path.join(out,label+'.png'),fullPage:true}); if(kind==='cross') { await page.getByText('Mark 청산가',{exact:true}).scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-history-viewport.png')}); } await page.evaluate(()=>scrollTo(0,0)); await page.getByTestId('futures-trade').scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-viewport.png')}); }
+      if(width===320 && fontScale===2 && ['isolated','cross','stale','open'].includes(kind)) { await page.screenshot({path:path.join(out,label+'.png'),fullPage:true}); await page.evaluate(()=>scrollTo(0,0)); await page.getByTestId('futures-trade').scrollIntoViewIfNeeded(); await page.screenshot({path:path.join(out,label+'-viewport.png')}); }
     }
     for(const mode of ['REDUCE_ONLY','DISABLED']) {
       await page.goto(`${base}/?kind=cross&mode=${mode}`); await page.getByTestId('futures-submit').waitFor();

@@ -59,3 +59,67 @@ it('foreign/missing subjects cannot fall back to the selected account', async t 
   assert.equal(h.orderOptions.enabled, false); assert.equal(h.requests.length, 0);
   assert.match(h.text(), /이 시즌의 계정을 찾을 수 없습니다/);
 });
+
+const has = (h: any, pattern: RegExp) => pattern.test(h.text());
+
+it('현물 | 선물: 선물 reads the pinned account\'s futures executions and liquidations; 현물 keeps the orders', async t => {
+  const h = createRecordScreenHarness('history', { accountId: 'historical' }); t.after(h.close); await h.settle();
+  assert.equal(Boolean(h.find('trade-history-market')), true);
+  await act(async () => h.renderer.root.findByType('FlatList').props.onEndReached()); await h.settle();
+  assert.equal(has(h, /체결가 70,000/), true, '현물 labels lose the 실제 prefix');
+  assert.equal(has(h, /실제 /), false);
+  assert.equal(has(h, /총액 70,000/) && has(h, /수수료 70/) && has(h, /수령액 69,930/), true);
+  assert.equal(has(h, /예약금 100,000/), true, 'a reservation stays a reservation');
+
+  await h.press('trade-history-futures');
+  assert.equal(Boolean(h.find('trade-history-futures-screen')), true);
+  assert.equal(h.orderOptions.enabled, false, 'the order list and its polling wait while 선물 is shown');
+  assert.equal(h.requests.some(r => r.path === '/trading-accounts/historical/futures/executions?limit=20&offset=0'), true);
+  assert.equal(has(h, /BTCUSDT · 신규 진입\(Open\) · 롱\(Long\)/), true);
+  assert.equal(has(h, /수량 \/ 체결가/) && has(h, /실현 손익 \/ 수수료/), true);
+
+  // Another account selected elsewhere never retargets this pinned history.
+  h.selectedAccount = h.accounts[1]; await h.update();
+  await h.press('futures-history-liquidations');
+  assert.equal(h.requests.some(r => r.path === '/trading-accounts/historical/futures/liquidations?limit=20&offset=0'), true);
+  assert.equal(h.requests.filter(r => r.path.includes('/futures/')).every(r => r.path.startsWith('/trading-accounts/historical/')), true);
+  assert.equal(has(h, /전량 강제청산/) && has(h, /경제적 실현 손익/) && has(h, /경제적 종료 수수료/), true);
+  assert.equal(has(h, /정산 수수료/) && has(h, /현금 정산/) && has(h, /미충당 손실/), true);
+  assert.equal(has(h, /종료 수량/) && has(h, /Mark 청산가/), true);
+  assert.equal(has(h, /실제 |예상 청산가/), false);
+
+  await h.press('trade-history-spot');
+  assert.equal(Boolean(h.find('record-order-list-screen')), true);
+  assert.equal(h.orderOptions.enabled, true);
+});
+
+it('선물 records: a failed read offers a retry, and no records is a normal empty state', async t => {
+  const h = createRecordScreenHarness('history', { accountId: 'historical' }); t.after(h.close); await h.settle();
+  h.futuresFailure = new Error('offline');
+  await h.press('trade-history-futures');
+  assert.equal(has(h, /기록을 불러오지 못했습니다/), true);
+  h.futuresFailure = null;
+  h.futuresData = (key: string) => (key === 'executions'
+    ? { tradingAccountId: 'historical', pagination: { limit: 20, offset: 0, total: 0, returned: 0, nextOffset: null }, executions: [] }
+    : undefined);
+  const retry = h.renderer.root.findAll((n: any) => n.props?.label === '기록 다시 불러오기')[0];
+  await act(async () => retry.props.onPress()); await h.settle();
+  assert.equal(has(h, /기록이 없습니다/), true);
+  assert.equal(has(h, /기록을 불러오지 못했습니다/), false);
+});
+
+it('선물 records page 20 at a time with 이전/다음; a page replaces the previous one', async t => {
+  const h = createRecordScreenHarness('history', { accountId: 'historical' }); t.after(h.close); await h.settle();
+  const row = (id: string) => ({ id, operation: 'open', direction: 'long', quantity: '1', executionPrice: '100', realizedPnl: '0', feeAmount: '0.1',
+    executedAt: '2026-10-16T00:00:00.000Z', instrument: { id: 'btc', underlying: { symbol: 'BTCUSDT', displayPriceDecimals: 2 } } });
+  const page = (offset: number) => ({ tradingAccountId: 'historical', pagination: { limit: 20, offset, total: 21, returned: offset ? 1 : 20, nextOffset: offset ? null : 20 },
+    executions: Array.from({ length: offset ? 1 : 20 }, (_, i) => row(`execution-${offset + i}`)) });
+  h.futuresData = (key: string, path: string) => (key === 'executions' ? page(/offset=20/.test(path) ? 20 : 0) : undefined);
+  await h.press('trade-history-futures');
+  const pageButton = (label: string) => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.accessibilityLabel === label)[0];
+  assert.equal(pageButton('이전').props.accessibilityState.disabled, true);
+  await act(async () => pageButton('다음').props.onPress()); await h.settle();
+  assert.equal(h.requests.some(r => r.path === '/trading-accounts/historical/futures/executions?limit=20&offset=20'), true);
+  assert.equal(pageButton('다음').props.accessibilityState.disabled, true, 'no page after the last');
+  assert.equal(pageButton('이전').props.accessibilityState.disabled, false);
+});

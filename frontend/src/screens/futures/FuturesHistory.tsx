@@ -4,7 +4,7 @@ import { useIsFocused } from '@react-navigation/native';
 import { StyleSheet, Text, View } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import { QUERY_KEYS } from '../../constants/queryKeys';
-import { getFuturesHistory, type FuturesInstrument } from '../../features/futures/api';
+import { getFuturesHistory, getFuturesInstruments } from '../../features/futures/api';
 import { futuresPriceBasisLabel } from '../../features/futures/policy';
 import { formatAssetPrice, formatDisplayDecimal, formatUsd } from '../../utils/format';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -22,12 +22,13 @@ const operationLabel = {
 };
 
 /**
- * The account's futures executions and forced liquidations, 20 per page. Read
- * only while shown (the screen's 기록 view); each record states the price basis
- * it was actually executed on, and liquidation separates economic loss, actual
- * cash and the uncovered shortfall.
+ * The account's futures executions and forced liquidations, 20 per page, from
+ * the existing futures history API (the central 거래 내역's 선물 view). Read
+ * only while shown; each record states the price basis it was actually
+ * executed on, and liquidation separates economic loss, the cash settled and
+ * the uncovered shortfall.
  */
-export default function FuturesHistory({ accountId, instruments }: { accountId: string; instruments: FuturesInstrument[] }) {
+export default function FuturesHistory({ accountId }: { accountId: string }) {
   const focused = useIsFocused();
   const [historyKind, setHistoryKind] = useState<'executions' | 'liquidations'>('executions');
   const [offset, setOffset] = useState(0);
@@ -37,6 +38,15 @@ export default function FuturesHistory({ accountId, instruments }: { accountId: 
     enabled: focused,
     retry: false,
   });
+  // Only a liquidation close lacks its contract: its display decimals come from
+  // the catalog (the futures screen's cache entry); unknown keeps 8.
+  const catalog = useQuery({
+    queryKey: QUERY_KEYS.tradingAccount.futures.instruments(accountId),
+    queryFn: ({ signal }) => getFuturesInstruments(accountId, signal),
+    enabled: focused && historyKind === 'liquidations',
+    retry: false,
+  });
+  const instruments = !catalog.isError && catalog.data?.tradingAccountId === accountId ? catalog.data.instruments : [];
   return (
     <View style={styles.stack} testID="futures-history">
       <SegmentedControl testID="futures-history-kind" accessibilityLabel="선물 기록 종류" compact value={historyKind}
@@ -72,8 +82,8 @@ export default function FuturesHistory({ accountId, instruments }: { accountId: 
               <Text style={styles.recordTitle}>{marginLabel[e.marginMode]} 전량 강제청산 · {e.closes.length}개 포지션</Text>
               <Metric label="경제적 실현 손익" value={usd(e.realizedPnl)} />
               <Metric label="경제적 종료 수수료" value={usd(e.feeAmount)} />
-              {e.settledFee !== undefined ? <Metric label="실제 정산 수수료" value={usd(e.settledFee)} /> : null}
-              <Metric label="실제 현금 정산" value={usd(e.settledCash)} />
+              {e.settledFee !== undefined ? <Metric label="정산 수수료" value={usd(e.settledFee)} /> : null}
+              <Metric label="현금 정산" value={usd(e.settledCash)} />
               <Metric label="미충당 손실 · 부채 이월 없음" value={usd(e.bankruptcyShortfall)} />
               {e.closes.map((c) => (
                 <View key={c.positionId} style={styles.record}>

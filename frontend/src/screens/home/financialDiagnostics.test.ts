@@ -7,6 +7,7 @@ const { financialDiagnosticsHarness, failure, act, QUERY_KEYS } = require('../..
 const { walletTransferHarness } = require('../../../test/walletTransferHarness.cjs');
 const { inlineTradingHarness } = require('../../../test/inlineTradingHarness.cjs');
 const { futuresHarness } = require('../../../test/futuresHarness.cjs');
+const { createRecordScreenHarness } = require('../../../test/recordScreenHarness.cjs');
 const { createTradingUiHarness, elements } = require('../../../test/tradingUiHarness.cjs');
 const forbidden = /fake-only-token|fake-password|db\.invalid|provider\.invalid|RAW_EXCEPTION|184527\.938475/;
 const renderedText = (h: any) => h.renderer.root.findAllByType('Text')
@@ -346,13 +347,24 @@ for (const stage of ['quote', 'create']) for (const role of ['user', 'operator',
   assert.equal(h.node('admin-diagnostic-panel') === undefined, true); assert.equal(h.success().visible, true);
 });
 
-for (const resource of ['instruments', 'executions']) for (const role of ['user', 'operator', 'admin']) it(`Futures ${resource} query failure connects its original error for ${role}`, async t => {
+for (const role of ['user', 'operator', 'admin']) it(`Futures executions query failure connects its original error for ${role}`, async t => {
+  // Futures records are read in the central 거래 내역's 선물 view.
+  const h = createRecordScreenHarness('history', { accountId: 'historical' }, { role }); const error = failure('futures-executions');
+  h.flush = h.settle; t.after(h.close); await h.settle();
+  h.futuresFailure = error;
+  await h.press('trade-history-futures');
+  const notice = h.renderer.root.findAll((node: any) => node.type.name === 'ErrorNotice').find((node: any) => node.props.error === error);
+  assert.ok(notice); assert.equal(Boolean(h.find('admin-diagnostic-panel')), role === 'admin'); await expandPanels(h);
+  assert.doesNotMatch(renderedText(h), forbidden);
+  if (role === 'admin') assert.ok(renderedText(h).includes('futures-executions'));
+  h.futuresFailure = null; await act(async () => h.client.refetchQueries()); await h.settle();
+  assert.equal(h.find('admin-diagnostic-panel') === undefined, true);
+});
+
+for (const resource of ['instruments']) for (const role of ['user', 'operator', 'admin']) it(`Futures ${resource} query failure connects its original error for ${role}`, async t => {
   const h = futuresHarness({ diagnostics: true, role }); const error = failure(`futures-${resource}`);
-  const suffix = resource === 'executions' ? 'executions?limit=20&offset=0' : resource;
-  h.readFailures = { [`/trading-accounts/A/futures/${suffix}`]: error };
+  h.readFailures = { [`/trading-accounts/A/futures/${resource}`]: error };
   t.after(h.close); await h.start();
-  // History is read in the screen's 기록 view.
-  if (resource === 'executions') await h.view('history');
   const notice = h.renderer.root.findAll((node: any) => node.type.name === 'ErrorNotice').find((node: any) => node.props.error === error);
   assert.ok(notice); assert.equal(Boolean(h.node('admin-diagnostic-panel')), role === 'admin'); await expandPanels(h);
   assert.doesNotMatch(renderedText(h), forbidden);

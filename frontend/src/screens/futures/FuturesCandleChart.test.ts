@@ -34,7 +34,7 @@ test('shows the selected contract chart from the account-free futures market-dat
   assert.deepEqual(keys, [JSON.stringify(['futuresMarket', 'candles', 'btc', '96d', '4h', 600])]);
   // Contract basis and the separate Mark role are both stated.
   assert.match(h.text(), /선물 계약 거래가격\(Last\) 기준/);
-  assert.match(h.text(), /Mark Price · 평가\/청산 기준/);
+  assert.match(h.text(), /Mark Price는 차트와 별개로 평가·청산에만 쓰입니다/);
   assert.match(h.text(), /마지막 봉은 진행 중인 잠정 봉입니다/);
 });
 

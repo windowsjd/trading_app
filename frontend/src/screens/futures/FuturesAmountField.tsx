@@ -14,7 +14,7 @@ const RATIOS = [0.25, 0.5, 0.75, 1] as const;
  * and the 주문가능 line. The screen owns the amount, the ratio and their rules.
  */
 export default function FuturesAmountField({ label, amount, onChange, editable, estimate, ratioLabel, ratio, activeRatio,
-  ratioDisabled, ratioReason, onRatio, available, onInputFocus, onInputBlur }: {
+  ratioDisabled, ratioReason, onRatio, available, availableTarget, onInputFocus, onInputBlur }: {
   label: string;
   amount: string;
   onChange: (amount: string) => void;
@@ -29,6 +29,8 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
   ratioReason: string | null;
   onRatio: (ratio: number) => void;
   available: string;
+  /** The beginner guide's 선물 지갑 준비 step points at the 주문가능 line. */
+  availableTarget?: React.Ref<View>;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
 }) {
@@ -95,7 +97,9 @@ export default function FuturesAmountField({ label, amount, onChange, editable, 
         })}
       </View>
       {ratioReason ? <Text style={styles.helper} testID="futures-ratio-reason" accessibilityLiveRegion="polite">{ratioReason}</Text> : null}
-      <Text style={styles.helper} testID="futures-available-collateral">{available}</Text>
+      <View ref={availableTarget} collapsable={false} style={styles.group}>
+        <Text style={styles.helper} testID="futures-available-collateral">{available}</Text>
+      </View>
     </View>
   );
 }

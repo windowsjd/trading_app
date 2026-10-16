@@ -6,6 +6,7 @@ const query = require('@tanstack/react-query');
 const { resolve } = require('node:path');
 const { load } = require('./ledgerTestHarness.cjs');
 const { recordDetail, recordEquity } = require('./recordFixtures.ts');
+const { futuresFixture } = require('./futuresFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 /** @param {import('../src/app/navigation/types').RootStackParamList['TradeHistory']} scope */
 function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'record-0' }, { detail = recordDetail(), role = 'user' } = {}) {
@@ -22,6 +23,11 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
       let data;
       if (path.startsWith('/records/me/seasons/')) {
         data = path.includes('/equity') ? h.equity : h.detail;
+      } else if (path.includes('/futures/')) {
+        // The existing futures history API (executions/liquidations) and catalog.
+        if (h.futuresFailure) throw h.futuresFailure;
+        const key = path.includes('/executions') ? 'executions' : path.includes('/liquidations') ? 'liquidations' : 'catalog';
+        data = h.futuresData?.(key, path) ?? futuresFixture(path.split('/')[2], { position: true })[key];
       } else {
         const all = h.orders.filter(row => !config.params.side || row.side === config.params.side);
         const offset = config.params.offset, orders = all.slice(offset, offset + h.pageLimit);
@@ -45,6 +51,7 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
   native.FlatList = ({ data, renderItem, ListHeaderComponent, ListFooterComponent, ...props }) => React.createElement('FlatList', props, ListHeaderComponent, ...data.map((item, index) => React.cloneElement(renderItem({ item, index }), { key: item.id })), ListFooterComponent);
   const recordApi = load(resolve('src/features/record/api.ts'), { '../../services/api/client': transport });
   const accountApi = load(resolve('src/features/tradingAccount/api.ts'), { '../../services/api/client': transport });
+  const futuresApi = load(resolve('src/features/futures/api.ts'), { '../../services/api/client': transport });
   const mocks = {
     'react-native': native,
     '@react-navigation/native': { useIsFocused: () => h.focused !== false },
@@ -52,6 +59,7 @@ function createRecordScreenHarness(screen = 'detail', scope = { seasonId: 'recor
     '../../features/me/api': { getMe: async () => ({ role }) },
     '../../features/record/api': recordApi,
     '../../features/tradingAccount/api': accountApi,
+    '../../features/futures/api': futuresApi,
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts, selectedAccount: h.selectedAccount, isLoading: false, isError: false }) },
     '../../components/charts': { LineChart: 'LineChart' },
   };

@@ -158,7 +158,7 @@ test("Reduce/Close accepts a quiet market's re-confirmed older Futures Last trad
   const h = futuresHarness({ position: true, stale: true, oldReference: true });
   await h.start();
   t.after(h.close);
-  assert.match(h.text(), /현재가 · 선물 Last 거래 기준/);
+  assert.equal(words(h.node("futures-last-price")), "$102");
   await h.choose("전량 종료(Close)");
   assert.equal(h.node("futures-submit").props.state, "enabled");
   await h.press("futures-submit");
@@ -314,17 +314,6 @@ test("logout/login generation suppresses old success and cache invalidation", as
   assert.doesNotMatch(h.text(), /체결 완료/);
   assert.equal(h.invalidations.length, 0);
 });
-test("liquidation history exposes economic loss, actual cash and shortfall separately", async (t) => {
-  const h = futuresHarness({ position: true, marginMode: "cross" });
-  await h.start();
-  t.after(h.close);
-  await h.view("history");
-  await h.choose("강제청산 기록");
-  assert.match(h.text(), /경제적 실현 손익/);
-  assert.match(h.text(), /실제 현금 정산/);
-  assert.match(h.text(), /미충당 손실/);
-  assert.doesNotMatch(h.text(), /예상 청산가/);
-});
 test("scope mismatch and failed refresh hide financial data", async (t) => {
   const h = futuresHarness();
   h.wrongScope = "B";
@@ -375,4 +364,97 @@ test("opening with no free collateral is refused on press; reduce and unknown co
   await reducing.press("futures-position-A:position-reduce");
   await reducing.amount("51");
   assert.equal(reducing.node("futures-collateral-insufficient") === undefined, true, "risk reduction needs no new collateral");
+});
+
+test("the header keeps the contract, its Last and Mark and the chart; no subtitle, wallet card or 기록 view", async (t) => {
+  const h = futuresHarness({ position: true });
+  await h.start();
+  t.after(h.close);
+  const text = h.text();
+  assert.equal(/USD 가상 무기한 계약|선물 Last 거래 기준|평가\/청산 기준/.test(text), false);
+  assert.equal(/"Last"/.test(text) && /"Mark"/.test(text), true, "minimal Last / Mark names stay");
+  assert.equal(words(h.node("futures-last-price")), "$102");
+  assert.equal(words(h.node("futures-mark-price")), "$101");
+  assert.equal(h.node("futures-chart-toggle") !== undefined, true);
+  assert.equal(h.node("futures-wallet") === undefined, true, "the futures wallet card is gone");
+  assert.match(words(h.node("futures-available-collateral")), /주문가능 9,995(\.00)? USD/);
+  assert.equal(h.node("futures-cross") === undefined, true, "isolated: no Cross card");
+  assert.equal(h.node("futures-view-positions") !== undefined && h.node("futures-view-pending") !== undefined, true);
+  assert.equal(h.node("futures-view-history") === undefined, true, "records moved to the central 거래 내역");
+  assert.equal(h.node("futures-position-A:position") !== undefined, true);
+  assert.equal(h.node("futures-position-A:position-protection") !== undefined, true, "손절가/익절가 설정 stays");
+});
+
+test("a Cross position keeps its shared-collateral risk card", async (t) => {
+  const h = futuresHarness({ position: true, marginMode: "cross" });
+  await h.start();
+  t.after(h.close);
+  assert.equal(h.node("futures-cross") !== undefined, true);
+  assert.equal(/청산 여유/.test(h.text()), true);
+});
+
+/** Advance the device clock without a new read (the screen re-renders each second). */
+async function deviceClockPlus(h: any, t: any, ms: number) {
+  const real = Date.now;
+  Date.now = () => real() + ms;
+  t.after(() => { Date.now = real; });
+  await h.update();
+}
+
+for (const [label, offset] of [["2 s ahead of", -2000], ["1.5 s behind", 1500]] as const)
+  test(`a device clock ${label} the server keeps a fresh Mark fresh between reads`, async (t) => {
+    const h = futuresHarness({ serverClockOffsetMs: offset, markPrice: "102" });
+    await h.start();
+    t.after(h.close);
+    assert.equal(words(h.node("futures-mark-price")), "$102");
+    // 2.1 s without a new read: on the device clock a device 2 s ahead sees this
+    // Mark 5.1 s old ("Mark 확인 불가"); on the read's server clock it is 3.1 s.
+    await deviceClockPlus(h, t, 2100);
+    assert.equal(words(h.node("futures-mark-price")), "$102");
+    assert.equal(/Mark가 없거나 오래되었습니다/.test(h.text()), false);
+    await h.amount("51");
+    assert.equal(h.node("futures-submit").props.state, "enabled");
+  });
+
+test("a Mark that is really old, or reads that stop, still show the warning and block Open", async (t) => {
+  const stale = futuresHarness({ serverClockOffsetMs: -2000, stale: true });
+  await stale.start();
+  t.after(stale.close);
+  assert.equal(words(stale.node("futures-mark-price")), "Mark 확인 불가");
+  assert.equal(/Mark가 없거나 오래되었습니다/.test(stale.text()), true);
+  await stale.amount("51");
+  assert.equal(stale.node("futures-submit").props.state, "disabled");
+
+  const h = futuresHarness({ serverClockOffsetMs: -2000, markPrice: "102" });
+  await h.start();
+  t.after(h.close);
+  await h.amount("51");
+  assert.equal(h.node("futures-submit").props.state, "enabled");
+  // 4.5 s without a read: the Mark is 5.5 s old on the server clock.
+  const real = Date.now;
+  Date.now = () => real() + 4500;
+  t.after(() => { Date.now = real; });
+  await h.update();
+  assert.equal(words(h.node("futures-mark-price")), "Mark 확인 불가");
+  assert.equal(/Mark가 없거나 오래되었습니다/.test(h.text()), true);
+  assert.equal(h.node("futures-submit").props.state, "disabled");
+  // The next read recovers it.
+  Date.now = real;
+  await h.client.refetchQueries();
+  await h.flush();
+  assert.equal(words(h.node("futures-mark-price")), "$102");
+  assert.equal(/Mark가 없거나 오래되었습니다/.test(h.text()), false);
+});
+
+test("the 선물 지갑 준비 guide step points at 주문가능 now that the wallet card is gone", async (t) => {
+  const guide = createRequire(import.meta.url)("../../features/quest/questGuideBridge.ts");
+  const { TRADING_GUIDE_STEPS } = createRequire(import.meta.url)("../../features/quest/tradingGuideSteps.ts");
+  const h = futuresHarness();
+  await h.start();
+  t.after(h.close);
+  const available = h.node("futures-available-collateral");
+  assert.equal(available.parent.props.ref === guide.questGuideTarget("futures-funding"), true);
+  const step = (Object.values(TRADING_GUIDE_STEPS).flat() as Array<{ target: string; title: string; body: string }>).find((item) => item.target === "futures-funding")!;
+  assert.equal(step.title, "선물 지갑 준비");
+  assert.equal(/주문가능 USD/.test(step.body) && /지갑 탭에서 USD를 이체/.test(step.body), true);
 });

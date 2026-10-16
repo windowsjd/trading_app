@@ -1,7 +1,8 @@
 // Futures order layout (RN Web, real FuturesScreen): the form left of the
 // contract book at every phone width, font scale and theme; the USD amount,
 // ratio, leverage and margin-mode sheets; the ladder's scroll/collapse; and
-// the submit button's ink after a refused (409) order. Transport, account
+// the submit button's ink after a refused (409) order; since 2026-10-16 also no
+// 선물 지갑 card or header description and the 격리/교차 help copy. Transport, account
 // selection and navigation are fixtures (futuresMocks.js); `?viewport=1` gives
 // a device-sized root so sheets anchor to the visible bottom like the app.
 // Run: NODE_PATH=<playwright+esbuild> BROWSER_EXECUTABLE_PATH=<chromium> node test/browser/futuresOrderLayoutBrowser.cjs
@@ -99,7 +100,11 @@ async function main() {
       assert.ok(form && book && form.width > 80 && book.width > 60, `${label}: both columns laid out`);
       assert.ok(form.x + form.width <= book.x + 1 && form.y < book.y + book.height && book.y < form.y + form.height, `${label}: form left of the book`);
       assert.ok(book.x + book.width <= width + 1, `${label}: the book stays on screen`);
-      for (const full of ['futures-wallet', 'futures-lists']) { const b = await box(full); assert.ok(b && b.width > width - 40, `${label}: ${full} full width`); }
+      for (const full of ['futures-lists']) { const b = await box(full); assert.ok(b && b.width > width - 40, `${label}: ${full} full width`); }
+      // 2026-10-16: no 선물 지갑 summary card and no header description; Last and Mark keep their names.
+      assert.equal(await id('futures-wallet').count(), 0, `${label}: no wallet card`);
+      assert.equal(await page.getByText(/USD 가상 무기한 계약/).count(), 0, `${label}: no header description`);
+      assert.deepEqual(await page.locator('[aria-label="현재가 Last"], [aria-label="Mark 가격"]').allInnerTexts(), ['Last', 'Mark'], `${label}: price names`);
       assert.deepEqual(await page.evaluate(clipped), [], `${label}: clipped text`);
       if (kind === 'open') {
         for (const target of ['futures-amount', 'futures-ratio-25', 'futures-leverage-select', 'futures-margin-info']) assert.ok(await hittable(target), `${label}: ${target} tappable`);
@@ -148,8 +153,12 @@ async function main() {
         await id('futures-leverage-apply').click(); await sheetSettled('futures-leverage-custom-sheet');
         assert.equal(await id('futures-leverage-value').textContent(), '37x');
         // 증거금 모드 ⓘ: explanation only in its sheet.
-        assert.equal(await page.getByText(/공동 담보를 교차 포지션들이 함께/).count(), 0);
+        assert.equal(await page.getByText(/선물 지갑의 담보를 함께 사용하는/).count(), 0);
         await id('futures-margin-info').click(); await id('futures-margin-info-body').waitFor(); await page.waitForTimeout(350);
+        assert.deepEqual((await id('futures-margin-info-body').innerText()).split('\n').filter(Boolean), [
+          '격리 (Isolated)', '이 포지션에 사용할 증거금을 따로 정해두는 방식입니다. 다른 교차 포지션과 담보를 공유하지 않습니다.',
+          '교차 (Cross)', '여러 교차 포지션이 선물 지갑의 담보를 함께 사용하는 방식입니다. 한 포지션의 손익이 다른 교차 포지션에도 영향을 줄 수 있습니다.',
+        ], `${label}: help sheet copy`);
         assert.deepEqual(await page.evaluate(clipped), [], `${label}: help sheet text`);
         if (width === 320 && fontScale === 2) await page.screenshot({ path: path.join(out, `${label}-margin-help.png`) });
         await id('futures-margin-info-sheet-close').click(); await sheetSettled('futures-margin-info-sheet');

@@ -1,6 +1,6 @@
-// Optional real RN Web check of the 주문방식 sheet, conditional/LOC forms,
+// Optional real RN Web check of the 주문방식 sheet (with its method icons), conditional/LOC forms,
 // the conditional list and the real-fill banner: screenshots at 320/360/390/430px,
-// light/dark and 1x/2x fonts, plus a clipped-text and page-overflow detector.
+// light/dark and 1x/1.5x/2x fonts, plus a clipped-text and page-overflow detector.
 // Requires external esbuild and Playwright (see README).
 const path = require('node:path');
 const fs = require('node:fs');
@@ -75,7 +75,7 @@ async function run() {
   try {
     const quick = process.env.ORDER_METHOD_QUICK === '1';
     const combos = [];
-    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const fontScale of [1, 2]) combos.push([width, appearance, fontScale]);
+    for (const width of [320, 360, 390, 430]) for (const appearance of ['light', 'dark']) for (const fontScale of [1, 1.5, 2]) combos.push([width, appearance, fontScale]);
     for (const [width, appearance, fontScale] of quick ? [[360, 'light', 1], [320, 'dark', 2]] : combos) {
       const page = await browser.newPage({ viewport: { width, height: 760 } });
       await page.addInitScript(() => localStorage.setItem('trading-app:appearance', 'system'));
@@ -176,6 +176,26 @@ async function run() {
       for (const method of ['market', 'limit', 'conditional', 'loc']) await row(method).waitFor();
       await shot('krx-sheet');
       await sheetReachable(['market', 'limit', 'conditional', 'loc']);
+      // Each method has its own stroked line icon (2026-10-16): 시장가 bolt, 지정가
+      // target, 조건주문 bell, LOC clock, in the appearance palette's tone (never a
+      // StyleSheet sentinel), inside its circle and left of the method name.
+      const icons = await page.evaluate(() => [['market', '시장가'], ['limit', '지정가'], ['conditional', '조건주문'], ['loc', 'LOC 주문']].map(([method, label]) => {
+        const icon = document.querySelector(`[data-testid="order-method-${method}-icon"]`), svg = icon?.querySelector('svg');
+        const row = document.querySelector(`[data-testid="order-method-${method}"]`);
+        const title = [...row.querySelectorAll('div, span')].find((el) => [...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim() === label));
+        const box = (el) => { const r = el.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom]; };
+        return { method, d: svg ? [...svg.querySelectorAll('path')].map((p) => p.getAttribute('d')).join(' ') : '', stroke: (svg?.getAttribute('stroke') ?? '').toLowerCase(),
+          text: icon?.textContent.trim() ?? null, icon: icon && box(icon), svg: svg && box(svg), row: box(row), title: title && box(title) };
+      }));
+      const tones = { light: { market: '#166534', limit: '#245b76', conditional: '#245b76', loc: '#725400' }, dark: { market: '#79d68b', limit: '#9acbe2', conditional: '#9acbe2', loc: '#e8bf69' } }[appearance];
+      assert.equal(new Set(icons.map((icon) => icon.d)).size, 4, `four different icons (${tag})`);
+      for (const { method, d, stroke, text, icon, svg, row: line, title } of icons) {
+        assert.ok(d && svg && icon && title, `${method} icon and name rendered (${tag})`);
+        assert.equal(text, '', `${method}: no glyph text (${tag})`);
+        assert.equal(stroke, tones[method], `${method}: palette stroke (${tag})`);
+        assert.ok(svg[0] >= icon[0] - 0.5 && svg[1] >= icon[1] - 0.5 && svg[2] <= icon[2] + 0.5 && svg[3] <= icon[3] + 0.5, `${method}: icon inside its circle (${tag})`);
+        assert.ok(icon[0] >= line[0] && icon[2] <= title[0], `${method}: icon left of the name, no overlap (${tag})`);
+      }
       await row('loc').click();
       await page.getByTestId('loc-order-notice').waitFor();
       assert.equal(await page.getByTestId('order-tp-sl-button').count(), 0, `LOC takes no 손절가/익절가 (${tag})`);
