@@ -4,26 +4,46 @@ import {
 } from './binance-fixed-asset-universe';
 import selection from '../../../artifacts/binance-universe-2026/selection.json';
 import originalUniverse from '../../../artifacts/binance-universe-2026/original-universe.json';
+import selection100 from '../../../artifacts/binance-crypto-100-2026/selection.json';
+
+const entryOf = (entry: {
+  symbol: string;
+  baseAsset: string;
+  name: string;
+  tickSize: string;
+  displayPriceDecimals: number;
+}) => ({
+  symbol: entry.symbol,
+  baseAsset: entry.baseAsset,
+  name: entry.name,
+  priceTickSize: entry.tickSize,
+  displayPriceDecimals: entry.displayPriceDecimals,
+  market: 'BINANCE',
+  assetType: 'crypto',
+  currencyCode: 'USD',
+  priceCurrency: 'USD',
+  settlementCurrency: 'USD',
+});
 
 describe('BINANCE_FIXED_ASSET_UNIVERSE', () => {
   it('preserves all ten original contracts and appends exactly the researched top fifteen', () => {
-    expect(BINANCE_FIXED_ASSET_UNIVERSE).toHaveLength(25);
+    expect(BINANCE_FIXED_ASSET_UNIVERSE.length).toBe(100);
     expect(BINANCE_FIXED_ASSET_UNIVERSE.slice(0, 10)).toEqual(originalUniverse);
-    expect(selection.selected).toHaveLength(15);
-    expect(BINANCE_FIXED_ASSET_UNIVERSE.slice(10)).toEqual(
-      selection.selected.map((entry) => ({
-        symbol: entry.symbol,
-        baseAsset: entry.baseAsset,
-        name: entry.name,
-        priceTickSize: entry.tickSize,
-        displayPriceDecimals: entry.displayPriceDecimals,
-        market: 'BINANCE',
-        assetType: 'crypto',
-        currencyCode: 'USD',
-        priceCurrency: 'USD',
-        settlementCurrency: 'USD',
-      })),
+    expect(selection.selected.length).toBe(15);
+    expect(BINANCE_FIXED_ASSET_UNIVERSE.slice(10, 25)).toEqual(
+      selection.selected.map(entryOf),
     );
+  });
+
+  it('keeps those 25 unchanged and appends exactly the 75 selected by the 2026-10-16 YTD research', () => {
+    expect(selection100.spot.existing).toEqual(
+      BINANCE_FIXED_SYMBOLS.slice(0, 25),
+    );
+    expect(selection100.spot.added.length).toBe(75);
+    expect(BINANCE_FIXED_ASSET_UNIVERSE.slice(25)).toEqual(
+      selection100.spot.added.map(entryOf),
+    );
+    expect(BINANCE_FIXED_SYMBOLS).toEqual(selection100.spot.final);
   });
 
   it('keeps the pre-existing BTC and ETH symbols', () => {

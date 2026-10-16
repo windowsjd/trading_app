@@ -71,9 +71,14 @@ async function main() {
           ...SPOT_ASSET_WHERE,
         },
       });
-      if (spot.length !== 25 || spotCount !== 25)
+      // The Spot seed runs first: every shared underlying must already be an
+      // active Spot asset, and nothing outside the fixed universe may be.
+      if (
+        spot.length !== BINANCE_FIXED_SYMBOLS.length ||
+        spotCount !== BINANCE_FIXED_SYMBOLS.length
+      )
         plan.blockers.push(
-          'Existing active Spot universe must contain exactly the unchanged fixed 25 symbols',
+          `Existing active Spot universe must contain exactly the fixed ${BINANCE_FIXED_SYMBOLS.length} symbols`,
         );
       console.log(
         JSON.stringify(
@@ -150,7 +155,9 @@ async function main() {
       isolationLevel: flags.apply
         ? Prisma.TransactionIsolationLevel.Serializable
         : Prisma.TransactionIsolationLevel.RepeatableRead,
-      timeout: 30000,
+      // About 200 sequential statements at 100 contracts; a remote database
+      // round trip must not abort the single atomic registration.
+      timeout: 120000,
     },
   );
 }

@@ -119,6 +119,7 @@ jest.mock('../generated/prisma/client', () => {
 });
 
 import { HttpException } from '@nestjs/common';
+import { BINANCE_FUTURES_ONLY_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { createHash } from 'node:crypto';
 import {
   AssetPriceSourceType,
@@ -345,7 +346,7 @@ describe('OrdersService', () => {
     return { prisma, service, primary, secondary };
   };
 
-  it.each(['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'])(
+  it.each([...BINANCE_FUTURES_ONLY_SYMBOLS])(
     'rejects active Futures-only %s before Spot quote/entry',
     async (symbol) => {
       const { prisma, service } = createService();

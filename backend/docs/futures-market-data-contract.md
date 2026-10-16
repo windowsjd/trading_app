@@ -19,8 +19,11 @@ outage cannot touch execution or risk evidence:
 | `wss://fstream.binance.com/market/stream` | `<symbol>@ticker` | rolling 24h statistics |
 
 Binance serves partial books only on `/public` and tickers on `/market`.
-Targets are the app catalog's instruments: active, offered (fixed 25 USDⓈ-M
-symbols) and contract-verified; they refresh every 30 s. Liveness follows
+Targets are the app catalog's instruments: active, offered (the fixed USDⓈ-M
+catalog, 100 symbols since 2026-10-16) and contract-verified; they refresh every
+30 s. Accepted books also feed the display-only 60 s history
+([crypto-order-book-history-contract.md](crypto-order-book-history-contract.md));
+the publish never waits for it. Liveness follows
 Futures Last: protocol ping every 5 s, a socket silent for 15 s is replaced,
 reconnects at most every 5 s (also covering the provider's 24-hour disconnect).
 No REST endpoint is called, so no Binance REST weight is spent.

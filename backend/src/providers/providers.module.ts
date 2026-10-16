@@ -47,6 +47,7 @@ import {
 } from './binance/binance-kline-usdm.client';
 import { BinanceOrderBookService } from './binance/binance-order-book.service';
 import { OrderBookPubSubService } from './order-book-pubsub.service';
+import { CryptoOrderBookHistoryService } from './crypto-order-book-history.service';
 import { MarketPriceEventService } from './market-price-event.service';
 import { MarketOrderBookSubscriptionService } from './market-order-book-subscription.service';
 import { UsdKrwRefreshService } from './usd-krw-refresh.service';
@@ -72,6 +73,7 @@ import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
     KoscomIngestionService,
     UsdKrwRefreshService,
     OrderBookPubSubService,
+    CryptoOrderBookHistoryService,
     BinanceOrderBookService,
     ProviderConfigService,
     ProviderHttpClient,
@@ -155,6 +157,7 @@ import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
     KoscomIngestionService,
     UsdKrwRefreshService,
     OrderBookPubSubService,
+    CryptoOrderBookHistoryService,
     BinanceOrderBookService,
     ProviderConfigService,
     ExchangeRateIngestionService,

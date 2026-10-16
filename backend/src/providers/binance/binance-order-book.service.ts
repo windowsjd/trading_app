@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { AssetType, CurrencyCode } from '../../generated/prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderBookPubSubService } from '../order-book-pubsub.service';
+import { CryptoOrderBookHistoryService } from '../crypto-order-book-history.service';
 import type { OrderBookEvent } from '../order-book.types';
 import { toBinanceUsdtSymbol } from '../provider-target-resolver.service';
 import {
@@ -16,7 +17,8 @@ export type BinanceOrderBookTarget = {
   baseAsset: string;
 };
 
-/** Shared by both existing owners; no provider socket or financial writes here. */
+/** Shared by both existing owners; no provider socket or financial writes
+ * here. Accepted books also feed the display-only 60 s history sampler. */
 @Injectable()
 export class BinanceOrderBookService implements OnModuleDestroy {
   private readonly logger = new Logger(BinanceOrderBookService.name);
@@ -35,6 +37,7 @@ export class BinanceOrderBookService implements OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pubsub: OrderBookPubSubService,
+    @Optional() private readonly history?: CryptoOrderBookHistoryService,
   ) {}
 
   async loadTargets(): Promise<Map<string, BinanceOrderBookTarget>> {
@@ -118,6 +121,8 @@ export class BinanceOrderBookService implements OnModuleDestroy {
     if (!this.publishing.has(target.symbol)) {
       this.startPublishing(target.symbol);
     }
+    // In-memory 60 s sampling only; the publish above never waits for it.
+    this.history?.offerSpot(target.assetId, parsed, receivedAt);
     return true;
   }
 

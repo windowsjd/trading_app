@@ -362,7 +362,8 @@ export const OpsJobName = {
   futures_candle_sync: 'futures_candle_sync',
   futures_conditional_entries: 'futures_conditional_entries',
   asset_price_snapshot_retention: 'asset_price_snapshot_retention',
-  futures_tp_sl_settings: 'futures_tp_sl_settings'
+  futures_tp_sl_settings: 'futures_tp_sl_settings',
+  crypto_order_book_retention: 'crypto_order_book_retention'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]

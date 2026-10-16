@@ -37,6 +37,8 @@ import {
   DatabaseStorageMonitorService,
 } from './ops/database-storage-monitor.service';
 import { AssetPriceSnapshotRetentionWorker } from './providers/asset-price-snapshot-retention.worker';
+import { CryptoOrderBookHistoryService } from './providers/crypto-order-book-history.service';
+import { CryptoOrderBookRetentionWorker } from './providers/crypto-order-book-retention.worker';
 
 /**
  * Structured readiness reasons for the operator market-session override
@@ -80,6 +82,11 @@ export const OPERATOR_ALERT_REASONS: ReadonlySet<string> = new Set([
   // history runs at the capped pace for hours by design, and storage growth
   // is paged by the DB_STORAGE_ codes.
   'ASSET_PRICE_SNAPSHOT_RETENTION_FAILING',
+  // Display-only history, but a failing writer or a retention that cannot
+  // keep up is a database incident in the making.
+  'CRYPTO_ORDER_BOOK_HISTORY_PERSIST_FAILING',
+  'CRYPTO_ORDER_BOOK_RETENTION_FAILING',
+  'CRYPTO_ORDER_BOOK_RETENTION_BACKLOG',
 ]);
 
 @Injectable()
@@ -116,6 +123,10 @@ export class AppService {
     private readonly databaseStorage?: DatabaseStorageMonitorService,
     @Optional()
     private readonly assetPriceRetention?: AssetPriceSnapshotRetentionWorker,
+    @Optional()
+    private readonly cryptoOrderBookHistory?: CryptoOrderBookHistoryService,
+    @Optional()
+    private readonly cryptoOrderBookRetention?: CryptoOrderBookRetentionWorker,
   ) {}
 
   getHealth() {
@@ -346,6 +357,7 @@ export class AppService {
         futuresMark: operations.futuresMark,
         futuresRetention: operations.futuresRetention,
         assetPriceRetention: operations.assetPriceRetention,
+        cryptoOrderBookHistory: operations.cryptoOrderBookHistory,
         databaseStorage: operations.databaseStorage,
         currentTime: now.toISOString(),
       },
@@ -389,10 +401,18 @@ export class AppService {
       last: this.futuresLastPriceRetention?.getStatus() ?? null,
     };
     const assetPriceRetention = this.assetPriceRetention?.getStatus() ?? null;
+    const cryptoOrderBookHistory = {
+      recorder: this.cryptoOrderBookHistory?.getStatus() ?? null,
+      retention: this.cryptoOrderBookRetention?.getStatus() ?? null,
+    };
+    const recorder = cryptoOrderBookHistory.recorder;
+    if (recorder?.enabled && recorder.consecutiveWriteFailures >= 3)
+      reasons.push('CRYPTO_ORDER_BOOK_HISTORY_PERSIST_FAILING');
     for (const [prefix, job] of [
       ['FUTURES_MARK_RETENTION', futuresRetention.mark],
       ['FUTURES_LAST_PRICE_RETENTION', futuresRetention.last],
       ['ASSET_PRICE_SNAPSHOT_RETENTION', assetPriceRetention],
+      ['CRYPTO_ORDER_BOOK_RETENTION', cryptoOrderBookHistory.retention],
     ] as const) {
       if (!job?.enabled) continue;
       if (job.failing) reasons.push(`${prefix}_FAILING`);
@@ -402,7 +422,14 @@ export class AppService {
       (futuresMark?.enabled &&
         futuresMark.lastPersistFailure?.kind === 'disk_full' &&
         recent(futuresMark.lastPersistFailure.at)) ||
-      [...Object.values(futuresRetention), assetPriceRetention].some(
+      (recorder?.enabled &&
+        recorder.lastWriteFailure?.kind === 'disk_full' &&
+        recent(recorder.lastWriteFailure.at)) ||
+      [
+        ...Object.values(futuresRetention),
+        assetPriceRetention,
+        cryptoOrderBookHistory.retention,
+      ].some(
         (job) =>
           job?.enabled &&
           job.lastFailureKind === 'disk_full' &&
@@ -432,6 +459,7 @@ export class AppService {
       futuresMark,
       futuresRetention,
       assetPriceRetention,
+      cryptoOrderBookHistory,
       databaseStorage,
     };
   }

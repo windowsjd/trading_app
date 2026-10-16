@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { BINANCE_FIXED_SYMBOLS } from './binance-fixed-asset-universe';
+import selection100 from '../../../artifacts/binance-crypto-100-2026/selection.json';
 import {
   BINANCE_FUTURES_SYMBOLS,
+  BINANCE_FUTURES_ONLY_ASSETS,
   BINANCE_FUTURES_ONLY_SYMBOLS,
   isOfferedFuturesSymbol,
   isFuturesOnlyAsset,
@@ -55,7 +57,7 @@ function instrument(symbol: string, tickSize?: string) {
   } as never;
 }
 describe('approved separate Binance products', () => {
-  it('matches all 25 CSV identities in selection order without changing the Spot 25', () => {
+  it('keeps the 25 CSV identities in selection order and appends the 75 researched contracts', () => {
     const csv = readFileSync(
       resolve(
         process.cwd(),
@@ -68,21 +70,41 @@ describe('approved separate Binance products', () => {
       .split(/\r?\n/)
       .slice(1)
       .map((line) => line.split(',')[2].replaceAll('"', ''));
-    expect(BINANCE_FUTURES_SYMBOLS).toEqual(symbols);
-    expect(new Set(symbols).size).toBe(25);
-    expect(BINANCE_FIXED_SYMBOLS.length).toBe(25);
-    expect(BINANCE_FUTURES_ONLY_SYMBOLS).toEqual([
-      'HYPEUSDT',
-      'PUMPUSDT',
-      'BCHUSDT',
-      'FILUSDT',
-      'AAVEUSDT',
-    ]);
+    expect(BINANCE_FUTURES_SYMBOLS.slice(0, 25)).toEqual(symbols);
+    expect(selection100.futures.existing).toEqual(symbols);
+    expect(BINANCE_FUTURES_SYMBOLS.slice(25)).toEqual(
+      selection100.futures.added.map((row) => row.symbol),
+    );
+    expect(BINANCE_FUTURES_SYMBOLS).toEqual(selection100.futures.final);
+    expect(new Set(BINANCE_FUTURES_SYMBOLS).size).toBe(100);
+    expect(BINANCE_FIXED_SYMBOLS.length).toBe(100);
+  });
+  it('derives the Futures-only underlyings from the two catalogs and names every one', () => {
+    const researched = selection100.futures.futuresOnlyUnderlyings;
+    expect(BINANCE_FUTURES_ONLY_SYMBOLS).toEqual(
+      researched.map((row) => row.symbol),
+    );
+    expect(BINANCE_FUTURES_ONLY_ASSETS).toEqual(
+      researched.map(({ symbol, name }) => ({ symbol, name })),
+    );
+    expect(BINANCE_FUTURES_ONLY_SYMBOLS.length).toBe(21);
     expect(
       BINANCE_FUTURES_ONLY_SYMBOLS.some((s) =>
         BINANCE_FIXED_SYMBOLS.includes(s),
       ),
     ).toBe(false);
+    // Former Futures-only underlyings the Spot ranking selected are Spot now.
+    for (const symbol of ['PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT']) {
+      expect(BINANCE_FIXED_SYMBOLS.includes(symbol)).toBe(true);
+      expect(
+        isFuturesOnlyAsset({ symbol, market: 'BINANCE', assetType: 'crypto' }),
+      ).toBe(false);
+    }
+  });
+  it('declares the researched FAPI display precision for every offered contract', () => {
+    expect(FUTURES_DISPLAY_DECIMALS).toEqual(
+      selection100.futures.displayPriceDecimals,
+    );
   });
   it.each(BINANCE_FUTURES_ONLY_SYMBOLS)(
     '%s is operationally valid for Futures, excluded only from Spot',
@@ -101,9 +123,9 @@ describe('approved separate Binance products', () => {
     },
   );
   it('rejects unoffered, alias and multiplier contracts for entry without narrowing the coverage parser', () => {
-    expect(verifiedFuturesInstrument(instrument('DOTUSDT'), at)).toBe(false);
+    expect(verifiedFuturesInstrument(instrument('BICOUSDT'), at)).toBe(false);
     expect(
-      parseFuturesContracts({ symbols: [row('DOTUSDT')] }).has('DOTUSDT'),
+      parseFuturesContracts({ symbols: [row('BICOUSDT')] }).has('BICOUSDT'),
     ).toBe(true);
     expect(isOfferedFuturesSymbol('HYPE')).toBe(false);
     expect(isOfferedFuturesSymbol('1000PEPEUSDT')).toBe(false);

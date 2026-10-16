@@ -20,6 +20,7 @@ import {
 import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
 import { readDatabaseStorageMonitorConfig } from '../ops/database-storage-monitor.config';
 import { assetPriceSnapshotRetentionConfig } from '../providers/asset-price-snapshot-retention.config';
+import { cryptoOrderBookHistoryConfig } from '../providers/crypto-order-book-history.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -62,6 +63,7 @@ export function validateEnv(
   collect(errors, () => futuresLastPriceRetentionConfig(env));
   collect(errors, () => readDatabaseStorageMonitorConfig(env));
   collect(errors, () => assetPriceSnapshotRetentionConfig(env));
+  collect(errors, () => cryptoOrderBookHistoryConfig(env));
   collect(errors, () => conditionalEnabled(env));
   collect(errors, () => legacyOcoRegistrationEnabled(env));
   collect(errors, () => conditionalBuyEnabled(env));

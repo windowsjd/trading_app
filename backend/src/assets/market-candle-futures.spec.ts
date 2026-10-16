@@ -182,7 +182,7 @@ describe('FuturesCandlesService', () => {
     ).toBe('404:FUTURES_INSTRUMENT_NOT_FOUND');
     expect(
       await errorCode(
-        create([], instrumentRow('DOTUSDT')).service.getInstrumentCandles(
+        create([], instrumentRow('BICOUSDT')).service.getInstrumentCandles(
           'user-1',
           'fut-btc',
           {},

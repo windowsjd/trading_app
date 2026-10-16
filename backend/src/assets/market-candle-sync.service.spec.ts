@@ -51,6 +51,7 @@ import { KOSCOM_HISTORY_SOURCE } from '../providers/koscom/koscom.config';
 import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 import { BINANCE_FIXED_ASSET_UNIVERSE } from '../providers/binance/binance-fixed-asset-universe';
+import { BINANCE_FUTURES_ONLY_SYMBOLS } from '../providers/binance/binance-product-catalog';
 
 const DAY = 24 * 60 * 60_000;
 const FIVE_MIN = 5 * 60_000;
@@ -1187,7 +1188,7 @@ describe('MarketCandleSyncService', () => {
   });
 
   it.each([1, 2, 4, 8])(
-    'collects all 25 assets and three feeds with configured concurrency %s',
+    'collects all 100 assets and three feeds with configured concurrency %s',
     async (assetConcurrency) => {
       const assets = BINANCE_FIXED_ASSET_UNIVERSE.map((entry) => ({
         ...CRYPTO_ASSET,
@@ -1245,11 +1246,12 @@ describe('MarketCandleSyncService', () => {
           ]);
           expect(refreshed.failedFeeds).toBe(0);
           expect(result.failedFeeds).toBe(0);
-          expect(result.processedAssets).toBe(25);
-          expect(result.totalFeeds).toBe(75);
+          expect(result.processedAssets).toBe(100);
+          expect(result.totalFeeds).toBe(300);
         }
         expect(maximum).toBeLessThanOrEqual(2);
-        expect(fetch).toHaveBeenCalledTimes(154);
+        // Two runs × (300 asset feeds + 1 chart refresh + 1 premiumIndex).
+        expect(fetch).toHaveBeenCalledTimes(604);
       } finally {
         fetch.mockRestore();
       }
@@ -1319,8 +1321,8 @@ describe('MarketCandleSyncService', () => {
     const result = await harness.service.syncAssets({
       now: NOW,
     });
-    expect(result.totalFeeds).toBe(75);
-    expect(result.processedAssets).toBe(25);
+    expect(result.totalFeeds).toBe(300);
+    expect(result.processedAssets).toBe(100);
     for (const entry of BINANCE_FIXED_ASSET_UNIVERSE) {
       for (const interval of ['5m', '1d', '1w']) {
         expect(harness.binanceCandles.fetchKlinesPage).toHaveBeenCalledWith(
@@ -1528,7 +1530,7 @@ describe('MarketCandleSyncService', () => {
     ).rejects.toBeInstanceOf(MarketCandleSyncInputError);
   });
 
-  it.each(['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'])(
+  it.each([...BINANCE_FUTURES_ONLY_SYMBOLS])(
     'rejects explicit Spot candle backfill of active Futures-only %s before provider I/O',
     async (symbol) => {
       const asset = { ...CRYPTO_ASSET, id: symbol, symbol };

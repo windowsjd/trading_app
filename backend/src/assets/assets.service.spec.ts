@@ -37,6 +37,7 @@ jest.mock('../generated/prisma/client', () => {
 });
 
 import { HttpException } from '@nestjs/common';
+import { BINANCE_FUTURES_ONLY_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import {
   AssetPriceSourceType,
   AssetType,
@@ -1394,7 +1395,7 @@ describe('AssetsService', () => {
     expectNoAssetWrites(prisma);
   });
 
-  it.each(['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'])(
+  it.each([...BINANCE_FUTURES_ONLY_SYMBOLS])(
     'hides active Futures-only %s from Spot detail and ticker',
     async (symbol) => {
       const { prisma, service } = createService();

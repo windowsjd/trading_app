@@ -11,12 +11,16 @@ import {
   validateBinanceSpotUniverse,
 } from '../src/providers/binance/binance-exchange-info.validation';
 import { readBinanceSymbolPricePrecision } from '../src/providers/binance/binance-tick-size';
-import { parseBinanceDepth } from '../src/providers/binance/binance-order-book.parser';
+import {
+  binanceCombinedStreamUrl,
+  parseBinanceDepth,
+} from '../src/providers/binance/binance-order-book.parser';
 import { Decimal } from '@prisma/client/runtime/client';
 import { loadRuntimeEnv } from './lib/load-runtime-env';
 
 /**
- * Opt-in real Binance public market-data smoke for the fixed 25-symbol universe.
+ * Opt-in real Binance public market-data smoke for the fixed Spot universe
+ * (100 symbols since the 2026-10-16 expansion).
  *
  *   BINANCE_MARKET_DATA_SMOKE=1 pnpm smoke:binance-fixed-universe
  *
@@ -24,9 +28,9 @@ import { loadRuntimeEnv } from './lib/load-runtime-env';
  * touches the database (no reads, writes, resets), needs no API key, and is
  * refused under NODE_ENV=production. Without the env flag it reports NOT_RUN and
  * exits 0 (never a fake pass). It verifies:
- *   1. exchangeInfo TRADING/Spot/USDT for all 25,
+ *   1. exchangeInfo TRADING/Spot/USDT for every symbol,
  *   1b. exchangeInfo PRICE_FILTER.tickSize matches the declared display decimals,
- *   2. REST 24hr ticker returns a positive price for all 25,
+ *   2. REST 24hr ticker returns a positive price for every symbol,
  *   3. the WS ticker stream delivers at least one tick per symbol within a bound.
  *   4. the existing depth parser accepts a real 10+10 snapshot per symbol.
  */
@@ -187,12 +191,13 @@ async function runSmoke(httpClient: ProviderHttpClient) {
 function collectWsSymbols(
   wsBaseUrl: string,
 ): Promise<{ tickers: Set<string>; depths: Set<string> }> {
-  const base = wsBaseUrl.replace(/\/+$/u, '');
+  // Same transport as the streaming service: one combined-stream socket and
+  // one SUBSCRIBE frame (ticker + depth10 per symbol, 200 streams at 100).
+  const url = binanceCombinedStreamUrl(wsBaseUrl);
   const streams = BINANCE_FIXED_SYMBOLS.flatMap((s) => [
     `${s.toLowerCase()}@ticker`,
     `${s.toLowerCase()}@depth10`,
-  ]).join('/');
-  const url = `${base}/stream?streams=${streams}`;
+  ]);
   const received = new Set<string>();
   const depths = new Set<string>();
 
@@ -208,6 +213,11 @@ function collectWsSymbols(
       resolve({ tickers: received, depths });
     };
     const timer = setTimeout(done, WS_RECEIVE_BUDGET_MS);
+    socket.on('open', () =>
+      socket.send(
+        JSON.stringify({ method: 'SUBSCRIBE', params: streams, id: 1 }),
+      ),
+    );
     socket.on('message', (data: Buffer) => {
       try {
         const text = data.toString('utf8');

@@ -233,7 +233,9 @@ async function main() {
           direction: 'long',
           quantity: '0.01000000',
           leverage: 2,
-          marginMode: symbol === 'PUMPUSDT' ? 'cross' : 'isolated',
+          // One Futures-only contract also covers the Cross wallet path.
+          marginMode:
+            symbol === BINANCE_FUTURES_ONLY_SYMBOLS[1] ? 'cross' : 'isolated',
           idempotencyKey: randomUUID(),
         };
         const open = (await http.request(
@@ -315,15 +317,15 @@ async function main() {
       JSON.stringify(
         {
           verdict: 'PASS',
-          spotSymbols: 25,
-          futuresSymbols: 25,
+          spotSymbols: BINANCE_FIXED_SYMBOLS.length,
+          futuresSymbols: BINANCE_FUTURES_SYMBOLS.length,
           futuresOnly: BINANCE_FUTURES_ONLY_SYMBOLS,
-          spotQuoteRejections: 20,
-          spotWsRejections: 15,
-          lastMarkWs: 5,
+          spotQuoteRejections: 4 * BINANCE_FUTURES_ONLY_SYMBOLS.length,
+          spotWsRejections: 3 * BINANCE_FUTURES_ONLY_SYMBOLS.length,
+          lastMarkWs: BINANCE_FUTURES_ONLY_SYMBOLS.length,
           marketLifecycleFills: fills,
-          limitCreateCancel: 5,
-          idempotencyReplay: 5,
+          limitCreateCancel: BINANCE_FUTURES_ONLY_SYMBOLS.length,
+          idempotencyReplay: BINANCE_FUTURES_ONLY_SYMBOLS.length,
           exactLedgerChains: 'PASS (focused account)',
           externalProviderAttempts: blocked,
           fullFixtureAudit:

@@ -1,0 +1,606 @@
+{
+ "window": "2026-10-16T07:31:00Z..08:04:00Z (1,980 s)",
+ "rule": "execute 10 s / quote 60 s by capturedAt (policy-decisions.md)",
+ "assets": [
+  {
+   "symbol": "BANKUSDT",
+   "exec_stale_pct": "59.30",
+   "quote_stale_pct": "22.99",
+   "max_gap_s": "220.1"
+  },
+  {
+   "symbol": "BARDUSDT",
+   "exec_stale_pct": "35.76",
+   "quote_stale_pct": "2.52",
+   "max_gap_s": "92.2"
+  },
+  {
+   "symbol": "ZKPUSDT",
+   "exec_stale_pct": "29.03",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "53.9"
+  },
+  {
+   "symbol": "TUTUSDT",
+   "exec_stale_pct": "27.80",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "40.4"
+  },
+  {
+   "symbol": "币安人生USDT",
+   "exec_stale_pct": "23.13",
+   "quote_stale_pct": "0.05",
+   "max_gap_s": "60.9"
+  },
+  {
+   "symbol": "SPKUSDT",
+   "exec_stale_pct": "21.53",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "57.8"
+  },
+  {
+   "symbol": "DEXEUSDT",
+   "exec_stale_pct": "20.89",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "29.9"
+  },
+  {
+   "symbol": "BREVUSDT",
+   "exec_stale_pct": "19.65",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "41.4"
+  },
+  {
+   "symbol": "CHZUSDT",
+   "exec_stale_pct": "19.52",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "59.9"
+  },
+  {
+   "symbol": "FOGOUSDT",
+   "exec_stale_pct": "18.59",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "38.3"
+  },
+  {
+   "symbol": "OPNUSDT",
+   "exec_stale_pct": "17.97",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "56.0"
+  },
+  {
+   "symbol": "BABYUSDT",
+   "exec_stale_pct": "16.98",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "38.3"
+  },
+  {
+   "symbol": "REUSDT",
+   "exec_stale_pct": "16.78",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "51.9"
+  },
+  {
+   "symbol": "HOMEUSDT",
+   "exec_stale_pct": "13.55",
+   "quote_stale_pct": "0.15",
+   "max_gap_s": "63.0"
+  },
+  {
+   "symbol": "LUNCUSDT",
+   "exec_stale_pct": "13.45",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "28.1"
+  },
+  {
+   "symbol": "GRAMUSDT",
+   "exec_stale_pct": "11.30",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "26.0"
+  },
+  {
+   "symbol": "SHIBUSDT",
+   "exec_stale_pct": "11.24",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "33.1"
+  },
+  {
+   "symbol": "PROMUSDT",
+   "exec_stale_pct": "10.54",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "30.0"
+  },
+  {
+   "symbol": "SENTUSDT",
+   "exec_stale_pct": "10.22",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "38.0"
+  },
+  {
+   "symbol": "STOUSDT",
+   "exec_stale_pct": "10.03",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "26.1"
+  },
+  {
+   "symbol": "ALLOUSDT",
+   "exec_stale_pct": "9.34",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "38.3"
+  },
+  {
+   "symbol": "ROBOUSDT",
+   "exec_stale_pct": "9.23",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "35.2"
+  },
+  {
+   "symbol": "SAGAUSDT",
+   "exec_stale_pct": "8.63",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "34.1"
+  },
+  {
+   "symbol": "BERAUSDT",
+   "exec_stale_pct": "5.62",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "28.9"
+  },
+  {
+   "symbol": "AXSUSDT",
+   "exec_stale_pct": "5.27",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "30.0"
+  },
+  {
+   "symbol": "BONKUSDT",
+   "exec_stale_pct": "5.14",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "21.6"
+  },
+  {
+   "symbol": "KITEUSDT",
+   "exec_stale_pct": "5.05",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "25.0"
+  },
+  {
+   "symbol": "ARUSDT",
+   "exec_stale_pct": "4.97",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "20.6"
+  },
+  {
+   "symbol": "GIGGLEUSDT",
+   "exec_stale_pct": "4.76",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "21.6"
+  },
+  {
+   "symbol": "SAHARAUSDT",
+   "exec_stale_pct": "4.59",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "21.9"
+  },
+  {
+   "symbol": "ACEUSDT",
+   "exec_stale_pct": "4.50",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "22.9"
+  },
+  {
+   "symbol": "ZAMAUSDT",
+   "exec_stale_pct": "4.14",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "25.8"
+  },
+  {
+   "symbol": "WIFUSDT",
+   "exec_stale_pct": "2.97",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "17.7"
+  },
+  {
+   "symbol": "CAKEUSDT",
+   "exec_stale_pct": "2.80",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "24.8"
+  },
+  {
+   "symbol": "ASTERUSDT",
+   "exec_stale_pct": "2.62",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "17.7"
+  },
+  {
+   "symbol": "BIOUSDT",
+   "exec_stale_pct": "2.60",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "19.5"
+  },
+  {
+   "symbol": "SYNUSDT",
+   "exec_stale_pct": "2.56",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "23.7"
+  },
+  {
+   "symbol": "ICPUSDT",
+   "exec_stale_pct": "2.05",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "19.8"
+  },
+  {
+   "symbol": "DASHUSDT",
+   "exec_stale_pct": "2.01",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "18.5"
+  },
+  {
+   "symbol": "BCHUSDT",
+   "exec_stale_pct": "1.80",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "18.8"
+  },
+  {
+   "symbol": "EIGENUSDT",
+   "exec_stale_pct": "1.73",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "19.5"
+  },
+  {
+   "symbol": "RENDERUSDT",
+   "exec_stale_pct": "1.63",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "17.8"
+  },
+  {
+   "symbol": "FETUSDT",
+   "exec_stale_pct": "1.61",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "24.7"
+  },
+  {
+   "symbol": "PLUMEUSDT",
+   "exec_stale_pct": "1.56",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "19.5"
+  },
+  {
+   "symbol": "ZENUSDT",
+   "exec_stale_pct": "1.45",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "21.6"
+  },
+  {
+   "symbol": "CHIPUSDT",
+   "exec_stale_pct": "1.38",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "18.4"
+  },
+  {
+   "symbol": "VIRTUALUSDT",
+   "exec_stale_pct": "1.14",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "14.3"
+  },
+  {
+   "symbol": "CRVUSDT",
+   "exec_stale_pct": "1.11",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "15.6"
+  },
+  {
+   "symbol": "ORDIUSDT",
+   "exec_stale_pct": "1.07",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "14.3"
+  },
+  {
+   "symbol": "SEIUSDT",
+   "exec_stale_pct": "0.95",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "15.7"
+  },
+  {
+   "symbol": "ENSOUSDT",
+   "exec_stale_pct": "0.95",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "20.8"
+  },
+  {
+   "symbol": "XPLUSDT",
+   "exec_stale_pct": "0.87",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "16.4"
+  },
+  {
+   "symbol": "LDOUSDT",
+   "exec_stale_pct": "0.78",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "14.6"
+  },
+  {
+   "symbol": "PUMPUSDT",
+   "exec_stale_pct": "0.74",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "18.7"
+  },
+  {
+   "symbol": "POLUSDT",
+   "exec_stale_pct": "0.55",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "14.3"
+  },
+  {
+   "symbol": "WLFIUSDT",
+   "exec_stale_pct": "0.55",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "14.3"
+  },
+  {
+   "symbol": "JTOUSDT",
+   "exec_stale_pct": "0.53",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "15.4"
+  },
+  {
+   "symbol": "PEPEUSDT",
+   "exec_stale_pct": "0.44",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "13.5"
+  },
+  {
+   "symbol": "AAVEUSDT",
+   "exec_stale_pct": "0.38",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "17.4"
+  },
+  {
+   "symbol": "NIGHTUSDT",
+   "exec_stale_pct": "0.36",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "13.3"
+  },
+  {
+   "symbol": "AEROUSDT",
+   "exec_stale_pct": "0.35",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "14.6"
+  },
+  {
+   "symbol": "ALGOUSDT",
+   "exec_stale_pct": "0.32",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "12.5"
+  },
+  {
+   "symbol": "QNTUSDT",
+   "exec_stale_pct": "0.32",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "12.5"
+  },
+  {
+   "symbol": "ETHFIUSDT",
+   "exec_stale_pct": "0.22",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "13.3"
+  },
+  {
+   "symbol": "PENDLEUSDT",
+   "exec_stale_pct": "0.22",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "12.5"
+  },
+  {
+   "symbol": "PYTHUSDT",
+   "exec_stale_pct": "0.17",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "11.5"
+  },
+  {
+   "symbol": "LTCUSDT",
+   "exec_stale_pct": "0.14",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "12.5"
+  },
+  {
+   "symbol": "PENGUUSDT",
+   "exec_stale_pct": "0.13",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "12.5"
+  },
+  {
+   "symbol": "MEGAUSDT",
+   "exec_stale_pct": "0.09",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "10.2"
+  },
+  {
+   "symbol": "HBARUSDT",
+   "exec_stale_pct": "0.07",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "11.5"
+  },
+  {
+   "symbol": "ONDOUSDT",
+   "exec_stale_pct": "0.06",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "11.2"
+  },
+  {
+   "symbol": "TRUMPUSDT",
+   "exec_stale_pct": "0.04",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "10.5"
+  },
+  {
+   "symbol": "ADAUSDT",
+   "exec_stale_pct": "0.03",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "10.4"
+  },
+  {
+   "symbol": "MARSCOINUSDT",
+   "exec_stale_pct": "0.02",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "10.4"
+  },
+  {
+   "symbol": "ARBUSDT",
+   "exec_stale_pct": "0.01",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "10.1"
+  },
+  {
+   "symbol": "DOTUSDT",
+   "exec_stale_pct": "0.01",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "10.2"
+  },
+  {
+   "symbol": "DOGEUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "7.3"
+  },
+  {
+   "symbol": "TIAUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "6.4"
+  },
+  {
+   "symbol": "LINKUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "AVAXUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.4"
+  },
+  {
+   "symbol": "TAOUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.1"
+  },
+  {
+   "symbol": "SOLUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "6.3"
+  },
+  {
+   "symbol": "XRPUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "6.3"
+  },
+  {
+   "symbol": "UNIUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.1"
+  },
+  {
+   "symbol": "NEARUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "7.3"
+  },
+  {
+   "symbol": "BTCUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "6.0"
+  },
+  {
+   "symbol": "ZROUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "INJUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.1"
+  },
+  {
+   "symbol": "WLDUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.1"
+  },
+  {
+   "symbol": "OPUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "TRXUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "APTUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.0"
+  },
+  {
+   "symbol": "XLMUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "ETHUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "6.0"
+  },
+  {
+   "symbol": "STRKUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.3"
+  },
+  {
+   "symbol": "ZECUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "SUIUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "7.3"
+  },
+  {
+   "symbol": "ENAUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "9.4"
+  },
+  {
+   "symbol": "BNBUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "6.0"
+  },
+  {
+   "symbol": "FILUSDT",
+   "exec_stale_pct": "0.00",
+   "quote_stale_pct": "0.00",
+   "max_gap_s": "8.1"
+  }
+ ]
+}

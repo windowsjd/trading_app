@@ -32,9 +32,9 @@ Evidence for the KRX source: [KOSCOM 10-minute history live check](../../docs/in
 
 ## Data identity and isolation
 
-- `FuturesInstrument` references its Spot underlying `Asset` (20 of the 25
-  catalog contracts share the Spot row; HYPE/PUMP/BCH/FIL/AAVE have their own
-  futures-only Asset). `market_candles` is keyed by
+- `FuturesInstrument` references its Spot underlying `Asset` (since
+  2026-10-16, 79 of the 100 catalog contracts share the Spot row; the 21 in
+  `BINANCE_FUTURES_ONLY_ASSETS` have their own futures-only Asset). `market_candles` is keyed by
   `(asset_id, interval, open_time)`, so a contract candle can never live there.
   Contract klines go to `futures_market_candles`
   `(futures_instrument_id, interval, open_time)` with `contract_symbol`; an
@@ -173,9 +173,11 @@ stopped. A failed scheduled run waits a full interval before the next one.
   Spot 4h klines cost 2 per call (≤ 1000 rows); USDⓈ-M klines cost 1 below
   100 rows and 2 below 500 (backfill pages are 499 rows). Long-range sync is
   strictly sequential with ≥ 150 ms between its calls so Futures Last/Mark REST
-  recovery keeps a slot. Initial backfill: 10 Spot symbols × 1 call (weight
+  recovery keeps a slot. Initial backfill (2026-10-13): 10 Spot symbols × 1 call (weight
   20) + 25 contracts × 2 calls (weight 100). Upkeep: Spot ≈ 10 calls per 4h,
-  Futures 25 weight per minute.
+  Futures 25 weight per minute. At 100 + 100 (2026-10-16): backfill 100 Spot × 1
+  call (200) + 100 contracts × 2 calls (≤ 400); upkeep ≈ 100 calls per 4h and
+  ≈ 100 weight per minute ([binance-rest-limits.md](binance-rest-limits.md)).
 
 ## KRX verification (KOSCOM 10-minute history)
 

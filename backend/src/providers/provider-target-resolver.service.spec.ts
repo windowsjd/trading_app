@@ -21,10 +21,12 @@ import {
   BINANCE_FIXED_ASSET_UNIVERSE,
   BINANCE_FIXED_SYMBOLS,
 } from './binance/binance-fixed-asset-universe';
+import { BINANCE_FUTURES_ONLY_SYMBOLS } from './binance/binance-product-catalog';
 
 describe('ProviderTargetResolverService', () => {
   it('never adds Futures-only assets to Spot provider targets, including explicit env/base symbols', () => {
-    const symbols = ['HYPEUSDT', 'PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT'];
+    const symbols = [...BINANCE_FUTURES_ONLY_SYMBOLS];
+    expect(symbols.length).toBe(21);
     const records = symbols.map((symbol) =>
       asset({
         symbol,
@@ -41,10 +43,15 @@ describe('ProviderTargetResolverService', () => {
     ).toEqual([]);
     expect(
       resolveEnvProviderTargets({
-        BINANCE_CRYPTO_SYMBOLS:
-          'BTCUSDT,HYPEUSDT,PUMP,BCHUSDT,FILUSDT,AAVEUSDT',
+        BINANCE_CRYPTO_SYMBOLS: 'BTCUSDT,HYPEUSDT,HYPE,ETCUSDT,ATOM,0GUSDT',
       }).binanceSymbols,
     ).toEqual(['BTCUSDT']);
+    // Underlyings the Spot ranking selected are ordinary Spot targets now.
+    expect(
+      resolveEnvProviderTargets({
+        BINANCE_CRYPTO_SYMBOLS: 'PUMPUSDT,BCHUSDT,FILUSDT,AAVEUSDT',
+      }).binanceSymbols,
+    ).toEqual(['PUMPUSDT', 'BCHUSDT', 'FILUSDT', 'AAVEUSDT']);
   });
 
   it('includes all fixed assets in active and merged targets using either base or USDT symbols', async () => {
@@ -192,10 +199,10 @@ describe('ProviderTargetResolverService', () => {
     expect(targets.kisUsSymbols).toEqual(['AAPL', 'TSLA']);
   });
 
-  it('falls back to the fixed 25-symbol Binance universe when the env watchlist is unset', () => {
+  it('falls back to the fixed 100-symbol Binance universe when the env watchlist is unset', () => {
     const targets = resolveEnvProviderTargets({});
     expect(targets.binanceSymbols).toEqual([...BINANCE_FIXED_SYMBOLS]);
-    expect(targets.binanceSymbols).toHaveLength(25);
+    expect(targets.binanceSymbols.length).toBe(100);
   });
 
   it('honors an explicit BINANCE_CRYPTO_SYMBOLS env override over the fixed default', () => {

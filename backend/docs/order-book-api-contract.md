@@ -9,7 +9,11 @@
 > A Spot asset book is never served for a contract.
 
 This implements the requested Binance Spot partial depth integration. It does
-not change order execution, ticker prices, candles, currencies or persistence.
+not change order execution, ticker prices, candles or currencies. Since
+2026-10-16 the accepted books can also be sampled once a minute into a
+display-only 14-day history (off by default) — see
+[crypto-order-book-history-contract.md](crypto-order-book-history-contract.md);
+the realtime path below is unchanged by it.
 
 ## Transport and ownership
 
@@ -47,7 +51,8 @@ within a process and never included in the app-facing snapshot.
 
 Redis channel `market:order-book:v1` carries
 `{ type: 'asset_order_book', sequence: string, book: AssetOrderBook }`.
-It is transient Pub/Sub: no database write, latest cache or history. Each app
+It is transient Pub/Sub: no latest cache, and the realtime fanout never waits
+for the optional 60 s history writer. Each app
 instance subscribes independently. Invalid events are rejected. Publication is
 coalesced to one in-flight and one latest pending snapshot per supported asset.
 
@@ -99,7 +104,8 @@ Official specification: https://github.com/binance/binance-spot-api-docs/blob/ma
   symbol/event time이 없으므로 별도 socket 대신 기존 연결의 endpoint를 `/stream`으로
   바꿨다. 설정된 host/query는 보존한다. ticker bid/ask, 등락률, DB throttle은 그대로다.
 - 최대 provider 구독 설정은 stream 수가 아니라 symbol 수였다. Live owner는 이를
-  유지하면서 3 streams/symbol 기준 1024 한도를 추가로 지킨다(현재 25종목은 75 streams).
+  유지하면서 3 streams/symbol 기준 1024 한도를 추가로 지킨다(2026-10-16 이후 100종목은
+  live-candle 300 streams, standalone ticker+depth10 200 streams).
 - 기존 candle backpressure는 sequence/revision, ticker는 최신값 coalescing이었다.
   order book은 기존 flush timer/byte threshold를 재사용하고 독립 pending map을 둔다.
 - 기존 Frontend 계약·normalization·fixture를 다시 만들 필요가 없었다. 카드 변경은

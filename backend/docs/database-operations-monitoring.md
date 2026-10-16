@@ -22,7 +22,10 @@ unwritable for about 8 hours with no alert
 | Futures retention backlog | same | 10 consecutive runs that hit the per-run cap (10 batches) | `FUTURES_MARK_RETENTION_BACKLOG`, `FUTURES_LAST_PRICE_RETENTION_BACKLOG` | `futures_retention_backlog` |
 | Price snapshot retention failures | `asset_price_snapshot_retention` worker (opt-in, §6) | 3 consecutive failed runs (one run per 5 min) | `ASSET_PRICE_SNAPSHOT_RETENTION_FAILING` | `price_snapshot_retention_failing` (every 5 min), `price_snapshot_retention_recovered` |
 | Price snapshot retention backlog | same | 10 consecutive runs that hit the per-run cap | `ASSET_PRICE_SNAPSHOT_RETENTION_BACKLOG` (readiness note only, §4) | `price_snapshot_retention_backlog` |
-| Disk full on write | Mark ingestion and the three retention workers (SQLSTATE 53100 / "No space left on device") | any, reported for 10 min after the last one | `DB_DISK_FULL` | `db_disk_full` (error) |
+| Order-book history write failures | `CryptoOrderBookHistoryService` (opt-in, §7) | 3 consecutive failed minute writes | `CRYPTO_ORDER_BOOK_HISTORY_PERSIST_FAILING` | `crypto_order_book_history_persist_failed` (once a minute per category) |
+| Order-book history retention failures | `crypto_order_book_retention` worker (§7) | 3 consecutive failed runs (one run per 5 min) | `CRYPTO_ORDER_BOOK_RETENTION_FAILING` | `crypto_order_book_retention_failing` (every 5 min), `crypto_order_book_retention_recovered` |
+| Order-book history retention backlog | same | 10 consecutive runs that hit the per-run cap (20,000 rows) | `CRYPTO_ORDER_BOOK_RETENTION_BACKLOG` | `crypto_order_book_retention_backlog` |
+| Disk full on write | Mark ingestion, the order-book history writer and the four retention workers (SQLSTATE 53100 / "No space left on device") | any, reported for 10 min after the last one | `DB_DISK_FULL` | `db_disk_full` (error) |
 | Database unreachable | existing readiness `SELECT 1` | any | `CANDLE_DB_UNAVAILABLE`, `status: unavailable` | — |
 
 Failure categories (`kind`, and `ops_job_runs.result_json.failureKind` for a failed
@@ -47,7 +50,7 @@ Limits of the signals:
 - `GET /readiness` (public, root path, no `/api/v1`): `data.reasons`,
   `data.alerts` (the subset in §4 that needs an operator), `data.futuresMark`,
   `data.futuresRetention.{mark,last}`, `data.assetPriceRetention`,
-  `data.databaseStorage`.
+  `data.cryptoOrderBookHistory.{recorder,retention}`, `data.databaseStorage`.
   - **Always HTTP 200**, even when the database is unreachable (`status:
     unavailable`, `success: false`). A monitor that checks only the HTTP status of
     `/readiness` misses every incident.
@@ -70,7 +73,7 @@ SELECT job_name, status, started_at,
        result_json->>'batchLimitReached' AS at_cap
 FROM ops_job_runs
 WHERE job_name IN ('futures_mark_retention', 'futures_last_price_retention',
-                   'asset_price_snapshot_retention')
+                   'asset_price_snapshot_retention', 'crypto_order_book_retention')
 ORDER BY started_at DESC
 LIMIT 30;
 ```
@@ -147,6 +150,8 @@ are not paged.
 | `FUTURES_MARK_RETENTION_FAILING` / `FUTURES_LAST_PRICE_RETENTION_FAILING` | 3 consecutive failed futures retention runs | `ops_job_runs.result_json.failureKind`; the 24 h window grows while it fails |
 | `FUTURES_MARK_RETENTION_BACKLOG` / `FUTURES_LAST_PRICE_RETENTION_BACKLOG` | 10 capped runs in a row | Deletion is not keeping up with the inflow; check run times and failures |
 | `ASSET_PRICE_SNAPSHOT_RETENTION_FAILING` | 3 consecutive failed price snapshot retention runs | `failureKind` in the failed runs; set `ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED=false` if it is causing load |
+| `CRYPTO_ORDER_BOOK_HISTORY_PERSIST_FAILING` | 3 consecutive failed order-book history writes | Category in `crypto_order_book_history_persist_failed`; the realtime books are unaffected; set `CRYPTO_ORDER_BOOK_HISTORY_ENABLED=false` if the database needs the room |
+| `CRYPTO_ORDER_BOOK_RETENTION_FAILING` / `_BACKLOG` | 3 failed or 10 capped order-book retention runs in a row | `ops_job_runs` (`failureKind`, `deleted`, `oldestRemaining`); stop recording first if the backlog grows |
 
 `ASSET_PRICE_SNAPSHOT_RETENTION_BACKLOG` is a readiness reason but not an alert:
 the first cleanup of the existing history runs at the capped pace for hours by
@@ -195,3 +200,25 @@ the existing history and is an approved rollout step (P1 report §14).
   rewrite (`VACUUM FULL`, `pg_repack`), which is a separate approved maintenance.
 - **Rollback:** set the flag back to `false`. Deleted rows are not restored; every
   row that any financial record or reader could need was kept.
+
+## 7. Crypto order-book history (`crypto_spot_order_book_snapshots`, `futures_order_book_snapshots`, 14 days)
+
+Contract: [crypto-order-book-history-contract.md](crypto-order-book-history-contract.md).
+Display-only 60 s samples of the Binance Spot and USDⓈ-M 10-level books; at
+100 + 100 products at most 288,000 rows a day. **Off by default.**
+
+- **Enable (after the disk decision):** `CRYPTO_ORDER_BOOK_HISTORY_ENABLED=true`
+  on every instance; the retention follows unless
+  `CRYPTO_ORDER_BOOK_RETENTION_ENABLED` is set. No stream, Redis channel or
+  financial path changes.
+- **Pace:** the writer inserts once a minute (one statement per table, 5 s
+  statement timeout); the retention runs every 5 minutes at :45 and deletes rows
+  whose whole minute is older than 336 hours, at most 20,000 rows or 60 s a run.
+- **Observe:** `/readiness` `data.cryptoOrderBookHistory` (recorder counts,
+  `lastInsertedAt`, `consecutiveWriteFailures`; retention `lastResult` with
+  `oldestRemaining`), `ops_job_runs` for `crypto_order_book_retention`.
+- **Disk:** see the 2026-10-16 report for the measured bytes per row and the
+  14-day size; like every DELETE, the space is reused after VACUUM, not returned.
+- **Rollback:** `CRYPTO_ORDER_BOOK_HISTORY_ENABLED=false` stops new rows at once;
+  leave `CRYPTO_ORDER_BOOK_RETENTION_ENABLED=true` for 14 days to empty the
+  tables. The tables are never read by any financial path.

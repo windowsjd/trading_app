@@ -2,8 +2,10 @@
 
 ## Product availability
 
-The Binance Spot fixed universe stays at 25. Active Futures-only HYPEUSDT,
-PUMPUSDT, BCHUSDT, FILUSDT and AAVEUSDT are excluded from Spot list/search,
+The Binance Spot fixed universe is 100 since 2026-10-16 (the earlier 25 kept,
+75 added; [binance-crypto-100-2026-ytd.md](binance-crypto-100-2026-ytd.md)).
+The 21 active Futures-only underlyings (`BINANCE_FUTURES_ONLY_ASSETS`: HYPEUSDT
+and twenty more; PUMP/BCH/FIL/AAVE became Spot by the Spot ranking) are excluded from Spot list/search,
 including `includeInactive=true`, and return `ASSET_NOT_FOUND` from generic
 Spot detail/price/candles. Ticker/candle/order-book subscriptions reject them
 using the existing WS error contracts. Spot quote/create/execute, Limit matching

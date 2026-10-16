@@ -69,7 +69,7 @@ USDⓈ-M 2400 weight/min), so 1200 spent entirely on either product is at most
 half of that product's own limit; 1200 is our ceiling, not a provider promise.
 Futures order books and 24h statistics are WebSocket only (no REST weight).
 
-Estimate for a future universe of 100 Spot + 100 USDⓈ-M symbols (today 25 + 25),
+Estimate for the universe of 100 Spot + 100 USDⓈ-M symbols (implemented 2026-10-16; written when it was 25 + 25),
 one ingesting process, live candles/ticker on WebSocket:
 
 | Source (cadence) | Weight per run | Average/min | Peak/min |

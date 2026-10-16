@@ -278,6 +278,7 @@ enum OpsJobName {
   futures_conditional_entries
   asset_price_snapshot_retention
   futures_tp_sl_settings
+  crypto_order_book_retention
 }
 
 enum MarketCandleSyncMode {
@@ -720,6 +721,7 @@ model Asset {
 
   priceSnapshots           AssetPriceSnapshot[]
   orderbookSnapshots       AssetOrderbookSnapshot[]
+  cryptoOrderBookSnapshots CryptoSpotOrderBookSnapshot[]
   marketCandles            MarketCandle[]
   marketCandleSyncStates   MarketCandleSyncState[]
   positions                Position[]
@@ -794,6 +796,31 @@ model AssetOrderbookSnapshot {
   @@index([assetId, capturedAt])
   @@index([sourceType, effectiveAt])
   @@map("asset_orderbook_snapshots")
+}
+
+/// Display-only 60 s history of the Binance Spot 10-level book
+/// (docs/crypto-order-book-history-contract.md). At most one row per asset and
+/// UTC minute: the newest validated book received in that minute that was
+/// still current at its end. Never an execution, valuation or risk input;
+/// KOSCOM/KIS books stay in asset_orderbook_snapshots. Kept 14 days.
+model CryptoSpotOrderBookSnapshot {
+  /// UTC minute that contains capturedAt (inclusive start).
+  bucketStartAt DateTime @map("bucket_start_at")
+  assetId       String   @map("asset_id")
+  /// Server receipt time of the book (the realtime event's capturedAt).
+  capturedAt    DateTime @map("captured_at")
+  /// Provider lastUpdateId of the partial book.
+  sequence      BigInt
+  /// [[price, quantity], ...] best first, exact provider decimal strings.
+  bids          Json     @db.Json
+  asks          Json     @db.Json
+  /// Database write time, never a market time.
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@id([bucketStartAt, assetId])
+  @@map("crypto_spot_order_book_snapshots")
 }
 
 model MarketCandle {
@@ -940,6 +967,7 @@ model FuturesInstrument {
   conditionalEntries FuturesConditionalEntry[]
   marketCandles      FuturesMarketCandle[]
   tpSlSettings       FuturesTpSlSetting[]
+  orderBookSnapshots FuturesOrderBookSnapshot[]
 
   @@unique([underlyingAssetId, productType, settlementCurrency])
   @@map("futures_instruments")
@@ -2423,6 +2451,31 @@ model FuturesMarkSnapshot {
   @@index([instrumentId, effectiveAt])
   @@index([capturedAt, id])
   @@map("futures_mark_snapshots")
+}
+
+/// Display-only 60 s history of the USDⓈ-M contract's own 10-level book,
+/// keyed by instrument, never by underlying asset
+/// (docs/crypto-order-book-history-contract.md). Same sampling rule as the
+/// Spot table; never a Last, Mark, execution or liquidation input. Kept 14 days.
+model FuturesOrderBookSnapshot {
+  /// UTC minute that contains capturedAt (inclusive start).
+  bucketStartAt DateTime          @map("bucket_start_at")
+  instrumentId  String            @map("instrument_id")
+  /// Server receipt time of the book (the realtime event's capturedAt).
+  capturedAt    DateTime          @map("captured_at")
+  /// Provider transaction time of the snapshot.
+  effectiveAt   DateTime          @map("effective_at")
+  /// Provider final update id of the partial book.
+  sequence      BigInt
+  /// [[price, quantity], ...] best first, exact provider decimal strings.
+  bids          Json              @db.Json
+  asks          Json              @db.Json
+  /// Database write time, never a market time.
+  createdAt     DateTime          @default(now()) @map("created_at")
+  instrument    FuturesInstrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+
+  @@id([bucketStartAt, instrumentId])
+  @@map("futures_order_book_snapshots")
 }
 
 model FuturesLiquidation {

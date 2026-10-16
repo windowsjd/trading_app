@@ -399,6 +399,7 @@ export const ModelName = {
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
+  CryptoSpotOrderBookSnapshot: 'CryptoSpotOrderBookSnapshot',
   MarketCandle: 'MarketCandle',
   MarketCandleSyncState: 'MarketCandleSyncState',
   MarketSessionOverride: 'MarketSessionOverride',
@@ -441,6 +442,7 @@ export const ModelName = {
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
   FuturesLastPriceSnapshot: 'FuturesLastPriceSnapshot',
   FuturesMarkSnapshot: 'FuturesMarkSnapshot',
+  FuturesOrderBookSnapshot: 'FuturesOrderBookSnapshot',
   FuturesLiquidation: 'FuturesLiquidation',
   FuturesLiquidationClose: 'FuturesLiquidationClose',
   FuturesSeasonPrice: 'FuturesSeasonPrice',
@@ -461,7 +463,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
+    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1572,6 +1574,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AssetOrderbookSnapshotCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AssetOrderbookSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
+    CryptoSpotOrderBookSnapshot: {
+      payload: Prisma.$CryptoSpotOrderBookSnapshotPayload<ExtArgs>
+      fields: Prisma.CryptoSpotOrderBookSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CryptoSpotOrderBookSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CryptoSpotOrderBookSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.CryptoSpotOrderBookSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CryptoSpotOrderBookSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.CryptoSpotOrderBookSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.CryptoSpotOrderBookSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.CryptoSpotOrderBookSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CryptoSpotOrderBookSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.CryptoSpotOrderBookSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>
+        }
+        update: {
+          args: Prisma.CryptoSpotOrderBookSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.CryptoSpotOrderBookSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CryptoSpotOrderBookSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CryptoSpotOrderBookSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.CryptoSpotOrderBookSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CryptoSpotOrderBookSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.CryptoSpotOrderBookSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCryptoSpotOrderBookSnapshot>
+        }
+        groupBy: {
+          args: Prisma.CryptoSpotOrderBookSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CryptoSpotOrderBookSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CryptoSpotOrderBookSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CryptoSpotOrderBookSnapshotCountAggregateOutputType> | number
         }
       }
     }
@@ -4683,6 +4759,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    FuturesOrderBookSnapshot: {
+      payload: Prisma.$FuturesOrderBookSnapshotPayload<ExtArgs>
+      fields: Prisma.FuturesOrderBookSnapshotFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.FuturesOrderBookSnapshotFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.FuturesOrderBookSnapshotFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>
+        }
+        findFirst: {
+          args: Prisma.FuturesOrderBookSnapshotFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.FuturesOrderBookSnapshotFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>
+        }
+        findMany: {
+          args: Prisma.FuturesOrderBookSnapshotFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>[]
+        }
+        create: {
+          args: Prisma.FuturesOrderBookSnapshotCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>
+        }
+        createMany: {
+          args: Prisma.FuturesOrderBookSnapshotCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.FuturesOrderBookSnapshotCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>[]
+        }
+        delete: {
+          args: Prisma.FuturesOrderBookSnapshotDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>
+        }
+        update: {
+          args: Prisma.FuturesOrderBookSnapshotUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>
+        }
+        deleteMany: {
+          args: Prisma.FuturesOrderBookSnapshotDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.FuturesOrderBookSnapshotUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.FuturesOrderBookSnapshotUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>[]
+        }
+        upsert: {
+          args: Prisma.FuturesOrderBookSnapshotUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$FuturesOrderBookSnapshotPayload>
+        }
+        aggregate: {
+          args: Prisma.FuturesOrderBookSnapshotAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateFuturesOrderBookSnapshot>
+        }
+        groupBy: {
+          args: Prisma.FuturesOrderBookSnapshotGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesOrderBookSnapshotGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.FuturesOrderBookSnapshotCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.FuturesOrderBookSnapshotCountAggregateOutputType> | number
+        }
+      }
+    }
     FuturesLiquidation: {
       payload: Prisma.$FuturesLiquidationPayload<ExtArgs>
       fields: Prisma.FuturesLiquidationFieldRefs
@@ -5365,6 +5515,19 @@ export const AssetOrderbookSnapshotScalarFieldEnum = {
 } as const
 
 export type AssetOrderbookSnapshotScalarFieldEnum = (typeof AssetOrderbookSnapshotScalarFieldEnum)[keyof typeof AssetOrderbookSnapshotScalarFieldEnum]
+
+
+export const CryptoSpotOrderBookSnapshotScalarFieldEnum = {
+  bucketStartAt: 'bucketStartAt',
+  assetId: 'assetId',
+  capturedAt: 'capturedAt',
+  sequence: 'sequence',
+  bids: 'bids',
+  asks: 'asks',
+  createdAt: 'createdAt'
+} as const
+
+export type CryptoSpotOrderBookSnapshotScalarFieldEnum = (typeof CryptoSpotOrderBookSnapshotScalarFieldEnum)[keyof typeof CryptoSpotOrderBookSnapshotScalarFieldEnum]
 
 
 export const MarketCandleScalarFieldEnum = {
@@ -6302,6 +6465,20 @@ export const FuturesMarkSnapshotScalarFieldEnum = {
 export type FuturesMarkSnapshotScalarFieldEnum = (typeof FuturesMarkSnapshotScalarFieldEnum)[keyof typeof FuturesMarkSnapshotScalarFieldEnum]
 
 
+export const FuturesOrderBookSnapshotScalarFieldEnum = {
+  bucketStartAt: 'bucketStartAt',
+  instrumentId: 'instrumentId',
+  capturedAt: 'capturedAt',
+  effectiveAt: 'effectiveAt',
+  sequence: 'sequence',
+  bids: 'bids',
+  asks: 'asks',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesOrderBookSnapshotScalarFieldEnum = (typeof FuturesOrderBookSnapshotScalarFieldEnum)[keyof typeof FuturesOrderBookSnapshotScalarFieldEnum]
+
+
 export const FuturesLiquidationScalarFieldEnum = {
   id: 'id',
   tradingAccountId: 'tradingAccountId',
@@ -6752,6 +6929,20 @@ export type EnumAssetPriceSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputT
  * Reference to a field of type 'AssetPriceSourceType[]'
  */
 export type ListEnumAssetPriceSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AssetPriceSourceType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
     
 
 
@@ -7452,6 +7643,7 @@ export type GlobalOmitConfig = {
   asset?: Prisma.AssetOmit
   assetPriceSnapshot?: Prisma.AssetPriceSnapshotOmit
   assetOrderbookSnapshot?: Prisma.AssetOrderbookSnapshotOmit
+  cryptoSpotOrderBookSnapshot?: Prisma.CryptoSpotOrderBookSnapshotOmit
   marketCandle?: Prisma.MarketCandleOmit
   marketCandleSyncState?: Prisma.MarketCandleSyncStateOmit
   marketSessionOverride?: Prisma.MarketSessionOverrideOmit
@@ -7494,6 +7686,7 @@ export type GlobalOmitConfig = {
   limitOrderCandleEvidence?: Prisma.LimitOrderCandleEvidenceOmit
   futuresLastPriceSnapshot?: Prisma.FuturesLastPriceSnapshotOmit
   futuresMarkSnapshot?: Prisma.FuturesMarkSnapshotOmit
+  futuresOrderBookSnapshot?: Prisma.FuturesOrderBookSnapshotOmit
   futuresLiquidation?: Prisma.FuturesLiquidationOmit
   futuresLiquidationClose?: Prisma.FuturesLiquidationCloseOmit
   futuresSeasonPrice?: Prisma.FuturesSeasonPriceOmit

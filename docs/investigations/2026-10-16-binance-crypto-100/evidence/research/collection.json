@@ -1,0 +1,12 @@
+{
+  "startedAt": "2026-10-16T06:36:41.302Z",
+  "completedAt": "2026-10-16T06:53:38.767Z",
+  "endExclusive": "2026-10-16T00:00:00.000Z",
+  "spotServerTime": "2026-10-16T06:36:40.910Z",
+  "futuresServerTime": "2026-10-16T06:36:41.858Z",
+  "spotCandidates": 511,
+  "futuresCandidates": 525,
+  "httpRequests": 1055,
+  "nonSuccess": [],
+  "maxUsedWeight1m": 126
+}

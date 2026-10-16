@@ -21,23 +21,64 @@ const contracts = parseFuturesContracts({
   })),
 });
 describe('selected Futures registration planning', () => {
-  it('creates only five underlyings and exactly 25 contracts; does not mutate inputs', () => {
+  it('on an empty catalog creates the 21 Futures-only underlyings and all 100 contracts; does not mutate inputs', () => {
     const before = JSON.stringify(assets);
     const p = futuresProvisionPlan(assets, [], contracts, at);
     expect(p.blockers).toEqual([]);
     expect(p.counts).toEqual({
-      assets: { create: 5, maintain: 20, change: 0 },
-      instruments: { create: 25, maintain: 0, change: 0 },
+      assets: { create: 21, maintain: 79, change: 0 },
+      instruments: { create: 100, maintain: 0, change: 0 },
     });
     expect(p.createInstruments).toEqual(BINANCE_FUTURES_SYMBOLS);
     expect(JSON.stringify(assets)).toBe(before);
+  });
+  it('upgrades the deployed 25 + 5 catalog: keeps every existing row, adds 20 underlyings and 75 contracts', () => {
+    // Production before activation: the Spot seed has already registered the
+    // Spot 100, reusing the four former Futures-only rows (same ids); HYPE
+    // stays Futures-only; the original 25 contracts are verified.
+    const deployed = [
+      ...BINANCE_FIXED_ASSET_UNIVERSE.map((a) => ({
+        ...a,
+        id: a.symbol,
+        isActive: true,
+      })),
+      {
+        symbol: 'HYPEUSDT',
+        name: 'Hyperliquid',
+        market: 'BINANCE',
+        assetType: 'crypto',
+        currencyCode: 'USD',
+        priceCurrency: 'USD',
+        settlementCurrency: 'USD',
+        id: 'HYPEUSDT',
+        isActive: true,
+      },
+    ] as never;
+    const instruments = BINANCE_FUTURES_SYMBOLS.slice(0, 25).map((symbol) => ({
+      id: `instrument-${symbol}`,
+      underlyingAssetId: symbol,
+      productType: 'synthetic_perpetual',
+      settlementCurrency: 'USD',
+      isActive: true,
+      markContractJson: contracts.get(symbol),
+      markVerifiedAt: at,
+    })) as never;
+    const p = futuresProvisionPlan(deployed, instruments, contracts, at);
+    expect(p.blockers).toEqual([]);
+    expect(p.counts).toEqual({
+      assets: { create: 20, maintain: 80, change: 0 },
+      instruments: { create: 75, maintain: 25, change: 0 },
+    });
+    expect(p.createInstruments).toEqual(BINANCE_FUTURES_SYMBOLS.slice(25));
+    expect(p.createAssets.map((a) => a.symbol)).not.toContain('HYPEUSDT');
   });
   it('fails closed on missing contracts and never creates an absent shared Spot asset', () => {
     const c = new Map(contracts);
     c.delete('HYPEUSDT');
     const p = futuresProvisionPlan([], [], c, at);
-    expect(p.blockers.length).toBe(21);
-    expect(p.createAssets.length).toBe(5);
+    // 79 shared Spot underlyings absent + the missing HYPE contract.
+    expect(p.blockers.length).toBe(80);
+    expect(p.createAssets.length).toBe(21);
     expect(p.blockers.some((b) => b.startsWith('HYPEUSDT:'))).toBe(true);
   });
   it('preserves nonselected financial lifetimes and reports inactive selected conflicts', () => {

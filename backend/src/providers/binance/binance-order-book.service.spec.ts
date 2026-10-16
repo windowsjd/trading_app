@@ -33,7 +33,7 @@ function setup(assets = [{ id: 'btc', symbol: 'BTCUSDT' }]) {
 }
 
 describe('shared Binance order book processor', () => {
-  it('maps and publishes depth10 for every fixed asset, including the fifteen additions', async () => {
+  it('maps and publishes depth10 for every fixed asset, including the 2026-09 and 2026-10 additions', async () => {
     const entries = BINANCE_FIXED_ASSET_UNIVERSE;
     const { service, pubsub, prisma } = setup(
       entries.map((entry, index) => ({
@@ -42,7 +42,7 @@ describe('shared Binance order book processor', () => {
       })),
     );
     const targets = await service.loadTargets();
-    expect(targets.size).toBe(25);
+    expect(targets.size).toBe(100);
     const query = prisma.asset.findMany.mock.calls[0] as unknown as [
       { where: { symbol: { in: string[] } } },
     ];

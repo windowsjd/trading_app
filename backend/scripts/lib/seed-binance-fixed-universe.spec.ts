@@ -10,13 +10,22 @@ import {
 import { BINANCE_FIXED_ASSET_UNIVERSE } from '../../src/providers/binance/binance-fixed-asset-universe';
 import { ProviderHttpClient } from '../../src/providers/provider-http.client';
 
+/** Production before this expansion: the Spot 25 plus the Futures-only
+ * underlyings that the Spot ranking has now selected (same names, same ids). */
+const FORMER_FUTURES_ONLY = ['PUMPUSDT', 'AAVEUSDT', 'BCHUSDT', 'FILUSDT'];
+
 function setup() {
   const desired = buildBinanceDesiredUniverse();
-  const rows = desired.slice(0, 10).map((entry) => ({
-    ...entry,
-    id: `existing-${entry.symbol}`,
-    isActive: true,
-  }));
+  const rows = desired
+    .filter(
+      (entry, index) =>
+        index < 25 || FORMER_FUTURES_ONLY.includes(entry.symbol),
+    )
+    .map((entry) => ({
+      ...entry,
+      id: `existing-${entry.symbol}`,
+      isActive: true,
+    }));
   const original = structuredClone(rows);
   const tx = {
     asset: {
@@ -54,7 +63,7 @@ function setup() {
 afterEach(() => jest.restoreAllMocks());
 
 describe('fixed Binance seed with the YTD expansion', () => {
-  it('plans exactly fifteen creates without writing in dry-run', async () => {
+  it('plans exactly 71 creates and reuses the 29 registered rows without writing in dry-run', async () => {
     const { prisma } = setup();
     const result = await seedBinanceFixedAssetUniverse({
       prisma: prisma as never,
@@ -63,17 +72,17 @@ describe('fixed Binance seed with the YTD expansion', () => {
     });
     expect(result.validation.ok).toBe(true);
     expect(result.universe?.counts).toEqual({
-      total: 25,
-      create: 15,
+      total: 100,
+      create: 71,
       update: 0,
-      unchanged: 10,
+      unchanged: 29,
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('aborts before DB access if even one new symbol fails validation', async () => {
     const { prisma, symbols } = setup();
-    symbols[24].status = 'BREAK';
+    symbols[99].status = 'BREAK';
     const result = await seedBinanceFixedAssetUniverse({
       prisma: prisma as never,
       apply: true,
@@ -94,21 +103,21 @@ describe('fixed Binance seed with the YTD expansion', () => {
     const result = await seedBinanceFixedAssetUniverse(input);
     expect(result.ok).toBe(true);
     expect(result.verification).toEqual({
-      total: 25,
-      verified: 25,
+      total: 100,
+      verified: 100,
       issues: [],
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(tx.asset.create).toHaveBeenCalledTimes(15);
+    expect(tx.asset.create).toHaveBeenCalledTimes(71);
     expect(tx.asset.update).not.toHaveBeenCalled();
-    expect(rows.slice(0, 10)).toEqual(original);
+    expect(rows.slice(0, 29)).toEqual(original);
     const repeated = await seedBinanceFixedAssetUniverse(input);
     expect(repeated.universe?.counts).toEqual({
-      total: 25,
+      total: 100,
       create: 0,
       update: 0,
-      unchanged: 25,
+      unchanged: 100,
     });
-    expect(tx.asset.create).toHaveBeenCalledTimes(15);
+    expect(tx.asset.create).toHaveBeenCalledTimes(71);
   });
 });

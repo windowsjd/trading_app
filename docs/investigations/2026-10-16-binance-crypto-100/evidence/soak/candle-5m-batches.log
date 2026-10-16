@@ -1,0 +1,6 @@
+round 1 08:15:14 batch=20 assets=20/20 feeds=20 coverageComplete=18 completedWithIncompleteCoverage=0 failed=2
+round 2 08:16:12 batch=20 assets=20/20 feeds=20 coverageComplete=18 completedWithIncompleteCoverage=0 failed=2
+round 3 08:17:07 batch=11 assets=11/11 feeds=11 coverageComplete=9 completedWithIncompleteCoverage=0 failed=2
+round 4 08:18:00 batch=2 assets=2/2 feeds=2 coverageComplete=0 completedWithIncompleteCoverage=0 failed=2
+round 5 08:18:59 batch=2 assets=2/2 feeds=2 coverageComplete=0 completedWithIncompleteCoverage=0 failed=2
+round 6 08:19:02 batch=2 assets=2/2 feeds=2 coverageComplete=0 completedWithIncompleteCoverage=0 failed=2

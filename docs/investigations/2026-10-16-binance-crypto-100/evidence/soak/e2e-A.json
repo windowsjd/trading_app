@@ -1,0 +1,83 @@
+{
+ "signup": 201,
+ "login": 200,
+ "spotList": {
+  "status": 200,
+  "ms": 33.9,
+  "bytes": 143915,
+  "count": 100,
+  "withPrice": 100,
+  "decimals": 100
+ },
+ "general": 200,
+ "accounts": {
+  "status": 200,
+  "id": "44ee3dd5-1315-486d-aaa6-e0300e92a416",
+  "mode": "general"
+ },
+ "futuresCatalog": {
+  "status": 200,
+  "msRuns": [
+   11.6,
+   10.9,
+   8.2,
+   9.8,
+   7
+  ],
+  "bytes": 114399,
+  "count": 100,
+  "withLast": 100,
+  "withMark": 100,
+  "sample": [
+   {
+    "symbol": "ONGUSDT",
+    "ref": "0.08115000",
+    "mark": "0.08115427",
+    "dec": 5
+   },
+   {
+    "symbol": "LSKUSDT",
+    "ref": "0.20377000",
+    "mark": "0.20364477",
+    "dec": 5
+   }
+  ]
+ },
+ "ws": {
+  "spotSymbol": "MARSCOINUSDT",
+  "contract": "0GUSDT",
+  "asset_order_book": 12,
+  "futures_order_book": 16,
+  "acks": [
+   "asset_order_book",
+   "futures_order_book"
+  ],
+  "errors": [],
+  "sampleSpot": {
+   "asks": 10,
+   "bids": 10,
+   "bestAsk": {
+    "price": "0.08300000",
+    "quantity": "22289.20000000"
+   },
+   "bestBid": {
+    "price": "0.08290000",
+    "quantity": "50326.50000000"
+   },
+   "capturedAt": "2026-10-16T07:23:10.950Z"
+  },
+  "sampleFut": {
+   "asks": 10,
+   "bids": 10,
+   "bestAsk": {
+    "price": "0.2548000",
+    "quantity": "2921"
+   },
+   "bestBid": {
+    "price": "0.2547000",
+    "quantity": "775"
+   },
+   "effectiveAt": "2026-10-16T07:23:09.799Z"
+  }
+ }
+}

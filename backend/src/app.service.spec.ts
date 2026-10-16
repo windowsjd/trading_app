@@ -631,6 +631,57 @@ describe('AppService candle readiness', () => {
       expect(result.data.alerts).toEqual(['DB_STORAGE_SAMPLE_STALE']);
     });
 
+    it('reports the crypto order-book history writer and retention, alerting on failures and disk full', async () => {
+      const history = (recorder: unknown, retention: unknown) =>
+        new AppService(
+          {
+            $queryRaw: jest.fn().mockResolvedValue([{ '?column?': 1 }]),
+          } as never,
+          ...(Array.from({ length: 14 }, () => undefined) as []),
+          { getStatus: jest.fn().mockReturnValue(recorder) } as never,
+          { getStatus: jest.fn().mockReturnValue(retention) } as never,
+        );
+      const failingRecorder = (enabled: boolean) => ({
+        enabled,
+        consecutiveWriteFailures: 3,
+        lastWriteFailure: {
+          kind: 'disk_full',
+          at: new Date(+at - 60000).toISOString(),
+        },
+      });
+      const failingRetention = (enabled: boolean) => ({
+        enabled,
+        failing: true,
+        backlog: true,
+        lastFailureKind: 'statement_timeout',
+        lastFailedAt: at.toISOString(),
+      });
+      const off = await history(
+        failingRecorder(false),
+        failingRetention(false),
+      ).getReadiness(at);
+      expect(off.data.reasons).toEqual([]);
+      const on = await history(
+        failingRecorder(true),
+        failingRetention(true),
+      ).getReadinessAlerts(at);
+      expect(on.httpStatus).toBe(503);
+      expect(on.body.data.alerts).toEqual([
+        'CRYPTO_ORDER_BOOK_HISTORY_PERSIST_FAILING',
+        'CRYPTO_ORDER_BOOK_RETENTION_FAILING',
+        'CRYPTO_ORDER_BOOK_RETENTION_BACKLOG',
+        'DB_DISK_FULL',
+      ]);
+      const readiness = await history(failingRecorder(true), null).getReadiness(
+        at,
+      );
+      expect(readiness.data.cryptoOrderBookHistory.recorder).toMatchObject({
+        enabled: true,
+        consecutiveWriteFailures: 3,
+      });
+      expect(readiness.data.cryptoOrderBookHistory.retention).toBeNull();
+    });
+
     it('drops DB_DISK_FULL ten minutes after the last disk-full write failure', async () => {
       const sources = unhealthy(true);
       sources.mark.lastPersistFailure.at = new Date(+at - 600001).toISOString();

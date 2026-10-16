@@ -335,6 +335,14 @@ jobs:
           PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE price_snapshot_retention_test'
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/providers/asset-price-snapshot-retention.integration.spec.ts
+      - name: Crypto order book history PostgreSQL 17 safety
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/crypto_order_book_history_test?schema=public
+          CRYPTO_ORDER_BOOK_HISTORY_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE crypto_order_book_history_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/providers/crypto-order-book-history.integration.spec.ts
 
   core-account-db-integration:
     name: Core account PostgreSQL integration
@@ -612,6 +620,14 @@ jobs:
           PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE price_snapshot_retention_test'
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/providers/asset-price-snapshot-retention.integration.spec.ts
+      - name: Crypto order book history PostgreSQL safety (writers, restart, 14-day retention)
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/crypto_order_book_history_test?schema=public
+          CRYPTO_ORDER_BOOK_HISTORY_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE crypto_order_book_history_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/providers/crypto-order-book-history.integration.spec.ts
       # Identify exactly the fixture JSON this run produced (files not present at
       # checkout). Runs on success and failure so a smoke that wrote a report
       # before failing still yields one debuggable file — but never falls back

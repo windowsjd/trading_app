@@ -1,0 +1,6 @@
+mark {"instruments":100,"rows":359969,"max_gap_s":"31.00","gaps_over_5s":1,"instruments_with_gap":1}
+last {"instruments":100,"rows":192869,"max_gap_s":"89.69","gaps_over_5s":9348,"gaps_over_10s":428}
+spotPrice {"assets":100,"rows":55994,"median_gap_s":"5.22","max_gap_s":"220.08","gaps_over_30s":95}
+historySpot {"products":100,"rows":5760,"first":"2026-10-16T07:31:00.000Z","last":"2026-10-16T08:30:00.000Z"}
+historyFutures {"products":100,"rows":5970,"first":"2026-10-16T07:31:00.000Z","last":"2026-10-16T08:30:00.000Z"}
+sizes {"spot_total":"5095424","spot_heap":"4513792","spot_idx":"540672","spot_rows":5857,"fut_total":"4087808","fut_heap":"3473408","fut_idx":"573440","fut_rows":6070,"spot_avg_tuple":"736.7","fut_avg_tuple":"545.8"}

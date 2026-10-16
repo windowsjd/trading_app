@@ -1,0 +1,46 @@
+{
+  "spot": {
+    "candidates": 511,
+    "eligible": 396,
+    "added": 75,
+    "boundary": [
+      "MARSCOINUSDT",
+      "MUBARAKUSDT"
+    ],
+    "total": "1884010272548.36556349"
+  },
+  "futures": {
+    "candidates": 525,
+    "eligible": 351,
+    "added": 75,
+    "boundary": [
+      "SAGAUSDT",
+      "BICOUSDT"
+    ],
+    "futuresOnly": [
+      "HYPEUSDT",
+      "LSKUSDT",
+      "ETCUSDT",
+      "SANDUSDT",
+      "DUSKUSDT",
+      "ORCAUSDT",
+      "NOMUSDT",
+      "MOVRUSDT",
+      "HEIUSDT",
+      "GALAUSDT",
+      "ATOMUSDT",
+      "ENJUSDT",
+      "KAITOUSDT",
+      "ESPUSDT",
+      "EDENUSDT",
+      "NILUSDT",
+      "PIXELUSDT",
+      "ONGUSDT",
+      "0GUSDT",
+      "ZBTUSDT",
+      "ONTUSDT"
+    ],
+    "total": "10589602041164.04648778"
+  },
+  "status": "PASS"
+}

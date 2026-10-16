@@ -206,7 +206,7 @@ async function newInstrument() {
   const references = (allocatedSymbols.get(symbol) ?? 0) + 1;
   allocatedSymbols.set(symbol, references);
   // The cursor gate intentionally has more accounts than offered contracts.
-  // Share the same-price canonical instrument after all 25 identities are used;
+  // Share the same-price canonical instrument after every catalog identity is used;
   // retain every account/position and the original multi-batch assertions.
   if (references > 1) {
     const asset = await db.asset.findUniqueOrThrow({

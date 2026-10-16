@@ -1,0 +1,30 @@
+{
+  "measuredAt": "2026-10-16T06:5xZ",
+  "database": "local PostgreSQL 17.10 (private, UTC), not production",
+  "input": "60 s of real Binance depth10 frames (Spot 25 x 1 s, USDⓈ-M 25 x 500 ms) replicated to 100,000 rows per table, inserted 100 rows per statement (one minute of 100 products), then VACUUM ANALYZE",
+  "method": "pg_relation_size / pg_indexes_size / pg_total_relation_size per row, avg pg_column_size, WAL bytes per row from pg_current_wal_insert_lsn() deltas after a CHECKPOINT",
+  "productFirstPrimaryKey": {
+    "spot.jsonb2": {"heapPerRow": 1024.0, "indexPerRow": 118.5, "totalPerRow": 1143.1, "avgTuple": 926.6, "walPerRow": 1171.9},
+    "spot.json2": {"heapPerRow": 791.8, "indexPerRow": 118.5, "totalPerRow": 910.9, "avgTuple": 742.1, "walPerRow": 986.7},
+    "spot.numeric4": {"heapPerRow": 676.1, "indexPerRow": 118.5, "totalPerRow": 795.1, "avgTuple": 636.8, "walPerRow": 881.1},
+    "spot.jsonb1": {"heapPerRow": 1024.0, "indexPerRow": 118.5, "totalPerRow": 1143.1, "avgTuple": 949.0, "walPerRow": 1194.3},
+    "futures.jsonb2": {"heapPerRow": 745.2, "indexPerRow": 118.5, "totalPerRow": 864.3, "avgTuple": 722.0, "walPerRow": 966.6},
+    "futures.json2": {"heapPerRow": 546.7, "indexPerRow": 118.5, "totalPerRow": 665.7, "avgTuple": 533.0, "walPerRow": 777.0},
+    "futures.numeric4": {"heapPerRow": 681.7, "indexPerRow": 118.5, "totalPerRow": 800.8, "avgTuple": 645.7, "walPerRow": 890.1},
+    "futures.jsonb1": {"heapPerRow": 791.8, "indexPerRow": 118.5, "totalPerRow": 910.9, "avgTuple": 744.4, "walPerRow": 991.3}
+  },
+  "minuteFirstPrimaryKey": {
+    "spot.json2": {"heapPerRow": 791.8, "indexPerRow": 82.8, "totalPerRow": 875.2, "avgTuple": 742.1, "walPerRow": 947.5},
+    "spot.numeric4": {"heapPerRow": 676.1, "indexPerRow": 82.8, "totalPerRow": 759.5, "avgTuple": 636.8, "walPerRow": 841.9},
+    "futures.json2": {"heapPerRow": 546.7, "indexPerRow": 82.8, "totalPerRow": 630.0, "avgTuple": 533.0, "walPerRow": 737.7},
+    "futures.numeric4": {"heapPerRow": 681.7, "indexPerRow": 82.8, "totalPerRow": 765.1, "avgTuple": 645.7, "walPerRow": 850.8}
+  },
+  "decision": "json text pairs [[price, quantity]] with PRIMARY KEY (bucket_start_at, product): byte-exact provider strings, mean of the two tables 752.6 B/row (numeric[] 762.3 B), the only index, right-edge inserts and prefix retention deletes",
+  "formats": {
+    "json2": "bids json + asks json, [[price, quantity], ...] exact strings",
+    "jsonb2": "bids jsonb + asks jsonb",
+    "jsonb1": "one jsonb {b, a}",
+    "numeric4": "bid_prices/bid_quantities/ask_prices/ask_quantities numeric[] (value and scale exact; strings re-rendered)"
+  },
+  "tools": "scratchpad format-bench.cjs / format-bench-bucketfirst.cjs (not committed)"
+}

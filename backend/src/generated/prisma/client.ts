@@ -116,6 +116,15 @@ export type AssetPriceSnapshot = Prisma.AssetPriceSnapshotModel
  */
 export type AssetOrderbookSnapshot = Prisma.AssetOrderbookSnapshotModel
 /**
+ * Model CryptoSpotOrderBookSnapshot
+ * Display-only 60 s history of the Binance Spot 10-level book
+ * (docs/crypto-order-book-history-contract.md). At most one row per asset and
+ * UTC minute: the newest validated book received in that minute that was
+ * still current at its end. Never an execution, valuation or risk input;
+ * KOSCOM/KIS books stay in asset_orderbook_snapshots. Kept 14 days.
+ */
+export type CryptoSpotOrderBookSnapshot = Prisma.CryptoSpotOrderBookSnapshotModel
+/**
  * Model MarketCandle
  * 
  */
@@ -349,6 +358,14 @@ export type FuturesLastPriceSnapshot = Prisma.FuturesLastPriceSnapshotModel
  * 
  */
 export type FuturesMarkSnapshot = Prisma.FuturesMarkSnapshotModel
+/**
+ * Model FuturesOrderBookSnapshot
+ * Display-only 60 s history of the USDⓈ-M contract's own 10-level book,
+ * keyed by instrument, never by underlying asset
+ * (docs/crypto-order-book-history-contract.md). Same sampling rule as the
+ * Spot table; never a Last, Mark, execution or liquidation input. Kept 14 days.
+ */
+export type FuturesOrderBookSnapshot = Prisma.FuturesOrderBookSnapshotModel
 /**
  * Model FuturesLiquidation
  * 

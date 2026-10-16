@@ -10,6 +10,7 @@ import WebSocket from 'ws';
 import { PrismaService } from '../prisma/prisma.service';
 import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { OrderBookPubSubService } from '../providers/order-book-pubsub.service';
+import { CryptoOrderBookHistoryService } from '../providers/crypto-order-book-history.service';
 import {
   FUTURES_PROVIDER_SOCKET_FACTORY,
   type FuturesProviderSocketFactory,
@@ -74,6 +75,7 @@ export class FuturesMarketDataIngestion
     @Optional()
     @Inject(FUTURES_PROVIDER_SOCKET_FACTORY)
     private readonly socketFactory?: FuturesProviderSocketFactory,
+    @Optional() private readonly history?: CryptoOrderBookHistoryService,
   ) {}
 
   onModuleInit() {
@@ -166,6 +168,8 @@ export class FuturesMarketDataIngestion
     });
     if (!this.publishing.has(target.symbol))
       this.startPublishing(target.symbol);
+    // In-memory 60 s sampling only; the publish above never waits for it.
+    this.history?.offerFutures(target.instrumentId, parsed, receivedAt);
     return true;
   }
 

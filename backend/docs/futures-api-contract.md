@@ -14,9 +14,12 @@ does not change the default DISABLED mode.
 ## Identity and API
 
 `Asset` is the reusable operational underlying/reference asset. Spot availability
-is separate from `isActive`: the unchanged fixed Spot 25 are retained, and
-HYPEUSDT/PUMPUSDT/BCHUSDT/FILUSDT/AAVEUSDT are active Futures-only underlyings.
-The exact Futures offering is the approved 25 in `binance-product-catalog.ts`;
+is separate from `isActive`: the fixed Spot universe (100 since 2026-10-16) is
+retained, and the 21 underlyings in `BINANCE_FUTURES_ONLY_ASSETS` are active
+Futures-only underlyings (HYPEUSDT since 2026-10-11; PUMP/BCH/FIL/AAVE moved to
+Spot with the 2026-10-16 Spot ranking, keeping their asset IDs).
+The exact Futures offering is the approved 100 in `binance-product-catalog.ts`
+(the 2026-10-11 25 plus 75 from the 2026-10-16 YTD research);
 new entry and catalog reads reject contracts outside it. `FuturesInstrument`
 has its own durable ID and an explicit `synthetic_perpetual` product type and USD
 settlement currency, unique per underlying/product/currency. Only active Binance
@@ -188,7 +191,7 @@ Provision with `pnpm futures:provision-instruments --dry-run`. A dry-run require
 `FUTURES_PROVISION_DRY_RUN_REDIS_URL` pointing to local Redis for the existing
 Binance REST coordinator, so production Valkey is never touched. It uses a
 PostgreSQL READ ONLY transaction and current exact exchangeInfo contracts.
-The plan reports all 25 symbols, five new operational underlyings, instrument
+The plan reports all offered symbols (100), the Futures-only underlyings to create, instrument
 create/maintain/reverify counts, conflicts and the unchanged Spot count. Missing
 shared Spot assets, inactive/conflicting identities or missing contracts block
 all writes. GET never provisions or repairs financial state.

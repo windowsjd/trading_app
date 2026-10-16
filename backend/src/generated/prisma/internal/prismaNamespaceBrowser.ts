@@ -66,6 +66,7 @@ export const ModelName = {
   Asset: 'Asset',
   AssetPriceSnapshot: 'AssetPriceSnapshot',
   AssetOrderbookSnapshot: 'AssetOrderbookSnapshot',
+  CryptoSpotOrderBookSnapshot: 'CryptoSpotOrderBookSnapshot',
   MarketCandle: 'MarketCandle',
   MarketCandleSyncState: 'MarketCandleSyncState',
   MarketSessionOverride: 'MarketSessionOverride',
@@ -108,6 +109,7 @@ export const ModelName = {
   LimitOrderCandleEvidence: 'LimitOrderCandleEvidence',
   FuturesLastPriceSnapshot: 'FuturesLastPriceSnapshot',
   FuturesMarkSnapshot: 'FuturesMarkSnapshot',
+  FuturesOrderBookSnapshot: 'FuturesOrderBookSnapshot',
   FuturesLiquidation: 'FuturesLiquidation',
   FuturesLiquidationClose: 'FuturesLiquidationClose',
   FuturesSeasonPrice: 'FuturesSeasonPrice',
@@ -404,6 +406,19 @@ export const AssetOrderbookSnapshotScalarFieldEnum = {
 } as const
 
 export type AssetOrderbookSnapshotScalarFieldEnum = (typeof AssetOrderbookSnapshotScalarFieldEnum)[keyof typeof AssetOrderbookSnapshotScalarFieldEnum]
+
+
+export const CryptoSpotOrderBookSnapshotScalarFieldEnum = {
+  bucketStartAt: 'bucketStartAt',
+  assetId: 'assetId',
+  capturedAt: 'capturedAt',
+  sequence: 'sequence',
+  bids: 'bids',
+  asks: 'asks',
+  createdAt: 'createdAt'
+} as const
+
+export type CryptoSpotOrderBookSnapshotScalarFieldEnum = (typeof CryptoSpotOrderBookSnapshotScalarFieldEnum)[keyof typeof CryptoSpotOrderBookSnapshotScalarFieldEnum]
 
 
 export const MarketCandleScalarFieldEnum = {
@@ -1339,6 +1354,20 @@ export const FuturesMarkSnapshotScalarFieldEnum = {
 } as const
 
 export type FuturesMarkSnapshotScalarFieldEnum = (typeof FuturesMarkSnapshotScalarFieldEnum)[keyof typeof FuturesMarkSnapshotScalarFieldEnum]
+
+
+export const FuturesOrderBookSnapshotScalarFieldEnum = {
+  bucketStartAt: 'bucketStartAt',
+  instrumentId: 'instrumentId',
+  capturedAt: 'capturedAt',
+  effectiveAt: 'effectiveAt',
+  sequence: 'sequence',
+  bids: 'bids',
+  asks: 'asks',
+  createdAt: 'createdAt'
+} as const
+
+export type FuturesOrderBookSnapshotScalarFieldEnum = (typeof FuturesOrderBookSnapshotScalarFieldEnum)[keyof typeof FuturesOrderBookSnapshotScalarFieldEnum]
 
 
 export const FuturesLiquidationScalarFieldEnum = {

@@ -45,7 +45,7 @@ import { runProviderIngestionCheck } from './dev-run-provider-ingestions';
  *
  * Does ONLY additive, idempotent work: keeps the dev season open, creates the
  * dev user/participant/wallets/grant when absent (never resetting existing
- * balances or ledgers), and registers the fixed 40 KIS stocks + 25 Binance
+ * balances or ledgers), and registers the fixed 40 KIS stocks + 100 Binance
  * crypto assets. It never drops, truncates, deletes, or resets anything.
  *
  * `--dry-run` (default) plans without writing; `--apply` writes;
@@ -163,7 +163,7 @@ async function main(argv: string[]) {
           binanceVerify.verified === binanceVerify.total
         : true);
 
-    // 5) Market data readiness. Registering 50 assets is NOT the same as the
+    // 5) Market data readiness. Registering the assets is NOT the same as the
     // market being ready (fresh price snapshots). Report the two separately.
     console.log('\n[5/5] Market data readiness');
     await runMarketSnapshotBootstrap({

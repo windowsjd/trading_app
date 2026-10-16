@@ -51,6 +51,8 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/binance-rest-limits.md` — shared REST cooldown, admission budget, Redis requirement and approved recovery procedure.
 5. `docs/scheduler-ops-foundation.md` — scheduler/ops contracts: flags default off; enabled scheduled jobs execute with `dryRun=false`. PostgreSQL lease renewal/loss and safe work boundaries are described there.
    - `docs/database-operations-monitoring.md` — disk usage, Futures Mark freshness and retention failure/backlog signals: `/readiness` reasons, log events, and the operator setup needed to deliver alerts.
+   - `docs/crypto-order-book-history-contract.md` — 2026-10-16: display-only 60 s history of the Binance Spot / USDⓈ-M 10-level books, 14-day retention, flags (default OFF) and diagnostics
+   - `docs/binance-crypto-100-2026-ytd.md` — 2026-10-16: 2026 YTD research and selection of the Spot 100 / USDⓈ-M 100 catalogs, registration order and rollback
 6. `docs/batch-job-foundation.md` — batch job foundation for daily snapshot/ranking/cycle/settlement/final-tier/reward-grant jobs.
 7. `docs/ranking-backfill-runbook.md` — migration/backfill runbook for ranking tie-breakers.
 8. `docs/operator-api-contract.md` — admin/operator authorization, account management, and audit foundation.

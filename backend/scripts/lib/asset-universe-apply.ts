@@ -146,17 +146,22 @@ export async function applyAssetUniverse(input: {
     return { plan, counts, applied: false, created: 0, updated: 0 };
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const create of plan.creates) {
-      await tx.asset.create({ data: toCreateData(create.desired) });
-    }
-    for (const update of plan.updates) {
-      await tx.asset.update({
-        where: { id: update.existingId },
-        data: toUpdateData(update.desired),
-      });
-    }
-  });
+  // One statement per row: 75 new Binance assets against a remote database
+  // exceed Prisma's default 5 s interactive transaction timeout.
+  await prisma.$transaction(
+    async (tx) => {
+      for (const create of plan.creates) {
+        await tx.asset.create({ data: toCreateData(create.desired) });
+      }
+      for (const update of plan.updates) {
+        await tx.asset.update({
+          where: { id: update.existingId },
+          data: toUpdateData(update.desired),
+        });
+      }
+    },
+    { timeout: 120_000 },
+  );
 
   return {
     plan,
