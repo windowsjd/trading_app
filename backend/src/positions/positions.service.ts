@@ -41,6 +41,7 @@ import {
   assertGeneralAccountTradingRowsIntegrity,
 } from '../trading-accounts/general-account-integrity';
 import {
+  adminManualAssetPriceScope,
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
   resolveAssetProviderEligibility,
@@ -819,6 +820,7 @@ export class PositionsService {
         assetId: asset.id,
         currencyCode,
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(asset),
         effectiveAt: {
           lte: valuationAt,
         },

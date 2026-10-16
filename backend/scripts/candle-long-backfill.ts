@@ -4,6 +4,9 @@
  *   spot    Binance Spot native 4h klines         → market_candles '4h'
  *   krx     KOSCOM 10-minute history, verified     → market_candles '4h'
  *           per session against the dated daily     (koscom_history_10m)
+ *   us      stored Tiingo 5m, complete buckets only → market_candles '4h'
+ *           (US_STOCK_PRICE_PROVIDER=tiingo; no        (tiingo_equity_intraday_4h)
+ *           provider call — backfill the 5m first)
  *   futures Binance USDⓈ-M contract 4h klines      → futures_market_candles
  *
  * Never runs on deploy and never inside a chart request. It is a thin wrapper
@@ -17,8 +20,8 @@
  *   pnpm candle:long-backfill --market spot --market futures --apply
  *   pnpm candle:long-backfill --market krx --apply --max-calls 800
  *
- * Flags: --market spot|krx|futures (repeatable, required), --apply | --dry-run
- * (default), --days N (crypto, 1..180, default 96), --sessions N (KRX, 1..125,
+ * Flags: --market spot|krx|us|futures (repeatable, required), --apply | --dry-run
+ * (default), --days N (crypto, 1..180, default 96), --sessions N (KRX/US, 1..125,
  * default 97), --asset-id, --instrument-id (repeatable),
  * --include-inactive-futures, --max-calls N (KRX KOSCOM calls, default 1500),
  * --min-remaining-daily N (stop at this observed KOSCOM daily remainder,
@@ -48,6 +51,7 @@ import {
 loadRuntimeEnv();
 
 import { OpsJobName } from '../src/generated/prisma/client';
+import { readUsStockPriceProvider } from '../src/providers/us-stock-price-provider.config';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RedisService } from '../src/redis/redis.service';
 import { readRedisConfig } from '../src/redis/redis.config';
@@ -195,7 +199,9 @@ async function runGroup(
             ? await service.syncSpot(input)
             : market === 'krx'
               ? await service.syncKrx(input)
-              : await service.syncFutures(input);
+              : market === 'us'
+                ? await service.syncUs(input)
+                : await service.syncFutures(input);
         print(results[market]);
       }
       return results;
@@ -207,6 +213,15 @@ export async function main(
   argv: string[] = process.argv.slice(2),
 ): Promise<number> {
   const args = parseCandleLongBackfillArgs(argv);
+  if (args.markets.includes('us') && readUsStockPriceProvider() !== 'tiingo') {
+    // The us series only synthesizes stored Tiingo 5m; under the KIS provider
+    // it is a deliberate no-op (the scheduler), so a CLI run would report an
+    // empty success. Say so instead.
+    console.error(
+      '--market us needs US_STOCK_PRICE_PROVIDER=tiingo in this process (the US 4h series is synthesized from stored Tiingo 5m).',
+    );
+    return 2;
+  }
   requireDatabaseUrl();
   console.log(`database: ${formatDatabaseTarget(process.env.DATABASE_URL)}`);
   console.log(

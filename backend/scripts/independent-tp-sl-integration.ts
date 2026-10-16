@@ -517,6 +517,93 @@ async function spotLimitEntry(kind: Market) {
 }
 
 /** An entry that ends unfilled ends its plans; ended entries take no plans. */
+/**
+ * US stocks on the Tiingo provider (2026-10-17): a pending US BUY Limit takes
+ * stop-loss/take-profit plans (refused on the KIS provider), and its fill on
+ * a Tiingo price activates them for ratio × the filled quantity.
+ */
+async function usEntryPlansOnTiingo() {
+  const previous = process.env.US_STOCK_PRICE_PROVIDER;
+  process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+  try {
+    await scenario('general', async (s) => {
+      tradingSessions.set(await now(), undefined, ['KRX', 'US']);
+      const asset = await db.asset.update({
+        where: { id: s.instruments[0].asset.id },
+        data: {
+          market: 'NAS',
+          assetType: 'us_stock',
+          currencyCode: 'USD',
+          priceCurrency: 'USD',
+          settlementCurrency: 'USD',
+        },
+      });
+      await db.cashWallet.updateMany({
+        where: {
+          tradingAccountId: s.accountId,
+          walletScope: 'securities',
+          currencyCode: 'USD',
+        },
+        data: { balanceAmount: '10000' },
+      });
+      const tiingo = async (value: string) => {
+        const at = await now();
+        return db.assetPriceSnapshot.create({
+          data: {
+            assetId: asset.id,
+            price: value,
+            currencyCode: 'USD',
+            sourceType: 'provider_api',
+            sourceName: 'tiingo_us_reference_price',
+            effectiveAt: at,
+            capturedAt: at,
+          },
+        });
+      };
+      await tiingo('100');
+      // 'KRX' = the stock (whole-quantity) path of the helper.
+      const orderId = await limitBuy(s, 'KRX', '99', '10');
+      const legs = {
+        stopLoss: { triggerPrice: '90', ratio: 100 },
+        takeProfit: { triggerPrice: '110', ratio: 50 },
+      };
+      process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+      await rejects(
+        addPlans(s, 'spot_limit_order', orderId, legs),
+        'ENTRY_TP_SL_MARKET_NOT_SUPPORTED',
+      );
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+      const added = await addPlans(s, 'spot_limit_order', orderId, legs);
+      assert.equal(added.plans.length, 2);
+      const snapshot = await tiingo('99');
+      await fxEvidence();
+      const filled = await fill.fillLimitOrder({
+        orderId,
+        plan: {
+          path: 'snapshot',
+          assetPriceSnapshotId: snapshot.id,
+          executedPrice: D('99'),
+        },
+      });
+      assert.equal(filled.state, 'filled');
+      const rows = await planRows(s);
+      assert.equal(rows.filter((row) => row.status === 'activated').length, 2);
+      const created = await settings(s);
+      assert.equal(created.length, 2);
+      const byKind = (kind: string) => created.find((row) => row.kind === kind);
+      assert.equal(byKind('stop_loss')?.quantity.toFixed(8), '10.00000000');
+      assert.equal(byKind('take_profit')?.quantity.toFixed(8), '5.00000000');
+      assert.ok(created.every((row) => row.status === 'watching'));
+      pass(
+        'US BUY Limit on the Tiingo provider: entry stop-loss/take-profit plans register (refused on KIS) and activate for the filled quantity',
+      );
+    });
+  } finally {
+    if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+    else process.env.US_STOCK_PRICE_PROVIDER = previous;
+  }
+}
+
 async function spotEntryEnds() {
   await scenario('general', async (s) => {
     await market(s, 'KRX');
@@ -1512,6 +1599,7 @@ async function legacyOcoRetired() {
 async function main() {
   await spotLimitEntry('KRX');
   await spotLimitEntry('BINANCE');
+  await usEntryPlansOnTiingo();
   await spotEntryEnds();
   await spotHoldingMerge();
   await conditionalBuyMarket();

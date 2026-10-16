@@ -24,7 +24,8 @@ const EPHEMERAL_DISPLAY_SOURCE_NAMES: ReadonlySet<string> = new Set([
 
 /**
  * Display-only price routing for assets served by an ephemeral provider
- * (currently the Tiingo US-equity trial). It answers only the asset read and
+ * (the Tiingo US-equity trial; Tiingo's official mode stores snapshots and
+ * uses the ordinary stored path). It answers only the asset read and
  * realtime ticker paths; orders, valuation, ranking, settlement and snapshot
  * health keep the stored-snapshot policy and never call it. For every other
  * asset it returns null and nothing changes.
@@ -38,7 +39,7 @@ export class MarketDisplayPriceService {
     asset: DisplayPriceAsset,
     now: Date,
   ): Promise<EphemeralDisplayPrice | null> {
-    if (!this.tiingo?.isEnabled()) return null;
+    if (!this.tiingo?.isTrialDisplayEnabled()) return null;
     return this.tiingo.resolveDisplayPrice(asset, now);
   }
 
@@ -50,15 +51,18 @@ export class MarketDisplayPriceService {
   async displaySourceNames(
     asset: DisplayPriceAsset,
   ): Promise<readonly string[] | null> {
-    if (!this.tiingo?.isEnabled()) return null;
+    if (!this.tiingo?.isTrialDisplayEnabled()) return null;
     return (await this.tiingo.targetForAsset(asset))
       ? [TIINGO_REFERENCE_PRICE_SOURCE]
       : null;
   }
 
+  /** Official-mode Tiingo prices are stored snapshots, not ephemeral. */
   isEphemeralSourceName(sourceName: string | null | undefined): boolean {
     return Boolean(
-      sourceName && EPHEMERAL_DISPLAY_SOURCE_NAMES.has(sourceName),
+      this.tiingo?.isTrialDisplayEnabled() &&
+      sourceName &&
+      EPHEMERAL_DISPLAY_SOURCE_NAMES.has(sourceName),
     );
   }
 }

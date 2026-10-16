@@ -117,9 +117,22 @@ describe('getOpsSchedulerConfig', () => {
     expect(config.futuresCandleSync.intervalSeconds).toBe(120);
   });
 
+  it('accepts the US long-range market only when listed (default spot, krx)', () => {
+    expect(getOpsSchedulerConfig({}).marketCandleLongSync.markets).toEqual([
+      'spot',
+      'krx',
+    ]);
+    expect(
+      getOpsSchedulerConfig({
+        SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS: 'spot,krx,us',
+      }).marketCandleLongSync.markets,
+    ).toEqual(['spot', 'krx', 'us']);
+  });
+
   it.each([
     { SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED: 'yes' },
-    { SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS: 'spot,us' },
+    { SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS: 'spot,futures' },
+    { SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS: 'spot,nyse' },
     { SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS: '30' },
     { SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS: '5' },
   ])('rejects invalid long-range scheduler config %#', (env) => {

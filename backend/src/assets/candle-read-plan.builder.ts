@@ -97,7 +97,10 @@ export class CandleReadPlanBuilder {
     } else if (
       sourceInterval !== '5m' &&
       durationMs >
-        (sourceInterval === '1d' && asset.assetType === AssetType.domestic_stock
+        // Stocks share the 576-session daily window (KRX; US 2026-10-17).
+        (sourceInterval === '1d' &&
+        (asset.assetType === AssetType.domestic_stock ||
+          asset.assetType === AssetType.us_stock)
           ? this.config.maxManagedKrxDailyRangeMs
           : this.config.maxManagedPeriodRangeMs)
     ) {

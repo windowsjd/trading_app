@@ -216,6 +216,33 @@ async function run() {
       await sheetReachable(['market', 'conditional', 'loc']);
       await page.getByTestId('order-method-sheet-close').click();
 
+      // 4b. US stocks once the server lists US (US_STOCK_PRICE_PROVIDER=tiingo,
+      // 2026-10-17): 조건주문 and LOC open like KRX, the LOC form shows the
+      // New York session (in KST) and the official price is never "체험".
+      await go('usOfficial=1&asset=AAPL&loc=enabled&locSell=enabled&conditional=enabled&sell=enabled');
+      await defaultField();
+      assert.equal(await page.getByTestId('asset-trial-price-notice').count(), 0, `no trial notice on official prices (${tag})`);
+      await field().click();
+      for (const method of ['market', 'limit', 'conditional', 'loc']) {
+        await row(method).waitFor();
+        assert.equal(await page.getByTestId(`order-method-${method}-badge`).count(), 0, `US ${method} available (${tag})`);
+      }
+      await shot('us-sheet');
+      await sheetReachable(['market', 'limit', 'conditional', 'loc']);
+      await row('loc').click();
+      await page.getByTestId('loc-order-notice').waitFor();
+      await page.getByTestId('order-limit-price-input').fill('247.5');
+      await page.getByTestId('order-quantity-input').fill('3');
+      await shot('us-loc');
+      await page.getByTestId('asset-detail-sell-button').click();
+      await field().click();
+      for (const method of ['market', 'conditional', 'loc']) {
+        await row(method).waitFor();
+        assert.equal(await page.getByTestId(`order-method-${method}-badge`).count(), 0, `US sell ${method} available (${tag})`);
+      }
+      await shot('us-sell-sheet');
+      await page.getByTestId('order-method-sheet-close').click();
+
       // 5. The account's conditional orders with every state.
       await go('asset=SUI&conditional=enabled&conditionalRows=1');
       await page.getByTestId('holdings-filter-pending').click();

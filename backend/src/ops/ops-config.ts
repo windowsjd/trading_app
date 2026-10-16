@@ -52,7 +52,7 @@ export type OpsSchedulerConfig = {
   marketCandleLongSync: {
     enabled: boolean;
     intervalSeconds: number;
-    markets: ('spot' | 'krx')[];
+    markets: LongSyncMarket[];
   };
   /**
    * USDⓈ-M contract 4h upkeep (`futures_candle_sync`), including the open
@@ -91,7 +91,11 @@ const DEFAULT_RETENTION_MINUTE = 0;
 const DEFAULT_MARKET_CANDLE_SYNC_INTERVAL_SECONDS = 600;
 const DEFAULT_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS = 900;
 const DEFAULT_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS = 60;
+// Scheduled by default; `us` (US stocks on Tiingo, 2026-10-17) is opt-in
+// through SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS and a no-op on KIS.
 const LONG_SYNC_MARKETS = ['spot', 'krx'] as const;
+const LONG_SYNC_ACCEPTED_MARKETS = ['spot', 'krx', 'us'] as const;
+type LongSyncMarket = (typeof LONG_SYNC_ACCEPTED_MARKETS)[number];
 
 export function getOpsSchedulerConfig(
   env: NodeJS.ProcessEnv = process.env,
@@ -461,7 +465,7 @@ function parseTextEnv(value: string | undefined, fallback: string) {
   return value.trim();
 }
 
-function parseLongSyncMarkets(value: string | undefined): ('spot' | 'krx')[] {
+function parseLongSyncMarkets(value: string | undefined): LongSyncMarket[] {
   const raw = value?.trim();
   if (!raw) return [...LONG_SYNC_MARKETS];
   const markets = [
@@ -475,15 +479,16 @@ function parseLongSyncMarkets(value: string | undefined): ('spot' | 'krx')[] {
   if (
     markets.length === 0 ||
     markets.some(
-      (market) => !(LONG_SYNC_MARKETS as readonly string[]).includes(market),
+      (market) =>
+        !(LONG_SYNC_ACCEPTED_MARKETS as readonly string[]).includes(market),
     )
   ) {
     // @diagnosticSurface internal: Scheduler configuration guard; the message names only the public env key.
     throw new OpsConfigError(
-      'SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS must be a comma list of spot, krx.',
+      'SCHEDULER_MARKET_CANDLE_LONG_SYNC_MARKETS must be a comma list of spot, krx, us.',
     );
   }
-  return markets as ('spot' | 'krx')[];
+  return markets as LongSyncMarket[];
 }
 
 function parseOptionalCommaSeparatedEnv(

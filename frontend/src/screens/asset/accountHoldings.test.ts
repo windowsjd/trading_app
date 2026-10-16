@@ -402,6 +402,35 @@ const pendingIds = (h: any) => h.renderer.root.findAll((node: any) =>
 ).map((node: any) => node.props.testID);
 
 describe('pending limit orders in the real trading screen', () => {
+  it('a pending US BUY limit offers 손절가/익절가 only while the server lists US, and keeps existing plans manageable', async t => {
+    const usRow = pendingOrder('us-1', 'buy', { quantity: '3', limitPrice: '240', asset: { id: 'aapl', symbol: 'AAPL', name: 'Apple', market: 'NAS' } });
+    const capabilities = (markets: string[]) => ({ spot: { enabled: true, canCreate: true, markets }, futures: { enabled: false, canCreate: false },
+      canCancel: true, maxPendingPerAccount: 30, maxPerEntry: 10 });
+    const list = (markets: string[], plans: unknown[]) => ({ tradingAccountId: 'general', capabilities: capabilities(markets), entry: null, plans,
+      pagination: { limit: 100, offset: 0, total: plans.length, returned: plans.length, nextOffset: null } });
+    const plan = { id: 'plan-us', entryType: 'spot_limit_order', entryId: 'us-1', childOrderId: null, kind: 'take_profit', triggerPrice: '260', ratioPercent: 100,
+      triggerCondition: 'at_or_above', status: 'pending', activatedQuantity: null, failureCode: null, terminalReason: null };
+    const tpSlButtons = async (entryTpSlList: unknown) => {
+      const h = inlineTradingHarness();
+      h.orders = { general: [usRow] };
+      h.entryTpSlList = entryTpSlList;
+      await h.mount(); t.after(h.close); await h.press('holdings-filter-pending');
+      for (let i = 0; i < 20 && pendingIds(h).length === 0; i += 1) await h.flush();
+      for (let i = 0; i < 5; i += 1) await h.flush();
+      const find = (pattern: RegExp) => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && pattern.test(n.props.testID ?? ''));
+      return {
+        buttons: find(/^pending-order-.*-tp-sl$/).length,
+        summary: [find(/^pending-order-.*-tp-sl-summary$/)[0]?.props.children].flat().join(''),
+      };
+    };
+    // Tiingo prices: the server lists US.
+    assert.deepEqual(await tpSlButtons(list(['KRX', 'CRYPTO_SPOT', 'US'], [])), { buttons: 1, summary: '' });
+    // KIS prices: US is not offered.
+    assert.deepEqual(await tpSlButtons(list(['KRX', 'CRYPTO_SPOT'], [])), { buttons: 0, summary: '' });
+    // Plans registered before a rollback stay visible and manageable.
+    assert.deepEqual(await tpSlButtons(list(['KRX', 'CRYPTO_SPOT'], [plan])), { buttons: 1, summary: '익절 1건' });
+  });
+
   it('a pending Spot BUY limit offers 손절가/익절가 by share of its fill; LOC and SELL rows do not', async t => {
     const h = inlineTradingHarness();
     h.orders = { general: [

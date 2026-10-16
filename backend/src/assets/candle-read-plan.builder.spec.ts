@@ -73,7 +73,7 @@ describe('CandleReadPlanBuilder', () => {
     );
   });
 
-  it('manages the KRX 576-session daily window but keeps other daily feeds at 365 days', () => {
+  it('manages the stock 576-session daily window (KRX; US 2026-10-17) but keeps other period feeds at 365 days', () => {
     const DAY = 86_400_000;
     const krxDaily = builder.build(asset, {
       ...base,
@@ -91,7 +91,17 @@ describe('CandleReadPlanBuilder', () => {
         rangeStartAt: new Date(base.rangeEndAt!.getTime() - 867 * DAY),
       },
     );
-    expect(us.outOfPolicyReason).toBe('period_range_exceeds_policy');
+    expect(us.managedByPersistence).toBe(true);
+    expect(us.outOfPolicyReason).toBeNull();
+    const cryptoDaily = builder.build(
+      { ...asset, market: 'BINANCE', assetType: AssetType.crypto },
+      {
+        ...base,
+        interval: '1d',
+        rangeStartAt: new Date(base.rangeEndAt!.getTime() - 400 * DAY),
+      },
+    );
+    expect(cryptoDaily.outOfPolicyReason).toBe('period_range_exceeds_policy');
     const krxWeekly = builder.build(asset, {
       ...base,
       interval: '1w',

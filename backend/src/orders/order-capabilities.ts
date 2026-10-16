@@ -1,6 +1,6 @@
 import {
-  limitOnCloseEnabled,
-  limitOnCloseSellEnabled,
+  limitOnCloseMarkets,
+  readLimitOnCloseConfig,
 } from './limit-on-close.config';
 import { readLimitOrderMatchingConfig } from './limit-order-matching.config';
 import { isLimitOrderEnabled } from './limit-order.config';
@@ -15,9 +15,17 @@ import { isLimitOrderEnabled } from './limit-order.config';
  * change is caught there. Already accepted LOC orders settle regardless.
  * `limitOnClose` stays the BUY answer (its `sides` is unchanged); LOC SELL
  * (2026-10-13) is its own additive block behind its own flag.
+ *
+ * `markets` lists exactly the markets whose registration flag for that side
+ * is on: `KRX` (LOC_ORDERS_ENABLED / LOC_SELL_ORDERS_ENABLED) and, since
+ * 2026-10-17, `US` (LOC_US_ORDERS_ENABLED / LOC_US_SELL_ORDERS_ENABLED).
+ * `enabled` is true when at least one market is listed.
  */
 export function readOrderCapabilities(env: NodeJS.ProcessEnv = process.env) {
   const limitEnabled = isLimitOrderEnabled(env);
+  const loc = readLimitOnCloseConfig(env);
+  const buyMarkets = limitEnabled ? limitOnCloseMarkets(loc, 'buy') : [];
+  const sellMarkets = limitEnabled ? limitOnCloseMarkets(loc, 'sell') : [];
   return {
     limitOrder: {
       enabled: limitEnabled,
@@ -25,14 +33,14 @@ export function readOrderCapabilities(env: NodeJS.ProcessEnv = process.env) {
         limitEnabled && readLimitOrderMatchingConfig(env).matchingEnabled,
     },
     limitOnClose: {
-      enabled: limitEnabled && limitOnCloseEnabled(env),
-      markets: ['KRX'] as const,
+      enabled: buyMarkets.length > 0,
+      markets: buyMarkets,
       sides: ['buy'] as const,
       attachedProtection: false as const,
     },
     limitOnCloseSell: {
-      enabled: limitEnabled && limitOnCloseSellEnabled(env),
-      markets: ['KRX'] as const,
+      enabled: sellMarkets.length > 0,
+      markets: sellMarkets,
     },
   };
 }

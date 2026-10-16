@@ -23,6 +23,7 @@ import {
   getLimitOnCloseSellGate,
   getOrderMethodOptions,
   getOrderTypeForMethod,
+  isEntryTpSlMarketSupported,
   isOrderMethodSelectable,
   type OrderMethod,
 } from '../../features/order/orderMethods';
@@ -573,13 +574,13 @@ export function OrderForm({
   const conditionalQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.list(accountId, { history: false, limit: 100 }),
     queryFn: ({ signal }) => getConditionalBuyOrders(accountId, { limit: 100 }, signal),
-    enabled: accountKnown && side === 'buy' && (asset?.assetType === 'domestic_stock' || asset?.assetType === 'crypto'),
+    enabled: accountKnown && side === 'buy' && (isStock || asset?.assetType === 'crypto'),
     retry: 1,
   });
   const orderCapabilitiesQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.orderCapabilities(accountId),
     queryFn: ({ signal }) => getTradingAccountOrderCapabilities(accountId, signal),
-    enabled: accountKnown && asset?.assetType === 'domestic_stock',
+    enabled: accountKnown && isStock,
     retry: 1,
     staleTime: 30_000,
   });
@@ -588,7 +589,7 @@ export function OrderForm({
   const sellIntentsQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalSell.list(accountId, { history: false, limit: 100 }),
     queryFn: ({ signal }) => getConditionalSellOrders(accountId, { limit: 100 }, signal),
-    enabled: accountKnown && side === 'sell' && (asset?.assetType === 'domestic_stock' || asset?.assetType === 'crypto'),
+    enabled: accountKnown && side === 'sell' && (isStock || asset?.assetType === 'crypto'),
     retry: 1,
   });
   const conditionalCapabilities = conditionalQuery.data?.tradingAccountId === accountId ? conditionalQuery.data.capabilities : null;
@@ -700,10 +701,11 @@ export function OrderForm({
   const positionReserved = findAccountPosition(positionQuery.data, assetId)?.reservedQuantity ?? null;
   const sellCapacity = positionAvailable ?? positionQuantity;
   const automationForm = orderMethod === 'conditional';
-  // 손절가/익절가 plans belong to an ordinary KRX/crypto limit BUY only; never to LOC.
+  // 손절가/익절가 plans belong to an ordinary limit BUY of a market the server
+  // lists (KRX, Spot crypto; US with its approved provider); never to LOC.
   const tpSlCapabilities = !tpSlCapabilityQuery.isError && tpSlCapabilityQuery.data?.tradingAccountId === accountId
     ? tpSlCapabilityQuery.data.capabilities.spot : null;
-  const tpSlMarket = asset?.assetType === 'domestic_stock' || asset?.assetType === 'crypto';
+  const tpSlMarket = isEntryTpSlMarketSupported(tpSlCapabilities, asset?.assetType);
   const tpSlVisible = side === 'buy' && orderMethod === 'limit' && tpSlMarket && (!!tpSlCapabilities?.enabled || tpSlDrafts.length > 0);
   const tpSlAvailable = !!tpSlCapabilities?.canCreate;
   tpSlPermission.current = tpSlAvailable;
@@ -1179,7 +1181,10 @@ export function OrderForm({
           ) : null}
           {locPreview ? (
             <Text testID="loc-quote-session" style={styles.noticeLine}>
-              대상 세션 {locPreview.sessionDate} · 정규장 마감 {formatKstDateTime(locPreview.sessionCloseAt)} · 판정 기한 {formatKstDateTime(locPreview.evidenceDeadlineAt)}
+              {asset?.assetType === 'us_stock'
+                // A New York session date beside Korean times: both labelled.
+                ? `대상 세션 ${locPreview.sessionDate}(미국 현지) · 정규장 마감 ${formatKstDateTime(locPreview.sessionCloseAt)} · 판정 기한 ${formatKstDateTime(locPreview.evidenceDeadlineAt)}(한국시간)`
+                : `대상 세션 ${locPreview.sessionDate} · 정규장 마감 ${formatKstDateTime(locPreview.sessionCloseAt)} · 판정 기한 ${formatKstDateTime(locPreview.evidenceDeadlineAt)}`}
             </Text>
           ) : null}
         </View>

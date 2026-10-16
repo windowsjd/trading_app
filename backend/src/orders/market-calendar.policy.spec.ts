@@ -213,15 +213,32 @@ describe('market calendar policy', () => {
   it('fails safe on dates in years without an audited calendar dataset', () => {
     expect(resolveMarketSession('KRX', '20280104')).toBeNull();
     expect(resolveMarketSession('US', '20280104')).toBeNull();
-    // KRX starts at 2024 (576-session daily window); 2023 stays uncovered.
+    // KRX and US start at 2024 (576-session daily window; US 2026-10-17);
+    // 2023 stays uncovered.
     expect(resolveMarketSession('KRX', '20230705')).toBeNull();
-    expect(resolveMarketSession('US', '20240705')).toBeNull();
+    expect(resolveMarketSession('US', '20230705')).toBeNull();
     expect(
       resolveRegularSessionForEvent(
         { assetType: AssetType.domestic_stock, market: 'KRX' },
         new Date('2028-01-04T01:00:00.000Z'),
       ),
     ).toBeNull();
+  });
+
+  it('treats real 2024 US closures and early closes per the dataset', () => {
+    // EDT regular session, the July 3 early close, the July 4 closure.
+    expect(resolveMarketSession('US', '20240705')?.openTime).toEqual(
+      new Date('2024-07-05T13:30:00.000Z'),
+    );
+    expect(resolveMarketSession('US', '20240703')?.closeTime).toEqual(
+      new Date('2024-07-03T17:00:00.000Z'),
+    );
+    expect(resolveMarketSession('US', '20240704')).toBeNull();
+    // EST: Christmas Eve early close, Good Friday closed.
+    expect(resolveMarketSession('US', '20241224')?.closeTime).toEqual(
+      new Date('2024-12-24T18:00:00.000Z'),
+    );
+    expect(resolveMarketSession('US', '20240329')).toBeNull();
   });
 
   it('treats real 2024 KRX closures and special sessions per the dataset', () => {

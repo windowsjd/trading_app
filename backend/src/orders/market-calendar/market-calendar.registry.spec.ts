@@ -24,7 +24,10 @@ describe('market calendar registry', () => {
     expect(hasCalendarYear('KRX', 2024)).toBe(true);
     expect(getCalendarDataset('KRX', 2024)?.version).toBe('2024.1');
     expect(hasCalendarYear('KRX', 2023)).toBe(false);
-    expect(hasCalendarYear('US', 2024)).toBe(false);
+    // US 2024 serves the same window (NYSE 2024 calendar, 2026-10-17).
+    expect(hasCalendarYear('US', 2024)).toBe(true);
+    expect(getCalendarDataset('US', 2024)?.version).toBe('2024.1');
+    expect(hasCalendarYear('US', 2023)).toBe(false);
     expect(hasCalendarYear('US', 2028)).toBe(false);
   });
 
@@ -46,15 +49,38 @@ describe('market calendar registry', () => {
     expect(sessions).toBe(244);
   });
 
+  it('counts the 2024 US sessions the 576-session window relies on', () => {
+    // 366 days − 104 weekend days = 262 weekdays − 10 closures = 252 (NYSE),
+    // three of them 13:00 ET early closes.
+    let sessions = 0;
+    let earlyCloses = 0;
+    for (
+      let day = Date.UTC(2024, 0, 1);
+      day < Date.UTC(2025, 0, 1);
+      day += 86_400_000
+    ) {
+      const date = new Date(day);
+      const weekday = date.getUTCDay();
+      if (weekday === 0 || weekday === 6) continue;
+      const iso = date.toISOString().slice(0, 10);
+      const schedule = findCalendarSchedule('US', iso);
+      if (!schedule?.isFullDayClosed) sessions += 1;
+      if (schedule?.closeTimeOverride === '130000') earlyCloses += 1;
+    }
+    expect(sessions).toBe(252);
+    expect(earlyCloses).toBe(3);
+  });
+
   it('keeps the fully elapsed 2024 and 2025 datasets audited, never provisional', () => {
     for (const market of ['KRX', 'US'] as const) {
       expect(getCalendarDataset(market, 2025)!.version).not.toContain(
         'provisional',
       );
     }
-    expect(getCalendarDataset('KRX', 2024)!.version).not.toContain(
-      'provisional',
-    );
+    for (const market of ['KRX', 'US'] as const)
+      expect(getCalendarDataset(market, 2024)!.version).not.toContain(
+        'provisional',
+      );
   });
 
   it('contains no test-holiday placeholder entries', () => {
@@ -197,18 +223,25 @@ describe('market calendar registry', () => {
 
     // A required range starting before the earliest dataset flags the
     // missing PREVIOUS year, which the 365-day lookback depends on. KRX 2024
-    // exists (audited, Q14) for the 576-session daily window; US 2024 does not.
+    // (audited, Q14) and US 2024 (NYSE, 2026-10-17) exist for the
+    // 576-session daily window; 2023 exists for neither.
     const missingPrevious = getMarketCalendarCoverage({
-      requiredFromYear: 2024,
+      requiredFromYear: 2023,
       requiredThroughYear: 2026,
     });
     expect(missingPrevious.complete).toBe(false);
     expect(missingPrevious.productionReady).toBe(false);
-    const krx2024 = missingPrevious.markets.find((m) => m.market === 'KRX')!;
-    expect(krx2024.missingYears).toEqual([]);
-    expect(krx2024.provisionalYears).toEqual([]);
-    const us2024 = missingPrevious.markets.find((m) => m.market === 'US')!;
-    expect(us2024.missingYears).toEqual([2024]);
+    for (const market of missingPrevious.markets) {
+      expect(market.missingYears).toEqual([2023]);
+      expect(market.provisionalYears).toEqual([]);
+    }
+    const from2024 = getMarketCalendarCoverage({
+      requiredFromYear: 2024,
+      requiredThroughYear: 2026,
+    });
+    expect(from2024.complete).toBe(true);
+    for (const market of from2024.markets)
+      expect(market.missingYears).toEqual([]);
 
     // With the requirement pinned to the audited year, the provisional KRX
     // 2027 dataset no longer affects the status at all.

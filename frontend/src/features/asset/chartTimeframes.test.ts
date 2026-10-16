@@ -145,11 +145,9 @@ test('KRX stocks, US stocks and crypto read the long-range 4h window', () => {
   for (const tab of ASSET_CHART_TIMEFRAMES) {
     assert.equal(resolveAssetChartTimeframe(tab, undefined) === null, true);
   }
-  // Every other tab of US stocks and crypto is the base list.
+  // Every other crypto tab is the base list (stocks: the session windows).
   for (const tab of ASSET_CHART_TIMEFRAMES.filter((t) => t.interval !== '4h')) {
-    for (const assetType of ['us_stock', 'crypto']) {
-      assert.equal(resolveAssetChartTimeframe(tab, assetType), tab);
-    }
+    assert.equal(resolveAssetChartTimeframe(tab, 'crypto'), tab);
   }
 });
 
@@ -166,7 +164,12 @@ const KRX_SESSION_POLICY: Record<
   '1d': { range: 'prev576_open', limit: 600, sessions: 576, perSession: 1, maxDays: 867.6 },
 };
 
-test('KRX stocks read the confirmed session windows (design v2.1 §5.1)', () => {
+test('KRX and US stocks read the confirmed session windows (design v2.1 §5.1; US 2026-10-17)', () => {
+  for (const tab of ASSET_CHART_TIMEFRAMES)
+    assert.deepEqual(
+      resolveAssetChartTimeframe(tab, 'us_stock'),
+      resolveAssetChartTimeframe(tab, 'domestic_stock'),
+    );
   for (const tab of ASSET_CHART_TIMEFRAMES) {
     const resolved = resolveAssetChartTimeframe(tab, 'domestic_stock');
     if (tab.interval === '4h') {

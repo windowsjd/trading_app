@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AssetType, OrderSide, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { usCandleRowFilter } from '../assets/us-candle-provider';
 import {
   resolveRegularSessionForEvent,
   resolveStockMarketSessionState,
@@ -126,7 +127,15 @@ export class LimitOrderCandleEvidenceService {
 
     evaluation.rowsRead = rows.length;
     const eligible = evaluation.candles;
+    // US stocks: only the current price provider's bars are evidence. One
+    // window holds one row, and around a provider switch (or a backfill) the
+    // other provider's bars sit in the same table (2026-10-17).
+    const currentProvider = usCandleRowFilter(asset);
     for (const row of rows) {
+      if (currentProvider && !currentProvider(row)) {
+        countReason(evaluation.exclusions, 'provider_mismatch');
+        continue;
+      }
       if (!isCandleWithinLookback(row.openTime, now, lookbackMs)) {
         countReason(evaluation.exclusions, 'outside_lookback');
         continue;

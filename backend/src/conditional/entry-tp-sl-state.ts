@@ -27,6 +27,7 @@ import {
   type EntryTpSlIntent,
   type EntryType,
 } from './entry-tp-sl-policy';
+import { usConditionalOrdersSupported } from './conditional-markets';
 
 export const pendingEntryTpSl = { status: 'pending' as const };
 
@@ -377,10 +378,14 @@ export async function createEntryTpSlPlansInTransaction(
       'The entry is no longer pending.',
       409,
     );
-  if (root.domain === 'spot' && root.asset.assetType === 'us_stock')
+  if (
+    root.domain === 'spot' &&
+    root.asset.assetType === 'us_stock' &&
+    !usConditionalOrdersSupported()
+  )
     throw createApiError(
       'ENTRY_TP_SL_MARKET_NOT_SUPPORTED',
-      'Stop-loss and take-profit settings are available for Korean stocks and crypto.',
+      'Stop-loss and take-profit settings are not available for this market.',
       409,
     );
   // A legacy OCO attachment will own the whole future holding.

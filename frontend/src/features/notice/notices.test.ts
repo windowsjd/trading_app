@@ -33,8 +33,8 @@ it('the order-method notice is newest and states how each method fills', () => {
   assert.equal(notices[0].id, NOTICE_IDS.orderMethodsAndExecution);
   const notice = findNotice(NOTICE_IDS.orderMethodsAndExecution)!;
   assert.equal(notice.title, '주문방식 및 체결 기준 안내');
-  assert.equal(notice.publishedOn, '2026-10-16');
-  assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문 (한국주식)', '손절가/익절가 설정', '선물']);
+  assert.equal(notice.publishedOn, '2026-10-17');
+  assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문', '손절가/익절가 설정', '선물']);
   const text = notice.sections.flatMap((section) => [section.heading, ...section.paragraphs]).join('\n');
   for (const required of [
     '실제 거래소로 전송되지 않고',
@@ -42,7 +42,13 @@ it('the order-method notice is newest and states how each method fills', () => {
     '주문 접수는 체결이 아닙니다',
     '감시 방향(이상·이하)은 직접 고르지 않습니다',
     '매수·매도(선물은 롱·숏) 모두 같은 비교 원칙을 사용합니다',
-    '미국 주식 조건주문은 아직 이용할 수 없습니다',
+    '미국 주식의 프리마켓·애프터마켓 거래는 지원하지 않습니다',
+    '서비스에서 열려 있을 때만 선택할 수 있습니다',
+    '뉴욕 시간 기준 그날 정규장의 확정 종가로 판정합니다',
+    '뉴욕 시간 21:10 이후',
+    '5분 이상 간격으로 같은 값이 두 번 확인되어야 확정합니다',
+    '뉴욕 시간 23:00까지 확정하지 못하면 주문이 종료되고 예약이 해제됩니다',
+    '확정 뒤에 자료가 정정되어도 이미 처리된 체결은 바뀌지 않습니다',
     '감시가격은 체결을 보장하는 가격이 아닙니다',
     '방향이 달라졌으면 등록하지 않고',
     '감시 중에는 현금·수량·담보를 예약하지 않습니다',

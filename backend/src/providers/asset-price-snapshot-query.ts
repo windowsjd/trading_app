@@ -17,6 +17,10 @@ export const NON_PROVIDER_SOURCE_TYPES = [
   'official_batch',
 ] as const;
 
+/** Receipt window of the open-market per-source fallback read (every open
+ * workflow rejects older receipts anyway: ≤ 300 s). */
+const OPEN_MARKET_SOURCE_FALLBACK_MS = 15 * 60_000;
+
 type PriceRead = {
   asset: ProviderAssetCandidate & { id: string };
   workflow: ProviderWorkflow;
@@ -76,9 +80,38 @@ export async function findMarketAwareAssetPriceCandidates(
   } satisfies Prisma.AssetPriceSnapshotFindManyArgs;
   const scope = closedMarketPriceScope(input);
   if (!scope) {
-    return (
-      (await client.assetPriceSnapshot.findMany({ ...query, take: 10 })) ?? []
+    const recent =
+      (await client.assetPriceSnapshot.findMany({ ...query, take: 10 })) ?? [];
+    if (
+      input.sourceNames.length === 0 ||
+      recent.some(
+        (row) =>
+          row.sourceName !== null && input.sourceNames.includes(row.sourceName),
+      )
+    )
+      return recent;
+    // Another provider's newer rows filled the window (two providers writing
+    // one asset, e.g. Tiingo collection next to KIS before a US provider
+    // switch, 2026-10-17). Read each eligible source's newest recent receipt
+    // through the (asset_id, captured_at) index — bounded, never a walk of
+    // the asset's history — so it is never crowded out.
+    const since = new Date(
+      input.now.getTime() - OPEN_MARKET_SOURCE_FALLBACK_MS,
     );
+    const eligible = (
+      await Promise.all(
+        input.sourceNames.map(
+          async (sourceName) =>
+            (await client.assetPriceSnapshot.findMany({
+              ...query,
+              where: { ...query.where, sourceName, capturedAt: { gte: since } },
+              orderBy: [{ capturedAt: 'desc' }, { createdAt: 'desc' }],
+              take: 1,
+            })) ?? [],
+        ),
+      )
+    ).flat();
+    return eligible.length > 0 ? [...eligible, ...recent] : recent;
   }
   const candidates = (
     await Promise.all(

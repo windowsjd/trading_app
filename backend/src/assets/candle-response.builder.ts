@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { AssetType, Prisma } from '../generated/prisma/client';
 import { normalizeKisUsMarketCode } from '../providers/kis/kis-websocket.subscription';
+import { usCandlesFromTiingo } from './us-candle-provider';
 import {
   KIS_DOMESTIC_MINUTE_PATH,
   KIS_DOMESTIC_MINUTE_TR_ID,
@@ -100,6 +101,34 @@ export class CandleResponseBuilder {
           },
         };
     }
+
+    // US stocks on Tiingo: the stored rows are Tiingo's (the loader serves
+    // nothing else), never labelled with a KIS path.
+    if (usCandlesFromTiingo(asset))
+      return {
+        success: true,
+        data: {
+          ...base,
+          source: {
+            provider: 'tiingo',
+            persisted: true,
+            priceAdjustment: 'raw',
+            sourceProviders: [
+              ...new Set(
+                (
+                  providers ??
+                  rows.flatMap((r) =>
+                    r.sourceProvider ? [r.sourceProvider] : [],
+                  )
+                ).filter((p): p is string => typeof p === 'string'),
+              ),
+            ],
+            marketCode: asset.market,
+            requestedCount: query.limit,
+            returnedCount: candles.length,
+          },
+        },
+      };
 
     const period = query.interval === '1d' || query.interval === '1w';
     const domestic = asset.assetType === AssetType.domestic_stock;

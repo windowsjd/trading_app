@@ -70,9 +70,10 @@ export class TiingoCandleReaderService {
     private readonly responses: CandleResponseBuilder,
   ) {}
 
-  /** The Tiingo target when this asset's candles come from the trial path. */
+  /** The Tiingo target when this asset's candles come from the trial path
+   * (official mode serves the stored Tiingo candles instead). */
   async targetFor(asset: AssetCandlesAsset): Promise<TiingoAssetTarget | null> {
-    if (!this.quotes.isEnabled()) return null;
+    if (!this.quotes.isTrialDisplayEnabled()) return null;
     return this.quotes.targetForAsset({
       id: asset.id,
       symbol: asset.symbol,

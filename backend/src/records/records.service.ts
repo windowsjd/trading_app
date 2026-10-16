@@ -68,6 +68,7 @@ import {
   calculateRankingPercentile,
 } from '../ranking/ranking-tier.policy';
 import {
+  adminManualAssetPriceScope,
   isPositiveDecimal,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
@@ -2154,6 +2155,7 @@ export class RecordsService {
         assetId: asset.id,
         currencyCode,
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(asset),
         effectiveAt: {
           lte: valuationAt,
         },

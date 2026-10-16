@@ -216,7 +216,7 @@ export class KisPeriodCandleNormalizerService {
   }
 }
 
-type PeriodWindow = {
+export type PeriodWindow = {
   openTime: Date;
   closeTime: Date;
   // Instant after which the candle counts as closed (actual session end of
@@ -254,6 +254,24 @@ export function resolveKisDailyPeriodWindows(
     if (window) windows.push(window);
   }
   return windows;
+}
+
+/**
+ * The stored 1d/1w window of one exchange-local trading date (`YYYYMMDD`),
+ * the exact bucket contract every stored stock period row uses — shared by
+ * the Tiingo US feed (2026-10-17) so both providers key rows identically.
+ * Null for a non-session date (1d) or an unavailable calendar.
+ */
+export function resolvePeriodWindowForDate(
+  calendarMarket: 'KRX' | 'US',
+  dateText: string,
+  interval: KisPeriodInterval,
+): PeriodWindow | null {
+  return resolvePeriodWindow(
+    dateText,
+    interval,
+    calendarMarket === 'KRX' ? DOMESTIC_MARKET : OVERSEAS_MARKET,
+  );
 }
 
 function resolvePeriodWindow(

@@ -14,6 +14,7 @@ import {
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  adminManualAssetPriceScope,
   buildAdminManualFallbackDecision,
   FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
   isPositiveDecimal,
@@ -316,6 +317,7 @@ export class MarketSnapshotHealthService {
         assetId: asset.id,
         currencyCode: priceCurrency,
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(asset),
         effectiveAt: {
           lte: now,
         },

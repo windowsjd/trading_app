@@ -131,7 +131,9 @@ export class TiingoStreamService implements OnModuleInit, OnModuleDestroy {
   }
 
   onModuleInit(): void {
-    void this.start();
+    // Official mode: only the collector-lease holder opens the socket
+    // (TiingoCollectorLeaseService starts and stops it).
+    if (this.configService.getConfig().trialMode) void this.start();
   }
 
   async onModuleDestroy(): Promise<void> {

@@ -58,6 +58,8 @@ import { TiingoAssetMapService } from './tiingo/tiingo-asset-map.service';
 import { TiingoStreamService } from './tiingo/tiingo-stream.service';
 import { TiingoQuoteService } from './tiingo/tiingo-quote.service';
 import { TiingoCandleService } from './tiingo/tiingo-candle.service';
+import { TiingoCollectorLeaseService } from './tiingo/tiingo-collector-lease.service';
+import { TiingoSnapshotWriterService } from './tiingo/tiingo-snapshot-writer.service';
 import { TiingoDiagnosticsService } from './tiingo/tiingo-diagnostics.service';
 import { MarketDisplayPriceService } from './market-display-price.service';
 import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
@@ -145,6 +147,8 @@ import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
     TiingoQuoteService,
     TiingoCandleService,
     TiingoDiagnosticsService,
+    TiingoCollectorLeaseService,
+    TiingoSnapshotWriterService,
     MarketDisplayPriceService,
     MarketEstimatedQuoteService,
   ],
@@ -196,6 +200,11 @@ import { MarketEstimatedQuoteService } from './market-estimated-quote.service';
     TiingoQuoteService,
     TiingoCandleService,
     TiingoDiagnosticsService,
+    // Official mode (2026-10-17): LOC US close evidence and candle sync.
+    TiingoConfigService,
+    TiingoRestClient,
+    TiingoAssetMapService,
+    TiingoMarketDataStore,
     MarketDisplayPriceService,
     MarketEstimatedQuoteService,
   ],

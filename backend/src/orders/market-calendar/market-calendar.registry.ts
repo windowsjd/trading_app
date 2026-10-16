@@ -8,6 +8,7 @@ import { KRX_2024 } from './data/krx-2024';
 import { KRX_2025 } from './data/krx-2025';
 import { KRX_2026 } from './data/krx-2026';
 import { KRX_2027 } from './data/krx-2027';
+import { US_2024 } from './data/us-2024';
 import { US_2025 } from './data/us-2025';
 import { US_2026 } from './data/us-2026';
 import { US_2027 } from './data/us-2027';
@@ -24,6 +25,7 @@ const DATASETS: readonly MarketCalendarDataset[] = [
   KRX_2025,
   KRX_2026,
   KRX_2027,
+  US_2024,
   US_2025,
   US_2026,
   US_2027,

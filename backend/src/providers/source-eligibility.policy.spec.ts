@@ -35,8 +35,10 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import {
+  adminManualAssetPriceScope,
   FX_USD_KRW_PROVIDER_SOURCE_PRIORITY,
   BINANCE_CRYPTO_USD_PROVIDER_SOURCE_PRIORITY,
+  readUsStockPriceProvider,
   getProviderFreshnessThresholdsSeconds,
   isProviderWorkflowAllowed,
   isProviderWorkflowDenied,
@@ -937,6 +939,98 @@ describe('provider source eligibility policy', () => {
       decision: {
         selectedSourceName: PROVIDER_SOURCE_NAMES.fxUsdKrwExchangeRateApi,
       },
+    });
+  });
+
+  describe('US stock financial source switch (2026-10-17)', () => {
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    afterEach(() => {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    });
+    const us = {
+      assetType: AssetType.us_stock,
+      market: 'NAS',
+      currencyCode: CurrencyCode.USD,
+    };
+
+    it('keeps KIS by default and moves every US workflow to the Tiingo snapshot only', () => {
+      delete process.env.US_STOCK_PRICE_PROVIDER;
+      expect(
+        resolveAssetProviderEligibility({
+          workflow: 'orders_execute',
+          asset: us,
+        }),
+      ).toMatchObject({
+        sourceName: 'kis_us_delayed_trade',
+        sourceNames: ['kis_us_delayed_trade'],
+      });
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+      for (const workflow of [
+        'assets_with_price',
+        'orders_quote',
+        'orders_execute',
+        'live_portfolio_valuation',
+        'daily_portfolio_snapshot',
+        'season_settlement',
+      ] as const)
+        expect(
+          resolveAssetProviderEligibility({ workflow, asset: us }),
+        ).toMatchObject({
+          eligible: true,
+          sourceName: 'tiingo_us_reference_price',
+          sourceNames: ['tiingo_us_reference_price'],
+        });
+      // Freshness is unchanged: 10 s execute, 60 s quote, 300 s display.
+      expect(
+        resolveAssetProviderEligibility({
+          workflow: 'orders_execute',
+          asset: us,
+        }),
+      ).toMatchObject({ freshnessThresholdSeconds: 10 });
+      // Other markets are untouched.
+      expect(
+        resolveAssetProviderEligibility({
+          workflow: 'orders_quote',
+          asset: {
+            assetType: AssetType.domestic_stock,
+            market: 'KRX',
+            currencyCode: CurrencyCode.KRW,
+          },
+        }),
+      ).toMatchObject({ sourceName: PROVIDER_SOURCE_NAMES.domesticStockKrx });
+    });
+
+    it('accepts exactly kis or tiingo', () => {
+      expect(readUsStockPriceProvider({})).toBe('kis');
+      expect(
+        readUsStockPriceProvider({ US_STOCK_PRICE_PROVIDER: 'tiingo' }),
+      ).toBe('tiingo');
+      for (const value of ['TIINGO', 'kis,tiingo', 'iex', ''])
+        if (value === '')
+          expect(
+            readUsStockPriceProvider({ US_STOCK_PRICE_PROVIDER: value }),
+          ).toBe('kis');
+        else
+          expect(() =>
+            readUsStockPriceProvider({ US_STOCK_PRICE_PROVIDER: value }),
+          ).toThrow('US_STOCK_PRICE_PROVIDER must be kis or tiingo');
+    });
+
+    it('never lets an operator price stand in for a US stock on Tiingo', () => {
+      const tiingo = { US_STOCK_PRICE_PROVIDER: 'tiingo' };
+      expect(
+        adminManualAssetPriceScope({ assetType: 'us_stock' }, tiingo),
+      ).toEqual({ id: { in: [] } });
+      expect(adminManualAssetPriceScope({ assetType: 'us_stock' }, {})).toEqual(
+        {},
+      );
+      expect(
+        adminManualAssetPriceScope({ assetType: 'domestic_stock' }, tiingo),
+      ).toEqual({});
+      expect(
+        adminManualAssetPriceScope({ assetType: 'crypto' }, tiingo),
+      ).toEqual({});
     });
   });
 });

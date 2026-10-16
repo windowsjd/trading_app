@@ -233,6 +233,61 @@ describe('closed candle evaluation metadata from the existing read', () => {
     });
   });
 
+  it("uses only the current US price provider's bars (never the other provider's rows around a switch)", async () => {
+    // Friday 2026-10-16 15:00–15:10 New York (EDT), inside the session.
+    const at = (open: string, sourceProvider: string) => ({
+      ...base(),
+      openTime: new Date(open),
+      closeTime: new Date(new Date(open).getTime() + 300_000),
+      sourceProvider,
+      sourceUpdatedAt: new Date('2026-10-16T19:11:00.000Z'),
+      updatedAt: new Date('2026-10-16T19:11:00.000Z'),
+    });
+    const rows = [
+      at('2026-10-16T19:00:00.000Z', 'kis_overseas_minute'),
+      at('2026-10-16T19:05:00.000Z', 'tiingo_equity_intraday'),
+    ];
+    const us = { id: 'aapl', assetType: AssetType.us_stock, market: 'NAS' };
+    const evaluate = async (provider: string | undefined) => {
+      const previous = process.env.US_STOCK_PRICE_PROVIDER;
+      if (provider === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = provider;
+      try {
+        const prisma = {
+          marketCandle: { findMany: jest.fn().mockResolvedValue(rows) },
+        };
+        return await new LimitOrderCandleEvidenceService(
+          prisma as never,
+        ).evaluateClosedCandlesForAsset(
+          us,
+          new Date('2026-10-16T19:12:00.000Z'),
+          900_000,
+        );
+      } finally {
+        if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+        else process.env.US_STOCK_PRICE_PROVIDER = previous;
+      }
+    };
+    const tiingo = await evaluate('tiingo');
+    expect(tiingo.candles.map((c) => c.sourceProvider)).toEqual([
+      'tiingo_equity_intraday',
+    ]);
+    expect(tiingo.exclusions).toEqual({ provider_mismatch: 1 });
+    const kis = await evaluate(undefined);
+    expect(kis.candles.map((c) => c.sourceProvider)).toEqual([
+      'kis_overseas_minute',
+    ]);
+    expect(kis.exclusions).toEqual({ provider_mismatch: 1 });
+    // Other assets keep every provider's rows (no provider policy there).
+    const prisma = {
+      marketCandle: { findMany: jest.fn().mockResolvedValue([base()]) },
+    };
+    const cryptoEvaluation = await new LimitOrderCandleEvidenceService(
+      prisma as never,
+    ).evaluateClosedCandlesForAsset(crypto, now, 900_000);
+    expect(cryptoEvaluation.candles).toHaveLength(1);
+  });
+
   it('reports calendar-unavailable without querying or inferring missing candles', async () => {
     const prisma = { marketCandle: { findMany: jest.fn() } };
     const service = new LimitOrderCandleEvidenceService(prisma as never);

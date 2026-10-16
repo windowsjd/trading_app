@@ -7,6 +7,8 @@ import {
 } from '../orders/market-calendar.policy';
 import { zonedDateTimeToUtc } from '../providers/kis/candles/kis-candle-time';
 import { MARKET_DAILY_CANDLE_SOURCE } from '../providers/market-daily-candle-source';
+import { resolvePeriodWindowForDate } from '../providers/kis/candles/kis-period-candle-normalizer.service';
+import { usCandlesFromTiingo } from './us-candle-provider';
 import { MarketCandlesRepository } from './market-candles.repository';
 
 const DAY_MS = 86_400_000;
@@ -131,7 +133,12 @@ function dailyBaselineWindow(input: {
       provider: MARKET_DAILY_CANDLE_SOURCE.crypto,
     };
   }
-  if (input.asset.assetType !== 'domestic_stock') return null;
+  const us = input.asset.assetType === 'us_stock';
+  if (
+    input.asset.assetType !== 'domestic_stock' &&
+    !(us && usCandlesFromTiingo(input.asset))
+  )
+    return null;
   const state = resolveStockMarketSessionState(input.asset, input.now);
   if (!state || state.state === 'calendar_unavailable') return null;
   const priceSession =
@@ -150,6 +157,21 @@ function dailyBaselineWindow(input: {
     1,
   );
   if (!previous || previous.closeTime > input.now) return null;
+  if (us) {
+    // The stored US daily window of that New York date (local midnights).
+    const window = resolvePeriodWindowForDate(
+      'US',
+      previous.localDate.replaceAll('-', ''),
+      '1d',
+    );
+    if (!window) return null;
+    return {
+      openTime: window.openTime,
+      closeTime: window.closeTime,
+      completedAt: previous.closeTime,
+      provider: MARKET_DAILY_CANDLE_SOURCE.usStock,
+    };
+  }
   const openTime = zonedDateTimeToUtc(
     previous.localDate.replaceAll('-', ''),
     '000000',

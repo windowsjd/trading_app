@@ -15,6 +15,7 @@ import {
   futuresTpSlCondition,
   futuresTpSlEnabled,
 } from '../futures/futures-tp-sl-policy';
+import { conditionalMarkets } from './conditional-markets';
 import { conditionalTradable } from './conditional-policy';
 import {
   assertConditionalSellKindEnabled,
@@ -259,7 +260,13 @@ export class EntryTpSlService {
       data: {
         tradingAccountId: accountId,
         capabilities: {
-          spot: { enabled: spot, canCreate: spot && tradable },
+          // Additive: the spot markets whose pending entries accept plans
+          // (KRX, Spot crypto; US with the Tiingo provider, 2026-10-17).
+          spot: {
+            enabled: spot,
+            canCreate: spot && tradable,
+            markets: conditionalMarkets(),
+          },
           futures: {
             enabled: futures,
             canCreate:

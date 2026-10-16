@@ -15,7 +15,7 @@ export type CandleLongBackfillArgs = {
   fetchMissingDaily: boolean;
 };
 
-const MARKETS: readonly LongCandleMarket[] = ['spot', 'krx', 'futures'];
+const MARKETS: readonly LongCandleMarket[] = ['spot', 'krx', 'us', 'futures'];
 
 /**
  * Operator flags for `candle:long-backfill`. Dry-run is the default; at least
@@ -67,7 +67,7 @@ export function parseCandleLongBackfillArgs(
       case '--market': {
         const market = takeText() as LongCandleMarket;
         if (!MARKETS.includes(market)) {
-          throw new Error('--market must be spot, krx, or futures.');
+          throw new Error('--market must be spot, krx, us, or futures.');
         }
         if (!args.markets.includes(market)) args.markets.push(market);
         break;
@@ -113,7 +113,7 @@ export function parseCandleLongBackfillArgs(
     }
   }
   if (args.markets.length === 0) {
-    throw new Error('Specify at least one --market spot|krx|futures.');
+    throw new Error('Specify at least one --market spot|krx|us|futures.');
   }
   if (args.includeInactiveFutures && args.instrumentIds.length === 0) {
     throw new Error('--include-inactive-futures requires --instrument-id.');

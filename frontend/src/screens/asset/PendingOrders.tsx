@@ -30,12 +30,25 @@ import { invalidateAfterOrderCreate } from '../../features/tradingAccount/invali
 import TpSlButton from '../../features/conditional/tpsl/TpSlButton';
 import TpSlSheet, { type TpSlTarget } from '../../features/conditional/tpsl/TpSlSheet';
 import { useEntryTpSlSummaries } from '../../features/conditional/tpsl/useEntryTpSlSummaries';
+import { isEntryTpSlMarketSupported } from '../../features/order/orderMethods';
 import type { RecordOrderItemDto } from '../../features/record/api';
 
-/** A pending entry that takes 손절가/익절가 plans: an ordinary KRX/crypto BUY Limit (never LOC). */
+/** The pending row's asset type from its market (KRX, BINANCE, US exchanges). */
+function pendingAssetType(market?: string) {
+  if (market === 'KRX') return 'domestic_stock';
+  if (market === 'BINANCE') return 'crypto';
+  if (market === 'NAS' || market === 'NYS' || market === 'AMS') return 'us_stock';
+  return null;
+}
+
+/**
+ * A pending entry that may take 손절가/익절가 plans: an ordinary BUY Limit
+ * (never LOC) of KRX, crypto Spot or US stocks. US rows offer it only while
+ * the server lists US (Tiingo prices, 2026-10-17) or plans already exist.
+ */
 function takesEntryTpSl(item: RecordOrderItemDto) {
   return item.side === 'buy' && item.orderType === 'limit' && !item.limitOnClose
-    && (item.market === 'KRX' || item.market === 'BINANCE');
+    && pendingAssetType(item.market) !== null;
 }
 
 type Props = {
@@ -109,7 +122,9 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
   // The account ID is part of the key and checked again at the display boundary.
   const data = query.data?.tradingAccountId === accountId ? query.data : undefined;
   const count = !query.isError && data ? data.items.filter(item => !item.conditionalChildId).length : undefined;
-  const plans = useEntryTpSlSummaries(accountId, isFocused && !!data?.items.some(takesEntryTpSl));
+  const entryRows = data?.items.filter(takesEntryTpSl) ?? [];
+  const plans = useEntryTpSlSummaries(accountId, isFocused && entryRows.length > 0, (capabilities) =>
+    !capabilities || entryRows.some((item) => isEntryTpSlMarketSupported(capabilities.spot, pendingAssetType(item.market))));
   useEffect(() => { onCount?.(count); }, [count, onCount]);
   const integrityMessage = query.isError
     ? getIntegrityErrorMessage(query.error)
@@ -202,7 +217,9 @@ export function SpotPendingOrders({ accountId, isFocused, seasonUi, onCount }: P
             {(() => {
               const orderId = item.orderId ?? item.id;
               const summary = orderId ? plans.summary(orderId) : null;
-              return orderId && takesEntryTpSl(item) && (plans.capabilities?.spot.enabled || summary) ? (
+              const offered = !!plans.capabilities?.spot.enabled
+                && isEntryTpSlMarketSupported(plans.capabilities.spot, pendingAssetType(item.market));
+              return orderId && takesEntryTpSl(item) && (offered || summary) ? (
                 <TpSlButton testID={`pending-order-${display.key}-tp-sl`} summary={summary}
                   onPress={() => setTpSlTarget({ type: 'entry', accountId, entryType: 'spot_limit_order', entryId: orderId })} />
               ) : null;

@@ -919,4 +919,154 @@ describe('CandleServingService', () => {
       expect(sync.syncAsset).toHaveBeenCalledTimes(1);
     });
   });
+
+  describe('US stocks on Tiingo (US_STOCK_PRICE_PROVIDER=tiingo, 2026-10-17)', () => {
+    const us = {
+      ...asset,
+      symbol: 'AAPL',
+      market: 'NAS',
+      assetType: AssetType.us_stock,
+    };
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    beforeEach(() => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    });
+    const harness = (
+      mode: 'legacy' | 'database' = 'database',
+      planOverrides: Partial<CandleReadPlan> = {},
+    ) => {
+      const plans = {
+        build: jest.fn().mockReturnValue({
+          ...plan,
+          assetType: us.assetType,
+          market: us.market,
+          ...planOverrides,
+        }),
+      };
+      const database = { load: jest.fn() };
+      const sync = { syncAsset: jest.fn() };
+      const service = new CandleServingService(
+        plans as never,
+        database as never,
+        { get: jest.fn().mockResolvedValue({ status: 'miss' }) } as never,
+        {
+          getOrLoad: jest.fn(
+            ({ loader }: { loader: () => Promise<AssetCandlesResponse> }) =>
+              loader(),
+          ),
+        } as never,
+        sync as never,
+        {
+          mode,
+          currentFreshnessMs: 60_000,
+          onDemandRefreshEnabled: true,
+          onDemandRefreshMaxDurationMs: 1_000,
+          onDemandRefreshMaxPages: 10,
+          onDemandRefreshMaxRows: 5000,
+          staleWaiterMaxWaitMs: 50,
+          maxManagedFiveMinuteRangeMs: 45 * 86_400_000,
+          maxManagedPeriodRangeMs: 365 * 86_400_000,
+          maxManagedKrxDailyRangeMs: 875 * 86_400_000,
+          maxOnDemandRepairRangeMs: 2 * 86_400_000,
+          coverageTailToleranceMs: 86_400_000,
+        },
+      );
+      return { service, database, sync };
+    };
+    const outcome = async (promise: Promise<unknown>) => {
+      const error = await promise.then(
+        () => null,
+        (e: unknown) => e,
+      );
+      const http = error as {
+        getStatus?: () => number;
+        getResponse?: () => { error?: { code?: string; message?: string } };
+      } | null;
+      return http?.getStatus
+        ? `${http.getStatus()}:${http.getResponse?.()?.error?.code ?? ''}:${http.getResponse?.()?.error?.message ?? ''}`
+        : 'no-http-error';
+    };
+
+    it('answers from PostgreSQL only — no on-demand sync, no KIS legacy read — in either serving mode', async () => {
+      for (const mode of ['database', 'legacy'] as const) {
+        const { service, database, sync } = harness(mode);
+        database.load.mockResolvedValue(
+          load('available', response('db'), { fresh: false }),
+        );
+        const legacy = jest.fn();
+        await expect(service.serve(us, query, legacy)).resolves.toEqual(
+          response('db'),
+        );
+        expect(sync.syncAsset).not.toHaveBeenCalled();
+        expect(legacy).not.toHaveBeenCalled();
+      }
+      const partial = harness();
+      partial.database.load.mockResolvedValue(
+        load('incomplete', response('partial'), { completedCoverage: false }),
+      );
+      await expect(
+        partial.service.serve(us, query, jest.fn()),
+      ).resolves.toEqual(response('partial'));
+      expect(partial.sync.syncAsset).not.toHaveBeenCalled();
+    });
+
+    it('fails an empty or out-of-policy window with 503 instead of reaching KIS', async () => {
+      const empty = harness();
+      empty.database.load.mockResolvedValue(
+        load('missing', null, { completedCoverage: false }),
+      );
+      const legacy = jest.fn();
+      // Users get the reviewed generic copy (provider prose is never public).
+      expect(await outcome(empty.service.serve(us, query, legacy))).toBe(
+        '503:ASSET_CANDLES_PROVIDER_UNAVAILABLE:Request could not be completed.',
+      );
+      const aggregated = harness('database', { requiresAggregation: true });
+      aggregated.database.load.mockResolvedValue(
+        load('missing', null, { completedCoverage: false }),
+      );
+      expect(
+        (await outcome(aggregated.service.serve(us, query, legacy))).startsWith(
+          '503:ASSET_CANDLES_BASELINE_NOT_READY',
+        ),
+      ).toBe(true);
+      const outOfPolicy = harness('database', {
+        managedByPersistence: false,
+        outOfPolicyReason: 'interval_not_persisted',
+      });
+      expect(
+        (
+          await outcome(outOfPolicy.service.serve(us, query, legacy))
+        ).startsWith('503:ASSET_CANDLES_PROVIDER_UNAVAILABLE'),
+      ).toBe(true);
+      expect(outOfPolicy.database.load).not.toHaveBeenCalled();
+      expect(legacy).not.toHaveBeenCalled();
+      for (const used of [empty, aggregated, outOfPolicy])
+        expect(used.sync.syncAsset).not.toHaveBeenCalled();
+    });
+
+    it('keeps the managed KIS path for US stocks while the provider is kis', async () => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+      const { service, database, sync } = harness();
+      database.load
+        .mockResolvedValueOnce(
+          load('available', response('old'), { fresh: false }),
+        )
+        .mockResolvedValueOnce(
+          load('available', response('old'), { fresh: false }),
+        )
+        .mockResolvedValueOnce(load('available', response('requery')));
+      sync.syncAsset.mockResolvedValue({
+        assetId: us.id,
+        feeds: [{ status: 'completed', complete: true, writtenRows: 1 }],
+      });
+      await expect(service.serve(us, query, jest.fn())).resolves.toEqual(
+        response('requery'),
+      );
+      expect(sync.syncAsset).toHaveBeenCalledTimes(1);
+    });
+  });
 });

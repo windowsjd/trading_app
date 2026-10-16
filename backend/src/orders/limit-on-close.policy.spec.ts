@@ -25,9 +25,11 @@ import {
   limitOnCloseDeadlinePassed,
   nextCloseEvidenceTransition,
   resolveBoundLimitOnCloseSession,
+  limitOnCloseObservationPolicy,
   resolveLimitOnCloseRegistration,
   sessionDateText,
   sessionDateValue,
+  usSessionWallTime,
 } from './limit-on-close.policy';
 import type { LimitOnCloseConfig } from './limit-on-close.config';
 
@@ -39,7 +41,21 @@ const config: LimitOnCloseConfig = {
   evidenceMinDelayMs: 1_200_000,
   evidenceConfirmMs: 300_000,
   evidenceDeadlineMs: 10_800_000,
+  us: {
+    enabled: false,
+    sellEnabled: false,
+    evidenceEarliestMinute: 21 * 60 + 10,
+    evidenceConfirmMs: 300_000,
+    evidenceDeadlineMinute: 23 * 60,
+  },
 };
+const usConfig = (
+  overrides: Partial<LimitOnCloseConfig['us']> = {},
+): LimitOnCloseConfig => ({
+  ...config,
+  us: { ...config.us, enabled: true, sellEnabled: true, ...overrides },
+});
+const nas = { assetType: AssetType.us_stock, market: 'NAS' };
 // 2026-07-13 is a regular KRX Monday: 09:00–15:30 KST = 00:00–06:30 UTC.
 const midday = new Date('2026-07-13T03:00:00.000Z');
 const close = new Date('2026-07-13T06:30:00.000Z');
@@ -122,6 +138,7 @@ describe('LOC registration session rules', () => {
       now: midday,
       seasonEndAt: null,
       config,
+      side: OrderSide.buy,
     });
     expect(result.market).toBe('KRX');
     expect(result.session.localDate).toBe('2026-07-13');
@@ -141,6 +158,7 @@ describe('LOC registration session rules', () => {
           now: justBefore,
           seasonEndAt: null,
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBeNull();
@@ -151,6 +169,7 @@ describe('LOC registration session rules', () => {
           now: close,
           seasonEndAt: null,
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBe('LOC_SESSION_NOT_OPEN');
@@ -169,6 +188,7 @@ describe('LOC registration session rules', () => {
             now,
             seasonEndAt: null,
             config,
+            side: OrderSide.buy,
           }),
         ),
       ).toBe('LOC_SESSION_NOT_OPEN');
@@ -180,6 +200,7 @@ describe('LOC registration session rules', () => {
           now: midday,
           seasonEndAt: null,
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBe('LOC_SESSION_NOT_OPEN');
@@ -199,6 +220,7 @@ describe('LOC registration session rules', () => {
       now: midday,
       seasonEndAt: null,
       config,
+      side: OrderSide.buy,
     });
     expect(result.session.closeTime.toISOString()).toBe(
       '2026-07-13T04:00:00.000Z',
@@ -211,6 +233,7 @@ describe('LOC registration session rules', () => {
           now: new Date('2026-07-13T04:30:00.000Z'),
           seasonEndAt: null,
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBe('LOC_SESSION_NOT_OPEN');
@@ -225,26 +248,187 @@ describe('LOC registration session rules', () => {
           now: midday,
           seasonEndAt: null,
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBe('MARKET_CALENDAR_UNAVAILABLE');
   });
 
-  it('keeps US stocks and crypto unsupported', () => {
-    for (const asset of [
-      { assetType: AssetType.us_stock, market: 'NAS' },
-      { assetType: AssetType.crypto, market: 'BINANCE' },
-    ])
+  it('keeps crypto unsupported, and each stock market behind its own side flag', () => {
+    expect(
+      errorCode(() =>
+        resolveLimitOnCloseRegistration({
+          asset: { assetType: AssetType.crypto, market: 'BINANCE' },
+          now: new Date('2026-07-13T15:00:00.000Z'),
+          seasonEndAt: null,
+          config: usConfig(),
+          side: OrderSide.buy,
+        }),
+      ),
+    ).toBe('LOC_MARKET_NOT_SUPPORTED');
+    // US flags off (KRX BUY on): a US order is refused, KRX still binds.
+    const usOpen = new Date('2026-07-13T15:00:00.000Z');
+    expect(
+      errorCode(() =>
+        resolveLimitOnCloseRegistration({
+          asset: nas,
+          now: usOpen,
+          seasonEndAt: null,
+          config,
+          side: OrderSide.buy,
+        }),
+      ),
+    ).toBe('LOC_MARKET_NOT_SUPPORTED');
+    // US on, KRX off: turning US on never opens KRX (and the reverse).
+    const usOnly: LimitOnCloseConfig = { ...usConfig(), enabled: false };
+    expect(
+      errorCode(() =>
+        resolveLimitOnCloseRegistration({
+          asset: krx,
+          now: midday,
+          seasonEndAt: null,
+          config: usOnly,
+          side: OrderSide.buy,
+        }),
+      ),
+    ).toBe('LOC_MARKET_NOT_SUPPORTED');
+    // Sides are separate: US SELL only.
+    const usSellOnly = usConfig({ enabled: false });
+    expect(
+      errorCode(() =>
+        resolveLimitOnCloseRegistration({
+          asset: nas,
+          now: usOpen,
+          seasonEndAt: null,
+          config: usSellOnly,
+          side: OrderSide.buy,
+        }),
+      ),
+    ).toBe('LOC_MARKET_NOT_SUPPORTED');
+    expect(
+      errorCode(() =>
+        resolveLimitOnCloseRegistration({
+          asset: nas,
+          now: usOpen,
+          seasonEndAt: null,
+          config: usSellOnly,
+          side: OrderSide.sell,
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('binds a US regular session with a 23:00 New York evidence deadline (EDT and EST)', () => {
+    // 2026-07-13 (EDT): 09:30–16:00 ET = 13:30–20:00 UTC; 23:00 ET = 03:00 UTC next day.
+    const summer = resolveLimitOnCloseRegistration({
+      asset: nas,
+      now: new Date('2026-07-13T15:00:00.000Z'),
+      seasonEndAt: null,
+      config: usConfig(),
+      side: OrderSide.buy,
+    });
+    expect(summer.market).toBe('US');
+    expect(sessionDateText(summer.sessionDate)).toBe('2026-07-13');
+    expect(summer.session.closeTime.toISOString()).toBe(
+      '2026-07-13T20:00:00.000Z',
+    );
+    expect(summer.evidenceDeadlineAt.toISOString()).toBe(
+      '2026-07-14T03:00:00.000Z',
+    );
+    // 2026-12-15 (EST): close 21:00 UTC; 23:00 ET = 04:00 UTC next day.
+    const winter = resolveLimitOnCloseRegistration({
+      asset: nas,
+      now: new Date('2026-12-15T16:00:00.000Z'),
+      seasonEndAt: null,
+      config: usConfig(),
+      side: OrderSide.sell,
+    });
+    expect(winter.session.closeTime.toISOString()).toBe(
+      '2026-12-15T21:00:00.000Z',
+    );
+    expect(winter.evidenceDeadlineAt.toISOString()).toBe(
+      '2026-12-16T04:00:00.000Z',
+    );
+    // Outside the US session (pre-market) and at the close instant: refused.
+    for (const now of ['2026-07-13T13:00:00.000Z', '2026-07-13T20:00:00.000Z'])
       expect(
         errorCode(() =>
           resolveLimitOnCloseRegistration({
-            asset,
-            now: new Date('2026-07-13T15:00:00.000Z'),
+            asset: nas,
+            now: new Date(now),
             seasonEndAt: null,
-            config,
+            config: usConfig(),
+            side: OrderSide.buy,
           }),
         ),
-      ).toBe('LOC_MARKET_NOT_SUPPORTED');
+      ).toBe('LOC_SESSION_NOT_OPEN');
+  });
+
+  it('keeps the New York wall times on a US early-close day (no close + offset)', () => {
+    // 2026-11-27 (day after Thanksgiving): 13:00 ET close = 18:00 UTC (EST).
+    const result = resolveLimitOnCloseRegistration({
+      asset: nas,
+      now: new Date('2026-11-27T16:00:00.000Z'),
+      seasonEndAt: null,
+      config: usConfig(),
+      side: OrderSide.buy,
+    });
+    expect(result.session.earlyClose).toBe(true);
+    expect(result.session.closeTime.toISOString()).toBe(
+      '2026-11-27T18:00:00.000Z',
+    );
+    expect(result.evidenceDeadlineAt.toISOString()).toBe(
+      '2026-11-28T04:00:00.000Z',
+    );
+    const window = limitOnCloseObservationPolicy(
+      'US',
+      { localDate: '2026-11-27', closeTime: result.session.closeTime },
+      usConfig(),
+    );
+    // 21:10 EST = 02:10 UTC next day — not 13:00 + some delay.
+    expect(window.earliestAt?.toISOString()).toBe('2026-11-28T02:10:00.000Z');
+    expect(window.confirmMs).toBe(300_000);
+  });
+
+  it('observes KRX from close + delay and US from 21:10 New York time', () => {
+    const krxWindow = limitOnCloseObservationPolicy(
+      'KRX',
+      { localDate: '2026-07-13', closeTime: close },
+      config,
+    );
+    expect(krxWindow.earliestAt?.toISOString()).toBe(
+      '2026-07-13T06:50:00.000Z',
+    );
+    expect(krxWindow.confirmMs).toBe(300_000);
+    const usWindow = limitOnCloseObservationPolicy(
+      'US',
+      {
+        localDate: '2026-07-13',
+        closeTime: new Date('2026-07-13T20:00:00.000Z'),
+      },
+      usConfig({ evidenceConfirmMs: 600_000 }),
+    );
+    // 21:10 EDT = 01:10 UTC next day.
+    expect(usWindow.earliestAt?.toISOString()).toBe('2026-07-14T01:10:00.000Z');
+    expect(usWindow.confirmMs).toBe(600_000);
+    expect(usSessionWallTime('2026-03-09', 23 * 60)?.toISOString()).toBe(
+      '2026-03-10T03:00:00.000Z',
+    );
+  });
+
+  it('applies the Season end rule to US sessions too', () => {
+    const usClose = new Date('2026-07-13T20:00:00.000Z');
+    expect(
+      errorCode(() =>
+        resolveLimitOnCloseRegistration({
+          asset: nas,
+          now: new Date('2026-07-13T15:00:00.000Z'),
+          seasonEndAt: usClose,
+          config: usConfig(),
+          side: OrderSide.buy,
+        }),
+      ),
+    ).toBe('LOC_SESSION_AFTER_SEASON_END');
   });
 
   it('rejects a session that closes at or after the Season end', () => {
@@ -255,6 +439,7 @@ describe('LOC registration session rules', () => {
           now: midday,
           seasonEndAt: close,
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBe('LOC_SESSION_AFTER_SEASON_END');
@@ -265,6 +450,7 @@ describe('LOC registration session rules', () => {
           now: midday,
           seasonEndAt: new Date(close.getTime() + 1),
           config,
+          side: OrderSide.buy,
         }),
       ),
     ).toBeNull();

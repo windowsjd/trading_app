@@ -50,25 +50,40 @@ const noise = [
   ),
   row('06:30:00', '0'),
 ];
-function database(rows: ReturnType<typeof row>[]) {
+type FakeWhere = {
+  assetId: string;
+  currencyCode: string;
+  sourceType: { notIn: string[] };
+  sourceName?: string;
+  price?: { gt: number };
+  id?: { in: string[] };
+  effectiveAt?: { gte: Date; lte: Date };
+  capturedAt?: { gte: Date };
+};
+type FakeRow = Omit<ReturnType<typeof row>, 'currencyCode'> & {
+  currencyCode: 'KRW' | 'USD';
+};
+function database(rows: FakeRow[]) {
   return {
     assetPriceSnapshot: {
-      findMany: jest.fn(async ({ where, take }) =>
-        rows
-          .filter(
-            (r) =>
-              r.assetId === where.assetId &&
-              r.currencyCode === where.currencyCode &&
-              !where.sourceType.notIn.includes(r.sourceType) &&
-              (!where.sourceName || r.sourceName === where.sourceName) &&
-              (!where.price || r.price.gt(where.price.gt)) &&
-              (!where.id || where.id.in.includes(r.id)) &&
-              (!where.effectiveAt ||
-                (r.effectiveAt >= where.effectiveAt.gte &&
-                  r.effectiveAt <= where.effectiveAt.lte)),
-          )
-          .sort((a, b) => b.effectiveAt.getTime() - a.effectiveAt.getTime())
-          .slice(0, take),
+      findMany: jest.fn(
+        async ({ where, take }: { where: FakeWhere; take: number }) =>
+          rows
+            .filter(
+              (r) =>
+                r.assetId === where.assetId &&
+                r.currencyCode === where.currencyCode &&
+                !where.sourceType.notIn.includes(r.sourceType) &&
+                (!where.sourceName || r.sourceName === where.sourceName) &&
+                (!where.price || r.price.gt(where.price.gt)) &&
+                (!where.id || where.id.in.includes(r.id)) &&
+                (!where.effectiveAt ||
+                  (r.effectiveAt >= where.effectiveAt.gte &&
+                    r.effectiveAt <= where.effectiveAt.lte)) &&
+                (!where.capturedAt || r.capturedAt >= where.capturedAt.gte),
+            )
+            .sort((a, b) => b.effectiveAt.getTime() - a.effectiveAt.getTime())
+            .slice(0, take),
       ),
     },
   };
@@ -230,6 +245,75 @@ describe('completed-session DB candidate selection', () => {
       }),
     ).toBeNull();
   });
+  it("open market: another provider's newer rows never crowd out the eligible source (2026-10-17)", async () => {
+    // US stock while KIS is still eligible and Tiingo collection writes the
+    // same asset more often: the eligible newest receipt is still read, via a
+    // bounded per-source query only when the newest ten hold none of it.
+    const us = {
+      ...asset,
+      id: 'aapl',
+      assetType: 'us_stock' as const,
+      market: 'NAS',
+      currencyCode: 'USD' as const,
+    };
+    const at = (time: string, sourceName: string, price = '250') => ({
+      ...row(time, price, sourceName),
+      assetId: us.id,
+      currencyCode: 'USD' as const,
+      effectiveAt: new Date(`2026-07-10T${time}Z`),
+      capturedAt: new Date(`2026-07-10T${time}Z`),
+    });
+    const tiingo = Array.from({ length: 12 }, (_, i) =>
+      at(
+        `15:00:${String(10 + i).padStart(2, '0')}`,
+        'tiingo_us_reference_price',
+      ),
+    );
+    const kis = at('15:00:05', 'kis_us_delayed_trade', '249.5');
+    const db = database([kis, ...tiingo]);
+    const input = {
+      asset: us,
+      now: new Date('2026-07-10T15:00:30Z'),
+      workflow: 'assets_with_price' as const,
+      sourceNames: ['kis_us_delayed_trade'],
+    };
+    const candidates = await findMarketAwareAssetPriceCandidates(
+      db as never,
+      input,
+    );
+    expect(candidates[0].id).toBe(kis.id);
+    expect(db.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(2);
+    const result = selectMarketAwareAssetPriceSnapshotBySourcePriority({
+      ...input,
+      candidates,
+      expectedSourceNames: input.sourceNames,
+      freshnessThresholdSeconds: 300,
+      isPositiveValue: (c) => c.price.gt(0),
+    });
+    expect(result.state === 'selected' && result.snapshot.id).toBe(kis.id);
+    // A receipt older than the bounded window is not read back (it would be
+    // stale for every open-market workflow anyway).
+    const old = database([
+      {
+        ...kis,
+        capturedAt: new Date('2026-07-10T14:30:00Z'),
+        effectiveAt: new Date('2026-07-10T14:30:00Z'),
+      },
+      ...tiingo,
+    ]);
+    const none = await findMarketAwareAssetPriceCandidates(old as never, input);
+    expect(none.some((c) => c.sourceName === 'kis_us_delayed_trade')).toBe(
+      false,
+    );
+    // When the newest ten already hold the eligible source, one query only.
+    const mixed = database([
+      ...tiingo.slice(0, 5),
+      at('15:00:20', 'kis_us_delayed_trade'),
+    ]);
+    await findMarketAwareAssetPriceCandidates(mixed as never, input);
+    expect(mixed.assetPriceSnapshot.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves source priority even when a lower-priority source has many newer rows', async () => {
     const low = Array.from({ length: 20 }, (_, i) =>
       row(`06:29:${String(i).padStart(2, '0')}`, '999999', 'secondary'),

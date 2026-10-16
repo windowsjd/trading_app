@@ -17,7 +17,7 @@ Historical holdings and financial reads retain their IDs and existing evidence.
 
 - `GET /api/v1/assets` read-only MVP is implemented.
 - `GET /api/v1/assets/:assetId` read-only MVP is implemented.
-- `GET /api/v1/assets/:assetId/candles` supports domestic stock candles through KOSCOM and US stock candles through KIS and crypto chart candles through Binance Spot klines.
+- `GET /api/v1/assets/:assetId/candles` supports domestic stock candles through KOSCOM and US stock candles through KIS — or, with `US_STOCK_PRICE_PROVIDER=tiingo` (2026-10-17), stored Tiingo candles only — and crypto chart candles through Binance Spot klines.
 - The list/detail API is for order-screen asset discovery, search, selection, and detail confirmation before calling order quote/create. The candles subresource is a chart-display read path.
 - With `withPrice=true`, the API reads existing `assets`, fresh eligible `provider_api` price/FX snapshots first, and existing safe `admin_manual` fallback snapshots.
 - List/detail price reads use existing DB snapshots and do not call external providers. The candles subresource may call KOSCOM, KIS or Binance public market-data endpoints for chart display only. No Assets API path ingests provider data, generates snapshots/rankings, settles seasons, grants rewards, or mutates business rows.
@@ -33,7 +33,7 @@ Historical holdings and financial reads retain their IDs and existing evidence.
 - `CurrencyCode.USDT` is not part of the MVP.
 - Asset price is best-effort per asset. Missing market data must not fake values or hide the asset.
 - `provider_api` is allowed only for `withPrice=true` list/detail price and USD/KRW conversion in this read-only workflow.
-- Eligible asset providers are `kis_krx_realtime_trade` for KRX-family domestic stocks, `kis_us_delayed_trade` for NAS/NYS US stocks, and `binance_public_rest_24hr_ticker` for BINANCE USD crypto.
+- Eligible asset providers are `kis_krx_realtime_trade` for KRX-family domestic stocks, `kis_us_delayed_trade` for NAS/NYS US stocks (`tiingo_us_reference_price` instead when `US_STOCK_PRICE_PROVIDER=tiingo`, 2026-10-17, with no `admin_manual` fallback for US stocks), and `binance_public_rest_24hr_ticker` for BINANCE USD crypto.
 - Eligible USD/KRW FX provider priority is `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - While a stock market is open, provider asset freshness requires the configured `capturedAt` threshold and an `effectiveAt` inside the current asset session. While closed, read/display may use only a provider price from that asset market's latest completed session; it never skips back to an older session. Crypto remains continuously fresh by `capturedAt`. Provider FX freshness is unchanged.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
@@ -314,7 +314,7 @@ Trading note policy:
 
 - Returns chart-compatible candles for existing assets without mutating DB rows.
 - `domestic_stock` uses KOSCOM v3 with preserved PostgreSQL KIS history; see [KOSCOM contract](koscom-market-data.md). Source metadata can be `koscom`, `kis`, or `mixed`; chart intervals and Decimal fields are preserved.
-- `us_stock` keeps the existing KIS overseas candle behavior.
+- `us_stock` keeps the existing KIS overseas candle behavior while `US_STOCK_PRICE_PROVIDER=kis`. With `tiingo` (2026-10-17, [tiingo-us-equity-official.md](tiingo-us-equity-official.md)) US candles are served from PostgreSQL only — stored Tiingo 5m (and 15m/30m/1h aggregates), stored 4h synthesized from complete 5m, end-of-day RAW 1d/1w — never a KIS row, legacy read or on-demand sync; the response `source` is `{ provider: 'tiingo', persisted: true, priceAdjustment: 'raw', sourceProviders, marketCode, requestedCount, returnedCount }` (the trial variant keeps `persisted: false`). Session windows (`prevN_open`, `96d`) use the US exchange calendar (2024 data added for the 576-session daily window). In either mode a US stock reads only the current provider's rows.
 - `crypto` uses Binance Spot `GET /api/v3/klines` only. Binance Futures `/fapi/v1/klines` and authenticated Binance APIs are never used for these Spot candles; USDⓈ-M contract klines are served only by the separate futures chart route `GET /api/v1/futures/instruments/:instrumentId/candles` ([long-range-4h-candles.md](long-range-4h-candles.md)).
 - Crypto candles are display-only and are not used for orders, quotes, valuation, ranking, settlement, scheduler jobs, `asset_price_snapshots`, or `fx_rate_snapshots`.
 - Crypto symbol normalization uses the asset symbol: `BTC` -> `BTCUSDT`, `ETH` -> `ETHUSDT`, existing `BTCUSDT` stays unchanged, and `BTC/USD`, `BTC-USD`, or `BTC_USD` normalize to `BTCUSDT`.

@@ -14,12 +14,12 @@
 //                    stocks (KRX and US) = the 96 most recent completed
 //                    sessions + today on the exchange calendar,
 //                    crypto = rolling 96 × 24h → now
-//   - 'prevN_open' = (KRX only, N = 3/6/12/24/576) the regular open of the
-//                    N-th actual KRX session before today's KST date → now
-//                    (N sessions on a holiday, N + 1 while trading). These
-//                    are the confirmed KRX chart windows (KOSCOM 100-stock
-//                    design v2.1 §5.1); they need the backend that accepts
-//                    the tokens (an older backend answers 400).
+//   - 'prevN_open' = (stocks, N = 3/6/12/24/576) the regular open of the
+//                    N-th actual exchange session before today's local date
+//                    → now (N sessions on a holiday, N + 1 while trading).
+//                    The confirmed KRX chart windows (KOSCOM 100-stock
+//                    design v2.1 §5.1), also used by US stocks on the US
+//                    exchange calendar (2026-10-17).
 //
 // 15m/30m/1h are aggregated by the backend from the stored 5m feed (45-day
 // retention), so their windows are bounded by that retention, not by a
@@ -121,11 +121,11 @@ const KRX_SESSION_TIMEFRAMES: Partial<
 };
 
 /**
- * The request window for a selected tab: KRX stocks use the session
- * windows, the 4h tab of every supported market the long-range window, and
- * everything else the base list. Returns null while the asset type is still
- * unknown so the caller waits instead of fetching (and caching) the wrong
- * window.
+ * The request window for a selected tab: stocks (KRX and US, each on its
+ * exchange calendar) use the session windows, the 4h tab of every supported
+ * market the long-range window, and everything else the base list. Returns
+ * null while the asset type is still unknown so the caller waits instead of
+ * fetching (and caching) the wrong window.
  */
 export function resolveAssetChartTimeframe(
   timeframe: AssetChartTimeframe,
@@ -136,7 +136,7 @@ export function resolveAssetChartTimeframe(
     return LONG_RANGE_ASSET_TYPES.has(assetType)
       ? LONG_RANGE_FOUR_HOUR_TIMEFRAME
       : timeframe;
-  if (assetType === 'domestic_stock')
+  if (assetType === 'domestic_stock' || assetType === 'us_stock')
     return KRX_SESSION_TIMEFRAMES[timeframe.interval] ?? timeframe;
   return timeframe;
 }

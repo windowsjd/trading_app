@@ -13,6 +13,12 @@ describe('Tiingo trial data labelling', () => {
       isTrialPriceSource({ sourceType: 'provider_api', sourceName: 'kis_us_delayed_trade' }),
       false,
     );
+    // The official stored Tiingo price (2026-10-17) is never labelled as trial.
+    assert.equal(
+      isTrialPriceSource({ sourceType: 'provider_api', sourceName: 'tiingo_us_reference_price' }),
+      false,
+    );
+    assert.equal(isTrialPriceSource('tiingo_us_reference_price'), false);
     assert.equal(isTrialPriceSource(null), false);
     assert.equal(isTrialPriceSource(undefined), false);
   });
@@ -38,5 +44,14 @@ describe('Tiingo trial data labelling', () => {
     );
     assert.equal(trialCandleNotice({ provider: 'kis' }), null);
     assert.equal(trialCandleNotice(undefined), null);
+    // Official stored Tiingo candles (persisted) are never labelled as trial.
+    assert.equal(
+      trialCandleNotice({ provider: 'tiingo', persisted: true, coverage: 'complete' }),
+      null,
+    );
+    assert.equal(
+      trialCandleNotice({ provider: 'tiingo', persisted: false, coverage: 'complete' }),
+      'Tiingo 체험 차트 · 서버에 저장하지 않는 임시 데이터',
+    );
   });
 });

@@ -6,6 +6,14 @@ import {
 } from '../generated/prisma/client';
 import { resolveMarketSession } from '../orders/market-calendar.policy';
 import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
+import { resolvePeriodWindowForDate } from '../providers/kis/candles/kis-period-candle-normalizer.service';
+import { TIINGO_INTRADAY_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
+import { newYorkDate } from '../providers/tiingo/tiingo-candle-normalizer';
+import {
+  usCandleRowFilter,
+  usCandlesFromTiingo,
+  usCheckpointFilter,
+} from './us-candle-provider';
 import {
   FIVE_MINUTES_MS,
   kstDate,
@@ -131,6 +139,11 @@ export class CandleDatabaseLoader {
       Math.min(plan.sourceRange.to.getTime(), query.clock.getTime()),
     );
     const krxEvidence = this.krxCentralEvidence(asset, plan, query.clock);
+    // US stocks: only the current provider's checkpoints are evidence.
+    const usTiingo = usCandlesFromTiingo(asset);
+    const usEvidence =
+      usCheckpointFilter(asset, plan.sourceInterval) ?? undefined;
+    const evidence = krxEvidence ?? usEvidence;
     const [coverage, latestCheckpoint] = await Promise.all([
       coverageTo.getTime() > plan.sourceRange.from.getTime()
         ? this.syncStates.findCandleCoverage(
@@ -138,7 +151,7 @@ export class CandleDatabaseLoader {
             plan.sourceInterval,
             plan.sourceRange.from,
             coverageTo,
-            ...(krxEvidence ? [krxEvidence] : []),
+            ...(evidence ? [evidence] : []),
           )
         : Promise.resolve<CandleCoverageEvidence>({
             startsAtRequestedFrom: false,
@@ -151,6 +164,7 @@ export class CandleDatabaseLoader {
         plan.sourceInterval,
         plan.sourceRange.from,
         plan.sourceRange.to,
+        usEvidence,
       ),
     ]);
     const hasBlockingCheckpoint =
@@ -173,7 +187,7 @@ export class CandleDatabaseLoader {
       sourceProviders = merged.sourceProviders;
       droppedIncompleteBuckets = merged.droppedIncompleteBuckets;
     } else if (plan.requiresAggregation) {
-      const stored = await this.repository.findRange({
+      const stored = await this.findRows(asset, {
         assetId: plan.assetId,
         interval: '5m',
         from: plan.sourceRange.from,
@@ -215,7 +229,7 @@ export class CandleDatabaseLoader {
         ];
       }
     } else {
-      let stored = await this.repository.findRange({
+      let stored = await this.findRows(asset, {
         assetId: plan.assetId,
         interval: plan.sourceInterval,
         from: plan.requestedRange.from,
@@ -223,6 +237,8 @@ export class CandleDatabaseLoader {
       });
       if (krxEvidence && plan.sourceInterval === '1d')
         stored = await this.withKrxDailyInProgress(plan, stored, query.clock);
+      else if (usTiingo && plan.sourceInterval === '1d')
+        stored = await this.withUsDailyInProgress(plan, stored, query.clock);
       const usable = stored.filter((candle) => {
         if (
           candle.isClosed ||
@@ -362,6 +378,88 @@ export class CandleDatabaseLoader {
   }
 
   /**
+   * Stored rows of the window. US stocks read only the current provider's
+   * rows: on Tiingo a KIS row from before the switch (same window keys) is
+   * never served, and after a rollback to KIS no Tiingo row is.
+   */
+  private async findRows(
+    asset: AssetCandlesAsset,
+    input: Parameters<MarketCandlesRepository['findRange']>[0],
+  ): Promise<MarketCandle[]> {
+    const rows = await this.repository.findRange(input);
+    const keep = usCandleRowFilter(asset);
+    return keep ? rows.filter(keep) : rows;
+  }
+
+  /**
+   * US stocks on Tiingo: today's in-progress daily bar comes from today's
+   * stored Tiingo 5m bars until the end-of-day row arrives (about 17:30 New
+   * York) — never from price snapshots, never interpolated (the KRX central
+   * rule). Tiingo bars land with the scheduled sync (every 10 minutes), so
+   * the newest stored bar trails the clock: the bar is built from the stored
+   * prefix of today, i.e. only while every required slot from the open
+   * through the newest stored bar is stored (a missing slot hides it).
+   */
+  private async withUsDailyInProgress(
+    plan: CandleReadPlan,
+    stored: MarketCandle[],
+    clock: Date,
+  ): Promise<MarketCandle[]> {
+    const session = resolveMarketSession(
+      'US',
+      newYorkDate(clock.getTime()).replace(/-/gu, ''),
+    );
+    if (!session || clock.getTime() <= session.openTime.getTime())
+      return stored;
+    const window = resolvePeriodWindowForDate(
+      'US',
+      session.localDate.replace(/-/gu, ''),
+      '1d',
+    );
+    if (!window) return stored;
+    const dayStart = window.openTime.getTime();
+    if (
+      dayStart < plan.requestedRange.from.getTime() ||
+      dayStart >= plan.requestedRange.to.getTime()
+    )
+      return stored;
+    if (
+      stored.some((row) => row.openTime.getTime() === dayStart && row.isClosed)
+    )
+      return stored;
+    const others = stored.filter((row) => row.openTime.getTime() !== dayStart);
+    const fiveMinute = (
+      await this.repository.findRange({
+        assetId: plan.assetId,
+        interval: '5m',
+        from: session.openTime,
+        to: new Date(
+          Math.max(
+            session.openTime.getTime() + 1,
+            Math.min(clock.getTime(), session.closeTime.getTime()),
+          ),
+        ),
+      })
+    ).filter(
+      (row) =>
+        row.sourceProvider === TIINGO_INTRADAY_CANDLE_SOURCE && row.isClosed,
+    );
+    if (fiveMinute.length === 0) return others;
+    const storedSlots = new Set(
+      fiveMinute.map((row) => row.openTime.getTime()),
+    );
+    const newestStored = Math.max(...storedSlots);
+    const complete = requiredFiveMinuteSlotStarts(session).every(
+      (slot) => slot > newestStored || storedSlots.has(slot),
+    );
+    if (!complete) return others;
+    return [
+      ...others,
+      dailyFromFiveMinute(fiveMinute, dayStart, window.closeTime.getTime()),
+    ];
+  }
+
+  /**
    * KRX central mode (design v2.1 §4.5, product approval P2): today's
    * in-progress daily bar is built at read time from today's stored KOSCOM
    * 5m candles, never from price snapshots. Only when EVERY closed required
@@ -413,33 +511,10 @@ export class CandleDatabaseLoader {
         slot + FIVE_MINUTES_MS > clock.getTime() || closedSlots.has(slot),
     );
     if (!complete || fiveMinute.length === 0) return others;
-    const first = fiveMinute[0];
-    const last = fiveMinute[fiveMinute.length - 1];
-    const inProgress: MarketCandle = {
-      ...first,
-      interval: '1d',
-      openTime: new Date(dayStart),
-      closeTime: new Date(dayStart + 24 * 60 * 60_000),
-      open: first.open,
-      high: Prisma.Decimal.max(...fiveMinute.map((row) => row.high)),
-      low: Prisma.Decimal.min(...fiveMinute.map((row) => row.low)),
-      close: last.close,
-      volume: fiveMinute.reduce(
-        (sum, row) => sum.add(row.volume),
-        new Prisma.Decimal(0),
-      ),
-      amount: fiveMinute.every((row) => row.amount !== null)
-        ? fiveMinute.reduce(
-            (sum, row) => sum.add(row.amount as Prisma.Decimal),
-            new Prisma.Decimal(0),
-          )
-        : null,
-      isClosed: false,
-      sourceUpdatedAt: new Date(
-        Math.max(...fiveMinute.map((row) => row.sourceUpdatedAt.getTime())),
-      ),
-    };
-    return [...others, inProgress];
+    return [
+      ...others,
+      dailyFromFiveMinute(fiveMinute, dayStart, dayStart + 24 * 60 * 60_000),
+    ];
   }
 
   /**
@@ -464,13 +539,13 @@ export class CandleDatabaseLoader {
     droppedIncompleteBuckets: number;
   }> {
     const [storedHistory, storedFiveMinute] = await Promise.all([
-      this.repository.findRange({
+      this.findRows(asset, {
         assetId: plan.assetId,
         interval: history.interval,
         from: plan.requestedRange.from,
         to: plan.requestedRange.to,
       }),
-      this.repository.findRange({
+      this.findRows(asset, {
         assetId: plan.assetId,
         interval: '5m',
         from: plan.sourceRange.from,
@@ -585,4 +660,42 @@ export class CandleDatabaseLoader {
     }
     return newestUpdate >= now.getTime() - this.config.currentFreshnessMs;
   }
+}
+
+/**
+ * An in-progress daily bar from one session's stored 5m rows (oldest first):
+ * first open, extreme high/low, last close, summed volume (amount only when
+ * every row has one). Never closed: the provider's daily row replaces it.
+ */
+function dailyFromFiveMinute(
+  fiveMinute: MarketCandle[],
+  dayStart: number,
+  dayEnd: number,
+): MarketCandle {
+  const first = fiveMinute[0];
+  const last = fiveMinute[fiveMinute.length - 1];
+  return {
+    ...first,
+    interval: '1d',
+    openTime: new Date(dayStart),
+    closeTime: new Date(dayEnd),
+    open: first.open,
+    high: Prisma.Decimal.max(...fiveMinute.map((row) => row.high)),
+    low: Prisma.Decimal.min(...fiveMinute.map((row) => row.low)),
+    close: last.close,
+    volume: fiveMinute.reduce(
+      (sum, row) => sum.add(row.volume),
+      new Prisma.Decimal(0),
+    ),
+    amount: fiveMinute.every((row) => row.amount !== null)
+      ? fiveMinute.reduce(
+          (sum, row) => sum.add(row.amount as Prisma.Decimal),
+          new Prisma.Decimal(0),
+        )
+      : null,
+    isClosed: false,
+    sourceUpdatedAt: new Date(
+      Math.max(...fiveMinute.map((row) => row.sourceUpdatedAt.getTime())),
+    ),
+  };
 }

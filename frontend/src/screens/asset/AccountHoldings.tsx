@@ -75,10 +75,15 @@ export default function AccountHoldings({
   const tpSlQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId ?? '', 'protection'),
     queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId ?? '', 'protection', getConditionalSellOrders, signal),
-    enabled: !!accountId && isFocused && filter !== 'pending' && visible.some(isTpSlMarket),
-    refetchInterval: isFocused ? 4000 : false,
+    enabled: !!accountId && isFocused && filter !== 'pending' && visible.some(isTpSlCandidate),
+    // US-only holdings: one read learns the server's markets; keep polling
+    // only while some visible holding can carry 손절가/익절가.
+    refetchInterval: (query) => isFocused && (!query.state.data
+      || visible.some((position) => isTpSlMarket(position, query.state.data?.capabilities.markets ?? null)))
+      ? 4000 : false,
   });
   const tpSlRows = !tpSlQuery.isError && tpSlQuery.data?.tradingAccountId === accountId ? tpSlQuery.data.conditionalOrders : null;
+  const tpSlMarkets = !tpSlQuery.isError && tpSlQuery.data?.tradingAccountId === accountId ? tpSlQuery.data.capabilities.markets : null;
   const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
 
   return (
@@ -142,7 +147,7 @@ export default function AccountHoldings({
         visible.map((position) => (
           <HoldingRow key={`${accountId}:${position.assetId}`} position={position} guideTarget={isFocused && position.assetId === assetId}
             tpSlSummary={tpSlRows ? tpSlCountSummary(tpSlRows.filter(row => row.assetId === position.assetId && (row.state === 'watching' || row.state === 'triggered'))) : null}
-            onTpSl={accountId && isTpSlMarket(position) ? () => setTpSlTarget({ type: 'spot_holding', accountId, assetId: position.assetId }) : undefined}
+            onTpSl={accountId && isTpSlMarket(position, tpSlMarkets) ? () => setTpSlTarget({ type: 'spot_holding', accountId, assetId: position.assetId }) : undefined}
             onSelect={onSelectAsset && position.assetId !== assetId ? () => onSelectAsset(position.assetId) : undefined} />
         ))
       )}
@@ -151,9 +156,18 @@ export default function AccountHoldings({
   );
 }
 
-/** Independent 손절가/익절가 exist for KRX stocks and crypto Spot only. */
-function isTpSlMarket(position: Pick<PositionItemDto, 'assetType'>) {
-  return position.assetType === 'domestic_stock' || position.assetType === 'crypto';
+/** Holdings whose market may offer independent 손절가/익절가 (the list read). */
+function isTpSlCandidate(position: Pick<PositionItemDto, 'assetType'>) {
+  return position.assetType === 'domestic_stock' || position.assetType === 'crypto' || position.assetType === 'us_stock';
+}
+
+/**
+ * Independent 손절가/익절가: KRX stocks and crypto Spot; US stocks only while
+ * the server lists US (Tiingo prices, 2026-10-17), never on a guess.
+ */
+function isTpSlMarket(position: Pick<PositionItemDto, 'assetType'>, markets: readonly string[] | null) {
+  if (position.assetType === 'domestic_stock' || position.assetType === 'crypto') return true;
+  return position.assetType === 'us_stock' && !!markets?.includes('US');
 }
 
 /**

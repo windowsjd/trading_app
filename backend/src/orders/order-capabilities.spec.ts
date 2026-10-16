@@ -14,6 +14,8 @@ import { TradingAccountAccessService } from '../trading-accounts/trading-account
 
 const env = (values: Record<string, string>) =>
   values as unknown as NodeJS.ProcessEnv;
+/** US LOC flags need the Tiingo provider (its close-evidence source). */
+const tiingo = { US_STOCK_PRICE_PROVIDER: 'tiingo' };
 
 describe('readOrderCapabilities', () => {
   it('reports every gate off by default', () => {
@@ -21,12 +23,80 @@ describe('readOrderCapabilities', () => {
       limitOrder: { enabled: false, autoExecutionEnabled: false },
       limitOnClose: {
         enabled: false,
-        markets: ['KRX'],
+        markets: [],
         sides: ['buy'],
         attachedProtection: false,
       },
-      limitOnCloseSell: { enabled: false, markets: ['KRX'] },
+      limitOnCloseSell: { enabled: false, markets: [] },
     });
+  });
+
+  it('lists each market only behind its own side flag (US 2026-10-17)', () => {
+    const usOnly = readOrderCapabilities(
+      env({
+        ...tiingo,
+        LIMIT_ORDER_ENABLED: 'true',
+        LOC_US_ORDERS_ENABLED: 'true',
+      }),
+    );
+    expect(usOnly.limitOnClose).toEqual({
+      enabled: true,
+      markets: ['US'],
+      sides: ['buy'],
+      attachedProtection: false,
+    });
+    expect(usOnly.limitOnCloseSell).toEqual({ enabled: false, markets: [] });
+    const both = readOrderCapabilities(
+      env({
+        ...tiingo,
+        LIMIT_ORDER_ENABLED: 'true',
+        LOC_ORDERS_ENABLED: 'true',
+        LOC_US_ORDERS_ENABLED: 'true',
+        LOC_SELL_ORDERS_ENABLED: 'true',
+        LOC_US_SELL_ORDERS_ENABLED: 'true',
+      }),
+    );
+    expect(both.limitOnClose.markets).toEqual(['KRX', 'US']);
+    expect(both.limitOnCloseSell).toEqual({
+      enabled: true,
+      markets: ['KRX', 'US'],
+    });
+    // KRX only: an old client keeps its exact KRX answer.
+    const krxOnly = readOrderCapabilities(
+      env({ LIMIT_ORDER_ENABLED: 'true', LOC_ORDERS_ENABLED: 'true' }),
+    );
+    expect(krxOnly.limitOnClose.markets).toEqual(['KRX']);
+    // US SELL only; never without the limit-order gate.
+    expect(
+      readOrderCapabilities(
+        env({
+          ...tiingo,
+          LIMIT_ORDER_ENABLED: 'true',
+          LOC_US_SELL_ORDERS_ENABLED: 'true',
+        }),
+      ).limitOnCloseSell,
+    ).toEqual({ enabled: true, markets: ['US'] });
+    expect(
+      readOrderCapabilities(
+        env({
+          ...tiingo,
+          LIMIT_ORDER_ENABLED: 'false',
+          LOC_US_ORDERS_ENABLED: 'true',
+        }),
+      ).limitOnClose,
+    ).toMatchObject({ enabled: false, markets: [] });
+    expect(() =>
+      readOrderCapabilities(
+        env({ LIMIT_ORDER_ENABLED: 'true', LOC_US_ORDERS_ENABLED: 'on' }),
+      ),
+    ).toThrow('LOC_US_ORDERS_ENABLED must be true or false');
+    // A US flag without the Tiingo provider is a startup error, never a
+    // market that could only expire.
+    expect(() =>
+      readOrderCapabilities(
+        env({ LIMIT_ORDER_ENABLED: 'true', LOC_US_ORDERS_ENABLED: 'true' }),
+      ),
+    ).toThrow('require US_STOCK_PRICE_PROVIDER=tiingo');
   });
 
   it('gates LOC SELL by its own flag, never by the BUY flag', () => {
@@ -135,7 +205,7 @@ describe('TradingAccountOrderCapabilitiesController', () => {
           sides: ['buy'],
           attachedProtection: false,
         },
-        limitOnCloseSell: { enabled: false, markets: ['KRX'] },
+        limitOnCloseSell: { enabled: false, markets: [] },
       },
     });
   });
@@ -213,7 +283,7 @@ describe('GET /api/v1/trading-accounts/:accountId/order-capabilities (HTTP)', ()
             sides: ['buy'],
             attachedProtection: false,
           },
-          limitOnCloseSell: { enabled: false, markets: ['KRX'] },
+          limitOnCloseSell: { enabled: false, markets: [] },
         },
       });
       expect(getOwnedAccountOrThrow).toHaveBeenCalledWith('u1', 'a1');

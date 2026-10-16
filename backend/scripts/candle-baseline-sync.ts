@@ -32,6 +32,13 @@ import { KoscomCandleAdapter } from '../src/providers/koscom/koscom-candle.adapt
  *   # keep the tail fresh afterwards (cheap; run on a schedule)
  *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --mode incremental
  *
+ *   # US stocks on Tiingo (US_STOCK_PRICE_PROVIDER=tiingo, official mode):
+ *   # 5m for the retention window, then the 576-session raw daily window
+ *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --asset-type us_stock \
+ *     --target 5m --days 45
+ *   pnpm exec tsx scripts/candle-baseline-sync.ts --apply --asset-type us_stock \
+ *     --mode repair --days 875 --target 1d --target 1w
+ *
  * Flags:
  *   --report                 coverage report only (no provider calls)
  *   --apply | --dry-run      run for real / plan only (default: --dry-run)
@@ -50,7 +57,8 @@ import { KoscomCandleAdapter } from '../src/providers/koscom/koscom-candle.adapt
  * confirm an active DB snapshot; initial load failure aborts the command.
  * The loader keeps its normal polling lifecycle until command cleanup.
  * Apply additionally uses Redis backfill locks and the real provider clients
- * (KIS for stocks, Binance for crypto). Dry-run makes no provider calls or
+ * (KOSCOM/KIS for stocks — Tiingo for US stocks when it is their provider —,
+ * Binance for crypto). Dry-run makes no provider calls or
  * candle/checkpoint writes. No credential or provider payload is logged.
  */
 import 'reflect-metadata';
@@ -91,6 +99,8 @@ import { KisCandleNormalizerService } from '../src/providers/kis/candles/kis-can
 import { KisDomesticFiveMinuteBuilder } from '../src/providers/kis/candles/kis-domestic-five-minute.builder';
 import { KisOverseasPeriodAdapter } from '../src/providers/kis/candles/kis-overseas-period.adapter';
 import { KisPeriodCandleNormalizerService } from '../src/providers/kis/candles/kis-period-candle-normalizer.service';
+import { TiingoConfigService } from '../src/providers/tiingo/tiingo.config';
+import { TiingoRestClient } from '../src/providers/tiingo/tiingo-rest.client';
 import { MarketCandleSyncMode } from '../src/generated/prisma/client';
 import { MarketSessionOverrideLoaderService } from '../src/orders/market-calendar/market-session-override.loader.service';
 import { getMarketSessionOverrideRuntimeStatus } from '../src/orders/market-calendar/market-session-override.store';
@@ -144,6 +154,9 @@ function createSyncService(prisma: PrismaService, redis: RedisService) {
     ),
     readMarketCandleSyncConfig(),
     cache,
+    // US stocks on Tiingo (US_STOCK_PRICE_PROVIDER=tiingo): 5m intraday and
+    // end-of-day raw 1d/1w come from Tiingo, never KIS.
+    new TiingoRestClient(new TiingoConfigService()),
   );
 }
 

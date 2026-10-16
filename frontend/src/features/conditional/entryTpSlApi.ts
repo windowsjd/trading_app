@@ -76,7 +76,8 @@ export interface EntryTpSlEntryDto {
 }
 
 export interface EntryTpSlCapabilitiesDto {
-  spot: { enabled: boolean; canCreate: boolean };
+  /** `markets` (additive, 2026-10-17): KRX, CRYPTO_SPOT and, when supported, US. */
+  spot: { enabled: boolean; canCreate: boolean; markets?: string[] };
   futures: { enabled: boolean; canCreate: boolean };
   canCancel: boolean;
   maxPendingPerAccount: number;

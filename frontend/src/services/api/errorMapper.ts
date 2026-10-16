@@ -387,7 +387,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.LOC_ORDERS_DISABLED:
       return 'LOC 주문은 현재 운영 상태에서 이용할 수 없습니다.';
     case ERROR_CODE.LOC_MARKET_NOT_SUPPORTED:
-      return 'LOC 주문은 한국주식만 지원합니다.';
+      return 'LOC 주문은 현재 이 시장에서 이용할 수 없습니다.';
     case ERROR_CODE.LOC_SIDE_NOT_SUPPORTED:
       return 'LOC 주문은 현재 매수만 지원합니다.';
     case ERROR_CODE.LOC_SESSION_NOT_OPEN:
@@ -399,7 +399,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.INDEPENDENT_TP_SL_DISABLED:
       return '현재 운영 상태에서는 새 손절가/익절가를 등록할 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_SELL_MARKET_NOT_SUPPORTED:
-      return '매도 조건주문과 손절가/익절가 설정은 한국주식과 암호화폐 현물만 지원합니다.';
+      return '매도 조건주문과 손절가/익절가 설정은 현재 이 시장에서 이용할 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_SELL_LIMIT_EXCEEDED:
       return '감시 중인 매도 설정이 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
     case ERROR_CODE.CONDITIONAL_SELL_ALREADY_MET:
@@ -458,7 +458,7 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.ENTRY_TP_SL_ENTRY_NOT_OPEN:
       return '대기 중인 주문이 아니어서 손절가/익절가를 설정할 수 없습니다.';
     case ERROR_CODE.ENTRY_TP_SL_MARKET_NOT_SUPPORTED:
-      return '손절가/익절가 설정은 한국주식·암호화폐 현물과 선물에서만 이용할 수 있습니다.';
+      return '손절가/익절가 설정은 현재 이 시장에서 이용할 수 없습니다.';
     case ERROR_CODE.ENTRY_TP_SL_LIMIT_EXCEEDED:
       return '체결을 기다리는 손절가/익절가가 최대 개수에 도달했습니다. 기존 설정을 확인해주세요.';
     case ERROR_CODE.ENTRY_TP_SL_TOTAL_EXCEEDS_ENTRY:
@@ -478,11 +478,11 @@ export function getErrorMessageFromCode(
     case ERROR_CODE.CONDITIONAL_ACCOUNT_NOT_TRADABLE:
       return '현재 계정 상태에서는 조건주문을 등록할 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_BUY_MARKET_NOT_SUPPORTED:
-      return '조건주문은 한국주식과 암호화폐 현물 매수만 지원합니다.';
+      return '조건주문은 현재 이 시장에서 이용할 수 없습니다.';
     case ERROR_CODE.CONDITIONAL_BUY_LIMIT_EXCEEDED:
       return '감시 중인 조건주문이 최대 개수에 도달했습니다. 기존 조건주문을 확인해주세요.';
     case ERROR_CODE.CONDITIONAL_PRICE_UNAVAILABLE:
-      return '감시에 사용할 최신 시세가 없어 등록할 수 없습니다. 한국주식은 정규장 중에 등록해주세요.';
+      return '감시에 사용할 최신 시세가 없어 등록할 수 없습니다. 주식은 정규장 중에 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_BUY_ALREADY_MET:
       return '현재 가격이 이미 감시가격에 도달해 등록하지 않았습니다. 다시 정해진 감시 조건을 확인한 뒤 등록해주세요.';
     case ERROR_CODE.CONDITIONAL_IDEMPOTENCY_CONFLICT:

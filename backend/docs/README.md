@@ -35,6 +35,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/trading-account-orders-api-contract.md`
    - `docs/general-account-and-ad-rewards-api-contract.md`
    - `docs/operator-api-contract.md`
+   - `docs/tiingo-us-equity-official.md` — Tiingo as the official US provider (2026-10-17): collector lease, stored reference prices, `US_STOCK_PRICE_PROVIDER` switch, stored Tiingo candles, US LOC, activation runbook and rollback; default OFF
    - `docs/tiingo-us-equity-trial.md` — Tiingo US-equity trial: display-only, memory-only prices/candles/estimated quote; default OFF
 2. `docs/policy-decisions.md` — freshness thresholds, execute repricing/maxChangeBps, source-type priority, crypto USD settlement, and final provider selection, each with a one-line rationale. This is the policy source of truth; it replaces `realtime-execution-policy.md`, `asset-price-freshness-policy.md`, `crypto-usd-settlement-policy-update.md`, and `provider-final-selection-readiness-recheck.md`.
 3. `docs/trading-modes-and-accounts.md` — season/general investment-mode and

@@ -21,6 +21,8 @@ import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
 import { readDatabaseStorageMonitorConfig } from '../ops/database-storage-monitor.config';
 import { assetPriceSnapshotRetentionConfig } from '../providers/asset-price-snapshot-retention.config';
 import { cryptoOrderBookHistoryConfig } from '../providers/crypto-order-book-history.config';
+import { readUsStockPriceProvider } from '../providers/us-stock-price-provider.config';
+import { readTiingoConfig } from '../providers/tiingo/tiingo.config';
 
 /**
  * Central startup validation for environment variables whose misconfiguration
@@ -70,6 +72,19 @@ export function validateEnv(
   collect(errors, () => conditionalSellEnabled(env));
   collect(errors, () => independentTpSlEnabled(env));
   collect(errors, () => readLimitOnCloseConfig(env));
+  // US_STOCK_PRICE_PROVIDER (2026-10-17): `tiingo` moves every US financial
+  // workflow to Tiingo's persisted snapshots, which only the official
+  // (licensed, non-trial) Tiingo mode writes. Refuse to boot instead of
+  // serving US prices from a source that is never written.
+  collect(errors, () => {
+    if (readUsStockPriceProvider(env) !== 'tiingo') return;
+    const tiingo = readTiingoConfig(env);
+    if (!tiingo.enabled || tiingo.trialMode)
+      // @diagnosticSurface internal: Startup rejects a US price source that the configuration never writes.
+      throw new Error(
+        'US_STOCK_PRICE_PROVIDER=tiingo requires TIINGO_ENABLED=true and TIINGO_TRIAL_MODE=false with a valid Tiingo configuration',
+      );
+  });
   collect(errors, () => readGeneralFxFeeRate(env));
   collect(errors, () => readProfileImageStorageConfig(config));
 

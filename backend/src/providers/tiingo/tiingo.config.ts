@@ -1,17 +1,33 @@
 import { Inject, Injectable, Optional } from '@nestjs/common';
+import { KIS_FIXED_ASSET_UNIVERSE } from '../kis/kis-fixed-asset-universe';
 
 /**
- * Tiingo US-equity provider (first integration phase, 7-day trial).
+ * Tiingo US-equity provider.
  *
- * Trial data is display-only and ephemeral: it lives in process memory and is
- * never written to PostgreSQL, Redis keys, files, logs or queues. The licensed
- * (persistent) mode is reserved and refused until a storage/redistribution
- * license exists, so `TIINGO_TRIAL_MODE=false` fails closed instead of
- * silently behaving like the trial.
+ * Trial mode (`TIINGO_TRIAL_MODE=true`, the default; 2026-10-14): display-only
+ * and ephemeral — data lives in process memory and is never written to
+ * PostgreSQL, Redis keys, files, logs or queues; at most 5 allow-listed
+ * symbols; production runtimes need an explicit opt-in.
+ *
+ * Official mode (`TIINGO_TRIAL_MODE=false`; 2026-10-17, user contract): the
+ * licensed provider for the US universe. One lease-holding server collects
+ * the reference price and persists regular-session snapshots, candles and LOC
+ * close evidence (policy-decisions "Tiingo 미국주식 정식 공급자"). The symbol
+ * list defaults to the fixed US universe; financial use still requires
+ * `US_STOCK_PRICE_PROVIDER=tiingo`.
  */
 export const TIINGO_PROVIDER = 'tiingo' as const;
-/** Tiingo consolidated reference price (`tngoLast`, WebSocket thresholdLevel 6). */
+/** Tiingo consolidated reference price (`tngoLast`, WebSocket thresholdLevel 6).
+ * Trial display only: memory-only, never stored; the app labels it trial data. */
 export const TIINGO_REFERENCE_PRICE_SOURCE = 'tiingo_equity_reference_price';
+/**
+ * The same reference price stored as an official `asset_price_snapshots` row
+ * (official mode, 2026-10-17). A distinct name, so a stored financial price
+ * can never be mistaken for the display-only trial value (or the reverse) by
+ * eligibility, the realtime fan-out or the app. Equals
+ * PROVIDER_SOURCE_NAMES.usStockTiingo.
+ */
+export const TIINGO_STORED_PRICE_SOURCE = 'tiingo_us_reference_price';
 /** Statistical liquidity estimate (`lq*`, WebSocket thresholdLevel 4). Never an exchange book. */
 export const TIINGO_LIQUIDITY_SOURCE = 'tiingo_equity_liquidity_estimate';
 /** Historical intraday bars (`/tiingo/equity/intraday/<ticker>/prices`). */
@@ -21,6 +37,13 @@ export const TIINGO_EOD_CANDLE_SOURCE = 'tiingo_eod';
 
 /** Trial guard: a small explicit test universe, never the full US list. */
 export const TIINGO_MAX_ALLOWED_SYMBOLS = 5;
+/** Official mode: the 25-symbol first phase, room for the 100-symbol phase. */
+export const TIINGO_MAX_OFFICIAL_SYMBOLS = 100;
+/** Official mode default list: the fixed US universe (Asset IDs unchanged). */
+export const TIINGO_DEFAULT_OFFICIAL_SYMBOLS: readonly string[] =
+  KIS_FIXED_ASSET_UNIVERSE.filter(
+    (entry) => entry.assetType === 'us_stock',
+  ).map((entry) => entry.symbol);
 export const TIINGO_DEFAULT_REST_BASE_URL = 'https://api.tiingo.com';
 export const TIINGO_DEFAULT_WS_URL = 'wss://api.tiingo.com/equity/intraday';
 
@@ -30,7 +53,6 @@ export type TiingoConfigErrorCode =
   | 'TIINGO_ALLOWED_SYMBOLS_EMPTY'
   | 'TIINGO_ALLOWED_SYMBOLS_INVALID'
   | 'TIINGO_ALLOWED_SYMBOLS_LIMIT'
-  | 'TIINGO_LICENSED_MODE_UNAVAILABLE'
   | 'TIINGO_URL_INVALID'
   | 'TIINGO_TRIAL_PRODUCTION_BLOCKED';
 
@@ -46,7 +68,12 @@ export type TiingoConfig = {
   wsUrl: string;
   /** Upper-case internal symbols (e.g. AAPL for asset NAS:AAPL). */
   allowedSymbols: readonly string[];
-  trialMode: true;
+  /** True: memory-only trial. False: official (licensed, persisted) mode. */
+  trialMode: boolean;
+  /** Official mode: regular-session snapshots/candles/close evidence are stored. */
+  persistenceEnabled: boolean;
+  /** Official mode: at most one stored reference snapshot per symbol per this interval. */
+  snapshotThrottleMs: number;
   streamEnabled: boolean;
   liquidityStreamEnabled: boolean;
   httpTimeoutMs: number;
@@ -86,21 +113,28 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
     'https:',
   );
   const wsUrl = normalizeUrl(env.TIINGO_WS_URL, TIINGO_DEFAULT_WS_URL, 'wss:');
-  const symbols = readSymbols(env.TIINGO_ALLOWED_SYMBOLS);
+  const explicit = readSymbols(env.TIINGO_ALLOWED_SYMBOLS);
+  // Official mode without an explicit list serves the fixed US universe.
+  const symbols =
+    !trialMode && !explicit.invalid && explicit.values.length === 0
+      ? { values: [...TIINGO_DEFAULT_OFFICIAL_SYMBOLS], invalid: false }
+      : explicit;
+  const maxSymbols = trialMode
+    ? TIINGO_MAX_ALLOWED_SYMBOLS
+    : TIINGO_MAX_OFFICIAL_SYMBOLS;
 
   if (requested) {
     if (!token) errors.push('TIINGO_TOKEN_MISSING');
     if (symbols.invalid) errors.push('TIINGO_ALLOWED_SYMBOLS_INVALID');
     else if (symbols.values.length === 0)
       errors.push('TIINGO_ALLOWED_SYMBOLS_EMPTY');
-    else if (symbols.values.length > TIINGO_MAX_ALLOWED_SYMBOLS)
+    else if (symbols.values.length > maxSymbols)
       errors.push('TIINGO_ALLOWED_SYMBOLS_LIMIT');
-    // Persistent (licensed) storage is not implemented in this phase.
-    if (!trialMode) errors.push('TIINGO_LICENSED_MODE_UNAVAILABLE');
     if (!restBaseUrl || !wsUrl) errors.push('TIINGO_URL_INVALID');
     // Trial data must not reach general users: refuse shared/production
     // runtimes unless an internal evaluation deployment opts in explicitly.
-    if (isProductionLikeRuntime(env) && !allowProductionTrial)
+    // The official (licensed) mode is meant for production.
+    if (trialMode && isProductionLikeRuntime(env) && !allowProductionTrial)
       errors.push('TIINGO_TRIAL_PRODUCTION_BLOCKED');
   }
 
@@ -112,10 +146,15 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
     token,
     restBaseUrl: restBaseUrl ?? TIINGO_DEFAULT_REST_BASE_URL,
     wsUrl: wsUrl ?? TIINGO_DEFAULT_WS_URL,
-    allowedSymbols: symbols.invalid
-      ? []
-      : symbols.values.slice(0, TIINGO_MAX_ALLOWED_SYMBOLS),
-    trialMode: true,
+    allowedSymbols: symbols.invalid ? [] : symbols.values.slice(0, maxSymbols),
+    trialMode,
+    persistenceEnabled: !trialMode,
+    snapshotThrottleMs: integer(
+      env.TIINGO_SNAPSHOT_THROTTLE_MS,
+      5_000,
+      1_000,
+      60_000,
+    ),
     streamEnabled,
     liquidityStreamEnabled,
     httpTimeoutMs: integer(env.TIINGO_HTTP_TIMEOUT_MS, 5_000, 500, 30_000),
@@ -126,14 +165,25 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
       16_384,
       16_000_000,
     ),
-    requestsPerMinute: integer(env.TIINGO_REST_REQUESTS_PER_MINUTE, 30, 1, 600),
+    // Local self-limits, far below the contract (30,000/hour, 400,000/day).
+    requestsPerMinute: integer(
+      env.TIINGO_REST_REQUESTS_PER_MINUTE,
+      trialMode ? 30 : 120,
+      1,
+      600,
+    ),
     requestsPerMinutePerSymbol: integer(
       env.TIINGO_REST_SYMBOL_REQUESTS_PER_MINUTE,
       20,
       1,
       600,
     ),
-    requestsPerHour: integer(env.TIINGO_REST_REQUESTS_PER_HOUR, 600, 1, 20_000),
+    requestsPerHour: integer(
+      env.TIINGO_REST_REQUESTS_PER_HOUR,
+      trialMode ? 600 : 3_000,
+      1,
+      20_000,
+    ),
     wsReconnectMinMs: integer(
       env.TIINGO_WS_RECONNECT_MIN_MS,
       1_000,
@@ -146,10 +196,13 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
       1_000,
       600_000,
     ),
-    // Tiingo sends a HeartBeat every 30 seconds; two missed beats = dead.
+    // Tiingo's equity socket sends a HeartBeat at subscribe and then every
+    // 120 s (measured 2026-10-13/16; not 30 s). Any frame counts as life, so
+    // in quiet periods only heartbeats arrive: allow 2.5 intervals before
+    // declaring the socket dead. Liveness never refreshes a price's time.
     wsHeartbeatTimeoutMs: integer(
       env.TIINGO_WS_HEARTBEAT_TIMEOUT_MS,
-      75_000,
+      300_000,
       35_000,
       600_000,
     ),

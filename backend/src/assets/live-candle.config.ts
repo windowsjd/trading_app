@@ -1,3 +1,5 @@
+import { readUsStockPriceProvider } from '../providers/us-stock-price-provider.config';
+
 export const LIVE_CANDLE_CONFIG = Symbol('LIVE_CANDLE_CONFIG');
 
 export type LiveCandleConfig = {
@@ -50,11 +52,12 @@ export function readLiveCandleConfig(
   const config: LiveCandleConfig = {
     enabled: boolean(env, 'CANDLE_LIVE_STREAMING_ENABLED', false),
     kisEnabled: boolean(env, 'CANDLE_LIVE_KIS_ENABLED', false),
-    kisUsDelayedEnabled: boolean(
-      env,
-      'CANDLE_LIVE_KIS_US_DELAYED_ENABLED',
-      false,
-    ),
+    // KIS delayed US trades never build US candles while US stocks are
+    // priced by Tiingo (2026-10-17): the flag is inert then, so a KIS live
+    // row can never overwrite a stored Tiingo bar.
+    kisUsDelayedEnabled:
+      boolean(env, 'CANDLE_LIVE_KIS_US_DELAYED_ENABLED', false) &&
+      readUsStockPriceProvider(env) !== 'tiingo',
     binanceEnabled: boolean(env, 'CANDLE_LIVE_BINANCE_ENABLED', false),
     ownerLeaseTtlMs: integer(
       env,

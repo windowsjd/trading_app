@@ -13,6 +13,20 @@
 > `tradingAccountId` 하나다. 아래 작업 7·8의 nullable scope와 dual-write 설명은
 > 당시 rolling migration 결정 이력이며, 현행 계약으로 해석하지 않는다.
 
+## Tiingo 미국주식 정식 공급자·미국 LOC (2026-10-17, current)
+
+- 미국주식 정식 시세 공급자는 Tiingo다(사용자 계약: 일 400,000 쿼리·시간 30,000 요청·월 1TB). 1차 범위는 기존 고정 25종목(`kis-fixed-asset-universe.ts`의 미국 종목)이며 Asset ID·주문·보유·가격 이력을 유지한다. ETF 14·지수 4·100종목 확대는 후속이다. 근거: 사용자 결정(2026-10-17)이 체험 단계의 저장 제한(아래 2026-10-14 절)을 계약 범위로 대체했다.
+- 정식 모드(`TIINGO_TRIAL_MODE=false`)는 Redis lease를 가진 서버 한 곳만 WebSocket 참조가격을 받는다. 정규장 tick만 `asset_price_snapshots`(`tiingo_us_reference_price`; 체험 모드의 메모리 전용 표시값 `tiingo_equity_reference_price`와 이름을 분리해 앱·자격 판정이 둘을 혼동하지 않는다)에 종목당 5초 간격으로 저장하고 Redis로 전파한다. 수신 시각을 effectiveAt로 바꾸지 않으며 heartbeat는 연결 생존만 뜻한다. 근거: 금융 입력은 서버가 검증·저장한 값이어야 하고 사용자 요청이 공급자를 호출하면 안 된다.
+- 금융 원천 전환은 별도 값 `US_STOCK_PRICE_PROVIDER`(`kis` 기본 | `tiingo`)다. `tiingo`이면 미국주식의 표시·견적·체결·평가·정산·조건 감시가 Tiingo 저장 스냅샷만 쓰고, 없거나 오래되면 기존 unavailable/stale로 실패한다. KIS·admin_manual로 대체하지 않는다. 신선도(300/60/10초)·Quote TTL·가격 변동 허용폭은 그대로다. 근거: 출처를 섞지 않고, 운영 전환·롤백을 값 하나로 한다.
+- 미국 가상 거래의 기준 가격은 Tiingo 통합 참조가격(`tngoLast`)이다. 실제 거래소 체결가·IEX 단일 거래소 가격·통계 추정 호가(`lq*`)가 아니다. 근거: 표시·주문·평가가 한 가격 기준을 써야 한다.
+- 일간 등락률 = 현재 원시 가격 ÷ 직전 정규장 Tiingo EOD 원시 종가(`tiingo_eod`) − 1. 조정가(`adj*`)·조정 `prevClose`와 섞지 않는다. 근거: 원시·조정가 혼용은 등락률을 왜곡한다.
+- 캔들: 5분봉은 Tiingo 실제 OHLCV를 저장하고 15m/30m/1h는 기존 세션 집계를 쓴다. 4시간봉은 빠짐없는 정규장 5분봉에서만 합성해 저장하고, 일봉은 EOD 원시 OHLCV를 저장한다. 범위는 국내주식과 같다(직전 3/6/12/24/96/576 세션 + 당일, 미국 거래소 달력, 2024년 NYSE 휴장표 추가). 누락 보간·거래량 합성은 없다. 미국 차트는 DB에서만 제공하고 현재 공급자의 행·coverage만 쓴다(KIS로 대체하지 않음). 진행 중 5분봉의 실시간 표시는 거래량 없는 참조가격 틱으로 만들 수 없어 별도 결정 전까지 두지 않는다(현재가는 ticker로 갱신). 근거: 국내와 같은 차트를 실제 데이터로만 만든다.
+- 미국 LOC(BUY·SELL)는 기존 LOC 등록·예약·상태·체결·해제 엔진을 그대로 쓴다. 종가 증거는 Tiingo EOD의 해당 거래일 원시 `close`다. 미국 동부 21:10 이후부터 관측하고, 같은 값을 5분 이상 간격으로 두 번 확인해야 final이다. 미국 동부 23:00까지 final이 없으면 만료하고 예약을 해제한다. 조기 폐장일도 같은 시각이다. final 이후 발견한 정정은 원장을 바꾸지 않고 운영 진단에만 남긴다. 근거: Tiingo는 EOD를 대체로 17:30 EST에 공개하고 거래소 정정을 20:00 EST까지 반영한다(문서). EST/EDT 해석 차이까지 보수적으로 둔 시험 정책이며, 공급자 정정 가능성을 완전히 없앤다는 주장이 아니다.
+- 미국 LOC 등록 플래그는 `LOC_US_ORDERS_ENABLED`·`LOC_US_SELL_ORDERS_ENABLED`(기본 false)로 국내 LOC 플래그와 독립이다. 국내 LOC의 KOSCOM 증거·시간 정책은 바꾸지 않는다. 근거: 한 시장의 활성화가 다른 시장을 켜면 안 된다.
+- 미국 조건주문·독립형 손절가/익절가는 `US_STOCK_PRICE_PROVIDER=tiingo`일 때 국내와 같은 규칙으로 허용한다(등록·감시·발동·예약·체결 조건 완화 없음). 근거: 거부 이유였던 승인된 데이터 제공처가 생겼다.
+- 기업행위(분할·배당)로 보유수량·평균단가·원장을 자동 조정하지 않고 배당도 지급하지 않는다. 분할은 EOD `splitFactor`로 감지해 운영 진단에 남기며, 처리 방안은 별도 승인 사항이다. 근거: 승인되지 않은 원장 소급 수정을 금지한다.
+- 운영 활성화(정식 모드·금융 원천 전환·LOC 플래그·백필)는 별도 승인 후 런북 순서로만 한다. 세부: [tiingo-us-equity-official.md](tiingo-us-equity-official.md), [미국 LOC](conditional-buy-and-loc-contract.md).
+
 ## 일반·초보모드 대표 수익률 (2026-10-14, current)
 
 - 일반·초보모드 대표 수익률 = (총자산 − 누적 투자원금) ÷ 누적 투자원금 × 100 = 투자손익 ÷ 누적 투자원금 × 100. API `returnRateMethod`는 `cumulative_principal`이며 `time_weighted`는 더 이상 반환하지 않는다. 시즌은 `initial_capital` 그대로다.
@@ -35,7 +49,9 @@
 - 체결·TP/SL(Futures Last), UPNL·청산(Futures Mark), Spot·국내주식 가격 기준은 변경하지 않는다. 4시간봉 종가는 어떤 금융 가격으로도 쓰지 않는다.
 - 최초 백필은 운영자 명령(`candle:long-backfill`)으로만, 지속 수집은 기본 비활성 플래그로만 시작한다. 세부: [long-range-4h-candles.md](long-range-4h-candles.md).
 
-## Tiingo 미국주식 체험 통합 (2026-10-14, current)
+## Tiingo 미국주식 체험 통합 (2026-10-14, current — 정식 모드는 2026-10-17 절이 대체)
+
+> 2026-10-17부터 `TIINGO_TRIAL_MODE=false`(정식 모드)와 `US_STOCK_PRICE_PROVIDER=tiingo`는 위 "Tiingo 미국주식 정식 공급자·미국 LOC" 절을 따른다. 아래는 체험 모드(`TIINGO_TRIAL_MODE=true`)에만 적용된다.
 
 - Tiingo는 허용 목록(최대 5, 테스트 AAPL) 미국주식의 **표시 시세·캔들·추정 호가**에만 쓴다. 주문 견적·체결·평가·랭킹·정산은 `kis_us_delayed_trade` 저장 스냅샷을 유지한다. 근거: 체험 데이터로 금융 원장을 만들지 않는다.
 - 체험 데이터는 메모리 전용이다. PostgreSQL·Redis key/Pub/Sub·파일·로그 원문에 남기지 않고, Redis 정렬 목록 snapshot도 저장하지 않는다. 근거: Tiingo ToS §1.6(a) 저장 제한.
@@ -614,7 +630,7 @@ preserves financial atomicity without exchange-style fill event infrastructure.
 - 발동은 등록 이후의 기존 Spot 적격 증거만 사용하고, 주식은 정규장 중에만 평가한다. 발동 후 30초·3회를 넘긴 일시 실패나 자금 부족 등 확정 실패는 `failed`로 끝낸다. 근거: 오래된 발동이 다른 가격으로 체결되거나 무한 재시도되면 안 된다.
 - LOC는 지정가 매수 예약을 그대로 쓰고 정규장 하나에 묶인다. 체결 가격은 확정 정규장 종가이며 종가 ≤ 지정가일 때만 체결한다. 매도 판정(종가 ≥ 지정가)은 공통 규칙으로만 둔다. 근거: 가상 LOC는 거래소 경매가 아니라 확정 종가 기준 판정이다.
 - 종가 증거는 KOSCOM 날짜 지정 일별 history(정확한 종목·거래일·마감 후 수신)를 마감 20분 후부터 수집하고, 5분 이상 간격으로 같은 값이 다시 관측되어야 final이다. 실시간 가격·분봉·일봉 캔들·전일 종가로 대체하지 않으며, 기한(마감 3시간) 안에 확정하지 못하면 예약을 해제하고 만료한다. 근거: 단일 응답만으로는 최종성을 증명할 수 없고, 미검증 가격으로 체결하거나 예약을 무기한 묶어 두면 안 된다.
-- 미국주식 조건주문·LOC는 데이터 제공처 확정 전까지 서버가 거부한다. 공통 market 컬럼과 세션·판정·최종성 구조만 둔다. 근거: 제공사 응답 형식을 가정한 구현은 하지 않는다.
+- 미국주식 조건주문·LOC는 데이터 제공처 확정 전까지 서버가 거부한다. 공통 market 컬럼과 세션·판정·최종성 구조만 둔다. 근거: 제공사 응답 형식을 가정한 구현은 하지 않는다. (2026-10-17: Tiingo 확정으로 `US_STOCK_PRICE_PROVIDER=tiingo`·미국 LOC 플래그일 때 허용 — 위 정식 공급자 절)
 
 ## Futures 시장 데이터·조건 진입 (2026-10-14, current)
 

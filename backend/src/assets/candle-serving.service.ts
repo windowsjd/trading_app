@@ -44,6 +44,7 @@ import {
 import { MarketCandleSyncService } from './market-candle-sync.service';
 import type { MarketCandleAssetSyncResult } from './market-candle-sync.types';
 import { LiveCandleOverlayService } from './live-candle-overlay.service';
+import { usCandlesFromTiingo } from './us-candle-provider';
 import {
   KRX_CENTRAL_CANDLES_CONFIG,
   type KrxCentralCandlesConfig,
@@ -133,6 +134,10 @@ export class CandleServingService {
   ): Promise<AssetCandlesResponse> {
     if (asset.assetType === 'domestic_stock' && this.krxCentral?.enabled)
       return this.serveKrxFromDatabase(asset, query);
+    // US stocks on Tiingo: the same PostgreSQL-only contract — no on-demand
+    // sync, no KIS legacy read, no cold-baseline provider fallback.
+    if (usCandlesFromTiingo(asset))
+      return this.serveKrxFromDatabase(asset, query, 'us_tiingo');
     // Compatibility reads share the same cache and cross-instance single flight
     // as persisted charts. One viewer must not create a new provider poller.
     if (asset.assetType === 'domestic_stock') {
@@ -435,18 +440,19 @@ export class CandleServingService {
   private serveKrxFromDatabase(
     asset: AssetCandlesAsset,
     query: ParsedAssetCandlesQuery,
+    scope: 'krx_central' | 'us_tiingo' = 'krx_central',
   ): Promise<AssetCandlesResponse> {
     const plan = this.plans.build(asset, query);
     if (!plan.managedByPersistence) {
       this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
-        reason: `krx_central_out_of_policy:${plan.outOfPolicyReason}`,
+        reason: `${scope}_out_of_policy:${plan.outOfPolicyReason}`,
       });
       return Promise.reject(this.providerCompatibilityError(asset));
     }
     return this.singleFlight.getOrLoad({
       cacheKeyInput: this.cacheKey(asset.id, query, plan),
       staleWaiterMaxWaitMs: this.config.staleWaiterMaxWaitMs,
-      loader: () => this.loadKrxFromDatabase(asset, query, plan),
+      loader: () => this.loadKrxFromDatabase(asset, query, plan, scope),
     });
   }
 
@@ -454,11 +460,12 @@ export class CandleServingService {
     asset: AssetCandlesAsset,
     query: ParsedAssetCandlesQuery,
     plan: CandleReadPlan,
+    scope: 'krx_central' | 'us_tiingo' = 'krx_central',
   ): Promise<AssetCandlesResponse> {
     const result = await this.database.load(asset, query, plan);
     const context = {
       ...this.coverageContext(result),
-      krxCentral: true,
+      ...(scope === 'krx_central' ? { krxCentral: true } : { usTiingo: true }),
       ...(result.obligation ? { obligation: result.obligation } : {}),
     };
     if (result.state === 'available' || result.state === 'confirmed_empty') {
@@ -467,7 +474,12 @@ export class CandleServingService {
         asset.id,
         query,
         plan,
-        result.fresh ? context : { ...context, reason: 'krx_stale_tail' },
+        result.fresh
+          ? context
+          : {
+              ...context,
+              reason: scope === 'krx_central' ? 'krx_stale_tail' : 'stale_tail',
+            },
       );
       return result.response as AssetCandlesResponse;
     }
@@ -484,13 +496,13 @@ export class CandleServingService {
     if (plan.requiresAggregation) {
       this.logDeliveryFailed('baseline_not_ready', asset.id, query, plan, {
         ...context,
-        reason: 'krx_central_no_stored_candles',
+        reason: `${scope}_no_stored_candles`,
       });
       throw this.baselineNotReadyError();
     }
     this.logDeliveryFailed('managed_unresolved', asset.id, query, plan, {
       ...context,
-      reason: 'krx_central_no_stored_candles',
+      reason: `${scope}_no_stored_candles`,
     });
     throw this.providerCompatibilityError(asset);
   }
@@ -570,7 +582,9 @@ export class CandleServingService {
         ? 'Binance candle provider is unavailable.'
         : asset.assetType === 'domestic_stock'
           ? 'KOSCOM candle provider is unavailable.'
-          : 'KIS candle provider is unavailable.',
+          : usCandlesFromTiingo(asset)
+            ? 'Tiingo candle provider is unavailable.'
+            : 'KIS candle provider is unavailable.',
       crypto ? HttpStatus.BAD_GATEWAY : HttpStatus.SERVICE_UNAVAILABLE,
     );
   }

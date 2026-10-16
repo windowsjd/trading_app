@@ -27,6 +27,7 @@ import {
 import { isFxSnapshotStaleForPortfolioValuation } from '../portfolio/portfolio-valuation.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import {
+  adminManualAssetPriceScope,
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
   resolveAssetProviderEligibility,
@@ -1280,6 +1281,7 @@ export class AssetsService {
         assetId: asset.id,
         currencyCode: this.getAssetPriceCurrency(asset),
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(asset),
         effectiveAt: {
           lte: valuationAt,
         },

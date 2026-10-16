@@ -165,6 +165,32 @@ export class TiingoQuoteService implements OnModuleInit, OnModuleDestroy {
     return this.configService.getConfig().enabled;
   }
 
+  /**
+   * The memory-only trial display path (in-memory prices, trial candles,
+   * per-tick in-process events). Official mode serves stored snapshots and
+   * stored candles instead, so this is false there.
+   */
+  isTrialDisplayEnabled(): boolean {
+    const config = this.configService.getConfig();
+    return config.enabled && config.trialMode;
+  }
+
+  /**
+   * Official mode REST top-up (socket not delivering): one rate-limited
+   * snapshot read; true when it produced a new regular-session reference.
+   */
+  async refreshRegularReference(symbol: string, now: Date): Promise<boolean> {
+    const before = this.store.latestReference(symbol);
+    await this.refreshSnapshot(symbol);
+    const after = this.store.latestReference(symbol);
+    return Boolean(
+      after &&
+      after !== before &&
+      after.segment === 'regular' &&
+      after.effectiveAt.getTime() <= now.getTime() + 1_000,
+    );
+  }
+
   targetForAsset(
     asset: TiingoAssetIdentity,
   ): Promise<TiingoAssetTarget | null> {
@@ -514,9 +540,11 @@ export class TiingoQuoteService implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  /** In-process only: trial prices never enter the Redis fan-out channel. */
+  /** In-process only: trial prices never enter the Redis fan-out channel.
+   * Official mode publishes stored snapshots instead (TiingoSnapshotWriterService). */
   private publishPrice(observation: TiingoReferenceObservation): void {
     if (observation.origin === 'rest_close') return;
+    if (!this.configService.getConfig().trialMode) return;
     const target = this.assetMap.cachedTargetForSymbol(observation.symbol);
     if (!target) return;
     this.events.publish({

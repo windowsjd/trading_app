@@ -157,7 +157,7 @@ export const MARKET_CANDLE_SYNC_LOCK_KEY = 'market_candle_sync:manual';
 export type MarketCandleLongSyncOpsJobInput = OpsJobRunnerInput & {
   now?: string | null;
   mode?: string;
-  /** Subset of spot, krx (default both). */
+  /** Subset of spot, krx, us (default spot and krx). */
   markets?: string[];
   assetIds?: string[];
   days?: number;
@@ -856,7 +856,10 @@ export class OpsJobRunnerService {
     input: MarketCandleLongSyncOpsJobInput = {},
   ): Promise<OpsJobRunnerResponse> {
     const service = this.requireLongCandleSync();
-    let parsed: { markets: ('spot' | 'krx')[]; sync: LongCandleSyncInput };
+    let parsed: {
+      markets: ('spot' | 'krx' | 'us')[];
+      sync: LongCandleSyncInput;
+    };
     let dryRunResult: Record<string, LongCandleSyncSummary> | undefined;
     try {
       parsed = this.parseLongSyncInput(input);
@@ -945,7 +948,7 @@ export class OpsJobRunnerService {
 
   private async runLongSyncMarkets(
     service: MarketCandleLongSyncService,
-    markets: readonly ('spot' | 'krx')[],
+    markets: readonly ('spot' | 'krx' | 'us')[],
     sync: LongCandleSyncInput,
   ): Promise<Record<string, LongCandleSyncSummary>> {
     const results: Record<string, LongCandleSyncSummary> = {};
@@ -953,27 +956,31 @@ export class OpsJobRunnerService {
       results[market] =
         market === 'spot'
           ? await service.syncSpot(sync)
-          : await service.syncKrx(sync);
+          : market === 'krx'
+            ? await service.syncKrx(sync)
+            : await service.syncUs(sync);
     }
     return results;
   }
 
   private parseLongSyncInput(input: MarketCandleLongSyncOpsJobInput): {
-    markets: ('spot' | 'krx')[];
+    markets: ('spot' | 'krx' | 'us')[];
     sync: LongCandleSyncInput;
   } {
     const markets = [...new Set(input.markets ?? ['spot', 'krx'])];
     if (
       markets.length === 0 ||
-      markets.some((market) => market !== 'spot' && market !== 'krx')
+      markets.some(
+        (market) => market !== 'spot' && market !== 'krx' && market !== 'us',
+      )
     ) {
       // @diagnosticSurface internal: Operator/scheduler input validation; mapped below to MARKET_CANDLE_LONG_SYNC_INVALID_INPUT.
       throw new LongCandleSyncInputError(
-        'markets must be a subset of spot, krx.',
+        'markets must be a subset of spot, krx, us.',
       );
     }
     return {
-      markets: markets as ('spot' | 'krx')[],
+      markets: markets as ('spot' | 'krx' | 'us')[],
       sync: {
         mode: this.parseLongSyncMode(input.mode),
         now: this.parseOptionalDate(input.now) ?? new Date(),

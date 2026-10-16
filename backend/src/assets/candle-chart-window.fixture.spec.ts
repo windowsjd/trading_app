@@ -35,6 +35,9 @@ import { CandleResponseBuilder } from './candle-response.builder';
 import { resolveRequiredFiveMinuteSlotEndMs } from './candle-expected-slots.policy';
 import { MarketCandleAggregationService } from './market-candle-aggregation.service';
 import type { CandleServingConfig } from './candle-serving.config';
+import { KIS_US_CANDLE_SOURCE } from '../providers/kis/candles/kis-candle.types';
+import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
+import { BINANCE_CANDLE_SOURCE } from '../providers/binance/binance-candle.types';
 
 /**
  * Fixture-level check of the whole read path the charts actually use:
@@ -122,7 +125,9 @@ describe('chart windows over a stored 5m fixture', () => {
     clock: now,
   });
 
-  const storedRow = (openTime: Date) => ({
+  // Every stored row names its provider; US reads keep only the current
+  // provider's rows (KIS by default, 2026-10-17).
+  const storedRow = (openTime: Date, sourceProvider: string) => ({
     openTime,
     closeTime: new Date(openTime.getTime() + FIVE_MIN),
     open: new Prisma.Decimal(100),
@@ -132,6 +137,7 @@ describe('chart windows over a stored 5m fixture', () => {
     volume: new Prisma.Decimal(10),
     amount: new Prisma.Decimal(1010),
     isClosed: true,
+    sourceProvider,
     sourceUpdatedAt: openTime,
   });
 
@@ -156,7 +162,12 @@ describe('chart windows over a stored 5m fixture', () => {
       openMs < endMs;
       openMs += FIVE_MIN
     ) {
-      rows.push(storedRow(new Date(openMs)));
+      rows.push(
+        storedRow(
+          new Date(openMs),
+          market === 'US' ? KIS_US_CANDLE_SOURCE : KOSCOM_MINUTE_SOURCE,
+        ),
+      );
     }
     return rows;
   };
@@ -380,13 +391,13 @@ describe('chart windows over a stored 5m fixture', () => {
     async (interval, limit) => {
       const now = new Date('2026-07-10T00:00:00.000Z');
       const from = new Date(now.getTime() - 14 * DAY_MS - 4 * 60 * 60_000);
-      const rows = [];
+      const rows: StoredRow[] = [];
       for (
         let openMs = from.getTime();
         openMs < now.getTime();
         openMs += FIVE_MIN
       ) {
-        rows.push(storedRow(new Date(openMs)));
+        rows.push(storedRow(new Date(openMs), BINANCE_CANDLE_SOURCE));
       }
       const { loader } = createLoader(rows);
       const request = query('14d', interval, limit, now, 14);

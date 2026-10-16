@@ -10,6 +10,20 @@ import {
 import { KoscomMarketMapService } from '../providers/koscom/koscom-market-map.service';
 import { ohlcv } from '../providers/koscom/koscom-candle.adapter';
 import { buildProviderRawPayloadJson } from '../providers/provider-raw-payload';
+import { TiingoRestClient } from '../providers/tiingo/tiingo-rest.client';
+import {
+  TIINGO_EOD_CANDLE_SOURCE,
+  TIINGO_PROVIDER,
+  TiingoConfigService,
+  toTiingoTicker,
+} from '../providers/tiingo/tiingo.config';
+import { TiingoError } from '../providers/tiingo/tiingo.errors';
+import { tiingoExchangeMatchesAssetMarket } from '../providers/tiingo/tiingo-identity';
+import {
+  parseTiingoDailyBars,
+  parseTiingoMeta,
+  type TiingoMeta,
+} from '../providers/tiingo/tiingo.parser';
 import {
   LOC_EVIDENCE_POLICY_VERSION,
   nextCloseEvidenceTransition,
@@ -50,11 +64,26 @@ export class SessionCloseEvidenceError extends Error {
 
 export function sessionCloseFailure(error: unknown): string {
   if (error instanceof KoscomError) return error.code;
+  if (error instanceof TiingoError) return error.code;
   if (error instanceof SessionCloseEvidenceError) return error.reason;
   return 'SESSION_CLOSE_OBSERVATION_FAILED';
 }
 
 const KOSCOM_PROVIDER = 'koscom';
+
+/**
+ * The only provider whose dated close may settle each market's LOC. KRX and
+ * US evidence never stand in for each other: the evidence lookup, the
+ * observation identity check and the fill all key on this provider.
+ */
+export const SESSION_CLOSE_PROVIDERS = {
+  KRX: KOSCOM_PROVIDER,
+  US: TIINGO_PROVIDER,
+} as const;
+
+export type SessionCloseSource = {
+  observe(target: SessionCloseTarget): Promise<SessionCloseObservation>;
+};
 
 /**
  * KRX dated regular-session close from KOSCOM `closed/{market}/{code}/history`
@@ -64,7 +93,7 @@ const KOSCOM_PROVIDER = 'koscom';
  * Provider calls happen outside every financial transaction.
  */
 @Injectable()
-export class KoscomSessionCloseSource {
+export class KoscomSessionCloseSource implements SessionCloseSource {
   constructor(
     private readonly config: KoscomConfigService,
     private readonly client: KoscomClient,
@@ -140,6 +169,131 @@ export class KoscomSessionCloseSource {
   }
 }
 
+const META_TTL_MS = 6 * 60 * 60_000;
+
+/**
+ * US dated regular-session close (2026-10-17) from Tiingo end-of-day prices
+ * `GET /tiingo/daily/<ticker>/prices?startDate=D&endDate=D`: exactly one bar
+ * dated the bound New York session date, received after that session's
+ * close, positive consistent OHLC with traded volume. Only the RAW `close` is
+ * evidence — never `adjClose`, the realtime reference price (`tngoLast`), an
+ * IEX print, a 5-minute bar or the previous close. The ticker identity comes
+ * from Tiingo's own metadata (ticker and exchange must match the Asset).
+ * Finality (the policy's earliest New York time, a second identical
+ * observation) is the settlement's job; provider calls happen outside every
+ * financial transaction.
+ */
+@Injectable()
+export class TiingoSessionCloseSource implements SessionCloseSource {
+  private readonly meta = new Map<
+    string,
+    { value: TiingoMeta; expiresAt: number }
+  >();
+
+  constructor(
+    private readonly config: TiingoConfigService,
+    private readonly client: TiingoRestClient,
+  ) {}
+
+  async observe(target: SessionCloseTarget): Promise<SessionCloseObservation> {
+    if (target.market !== 'US')
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'SESSION_CLOSE_SOURCE_UNAVAILABLE',
+      );
+    const config = this.config.getConfig();
+    // Close evidence is persisted: only the licensed (non-trial) mode may.
+    if (!config.enabled || config.trialMode)
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_SOURCE_DISABLED',
+      );
+    const meta = await this.identity(target.symbol);
+    if (
+      !tiingoExchangeMatchesAssetMarket(meta.exchangeCode, target.assetMarket)
+    )
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_EXCHANGE_MISMATCH',
+      );
+    const date = sessionDateText(target.sessionDate);
+    const query = { startDate: date, endDate: date };
+    const response = await this.client.getDailyPrices(target.symbol, query);
+    if (response.receivedAt < target.sessionCloseAt)
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_BEFORE_SESSION_END',
+      );
+    const parsed = parseTiingoDailyBars(response.json);
+    if (parsed.invalid > 0 || parsed.duplicates > 0)
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_INVALID_BAR',
+      );
+    if (parsed.bars.length !== 1)
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_EVIDENCE_MISSING',
+      );
+    const bar = parsed.bars[0];
+    // A different date (the previous or the next session) is never evidence.
+    if (bar.date !== date)
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_DATE_MISMATCH',
+      );
+    // A session without trades has no closing print to fill against.
+    if (bar.volume === null || !new Prisma.Decimal(bar.volume).gt(0))
+      throw /* @diagnosticSurface internal: Fixed LOC evidence category recorded on the order and Ops summary. */ new SessionCloseEvidenceError(
+        'TIINGO_CLOSE_NO_TRADES',
+      );
+    const ticker = toTiingoTicker(target.symbol);
+    return {
+      provider: TIINGO_PROVIDER,
+      sourceName: TIINGO_EOD_CANDLE_SOURCE,
+      providerSymbol: target.symbol,
+      providerTradingDate: date.replaceAll('-', ''),
+      // RAW close. Adjusted values are recorded below for audit only.
+      closePrice: new Prisma.Decimal(bar.close),
+      currencyCode: CurrencyCode.USD,
+      observedAt: response.receivedAt,
+      raw: buildProviderRawPayloadJson({
+        payload: {
+          provider: TIINGO_PROVIDER,
+          messageType: 'rest_eod_session_close',
+          path: `/tiingo/daily/${ticker}/prices`,
+          query,
+          ticker,
+          meta: { ticker: meta.symbol, exchangeCode: meta.exchangeCode },
+          bar,
+          priceBasis: 'raw_close',
+          receivedAt: response.receivedAt.toISOString(),
+        },
+        maxBytes: 16000,
+        secrets: [config.token],
+      }) as Prisma.InputJsonValue,
+    };
+  }
+
+  /** Tiingo's own ticker metadata, cached briefly per symbol. */
+  private async identity(symbol: string): Promise<TiingoMeta> {
+    const cached = this.meta.get(symbol);
+    if (cached && cached.expiresAt > Date.now()) return cached.value;
+    const response = await this.client.getMeta(symbol);
+    const value = parseTiingoMeta(response.json, symbol);
+    this.meta.set(symbol, { value, expiresAt: Date.now() + META_TTL_MS });
+    return value;
+  }
+}
+
+/** Per-market close source: KOSCOM for KRX, Tiingo EOD for US. */
+@Injectable()
+export class SessionCloseSources implements SessionCloseSource {
+  constructor(
+    private readonly koscom: KoscomSessionCloseSource,
+    private readonly tiingo: TiingoSessionCloseSource,
+  ) {}
+
+  observe(target: SessionCloseTarget): Promise<SessionCloseObservation> {
+    return target.market === 'US'
+      ? this.tiingo.observe(target)
+      : this.koscom.observe(target);
+  }
+}
+
 export type SessionCloseEvidenceRow = Awaited<
   ReturnType<LimitOnCloseEvidenceService['find']>
 >;
@@ -160,7 +314,7 @@ export class LimitOnCloseEvidenceService {
           assetId: target.assetId,
           market: target.market,
           sessionDate: target.sessionDate,
-          provider: KOSCOM_PROVIDER,
+          provider: SESSION_CLOSE_PROVIDERS[target.market],
         },
       },
     });
@@ -267,6 +421,7 @@ function assertObservationIdentity(
   observation: SessionCloseObservation,
 ) {
   if (
+    observation.provider !== SESSION_CLOSE_PROVIDERS[target.market] ||
     observation.providerSymbol !== target.symbol ||
     observation.providerTradingDate !==
       sessionDateText(target.sessionDate).replaceAll('-', '') ||

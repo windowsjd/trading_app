@@ -150,6 +150,14 @@ const locConfig: LimitOnCloseConfig = {
   evidenceMinDelayMs: 0,
   evidenceConfirmMs: CONFIRM_MS,
   evidenceDeadlineMs: 10_800_000,
+  // US LOC (2026-10-17) has its own flags and suite; off here.
+  us: {
+    enabled: false,
+    sellEnabled: false,
+    evidenceEarliestMinute: 21 * 60 + 10,
+    evidenceConfirmMs: 300_000,
+    evidenceDeadlineMinute: 23 * 60,
+  },
 };
 
 let checks = 0;
@@ -1180,7 +1188,7 @@ async function locSellRules() {
     },
     { closeInMs: 5000 },
   );
-  // Crypto has no LOC; US waits for an approved close data provider.
+  // Crypto has no LOC; US LOC has its own flags (off here) and suite.
   await sellScenario('general', 'BINANCE', '10', async (s) => {
     await rejects(locSell(s, '2'), 'LOC_MARKET_NOT_SUPPORTED');
     pass('LOC SELL refused for crypto');
@@ -2406,6 +2414,113 @@ async function executionWindow() {
   });
 }
 
+/**
+ * US stocks on the Tiingo provider (2026-10-17): a SELL condition and an
+ * independent stop-loss register like KRX, watch only the stored Tiingo price
+ * (a lower, newer KIS price never fires them) and sell at the Tiingo price
+ * into the USD securities wallet.
+ */
+async function usOnTiingo() {
+  const previous = process.env.US_STOCK_PRICE_PROVIDER;
+  process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+  try {
+    await sellScenario('general', 'KRX', '10', async (s) => {
+      await db.asset.update({
+        where: { id: s.assetId },
+        data: {
+          market: 'NAS',
+          assetType: 'us_stock',
+          currencyCode: 'USD',
+          priceCurrency: 'USD',
+          settlementCurrency: 'USD',
+        },
+      });
+      await db.position.update({
+        where: {
+          tradingAccountId_assetId: {
+            tradingAccountId: s.accountId,
+            assetId: s.assetId,
+          },
+        },
+        data: { currencyCode: 'USD' },
+      });
+      const usPrice = async (
+        value: string,
+        sourceName = 'tiingo_us_reference_price',
+      ) => {
+        const at = await now();
+        return db.assetPriceSnapshot.create({
+          data: {
+            assetId: s.assetId,
+            price: value,
+            currencyCode: 'USD',
+            sourceType: 'provider_api',
+            sourceName,
+            effectiveAt: at,
+            capturedAt: at,
+          },
+        });
+      };
+      const usd = async () =>
+        (
+          await db.cashWallet.findFirstOrThrow({
+            where: {
+              tradingAccountId: s.accountId,
+              walletScope: 'securities',
+              currencyCode: 'USD',
+            },
+          })
+        ).balanceAmount;
+      await usPrice('100');
+      const before = await usd();
+      const watch = await condition(s, {
+        triggerCondition: 'at_or_below',
+        triggerPrice: '95',
+        quantity: '2',
+      });
+      const { stopLoss } = await tpSl(s, {
+        stopLoss: { triggerPrice: '90', quantity: '3' },
+      });
+      assert.equal(typeof stopLoss, 'string');
+      const stopLossId = stopLoss as string;
+      // A lower, newer KIS price is not this provider's: it never fires them
+      // (the only eligible evidence still predates the registration).
+      await usPrice('80', 'kis_us_delayed_trade');
+      assert.equal(await evaluate(watch), 'awaiting_price');
+      assert.equal(await evaluate(stopLossId), 'awaiting_price');
+      await usPrice('97');
+      assert.equal(await evaluate(watch), 'watching');
+      assert.equal(await evaluate(stopLossId), 'watching');
+      // The Tiingo price reaches the condition, not yet the stop-loss.
+      await usPrice('94');
+      assert.equal(await evaluate(watch), 'ordered');
+      assert.equal(await evaluate(stopLossId), 'watching');
+      const sold = (await intent(watch)).order;
+      assert.equal(sold?.status, 'executed');
+      assert.equal(sold?.executedPrice?.toFixed(2), '94.00');
+      assert.equal(sold?.currencyCode, 'USD');
+      assert.equal(
+        D(await usd())
+          .minus(before)
+          .toFixed(8),
+        sold?.netAmount?.toFixed(8),
+      );
+      await usPrice('89');
+      assert.equal(await evaluate(stopLossId), 'ordered');
+      const stopped = (await intent(stopLossId)).order;
+      assert.equal(stopped?.status, 'executed');
+      assert.equal(stopped?.executedPrice?.toFixed(2), '89.00');
+      assert.equal((await position(s)).quantity.toFixed(8), '5.00000000');
+      pass(
+        'US stocks on the Tiingo provider: SELL condition and stop-loss register, ignore a lower KIS price, and sell at the Tiingo price into the USD wallet',
+      );
+    });
+  } finally {
+    if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+    else process.env.US_STOCK_PRICE_PROVIDER = previous;
+  }
+}
+
 async function scopeAndBeginner() {
   await sellScenario('general', 'KRX', '10', async (s) => {
     await db.asset.update({
@@ -2432,7 +2547,7 @@ async function scopeAndBeginner() {
     );
     await rejects(locSell(s, '1'), 'LOC_MARKET_NOT_SUPPORTED');
     pass(
-      'US stocks: new SELL condition/TP·SL/LOC refused until a data provider is approved',
+      'US stocks on the KIS provider: new SELL condition/TP·SL/LOC refused (US needs US_STOCK_PRICE_PROVIDER=tiingo and its own LOC flags)',
     );
   });
   await sellScenario(
@@ -2607,6 +2722,7 @@ async function run() {
   await lifecycle();
   await executionWindow();
   await scopeAndBeginner();
+  await usOnTiingo();
   await listStates();
   for (const [close, expect] of [
     ['99', 'unfilled'],

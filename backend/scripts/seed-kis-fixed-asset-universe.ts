@@ -21,10 +21,19 @@ import type { AssetUniverseDesired } from './lib/asset-universe-upsert';
  *
  * Default run applies; `--dry-run` prints the plan without writing. Env is
  * loaded like the backend so it targets the same DB.
+ *
+ * `--us-only` (2026-10-17) scopes the plan to the 25 US stocks — the Tiingo
+ * official universe — e.g. `--dry-run --us-only` to check that every one is
+ * registered, active and listed on NAS/NYS before switching their provider.
+ * Applying it against a production database is an approved operator step.
  */
 
-export function buildKisDesiredUniverse(): AssetUniverseDesired[] {
-  return KIS_FIXED_ASSET_UNIVERSE.map((entry) => ({
+export function buildKisDesiredUniverse(
+  options: { usOnly?: boolean } = {},
+): AssetUniverseDesired[] {
+  return KIS_FIXED_ASSET_UNIVERSE.filter(
+    (entry) => !options.usOnly || entry.assetType === 'us_stock',
+  ).map((entry) => ({
     symbol: entry.symbol,
     name: entry.name,
     market: entry.market,
@@ -38,16 +47,18 @@ export function buildKisDesiredUniverse(): AssetUniverseDesired[] {
 export async function seedKisFixedAssetUniverse(input: {
   prisma: PrismaClient;
   apply: boolean;
+  usOnly?: boolean;
 }): Promise<AssetUniverseApplyResult> {
   return applyAssetUniverse({
     prisma: input.prisma,
-    desired: buildKisDesiredUniverse(),
+    desired: buildKisDesiredUniverse({ usOnly: input.usOnly }),
     apply: input.apply,
   });
 }
 
 export async function runSeedKisFixedAssetUniverse(argv: string[]) {
   const dryRun = argv.includes('--dry-run');
+  const usOnly = argv.includes('--us-only');
   loadRuntimeEnv();
 
   const adapter = new PrismaPg({ connectionString: requireDatabaseUrl() });
@@ -55,9 +66,13 @@ export async function runSeedKisFixedAssetUniverse(argv: string[]) {
 
   try {
     console.log(`Target DB: ${formatDatabaseTarget(process.env.DATABASE_URL)}`);
-    const result = await seedKisFixedAssetUniverse({ prisma, apply: !dryRun });
+    const result = await seedKisFixedAssetUniverse({
+      prisma,
+      apply: !dryRun,
+      usOnly,
+    });
     for (const line of describeAssetUniverseResult(
-      'KIS fixed asset universe',
+      usOnly ? 'US stock universe (25)' : 'KIS fixed asset universe',
       result,
     )) {
       console.log(line);

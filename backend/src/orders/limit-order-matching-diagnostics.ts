@@ -59,7 +59,8 @@ export type CandleExclusionReason =
   | 'outside_lookback'
   | 'future_evidence'
   | 'malformed_window'
-  | 'session_invalid';
+  | 'session_invalid'
+  | 'provider_mismatch';
 export type CandleOrderExclusionReason =
   | 'before_first_boundary'
   | 'after_season_end'

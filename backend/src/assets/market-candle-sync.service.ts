@@ -8,7 +8,7 @@ import {
   KOSCOM_HISTORY_SOURCE,
 } from '../providers/koscom/koscom.config';
 import { BINANCE_REST_MAX_CONCURRENCY } from '../providers/binance/binance-rest-coordinator';
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
   AssetType,
   MarketCandleSyncMode,
@@ -32,14 +32,38 @@ import { KisOverseasPeriodAdapter } from '../providers/kis/candles/kis-overseas-
 import {
   KisPeriodCandleNormalizerService,
   resolveKisDailyPeriodWindows,
+  resolvePeriodWindowForDate,
 } from '../providers/kis/candles/kis-period-candle-normalizer.service';
+import { readUsStockPriceProvider } from '../providers/us-stock-price-provider.config';
+import { TiingoRestClient } from '../providers/tiingo/tiingo-rest.client';
+import {
+  TIINGO_EOD_CANDLE_SOURCE,
+  TIINGO_INTRADAY_CANDLE_SOURCE,
+} from '../providers/tiingo/tiingo.config';
+import {
+  parseTiingoDailyBars,
+  parseTiingoIntradayBars,
+} from '../providers/tiingo/tiingo.parser';
+import {
+  composeTiingoWeeklyCandles,
+  firstUnsettledSlotStart,
+  newYorkDate,
+  normalizeTiingoDailyBars,
+  normalizeTiingoFiveMinuteBars,
+  sessionsWithoutBars,
+  usSessionsBetween,
+} from '../providers/tiingo/tiingo-candle-normalizer';
 import { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 import {
   BINANCE_CANDLE_SOURCE,
   type BinanceCandleInterval,
 } from '../providers/binance/binance-candle.types';
 import { MarketCandleIngestionService } from './market-candle-ingestion.service';
-import { MarketCandlesRepository } from './market-candles.repository';
+import {
+  MarketCandlesRepository,
+  type MarketCandleFindLatestParams,
+} from './market-candles.repository';
+import { usCheckpointFilter } from './us-candle-provider';
 import {
   MarketCandleBackfillLockService,
   type MarketCandleBackfillLockHandle,
@@ -107,6 +131,8 @@ const KIS_FIVE_MINUTE_SEGMENT_MS: Record<'kis_domestic' | 'kis_us', number> = {
   kis_us: 40 * DAY_MS,
 };
 const KIS_SEGMENT_MAX_PAGES = 60;
+// Tiingo 5m: one request per ≤ 10 regular sessions (≤ 780 bars), oldest first.
+const TIINGO_SESSIONS_PER_PAGE = 10;
 const KIS_SEGMENT_MAX_RAW_ROWS = 12_000;
 const DOMESTIC_KRX_MARKETS = new Set(['KRX', 'KOSPI', 'KOSDAQ', 'KONEX']);
 const SWEEP_TERMINAL_REASONS: ReadonlySet<MarketCandleSyncStopReason> = new Set(
@@ -132,6 +158,9 @@ type SyncAssetRecord = {
 type ProviderDescriptor =
   | { kind: 'kis_domestic'; symbol: string; marketCode: string }
   | { kind: 'kis_us'; symbol: string; marketCode: string }
+  // US stocks while US_STOCK_PRICE_PROVIDER=tiingo (2026-10-17): Tiingo
+  // intraday 5m and end-of-day raw 1d (1w composed from it); never KIS.
+  | { kind: 'tiingo_us'; symbol: string; marketCode: string }
   | { kind: 'binance'; symbol: string };
 
 type FeedBudget = {
@@ -213,6 +242,7 @@ export class MarketCandleSyncService {
     @Inject(MARKET_CANDLE_SYNC_CONFIG)
     private readonly config: MarketCandleSyncConfig,
     private readonly cache: AssetCandlesCacheService,
+    @Optional() private readonly tiingo?: TiingoRestClient,
   ) {}
 
   async syncAsset(
@@ -508,9 +538,17 @@ export class MarketCandleSyncService {
       mode: options.mode,
       dryRun: options.dryRun,
     };
+    // US stocks: only the current provider's rows and checkpoints describe
+    // what this run has to fetch (a provider switch leaves the other's).
+    const usProviders = usCheckpointFilter(asset, feed) ?? undefined;
     let range: { from: Date; to: Date };
     try {
-      range = await this.resolveTargetRange(asset.id, feed, options);
+      range = await this.resolveTargetRange(
+        asset.id,
+        feed,
+        options,
+        usProviders,
+      );
     } catch (error) {
       if (error instanceof MarketCandleSyncInputError) throw error;
       return this.failedResult(base, {
@@ -661,7 +699,21 @@ export class MarketCandleSyncService {
         asset.id,
         feed,
       );
-      if (resumable) {
+      if (
+        resumable &&
+        asset.assetType === 'us_stock' &&
+        resumable.sourceProvider !== sourceProvider
+      ) {
+        // The other US provider's checkpoint (a provider switch): its cursor
+        // and coverage describe that provider's rows, so it is never resumed
+        // under this one, and a stale active row of it (we hold the
+        // asset/feed lock) must not block this run.
+        await this.stateRepository.cancelActiveRuns(
+          asset.id,
+          feed,
+          'Superseded by a sync of the current US price provider.',
+        );
+      } else if (resumable) {
         state = await this.stateRepository.resumeRun(resumable.id);
         resumed = state !== null;
       }
@@ -1256,10 +1308,265 @@ export class MarketCandleSyncService {
         coveredTo: effectiveTo,
       };
     }
+    if (input.descriptor.kind === 'tiingo_us') {
+      if (input.feed === '5m')
+        return this.fetchTiingoFiveMinutePage(input, input.descriptor);
+      return input.feed === '1d'
+        ? this.fetchTiingoDailyPage(input, input.descriptor)
+        : this.fetchTiingoWeeklyPage(input, input.descriptor);
+    }
     if (input.feed === '5m') {
       return this.fetchKisFiveMinuteSegment(input, input.descriptor);
     }
     return this.fetchKisPeriodPage(input, input.descriptor);
+  }
+
+  private tiingoClient(): TiingoRestClient {
+    if (!this.tiingo)
+      // @diagnosticSurface internal: Wiring guard; the sync loop rethrows ProviderConfigError to its Ops/CLI caller as a configuration failure.
+      throw new ProviderConfigError(
+        'common',
+        'TIINGO_CANDLE_CLIENT_UNAVAILABLE',
+        'The Tiingo REST client is not available for US candle sync.',
+      );
+    return this.tiingo;
+  }
+
+  /**
+   * One Tiingo 5m page: ≤ 10 regular sessions from the cursor (oldest first,
+   * like the Binance sweep). Only settled regular-session bars are stored.
+   * The page confirms [pageFrom, min(next unfetched session, last settled
+   * 5m boundary)); a malformed response or a finished session without a
+   * single bar seals the run's claim (nothing is invented for it).
+   */
+  private async fetchTiingoFiveMinutePage(
+    input: {
+      from: Date;
+      to: Date;
+      cursor: Prisma.JsonObject | null;
+      now: Date;
+      signal?: AbortSignal;
+    },
+    descriptor: { kind: 'tiingo_us'; symbol: string },
+  ): Promise<MarketCandleFeedPage> {
+    const effectiveToMs = Math.min(input.to.getTime(), input.now.getTime());
+    const cursorFrom = readIntegerField(input.cursor, 'startTime');
+    const pageFromMs =
+      cursorFrom !== null && cursorFrom >= input.from.getTime()
+        ? cursorFrom
+        : input.from.getTime();
+    if (pageFromMs >= effectiveToMs)
+      return emptyFeedPage('target_reached', true);
+    const sessions = usSessionsBetween(pageFromMs, effectiveToMs);
+    if (sessions === null) return emptyFeedPage('calendar_unavailable', false);
+    const pending = sessions.filter(
+      (session) =>
+        session.closeTime.getTime() > pageFromMs &&
+        session.openTime.getTime() < effectiveToMs,
+    );
+    if (pending.length === 0)
+      return {
+        ...emptyFeedPage('expected_no_data', true),
+        coveredFrom: new Date(pageFromMs),
+        coveredTo: new Date(effectiveToMs),
+      };
+    const chunk = pending.slice(0, TIINGO_SESSIONS_PER_PAGE);
+    const more = chunk.length < pending.length;
+    const chunkEndMs = more
+      ? pending[chunk.length].openTime.getTime()
+      : effectiveToMs;
+    const response = await this.tiingoClient().getIntradayPrices(
+      descriptor.symbol,
+      {
+        startDate: chunk[0].localDate,
+        endDate: chunk[chunk.length - 1].localDate,
+      },
+      input.signal,
+    );
+    const parsed = parseTiingoIntradayBars(response.json);
+    const normalized = normalizeTiingoFiveMinuteBars({
+      bars: parsed.bars,
+      sessions: chunk,
+      from: new Date(pageFromMs),
+      to: new Date(chunkEndMs),
+      receivedAt: response.receivedAt,
+    });
+    // Bars still settling are not stored, so nothing from the first of them
+    // on is confirmed (after the close every slot is settled).
+    const coveredToMs = Math.min(
+      chunkEndMs,
+      firstUnsettledSlotStart(chunk, response.receivedAt) ?? chunkEndMs,
+    );
+    // A finished session without a single bar is a hole, never "no trades"
+    // for these listed stocks; a sealed page claims nothing (the run's merge
+    // ignores sealed pages) and the next sweep fetches it again.
+    const sealed =
+      parsed.invalid > 0 ||
+      parsed.duplicates > 0 ||
+      sessionsWithoutBars({
+        candles: normalized.candles,
+        sessions: chunk,
+        from: new Date(pageFromMs),
+        to: new Date(chunkEndMs),
+        receivedAt: response.receivedAt,
+      }).length > 0;
+    const claimed = !sealed && coveredToMs > pageFromMs;
+    return {
+      candles: normalized.candles,
+      pagesFetched: 1,
+      providerReturnedRows: parsed.bars.length + parsed.invalid,
+      acceptedRows: normalized.accepted,
+      rejectedRows: normalized.rejected + parsed.invalid,
+      duplicateRows: parsed.duplicates,
+      nextCursor: more ? { startTime: chunkEndMs } : null,
+      stopReason: more ? null : sealed ? 'data_incomplete' : 'target_reached',
+      complete: !more && !sealed,
+      coveredFrom: claimed ? new Date(pageFromMs) : null,
+      coveredTo: claimed ? new Date(coveredToMs) : null,
+      coverageSealed: sealed,
+    };
+  }
+
+  /** Tiingo end-of-day RAW daily rows for the whole range in one request. */
+  private async fetchTiingoDailyPage(
+    input: { from: Date; to: Date; now: Date; signal?: AbortSignal },
+    descriptor: { kind: 'tiingo_us'; symbol: string },
+  ): Promise<MarketCandleFeedPage> {
+    const effectiveToMs = Math.min(input.to.getTime(), input.now.getTime());
+    const response = await this.tiingoClient().getDailyPrices(
+      descriptor.symbol,
+      {
+        startDate: newYorkDate(input.from.getTime()),
+        endDate: newYorkDate(effectiveToMs - 1),
+      },
+      input.signal,
+    );
+    const parsed = parseTiingoDailyBars(response.json);
+    this.reportTiingoSplits(descriptor.symbol, parsed.bars);
+    const normalized = normalizeTiingoDailyBars({
+      bars: parsed.bars,
+      windowFor: (date) => resolvePeriodWindowForDate('US', date, '1d'),
+      from: input.from,
+      to: input.to,
+      receivedAt: response.receivedAt,
+    });
+    const sealed =
+      parsed.invalid > 0 || parsed.duplicates > 0 || normalized.rejected > 0;
+    // The daily evidence audit then re-checks every closed window in stored
+    // data before this candidate coverage is checkpointed.
+    return {
+      candles: normalized.candles,
+      pagesFetched: 1,
+      providerReturnedRows: parsed.bars.length + parsed.invalid,
+      acceptedRows: normalized.accepted,
+      rejectedRows: normalized.rejected + parsed.invalid,
+      duplicateRows: parsed.duplicates,
+      nextCursor: null,
+      stopReason: sealed ? 'data_incomplete' : 'target_reached',
+      complete: !sealed,
+      coveredFrom: sealed ? null : input.from,
+      coveredTo: sealed ? null : new Date(effectiveToMs),
+      coverageSealed: sealed,
+    };
+  }
+
+  /**
+   * A split in Tiingo's end-of-day data is reported for operations only:
+   * holdings, average costs and ledgers are never adjusted automatically
+   * (policy-decisions "Tiingo 미국주식 정식 공급자": a separate decision).
+   */
+  private reportTiingoSplits(
+    symbol: string,
+    bars: ReadonlyArray<{ date: string; splitFactor: string | null }>,
+  ): void {
+    for (const bar of bars)
+      if (
+        bar.splitFactor !== null &&
+        !new Prisma.Decimal(bar.splitFactor).eq(1)
+      )
+        this.logger.warn(
+          JSON.stringify({
+            event: 'TIINGO_US_SPLIT_OBSERVED',
+            symbol,
+            date: bar.date,
+            splitFactor: bar.splitFactor,
+          }),
+        );
+  }
+
+  /**
+   * Weekly rows composed from Tiingo raw daily rows (older apps still read
+   * 1w). Only closed weeks whose every session has its daily row are
+   * stored; the claim stops at the first week that is not.
+   */
+  private async fetchTiingoWeeklyPage(
+    input: { from: Date; to: Date; now: Date; signal?: AbortSignal },
+    descriptor: { kind: 'tiingo_us'; symbol: string },
+  ): Promise<MarketCandleFeedPage> {
+    const effectiveToMs = Math.min(input.to.getTime(), input.now.getTime());
+    const firstWeek = resolvePeriodWindowForDate(
+      'US',
+      newYorkDate(input.from.getTime()).replace(/-/gu, ''),
+      '1w',
+    );
+    if (!firstWeek) return emptyFeedPage('calendar_unavailable', false);
+    const response = await this.tiingoClient().getDailyPrices(
+      descriptor.symbol,
+      {
+        startDate: newYorkDate(firstWeek.openTime.getTime()),
+        endDate: newYorkDate(effectiveToMs - 1),
+      },
+      input.signal,
+    );
+    const parsed = parseTiingoDailyBars(response.json);
+    const daily = normalizeTiingoDailyBars({
+      bars: parsed.bars,
+      windowFor: (date) => resolvePeriodWindowForDate('US', date, '1d'),
+      from: firstWeek.openTime,
+      to: new Date(effectiveToMs),
+      receivedAt: response.receivedAt,
+    });
+    const weekly = composeTiingoWeeklyCandles({
+      daily: daily.candles.map((candle, index) => ({
+        date: daily.dates[index],
+        candle,
+      })),
+      weekFor: (date) => resolvePeriodWindowForDate('US', date, '1w'),
+      sessionDatesOf: (week) =>
+        usSessionsBetween(
+          week.openTime.getTime(),
+          week.closeTime.getTime(),
+        )?.map((session) => session.localDate) ?? null,
+      from: input.from,
+      to: input.to,
+      receivedAt: response.receivedAt,
+    });
+    const sealed =
+      parsed.invalid > 0 ||
+      parsed.duplicates > 0 ||
+      daily.rejected > 0 ||
+      weekly.incompleteWeeks > 0;
+    const lastStored = weekly.candles.at(-1);
+    const coveredToMs = sealed
+      ? (lastStored?.closeTime.getTime() ?? input.from.getTime())
+      : effectiveToMs;
+    return {
+      candles: weekly.candles,
+      pagesFetched: 1,
+      providerReturnedRows: parsed.bars.length + parsed.invalid,
+      acceptedRows: weekly.accepted,
+      rejectedRows: weekly.rejected + daily.rejected + parsed.invalid,
+      duplicateRows: parsed.duplicates,
+      nextCursor: null,
+      stopReason: sealed ? 'data_incomplete' : 'target_reached',
+      complete: !sealed,
+      coveredFrom: coveredToMs > input.from.getTime() ? input.from : null,
+      coveredTo:
+        coveredToMs > input.from.getTime()
+          ? new Date(Math.min(coveredToMs, effectiveToMs))
+          : null,
+      coverageSealed: sealed,
+    };
   }
 
   private async fetchBinancePage(
@@ -1732,6 +2039,7 @@ export class MarketCandleSyncService {
       to?: Date;
       now: Date;
     },
+    providers?: NonNullable<MarketCandleFindLatestParams['providers']>,
   ): Promise<{ from: Date; to: Date }> {
     const to = options.to ?? options.now;
     const defaultFrom = new Date(
@@ -1746,10 +2054,13 @@ export class MarketCandleSyncService {
     }
     // incremental: continue from the latest stored row with overlap so
     // provider-side revisions of recent candles are re-fetched. Only the
-    // latest row is inspected — interior gaps need repair mode.
+    // latest row is inspected — interior gaps need repair mode. US stocks
+    // continue from the current provider's latest row: the other provider's
+    // newer rows are not this provider's data.
     const latest = await this.repository.findLatest({
       assetId,
       interval: feed,
+      ...(providers ? { providers } : {}),
     });
     const base = options.from ?? defaultFrom;
     if (!latest) return { from: base, to };
@@ -1789,9 +2100,15 @@ export class MarketCandleSyncService {
       if (!/^[A-Z0-9][A-Z0-9.-]{0,19}$/u.test(symbol)) {
         return { ok: false, reason: 'INVALID_KIS_US_SYMBOL' };
       }
+      // One US candle source at a time: the financial price provider's.
       return {
         ok: true,
-        descriptor: { kind: 'kis_us', symbol, marketCode },
+        descriptor: {
+          kind:
+            readUsStockPriceProvider() === 'tiingo' ? 'tiingo_us' : 'kis_us',
+          symbol,
+          marketCode,
+        },
       };
     }
     if (asset.assetType === AssetType.crypto) {
@@ -1812,6 +2129,10 @@ export class MarketCandleSyncService {
     feed: MarketCandleFeed,
   ): string {
     if (descriptor.kind === 'binance') return BINANCE_CANDLE_SOURCE;
+    if (descriptor.kind === 'tiingo_us')
+      return feed === '5m'
+        ? TIINGO_INTRADAY_CANDLE_SOURCE
+        : TIINGO_EOD_CANDLE_SOURCE;
     if (feed === '5m') {
       return descriptor.kind === 'kis_domestic'
         ? KOSCOM_MINUTE_SOURCE

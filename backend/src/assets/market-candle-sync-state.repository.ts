@@ -114,7 +114,36 @@ export type CandleCoverageOptions = {
   bridge?: CoverageBridge;
   /** Only checkpoints created at/after this instant are evidence. */
   createdAtOrAfter?: Date;
+} & CheckpointProviderFilter;
+
+/**
+ * Which sync runs may prove stored rows (US stocks: only the current
+ * provider's — a KIS run never proves Tiingo rows, and after a rollback a
+ * Tiingo run never proves KIS rows).
+ */
+export type CheckpointProviderFilter = {
+  /** Only checkpoints of these providers. */
+  sourceProviders?: readonly string[];
+  /** Never checkpoints whose provider starts with this prefix. */
+  excludeSourceProviderPrefix?: string;
 };
+
+function checkpointProviderWhere(
+  filter: CheckpointProviderFilter | undefined,
+): Prisma.MarketCandleSyncStateWhereInput {
+  return {
+    ...(filter?.sourceProviders
+      ? { sourceProvider: { in: [...filter.sourceProviders] } }
+      : {}),
+    ...(filter?.excludeSourceProviderPrefix
+      ? {
+          NOT: {
+            sourceProvider: { startsWith: filter.excludeSourceProviderPrefix },
+          },
+        }
+      : {}),
+  };
+}
 
 export type MarketCandleSyncCompletionInput = {
   // True only when the provider cursor confirmed the whole target range.
@@ -215,6 +244,7 @@ export class MarketCandleSyncStateRepository {
     feed: MarketCandleFeed,
     from: Date,
     to: Date,
+    providers?: CheckpointProviderFilter,
   ): Promise<MarketCandleSyncState | null> {
     return this.prisma.marketCandleSyncState.findFirst({
       where: {
@@ -222,6 +252,7 @@ export class MarketCandleSyncStateRepository {
         feed,
         targetFrom: { lt: to },
         targetTo: { gt: from },
+        ...checkpointProviderWhere(providers),
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -302,6 +333,7 @@ export class MarketCandleSyncStateRepository {
         ...(options.createdAtOrAfter
           ? { createdAt: { gte: options.createdAtOrAfter } }
           : {}),
+        ...checkpointProviderWhere(options),
       },
       orderBy: [{ coveredFrom: 'asc' }, { coveredTo: 'desc' }],
       take: COVERAGE_UNION_MAX_ROWS,

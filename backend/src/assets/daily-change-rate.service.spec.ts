@@ -351,4 +351,104 @@ describe('canonical daily return', () => {
     expect(await service.calculate(input)).toBeNull();
     expect(findRange).toHaveBeenCalledTimes(3);
   });
+
+  describe('US stocks (Tiingo end-of-day raw close, 2026-10-17)', () => {
+    const us = {
+      id: 'aapl',
+      assetType: 'us_stock' as AssetType,
+      market: 'NAS',
+    };
+    const eodRow = (
+      openIso: string,
+      closeIso: string,
+      close: string,
+      provider = 'tiingo_eod',
+    ) => ({
+      assetId: us.id,
+      interval: '1d',
+      openTime: new Date(openIso),
+      closeTime: new Date(closeIso),
+      sourceUpdatedAt: new Date(new Date(closeIso).getTime() - 3_600_000),
+      sourceProvider: provider,
+      isClosed: true,
+      open: new Prisma.Decimal(close),
+      high: new Prisma.Decimal(close),
+      low: new Prisma.Decimal(close),
+      close: new Prisma.Decimal(close),
+    });
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    afterEach(() => {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    });
+
+    it("divides by the previous session's raw Tiingo close on its New York daily window", async () => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+      // Friday 2026-10-16 14:00Z (10:00 EDT): baseline = Thursday 10-15.
+      const now = new Date('2026-10-16T14:00:00Z');
+      const { service, findRange } = setup([
+        eodRow('2026-10-15T04:00:00Z', '2026-10-16T04:00:00Z', '100'),
+      ]);
+      expect(
+        await service.calculate({
+          asset: us,
+          price: '110',
+          effectiveAt: now,
+          now,
+        }),
+      ).toBe('10.00000000');
+      expect(findRange).toHaveBeenCalledWith({
+        assetId: us.id,
+        interval: '1d',
+        from: new Date('2026-10-15T04:00:00Z'),
+        to: new Date('2026-10-15T04:00:00.001Z'),
+      });
+    });
+
+    it('reaches back across the DST change to the last session and never uses a KIS (adjusted) row', async () => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+      // Monday 2026-11-02 15:00Z (10:00 EST): baseline = Friday 10-30 (EDT).
+      const now = new Date('2026-11-02T15:00:00Z');
+      const friday = eodRow(
+        '2026-10-30T04:00:00Z',
+        '2026-10-31T04:00:00Z',
+        '200',
+      );
+      expect(
+        await setup([friday]).service.calculate({
+          asset: us,
+          price: '210',
+          effectiveAt: now,
+          now,
+        }),
+      ).toBe('5.00000000');
+      expect(
+        await setup([
+          { ...friday, sourceProvider: 'kis_overseas_period' },
+        ]).service.calculate({
+          asset: us,
+          price: '210',
+          effectiveAt: now,
+          now,
+        }),
+      ).toBeNull();
+    });
+
+    it('stays null for US stocks on the KIS provider (no raw daily close exists)', async () => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+      const now = new Date('2026-10-16T14:00:00Z');
+      const { service, findRange } = setup([
+        eodRow('2026-10-15T04:00:00Z', '2026-10-16T04:00:00Z', '100'),
+      ]);
+      expect(
+        await service.calculate({
+          asset: us,
+          price: '110',
+          effectiveAt: now,
+          now,
+        }),
+      ).toBeNull();
+      expect(findRange).not.toHaveBeenCalled();
+    });
+  });
 });

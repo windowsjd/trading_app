@@ -1,6 +1,7 @@
 import { CurrencyCode, Prisma } from '../generated/prisma/client';
 import type { AssetType } from '../generated/prisma/client';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
+import { readUsStockPriceProvider } from './us-stock-price-provider.config';
 
 export const PROVIDER_SOURCE_NAMES = {
   fxUsdKrw: 'exchange_rate_api',
@@ -12,7 +13,40 @@ export const PROVIDER_SOURCE_NAMES = {
   domesticStockKrx: 'koscom_krx_realtime_price',
   domesticStockLegacy: 'kis_krx_realtime_trade',
   usStock: 'kis_us_delayed_trade',
+  /** Tiingo reference price (`tngoLast`) stored in official mode (2026-10-17);
+   * the trial's display-only value keeps `tiingo_equity_reference_price`. */
+  usStockTiingo: 'tiingo_us_reference_price',
 } as const;
+
+export {
+  readUsStockPriceProvider,
+  type UsStockPriceProvider,
+} from './us-stock-price-provider.config';
+
+/**
+ * Where-clause guard for every admin_manual asset-price fallback: operator
+ * prices never stand in for US stocks priced by Tiingo (2026-10-17); other
+ * assets keep the existing fallback unchanged.
+ */
+export function adminManualAssetPriceScope(
+  asset: { assetType: string },
+  env: Record<string, string | undefined> = process.env,
+): Prisma.AssetPriceSnapshotWhereInput {
+  return asset.assetType === 'us_stock' &&
+    readUsStockPriceProvider(env) === 'tiingo'
+    ? { id: { in: [] } }
+    : {};
+}
+
+export function usStockPriceSourceName(
+  env: Record<string, string | undefined> = process.env,
+):
+  | typeof PROVIDER_SOURCE_NAMES.usStock
+  | typeof PROVIDER_SOURCE_NAMES.usStockTiingo {
+  return readUsStockPriceProvider(env) === 'tiingo'
+    ? PROVIDER_SOURCE_NAMES.usStockTiingo
+    : PROVIDER_SOURCE_NAMES.usStock;
+}
 
 export const FX_USD_KRW_PROVIDER_SOURCE_PRIORITY = [
   PROVIDER_SOURCE_NAMES.fxUsdKrwKoreaExim,
@@ -237,10 +271,11 @@ export function resolveAssetProviderEligibility(input: {
     input.asset.currencyCode === CurrencyCode.USD &&
     isUsNasNysMarketFamily(market)
   ) {
+    const sourceName = usStockPriceSourceName();
     return {
       eligible: true,
-      sourceName: PROVIDER_SOURCE_NAMES.usStock,
-      sourceNames: [PROVIDER_SOURCE_NAMES.usStock],
+      sourceName,
+      sourceNames: [sourceName],
       freshnessThresholdSeconds: resolveAssetPriceFreshnessThresholdSeconds(
         input.workflow,
       ),

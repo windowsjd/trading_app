@@ -3,6 +3,10 @@
 KIS 미국주식 데이터 공급자를 Tiingo로 교체하기 위한 1차 통합이다. **정식 공급자
 전환이 아니다.** 7일 체험 권한 기간의 개발·내부 평가 목적이며, 기본값은 비활성화다.
 
+> 2026-10-17: 정식 모드(`TIINGO_TRIAL_MODE=false`, 저장·lease·25종목)와 금융 원천 전환
+> (`US_STOCK_PRICE_PROVIDER=tiingo`)은 [tiingo-us-equity-official.md](tiingo-us-equity-official.md)를 따른다.
+> 이 문서는 체험 모드(`TIINGO_TRIAL_MODE=true`)에만 적용된다.
+
 - 범위: 허용 목록(기본 없음, 테스트는 `AAPL`)의 기존 미국주식 Asset 표시 시세·캔들·추정 호가.
 - 체험 데이터는 **표시 전용·메모리 전용**이다. PostgreSQL 행, Redis key/Pub/Sub, 파일,
   로그 원문, 큐에 남기지 않는다 (Tiingo ToS §1.6(a) 저장 제한).
@@ -61,7 +65,7 @@ Changelog(2026-07-07, 2026-07-21, 2026-10-09). 문서 표기는 **Beta**다.
   - `GET /tiingo/daily/<ticker>` — `ticker, name, exchangeCode, startDate, endDate` (식별 확인만).
 - WebSocket `wss://api.tiingo.com/equity/intraday`
   - 구독: `{"eventName":"subscribe","authorization":"…","eventData":{"thresholdLevel":6|4,"tickers":["aapl"]}}`.
-  - 응답: `I`(`data.subscriptionId`), `H`(30초 HeartBeat), `A`(data, `service:"cons"`), `E`(오류).
+  - 응답: `I`(`data.subscriptionId`), `H`(HeartBeat, 2026-10-16 실측 120초 간격), `A`(data, `service:"cons"`), `E`(오류).
   - thresholdLevel 6: `[timestamp, ticker, referencePrice]`. thresholdLevel 4: `[timestamp, ticker, lqSpread, lqBidSize, lqBidPrice, referencePrice, lqAskPrice, lqAskSize]`.
   - 구독 수정/해제는 `subscriptionId`를 넣은 subscribe/unsubscribe(IEX 문서). 문서 예시는 연결당 하나의
     thresholdLevel만 보여 주므로 **level 6/4를 별도 연결 2개**로 운용한다.
@@ -170,7 +174,8 @@ assets/tiingo-candle-reader.service.ts      캔들 응답 (기존 read plan·집
 ```bash
 TIINGO_ENABLED=true TIINGO_API_TOKEN=<backend only> TIINGO_ALLOWED_SYMBOLS=AAPL
 ```
-- `TIINGO_TRIAL_MODE=false`는 거부(`TIINGO_LICENSED_MODE_UNAVAILABLE`).
+- `TIINGO_TRIAL_MODE=false`는 2026-10-17부터 정식 모드다(이전의 `TIINGO_LICENSED_MODE_UNAVAILABLE` 거부는 없어졌다,
+  [정식 문서](tiingo-us-equity-official.md)).
 - `NODE_ENV=production` 또는 Render에서는 `TIINGO_ALLOW_PRODUCTION_TRIAL=true` 없이는 거부
   (`TIINGO_TRIAL_PRODUCTION_BLOCKED`) — 체험 데이터의 일반 사용자 재배포 방지.
 - 다중 인스턴스: 인스턴스마다 Tiingo 소켓 2개를 연다(lease 없음). 체험은 단일 인스턴스 전제.

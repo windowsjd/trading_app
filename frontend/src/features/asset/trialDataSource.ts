@@ -12,6 +12,8 @@ export const TRIAL_ORDER_NOTICE =
 
 type CandleSourceLike = {
   provider?: string;
+  /** false/absent: the memory-only trial; true: stored official Tiingo rows. */
+  persisted?: boolean;
   coverage?: string;
   requestedSessions?: number;
   coveredSessions?: number;
@@ -31,7 +33,8 @@ export function isTrialPriceSource(priceSource: unknown): boolean {
 
 /** One line for a Tiingo chart: coverage and the in-progress last candle. */
 export function trialCandleNotice(source: CandleSourceLike): string | null {
-  if (source?.provider !== 'tiingo') return null;
+  // Official stored Tiingo candles (2026-10-17) are ordinary chart data.
+  if (source?.provider !== 'tiingo' || source.persisted === true) return null;
   const parts = ['Tiingo 체험 차트'];
   if (source.coverage === 'empty') parts.push('표시할 실제 데이터가 아직 없습니다');
   else if (

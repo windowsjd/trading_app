@@ -12,8 +12,10 @@ Scope of the activation agreed for this release:
 
 Explicitly **not** part of it: Futures conditional entry
 (`FUTURES_CONDITIONAL_ENTRY_ENABLED` stays as it is), every US-stock
-conditional/LOC capability (refused by the server until a data provider is
-approved), and OCO links to conditional orders or LOC (none exist).
+conditional/LOC capability (2026-10-17: opened only by the separate Tiingo
+activation — `US_STOCK_PRICE_PROVIDER=tiingo` and the US LOC flags, see
+[tiingo-us-equity-official.md](tiingo-us-equity-official.md)), and OCO links to
+conditional orders or LOC (none exist).
 
 Contracts: [conditional-buy-and-loc-contract.md](conditional-buy-and-loc-contract.md),
 [conditional-sell-and-loc-sell-contract.md](conditional-sell-and-loc-sell-contract.md).
@@ -29,7 +31,10 @@ Contracts: [conditional-buy-and-loc-contract.md](conditional-buy-and-loc-contrac
 
 - All five flags are strict `true`/`false`; startup rejects other values.
 - LOC (both sides) requires `LIMIT_ORDER_ENABLED=true`
-  (`order-capabilities`: `limitOnClose.enabled = LIMIT && LOC`).
+  (`order-capabilities`: `limitOnClose.enabled = LIMIT && LOC`; since
+  2026-10-17 `markets` lists exactly the markets whose flag is on — `KRX`
+  here, `US` only with the separate US LOC flags — and `enabled` means at
+  least one is listed).
 - A conditional order with **limit** execution requires
   `LIMIT_ORDER_ENABLED=true` and `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=true`
   (`canUseLimit`); market execution does not.
@@ -84,7 +89,8 @@ in production until an operator applies the steps below.
    `LOC_ORDERS_ENABLED=true`, `LOC_SELL_ORDERS_ENABLED=true` (the service
    restarts).
 4. Read-only checks: `GET /api/v1/trading-accounts/:id/order-capabilities`
-   (`limitOnClose.enabled`, `limitOnCloseSell.enabled` true for KRX);
+   (`limitOnClose.enabled`, `limitOnCloseSell.enabled` true with
+   `markets` containing `KRX`);
    `GET .../conditional-buy-orders` and `.../conditional-sell-orders`
    (`capabilities.enabled`, `protection.canUseLimit=false`); `ops_job_runs`
    rows for `conditional_buy_orders`, `conditional_sell_orders` and

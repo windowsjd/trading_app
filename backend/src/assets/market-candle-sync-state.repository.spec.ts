@@ -544,6 +544,42 @@ describe('MarketCandleSyncStateRepository', () => {
       expect(take).toBeGreaterThan(0);
     });
 
+    it('restricts evidence to the current US provider (2026-10-17), and leaves other callers unfiltered', async () => {
+      const { repository, delegate } = createRepository();
+      delegate.findMany.mockResolvedValue([]);
+      delegate.findFirst.mockResolvedValue(null);
+      const from = new Date('2026-07-01T00:00:00Z');
+      const to = new Date('2026-07-15T00:00:00Z');
+      await repository.findCandleCoverage('asset-1', '5m', from, to, {
+        sourceProviders: ['tiingo_equity_intraday'],
+      });
+      expect(
+        callArg<{ where: Record<string, unknown> }>(delegate.findMany).where
+          .sourceProvider,
+      ).toEqual({ in: ['tiingo_equity_intraday'] });
+      delegate.findMany.mockClear();
+      await repository.findCandleCoverage('asset-1', '5m', from, to, {
+        excludeSourceProviderPrefix: 'tiingo_',
+      });
+      expect(
+        callArg<{ where: Record<string, unknown> }>(delegate.findMany).where
+          .NOT,
+      ).toEqual({ sourceProvider: { startsWith: 'tiingo_' } });
+      await repository.findLatestOverlapping('asset-1', '1d', from, to, {
+        sourceProviders: ['tiingo_eod'],
+      });
+      expect(
+        callArg<{ where: Record<string, unknown> }>(delegate.findFirst).where
+          .sourceProvider,
+      ).toEqual({ in: ['tiingo_eod'] });
+      delegate.findMany.mockClear();
+      await repository.findCandleCoverage('asset-1', '5m', from, to);
+      const unfiltered = callArg<{ where: Record<string, unknown> }>(
+        delegate.findMany,
+      ).where;
+      expect('sourceProvider' in unfiltered || 'NOT' in unfiltered).toBe(false);
+    });
+
     it('stitches the seeded baseline together with later incremental tails', async () => {
       // The real shape: one 35-day baseline run plus the incremental runs that
       // confirmed the tail since. No single row covers "14 days ago → now".

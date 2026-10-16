@@ -28,6 +28,7 @@ import {
   PortfolioValuationResult,
 } from './portfolio-valuation.policy';
 import {
+  adminManualAssetPriceScope,
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
   isProviderWorkflowAllowed,
@@ -614,6 +615,7 @@ export class PortfolioValuationService {
         assetId: asset.id,
         currencyCode: this.getAssetPriceCurrency(asset),
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(asset),
         effectiveAt: {
           lte: valuationAt,
         },

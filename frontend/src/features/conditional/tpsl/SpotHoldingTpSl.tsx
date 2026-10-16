@@ -178,7 +178,10 @@ export default function SpotHoldingTpSl({ accountId, assetId, onBusyChange, onIn
   const active = TP_SL_KINDS.filter((kind) => legs[kind].enabled);
   const legError = (kind: TpSlKind) => getTpSlLegError({ kind, draft: legs[kind], direction: 'long', mode: 'quantity', basis: holding, scale: 6, existing: live });
   const draftError = active.length === 0 ? '익절가 또는 손절가 중 하나 이상을 선택해주세요.' : active.map(legError).find((message) => message !== null) ?? null;
-  const unsupported = position && position.assetType !== 'domestic_stock' && position.assetType !== 'crypto';
+  // US holdings only while the server lists US; known before its list loads otherwise.
+  const unsupported = !!position && (position.assetType === 'us_stock'
+    ? !!settingsData && !settingsData.capabilities.markets.includes('US')
+    : position.assetType !== 'domestic_stock' && position.assetType !== 'crypto');
   const blockedReason = !position
     ? holdingsQuery.isError ? '보유 수량을 확인하지 못했어요.' : holdingsQuery.data ? '보유 수량이 없어 설정할 수 없어요.' : '보유 수량을 확인하는 중이에요.'
     : unsupported ? '이 종목은 손절가/익절가 설정을 지원하지 않아요.'

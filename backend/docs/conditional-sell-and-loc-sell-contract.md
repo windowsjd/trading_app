@@ -25,7 +25,7 @@ whole-position Spot TP/SL/OCO protection and Futures are unchanged.
 | SELL condition (watch → ordinary market or limit SELL) | KRX stocks, crypto Spot | `CONDITIONAL_SELL_ORDERS_ENABLED=false` |
 | Independent stop-loss / take-profit (own quantities, market execution, not OCO) | KRX stocks, crypto Spot | `INDEPENDENT_TP_SL_ORDERS_ENABLED=false` |
 | Limit-on-Close SELL | KRX stocks | `LOC_SELL_ORDERS_ENABLED=false` (also needs `LIMIT_ORDER_ENABLED`) |
-| US stocks (all three) | refused until a quote/close data provider is approved | — |
+| US stocks (2026-10-17) | SELL conditions and stop-loss/take-profit with `US_STOCK_PRICE_PROVIDER=tiingo` (same flags and rules; capability `markets` lists `US`); US LOC SELL behind its own `LOC_US_SELL_ORDERS_ENABLED` ([US Limit-on-Close](conditional-buy-and-loc-contract.md#us-limit-on-close-2026-10-17)). On the KIS provider all three are refused | — |
 
 No existing flag enables any of them (`CONDITIONAL_ORDERS_ENABLED`,
 `CONDITIONAL_BUY_ORDERS_ENABLED`, `LOC_ORDERS_ENABLED` stay independent).
@@ -108,7 +108,8 @@ Stop-loss watches `at_or_below`, take-profit `at_or_above` (SQL CHECK).
 Registration requires (in order, under the existing account fence): kind flag,
 Spot limit availability for a limit execution (`CONDITIONAL_LIMIT_UNAVAILABLE`),
 tradable account/Season (`CONDITIONAL_ACCOUNT_NOT_TRADABLE`), an active Spot
-asset, KRX or crypto (`CONDITIONAL_SELL_MARKET_NOT_SUPPORTED` for US),
+asset, KRX or crypto — or US with `US_STOCK_PRICE_PROVIDER=tiingo`
+(2026-10-17) — (`CONDITIONAL_SELL_MARKET_NOT_SUPPORTED` otherwise),
 the existing order input policy (whole shares for a stock limit execution),
 beginner learning access (`allTrading`; a **crypto stop-loss/take-profit**
 needs `spotProtection`, the QUEST 04 step, as the OCO protection did), at most
@@ -231,8 +232,13 @@ except:
   ledger, realized PnL, equity snapshot) and link
   `orders.session_close_evidence_id`; the SQL CHECK now admits SELL.
 - `GET /trading-accounts/:accountId/order-capabilities` adds
-  `limitOnCloseSell: { enabled, markets: ['KRX'] }`; `limitOnClose` (BUY) is
-  unchanged.
+  `limitOnCloseSell: { enabled, markets }`; `limitOnClose` (BUY) is
+  unchanged. Since 2026-10-17 `markets` (both blocks) lists exactly the
+  markets whose flag for that side is on (`KRX`: `LOC_ORDERS_ENABLED` /
+  `LOC_SELL_ORDERS_ENABLED`; `US`: `LOC_US_ORDERS_ENABLED` /
+  `LOC_US_SELL_ORDERS_ENABLED`) and `enabled` is true when one is listed.
+  Earlier servers always sent `markets: ['KRX']` with `enabled` as the flag,
+  so clients combine both: a market is open when `enabled` and listed.
 
 ## Lifecycle and settlement
 

@@ -213,7 +213,8 @@ export type AssetCandlesResponse = {
           // were cut off and the latest candles were preserved.
           truncated?: boolean;
         }
-      | TiingoCandleSource;
+      | TiingoCandleSource
+      | TiingoStoredCandleSource;
   };
 };
 
@@ -234,6 +235,22 @@ export type TiingoCandleSource = {
   requestedSessions: number;
   coveredSessions: number;
   currentCandleTime: string | null;
+};
+
+/**
+ * US stocks on Tiingo (official mode, `US_STOCK_PRICE_PROVIDER=tiingo`,
+ * 2026-10-17): stored rows only — Tiingo intraday 5m (and its read-time
+ * 15m/30m/1h/4h aggregates), stored 4h, and end-of-day RAW 1d/1w. Distinct
+ * from the trial source by `persisted: true`.
+ */
+export type TiingoStoredCandleSource = {
+  provider: 'tiingo';
+  persisted: true;
+  priceAdjustment: 'raw';
+  sourceProviders: string[];
+  marketCode: string;
+  requestedCount: number;
+  returnedCount: number;
 };
 
 // Provider-specific per-request row caps. Our request `limit` is clamped to
@@ -588,7 +605,10 @@ export class AssetCandlesService {
         `Tiingo candle read completed for ${asset.symbol}.`,
         {
           returnedCount: source.returnedCount,
-          coverage: source.provider === 'tiingo' ? source.coverage : null,
+          coverage:
+            source.provider === 'tiingo' && !source.persisted
+              ? source.coverage
+              : null,
           stopCode: result.stopCode,
           droppedIncompleteBuckets: result.droppedIncompleteBuckets,
         },

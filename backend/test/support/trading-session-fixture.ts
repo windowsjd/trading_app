@@ -16,11 +16,15 @@ export const tradingSessions = {
     now: Date,
     closeAt = new Date(now.getTime() + 86_400_000),
     markets: Market[] = ['KRX'],
+    // US LOC evidence times are New York wall times OF this date, so the US
+    // runner passes the date whose wall clock it places the window on.
+    options: { localDate?: string } = {},
   ) {
     for (const market of markets) {
       sessions.set(market, {
         market,
-        localDate: '2026-07-10', // audited Friday; fixture windows use real instants below
+        // Default: an audited Friday; fixture windows use real instants below.
+        localDate: options.localDate ?? '2026-07-10',
         timeZone: market === 'KRX' ? 'Asia/Seoul' : 'America/New_York',
         openTime: new Date(now.getTime() - 86_400_000),
         closeTime: closeAt,

@@ -22,6 +22,8 @@ import { OpsJobRunService } from '../ops/ops-job-run.service';
 import {
   KoscomSessionCloseSource,
   LimitOnCloseEvidenceService,
+  SessionCloseSources,
+  TiingoSessionCloseSource,
 } from './limit-on-close-evidence.service';
 import { LimitOnCloseSettlementService } from './limit-on-close-settlement.service';
 import { LimitOnCloseWorker } from './limit-on-close-worker.service';
@@ -51,6 +53,8 @@ import { LimitOnCloseWorker } from './limit-on-close-worker.service';
     LimitOrderExecutionService,
     LimitOrderMatchingService,
     KoscomSessionCloseSource,
+    TiingoSessionCloseSource,
+    SessionCloseSources,
     LimitOnCloseEvidenceService,
     LimitOnCloseSettlementService,
     LimitOnCloseWorker,

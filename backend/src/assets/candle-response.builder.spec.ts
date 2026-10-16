@@ -149,4 +149,43 @@ describe('CandleResponseBuilder.buildPersisted source diagnostics', () => {
       returnedCount: 1,
     });
   });
+
+  it('labels stored US candles as persisted raw Tiingo data on the Tiingo provider, KIS otherwise', () => {
+    const us = asset(AssetType.us_stock, {
+      symbol: 'AAPL',
+      market: 'NAS',
+      currencyCode: CurrencyCode.USD,
+      priceCurrency: CurrencyCode.USD,
+      settlementCurrency: CurrencyCode.USD,
+    });
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    try {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+      const tiingo = builder.buildPersisted(us, query('14d', '30m', 672), [
+        { ...row(30), sourceProvider: 'tiingo_equity_intraday' },
+        { ...row(0), sourceProvider: 'tiingo_equity_intraday' },
+      ]);
+      expect(tiingo.data.source).toEqual({
+        provider: 'tiingo',
+        persisted: true,
+        priceAdjustment: 'raw',
+        sourceProviders: ['tiingo_equity_intraday'],
+        marketCode: 'NAS',
+        requestedCount: 672,
+        returnedCount: 2,
+      });
+      // Empty answers keep the provider label (no KIS path ever named).
+      expect(
+        builder.buildPersisted(us, query('14d', '30m', 672), []).data.source,
+      ).toMatchObject({ provider: 'tiingo', persisted: true });
+      process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+      expect(
+        builder.buildPersisted(us, query('14d', '30m', 672), [row(0)]).data
+          .source.provider,
+      ).toBe('kis');
+    } finally {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    }
+  });
 });

@@ -1,3 +1,7 @@
+import {
+  conditionalMarkets,
+  usConditionalOrdersSupported,
+} from './conditional-markets';
 import { Injectable } from '@nestjs/common';
 import { createApiError } from '../common/api-error';
 import { apiErrorCode } from '../common/api-error-code';
@@ -179,11 +183,11 @@ export class ConditionalSellService {
           'Asset is not a Spot product.',
           400,
         );
-      // US stocks wait for an approved quote and close data provider.
-      if (asset.assetType === 'us_stock')
+      // US stocks need the approved US price source (Tiingo, 2026-10-17).
+      if (asset.assetType === 'us_stock' && !usConditionalOrdersSupported())
         throw createApiError(
           'CONDITIONAL_SELL_MARKET_NOT_SUPPORTED',
-          'Conditional sell orders are available for Korean stocks and crypto.',
+          'Conditional sell orders are not available for this market.',
           409,
         );
       if (input.currencyCode && input.currencyCode !== asset.settlementCurrency)
@@ -493,7 +497,7 @@ export class ConditionalSellService {
             canUseLimit: false,
           },
           canCancel: true,
-          markets: ['KRX', 'CRYPTO_SPOT'],
+          markets: conditionalMarkets(),
           maxLivePerAccount: CONDITIONAL_SELL_MAX_LIVE_PER_ACCOUNT,
         },
         conditionalOrders: rows.map((row) =>

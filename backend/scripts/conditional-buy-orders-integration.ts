@@ -945,6 +945,90 @@ async function usStockScope() {
   });
 }
 
+/**
+ * US stocks on the Tiingo provider (2026-10-17): a conditional BUY registers
+ * like KRX, watches only the stored Tiingo price (a higher, newer KIS price
+ * never fires it) and buys at the Tiingo price from the USD wallet.
+ */
+async function usOnTiingo() {
+  const previous = process.env.US_STOCK_PRICE_PROVIDER;
+  process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+  try {
+    await scenario('season', async (s) => {
+      tradingSessions.set(await now(), undefined, ['KRX', 'US']);
+      const asset = await db.asset.update({
+        where: { id: s.instruments[0].asset.id },
+        data: {
+          market: 'NAS',
+          assetType: 'us_stock',
+          currencyCode: 'USD',
+          priceCurrency: 'USD',
+          settlementCurrency: 'USD',
+        },
+      });
+      const usdWallet = {
+        tradingAccountId: s.accountId,
+        walletScope: 'securities' as const,
+        currencyCode: 'USD' as const,
+      };
+      await db.cashWallet.updateMany({
+        where: usdWallet,
+        data: { balanceAmount: '10000' },
+      });
+      const usPrice = async (
+        value: string,
+        sourceName = 'tiingo_us_reference_price',
+      ) => {
+        const at = await now();
+        return db.assetPriceSnapshot.create({
+          data: {
+            assetId: asset.id,
+            price: value,
+            currencyCode: 'USD',
+            sourceType: 'provider_api',
+            sourceName,
+            effectiveAt: at,
+            capturedAt: at,
+          },
+        });
+      };
+      const usd = async () =>
+        (await db.cashWallet.findFirstOrThrow({ where: usdWallet }))
+          .balanceAmount;
+      await usPrice('100');
+      const before = await usd();
+      const id = await register(s, {
+        triggerCondition: 'at_or_above',
+        triggerPrice: '110',
+        executionType: 'market',
+        quantity: '2',
+      });
+      // A higher, newer KIS price is not this provider's: it never fires the
+      // watch (the only eligible evidence still predates the registration).
+      await usPrice('120', 'kis_us_delayed_trade');
+      assert.equal((await conditionalBuy.evaluate(id)).state, 'awaiting_price');
+      await usPrice('105');
+      assert.equal((await conditionalBuy.evaluate(id)).state, 'watching');
+      await usPrice('111');
+      assert.equal((await conditionalBuy.evaluate(id)).state, 'ordered');
+      const bought = (await watch(id)).order;
+      assert.equal(bought?.status, 'executed');
+      assert.equal(bought?.executedPrice?.toFixed(2), '111.00');
+      assert.equal(bought?.currencyCode, 'USD');
+      assert.equal(
+        new Prisma.Decimal(before).minus(await usd()).toFixed(8),
+        bought?.netAmount?.toFixed(8),
+      );
+      pass(
+        'US stock on the Tiingo provider: conditional BUY registers, ignores a higher KIS price, and buys at the Tiingo price from the USD wallet',
+      );
+    });
+  } finally {
+    if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+    else process.env.US_STOCK_PRICE_PROVIDER = previous;
+  }
+}
+
 async function beginner() {
   await scenario(
     'beginner',
@@ -1587,6 +1671,7 @@ async function run() {
   await flagsAndScope();
   await listStates();
   await usStockScope();
+  await usOnTiingo();
   await beginner();
   await workerLease();
   await smallConcurrentBatch('market');

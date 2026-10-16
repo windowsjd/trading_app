@@ -31,6 +31,7 @@
     "smoke:candle-live": "tsx scripts/candle-live-smoke.ts",
     "smoke:binance-fixed-universe": "tsx scripts/binance-fixed-universe-smoke.ts",
     "smoke:tiingo-trial": "tsx scripts/tiingo-trial-smoke.ts",
+    "smoke:tiingo-official": "tsx scripts/tiingo-official-smoke.ts",
     "smoke:candle-report": "tsx scripts/candle-live-smoke-report.ts",
     "dev:open-season": "tsx scripts/dev-open-season.ts",
     "dev:run-provider-ingestions": "tsx scripts/dev-run-provider-ingestions.ts",

@@ -133,6 +133,14 @@ const config: LimitOnCloseConfig = {
   evidenceMinDelayMs: 0,
   evidenceConfirmMs: CONFIRM_MS,
   evidenceDeadlineMs: 10_800_000,
+  // US LOC (2026-10-17) has its own flags and suite; off here.
+  us: {
+    enabled: false,
+    sellEnabled: false,
+    evidenceEarliestMinute: 21 * 60 + 10,
+    evidenceConfirmMs: 300_000,
+    evidenceDeadlineMinute: 23 * 60,
+  },
 };
 // Fills record the existing equity snapshot, which values the account's USD
 // wallets with fresh provider FX exactly like any other limit fill.
@@ -943,7 +951,7 @@ async function registrationRules() {
         'LOC_MARKET_NOT_SUPPORTED',
       );
       pass(
-        `${kind}: LOC refused (US pending a close-price provider; no crypto LOC)`,
+        `${kind}: LOC refused (US LOC flags off here, its own suite covers US; no crypto LOC)`,
       );
     });
   await locScenario(

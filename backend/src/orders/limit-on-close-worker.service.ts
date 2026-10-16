@@ -133,6 +133,8 @@ function changed(summary: LimitOnCloseCycleSummary) {
     summary.unfilled > 0 ||
     Object.keys(summary.expired).length > 0 ||
     Object.keys(summary.observationFailures).length > 0 ||
-    Object.keys(summary.errors).length > 0
+    Object.keys(summary.errors).length > 0 ||
+    // The run summary is the restart-safe record of US post-final audits.
+    summary.postFinalAudited.length > 0
   );
 }

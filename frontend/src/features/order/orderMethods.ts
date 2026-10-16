@@ -44,7 +44,6 @@ export const ORDER_METHOD_LABEL: Record<OrderMethod, string> = {
 export const DEFAULT_ORDER_METHOD: OrderMethod = 'market';
 
 const AVAILABLE: OrderMethodAvailability = { state: 'available' };
-const PREPARING: OrderMethodAvailability = { state: 'preparing' };
 
 function fromGate(gate: ServerGate): OrderMethodAvailability {
   if (gate.state === 'loading') return { state: 'checking' };
@@ -73,13 +72,35 @@ export function getOrderMethodOptions(input: {
   const crypto = assetType === 'crypto';
   // New sell limit is not offered on the SELL side; already accepted sell
   // limits keep their server fill, list and cancel paths. US conditional/LOC
-  // wait for an approved quote/close data provider: listed, never enabled.
+  // (2026-10-17, Tiingo prices and end-of-day close) follow the same server
+  // gates as KRX: the server lists 'US' only when the US flags are on.
   const options = side === 'buy'
     ? [option('market', AVAILABLE), option('limit', AVAILABLE)]
     : [option('market', AVAILABLE)];
-  if (krx || us || crypto) options.push(option('conditional', us ? PREPARING : fromGate(input.conditional)));
-  if (krx || us) options.push(option('loc', us ? PREPARING : fromGate(input.loc)));
+  if (krx || us || crypto) options.push(option('conditional', fromGate(input.conditional)));
+  if (krx || us) options.push(option('loc', fromGate(input.loc)));
   return options;
+}
+
+/** The server's market token for an asset type (capabilities `markets`). */
+export function serverMarket(assetType?: string | null): 'KRX' | 'US' | 'CRYPTO_SPOT' | null {
+  if (assetType === 'domestic_stock') return 'KRX';
+  if (assetType === 'us_stock') return 'US';
+  if (assetType === 'crypto') return 'CRYPTO_SPOT';
+  return null;
+}
+
+/**
+ * Whether a pending spot entry of this asset type accepts 손절가/익절가 plans.
+ * The capability's `markets` is additive (2026-10-17); an older server that
+ * lists none keeps its original answer, KRX and Spot crypto.
+ */
+export function isEntryTpSlMarketSupported(
+  spot: { markets?: readonly string[] } | null | undefined,
+  assetType?: string | null,
+): boolean {
+  const market = serverMarket(assetType);
+  return !!market && (spot?.markets ?? ['KRX', 'CRYPTO_SPOT']).includes(market);
 }
 
 /**
@@ -140,7 +161,7 @@ export function getConditionalBuyGate(
   if (query.isError) return { state: 'error' };
   if (query.isLoading || !query.data) return { state: 'loading' };
   const { enabled, canCreate, markets } = query.data.capabilities;
-  const market = assetType === 'crypto' ? 'CRYPTO_SPOT' : assetType === 'domestic_stock' ? 'KRX' : null;
+  const market = serverMarket(assetType);
   if (!enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 새 조건주문을 등록할 수 없어요.' };
   if (!market || !markets.includes(market)) return { state: 'ready', enabled: false, reason: '이 시장은 조건주문을 지원하지 않아요.' };
   if (!canCreate) return { state: 'ready', enabled: false, reason: '현재 계정 상태에서는 조건주문을 등록할 수 없어요.' };
@@ -164,7 +185,7 @@ export function getConditionalSellGate(
   if (query.isLoading || !query.data) return { state: 'loading' };
   const capability = query.data.capabilities[family];
   const name = family === 'condition' ? '조건주문' : '손절가/익절가';
-  const market = assetType === 'crypto' ? 'CRYPTO_SPOT' : assetType === 'domestic_stock' ? 'KRX' : null;
+  const market = serverMarket(assetType);
   if (!capability?.enabled) return { state: 'ready', enabled: false, reason: `현재 운영 상태에서 새 ${name} 매도를 등록할 수 없어요.` };
   if (!market || !query.data.capabilities.markets.includes(market))
     return { state: 'ready', enabled: false, reason: `이 시장은 ${name} 매도를 지원하지 않아요.` };
@@ -172,7 +193,8 @@ export function getConditionalSellGate(
   return { state: 'ready', enabled: true };
 }
 
-/** Server capability → gate for a new LOC SELL (its own flag, never the BUY one). */
+/** Server capability → gate for a new LOC SELL (its own flag, never the BUY
+ * one; KRX and US each listed only behind their own SELL flag). */
 export function getLimitOnCloseSellGate(
   query: { isLoading: boolean; isError: boolean; data?: { limitOnCloseSell?: { enabled: boolean; markets: string[] } } | null },
   assetType?: string | null,
@@ -180,13 +202,15 @@ export function getLimitOnCloseSellGate(
   if (query.isError) return { state: 'error' };
   if (query.isLoading || !query.data) return { state: 'loading' };
   const sell = query.data.limitOnCloseSell;
+  const market = serverMarket(assetType);
   if (!sell?.enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 LOC 매도를 이용할 수 없어요.' };
-  if (assetType !== 'domestic_stock' || !sell.markets.includes('KRX'))
-    return { state: 'ready', enabled: false, reason: 'LOC 매도는 한국주식만 지원해요.' };
+  if ((market !== 'KRX' && market !== 'US') || !sell.markets.includes(market))
+    return { state: 'ready', enabled: false, reason: '이 시장은 LOC 매도를 지원하지 않아요.' };
   return { state: 'ready', enabled: true };
 }
 
-/** Server capability → gate for a new LOC BUY on this asset. */
+/** Server capability → gate for a new LOC BUY on this asset (KRX or US, each
+ * listed only behind its own BUY flag). */
 export function getLimitOnCloseGate(
   query: { isLoading: boolean; isError: boolean; data?: { limitOnClose: { enabled: boolean; markets: string[]; sides: string[] } } | null },
   assetType?: string | null,
@@ -194,8 +218,9 @@ export function getLimitOnCloseGate(
   if (query.isError) return { state: 'error' };
   if (query.isLoading || !query.data) return { state: 'loading' };
   const { enabled, markets, sides } = query.data.limitOnClose;
+  const market = serverMarket(assetType);
   if (!enabled) return { state: 'ready', enabled: false, reason: '현재 운영 상태에서 LOC 주문을 이용할 수 없어요.' };
-  if (assetType !== 'domestic_stock' || !markets.includes('KRX') || !sides.includes('buy'))
-    return { state: 'ready', enabled: false, reason: 'LOC 주문은 한국주식 매수만 지원해요.' };
+  if ((market !== 'KRX' && market !== 'US') || !markets.includes(market) || !sides.includes('buy'))
+    return { state: 'ready', enabled: false, reason: '이 시장은 LOC 매수를 지원하지 않아요.' };
   return { state: 'ready', enabled: true };
 }

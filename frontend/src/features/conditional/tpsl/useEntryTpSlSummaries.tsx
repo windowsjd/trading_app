@@ -9,12 +9,18 @@ import { tpSlCountSummary } from '../tpSlModel';
  * order it created (`childOrderId`). Kept in a `.tsx` module so test harnesses
  * load it through their API mocks.
  */
-export function useEntryTpSlSummaries(accountId: string, enabled: boolean) {
+export function useEntryTpSlSummaries(
+  accountId: string,
+  enabled: boolean,
+  /** Keep refreshing only while this holds for the last answer (null = none yet). */
+  keepPolling?: (capabilities: EntryTpSlCapabilitiesDto | null) => boolean,
+) {
   const query = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.entryTpSl.list(accountId, 'open'),
     queryFn: ({ signal }) => getAccountEntryTpSlPlans(accountId, 'open', signal),
     enabled,
-    refetchInterval: enabled ? 4000 : false,
+    refetchInterval: (state) =>
+      enabled && (keepPolling?.(state.state.data?.capabilities ?? null) ?? true) ? 4000 : false,
     retry: false,
   });
   const data = !query.isError && query.data?.tradingAccountId === accountId ? query.data : null;

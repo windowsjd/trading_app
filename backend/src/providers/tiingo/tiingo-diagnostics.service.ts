@@ -13,6 +13,8 @@ import {
   type UsEquitySessionSegment,
 } from './tiingo-session';
 import { TiingoStreamService } from './tiingo-stream.service';
+import { TiingoCollectorLeaseService } from './tiingo-collector-lease.service';
+import { TiingoSnapshotWriterService } from './tiingo-snapshot-writer.service';
 
 /** Reference data newer than this counts as flowing. */
 const DATA_FLOWING_MS = 60_000;
@@ -34,9 +36,9 @@ export type TiingoSymbolDiagnostics = TiingoSymbolDataStats & {
 };
 
 /**
- * Operator view of the Tiingo trial, published through `/readiness`. Codes,
- * counters and timestamps only: never a price, payload, URL or the token.
- * It is informational and does not change readiness status.
+ * Operator view of Tiingo (trial or official mode), published through
+ * `/readiness`. Codes, counters and timestamps only: never a price, payload,
+ * URL or the token. It is informational and does not change readiness status.
  */
 @Injectable()
 export class TiingoDiagnosticsService {
@@ -48,6 +50,8 @@ export class TiingoDiagnosticsService {
     @Optional() private readonly stream?: TiingoStreamService,
     @Optional() private readonly quotes?: TiingoQuoteService,
     @Optional() private readonly candles?: TiingoCandleService,
+    @Optional() private readonly lease?: TiingoCollectorLeaseService,
+    @Optional() private readonly writer?: TiingoSnapshotWriterService,
   ) {}
 
   getStatus(now: Date = new Date()) {
@@ -60,7 +64,10 @@ export class TiingoDiagnosticsService {
       configError: config.configError,
       trialMode: config.trialMode,
       // Trial data is never stored: no PostgreSQL rows, Redis keys or files.
-      persistence: 'disabled' as const,
+      // Official mode stores snapshots, candles and LOC close evidence.
+      persistence: config.persistenceEnabled
+        ? ('official' as const)
+        : ('disabled' as const),
       allowedSymbols: [...config.allowedSymbols],
       streamEnabled: config.streamEnabled,
       liquidityStreamEnabled: config.liquidityStreamEnabled,
@@ -139,6 +146,9 @@ export class TiingoDiagnosticsService {
       symbols,
       quotes,
       candles,
+      // Official mode: which instance collects, and what it stored.
+      collector: this.lease?.getStatus() ?? null,
+      snapshots: this.writer?.getStatus() ?? null,
       // An invalid configuration is the root cause whenever it is present.
       lastFailure: config.configError
         ? { stage: 'config', code: config.configError, at: null }

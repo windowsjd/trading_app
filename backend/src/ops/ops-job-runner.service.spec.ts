@@ -205,6 +205,7 @@ describe('OpsJobRunnerService', () => {
     const marketCandleLongSyncService = {
       syncSpot: jest.fn(),
       syncKrx: jest.fn(),
+      syncUs: jest.fn(),
       syncFutures: jest.fn(),
     };
     const prisma = {
@@ -1271,11 +1272,47 @@ describe('OpsJobRunnerService', () => {
     expect(f.runService.recordFailed).not.toHaveBeenCalled();
   });
 
+  it('runs the US long-range market (stored Tiingo 5m → 4h) under the same lock when listed', async () => {
+    const f = createService();
+    f.lockService.acquireLock.mockResolvedValueOnce({
+      acquired: true,
+      lockKey: 'market_candle_long_sync',
+      ownerId: 'owner',
+      expiresAt: new Date('2026-10-17T08:10:00.000Z'),
+    });
+    f.runService.createRunning.mockResolvedValueOnce({
+      id: 'long-run',
+      startedAt,
+    });
+    f.runService.recordSucceeded.mockResolvedValueOnce({
+      serialized: serializedRun({
+        jobName: OpsJobName.market_candle_long_sync,
+      }),
+    });
+    f.marketCandleLongSyncService.syncUs.mockResolvedValueOnce(
+      longSummary('us'),
+    );
+
+    await f.service.runMarketCandleLongSyncJob({
+      trigger: OpsJobTrigger.test,
+      markets: ['us'],
+    });
+
+    expect(f.marketCandleLongSyncService.syncUs).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'incremental' }),
+    );
+    expect(f.marketCandleLongSyncService.syncKrx).not.toHaveBeenCalled();
+    expect(f.runService.recordSucceeded).toHaveBeenCalledTimes(1);
+  });
+
   it('rejects an unknown long-range market before any provider work', async () => {
     const f = createService();
-    await expect(
-      f.service.runMarketCandleLongSyncJob({ markets: ['us'] }),
-    ).rejects.toBeDefined();
+    // `us` is a market since 2026-10-17 (stored Tiingo 5m → 4h); futures
+    // has its own job, and an unknown name is never guessed.
+    for (const market of ['futures', 'nyse'])
+      await expect(
+        f.service.runMarketCandleLongSyncJob({ markets: [market] }),
+      ).rejects.toBeDefined();
     expect(f.lockService.acquireLock).not.toHaveBeenCalled();
     expect(f.marketCandleLongSyncService.syncKrx).not.toHaveBeenCalled();
   });

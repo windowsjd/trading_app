@@ -27,6 +27,14 @@ Evidence for the KRX source: [KOSCOM 10-minute history live check](../../docs/in
   5m bars over the whole window ([tiingo-us-equity-trial.md](tiingo-us-equity-trial.md)).
   Deploy the backend before an app build that sends US `96d` (an older backend
   answers 400).
+- US stocks on Tiingo (`US_STOCK_PRICE_PROVIDER=tiingo`, 2026-10-17): COMPLETED
+  4h rows (`tiingo_equity_intraday_4h`) are synthesized from the stored Tiingo
+  5m — 09:30–13:30 / 13:30–16:00 New York, one 09:30–13:00 bucket on
+  early-close days, the read-time aggregation's own buckets — only when every
+  regular 5m slot of the bucket is stored. No provider call: the 5m sync and
+  its backfill fetch the bars, and these rows keep the 96-session chart beyond
+  the 5m retention ([tiingo-us-equity-official.md](tiingo-us-equity-official.md)).
+  On the KIS provider nothing is stored for US.
 - `range=96d` accepts only `interval=4h`; the request `limit` stays ≤ 1000
   (the app sends 600).
 
@@ -98,11 +106,12 @@ cd backend   # pin DATABASE_URL/REDIS_URL — .env.local may point at Render
 pnpm candle:long-backfill --market spot --market futures            # plan only
 pnpm candle:long-backfill --market spot --market futures --apply
 pnpm candle:long-backfill --market krx --apply --max-calls 800      # outside 09:00–15:30 KST
+pnpm candle:long-backfill --market us --apply --sessions 97         # US on Tiingo; after the 5m backfill
 ```
 
-Flags: `--market spot|krx|futures` (required, repeatable), `--apply` (default
+Flags: `--market spot|krx|us|futures` (required, repeatable), `--apply` (default
 is a dry-run plan with no provider call or write), `--days N` (crypto, 1–180,
-default 96), `--sessions N` (KRX, 1–125, default 97), `--asset-id`,
+default 96), `--sessions N` (KRX/US, 1–125, default 97), `--asset-id`,
 `--instrument-id` (repeatable), `--include-inactive-futures` (with
 `--instrument-id`), `--max-calls N` (KRX KOSCOM calls per run, default 1500),
 `--min-remaining-daily N` (stop once an observed `X-RateLimit-Remaining-Day`
@@ -131,7 +140,7 @@ is ≤ N, default 20000), `--min-call-interval-ms N` (KRX pacing, default
 
 | Job | Flag | Interval | Work per run |
 | --- | --- | --- | --- |
-| `market_candle_long_sync` | `SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED=true` (`…_MARKETS=spot,krx`) | `SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS` (900) | Spot: missing closed buckets of the last 2 days + one re-fetch of a bucket first stored within 2 min of its close (1 call/symbol when due). KRX (skipped while the session is open): the last 5 completed sessions (close + 20 min) missing a verified row — 1 call per session, only when the dated `koscom_history` daily bar is already stored by the existing 1d sync (no duplicate KOSCOM daily call; otherwise the session stays `pending`); ≤ 60 calls/run |
+| `market_candle_long_sync` | `SCHEDULER_MARKET_CANDLE_LONG_SYNC_ENABLED=true` (`…_MARKETS=spot,krx`; add `us` for US on Tiingo: the last 5 sessions + today from stored 5m, no provider call) | `SCHEDULER_MARKET_CANDLE_LONG_SYNC_INTERVAL_SECONDS` (900) | Spot: missing closed buckets of the last 2 days + one re-fetch of a bucket first stored within 2 min of its close (1 call/symbol when due). KRX (skipped while the session is open): the last 5 completed sessions (close + 20 min) missing a verified row — 1 call per session, only when the dated `koscom_history` daily bar is already stored by the existing 1d sync (no duplicate KOSCOM daily call; otherwise the session stays `pending`); ≤ 60 calls/run |
 | `futures_candle_sync` | `SCHEDULER_FUTURES_CANDLE_SYNC_ENABLED=true` | `SCHEDULER_FUTURES_CANDLE_SYNC_INTERVAL_SECONDS` (60) | catalog contracts that are active + verified or hold an open position, and whose stored contract mapping still parses as USDⓈ-M PERPETUAL/TRADING (otherwise `CONTRACT_UNVERIFIED`, history kept): missing closed buckets of the last 2 days + the current provisional bucket — 1 call (`limit<100`, weight 1) per contract |
 
 Retention of the 4h history runs inside the existing `market_candle_retention`

@@ -1,12 +1,17 @@
 import { createApiError } from '../common/api-error';
 import { AssetType, OrderSide, type Prisma } from '../generated/prisma/client';
+import { zonedDateTimeToUtc } from '../providers/kis/candles/kis-candle-time';
 import {
   resolveRegularSessionForEvent,
   resolveStockMarketSessionState,
   type MarketCalendarAsset,
   type MarketSessionWindow,
 } from './market-calendar.policy';
-import type { LimitOnCloseConfig } from './limit-on-close.config';
+import {
+  LOC_US_TIME_ZONE,
+  limitOnCloseMarkets,
+  type LimitOnCloseConfig,
+} from './limit-on-close.config';
 import { LIMIT_ORDER_CANCEL_REASONS } from './limit-order-policy';
 
 /** Bumped only when the meaning of a final close evidence row changes. */
@@ -67,20 +72,35 @@ export type LimitOnCloseRegistration = {
 
 /**
  * Registration rule shared by the quote courtesy check and the post-lock
- * create check. Only KRX stocks are enabled; US stocks wait for a confirmed
- * closing-price data provider and crypto has no LOC. The order binds to the
- * regular session OPEN at the DB clock and must close before Season end.
+ * create check. KRX and US stocks each have their own BUY/SELL registration
+ * flag (2026-10-17: US with Tiingo end-of-day close evidence); crypto has no
+ * LOC. The order binds to the regular session OPEN at the DB clock and must
+ * close before Season end. The evidence deadline is the session close + the
+ * KRX deadline, or the configured New York wall time of the session date.
  */
 export function resolveLimitOnCloseRegistration(input: {
   asset: MarketCalendarAsset;
   now: Date;
   seasonEndAt: Date | null;
   config: LimitOnCloseConfig;
+  side: OrderSide;
 }): LimitOnCloseRegistration {
-  if (input.asset.assetType !== AssetType.domestic_stock)
+  const market =
+    input.asset.assetType === AssetType.domestic_stock
+      ? 'KRX'
+      : input.asset.assetType === AssetType.us_stock
+        ? 'US'
+        : null;
+  if (
+    !market ||
+    !limitOnCloseMarkets(
+      input.config,
+      input.side === OrderSide.sell ? 'sell' : 'buy',
+    ).includes(market)
+  )
     throw createApiError(
       'LOC_MARKET_NOT_SUPPORTED',
-      'Limit-on-Close is available only for Korean stocks.',
+      'Limit-on-Close is not available for this market.',
       409,
     );
   const state = resolveStockMarketSessionState(input.asset, input.now);
@@ -97,19 +117,81 @@ export function resolveLimitOnCloseRegistration(input: {
       409,
     );
   const session = state.currentSession;
+  if (state.market !== market)
+    throw createApiError(
+      'MARKET_CALENDAR_UNAVAILABLE',
+      'Market calendar is unavailable.',
+      409,
+    );
   if (input.seasonEndAt && input.seasonEndAt <= session.closeTime)
     throw createApiError(
       'LOC_SESSION_AFTER_SEASON_END',
       'The session closes after the Season ends.',
       409,
     );
+  const evidenceDeadlineAt =
+    market === 'US'
+      ? usSessionWallTime(
+          session.localDate,
+          input.config.us.evidenceDeadlineMinute,
+        )
+      : new Date(session.closeTime.getTime() + input.config.evidenceDeadlineMs);
+  if (!evidenceDeadlineAt || evidenceDeadlineAt <= session.closeTime)
+    throw createApiError(
+      'MARKET_CALENDAR_UNAVAILABLE',
+      'Market calendar is unavailable.',
+      409,
+    );
   return {
-    market: state.market,
+    market,
     session,
     sessionDate: sessionDateValue(session.localDate),
-    evidenceDeadlineAt: new Date(
-      session.closeTime.getTime() + input.config.evidenceDeadlineMs,
-    ),
+    evidenceDeadlineAt,
+  };
+}
+
+/**
+ * The New York instant of `minuteOfDay` on a session's local date (DST-aware;
+ * the same wall time on early-close days). Null for an impossible date.
+ */
+export function usSessionWallTime(
+  localDate: string,
+  minuteOfDay: number,
+): Date | null {
+  const hour = Math.floor(minuteOfDay / 60);
+  const minute = minuteOfDay % 60;
+  return zonedDateTimeToUtc(
+    localDate.replaceAll('-', ''),
+    `${String(hour).padStart(2, '0')}${String(minute).padStart(2, '0')}00`,
+    LOC_US_TIME_ZONE,
+  );
+}
+
+/**
+ * When the settlement may request close evidence for a bound session, and
+ * the confirmation interval of that market. KRX: session close + delay. US:
+ * the configured New York wall time of the session date (never earlier than
+ * the close).
+ */
+export function limitOnCloseObservationPolicy(
+  market: 'KRX' | 'US',
+  session: { localDate: string; closeTime: Date },
+  config: LimitOnCloseConfig,
+): { earliestAt: Date | null; confirmMs: number } {
+  if (market === 'KRX')
+    return {
+      earliestAt: new Date(
+        session.closeTime.getTime() + config.evidenceMinDelayMs,
+      ),
+      confirmMs: config.evidenceConfirmMs,
+    };
+  const earliest = usSessionWallTime(
+    session.localDate,
+    config.us.evidenceEarliestMinute,
+  );
+  return {
+    earliestAt: earliest && earliest > session.closeTime ? earliest : null,
+    confirmMs: config.us.evidenceConfirmMs,
   };
 }
 

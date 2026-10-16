@@ -59,6 +59,11 @@ export type MarketCandleFindLatestParams = {
   assetId: string;
   interval: MarketCandleInterval;
   closedOnly?: boolean;
+  /** Only rows of these providers / never rows with this provider prefix. */
+  providers?: {
+    sourceProviders?: readonly string[];
+    excludeSourceProviderPrefix?: string;
+  };
 };
 
 export type MarketCandleDeleteClosedBeforeParams = {
@@ -212,11 +217,24 @@ export class MarketCandlesRepository {
     const assetId = this.requireNonEmptyString(params.assetId, 'assetId');
     const interval = this.requireInterval(params.interval);
 
+    const providers = params.providers;
     return this.prisma.marketCandle.findFirst({
       where: {
         assetId,
         interval,
         ...(params.closedOnly ? { isClosed: true } : {}),
+        ...(providers?.sourceProviders
+          ? { sourceProvider: { in: [...providers.sourceProviders] } }
+          : {}),
+        ...(providers?.excludeSourceProviderPrefix
+          ? {
+              NOT: {
+                sourceProvider: {
+                  startsWith: providers.excludeSourceProviderPrefix,
+                },
+              },
+            }
+          : {}),
       },
       orderBy: {
         openTime: 'desc',

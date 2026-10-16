@@ -586,4 +586,234 @@ describe('CandleDatabaseLoader', () => {
       expect(holed.length).toBe(0);
     });
   });
+
+  describe('US stocks on Tiingo (US_STOCK_PRICE_PROVIDER=tiingo, 2026-10-17)', () => {
+    const us = {
+      ...asset,
+      id: 'aapl',
+      symbol: 'AAPL',
+      market: 'NAS',
+      assetType: AssetType.us_stock,
+    };
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    beforeEach(() => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    });
+    // Friday 2026-10-16, 17:00 EDT (after the close, before end-of-day data).
+    const clock = new Date('2026-10-16T21:00:00Z');
+    const usQuery = { ...query, clock, rangeEndAt: clock, toInstant: clock };
+    const row = (
+      openIso: string,
+      minutes: number,
+      provider: string,
+      close = 101,
+    ) => ({
+      assetId: us.id,
+      interval: minutes === 1440 ? '1d' : '5m',
+      openTime: new Date(openIso),
+      closeTime: new Date(new Date(openIso).getTime() + minutes * 60_000),
+      open: new Prisma.Decimal(100),
+      high: new Prisma.Decimal(close + 1),
+      low: new Prisma.Decimal(99),
+      close: new Prisma.Decimal(close),
+      volume: new Prisma.Decimal(10),
+      amount: null,
+      isClosed: true,
+      sourceUpdatedAt: new Date('2026-10-16T20:30:00Z'),
+      sourceProvider: provider,
+    });
+
+    it('serves only Tiingo rows and counts only Tiingo checkpoints as coverage', async () => {
+      const { loader, repository, states, responses } = create();
+      repository.findRange.mockResolvedValue([
+        row('2026-10-16T19:50:00Z', 5, 'kis_overseas_minute', 90),
+        row('2026-10-16T19:55:00Z', 5, 'tiingo_equity_intraday', 101),
+      ]);
+      const usPlan = {
+        ...plan,
+        assetId: us.id,
+        assetType: us.assetType,
+        market: us.market,
+        requestedRange: { from: new Date('2026-10-16T13:30:00Z'), to: clock },
+        sourceRange: { from: new Date('2026-10-16T13:30:00Z'), to: clock },
+      };
+      await loader.load(us, usQuery, usPlan);
+      const rows = (
+        responses.buildPersisted.mock.calls.at(-1) as unknown[]
+      )[2] as Array<{
+        sourceProvider: string;
+      }>;
+      expect(rows.map((r) => r.sourceProvider)).toEqual([
+        'tiingo_equity_intraday',
+      ]);
+      const coverageCall = states.findCandleCoverage.mock.calls.at(
+        -1,
+      ) as unknown[];
+      expect(coverageCall[4]).toEqual({
+        sourceProviders: ['tiingo_equity_intraday'],
+      });
+      const checkpointCall = states.findLatestOverlapping.mock.calls.at(
+        -1,
+      ) as unknown[];
+      expect(checkpointCall[4]).toEqual({
+        sourceProviders: ['tiingo_equity_intraday'],
+      });
+    });
+
+    it('after a rollback to KIS, never serves or counts a Tiingo row or run', async () => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+      const { loader, repository, states, responses } = create();
+      repository.findRange.mockResolvedValue([
+        row('2026-10-16T19:50:00Z', 5, 'kis_overseas_minute', 90),
+        row('2026-10-16T19:55:00Z', 5, 'tiingo_equity_intraday', 101),
+      ]);
+      const usPlan = {
+        ...plan,
+        assetId: us.id,
+        assetType: us.assetType,
+        market: us.market,
+        requestedRange: { from: new Date('2026-10-16T13:30:00Z'), to: clock },
+        sourceRange: { from: new Date('2026-10-16T13:30:00Z'), to: clock },
+      };
+      await loader.load(us, usQuery, usPlan);
+      const rows = (
+        responses.buildPersisted.mock.calls.at(-1) as unknown[]
+      )[2] as Array<{
+        sourceProvider: string;
+      }>;
+      expect(rows.map((r) => r.sourceProvider)).toEqual([
+        'kis_overseas_minute',
+      ]);
+      const coverageCall = states.findCandleCoverage.mock.calls.at(
+        -1,
+      ) as unknown[];
+      expect(coverageCall[4]).toEqual({
+        excludeSourceProviderPrefix: 'tiingo_',
+      });
+    });
+
+    it("builds today's in-progress daily bar from complete stored Tiingo 5m until end-of-day data arrives", async () => {
+      const { loader, repository, responses } = create();
+      // All 78 regular 5m slots of Friday, Tiingo; plus a KIS daily row that
+      // must never stand in.
+      const fiveMinute = Array.from({ length: 78 }, (_, index) =>
+        row(
+          new Date(
+            Date.parse('2026-10-16T13:30:00Z') + index * 300_000,
+          ).toISOString(),
+          5,
+          'tiingo_equity_intraday',
+          100 + (index === 77 ? 5 : 0),
+        ),
+      );
+      repository.findRange.mockImplementation(
+        ({ interval }: { interval: string }) =>
+          Promise.resolve(
+            interval === '5m'
+              ? fiveMinute
+              : [row('2026-10-16T04:00:00Z', 1440, 'kis_overseas_period', 77)],
+          ),
+      );
+      const dailyPlan = {
+        ...plan,
+        assetId: us.id,
+        assetType: us.assetType,
+        market: us.market,
+        targetInterval: '1d' as const,
+        sourceInterval: '1d' as const,
+        requestedRange: { from: new Date('2026-10-15T04:00:00Z'), to: clock },
+        sourceRange: { from: new Date('2026-10-15T04:00:00Z'), to: clock },
+      };
+      await loader.load(us, { ...usQuery, interval: '1d' }, dailyPlan);
+      const rows = (
+        responses.buildPersisted.mock.calls.at(-1) as unknown[]
+      )[2] as Array<{
+        openTime: Date;
+        closeTime: Date;
+        close: Prisma.Decimal;
+        isClosed: boolean;
+      }>;
+      expect(rows.length).toBe(1);
+      expect(rows[0].openTime.toISOString()).toBe('2026-10-16T04:00:00.000Z');
+      expect(rows[0].closeTime.toISOString()).toBe('2026-10-17T04:00:00.000Z');
+      expect(rows[0].close.toString()).toBe('105');
+      expect(rows[0].isClosed).toBe(false);
+      // A missing settled slot: no in-progress bar (never interpolated).
+      repository.findRange.mockImplementation(
+        ({ interval }: { interval: string }) =>
+          Promise.resolve(interval === '5m' ? fiveMinute.slice(1) : []),
+      );
+      await loader.load(us, { ...usQuery, interval: '1d' }, dailyPlan);
+      expect(
+        (
+          (
+            responses.buildPersisted.mock.calls.at(-1) as unknown[]
+          )[2] as unknown[]
+        ).length,
+      ).toBe(0);
+    });
+
+    it('keeps the in-progress daily bar between 10-minute syncs (built from the stored prefix) and hides it across a missing slot', async () => {
+      const { loader, repository, responses } = create();
+      // 13:00 New York; the last sync (12:42) stored bars through 12:35.
+      const midSession = new Date('2026-10-16T17:00:00Z');
+      const stored = Array.from({ length: 38 }, (_, index) =>
+        row(
+          new Date(
+            Date.parse('2026-10-16T13:30:00Z') + index * 300_000,
+          ).toISOString(),
+          5,
+          'tiingo_equity_intraday',
+          100 + index / 10,
+        ),
+      );
+      const dailyPlan = {
+        ...plan,
+        assetId: us.id,
+        assetType: us.assetType,
+        market: us.market,
+        targetInterval: '1d' as const,
+        sourceInterval: '1d' as const,
+        requestedRange: {
+          from: new Date('2026-10-15T04:00:00Z'),
+          to: midSession,
+        },
+        sourceRange: { from: new Date('2026-10-15T04:00:00Z'), to: midSession },
+      };
+      const daily = async (fiveMinute: typeof stored) => {
+        repository.findRange.mockImplementation(
+          ({ interval }: { interval: string }) =>
+            Promise.resolve(interval === '5m' ? fiveMinute : []),
+        );
+        await loader.load(
+          us,
+          {
+            ...usQuery,
+            interval: '1d',
+            clock: midSession,
+            rangeEndAt: midSession,
+            toInstant: midSession,
+          },
+          dailyPlan,
+        );
+        return (
+          responses.buildPersisted.mock.calls.at(-1) as unknown[]
+        )[2] as Array<{
+          close: Prisma.Decimal;
+          isClosed: boolean;
+        }>;
+      };
+      const lagging = await daily(stored);
+      expect(lagging.length).toBe(1);
+      expect(lagging[0].isClosed).toBe(false);
+      expect(lagging[0].close.toString()).toBe('103.7');
+      // A slot missing inside the stored prefix: hidden, never interpolated.
+      const holed = await daily([...stored.slice(0, 10), ...stored.slice(11)]);
+      expect(holed.length).toBe(0);
+    });
+  });
 });

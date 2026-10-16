@@ -23,6 +23,24 @@ describe('readLiveCandleConfig', () => {
     });
   });
 
+  it('never streams KIS delayed US trades while US stocks are priced by Tiingo', () => {
+    const live = {
+      CANDLE_LIVE_STREAMING_ENABLED: 'true',
+      CANDLE_LIVE_KIS_ENABLED: 'true',
+      CANDLE_LIVE_KIS_US_DELAYED_ENABLED: 'true',
+    };
+    expect(readLiveCandleConfig(live).kisUsDelayedEnabled).toBe(true);
+    expect(
+      readLiveCandleConfig({ ...live, US_STOCK_PRICE_PROVIDER: 'tiingo' })
+        .kisUsDelayedEnabled,
+    ).toBe(false);
+    // The KIS domestic live path is untouched.
+    expect(
+      readLiveCandleConfig({ ...live, US_STOCK_PRICE_PROVIDER: 'tiingo' })
+        .kisEnabled,
+    ).toBe(true);
+  });
+
   it('rejects boolean typos and invalid lease/backoff relationships', () => {
     expect(() =>
       readLiveCandleConfig({ CANDLE_LIVE_STREAMING_ENABLED: 'tru' }),

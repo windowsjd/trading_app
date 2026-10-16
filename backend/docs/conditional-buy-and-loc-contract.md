@@ -1,4 +1,4 @@
-# Conditional BUY and KRX Limit-on-Close (2026-10-12, current)
+# Conditional BUY and Limit-on-Close — KRX, US (2026-10-12; US 2026-10-17, current)
 
 Current contract: both capabilities are server-gated and default OFF. API base
 remains `/api/v1`. This work exposes no UI and changes no existing market/limit,
@@ -6,9 +6,9 @@ protection (SL/TP/OCO), Futures or calendar behavior.
 
 | Capability | Markets now | Flag (default) |
 | --- | --- | --- |
-| Conditional BUY (watch → ordinary market or limit BUY) | KRX stocks, crypto Spot | `CONDITIONAL_BUY_ORDERS_ENABLED=false` |
+| Conditional BUY (watch → ordinary market or limit BUY) | KRX stocks, crypto Spot; US stocks with `US_STOCK_PRICE_PROVIDER=tiingo` (2026-10-17) | `CONDITIONAL_BUY_ORDERS_ENABLED=false` |
 | Limit-on-Close BUY | KRX stocks | `LOC_ORDERS_ENABLED=false` |
-| US stocks (both) | refused until a closing-price/data provider is chosen | — |
+| Limit-on-Close BUY / SELL, US stocks (2026-10-17) | US stocks (Tiingo end-of-day close, §US Limit-on-Close) | `LOC_US_ORDERS_ENABLED=false`, `LOC_US_SELL_ORDERS_ENABLED=false` (require `US_STOCK_PRICE_PROVIDER=tiingo`) |
 
 `CONDITIONAL_ORDERS_ENABLED` (Spot/Futures protection) does not enable
 Conditional BUY. Startup rejects any value other than `true`/`false` for both
@@ -138,8 +138,13 @@ includes it. Quote validates as a courtesy and returns a `limitOnClose` preview
 `evidenceDeadlineAt`, `executionPricePolicy`). Create re-validates at the
 post-lock DB clock:
 
-- `LOC_ORDERS_DISABLED` (after committed replay, like `LIMIT_ORDER_ENABLED`).
-- KRX `domestic_stock` only; US stocks and crypto → `LOC_MARKET_NOT_SUPPORTED`.
+- `LOC_ORDERS_DISABLED` / `LOC_SELL_ORDERS_DISABLED` (after committed replay,
+  like `LIMIT_ORDER_ENABLED`) when NO market has that side's flag on.
+- The asset's market must have that side's flag on: KRX `domestic_stock`
+  (`LOC_ORDERS_ENABLED` / `LOC_SELL_ORDERS_ENABLED`), US `us_stock`
+  (`LOC_US_ORDERS_ENABLED` / `LOC_US_SELL_ORDERS_ENABLED`); otherwise, and for
+  crypto, `LOC_MARKET_NOT_SUPPORTED` ("Limit-on-Close is not available for
+  this market.").
 - The regular session must be OPEN at the DB clock (overrides and early
   closes apply; the close instant itself is excluded) → `LOC_SESSION_NOT_OPEN`;
   unknown calendar → `MARKET_CALENDAR_UNAVAILABLE`. A quote taken before the
@@ -233,51 +238,86 @@ account is the existing 404 `TRADING_ACCOUNT_NOT_FOUND`)
 
 ```json
 { "tradingAccountId": "…",
-  "limitOrder": { "enabled": false, "autoExecutionEnabled": false },
-  "limitOnClose": { "enabled": false, "markets": ["KRX"], "sides": ["buy"],
+  "limitOrder": { "enabled": true, "autoExecutionEnabled": false },
+  "limitOnClose": { "enabled": true, "markets": ["KRX", "US"], "sides": ["buy"],
                     "attachedProtection": false },
-  "limitOnCloseSell": { "enabled": false, "markets": ["KRX"] } }
+  "limitOnCloseSell": { "enabled": true, "markets": ["US"] } }
 ```
+
+`markets` (2026-10-17) lists exactly the markets whose flag for that side is
+on (KRX first), `[]` when none or when `LIMIT_ORDER_ENABLED=false`; before,
+it was always `["KRX"]` regardless of the flag. A client checks `enabled` and
+then the asset's market (`domestic_stock` → `KRX`, `us_stock` → `US`).
 
 - `limitOrder.enabled` = `LIMIT_ORDER_ENABLED`; `autoExecutionEnabled` also
   needs `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED` (same value as a limit
   quote's `executionPolicy.autoExecutionEnabled`).
-- `limitOnClose.enabled` = `LIMIT_ORDER_ENABLED && LOC_ORDERS_ENABLED`, the
+- `limitOnClose.enabled` = `LIMIT_ORDER_ENABLED &&` (KRX or US BUY flag), the
   same precedence as create (`LIMIT_ORDER_DISABLED` before
   `LOC_ORDERS_DISABLED`). It stays the BUY answer.
-- `limitOnCloseSell.enabled` = `LIMIT_ORDER_ENABLED && LOC_SELL_ORDERS_ENABLED`
-  (2026-10-13, additive).
+- `limitOnCloseSell.enabled` = `LIMIT_ORDER_ENABLED &&` (KRX or US SELL flag)
+  (2026-10-13, additive; US 2026-10-17).
 - It reads flags only: no DB write, no order/wallet/ledger access, no
   migration. Session, market, Season and account rules stay with quote/create,
   which remain authoritative after any flag change. A client that cannot read
   this must treat LOC as unavailable.
 
-## US stocks — extension contract
+## US Limit-on-Close (2026-10-17)
 
-Nothing US-specific is implemented or enabled: no worker, table, adapter or
-provider assumption. The shared pieces are market-neutral: `limit_on_close_orders.market`
-and `session_close_price_evidences.market` (`KRX`/`US`), the calendar session
-binding (`resolveLimitOnCloseRegistration` / `resolveBoundLimitOnCloseSession`
-already resolve US sessions, DST and early closes), the decision rule, the
-finality state machine and the settlement worker.
+The KRX engine unchanged — registration, reservation (BUY cash `limit × qty +
+fee` in USD; SELL holding quantity), states, decision rule, fill transaction,
+release and lifecycle cleanup — with a US evidence source and New York times.
+Overview and runbook: [tiingo-us-equity-official.md](tiingo-us-equity-official.md).
 
-After a provider is chosen:
+- **Flags**: `LOC_US_ORDERS_ENABLED`, `LOC_US_SELL_ORDERS_ENABLED`, independent
+  of the KRX flags in both directions; startup requires
+  `US_STOCK_PRICE_PROVIDER=tiingo` (whose own validation requires Tiingo's
+  official mode).
+- **Registration**: during the US regular session only (no pre-/after-market),
+  Season `endAt` after the session close, integer quantity, no attached
+  protection — the KRX rules. `evidenceDeadlineAt` = the session date at
+  `LOC_US_CLOSE_EVIDENCE_DEADLINE_ET` New York (default 23:00; DST-aware; the
+  same wall time on early-close days).
+- **Evidence** (`provider = tiingo`, `sourceName = tiingo_eod`): Tiingo
+  end-of-day `GET /tiingo/daily/<ticker>/prices?startDate=D&endDate=D` — exactly
+  one bar dated the bound New York session date, received after that session's
+  close, consistent OHLC, volume > 0, and Tiingo's own metadata naming the same
+  ticker on the Asset's exchange (NAS ↔ NASDAQ, NYS ↔ NYSE). Only the RAW
+  `close` is evidence: never `adjClose`, `tngoLast`, an IEX print, a 5-minute
+  bar or the previous close. Failure codes (`TIINGO_CLOSE_*`, recorded on the
+  order and in the run summary): `SOURCE_DISABLED`, `EXCHANGE_MISMATCH`,
+  `BEFORE_SESSION_END`, `INVALID_BAR`, `EVIDENCE_MISSING`, `DATE_MISMATCH`,
+  `NO_TRADES`; plus Tiingo transport codes.
+- **Finality**: the first observation no earlier than
+  `LOC_US_CLOSE_EVIDENCE_EARLIEST_ET` New York (default 21:10, bounded
+  21:10–22:50: Tiingo publishes about 17:30 EST and applies corrections until
+  20:00 EST, read as EDT too, plus a margin; an earlier time needs real EOD
+  evidence and approval); an identical observation at least
+  `LOC_US_CLOSE_EVIDENCE_CONFIRM_SECONDS` later (default 300) is final; a
+  different value restarts the confirmation. One request per asset/session per
+  interval, shared by every order of that symbol and date.
+- **Deadline**: no final close by the deadline → `expired`,
+  `loc_close_evidence_unavailable`, reservation released once. A fill at or
+  after the deadline is refused at the fill transaction's DB clock.
+- **Fill**: at the final close, USD settlement with fill-time USD/KRW (≤ 60 s):
+  the settlement prepares it (`UsdKrwRefreshService`) before the US fills of a
+  group; stale FX defers the fill to the next cycle (never stale FX), and the
+  deadline still releases.
+- **Provider isolation**: the evidence lookup, the observation identity check
+  and the fill all require `SESSION_CLOSE_PROVIDERS[market]` (`KRX → koscom`,
+  `US → tiingo`); one market's evidence never settles the other's orders.
+- **After finality**: each US final close is read once more 6–72 h after
+  finalization. A different value is logged
+  (`LOC_US_CLOSE_CORRECTED_AFTER_FINAL`) and reported in the run summary
+  (`postFinalCorrections`); the evidence row, fills and ledgers are never
+  rewritten. Audit marks are the ids in the recorded run summaries
+  (restart-safe); a failed audit read is reported, not retried.
+- Verified by `scripts/limit-on-close-us-integration.ts`
+  (`LIMIT_ON_CLOSE_US_DB_INTEGRATION=1`, CI).
 
-1. Prove its regular-session close semantics: exact symbol, exchange-local
-   trading date, regular session only (not extended hours or a consolidated
-   last), finalization time and revision behavior, and receipt after the
-   calendar close.
-2. Add one observation source for `market = 'US'` returning the existing
-   observation contract (symbol, compact date, close, USD, receipt time, raw
-   request/response); select it in the settlement service by market.
-3. Allow `us_stock` in the registration rule and Conditional BUY, with US
-   evidence for triggers that meets the existing source/freshness policy.
-4. Fills settle in USD with fill-time FX evidence (existing limit fill path).
-5. Re-run the LOC/Conditional PostgreSQL suites with US fixtures and set the
-   evidence timing for the provider's publication delay.
-
-Until then US Conditional BUY/LOC requests are refused and existing US
-market/limit orders are unchanged (covered by integration tests).
+US Conditional BUY (and the SELL conditions / stop-loss·take-profit) follow
+`US_STOCK_PRICE_PROVIDER=tiingo`: capability `markets` then lists `US`, with
+the existing rules and evidence policy unchanged.
 
 ## Operations and release
 
@@ -294,6 +334,10 @@ market/limit orders are unchanged (covered by integration tests).
   15:30 (row presence and stability, `trdPrc` = official regular close, no
   after-hours influence, publication delay) and tune the three timing values.
   Without KOSCOM, LOCs expire and release; nothing fills.
+- Before enabling US LOC, run `pnpm smoke:tiingo-official` with the contract
+  token (end-of-day bar presence and date for the latest session) and follow
+  the runbook in [tiingo-us-equity-official.md](tiingo-us-equity-official.md).
+  Without Tiingo's official mode, US LOCs expire and release; nothing fills.
 - Watch `ops_job_runs` for `conditional_buy_orders` (state counts, ≤ 1/min) and
   `limit_on_close_settlement` (observations, failures by code, fills,
   unfilled/expired by reason).

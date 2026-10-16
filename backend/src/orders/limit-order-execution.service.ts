@@ -76,6 +76,7 @@ import {
   limitOnCloseDeadlinePassed,
   resolveBoundLimitOnCloseSession,
 } from './limit-on-close.policy';
+import { SESSION_CLOSE_PROVIDERS } from './limit-on-close-evidence.service';
 import { getAssetTradingStatus } from './market-hours.policy';
 
 import {
@@ -559,6 +560,8 @@ export class LimitOrderExecutionService {
           evidence.policyVersion !== LOC_EVIDENCE_POLICY_VERSION ||
           evidence.assetId !== order.assetId ||
           evidence.market !== limitOnClose.market ||
+          // KRX settles on KOSCOM, US on Tiingo; never the other's close.
+          evidence.provider !== SESSION_CLOSE_PROVIDERS[limitOnClose.market] ||
           evidence.sessionDate.getTime() !==
             limitOnClose.sessionDate.getTime() ||
           evidence.currencyCode !== order.currencyCode ||

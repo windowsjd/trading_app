@@ -25,10 +25,15 @@ import {
   KoscomError,
 } from '../providers/koscom/koscom.config';
 import {
+  findPreviousMarketSession,
   resolveMarketSession,
   resolveStockMarketSessionState,
   type MarketSessionWindow,
 } from '../orders/market-calendar.policy';
+import { TIINGO_INTRADAY_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
+import { usSessionsBetween } from '../providers/tiingo/tiingo-candle-normalizer';
+import { MarketCandleAggregationService } from './market-candle-aggregation.service';
+import { usCandlesFromTiingo } from './us-candle-provider';
 import { hasEffectiveMarketCalendarForDate } from '../orders/market-holidays.config';
 import { formatZonedCursor } from '../providers/kis/candles/kis-candle-time';
 import { parseFuturesContracts } from '../futures/futures-instrument-coverage';
@@ -105,7 +110,10 @@ const KOSCOM_DATA_CODES = new Set([
 export const MARKET_CANDLE_LONG_SYNC_LOCK_KEY = 'market_candle_long_sync';
 export const FUTURES_CANDLE_SYNC_LOCK_KEY = 'futures_candle_sync';
 
-export type LongCandleMarket = 'spot' | 'krx' | 'futures';
+export type LongCandleMarket = 'spot' | 'krx' | 'us' | 'futures';
+
+/** US 4h rows synthesized from stored Tiingo 5m (2026-10-17). */
+export const TIINGO_US_FOUR_HOUR_SOURCE = 'tiingo_equity_intraday_4h';
 export type LongCandleSyncMode = 'backfill' | 'incremental';
 
 export type LongCandleKrxOptions = {
@@ -138,7 +146,7 @@ export type LongCandleSyncInput = {
   includeInactiveFutures?: boolean;
   /** Crypto window in days (spot/futures). */
   days?: number;
-  /** KRX window in completed sessions. */
+  /** KRX/US window in completed sessions. */
   sessions?: number;
   krx?: LongCandleKrxOptions;
 };
@@ -391,6 +399,193 @@ export class MarketCandleLongSyncService {
       if (result.rowsWritten > 0) await this.invalidateAsset(asset.id);
       return { ...result, errorCode, status: errorCode ? 'partial' : 'synced' };
     });
+  }
+
+  // ------------------------------------------------------------------ US --
+
+  /**
+   * US stocks on Tiingo (2026-10-17): COMPLETED 4h buckets — 09:30–13:30 and
+   * 13:30–16:00 New York, one 09:30–13:00 bucket on early-close days, the
+   * read-time aggregation's own buckets — synthesized from the stored Tiingo
+   * 5m rows, and only when every regular 5m slot of the bucket is stored
+   * (never interpolated). No provider call: the 5m sync and its backfill
+   * fetch the bars; these rows keep the 96-session 4h chart beyond the 5m
+   * retention. On the KIS provider nothing runs (no stored US 4h there).
+   */
+  async syncUs(input: LongCandleSyncInput): Promise<LongCandleSyncSummary> {
+    const context = this.context(input);
+    const sessions = this.krxSessions(input);
+    const startedAt = new Date();
+    const usAsset = { assetType: AssetType.us_stock, market: 'NAS' };
+    if (!usCandlesFromTiingo(usAsset))
+      return this.summary(
+        'us',
+        input,
+        context,
+        startedAt,
+        [],
+        { from: null, to: null, unit: 'sessions', size: sessions },
+        0,
+      );
+    const anchor = findPreviousMarketSession(usAsset, context.now, sessions);
+    const window = anchor
+      ? usSessionsBetween(anchor.openTime.getTime(), context.now.getTime())
+      : null;
+    const completed = (window ?? []).filter(
+      (session) =>
+        session.openTime.getTime() >= (anchor?.openTime.getTime() ?? 0) &&
+        session.closeTime.getTime() <= context.now.getTime(),
+    );
+    if (!anchor || !window || completed.length === 0) {
+      context.stopReason = 'calendar_unavailable';
+      return this.summary(
+        'us',
+        input,
+        context,
+        startedAt,
+        [],
+        { from: null, to: null, unit: 'sessions', size: sessions },
+        0,
+      );
+    }
+    const range = {
+      from: completed[0].openTime,
+      to: completed[completed.length - 1].closeTime,
+    };
+    const assets = await this.prisma.asset.findMany({
+      where: {
+        assetType: AssetType.us_stock,
+        ...(input.assetIds
+          ? { id: { in: [...input.assetIds] } }
+          : { isActive: true }),
+      },
+      orderBy: [{ symbol: 'asc' }, { id: 'asc' }],
+      select: { id: true, symbol: true },
+    });
+    const series: LongCandleSeriesResult[] = [];
+    for (const asset of assets) {
+      if (this.stopped(context)) break;
+      series.push(await this.syncUsAsset(asset, completed, range, context));
+    }
+    return this.summary(
+      'us',
+      input,
+      context,
+      startedAt,
+      series,
+      { ...range, unit: 'sessions', size: sessions },
+      assets.length,
+    );
+  }
+
+  private async syncUsAsset(
+    asset: { id: string; symbol: string },
+    sessions: readonly MarketSessionWindow[],
+    range: { from: Date; to: Date },
+    context: RunContext,
+  ): Promise<LongCandleSeriesResult> {
+    const result = emptySeries('us', asset.id, asset.symbol);
+    const [storedHistory, storedFiveMinute] = await Promise.all([
+      this.repository.findRange({
+        assetId: asset.id,
+        interval: '4h',
+        from: range.from,
+        to: range.to,
+      }),
+      this.repository.findRange({
+        assetId: asset.id,
+        interval: '5m',
+        from: range.from,
+        to: range.to,
+      }),
+    ]);
+    const stored = new Set(
+      storedHistory
+        .filter(
+          (row) =>
+            row.isClosed && row.sourceProvider === TIINGO_US_FOUR_HOUR_SOURCE,
+        )
+        .map((row) => row.openTime.getTime()),
+    );
+    const buckets = this.usAggregation().aggregateCandles({
+      assetType: AssetType.us_stock,
+      interval: '4h',
+      candles: storedFiveMinute.filter(
+        (row) =>
+          row.sourceProvider === TIINGO_INTRADAY_CANDLE_SOURCE && row.isClosed,
+      ),
+      from: range.from,
+      to: range.to,
+      now: context.now,
+    }).candles;
+    // Two buckets per session, one on an early-close day.
+    result.expected = sessions.reduce(
+      (sum, session) =>
+        sum +
+        (session.closeTime.getTime() - session.openTime.getTime() >
+        FOUR_HOURS_MS
+          ? 2
+          : 1),
+      0,
+    );
+    result.missingBefore = Math.max(0, result.expected - stored.size);
+    const ready = buckets.filter(
+      (bucket) =>
+        bucket.complete &&
+        bucket.isClosed &&
+        !bucket.isCurrent &&
+        !stored.has(bucket.openTime.getTime()),
+    );
+    // A session whose 5m bars are not all stored yet stays pending (the 5m
+    // sync or backfill fills it; nothing is synthesized from a partial day).
+    const covered = new Set([
+      ...stored,
+      ...ready.map((bucket) => bucket.openTime.getTime()),
+    ]);
+    result.pending = sessions
+      .filter(
+        (session) =>
+          ![...covered].some(
+            (openMs) =>
+              openMs >= session.openTime.getTime() &&
+              openMs < session.closeTime.getTime(),
+          ),
+      )
+      .map((session) => ({
+        date: session.localDate,
+        reason: 'five_minute_incomplete',
+      }));
+    if (ready.length === 0) return result;
+    if (context.dryRun) return { ...result, status: 'planned' };
+    return this.withSeriesLock(asset.id, 'long-4h', result, async (renew) => {
+      if (this.stopped(context) || !(await renew()))
+        return { ...result, status: 'partial', errorCode: 'INTERRUPTED' };
+      const written = await this.repository.upsertMany(
+        ready.map((bucket) => ({
+          assetId: asset.id,
+          interval: '4h' as const,
+          openTime: bucket.openTime,
+          closeTime: bucket.closeTime,
+          open: bucket.open,
+          high: bucket.high,
+          low: bucket.low,
+          close: bucket.close,
+          volume: bucket.volume,
+          amount: null,
+          isClosed: true,
+          sourceProvider: TIINGO_US_FOUR_HOUR_SOURCE,
+          sourceUpdatedAt: bucket.sourceUpdatedAt,
+        })),
+      );
+      result.rowsWritten += written.writtenCount;
+      if (result.rowsWritten > 0) await this.invalidateAsset(asset.id);
+      return { ...result, status: 'synced' };
+    });
+  }
+
+  private usAggregation(): MarketCandleAggregationService {
+    // Stateless bucket rules (the read path's own); no repository read here.
+    return new MarketCandleAggregationService(this.repository);
   }
 
   // ------------------------------------------------------------- Futures --

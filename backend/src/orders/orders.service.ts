@@ -42,7 +42,10 @@ import {
   parseEntryTpSlDrafts,
   type EntryTpSlIntent,
 } from '../conditional/entry-tp-sl-policy';
-import { readLimitOnCloseConfig } from './limit-on-close.config';
+import {
+  limitOnCloseMarkets,
+  readLimitOnCloseConfig,
+} from './limit-on-close.config';
 import {
   resolveLimitOnCloseRegistration,
   sessionDateText,
@@ -108,6 +111,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
+  adminManualAssetPriceScope,
+  readUsStockPriceProvider,
   resolveAssetProviderEligibility,
   resolveFxProviderEligibility,
   selectFreshProviderSnapshotBySourcePriority,
@@ -1073,6 +1078,7 @@ export class OrdersService {
           now: quoteAt,
           seasonEndAt: context.season?.endAt ?? null,
           config: readLimitOnCloseConfig(),
+          side: request.side,
         })
       : null;
 
@@ -1269,6 +1275,7 @@ export class OrdersService {
           now: quoteAt,
           seasonEndAt: context.season?.endAt ?? null,
           config: readLimitOnCloseConfig(),
+          side: request.side,
         })
       : null;
     const quantityAdjustment = limitOnClose
@@ -2137,6 +2144,7 @@ export class OrdersService {
               now: transactionNow,
               seasonEndAt: lockedContext?.seasonEndAt ?? null,
               config: readLimitOnCloseConfig(),
+              side: request.side,
             })
           : undefined;
 
@@ -3766,6 +3774,9 @@ export class OrdersService {
         assetId: order.assetId,
         currencyCode: this.getAssetPriceCurrency(order.asset),
         sourceType: AssetPriceSourceType.provider_api,
+        // Only the eligible sources: rows of another provider for the same
+        // asset (e.g. KIS and Tiingo side by side) never crowd them out.
+        sourceName: { in: [...providerEligibility.sourceNames] },
       },
       orderBy: [
         { effectiveAt: 'desc' },
@@ -5339,6 +5350,7 @@ export class OrdersService {
         assetId: input.assetId,
         currencyCode: input.currencyCode,
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(input),
         price: {
           gt: 0,
         },
@@ -6496,11 +6508,16 @@ export class OrdersService {
     return true;
   }
 
+  /**
+   * Side gate before the asset is known: the side must be enabled for at
+   * least one market (KRX or US, each with its own flag). The market itself
+   * is checked by resolveLimitOnCloseRegistration once the asset is resolved.
+   */
   private assertLimitOnCloseFeatureEnabled(request: ParsedOrderRequest) {
     if (!request.limitOnClose) return;
     const config = readLimitOnCloseConfig();
     if (request.side === OrderSide.sell) {
-      if (!config.sellEnabled)
+      if (!limitOnCloseMarkets(config, 'sell').length)
         throw createApiError(
           'LOC_SELL_ORDERS_DISABLED',
           'Limit-on-Close SELL orders are currently disabled.',
@@ -6508,7 +6525,7 @@ export class OrdersService {
         );
       return;
     }
-    if (!config.enabled)
+    if (!limitOnCloseMarkets(config, 'buy').length)
       throw createApiError(
         'LOC_ORDERS_DISABLED',
         'Limit-on-Close orders are currently disabled.',
@@ -6970,6 +6987,7 @@ export class OrdersService {
             assetId: asset.id,
             currencyCode: this.getAssetPriceCurrency(asset),
             sourceType: AssetPriceSourceType.provider_api,
+            sourceName: { in: [...providerEligibility.sourceNames] },
           },
           orderBy: [
             { effectiveAt: 'desc' },
@@ -7033,6 +7051,31 @@ export class OrdersService {
       asset,
       isPositiveValue: (candidate) => isPositiveDecimal(candidate.price),
     });
+
+    // US stocks on Tiingo (2026-10-17): a missing or stale Tiingo price is
+    // never replaced by an operator price.
+    if (
+      asset.assetType === AssetType.us_stock &&
+      readUsStockPriceProvider() === 'tiingo'
+    ) {
+      setAdminDiagnosticContext({
+        failureStage: 'asset_price_selection',
+        entities: { assetId: asset.id },
+        evidence: {
+          ...providerFailureEvidence,
+          manualFallback: {
+            lookupPerformed: false,
+            result: 'not_allowed',
+            reason: 'us_stock_tiingo_provider_only',
+          },
+        },
+      });
+      this.throwApiError(
+        HttpStatus.SERVICE_UNAVAILABLE,
+        'ASSET_PRICE_UNAVAILABLE',
+        'Asset price is unavailable.',
+      );
+    }
 
     const snapshot = await this.prisma.assetPriceSnapshot.findFirst({
       where: {

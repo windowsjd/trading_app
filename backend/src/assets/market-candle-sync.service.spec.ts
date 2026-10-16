@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 jest.mock('../generated/prisma/client', () => {
   const runtime = jest.requireActual<{ Decimal: unknown }>(
@@ -390,6 +391,10 @@ describe('MarketCandleSyncService', () => {
       fiveMinuteIngestion?: MarketCandleIngestionService;
     } = {},
   ) => {
+    const tiingo = {
+      getIntradayPrices: jest.fn(),
+      getDailyPrices: jest.fn(),
+    };
     const assets = input.assets ?? [CRYPTO_ASSET];
     const prisma = {
       asset: {
@@ -507,9 +512,11 @@ describe('MarketCandleSyncService', () => {
       binanceCandles as never,
       config,
       cache as never,
+      tiingo as never,
     );
     return {
       service,
+      tiingo,
       prisma,
       repository,
       stored,
@@ -3228,6 +3235,403 @@ describe('MarketCandleSyncService', () => {
       expect(feed.stopReason).toBe('malformed_response');
       expect(feed.coverageComplete).toBe(false);
       expect(feed.completionReason).not.toBe('confirmed_empty');
+    });
+  });
+
+  describe('US stocks on Tiingo (US_STOCK_PRICE_PROVIDER=tiingo, 2026-10-17)', () => {
+    const US_TIINGO = {
+      id: 'us-tiingo-1',
+      symbol: 'AAPL',
+      market: 'NAS',
+      assetType: 'us_stock',
+      isActive: true,
+    };
+    // Friday 2026-10-16 21:00Z = 17:00 EDT, after that day's close.
+    const AFTER_CLOSE = new Date('2026-10-16T21:00:00Z');
+    const WEDNESDAY = new Date('2026-10-14T04:00:00Z'); // New York midnight
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    beforeEach(() => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    });
+    /** 78 regular-session 5m bars per New York date (EDT 13:30–20:00Z). */
+    const sessionBars = (date: string) =>
+      Array.from({ length: 78 }, (_, index) => ({
+        date: new Date(
+          Date.parse(`${date}T13:30:00Z`) + index * FIVE_MIN,
+        ).toISOString(),
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100.5,
+        volume: 1000,
+      }));
+    const datesBetween = (startDate: string, endDate: string) => {
+      const dates: string[] = [];
+      for (
+        let day = Date.parse(`${startDate}T00:00:00Z`);
+        day <= Date.parse(`${endDate}T00:00:00Z`);
+        day += DAY
+      ) {
+        const date = new Date(day);
+        if (date.getUTCDay() !== 0 && date.getUTCDay() !== 6)
+          dates.push(date.toISOString().slice(0, 10));
+      }
+      return dates;
+    };
+    const eod = (date: string, close: number, adjClose = close) => ({
+      date: `${date}T00:00:00.000Z`,
+      open: close,
+      high: close + 1,
+      low: close - 1,
+      close,
+      volume: 1_000_000,
+      adjOpen: adjClose,
+      adjHigh: adjClose + 1,
+      adjLow: adjClose - 1,
+      adjClose,
+      adjVolume: 1_000_000,
+      divCash: 0,
+      splitFactor: 1,
+    });
+
+    it('syncs settled regular-session 5m bars from Tiingo (never KIS) and confirms the swept range', async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      harness.tiingo.getIntradayPrices.mockImplementation(
+        (_symbol: string, query: { startDate: string; endDate: string }) =>
+          Promise.resolve({
+            json: datesBetween(query.startDate, query.endDate).flatMap(
+              sessionBars,
+            ),
+            receivedAt: AFTER_CLOSE,
+            bytes: 0,
+          }),
+      );
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: WEDNESDAY,
+        now: AFTER_CLOSE,
+      });
+      const feed = result.feeds[0];
+      expect(feed.provider).toBe('tiingo_equity_intraday');
+      expect(feed.status).toBe('completed');
+      expect(feed.coverageComplete).toBe(true);
+      expect(feed.writtenRows).toBe(3 * 78);
+      expect(
+        harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles,
+      ).not.toHaveBeenCalled();
+      expect(harness.tiingo.getIntradayPrices).toHaveBeenCalledWith(
+        'AAPL',
+        { startDate: '2026-10-14', endDate: '2026-10-16' },
+        undefined,
+      );
+      const rows = harness.upserted.flat() as MarketCandle[];
+      expect(new Set(rows.map((row) => row.sourceProvider))).toEqual(
+        new Set(['tiingo_equity_intraday']),
+      );
+      expect(rows.every((row) => row.isClosed && row.amount === null)).toBe(
+        true,
+      );
+      expect(harness.stateRepository.rows[0]).toMatchObject({
+        coverageComplete: true,
+        coveredFrom: WEDNESDAY,
+        coveredTo: AFTER_CLOSE,
+      });
+    });
+
+    const tiingoSessions = (harness: ReturnType<typeof createHarness>) =>
+      harness.tiingo.getIntradayPrices.mockImplementation(
+        (_symbol: string, query: { startDate: string; endDate: string }) =>
+          Promise.resolve({
+            json: datesBetween(query.startDate, query.endDate).flatMap(
+              sessionBars,
+            ),
+            receivedAt: AFTER_CLOSE,
+            bytes: 0,
+          }),
+      );
+
+    it("continues an incremental run from the current provider's latest row, never the other provider's newer row", async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      tiingoSessions(harness);
+      // A KIS bar of 10-16 is newer than the latest Tiingo bar of 10-14
+      // (rows left from before the switch): the Tiingo run must still
+      // re-fetch from 10-14, not skip 10-15 behind the KIS row.
+      const latest = {
+        kis: {
+          openTime: new Date('2026-10-16T19:55:00Z'),
+          sourceProvider: 'kis_overseas_minute',
+        },
+        tiingo: {
+          openTime: new Date('2026-10-14T19:55:00Z'),
+          sourceProvider: 'tiingo_equity_intraday',
+        },
+      };
+      harness.repository.findLatest.mockImplementation(
+        (params: { providers?: { sourceProviders?: string[] } }) =>
+          Promise.resolve(
+            params.providers?.sourceProviders?.includes(
+              'tiingo_equity_intraday',
+            )
+              ? latest.tiingo
+              : latest.kis,
+          ),
+      );
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['5m'],
+        mode: 'incremental' as never,
+        now: AFTER_CLOSE,
+      });
+      expect(result.feeds[0].provider).toBe('tiingo_equity_intraday');
+      expect(harness.repository.findLatest).toHaveBeenCalledWith({
+        assetId: US_TIINGO.id,
+        interval: '5m',
+        providers: { sourceProviders: ['tiingo_equity_intraday'] },
+      });
+      expect(harness.tiingo.getIntradayPrices).toHaveBeenCalledWith(
+        'AAPL',
+        { startDate: '2026-10-14', endDate: '2026-10-16' },
+        undefined,
+      );
+    });
+
+    it("never resumes the other provider's checkpoint left before the switch", async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      tiingoSessions(harness);
+      // A crashed KIS run still "running", claiming KIS coverage.
+      const kisRun = await harness.stateRepository.createRunning({
+        assetId: US_TIINGO.id,
+        feed: '5m',
+        sourceProvider: 'kis_overseas_minute',
+        mode: 'initial',
+        targetFrom: WEDNESDAY,
+        targetTo: AFTER_CLOSE,
+      });
+      harness.stateRepository.rows[0].coveredFrom = WEDNESDAY;
+      harness.stateRepository.rows[0].coveredTo = AFTER_CLOSE;
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: WEDNESDAY,
+        now: AFTER_CLOSE,
+      });
+      const feed = result.feeds[0];
+      expect(feed.provider).toBe('tiingo_equity_intraday');
+      expect(feed.resumed).toBe(false);
+      expect(feed.status).toBe('completed');
+      expect(harness.stateRepository.rows[0]).toMatchObject({
+        id: kisRun.id,
+        sourceProvider: 'kis_overseas_minute',
+        status: 'canceled',
+        errorCode: 'SUPERSEDED',
+      });
+      expect(harness.stateRepository.rows[1]).toMatchObject({
+        sourceProvider: 'tiingo_equity_intraday',
+        coverageComplete: true,
+      });
+    });
+
+    it('asks Tiingo for at most 10 sessions per page, oldest first, resuming from the cursor', async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      harness.tiingo.getIntradayPrices.mockImplementation(
+        (_symbol: string, query: { startDate: string; endDate: string }) =>
+          Promise.resolve({
+            json: datesBetween(query.startDate, query.endDate).flatMap(
+              sessionBars,
+            ),
+            receivedAt: AFTER_CLOSE,
+            bytes: 0,
+          }),
+      );
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: new Date('2026-09-28T04:00:00Z'),
+        now: AFTER_CLOSE,
+      });
+      const calls = harness.tiingo.getIntradayPrices.mock.calls.map(
+        ([, query]) => query as { startDate: string; endDate: string },
+      );
+      expect(calls).toEqual([
+        { startDate: '2026-09-28', endDate: '2026-10-09' },
+        { startDate: '2026-10-12', endDate: '2026-10-16' },
+      ]);
+      expect(result.feeds[0].coverageComplete).toBe(true);
+      expect(result.feeds[0].writtenRows).toBe(15 * 78);
+    });
+
+    it('never claims coverage across a finished session that returned no bar (a hole is not invented)', async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      harness.tiingo.getIntradayPrices.mockResolvedValue({
+        json: [...sessionBars('2026-10-14'), ...sessionBars('2026-10-16')],
+        receivedAt: AFTER_CLOSE,
+        bytes: 0,
+      });
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: WEDNESDAY,
+        now: AFTER_CLOSE,
+      });
+      const feed = result.feeds[0];
+      expect(feed.writtenRows).toBe(2 * 78);
+      expect(feed.coverageComplete).toBe(false);
+      expect(feed.completionReason).toBe('data_incomplete');
+      expect(harness.stateRepository.rows[0].coveredFrom).toBeNull();
+    });
+
+    it('stores end-of-day RAW daily rows on the shared daily window and audits them', async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      harness.tiingo.getDailyPrices.mockResolvedValue({
+        json: [
+          eod('2026-10-14', 95, 47.5),
+          eod('2026-10-15', 96),
+          eod('2026-10-16', 97),
+        ],
+        receivedAt: new Date('2026-10-16T23:00:00Z'),
+        bytes: 0,
+      });
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['1d'],
+        mode: 'initial' as never,
+        from: WEDNESDAY,
+        now: new Date('2026-10-16T23:00:00Z'),
+      });
+      const feed = result.feeds[0];
+      expect(feed.provider).toBe('tiingo_eod');
+      expect(feed.coverageComplete).toBe(true);
+      expect(
+        harness.overseasPeriodAdapter.fetchPeriodPage,
+      ).not.toHaveBeenCalled();
+      const rows = harness.upserted.flat() as MarketCandle[];
+      expect(rows.map((row) => String(row.close))).toEqual(['95', '96', '97']);
+      expect(rows[0].openTime.toISOString()).toBe('2026-10-14T04:00:00.000Z');
+      expect(rows[0].sourceProvider).toBe('tiingo_eod');
+      // A missing closed session fails the stored-daily audit: no claim.
+      const gap = createHarness({ assets: [US_TIINGO] });
+      gap.tiingo.getDailyPrices.mockResolvedValue({
+        json: [eod('2026-10-14', 95), eod('2026-10-16', 97)],
+        receivedAt: new Date('2026-10-16T23:00:00Z'),
+        bytes: 0,
+      });
+      const gapResult = await gap.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['1d'],
+        mode: 'initial' as never,
+        from: WEDNESDAY,
+        now: new Date('2026-10-16T23:00:00Z'),
+      });
+      expect(gapResult.feeds[0].coverageComplete).toBe(false);
+    });
+
+    it('reports a split seen in end-of-day data for operations, storing the raw rows unchanged', async () => {
+      const warn = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      try {
+        const harness = createHarness({ assets: [US_TIINGO] });
+        harness.tiingo.getDailyPrices.mockResolvedValue({
+          json: [
+            eod('2026-10-14', 95),
+            { ...eod('2026-10-15', 9.6), splitFactor: 10 },
+            eod('2026-10-16', 9.7),
+          ],
+          receivedAt: new Date('2026-10-16T23:00:00Z'),
+          bytes: 0,
+        });
+        await harness.service.syncAsset({
+          assetId: US_TIINGO.id,
+          targets: ['1d'],
+          mode: 'initial' as never,
+          from: WEDNESDAY,
+          now: new Date('2026-10-16T23:00:00Z'),
+        });
+        const events = warn.mock.calls
+          .map(([message]) => String(message))
+          .filter((message) => message.includes('TIINGO_US_SPLIT_OBSERVED'));
+        expect(events).toHaveLength(1);
+        expect(JSON.parse(events[0]) as unknown).toEqual({
+          event: 'TIINGO_US_SPLIT_OBSERVED',
+          symbol: 'AAPL',
+          date: '2026-10-15',
+          splitFactor: '10',
+        });
+        const rows = harness.upserted.flat() as MarketCandle[];
+        expect(rows.map((row) => String(row.close))).toEqual([
+          '95',
+          '9.6',
+          '9.7',
+        ]);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('composes closed weekly rows from raw daily rows only when the week is whole', async () => {
+      const harness = createHarness({ assets: [US_TIINGO] });
+      harness.tiingo.getDailyPrices.mockResolvedValue({
+        json: datesBetween('2026-10-05', '2026-10-16').map((date, index) =>
+          eod(date, 100 + index),
+        ),
+        receivedAt: new Date('2026-10-17T12:00:00Z'),
+        bytes: 0,
+      });
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['1w'],
+        mode: 'initial' as never,
+        from: new Date('2026-10-05T04:00:00Z'),
+        now: new Date('2026-10-17T12:00:00Z'),
+      });
+      const rows = harness.upserted.flat() as MarketCandle[];
+      expect(rows.map((row) => row.openTime.toISOString())).toEqual([
+        '2026-10-05T04:00:00.000Z',
+        '2026-10-12T04:00:00.000Z',
+      ]);
+      expect(rows.map((row) => [String(row.open), String(row.close)])).toEqual([
+        ['100', '104'],
+        ['105', '109'],
+      ]);
+      expect(result.feeds[0].coverageComplete).toBe(true);
+    });
+
+    it('keeps the KIS US path while the provider is kis', async () => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+      const harness = createHarness({ assets: [US_TIINGO] });
+      harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles.mockResolvedValue({
+        candles: [],
+        pagesFetched: 1,
+        providerReturnedRows: 0,
+        acceptedRows: 0,
+        rejectedRows: 0,
+        duplicateRows: 0,
+        stopReason: 'empty_page',
+        complete: false,
+        oldestOpenTime: null,
+        latestOpenTime: null,
+      });
+      const result = await harness.service.syncAsset({
+        assetId: US_TIINGO.id,
+        targets: ['5m'],
+        mode: 'initial' as never,
+        from: WEDNESDAY,
+        now: AFTER_CLOSE,
+      });
+      expect(result.feeds[0].provider).not.toBe('tiingo_equity_intraday');
+      expect(harness.tiingo.getIntradayPrices).not.toHaveBeenCalled();
+      expect(
+        harness.fiveMinuteIngestion.fetchUsFiveMinuteCandles,
+      ).toHaveBeenCalled();
     });
   });
 });

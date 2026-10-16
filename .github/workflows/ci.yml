@@ -188,6 +188,10 @@ jobs:
       # the existing order cores, final close evidence, races and lifecycle.
       CONDITIONAL_BUY_DB_INTEGRATION: "1"
       LIMIT_ON_CLOSE_DB_INTEGRATION: "1"
+      # US Limit-on-Close (Tiingo end-of-day raw close, New York evidence
+      # times): BUY/SELL decisions, shared per-symbol reads, deadline, FX,
+      # races, lifecycle and the post-final audit, next to KRX.
+      LIMIT_ON_CLOSE_US_DB_INTEGRATION: "1"
       # SELL intents (conditions, independent stop-loss/take-profit) and KRX
       # LOC SELL: several settings on one holding never sell or reserve more
       # than the unreserved holding; races, flat holding, lifecycle.
@@ -253,6 +257,7 @@ jobs:
           src/conditional/conditional-sell.integration.spec.ts
           src/conditional/independent-tp-sl.integration.spec.ts
           src/orders/limit-on-close.integration.spec.ts
+          src/orders/limit-on-close-us.integration.spec.ts
           src/futures/futures-limit.integration.spec.ts
           src/futures/futures-conditional-entry.integration.spec.ts
           src/futures/futures-isolated-boundary.integration.spec.ts

@@ -212,7 +212,8 @@ describe('TiingoStreamService', () => {
     const first = sockets[0];
     first.open();
     first.frame(ack(1));
-    jest.advanceTimersByTime(80_000);
+    // Nothing at all (not even a heartbeat) past the 300 s default.
+    jest.advanceTimersByTime(305_000);
     expect(first.closes).toContain(4000);
     expect(stream.getStatus().reference.lastErrorCode).toBe(
       'TIINGO_WS_HEARTBEAT_TIMEOUT',
@@ -228,6 +229,30 @@ describe('TiingoStreamService', () => {
       state: 'subscribed',
       reconnectCount: 1,
     });
+    await stream.stop();
+  });
+
+  it("keeps a quiet socket alive on Tiingo's 120 s heartbeats (no 80 s reconnect cycle)", async () => {
+    const { stream, sockets } = createStream({
+      TIINGO_WS_LIQUIDITY_ENABLED: 'false',
+    });
+    await stream.start();
+    const first = sockets[0];
+    first.open();
+    first.frame(ack(1));
+    // Ten minutes with heartbeats only, every 120 s (measured cadence).
+    for (let minute = 0; minute < 5; minute += 1) {
+      jest.advanceTimersByTime(120_000);
+      first.frame({
+        messageType: 'H',
+        response: { code: 200, message: 'HeartBeat' },
+      });
+    }
+    expect(first.closes).not.toContain(4000);
+    expect(sockets).toHaveLength(1);
+    // Liveness is not price freshness: no data was recorded.
+    expect(stream.getStatus().reference.lastDataAt).toBeNull();
+    expect(stream.getStatus().reference.counters.heartbeats).toBe(5);
     await stream.stop();
   });
 

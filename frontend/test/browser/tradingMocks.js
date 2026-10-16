@@ -35,14 +35,17 @@ const krxStock = params.get('krx') === '1' ? [{
 // display values only (never provider data). `?usAsk=none` drops the ask side,
 // `?usLong=1` uses long numbers, `?usClosed=1` closes the market.
 const usLong = params.get('usLong') === '1';
-const usStock = params.get('us') === '1' ? [{
+// `?usOfficial=1` (2026-10-17): the same asset priced by the official stored
+// Tiingo source, and every capability list naming US.
+const usOfficial = params.get('usOfficial') === '1';
+const usStock = params.get('us') === '1' || usOfficial ? [{
   id: 'AAPL', assetType: 'us_stock', symbol: 'AAPL', market: 'NAS', name: 'Apple Inc.',
   priceCurrency: 'USD', settlementCurrency: 'USD', displayPriceDecimals: null, isActive: true,
   marketStatus: params.get('usClosed') === '1' ? 'closed' : 'open', tradable: true,
   price: { state: 'available', currentPrice: usLong ? '12345.12345600' : '247.61000000', priceCurrency: 'USD',
     priceKrwState: 'available', priceKrw: '346654.00000000', changeRate: null,
     priceCapturedAt: new Date().toISOString(), priceEffectiveAt: new Date().toISOString(), assetPriceSnapshotId: null,
-    priceSource: { sourceType: 'provider_api', sourceName: 'tiingo_equity_reference_price', snapshotId: null,
+    priceSource: { sourceType: 'provider_api', sourceName: usOfficial ? 'tiingo_us_reference_price' : 'tiingo_equity_reference_price', snapshotId: null,
       effectiveAt: new Date().toISOString(), capturedAt: new Date().toISOString(), fallbackUsed: false,
       fallbackReason: null, rejectedProviderReason: null, freshnessAgeSeconds: 1 } },
 }] : [];
@@ -274,15 +277,16 @@ export const apiClient = {
         : query.history === 'true' ? all : all.filter((r) => r.state === 'watching' || r.state === 'triggered');
       const offset = Number(query.offset ?? 0), limit = Number(query.limit ?? 30);
       const page = rows.slice(offset, offset + limit);
+      // `usOfficial=1`: the server lists US (US_STOCK_PRICE_PROVIDER=tiingo, 2026-10-17).
       return response({ tradingAccountId: id, capabilities: { enabled: conditionalEnabled, canCreate: conditionalEnabled, canCancel: true,
-        canUseLimit: conditionalEnabled && params.get('conditionalLimit') !== 'off', markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
+        canUseLimit: conditionalEnabled && params.get('conditionalLimit') !== 'off', markets: ['KRX', 'CRYPTO_SPOT', ...(usOfficial ? ['US'] : [])], maxLivePerAccount: 20 },
         conditionalOrders: page, pagination: { limit, offset, total: rows.length, returned: page.length, nextOffset: offset + page.length < rows.length ? offset + page.length : null } });
     }
     if (path.endsWith('/order-capabilities')) {
       const id = path.split('/')[2];
       return response({ tradingAccountId: id, limitOrder: { enabled: true, autoExecutionEnabled: false },
-        limitOnClose: { enabled: locEnabled, markets: ['KRX'], sides: ['buy'], attachedProtection: false },
-        limitOnCloseSell: { enabled: params.get('locSell') === 'enabled', markets: ['KRX'] } });
+        limitOnClose: { enabled: locEnabled, markets: ['KRX', ...(usOfficial ? ['US'] : [])], sides: ['buy'], attachedProtection: false },
+        limitOnCloseSell: { enabled: params.get('locSell') === 'enabled', markets: ['KRX', ...(usOfficial ? ['US'] : [])] } });
     }
     if (path.endsWith('/conditional-sell-orders')) {
       const id = path.split('/')[2];
@@ -299,7 +303,7 @@ export const apiClient = {
       const page = rows.slice(offset, offset + limit);
       const family = { enabled: sellEnabled, canCreate: sellEnabled, canUseLimit: sellEnabled };
       return response({ tradingAccountId: id, capabilities: { enabled: sellEnabled, condition: family, protection: family, canCancel: true,
-        markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 30 },
+        markets: ['KRX', 'CRYPTO_SPOT', ...(usOfficial ? ['US'] : [])], maxLivePerAccount: 30 },
         conditionalOrders: page, pagination: { limit, offset, total: rows.length, returned: page.length, nextOffset: offset + page.length < rows.length ? offset + page.length : null } });
     }
     state.reads.push(path);
@@ -456,8 +460,12 @@ export const apiClient = {
     if (path.includes('/futures/conditional-entries'))
       return response({ tradingAccountId: state.accountId, duplicate: false, entry: { id: 'entry', state: path.endsWith('/cancel') ? 'canceled' : 'watching', ...body } });
     const asset = assets.find((a) => a.id === body.assetId);
-    const loc = body.limitOnClose ? { market: 'KRX', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T00:00:00.000Z',
-      sessionCloseAt: '2026-10-13T06:30:00.000Z', evidenceDeadlineAt: '2026-10-13T09:30:00.000Z', executionPricePolicy: 'final_regular_session_close' } : null;
+    // A US LOC binds the New York session; its deadline is 23:00 New York.
+    const loc = body.limitOnClose ? (asset?.assetType === 'us_stock'
+      ? { market: 'US', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T13:30:00.000Z',
+        sessionCloseAt: '2026-10-13T20:00:00.000Z', evidenceDeadlineAt: '2026-10-14T03:00:00.000Z', executionPricePolicy: 'final_regular_session_close' }
+      : { market: 'KRX', sessionDate: '2026-10-13', sessionOpenAt: '2026-10-13T00:00:00.000Z',
+        sessionCloseAt: '2026-10-13T06:30:00.000Z', evidenceDeadlineAt: '2026-10-13T09:30:00.000Z', executionPricePolicy: 'final_regular_session_close' }) : null;
     if (path.endsWith('/quote'))
       return response({
         state: 'available',

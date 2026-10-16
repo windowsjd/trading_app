@@ -986,3 +986,117 @@ describe('MarketCandleLongSyncService — run outcome', () => {
     expect(summary.runFailed).toBe(true);
   });
 });
+
+describe('MarketCandleLongSyncService — US stocks on Tiingo (stored 5m → 4h)', () => {
+  const FIVE = 300_000;
+  const previous = process.env.US_STOCK_PRICE_PROVIDER;
+  afterEach(() => {
+    if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+    else process.env.US_STOCK_PRICE_PROVIDER = previous;
+  });
+  /** Every regular 5m slot of a US session, Tiingo (or another provider). */
+  function seedSession(
+    repository: ReturnType<typeof createService>['repository'],
+    date: string,
+    provider = 'tiingo_equity_intraday',
+    skip: number[] = [],
+  ) {
+    const session = resolveMarketSession('US', date)!;
+    let index = 0;
+    for (
+      let open = session.openTime.getTime();
+      open + FIVE <= session.closeTime.getTime();
+      open += FIVE
+    ) {
+      if (!skip.includes(index))
+        repository.rows.set(`aapl|5m|${open}`, {
+          assetId: 'aapl',
+          interval: '5m',
+          openTime: new Date(open),
+          closeTime: new Date(open + FIVE),
+          open: String(100 + index),
+          high: String(101 + index),
+          low: String(99 + index),
+          close: String(100.5 + index),
+          volume: '10',
+          amount: null,
+          isClosed: true,
+          sourceProvider: provider,
+          sourceUpdatedAt: new Date(session.closeTime.getTime() + 600_000),
+        });
+      index += 1;
+    }
+    return session;
+  }
+
+  it('does nothing while US stocks are on the KIS provider', async () => {
+    process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+    const { service, prisma, repository } = createService();
+    const summary = await service.syncUs({
+      mode: 'backfill',
+      now: new Date('2026-12-01T00:00:00Z'),
+      sessions: 5,
+    });
+    expect(summary.series).toEqual([]);
+    expect(prisma.asset.findMany).not.toHaveBeenCalled();
+    expect(repository.upsertMany).not.toHaveBeenCalled();
+  });
+
+  it('synthesizes only complete regular buckets (two a day, one on an early close) and leaves incomplete days pending', async () => {
+    process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+    const { service, prisma, repository } = createService();
+    prisma.asset.findMany.mockResolvedValue([{ id: 'aapl', symbol: 'AAPL' }]);
+    // Wed 11-25 complete; Fri 11-27 early close (13:00) complete; Mon 11-30
+    // misses one 5m bar in its second bucket; Tue 12-01 KIS rows only.
+    seedSession(repository, '20261125');
+    const early = seedSession(repository, '20261127');
+    seedSession(repository, '20261130', 'tiingo_equity_intraday', [60]);
+    seedSession(repository, '20261201', 'kis_overseas_minute');
+    // Three previous sessions + today (12-01, completed at 22:00 New York),
+    // as the 96-session chart window counts them.
+    const summary = await service.syncUs({
+      mode: 'backfill',
+      now: new Date('2026-12-02T03:00:00Z'),
+      sessions: 3,
+    });
+    const series = summary.series[0];
+    expect(series.status).toBe('synced');
+    // 11-25 ×2, 11-27 ×1 (early close), 11-30 ×2, 12-01 ×2.
+    expect(series.expected).toBe(7);
+    const written = [...repository.rows.values()].filter(
+      (row) => row.interval === '4h',
+    );
+    expect(
+      written.map((row) => [
+        row.openTime.toISOString(),
+        row.closeTime.toISOString(),
+      ]),
+    ).toEqual([
+      ['2026-11-25T14:30:00.000Z', '2026-11-25T18:30:00.000Z'],
+      ['2026-11-25T18:30:00.000Z', '2026-11-25T21:00:00.000Z'],
+      ['2026-11-27T14:30:00.000Z', '2026-11-27T18:00:00.000Z'],
+      // 11-30: only the complete morning bucket.
+      ['2026-11-30T14:30:00.000Z', '2026-11-30T18:30:00.000Z'],
+    ]);
+    expect(early.closeTime.toISOString()).toBe('2026-11-27T18:00:00.000Z');
+    expect(
+      written.every(
+        (row) =>
+          row.sourceProvider === 'tiingo_equity_intraday_4h' && row.isClosed,
+      ),
+    ).toBe(true);
+    // KIS rows never become Tiingo history: 12-01 stays pending.
+    expect(series.pending).toEqual([
+      { date: '2026-12-01', reason: 'five_minute_incomplete' },
+    ]);
+    // A rerun writes nothing new.
+    repository.upsertMany.mockClear();
+    const again = await service.syncUs({
+      mode: 'incremental',
+      now: new Date('2026-12-02T03:00:00Z'),
+      sessions: 3,
+    });
+    expect(again.series[0].status).toBe('up_to_date');
+    expect(repository.upsertMany).not.toHaveBeenCalled();
+  });
+});

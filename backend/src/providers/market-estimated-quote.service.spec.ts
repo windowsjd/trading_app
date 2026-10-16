@@ -34,10 +34,23 @@ describe('display-only provider facades', () => {
     expect(await absent.resolve(AAPL, new Date())).toBeNull();
     expect(await absent.displaySourceNames(AAPL)).toBeNull();
     const disabled = new MarketDisplayPriceService({
-      isEnabled: () => false,
+      isTrialDisplayEnabled: () => false,
       resolveDisplayPrice: jest.fn(),
     } as unknown as TiingoQuoteService);
     expect(await disabled.resolve(AAPL, new Date())).toBeNull();
+    // Official mode (2026-10-17): Tiingo prices are stored snapshots; the
+    // ephemeral display path steps aside.
+    const official = new MarketDisplayPriceService({
+      isEnabled: () => true,
+      isTrialDisplayEnabled: () => false,
+      resolveDisplayPrice: jest.fn(),
+      targetForAsset: jest.fn().mockResolvedValue({ assetId: 'asset-aapl' }),
+    } as unknown as TiingoQuoteService);
+    expect(await official.resolve(AAPL, new Date())).toBeNull();
+    expect(await official.displaySourceNames(AAPL)).toBeNull();
+    expect(
+      official.isEphemeralSourceName('tiingo_equity_reference_price'),
+    ).toBe(false);
     expect(new MarketEstimatedQuoteService().subscribe(jest.fn())).toEqual(
       expect.any(Function),
     );
@@ -49,6 +62,7 @@ describe('display-only provider facades', () => {
   it('routes a managed asset to the Tiingo source only', async () => {
     const tiingo = {
       isEnabled: () => true,
+      isTrialDisplayEnabled: () => true,
       targetForAsset: jest.fn().mockResolvedValue({ assetId: 'asset-aapl' }),
     } as unknown as TiingoQuoteService;
     const service = new MarketDisplayPriceService(tiingo);

@@ -39,6 +39,7 @@ import {
 } from '../ranking/season-ranking-scope';
 import { assertSeasonRankingSetScope } from '../ranking/season-ranking-set-scope';
 import {
+  adminManualAssetPriceScope,
   buildAdminManualFallbackDecision,
   isPositiveDecimal,
   resolveAssetProviderEligibility,
@@ -1268,6 +1269,7 @@ export class HomeService {
         assetId: asset.id,
         currencyCode,
         sourceType: AssetPriceSourceType.admin_manual,
+        ...adminManualAssetPriceScope(asset),
         effectiveAt: {
           lte: valuationAt,
         },
