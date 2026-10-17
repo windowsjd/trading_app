@@ -145,8 +145,8 @@ export class DailyChangeRateService {
    * (`koscom_history`, same row checks as the change-rate baseline). See
    * `krxAuctionClose`: the closes agree, or the daily close may still be
    * provisional (the NXT after-market last price, 2026-10-16: 217,000 vs the
-   * 215,500 auction) and the stored session reproduces the daily's KRX
-   * O/H/L. Otherwise null: never an older session's close and never another
+   * 215,500 auction) and the stored session reproduces the daily's O/H/L.
+   * Otherwise null: never an older session's close and never another
    * provider's price. Nothing is written; orders, valuation and settlement
    * never call this.
    */
@@ -304,8 +304,9 @@ export class DailyChangeRateService {
    * - the daily close may still be provisional
    *   (`koscomDailyCloseMayBeProvisional`, the NXT after-market last price):
    *   accepted only when the whole stored KOSCOM 5m session reproduces the
-   *   daily's KRX open/high/low with no more volume — the backfill's date
-   *   attribution rule;
+   *   daily's open/high/low exactly with no more volume — the backfill's date
+   *   attribution rule (a provisional high/low that carries an NXT print
+   *   outside the KRX range never matches: null until the final daily);
    * - a final daily close that differs: null.
    */
   private async krxAuctionClose(

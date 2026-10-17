@@ -841,14 +841,17 @@ type SessionBar = {
 /**
  * Whether KOSCOM's dated daily bar of KRX `session`, received at
  * `receivedAt`, may still carry a provisional close (2026-10-18). The latest
- * session's daily row follows the live quote: O/H/L stay the KRX regular
- * session's, but the close tracks the NXT after-market (to 20:00) last trade
- * — 10-16 005930/000660/000270 closes equal their 19:59 NXT prints and differ
- * from both the 15:30 auction and the 18:00 prints — until KOSCOM finalizes
- * it to the KRX close. Observed final by the next session's open (10-15 was
- * final at 06:33 KST on 10-16; 10-12…10-15 closes equal the auction for all
- * 70 stocks), so a bar received before the next session's open may be
- * provisional. Unknown receipt or calendar: false (the close is compared).
+ * session's daily row is the integrated KRX+NXT quote until KOSCOM finalizes
+ * it to the KRX bar: the close tracks the NXT after-market (to 20:00) last
+ * trade — 10-16 005930/000660/000270 closes equal their 19:59 NXT prints and
+ * differ from both the 15:30 auction and the 18:00 prints — and high/low
+ * include NXT prints outside the KRX range (10-16 032820/080220/090710 highs
+ * are their NXT after-market highs). Callers still compare O/H/L exactly, so
+ * such a session is held until the final bar. Observed final by the next
+ * session's open (10-15 was final at 06:33 KST on 10-16; 10-12…10-15 closes
+ * equal the auction for all 70 stocks), so a bar received before the next
+ * session's open may be provisional. Unknown receipt or calendar: false (the
+ * close is compared).
  */
 export function koscomDailyCloseMayBeProvisional(
   session: MarketSessionWindow,
