@@ -1,6 +1,11 @@
 {
+  "icon": "./assets/icon/trading-class-ios-icon-1024.png",
   "android": {
     "package": "com.leagueoftrading",
+    "adaptiveIcon": {
+      "foregroundImage": "./assets/icon/trading-class-android-foreground-432.png",
+      "backgroundImage": "./assets/icon/trading-class-android-background-432.png"
+    },
     "softwareKeyboardLayoutMode": "resize"
   },
   "extra": {
