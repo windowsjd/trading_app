@@ -123,3 +123,31 @@ it('lists 초보모드 first, then 일반모드, then 시즌모드, keeping past
   // Order only: nothing is selected or created by rendering.
   assert.deepEqual([h.selections, h.opens, h.beginnerOpens, fresh.opens, fresh.beginnerOpens], [[], 0, 0, 0, 0]);
 });
+
+it('describes each account type directly under its title and no longer shows the old beginner note', () => {
+  const copy = {
+    beginner: '퀘스트를 따라 투자의 기초부터 다양한 거래 방법까지 단계별로 연습합니다.',
+    general: '시즌 기간 제한 없이 자유롭게 가상 투자를 연습합니다.',
+    season: '정해진 기간 동안 같은 시작 자금으로 투자 성과를 경쟁합니다.',
+  };
+  const texts = tree => elements(tree, 'Text').map(node => [node.props.children].flat().join(''));
+  // Owned general + joined season, then a fresh user offered start/join.
+  const joined = harness(), fresh = harness();
+  fresh.accounts = [];
+  for (const [h, seasonName] of [[joined, 'Season 1'], [fresh, 'Season 1']] as const) {
+    const tree = h.render(), all = texts(tree);
+    assert.doesNotMatch(all.join(' '), /초보 계정의 자산과 거래 기록은 다른 계정과 별도로 관리됩니다/);
+    assert.equal(find(tree, 'beginner-account-description').props.children, copy.beginner);
+    assert.equal(find(tree, 'mode-description-general').props.children, copy.general);
+    assert.equal(find(tree, 'mode-description-season').props.children, copy.season);
+    // Each sentence follows its own title (a status badge may sit between) and precedes the next card.
+    const at = (value: string) => all.indexOf(value);
+    assert.equal(at(copy.beginner), at('초보모드') + 1);
+    assert.equal(at('일반모드') < at(copy.general) && at(copy.general) <= at('일반모드') + 2, true);
+    assert.equal(at(copy.general) < at('시즌모드'), true);
+    assert.equal(at('시즌모드') < at(copy.season) && at(copy.season) < at(seasonName), true);
+    assert.equal(all.filter(value => Object.values(copy).includes(value)).length, 3, 'one sentence per type');
+  }
+  // Rendering the copy creates or selects nothing.
+  assert.deepEqual([joined.selections, joined.opens, joined.beginnerOpens, fresh.opens, fresh.beginnerOpens], [[], 0, 0, 0, 0]);
+});

@@ -10,6 +10,7 @@ import {
   ScrollView,
   Switch,
   Platform,
+  Linking,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
 import LogoutButton from '../../components/common/LogoutButton';
@@ -33,6 +34,7 @@ import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import NotificationSettingsSection from '../../features/notifications/NotificationSettingsSection';
+import { LOGO_DEV_KEY } from '../../features/market/assetLogoSource';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
@@ -336,6 +338,13 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>앱 정보</Text>
           <Text style={styles.helper}>앱 버전 0.1.0</Text>
+          {/* The provider's attribution, required while stock logos come from it (free plan). */}
+          {LOGO_DEV_KEY ? (
+            <ActionPressable testID="settings-logo-attribution" accessibilityRole="link" style={styles.attribution}
+              onPress={() => void Linking.openURL('https://logo.dev')}>
+              <Text style={styles.helper}>Logos provided by Logo.dev</Text>
+            </ActionPressable>
+          ) : null}
         </View>
 
         <LogoutButton testID={TEST_IDS.settings.logout} onPress={onLogout} />
@@ -375,6 +384,7 @@ const styles = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   switchLabel: { flex: 1, minWidth: 0, lineHeight: 27 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
+  attribution: { minHeight: 44, justifyContent: 'center' },
   photoActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   photoButton: { flexGrow: 1, flexBasis: 130, minHeight: 48, paddingHorizontal: 12 },
   photoError: { fontSize: 14, color: semantic.error, lineHeight: 21 },

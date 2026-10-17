@@ -165,8 +165,14 @@ export const TEST_IDS = {
 
   my: {
     screen: 'my-screen',
-    rewardMenu: 'my-reward-menu',
+    badgeMenu: 'my-badge-menu',
     logoutMenu: 'my-logout-menu',
+  },
+
+  badges: {
+    screen: 'my-badges-screen',
+    rewardHistory: 'my-badges-reward-history',
+    card: (seasonId: string) => `season-badge-${seasonId}`,
   },
 
   reward: {

@@ -217,11 +217,11 @@ export default function MyScreen({ navigation }: Props) {
 
         <View style={styles.card}>
           <ActionPressable
-            testID={TEST_IDS.my.rewardMenu}
+            testID={TEST_IDS.my.badgeMenu}
             style={styles.menuRow}
-            onPress={() => navigation.navigate('Reward')}
+            onPress={() => navigation.navigate('Badges')}
           >
-            <Text style={styles.menuText}>내 보상 / 뱃지</Text>
+            <Text style={styles.menuText}>내 뱃지</Text>
           </ActionPressable>
 
           <LogoutButton testID={TEST_IDS.my.logoutMenu} onPress={onLogout} />

@@ -33,7 +33,6 @@ import {
 import { useRankingInsights } from '../../features/ranking/useRankingInsights';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 import { getApiErrorCode } from '../../services/api/errorMapper';
-import { formatKrw } from '../../utils/format';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -44,13 +43,11 @@ import ProfileAvatar from '../../components/common/ProfileAvatar';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import { getMe, type MeDto } from '../../features/me/api';
 import WhaleLoader from '../../components/states/WhaleLoader';
-import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
-import { useAppearance, type AppearanceMode } from '../../theme/appearance';
+import { useAppearance } from '../../theme/appearance';
 import { getHomeTier, type HomeTier } from '../home/tierPresentation';
-import TierCard, { tierForeground, type TierPresentation } from '../home/TierCard';
 import TierEmblem, { tierEmblemWidth } from '../home/TierEmblem';
 import RankingInsightSlot from './RankingInsightSlot';
-import { getFinancialColors, type FinancialColorPreference } from '../../theme/financialColors';
+import StandingCard, { rankingFigureText } from './StandingCard';
 
 type Props = RankingScreenProps;
 
@@ -381,88 +378,26 @@ function MyRankingCard({
 }
 
 /**
- * 내 순위 on the season tier card (TierCard keeps the tier's art, and the
- * emblem with the tier name on the right). The left column reads top to
- * bottom: profile, 내 순위 with the rank, then the return rate and total assets
- * of my ranking row, as the list shows them. Without a known tier the same
- * column sits on a plain card.
+ * 내 순위 on the season tier card (StandingCard, shared with 내 뱃지): the
+ * profile, 내 순위 with the rank, then the return rate and total assets of my
+ * ranking row, as the list shows them.
  */
 function MyStandingCard({ me, ranking, rankType, seasonId, focused }: {
   me?: MeDto; ranking: Extract<MyRankingDto, { state: 'available' }> | null; rankType?: RankingRankType; seasonId?: string; focused: boolean;
 }) {
-  const { mode, financialPreference } = useAppearance();
-  const { width } = useWindowDimensions();
-  const tier = getHomeTier(getRankingTier(ranking, rankType), mode);
-  const foreground = tier ? tierForeground(tier, mode) : undefined;
-  const { rate, total } = rankingFigureText(ranking);
-  const label = [styles.label, foreground && styles.onArtLabel, foreground];
-  const content = (
-    <View style={styles.standing}>
-      {me ? (
+  return (
+    <StandingCard testIDPrefix="ranking-my" tier={getRankingTier(ranking, rankType)} rankLabel="내 순위" rank={ranking?.rank}
+      settled={rankType === 'final'} figures={ranking}
+      header={(foreground) => me ? (
         <View style={styles.profile}>
           <ProfileAvatar profileImageUrl={me.profileImageUrl} size={36} testID="ranking-my-avatar" />
           <Text style={[styles.myName, foreground]}>{me.nickname}</Text>
         </View>
       ) : null}
-      <View>
-        <Text style={label}>내 순위</Text>
-        <Text testID="ranking-my-rank" style={[styles.myRank, foreground]}>{ranking ? `#${ranking.rank}` : '-'}</Text>
-        {rankType === 'final' ? (
-          <Text testID="ranking-my-settled" style={[styles.settledText, foreground && styles.onArtSettled,
-            // Whale's art is dark even in Light, where the error red would not read.
-            tier?.id === 'whale' && mode === 'light' && foreground]}>최종 랭킹 확정</Text>
-        ) : null}
-      </View>
-      <View testID="ranking-my-figures" style={styles.myFigures} accessible accessibilityLabel={`수익률 ${rate.text}, 총자산 ${total}`}>
-        <View style={styles.myFigure}>
-          <Text style={label}>수익률</Text>
-          <Text testID="ranking-my-return" style={[styles.myFigureValue, foreground, {
-            color: tier ? artRateColor(ranking?.returnRate, tier, mode, financialPreference) : rate.color,
-          }]}>{rate.text}</Text>
-        </View>
-        <View style={styles.myFigure}>
-          <Text style={label}>총자산</Text>
-          <Text testID="ranking-my-total" style={[styles.myFigureValue, foreground]}>{total}</Text>
-        </View>
-      </View>
-    </View>
+      // The tier is read from this publication's season and rank type for me: a tier change within them
+      // replays the emblem's entrance; another season, daily → final or another account only re-anchors it.
+      spotlight={{ context: `${seasonId}|${rankType}|${ranking?.seasonParticipantId}`, paused: !focused }} />
   );
-  if (!tier) {
-    return <View testID="ranking-my-card" style={styles.card}>{content}</View>;
-  }
-  return (
-    <View style={styles.myCard}>
-      <TierCard testID="ranking-my-card" tier={tier} mode={mode} emblemSize={width < 360 ? 104 : 124}
-        caption={<Text testID="ranking-my-tier" style={[styles.tierCaption, foreground]}>{tier.name}</Text>}
-        // The tier is read from this publication's season and rank type for me: a tier change within them
-        // replays the emblem's entrance; another season, daily → final or another account only re-anchors it.
-        spotlight={{ context: `${seasonId}|${rankType}|${ranking?.seasonParticipantId}`, paused: !focused }}>
-        {content}
-      </TierCard>
-    </View>
-  );
-}
-
-/** One ranking row's figures, in the same words on 내 순위 and in the list. */
-function rankingFigureText(ranking: Pick<RankingItemDto, 'returnRate' | 'totalAssetKrw'> | null) {
-  const won = formatKrw(ranking?.totalAssetKrw);
-  return { rate: getRecordFinancialDisplay(ranking?.returnRate, 'rate'), total: won === '-' ? '-' : `${won}원` };
-}
-
-/**
- * The return rate directly on tier art. Keep the user's direction hue, chosen
- * and shaded for the art's own luminance (Whale is dark even in Light), whose
- * facets differ from the screen. Neutral and unavailable rates use the tier's
- * foreground.
- */
-function artRateColor(returnRate: string | undefined, tier: TierPresentation, mode: AppearanceMode,
-  financialPreference?: FinancialColorPreference) {
-  const sign = Number(returnRate);
-  // Unavailable (`-`) or zero.
-  if (!Number.isFinite(sign) || sign === 0) return tierForeground(tier, mode).color;
-  const darkSurface = mode === 'dark' || tier.id === 'whale';
-  const direction = getFinancialColors(darkSurface ? 'dark' : 'light', financialPreference);
-  return shadeFinancialInk(sign > 0 ? direction.rise : direction.fall, darkSurface);
 }
 
 /**
@@ -478,15 +413,6 @@ function RankingFigures({ item, tierName, mine }: { item: RankingItemDto; tierNa
       <Text testID={`ranking-total-${item.userId}`} style={styles.totalAsset}>{total}</Text>
     </View>
   );
-}
-
-// Light art has mid-tone facets (Platinum's and Diamond's lower faces, where the
-// figures sit with large text): the hue needs 70% black there to keep 4.5:1.
-function shadeFinancialInk(hex: string, dark: boolean) {
-  const amount = dark ? .55 : .7;
-  const target = dark ? 255 : 0;
-  return `#${[1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * (1 - amount) + target * amount)
-    .toString(16).padStart(2, '0')).join('')}`;
 }
 
 const HIDDEN = {
@@ -585,32 +511,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   tabs: { marginBottom: 12 },
-  myCard: { marginBottom: 12 },
-  onArtLabel: { fontWeight: '700' },
-  onArtSettled: { fontWeight: '800' },
-  // 내 순위's left column: profile, then the rank, then the figures, with room between the three.
-  standing: { gap: 12, minWidth: 0 },
   myName: { flex: 1, minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
-  myRank: { fontSize: 32, lineHeight: 40, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  myFigures: { gap: 2, minWidth: 0 },
-  // A value moves under its label only when the two cannot share the line;
-  // alone on its line it may still wrap, so it never runs into the emblem.
-  myFigure: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, minWidth: 0 },
-  myFigureValue: { flexShrink: 1, minWidth: 0, fontSize: 16, lineHeight: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
   profile: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 0, flexShrink: 1 },
   // Only when the figures cannot fit beside the name (narrow screens at large
   // text) do they wrap under it; long values remain fully visible.
   figures: { marginLeft: 'auto', flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch', gap: 2 },
-  // The app's percent figures: system font, regular weight, tabular digits.
-  // Only the size (18) keeps the ranking's emphasis.
-  returnValue: { fontSize: 18, lineHeight: 26, textAlign: 'right', fontVariant: ['tabular-nums'] },
+  // The app's percent figures: system font and tabular digits, at the
+  // ranking's size (18). Bold, so the direction color reads at full strength
+  // in every row (a regular stroke is thin enough to look faded).
+  returnValue: { fontSize: 18, lineHeight: 26, fontWeight: '700', textAlign: 'right', fontVariant: ['tabular-nums'] },
   totalAsset: { fontSize: 15, lineHeight: 22, fontWeight: '600', textAlign: 'right', fontVariant: ['tabular-nums'] },
   title: { fontSize: 22, fontWeight: '700' },
   label: { fontSize: 13, color: semantic.secondary },
-  big: { fontSize: 24, fontWeight: '700' },
   helper: { fontSize: 14, color: semantic.secondary },
-  settledText: { color: semantic.error, fontWeight: '700' },
   // Every tier: the plain card's surface, border and radius (as styles.card).
   rankRow: {
     borderWidth: ROW_BORDER,

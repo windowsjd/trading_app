@@ -14,7 +14,7 @@ export default function BeginnerAccountEntry({ onEntered }: { onEntered: () => v
   return (
     <View style={styles.card} testID="beginner-account-entry">
       <Text style={styles.title}>초보모드</Text>
-      <Text style={styles.body}>초보 계정의 자산과 거래 기록은 다른 계정과 별도로 관리됩니다.</Text>
+      <Text testID="beginner-account-description" style={styles.body}>퀘스트를 따라 투자의 기초부터 다양한 거래 방법까지 단계별로 연습합니다.</Text>
       <CTAButton
         testID="beginner-account-start"
         label={existing ? '초보모드 계속하기' : '초보 계정 만들기'}

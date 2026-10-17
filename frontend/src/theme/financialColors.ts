@@ -33,6 +33,8 @@ function directionalPalette(positive: typeof red, negative: typeof red) {
   return {
     buy: positive.text, sell: negative.text, rise: positive.text, fall: negative.text,
     buySurface: positive.surface, sellSurface: negative.surface,
+    // The same direction surfaces under rate names: a return rate's own chip.
+    riseSurface: positive.surface, fallSurface: negative.surface,
     buyAction: positive.action, sellAction: negative.action,
     candleUp: positive.candle, candleDown: negative.candle,
     // Cashflow is independent of market/order direction and of this preference.
@@ -53,6 +55,7 @@ export const financial = {
   credit: '#0e0007', debit: '#0e0008',
   buyAction: '#0e0009', sellAction: '#0e000a',
   candleUp: '#0e000b', candleDown: '#0e000c',
+  riseSurface: '#0e000d', fallSurface: '#0e000e',
 } as const;
 type Role = keyof typeof financial;
 const roleByValue = Object.fromEntries(Object.entries(financial).map(([role, value]) => [value, role])) as Record<string, Role>;

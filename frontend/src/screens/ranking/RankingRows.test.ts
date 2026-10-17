@@ -3,7 +3,7 @@ import { createRequire } from 'node:module';
 import { describe, it, type TestContext } from 'node:test';
 import { availableRankings } from '../../features/ranking/fixtures.ts';
 import type { RankingItemDto } from '../../features/ranking/api.ts';
-import { financial } from '../../theme/financialColors.ts';
+import { financial, resolveFinancialColor } from '../../theme/financialColors.ts';
 import { semantic } from '../../theme/tokens.ts';
 import { getHomeTier } from '../home/tierPresentation.ts';
 
@@ -183,6 +183,8 @@ describe('랭킹 목록 행: 일반 카드', () => {
         for (const [index, expected] of [financial.rise, financial.fall, semantic.text, semantic.text].entries()) {
           const rate = h.node(`ranking-return-user-${index}`);
           assert.equal(flatten(rate.props.style).color, expected, `${mode} ${tier} ${rates[index]}`);
+          // Bold, so a direction color is not thinned into a faded tint.
+          assert.equal(flatten(rate.props.style).fontWeight, '700');
           // Rank, nickname, (hidden) chip slot, tier name and total.
           for (const text of h.node(`ranking-item-user-${index}`).findAll((node: any) => node.type === 'Text')) {
             if (text === rate) continue;
@@ -395,24 +397,44 @@ describe('내 순위 카드: 왼쪽 정보, 오른쪽 티어 엠블럼', () => {
     }
   });
 
-  it("on tier art the rate keeps the user's direction hue (shaded for the art); zero and unavailable take the tier's foreground", async (t) => {
+  it("on tier art a rising or falling rate sits on its direction's own surface in the role colors; zero and unavailable take the tier's foreground", async (t) => {
     const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
     const dominant = (hex: string) => ['red', 'green', 'blue'][rgb(hex).indexOf(Math.max(...rgb(hex)))];
+    const luminance = (hex: string) => {
+      const [r, g, b] = rgb(hex).map((v) => v / 255).map((v) => v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      return r * 0.2126 + g * 0.7152 + b * 0.0722;
+    };
+    const contrast = (a: string, b: string) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
     const hues = { red_blue: { up: 'red', down: 'blue' }, green_red: { up: 'green', down: 'red' } } as const;
     for (const palette of ['red_blue', 'green_red'] as const) {
       for (const mode of ['light', 'dark'] as const) {
         for (const tier of TIERS) {
-          // Zero and unavailable do not depend on the palette.
-          const cases = [['4.5', 'up'], ['-3', 'down'], ...(palette === 'red_blue' ? [['0', null], [null, null]] : [])] as const;
+          // Zero, a rate shown as 0% and unavailable do not depend on the palette.
+          const cases = [['4.5', 'up'], ['-3', 'down'],
+            ...(palette === 'red_blue' ? [['0', null], ['0.001', null], [null, null]] : [])] as const;
           for (const [returnRate, direction] of cases) {
             const h = await rowsHarness(t, { rows: [person(0, 'master'), person(1, tier, rate(returnRate))], mine: 'sp-1', mode, palette });
             const foreground = h.tierForeground(getHomeTier(tier, mode), mode);
             const ink = flatten(h.node('ranking-my-return').props.style);
             const where = `${palette} ${mode} ${tier} ${returnRate}`;
-            if (direction) assert.equal(dominant(ink.color), hues[palette][direction], where);
-            else assert.equal(ink.color, foreground.color, where);
-            // The same halo as the card's other text on this art.
-            assert.equal(ink.textShadowColor ?? 'none', foreground.textShadowColor ?? 'none', where);
+            if (direction) {
+              const chip = flatten(h.node('ranking-my-return-chip').props.style);
+              assert.deepEqual([ink.color, chip.backgroundColor], direction === 'up'
+                ? [financial.rise, financial.riseSurface] : [financial.fall, financial.fallSurface], where);
+              // Resolved for this appearance and palette: the full direction hue, readable on its own surface.
+              const text = resolveFinancialColor(ink.color, mode, palette);
+              const surface = resolveFinancialColor(chip.backgroundColor, mode, palette);
+              assert.equal(dominant(text), hues[palette][direction], where);
+              assert.equal(contrast(text, surface) >= 4.5, true, where);
+              // The chip gives the contrast: no tier halo blurs the colored digits.
+              assert.equal(ink.textShadowColor === undefined && ink.textShadowRadius === undefined, true, where);
+              assert.equal(hostParent(h.node('ranking-my-return')) === h.node('ranking-my-return-chip'), true, where);
+            } else {
+              assert.equal(h.has('ranking-my-return-chip'), false, where);
+              assert.equal(ink.color, foreground.color, where);
+              // The same halo as the card's other text on this art.
+              assert.equal(ink.textShadowColor ?? 'none', foreground.textShadowColor ?? 'none', where);
+            }
             assert.deepEqual([flatten(h.node('ranking-my-total').props.style).color, flatten(h.node('ranking-my-rank').props.style).color],
               [foreground.color, foreground.color], where);
           }

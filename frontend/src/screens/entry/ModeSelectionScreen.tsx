@@ -28,6 +28,16 @@ import { getApiErrorCode } from '../../services/api/errorMapper';
 import { ERROR_CODE } from '../../models/enums/errorCode';
 
 /**
+ * One sentence under each account type saying what it is for (초보모드's is
+ * in BeginnerAccountEntry). Copy only: selection and creation stay on the
+ * explicit press of each card.
+ */
+const MODE_DESCRIPTIONS = {
+  general: '시즌 기간 제한 없이 자유롭게 가상 투자를 연습합니다.',
+  season: '정해진 기간 동안 같은 시작 자금으로 투자 성과를 경쟁합니다.',
+} as const;
+
+/**
  * The question every fresh authentication must answer (작업 13 §2·§3):
  * "이번 세션에서 어떤 투자 계정으로 시작할 것인가?"
  *
@@ -137,6 +147,7 @@ export default function ModeSelectionScreen({
         ) : (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>일반모드</Text>
+            <ModeDescription mode="general" />
             <CTAButton
               testID={TEST_IDS.modeSelection.generalStart}
               label={
@@ -165,6 +176,7 @@ export default function ModeSelectionScreen({
                 <Text style={[styles.cardTitle, styles.cardHeaderTitle]}>시즌모드</Text>
                 <View style={styles.badge}><Text style={styles.badgeText}>참가중</Text></View>
               </View>
+              <ModeDescription mode="season" />
               <Text style={styles.cardBody}>{account.season?.seasonName}</Text>
               <CTAButton
                 testID={TEST_IDS.modeSelection.seasonContinue(account.id)}
@@ -195,6 +207,7 @@ export default function ModeSelectionScreen({
         ) : model.seasonJoin.kind === 'available' ? (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>시즌모드</Text>
+            <ModeDescription mode="season" />
             <Text style={styles.cardBody}>{model.seasonJoin.seasonName}</Text>
             <CTAButton
               testID={TEST_IDS.modeSelection.seasonJoin}
@@ -264,12 +277,21 @@ function GeneralExistingCard({
           <Text style={styles.badgeText}>{display.statusLabel}</Text>
         </View>
       </View>
+      <ModeDescription mode="general" />
       <CTAButton
         testID={TEST_IDS.modeSelection.generalUse}
         label="일반모드"
         onPress={onStart}
       />
     </View>
+  );
+}
+
+function ModeDescription({ mode }: { mode: keyof typeof MODE_DESCRIPTIONS }) {
+  return (
+    <Text testID={`mode-description-${mode}`} style={styles.cardBody}>
+      {MODE_DESCRIPTIONS[mode]}
+    </Text>
   );
 }
 

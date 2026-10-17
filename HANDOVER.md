@@ -10,6 +10,61 @@
 
 ---
 
+## 2026-10-18 A차 통합 개선 (내 뱃지·미국주식 한글명/로고·계정 선택 설명·총자산 정렬·랭킹 수익률 색)
+
+- **구현 목표:** MY `내 뱃지`(정산 완료 시즌별 최종 티어·순위·수익률 카드), 미국주식 한국어 이름과 종목 원형 로고, 계정 선택 화면 설명 문구,
+  홈 총자산·티어 엠블럼 좌우 고정과 글자 크기 자동 축소, 랭킹 수익률 빨강/파랑 가독성. 시작 `main`=`origin/main`=`e7ab736d`(clean).
+  **frontend만 변경**(backend·DB·API·migration 없음). 커밋·push·배포·운영 DB 변경 없음.
+- **기능 구현 의도:**
+  - **내 뱃지는 저장하지 않고 정산 결과를 읽는다.** 정산은 한 트랜잭션에서 final `SeasonRanking` 행, 참가자 `finalRank/finalTier`,
+    `Season.status=settled`를 함께 쓰고, 운영자 결과 정정은 참가자 값과 final 행 순위를 함께 고친다. 그래서 별도 성적 테이블을 만들면
+    오히려 "정정 후 불일치·중복 생성·재시도 멱등성"을 새로 관리해야 한다. `GET /records/me/seasons?seasonStatus=settled`(기존 API·필터)를
+    그대로 읽고 `finalRank`·`finalTier`가 확정된 시즌만 카드로 만든다(`features/record/seasonBadges.ts`). 수익률·자산은 같은 응답의
+    `latestReturnRate/latestTotalAssetKrw`이며, final 행이 있으면 그것이 우선이라는 계약은 backend `records.service.spec`
+    ("final ranking row wins over the daily snapshot")가 이미 고정한다. 미정산(ended 포함)·미자격(`finalQualified=false`)·제외 참가자는
+    카드가 없고, 순위·티어를 만들어 내지 않는다. 카드는 랭킹 탭 내 순위 카드와 같은 컴포넌트(`screens/ranking/StandingCard.tsx`)다.
+    **보상과 분리:** 뱃지는 기록 UI이고, 기존 보상 화면(`Reward`)은 그대로 두어 제목만 `보상 지급 내역`으로 바꾸고 내 뱃지 하단 링크·홈
+    `보상 확인`에서 연다. `REWARD_POLICY_GATE_CLOSED`·관리자 보상은 손대지 않았다.
+  - **한국어 이름은 표시 계층 표 1개.** `utils/usStockKoreanNames.ts`(98개, 네이버 증권이 보여 주는 한국어 종목명을 2026-10-18에 심볼+거래소로
+    조회해 거래소가 우리 market과 모두 일치한 것만; 번역·추정 없음, 한글이 없는 AT&T·KLA와 상장폐지 WBD는 영문 유지). 키는 backend의
+    unique 키와 같은 `market:symbol`이라 다른 시장의 같은 심볼에 붙지 않는다. `getAssetNameDisplay`가 이 표를 보므로 마켓·보유·주문 등
+    모든 화면이 같은 규칙을 쓰고(`Asset.name`은 그대로), 마켓 행은 둘째 줄에 `(Apple Inc.) · AAPL`을 둔다. **검색:** 서버는 영문명·심볼만
+    검색하므로, 한글이 들어간 검색어가 표와 맞으면 미국 종목 전체 목록(같은 정렬, 1회 조회, 30초 캐시)에서 market+symbol로 찾아 첫 페이지
+    앞에 붙인다(`features/market/koreanNameSearch.ts`, `useMarketAssetSearch`). 영문·심볼 검색 경로는 바뀌지 않았다.
+  - **로고는 확인된 것만.** 원형 40dp 고정, 로고가 원을 넘거나 잘리지 않게 원격 로고는 원에 내접하는 28dp 상자에 비율 유지(contain),
+    없거나 로드 실패면 표시 이름 첫 글자(`features/market/AssetLogo.tsx`, 해석은 `assetLogoSource.ts`). 승인 없이 쓸 수 있는 출처는
+    CC0 `cryptocurrency-icons@0.18.1`뿐이라 우리 Spot 종목과 심볼·프로젝트명이 일치하고 그림을 눈으로 확인한 24개만 번들했다(CRV는 그림이
+    공식 마크와 달라 제외, `src/assets/crypto-logos/README.md`). 암호화폐 티커는 토큰 간 중복이 있어 원격 조회를 하지 않는다. 주식 로고는
+    Logo.dev 공개 키(`EXPO_PUBLIC_LOGO_DEV_KEY`)가 설정될 때만 미국=티커(BRK.B=ISIN), 국내=보통주 ISIN으로 요청하고(`fallback=404`),
+    키가 없으면 요청 자체가 없다. 무료 플랜 상업적 사용 시 필요한 출처 표기는 키가 있을 때만 설정 > 앱 정보에 나온다.
+  - **총자산은 고정 폭 칸에서 글자를 줄인다.** 엠블럼은 항상 총자산 오른쪽에 두고, 총자산 칸 = 행 − 12 − 엠블럼 폭(금액과 무관). 기준 36에서
+    측정 폭으로 크기를 정하되(`screens/home/heroTotalFit.ts`), 렌더러가 글자 폭을 글자마다 반올림해 선형이 아니므로(RN-Web 실측 36→232dp,
+    33.5→220dp) 글자당 0.5dp를 더 비우고, 그래도 두 줄이 되면 0.5씩 줄이는 백스톱을 둔다. 줄임표·자르기는 없고 최소 18(라벨 크기). 엠블럼
+    옆에서 18도 안 될 때(좁은 화면의 큰 글꼴, 예: 360dp·1.3배·Diamond, 2배 대부분)만 엠블럼이 기존 하단 위치로 간다. 기본 글꼴에서는
+    320–430dp·6개 티어·10자리 금액까지 항상 옆에 있다. 줄 높이는 고정이라 금액이 바뀌어도 높이가 흔들리지 않는다.
+  - **랭킹 수익률은 방향색 칩.** 티어 아트 위 수익률을 아트 명도에 맞춰 70% 검정/55% 흰색으로 섞던 보정 때문에 빨강·파랑이 탁하거나 파스텔로
+    보였다. 이제 상승/하락은 자기 방향 표면(`financial.riseSurface/fallSurface`, 기존 buy/sell 표면과 같은 값, 4.5:1 이상 테스트됨) 위에
+    원래 방향색으로 쓴다(사용자 금융 색상 설정 그대로). 목록 수익률은 굵게(700). 0%로 반올림되는 값(예: 0.001%)도 중립색이다
+    (`getRecordFinancialDisplay`).
+  - **계정 선택 설명:** 초보/일반/시즌 제목 바로 아래 지정 문구, 기존 초보 문구 삭제. 생성·선택은 여전히 각 카드의 명시적 버튼만.
+- **설계·변경:** 새 라우트 `Badges`(MyStack, 제목 `내 뱃지`), MY 메뉴 `내 뱃지`(`my-badge-menu`), `record.seasonBadges`·
+  `market.koreanNameIndex` 쿼리 키, `getMySeasonRecords({ seasonStatus })`. `test/ledgerTestHarness.cjs`의 `withNativeDefaults`가 `Image`를
+  기본 호스트로 채운다(최소 RN mock을 쓰는 화면 테스트가 행 로고에서 깨지지 않게). 같은 폴더에 대소문자만 다른 파일명은 피한다
+  (`AssetLogo.tsx`와 `assetLogo.ts`가 대소문자 무시 해석기에서 자기 자신으로 풀린 것을 확인해 `assetLogoSource.ts`로 이름을 바꿨다).
+- **검증:** frontend `typecheck`·`lint:accounts:check`·`lint:guides:check` PASS, 전체 단위 테스트 2,980건/343 스위트 통과(실패 0; 신규:
+  뱃지 매핑 5·화면 5, 한글명 3·검색 통합 4·병합 3, 로고 6·원격 1·행 3, 총자산 맞춤 8, 계정 선택 설명 1 등; 기존 고정 테스트 중 예전 정책을
+  고정하던 랭킹 아트 색·홈 엠블럼 줄바꿈 소스 가드는 새 정책으로 같은 강도 이상 갱신). backend 코드 무변경, 근거 계약 확인용
+  `records.service.spec` 54건 통과. RN-Web 브라우저(스크래치 픽스처, 실제 컴포넌트): 총자산 6티어×5금액×320/360/390/430×글꼴 1/1.3/2×
+  Light/Dark·마켓 행·뱃지 카드 768페이지(겹침·잘림·화면 밖 글자 0, 기본 글꼴 10자리까지 엠블럼 옆·한 줄, 1.3배까지 한 줄, 뱃지 칩 대비 ≥4.5:1),
+  기존 `test/browser/rankingTierBrowser.cjs`(320/390 × 1/2배, 두 팔레트) 224 레이아웃/896행 PASS, 내 순위 글자 대비 최저 4.81:1.
+  `mainTabHeadersBrowser.cjs`는 헤더 목록만 갱신, 실행하지 않음(rootTabs 픽스처 기존 이슈).
+- **NOT_RUN / BLOCKED:** Android/iOS 실기기·에뮬레이터 확인 NOT_RUN(웹 렌더러로만 레이아웃 측정). Logo.dev 실제 응답(국내 ISIN 지원 범위
+  포함)은 키가 없어 BLOCKED(사용자 가입·약관 동의 필요).
+- **주의:** 국내주식도 `Asset.name`이 영문이라 영문으로 보인다(이번 범위 밖). 내 뱃지는 레코드 API 한 페이지 100건씩 모두 읽는다.
+  B차의 선물 종목 카드 크기·미국주식 종가 날짜 제거는 같은 `MarketAssetRow`를 건드린다.
+
+---
+
 ## 2026-10-17 문의 답변 기능·푸시 알림 보완 (주문 실패 이동·권한 재요청·전면 강제청산 안내)
 
 - **구현 목표:** 운영자·관리자가 문의를 조회하고 공식 답변 1건을 등록하며, 사용자는 MY > 문의하기에서 처리 상태와 답변을 본다.

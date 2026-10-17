@@ -29,6 +29,19 @@ import {
 export interface RecordSeasonListItemDto {
   seasonId: string;
   seasonName: string;
+  /** Present on `/records/me/seasons` (backend records contract). */
+  seasonStatus?: 'upcoming' | 'active' | 'ended' | 'settled' | (string & {});
+  participantStatus?: string;
+  /** Settlement's final-ranking eligibility verdict; null = no rule / not settled. */
+  finalQualified?: boolean | null;
+  /**
+   * The season's headline figures: the participant's final ranking row once
+   * one exists (settlement writes it with finalRank/finalTier), otherwise the
+   * settled totals of a non-qualified participant or the latest daily
+   * snapshot (backend selectBestMetric / notQualifiedFinalMetric).
+   */
+  latestReturnRate?: RateString | null;
+  latestTotalAssetKrw?: MoneyString | null;
   joinedAt: IsoDateTimeString;
   finalRank?: number | null;
   rank?: number | null;
@@ -199,6 +212,11 @@ export interface GetRecordPageParams {
   offset?: number;
 }
 
+export interface GetMySeasonRecordsParams extends GetRecordPageParams {
+  /** Server-side filter on the season's status (records contract). */
+  seasonStatus?: 'upcoming' | 'active' | 'ended' | 'settled';
+}
+
 export interface GetRecordOrdersParams extends GetRecordPageParams {
   seasonId: string;
   side?: 'buy' | 'sell';
@@ -338,10 +356,11 @@ export function getRecordExchangeDisplay(item: RecordExchangeItemDto) {
   };
 }
 
-export async function getMySeasonRecords(params: GetRecordPageParams = {}) {
+export async function getMySeasonRecords(params: GetMySeasonRecordsParams = {}) {
   const limit = params.limit ?? 20;
   const offset = params.offset ?? 0;
   const searchParams = new URLSearchParams();
+  if (params.seasonStatus) searchParams.set('seasonStatus', params.seasonStatus);
   searchParams.set('limit', String(limit));
   searchParams.set('offset', String(offset));
 

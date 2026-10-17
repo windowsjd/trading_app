@@ -24,6 +24,7 @@ export const ROUTES = {
   TRADE_HISTORY: 'TradeHistory',
 
   REWARD: 'Reward',
+  BADGES: 'Badges',
 
   MY: 'My',
   SETTINGS: 'Settings',

@@ -132,7 +132,7 @@ async function run() {
           ...(account === 'general' ? [['GuideTab', 'MarketBasics', '시장기초'], ['GuideTab', 'Candles', '캔들']] : [['RankingTab', 'UserSeasonSummary', '유저 시즌 요약', { userId: 'user-0', seasonId: 'record-0' }]]),
           ['WalletTab', 'WalletFx', '환전'], ['WalletTab', 'WalletTransactions', '지갑 원장'],
           ['MyTab', 'Settings', '설정'], ['MyTab', 'Friends', '친구'], ['MyTab', 'Notices', '공지사항'],
-          ['MyTab', 'My', 'MY'], ['MyTab', 'Reward', '보상 / 뱃지'],
+          ['MyTab', 'My', 'MY'], ['MyTab', 'Badges', '내 뱃지'], ['MyTab', 'Reward', '보상 지급 내역'],
         ];
         for (const [tabName, screen, label, params] of details) {
           const rootLabel = { HomeTab: '홈', MarketTab: '마켓', GuideTab: '가이드', RankingTab: '랭킹', WalletTab: '지갑', MyTab: '전체' }[tabName];

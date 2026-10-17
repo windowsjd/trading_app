@@ -38,6 +38,9 @@ for (const mode of ['light', 'dark'] as const) for (const preference of ['red_bl
     assert.equal(colors.candleDown, candles[1]);
     assert.equal(colors.buySurface, surfaces[0]);
     assert.equal(colors.sellSurface, surfaces[1]);
+    // Rate chips (ranking on tier art): the direction's own surface under its text.
+    assert.deepEqual([colors.riseSurface, colors.fallSurface], surfaces);
+    assert.ok(contrast(colors.rise, colors.riseSurface) >= 4.5 && contrast(colors.fall, colors.fallSurface) >= 4.5);
     assert.notEqual(colors.fall, colors.candleDown);
     if (preference === 'red_blue') assert.notEqual(colors.rise, colors.candleUp);
     assert.equal(resolveFinancialColor(BUY_COLOR, mode, preference), colors.buyAction);

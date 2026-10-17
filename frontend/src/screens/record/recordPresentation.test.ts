@@ -75,6 +75,12 @@ it('all displayed signs use semantic financial roles; zero/missing and assets ar
   for (const value of ['0', null, undefined, 'invalid']) assert.equal(getRecordFinancialDisplay(value).color, semantic.text);
   assert.equal(getRecordFinancialDisplay('11234000', 'money', false).color, semantic.text);
   assert.equal(getRecordFinancialDisplay('0').text, '0원');
+  // A rate that rounds to 0% for display is neutral and unsigned, not a direction.
+  for (const value of ['0.001', '-0.004']) {
+    assert.deepEqual(getRecordFinancialDisplay(value, 'rate'), { text: '0%', color: semantic.text });
+  }
+  assert.deepEqual(getRecordFinancialDisplay('0.005', 'rate'), { text: '+0.01%', color: financial.rise });
+  assert.deepEqual(getRecordFinancialDisplay('-0.005', 'rate'), { text: '-0.01%', color: financial.fall });
 });
 
 for (const role of ['admin', 'user', 'operator']) {

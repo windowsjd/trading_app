@@ -2,6 +2,8 @@
 // them back to the API — they are lossy (rounded) by design. Formatters are for
 // rendering to the screen only, never for order/price/settlement calculations.
 
+import { getUsStockKoreanName } from './usStockKoreanNames.ts';
+
 export type FormatCurrencyCode = 'KRW' | 'USD' | (string & {});
 
 const KRW_UNIT = '원';
@@ -405,14 +407,21 @@ export function getAssetSymbolDisplay(
 export type AssetNameDisplay = {
   primary: string;
   secondary: string | null;
+  /** The English `Asset.name`, present when `primary` is a US listing's Korean name. */
+  english?: string;
 };
 
 /**
  * Name-first display for an asset: company/coin name as primary, symbol as
  * secondary. Falls back to symbol as primary when the name is missing.
+ *
+ * A US stock whose listing (`market` + `symbol`, the asset's identity) has a
+ * Korean name (usStockKoreanNames) shows that name as primary; its English
+ * name is kept as `english` for screens that show it beside the Korean one.
+ * Without `market` the English name stays primary.
  */
 export function getAssetNameDisplay(
-  asset?: { name?: string | null; symbol?: string | null } | null,
+  asset?: { name?: string | null; symbol?: string | null; market?: string | null } | null,
 ): AssetNameDisplay {
   const rawName = asset?.name?.trim() || null;
   const rawSymbol = asset?.symbol?.trim() || null;
@@ -420,6 +429,12 @@ export function getAssetNameDisplay(
   // Some fallback payloads may repeat the symbol in `name`. Do not let a
   // hidden numeric symbol re-enter the UI through that duplicate field.
   const name = rawName === rawSymbol && rawSymbol && !symbol ? null : rawName;
+  const korean = getUsStockKoreanName(asset);
+  if (korean) {
+    return name && name !== korean && name !== symbol
+      ? { primary: korean, secondary: symbol, english: name }
+      : { primary: korean, secondary: symbol };
+  }
 
   if (name && symbol && name !== symbol) return { primary: name, secondary: symbol };
   if (name) return { primary: name, secondary: null };

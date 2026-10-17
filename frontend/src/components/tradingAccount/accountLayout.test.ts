@@ -208,14 +208,17 @@ describe('the styles long text depends on are present', () => {
     assert.match(hero, /total:\s*\{[^}]*flexShrink:\s*1/s);
     assert.match(hero, /total:\s*\{[^}]*lineHeight/s);
     // The nickname shrinks beside the avatar (the rank moved to the Ranking
-    // tab); the emblem lives beside the total, and the hero row wraps it below
-    // long amounts or large text.
+    // tab); the emblem stays beside the total, whose fixed-width column draws
+    // a long amount smaller instead of moving the emblem (fitHeroTotal); only
+    // very large text puts the emblem below. The total is never truncated.
     const context = read('screens/home/HomeAccountContext.tsx');
     assert.equal(/identity:\s*\{[^}]*minWidth:\s*0/s.test(context), true);
     assert.equal(/nickname:\s*\{[^}]*flexShrink:\s*1[^}]*minWidth:\s*0/s.test(context), true);
     assert.equal(context.includes('TEST_IDS.home.rank'), false);
-    assert.equal(/heroRow:\s*\{[^}]*flexWrap:\s*'wrap'/s.test(hero), true);
-    assert.equal(/hero:\s*\{[^}]*flexShrink:\s*1/s.test(hero), true);
+    assert.match(hero, /fitHeroTotal\(/);
+    assert.equal(/hero:\s*\{[^}]*flexShrink:\s*1[^}]*flexBasis:\s*0/s.test(hero), true);
+    assert.equal(/hero:\s*\{[^}]*minWidth:\s*0/s.test(hero), true);
+    assert.equal(/numberOfLines=\{|adjustsFontSizeToFit|ellipsizeMode/.test(hero), false);
     assert.match(read('screens/home/HomeHoldings.tsx'), /<PositionAssetRow/);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /value:\s*\{[^}]*minWidth:\s*0/s);
     assert.match(read('components/tradingAccount/PositionAssetRow.tsx'), /columns:\s*\{[^}]*flexDirection:\s*'row'/s);

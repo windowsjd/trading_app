@@ -269,6 +269,25 @@ test('getAssetNameDisplay', async (t) => {
     assert.deepEqual(getAssetNameDisplay(null), { primary: '-', secondary: null });
     assert.deepEqual(getAssetNameDisplay({}), { primary: '-', secondary: null });
   });
+
+  await t.test('a US listing with a Korean name shows it first and keeps the English name', () => {
+    assert.deepEqual(getAssetNameDisplay({ name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS' }), {
+      primary: '애플', secondary: 'AAPL', english: 'Apple Inc.',
+    });
+    assert.deepEqual(getAssetNameDisplay({ name: 'NVIDIA Corp.', symbol: 'NVDA', market: 'NAS' }), {
+      primary: '엔비디아', secondary: 'NVDA', english: 'NVIDIA Corp.',
+    });
+    // Without its English name the Korean one still leads, with nothing to repeat.
+    assert.deepEqual(getAssetNameDisplay({ name: null, symbol: 'AAPL', market: 'NAS' }), { primary: '애플', secondary: 'AAPL' });
+    // Another market's symbol, no market, or no Korean name at the source: unchanged.
+    for (const asset of [{ name: 'Apple Inc.', symbol: 'AAPL', market: 'NYS' }, { name: 'Apple Inc.', symbol: 'AAPL' },
+      { name: 'AT&T Inc.', symbol: 'T', market: 'NYS' }, { name: 'KLA Corp.', symbol: 'KLAC', market: 'NAS' }]) {
+      assert.deepEqual(getAssetNameDisplay(asset), { primary: asset.name, secondary: asset.symbol }, JSON.stringify(asset));
+    }
+    assert.deepEqual(getAssetNameDisplay({ name: 'Samsung Electronics', symbol: '005930', market: 'KRX' }), {
+      primary: 'Samsung Electronics', secondary: null,
+    });
+  });
 });
 
 test('asset symbol display policy', async (t) => {

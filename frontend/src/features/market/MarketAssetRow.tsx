@@ -15,6 +15,7 @@ import { getLastSessionCloseLabel } from '../asset/lastSessionClose';
 import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
+import AssetLogo from './AssetLogo';
 
 type Props = {
   /** REST baseline row — never rebuilt when some other asset ticks. */
@@ -52,7 +53,11 @@ function MarketAssetRowComponent({
     [item, ticker],
   );
   const nameDisplay = getAssetNameDisplay(displayItem);
-  const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
+  // A US stock shown by its Korean name keeps its English name under it:
+  // `(Apple Inc.) · AAPL`. Every other row keeps `symbol · market`.
+  const secondLine = nameDisplay.english
+    ? [`(${nameDisplay.english})`, nameDisplay.secondary].filter(Boolean).join(' · ')
+    : getAssetSymbolMarketDisplay(displayItem);
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
   // A closed US market's last confirmed close is named by its date, never "live".
@@ -68,11 +73,15 @@ function MarketAssetRowComponent({
         style={styles.itemRow}
         onPress={() => onPress(item.id)}
       >
-        <View style={styles.identity}>
-          <Text style={styles.itemSymbol}>{nameDisplay.primary}</Text>
-          {symbolMarketDisplay ? (
-            <Text style={styles.helper}>{symbolMarketDisplay}</Text>
-          ) : null}
+        <View style={styles.leading}>
+          <AssetLogo testID={`market-logo-${item.id}`} assetType={displayItem.assetType} market={displayItem.market}
+            symbol={displayItem.symbol} name={nameDisplay.primary} />
+          <View style={styles.identity}>
+            <Text testID={`market-name-${item.id}`} style={styles.itemSymbol}>{nameDisplay.primary}</Text>
+            {secondLine ? (
+              <Text testID={`market-subtitle-${item.id}`} style={styles.helper}>{secondLine}</Text>
+            ) : null}
+          </View>
         </View>
 
         <View style={styles.alignEnd}>
@@ -115,7 +124,10 @@ export const MarketAssetRow = React.memo(
 );
 
 const styles = StyleSheet.create({
-  identity: { flexGrow: 1, flexShrink: 1, flexBasis: 110, minWidth: 0 },
+  // The logo's fixed circle and the names; below this width the price column
+  // wraps under them (the names alone kept 110 before the logo's 40 + 10).
+  leading: { flexDirection: 'row', alignItems: 'center', gap: 10, flexGrow: 1, flexShrink: 1, flexBasis: 160, minWidth: 0 },
+  identity: { flex: 1, minWidth: 0 },
   itemRow: {
     paddingHorizontal: 12, marginBottom: 8, borderRadius: 12,
     backgroundColor: semantic.surface,

@@ -82,6 +82,8 @@ export type MyStackParamList = {
   Inquiry: undefined;
   UserSeasonSummary: { userId: string };
   My: undefined;
+  /** 내 뱃지: my settled seasons' final tier, rank and return. */
+  Badges: undefined;
   Reward: undefined;
   Settings: undefined;
 };
@@ -231,6 +233,11 @@ export type RecordProfitAnalysisScreenProps = CompositeScreenProps<
 
 export type MyScreenProps = CompositeScreenProps<
   StackScreenProps<MyStackParamList, 'My'>,
+  CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
+>;
+
+export type MyBadgesScreenProps = CompositeScreenProps<
+  StackScreenProps<MyStackParamList, 'Badges'>,
   CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
 >;
 

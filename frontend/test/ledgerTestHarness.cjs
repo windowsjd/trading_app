@@ -16,8 +16,10 @@ class StillValue {
   interpolate(config) { return { value: this, ...config }; }
 }
 const stillAnimated = { Value: StillValue, View: 'AnimatedView', timing: () => ({ start() {}, stop() {} }), spring: () => ({ start() {}, stop() {} }), loop: () => ({ start() {}, stop() {} }) };
-const withNativeDefaults = (native) => native && (!native.Animated || !native.Platform)
-  ? { Platform: { OS: 'android' }, ...native, Animated: native.Animated ?? stillAnimated }
+// Minimal per-test mocks keep working where a shared row now draws an Image
+// (market rows' asset logos): absent hosts get a plain host, never undefined.
+const withNativeDefaults = (native) => native && (!native.Animated || !native.Platform || !native.Image)
+  ? { Platform: { OS: 'android' }, Image: 'Image', ...native, Animated: native.Animated ?? stillAnimated }
   : native;
 
 // Screens import app modules as '../../<dir>/<path>' and tests key their

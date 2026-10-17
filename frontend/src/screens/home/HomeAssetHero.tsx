@@ -7,6 +7,7 @@ import type { TradingAccountPortfolioSummaryDto, TradingAccountPortfolioDto } fr
 import { homeUnrealizedPnlKrw } from '../../features/tradingAccount/homePortfolio';
 import { formatKrw, formatPercent } from '../../utils/format';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
+import { fitHeroTotal, HERO_ASIDE_GAP, HERO_TOTAL_FONT_SIZE, HERO_TOTAL_MIN_FONT_SIZE } from './heroTotalFit';
 
 type Props = {
   summary: TradingAccountPortfolioSummaryDto | null;
@@ -26,38 +27,60 @@ function performanceStyle(value: string | null | undefined) {
   return amount > 0 ? styles.up : styles.down;
 }
 
-const GAP = 12;
-
 export default function HomeAssetHero({ summary, finalResult, settled = false, compactBottom = false, compactTop = false, unavailableMessage, aside }: Props) {
   const result = settled ? (finalResult?.state === 'available' ? finalResult : null) : summary;
   const total = result ? `${formatKrw(result.totalAssetKrw)}원` : '';
   const unrealizedPnl = !settled && summary ? homeUnrealizedPnlKrw(summary) : null;
-  // The emblem stays beside the total only when the total's natural width
-  // leaves room for it (measured, so fonts and long amounts never wrap the
-  // total or meet the emblem); otherwise it sits lower, beside the
-  // performance lines. Until measured, the lower position is the safe one.
+  // The emblem keeps its place beside the total, so the total has one column
+  // of fixed width whatever the amount; a total too long for it is drawn
+  // smaller to fit (fitHeroTotal, from the measured widths), never cut. Only
+  // large text on a narrow phone moves the emblem lower, beside the performance lines.
   const [row, setRow] = useState(0);
-  const [totalWidth, setTotalWidth] = useState(0);
+  const [natural, setNatural] = useState({ width: 0, height: 0 });
   const [asideWidth, setAsideWidth] = useState(0);
-  const beside = !result || (row > 0 && totalWidth > 0 && asideWidth > 0 && totalWidth + GAP + asideWidth <= row);
+  // Backstop: a drawn total that still breaks onto a second line takes half a
+  // point off, until it fits or reaches the minimum. Kept while the measured
+  // widths stay the same (an update with as many digits keeps its size).
+  const fitInputs = `${row}|${aside ? asideWidth : '-'}|${natural.width}`;
+  const [overflow, setOverflow] = useState({ inputs: '', steps: 0 });
+  const shrinkSteps = overflow.inputs === fitInputs ? overflow.steps : 0;
+  const fit = fitHeroTotal({ row, aside: aside ? asideWidth : null, natural: result ? natural.width : 0,
+    glyphs: Array.from(total).length, shrinkSteps });
+  const beside = !result || fit.beside;
+  // One style object (not an array), sized only when the column needs it.
+  const totalStyle = fit.fontSize === HERO_TOTAL_FONT_SIZE ? styles.total : { ...styles.total, fontSize: fit.fontSize };
   const asideView = aside ? (
     <View testID="home-hero-aside" style={styles.aside} onLayout={event => setAsideWidth(event.nativeEvent.layout.width)}>{aside}</View>
   ) : null;
   return (
     <View style={styles.host}>
-    {asideView && result ? (
-      // Measures the total unwrapped (capped at the row), outside the card's
-      // content; never shown or read.
-      <Text style={[styles.total, styles.measure]} onLayout={event => setTotalWidth(event.nativeEvent.layout.width)}
-        accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>{total}</Text>
+    {result ? (
+      // Measures the total at the base size on one line (a wide row inside a
+      // zero-size clip, so a long amount is not capped by the screen and adds
+      // no scrollable width); never shown or read.
+      <View style={styles.measureClip} pointerEvents="none" accessible={false} accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants" aria-hidden>
+        <View style={styles.measureRow}>
+          <Text style={styles.total} onLayout={event => setNatural({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+            accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>{total}</Text>
+        </View>
+      </View>
     ) : null}
     <View testID={TEST_IDS.home.summaryCard} style={[styles.heroRow, compactBottom && styles.compactBottom, compactTop && styles.compactTop]}
       onLayout={event => setRow(event.nativeEvent.layout.width)}>
-    <View style={[styles.hero, asideView && beside && totalWidth > 0 && { flexBasis: totalWidth }]}>
+    <View style={styles.hero}>
       <Text style={styles.label}>{settled ? '최종 자산' : '총 자산'}</Text>
       {result ? (
         <>
-          <Text testID={TEST_IDS.home.totalAsset} style={styles.total}>
+          {/* Keyed by its size: a remount reports its layout again, so each step is checked. */}
+          <Text key={fit.fontSize} testID={TEST_IDS.home.totalAsset} style={totalStyle} onLayout={event => {
+            // The measured one-line height is the same line box (the line height does not change with the size).
+            const broke = natural.height > 0 && event.nativeEvent.layout.height > natural.height * 1.5;
+            // Beside the emblem a step past the minimum moves the emblem below; otherwise stop at the minimum.
+            if (broke && ((!!aside && fit.beside) || fit.fontSize > HERO_TOTAL_MIN_FONT_SIZE)) {
+              setOverflow(current => ({ inputs: fitInputs, steps: (current.inputs === fitInputs ? current.steps : 0) + 1 }));
+            }
+          }}>
             {total}
           </Text>
           <View style={styles.performanceRow}>
@@ -99,16 +122,19 @@ export default function HomeAssetHero({ summary, finalResult, settled = false, c
 
 const styles = StyleSheet.create({
   host: { minWidth: 0 },
-  heroRow: { paddingVertical: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: GAP, rowGap: 8, minWidth: 0 },
-  hero: { gap: 8, minWidth: 0, flexGrow: 1, flexShrink: 1, flexBasis: 190 },
+  heroRow: { paddingVertical: 12, flexDirection: 'row', alignItems: 'center', columnGap: HERO_ASIDE_GAP, minWidth: 0 },
+  // The total's column: everything the emblem leaves, independent of the amount.
+  hero: { gap: 8, minWidth: 0, flexGrow: 1, flexShrink: 1, flexBasis: 0 },
   aside: { flexShrink: 0, marginLeft: 'auto' },
-  measure: { position: 'absolute', left: 0, top: 0, opacity: 0 },
-  // Lower emblem position: beside the performance lines, below the total.
-  performanceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: GAP, rowGap: 8, minWidth: 0 },
+  measureClip: { position: 'absolute', left: 0, top: 0, width: 0, height: 0, overflow: 'hidden', opacity: 0 },
+  measureRow: { position: 'absolute', left: 0, top: 0, width: 4096, flexDirection: 'row' },
+  // Lower emblem position (large text on a narrow phone only): beside the performance lines, below the total.
+  performanceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', columnGap: HERO_ASIDE_GAP, rowGap: 8, minWidth: 0 },
   compactBottom: { paddingBottom: 0 },
   compactTop: { paddingTop: 0 },
   label: { fontSize: 18, fontWeight: '700', lineHeight: 27, color: semantic.secondary },
-  total: { fontSize: 36, fontWeight: '700', lineHeight: 46, flexShrink: 1, fontVariant: ['tabular-nums'] },
+  // A smaller fitted size keeps this line height, so the hero never jumps when the amount changes.
+  total: { fontSize: HERO_TOTAL_FONT_SIZE, fontWeight: '700', lineHeight: 46, flexShrink: 1, fontVariant: ['tabular-nums'] },
   performance: { gap: 4, marginTop: 4, flexGrow: 1, flexShrink: 1, flexBasis: 150, minWidth: 0 },
   metric: { fontSize: 14, lineHeight: 22, color: semantic.secondary },
   up: { color: financial.rise },

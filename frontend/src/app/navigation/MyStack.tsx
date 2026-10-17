@@ -15,6 +15,7 @@ import FriendsScreen from '../../screens/friends/FriendsScreen';
 import UserSeasonSummaryScreen from '../../screens/ranking/UserSeasonSummaryScreen';
 import MyScreen from '../../screens/my/MyScreen';
 import RewardScreen from '../../screens/reward/RewardScreen';
+import MyBadgesScreen from '../../screens/my/MyBadgesScreen';
 import SettingsScreen from '../../screens/my/SettingsScreen';
 
 const Stack = createNativeStackNavigator<MyStackParamList>();
@@ -51,9 +52,15 @@ export default function MyStack() {
       />
       <Stack.Screen name="My" component={MyScreen} options={{ title: 'MY' }} />
       <Stack.Screen
+        name="Badges"
+        component={MyBadgesScreen}
+        options={{ title: '내 뱃지' }}
+      />
+      <Stack.Screen
         name="Reward"
         component={RewardScreen}
-        options={{ title: '보상 / 뱃지' }}
+        // The reward payout ledger; season results live on 내 뱃지 (Badges).
+        options={{ title: '보상 지급 내역' }}
       />
       <Stack.Screen
         name="Settings"

@@ -80,6 +80,9 @@ export const QUERY_KEYS = {
   },
 
   market: {
+    /** All listed US stocks in one sort: the Korean-name search's source (useMarketAssetSearch). */
+    koreanNameIndex: (params: { sortBy: 'turnover' | 'changeRate'; sortOrder: 'asc' | 'desc' }) =>
+      ['market', 'korean-name-index', params.sortBy, params.sortOrder] as const,
     assetPreview: (params: {
       assetType: string;
       sortBy: 'turnover' | 'changeRate';
@@ -260,6 +263,9 @@ export const QUERY_KEYS = {
       ] as const,
     infiniteSeasons: (params?: { limit?: number; offset?: number }) =>
       [...QUERY_KEYS.record.seasons(params), 'infinite'] as const,
+    /** 내 뱃지: my settled seasons' final results (user-scoped, like seasons). */
+    seasonBadges: (limit: number) =>
+      ['record', 'season-badges', limit] as const,
     seasonDetail: (seasonId: string) =>
       ['record', 'season-detail', seasonId] as const,
     seasonEquity: (params: {
