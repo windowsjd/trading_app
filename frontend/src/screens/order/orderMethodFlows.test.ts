@@ -209,7 +209,7 @@ describe('Conditional BUY', () => {
     assert.equal(h.requests.length, 0);
   });
 
-  it('without a fresh current price no direction is decided and nothing registers', async (t) => {
+  it('without a fresh current price no direction is decided and nothing registers; the price can be read again', async (t) => {
     const h = inlineTradingHarness();
     h.conditionalList = capabilities()('general');
     h.method = 'conditional';
@@ -217,10 +217,16 @@ describe('Conditional BUY', () => {
     await h.mount(); t.after(h.close);
     await h.input('conditional-size', '10');
     await h.input('conditional-trigger-price', '700');
-    assert.equal(panelText(h.node('conditional-trigger-direction')), '현재가를 확인할 수 없어 감시 방향을 정할 수 없어요.');
+    // Crypto never closes: a missing price is a price failure, never a closure.
+    assert.equal(panelText(h.node('conditional-trigger-direction')), '현재가를 확인할 수 없습니다. 시세가 업데이트된 후 다시 시도해주세요.');
+    assert.equal(h.node('conditional-off-session-notice') === undefined, true);
+    assert.equal(h.renderer.root.findAll((n: any) => typeof n.props?.testID === 'string' && n.props.testID.startsWith('conditional-trigger-at_or')).length, 0);
     assert.equal(h.node('conditional-submit').props.state, 'disabled');
     await h.press('conditional-submit'); await h.flush();
     assert.equal(h.requests.length, 0);
+    const reads = h.refetches;
+    await h.press('conditional-price-refresh');
+    assert.equal(h.refetches, reads + 1, 'the screen price is read again');
   });
 
   it('a price move never flips the decided direction silently; sending re-decides and asks again', async (t) => {

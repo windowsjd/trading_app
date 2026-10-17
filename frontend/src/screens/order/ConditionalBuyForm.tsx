@@ -19,14 +19,34 @@ import {
   getConditionalBuyDraftError,
   getConditionalBuyResultNotice,
 } from '../../features/conditional/conditionalBuyDisplay';
-import { getTriggerDirectionText, isTriggerDirectionValid } from '../../features/conditional/autoDirection';
+import {
+  getTriggerDirectionText,
+  isTriggerDirectionValid,
+  type TriggerCondition,
+} from '../../features/conditional/autoDirection';
+import {
+  DIRECTION_REQUIRED,
+  LIVE_PRICE_UNAVAILABLE,
+  OFF_SESSION_REGISTRATION_NOTICE,
+  getConditionalRegistrationErrorMessage,
+  resolveConditionalDirectionMode,
+  shouldRefreshAfterRegistrationError,
+} from '../../features/conditional/directionMode';
+import {
+  conditionalBuySizeAtRatio,
+  getConditionalBuyRatioBlock,
+  ratioOfCapacity,
+} from '../../features/conditional/conditionalRatio';
 import { useTriggerDirection } from '../../features/conditional/useTriggerDirection';
 import { emitOrderFillEvent } from '../../features/order/fillEvents';
 import { BUY_COLOR } from '../../features/order/sideColors';
 import { getApiErrorCode, getApiErrorInfo, getErrorMessageFromCode } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatCurrency, formatDisplayDecimal } from '../../utils/format';
+import ActionPressable from '../../components/common/ActionPressable';
 import OrderNumberInput, { orderInputStyle } from './OrderNumberInput';
+import OrderRatioControls from './OrderRatioControls';
+import TriggerDirectionChoice from './TriggerDirectionChoice';
 
 type LearningGate = { allowed: boolean; locked: boolean; message: string | null; guard: (work: () => void) => void };
 
@@ -35,11 +55,14 @@ type Request = { accountId: string; epoch: number; body: ConditionalBuyCreateDto
 const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 대기 목록의 조건주문을 먼저 확인해 주세요. 같은 내용으로 다시 누르면 중복 없이 다시 확인해요.';
 
 /**
- * New Conditional BUY (KRX stocks, crypto Spot). The watch price and the
- * limit price are separate fields; 이상/이하 follows the watch price against
- * the current price (never chosen by hand); nothing is reserved while
- * watching, and a registration is never presented as a fill. The server
- * re-checks every rule.
+ * New Conditional BUY (KRX/US stocks, crypto Spot). The watch price and the
+ * limit price are separate fields. During the session (and always for
+ * crypto) 이상/이하 follows the watch price against the fresh current price;
+ * while a stock market is closed the user chooses it and the server watches
+ * from the next regular session (2026-10-18); an unknown market state
+ * registers nothing. The size can be typed or picked as a share of the
+ * available cash (ratio controls). Nothing is reserved while watching, and a
+ * registration is never presented as a fill. The server re-checks every rule.
  */
 export default function ConditionalBuyForm({
   accountId,
@@ -47,10 +70,13 @@ export default function ConditionalBuyForm({
   capabilities,
   blockedReason,
   buyAvailable,
+  feeRate = null,
   currentPrice,
+  marketStatus = null,
   learning,
   onInputFocus,
   onInputBlur,
+  onRefreshPrice,
 }: {
   accountId: string;
   asset: { assetType?: string | null; settlementCurrency?: string | null; symbol?: string | null; id: string };
@@ -58,22 +84,41 @@ export default function ConditionalBuyForm({
   /** Account/asset gates the order form already resolved. */
   blockedReason: string | null;
   buyAvailable: string | null;
+  /** The account's trade fee rate (ratio fee headroom); null while unknown. */
+  feeRate?: string | null;
   /** The screen's fresh current price: the reference for 이상/이하. */
   currentPrice: string | null;
+  /** The screen's market state: automatic or chosen 이상/이하. */
+  marketStatus?: string | null;
   learning: LearningGate;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
+  /** Reads the screen's price and market state again. */
+  onRefreshPrice?: () => void;
 }) {
   const queryClient = useQueryClient();
   const crypto = asset.assetType === 'crypto';
   const currency = asset.settlementCurrency ?? '';
+  const directionMode = resolveConditionalDirectionMode({
+    assetType: asset.assetType, marketStatus, offSessionMarkets: capabilities?.offSessionMarkets,
+  });
+  const manual = directionMode.mode === 'manual';
   const [triggerPrice, setTriggerPrice] = useState('');
-  const trigger = useTriggerDirection(triggerPrice, currentPrice);
-  const condition = trigger.condition;
+  // Automatic only in session: a closed market's last price is no reference.
+  const trigger = useTriggerDirection(triggerPrice, manual ? null : currentPrice);
+  const [chosenCondition, setChosenCondition] = useState<TriggerCondition | null>(null);
+  // Every closed period starts without a choice; nothing is ever assumed.
+  useEffect(() => {
+    if (!manual) setChosenCondition(null);
+  }, [manual]);
+  const condition = directionMode.mode === 'auto' ? trigger.condition : manual ? chosenCondition : null;
   const [directionNotice, setDirectionNotice] = useState<string | null>(null);
   const [executionType, setExecutionType] = useState<ConditionalBuyExecutionType>('market');
   const [limitPrice, setLimitPrice] = useState('');
   const [size, setSize] = useState('');
+  // The pick that produced `size` (kept only while it still does).
+  const [chosenRatio, setChosenRatio] = useState<number | null>(null);
+  const [ratioNotice, setRatioNotice] = useState<string | null>(null);
   const [registered, setRegistered] = useState<ConditionalBuyOrderDto | null>(null);
   // The original error only; its public copy is mapped where it is shown.
   const [error, setError] = useState<{ cause: unknown; uncertain: boolean } | null>(null);
@@ -104,6 +149,8 @@ export default function ConditionalBuyForm({
         setTriggerPrice('');
         setLimitPrice('');
         setSize('');
+        setChosenRatio(null);
+        setChosenCondition(null);
         setExecutionType('market');
       }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.conditionalBuy.all(request.accountId) });
@@ -116,6 +163,8 @@ export default function ConditionalBuyForm({
       // The server's own price had already crossed the watch price: decide
       // the direction again from the latest price before another try.
       if (info.serverCode === 'CONDITIONAL_BUY_ALREADY_MET') trigger.reset();
+      // The server saw another price or session than this screen: read both again.
+      if (shouldRefreshAfterRegistrationError(info.serverCode)) onRefreshPrice?.();
       setError({ cause, uncertain });
     },
   });
@@ -129,22 +178,52 @@ export default function ConditionalBuyForm({
     setRegistered(null);
     setError(null);
     setDirectionNotice(null);
+    setRatioNotice(null);
   };
 
   const canUseLimit = capabilities?.canUseLimit === true;
-  // No usable current price, or a watch price equal to it: no direction yet.
-  const directionError = trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
-    ? getTriggerDirectionText(trigger.direction, triggerPrice, currency) : null;
+  // Automatic: no usable current price (a price failure, never a closure) or a
+  // watch price equal to it. Chosen: nothing chosen yet. Blocked: the cause.
+  const directionError = directionMode.mode === 'blocked' ? directionMode.reason
+    : manual ? chosenCondition ? null : DIRECTION_REQUIRED
+      : trigger.direction.state === 'no_reference' ? LIVE_PRICE_UNAVAILABLE
+        : trigger.direction.state === 'equal' ? getTriggerDirectionText(trigger.direction, triggerPrice, currency) : null;
   // A limit choice that became unavailable falls back to nothing, not to market.
   const draftError = getConditionalBuyDraftError({
     assetType: asset.assetType, triggerPrice, executionType, limitPrice, size,
   }) ?? directionError ?? (executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
-  const directionText = getTriggerDirectionText(trigger.direction, triggerPrice, currency);
+  // A chosen direction reads like an automatic one once a valid price is typed.
+  const triggerEntered = trigger.direction.state !== 'empty' && trigger.direction.state !== 'invalid';
+  const directionText = getTriggerDirectionText(manual && chosenCondition && triggerEntered
+    ? { state: 'ready', condition: chosenCondition } : trigger.direction, triggerPrice, currency);
   // The market moved past the watch price after the direction was decided.
-  const crossed = !!condition && !!currentPrice && !isTriggerDirectionValid(condition, triggerPrice, currentPrice);
+  const crossed = !manual && !!condition && !!currentPrice && !isTriggerDirectionValid(condition, triggerPrice, currentPrice);
   const createBlocked = !capabilities?.canCreate ? '현재 조건주문을 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(triggerPrice.trim() || size.trim() || limitPrice.trim());
+  // Ratio picks: a share of the available cash (the server re-checks it when
+  // the watch fires). Without a safe price the size is typed instead.
+  const ratioInput = {
+    crypto, executionType, available: buyAvailable, feeRate, currentPrice: manual ? null : currentPrice,
+    triggerPrice, limitPrice, offSession: manual, currency,
+  };
+  const ratioBlock = getConditionalBuyRatioBlock(ratioInput);
+  const ratioDisabled = pending || !!blockedReason || !!createBlocked || !!ratioBlock;
+  const sizeAtRatio = (ratio: number) => (ratioBlock ? null : conditionalBuySizeAtRatio(ratioInput, ratio));
+  const activeRatio = !ratioBlock && chosenRatio !== null
+    && (chosenRatio === 0 ? size === '' : sizeAtRatio(chosenRatio) === size) ? chosenRatio : null;
+  const shownRatio = activeRatio ?? (ratioBlock ? 0 : ratioOfCapacity(size, sizeAtRatio(1)));
+  const applyRatio = (value: number) => {
+    if (ratioDisabled || !Number.isFinite(value)) return;
+    const ratio = Math.max(0, Math.min(1, value));
+    const next = ratio === 0 ? '' : sizeAtRatio(ratio);
+    if (next === null) {
+      setRatioNotice(crypto ? '계산된 매수 금액이 너무 작아요.' : '계산된 수량이 너무 작아요.');
+      return;
+    }
+    edit(() => setSize(next));
+    setChosenRatio(ratio);
+  };
   // A replayed create returns the watch as it is NOW (it may have triggered,
   // ordered, filled or ended since): the server's state decides the copy.
   const result = registered ? getConditionalBuyResultNotice(registered) : null;
@@ -156,8 +235,9 @@ export default function ConditionalBuyForm({
     }
     if (!canSubmit || !condition) return;
     setError(null);
-    // Never send a direction the latest price no longer supports.
-    if (!actionRef.current) {
+    // Never send an automatic direction the latest price no longer supports;
+    // a chosen one (market closed) is sent as chosen.
+    if (!actionRef.current && directionMode.mode === 'auto') {
       const changed = trigger.recheck(currentPrice);
       if (changed) { setDirectionNotice(changed); return; }
     }
@@ -194,7 +274,44 @@ export default function ConditionalBuyForm({
           onFieldFocus={onInputFocus}
           onBlur={onInputBlur}
         />
-        {directionText ? (
+        {manual ? (
+          <>
+            <Text testID="conditional-off-session-notice" style={styles.notice}>{OFF_SESSION_REGISTRATION_NOTICE}</Text>
+            <TriggerDirectionChoice
+              testID="conditional-trigger"
+              value={chosenCondition}
+              disabled={pending}
+              onChange={(next) => edit(() => setChosenCondition(next))}
+            />
+            {chosenCondition && triggerEntered && directionText ? (
+              <Text testID="conditional-trigger-direction" accessibilityLiveRegion="polite" style={styles.direction}>
+                {`감시 조건 · ${directionText}`}
+              </Text>
+            ) : null}
+          </>
+        ) : directionMode.mode === 'blocked' ? (
+          <Text testID="conditional-trigger-direction" accessibilityLiveRegion="polite" style={styles.error}>
+            {directionMode.reason}
+          </Text>
+        ) : trigger.direction.state === 'no_reference' ? (
+          <>
+            <Text testID="conditional-trigger-direction" accessibilityLiveRegion="polite" style={styles.error}>
+              {LIVE_PRICE_UNAVAILABLE}
+            </Text>
+            {onRefreshPrice ? (
+              <ActionPressable
+                testID="conditional-price-refresh"
+                accessibilityRole="button"
+                accessibilityLabel="시세 다시 불러오기"
+                disabled={pending}
+                onPress={onRefreshPrice}
+                style={styles.refresh}
+              >
+                <Text style={styles.refreshText}>시세 다시 불러오기</Text>
+              </ActionPressable>
+            ) : null}
+          </>
+        ) : directionText ? (
           <Text testID="conditional-trigger-direction" accessibilityLiveRegion="polite"
             style={trigger.direction.state === 'ready' ? styles.direction : styles.error}>
             {trigger.direction.state === 'ready' ? `감시 조건 · ${directionText}` : directionText}
@@ -251,7 +368,10 @@ export default function ConditionalBuyForm({
           editable={!pending}
           style={orderInputStyle}
           value={size}
-          onChangeText={(value) => edit(() => setSize(value))}
+          onChangeText={(value) => edit(() => {
+            setSize(value);
+            setChosenRatio(null);
+          })}
           keyboardType="decimal-pad"
           placeholder={crypto ? '매수 금액 입력' : '수량 입력'}
           onFieldFocus={onInputFocus}
@@ -260,6 +380,19 @@ export default function ConditionalBuyForm({
         {crypto ? <Text style={styles.helper}>수수료를 제외한 매수 원금이에요.</Text>
           : executionType === 'limit' ? <Text style={styles.helper}>지정가 발동은 정수 수량만 가능해요.</Text> : null}
       </View>
+      <OrderRatioControls
+        testID="conditional-ratio"
+        label={crypto ? '매수 금액 비율' : '수량 비율'}
+        accessibilityLabel={crypto ? '매수 금액 비율, 주문 가능 금액 기준' : '주문 수량 비율, 주문 가능 금액 기준'}
+        pickLabel={crypto ? '주문 가능 금액의' : '주문 가능 수량'}
+        tint={crypto ? undefined : BUY_COLOR}
+        value={shownRatio}
+        active={activeRatio}
+        disabled={ratioDisabled}
+        reason={blockedReason || createBlocked ? null : ratioBlock}
+        notice={ratioNotice}
+        onChange={applyRatio}
+      />
       <Text style={styles.helper}>
         현재 주문 가능 {buyAvailable !== null ? formatCurrency(buyAvailable, currency) : '-'} · 감시 중에는 금액을 예약하지 않아요
       </Text>
@@ -269,7 +402,9 @@ export default function ConditionalBuyForm({
       {typed && draftError && draftError !== directionError ? <Text testID="conditional-input-error" style={styles.error}>{draftError}</Text> : null}
       {directionNotice ? <Text testID="conditional-direction-changed" accessibilityLiveRegion="polite" style={styles.warning}>{directionNotice}</Text> : null}
       {error ? (
-        <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : getErrorMessageFromCode(getApiErrorCode(error.cause))}
+        <ErrorNotice error={error.cause}
+          message={error.uncertain ? UNCERTAIN_CREATE
+            : getConditionalRegistrationErrorMessage(getApiErrorCode(error.cause)) ?? getErrorMessageFromCode(getApiErrorCode(error.cause))}
           testID="conditional-error" style={styles.error} />
       ) : null}
       {registered && result ? (
@@ -304,6 +439,20 @@ const styles = {
   warning: { fontSize: 12, lineHeight: 17, color: semantic.warning },
   error: { fontSize: 12, lineHeight: 17, color: semantic.error },
   direction: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: semantic.info },
+  notice: { fontSize: 12, lineHeight: 17, color: semantic.info },
+  refresh: {
+    alignSelf: 'flex-start',
+    minHeight: 36,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: semantic.border,
+    backgroundColor: semantic.raised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  refreshText: { fontSize: 12, lineHeight: 16, fontWeight: '600', color: semantic.text },
   resultTitle: { fontSize: 14, lineHeight: 20, fontWeight: '700' },
 } as const;
 

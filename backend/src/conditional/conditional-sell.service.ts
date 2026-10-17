@@ -1,5 +1,6 @@
 import {
   conditionalMarkets,
+  conditionalOffSessionMarkets,
   usConditionalOrdersSupported,
 } from './conditional-markets';
 import { Injectable } from '@nestjs/common';
@@ -20,7 +21,10 @@ import { assertOrderInputPolicy } from '../orders/order-input-policy';
 import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { conditionalTradable } from './conditional-policy';
-import { conditionalPrice } from './conditional-price';
+import {
+  conditionalPrice,
+  conditionalRegistrationReference,
+} from './conditional-price';
 import { liveProtection } from './conditional-state';
 import {
   assertConditionalSellKindEnabled,
@@ -300,7 +304,12 @@ export class ConditionalSellService {
             409,
           );
       }
-      const price = await conditionalPrice(tx, asset, 'spot', now);
+      // A user condition on a confirmed-closed stock market registers without
+      // a price (its direction as sent, watched from the next regular
+      // session); stop-loss/take-profit settings keep requiring one.
+      const price = input.intents.every((intent) => intent.kind === 'condition')
+        ? await conditionalRegistrationReference(tx, asset, now)
+        : await conditionalPrice(tx, asset, 'spot', now);
       if (!price) {
         setAdminDiagnosticContext({
           domain: 'CONDITIONAL',
@@ -319,6 +328,7 @@ export class ConditionalSellService {
         );
       }
       if (
+        price !== 'off_session' &&
         input.intents.some((intent) =>
           isConditionalSellMet(
             intent.triggerCondition,
@@ -347,7 +357,8 @@ export class ConditionalSellService {
               limitPrice: intent.limitPrice,
               quantity: intent.quantity,
               currencyCode: asset.settlementCurrency,
-              registrationSnapshotId: price.id,
+              // Null exactly for an off-session registration (no price referenced).
+              registrationSnapshotId: price === 'off_session' ? null : price.id,
               idempotencyKey: input.idempotencyKey,
               requestHash: hash,
               createdAt: now,
@@ -489,6 +500,10 @@ export class ConditionalSellService {
             enabled: conditionEnabled,
             canCreate: conditionEnabled && tradable,
             canUseLimit: conditionEnabled && canUseLimit,
+            // Additive (2026-10-18): stock markets where a condition may also
+            // be registered while the market is closed, with a chosen
+            // direction. Stop-loss/take-profit settings have no such list.
+            offSessionMarkets: conditionalOffSessionMarkets(),
           },
           protection: {
             enabled: protectionEnabled,
@@ -865,6 +880,12 @@ export function presentConditionalSell(
             : order?.status === 'canceled'
               ? 'order_canceled'
               : 'order_rejected',
+    // A condition registered while its stock market was closed (no price
+    // referenced): watching starts in the next regular session. Settings an
+    // entry plan activated at its fill have no registration price either,
+    // but they are never conditions.
+    registeredOffSession:
+      row.kind === 'condition' && row.registrationSnapshotId === null,
     position:
       position && sizing
         ? {

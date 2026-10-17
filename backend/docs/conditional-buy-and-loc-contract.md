@@ -44,10 +44,27 @@ trade at or after registration (`effectiveAt ≥ createdAt`) can trigger. A
 closed/holiday KRX market pauses evaluation (`price_unavailable`); it resumes in
 the next regular session. Calendar unavailability fails closed.
 
-Registration requires the same eligible evidence and rejects a condition that is
-already met (`CONDITIONAL_BUY_ALREADY_MET`). No eligible evidence means
-`CONDITIONAL_PRICE_UNAVAILABLE` (so KRX watches are registered during the
-session). US stocks: `CONDITIONAL_BUY_MARKET_NOT_SUPPORTED`. Beginner accounts
+Registration (2026-10-18) decides the session at its post-lock DB clock
+(`conditionalRegistrationReference`):
+
+- **Crypto, or a stock inside its regular session**: the same eligible evidence
+  is required and a condition that is already met is refused
+  (`CONDITIONAL_BUY_ALREADY_MET`); no eligible evidence →
+  `CONDITIONAL_PRICE_UNAVAILABLE`. In session this check alone keeps the
+  direction the price-decided one (a direction that is not already met is the
+  one the app would decide).
+- **A stock market that is confirmed closed** (outside the regular session,
+  weekend, holiday, operator closure — `MARKET_CLOSED`): the watch registers
+  **without a price**, `registrationSnapshotId = null`, with
+  `triggerCondition` exactly as sent (the user chose it; it is never flipped).
+  Nothing is reserved. Evaluation is unchanged: it starts in the next regular
+  session, only evidence inside that session and after registration counts,
+  and a first eligible trade that already passes the watch price (an opening
+  gap) triggers at once. Off-hours trades and the previous close never do.
+- **An undecidable session** (calendar unavailable / override store not
+  loaded): `409 MARKET_CALENDAR_UNAVAILABLE` — never taken for a closure.
+
+US stocks without the approved provider: `CONDITIONAL_BUY_MARKET_NOT_SUPPORTED`. Beginner accounts
 need `allTrading` learning access. At most 20 live watches per account
 (`CONDITIONAL_BUY_LIMIT_EXCEEDED`). Limit execution additionally requires
 `LIMIT_ORDER_ENABLED` and `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`
@@ -105,12 +122,14 @@ All routes require the owning user; a foreign account is the existing 404.
 | Method | Path | Notes |
 | --- | --- | --- |
 | POST | `/trading-accounts/:accountId/conditional-buy-orders` | Body: `assetId`, `triggerCondition`, `triggerPrice`, `executionType`, `limitPrice` (limit only), `quantity` XOR `amount`, optional `currencyCode`, `idempotencyKey` (8–128 `[A-Za-z0-9:_-]`). Same key + same body replays (`duplicate: true`); a different body → `CONDITIONAL_IDEMPOTENCY_CONFLICT` |
-| GET | `/trading-accounts/:accountId/conditional-buy-orders` | Default: live rows (`watching`/`triggered`); `history=true` includes terminal rows; `state=open` = every row the owner can still cancel (`watching`, `triggered`, `order_pending`), `state=ended` = the rest (`state` is not combined with `history` → `INVALID_PAGINATION`); `assetId`; `limit` ≤ 100 (default 30), `offset` ≤ 100000; newest first. Returns `capabilities` (`enabled`, `canCreate`, `canCancel`, `canUseLimit`, `markets`, `maxLivePerAccount`) |
+| GET | `/trading-accounts/:accountId/conditional-buy-orders` | Default: live rows (`watching`/`triggered`); `history=true` includes terminal rows; `state=open` = every row the owner can still cancel (`watching`, `triggered`, `order_pending`), `state=ended` = the rest (`state` is not combined with `history` → `INVALID_PAGINATION`); `assetId`; `limit` ≤ 100 (default 30), `offset` ≤ 100000; newest first. Returns `capabilities` (`enabled`, `canCreate`, `canCancel`, `canUseLimit`, `markets`, `offSessionMarkets` (2026-10-18, additive: the listed stock markets — `KRX`, and `US` when supported — where a watch may also register while closed), `maxLivePerAccount`) |
 | GET | `/trading-accounts/:accountId/conditional-buy-orders/:id` | Detail |
 | POST | `/trading-accounts/:accountId/conditional-buy-orders/:id/cancel` | Idempotent for terminal rows (`duplicate: true`); `ordered` → `CONDITIONAL_BUY_ALREADY_ORDERED` |
 
 Each row returns money as strings: `triggerPrice`, `limitPrice`, `quantity`,
-`amount`, `status`, `state`, `trigger` (`triggeredAt`, `snapshotId`, copied
+`amount`, `status`, `state`, `registeredOffSession` (2026-10-18, additive:
+`registrationSnapshotId` is null — registered while its stock market was
+closed), `trigger` (`triggeredAt`, `snapshotId`, copied
 evidence: price, source, effective/captured time), `order` (`orderId`,
 `orderType`, `status`, executed price/quantity/gross/fee/net, reservation,
 `cancelReason`, fill evidence ids, timestamps), `attemptCount`, `failureCode`,

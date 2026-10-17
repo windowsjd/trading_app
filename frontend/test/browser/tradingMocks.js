@@ -117,6 +117,9 @@ function otherStockHolding() {
     currencyCode: 'KRW', quantity: '3', averageCost: '180000', realizedPnl: '0', realizedPnlKrw: '0', valuation: stockValuation(asset, '3', '180000') };
 }
 const conditionalEnabled = params.get('conditional') === 'enabled';
+// `offSession=1`: the server registers stock watches while the market is closed (2026-10-18).
+const offSessionMarkets = params.get('offSession') === '1' ? { offSessionMarkets: ['KRX', ...(params.get('usOfficial') === '1' ? ['US'] : [])] } : {};
+const marketClosed = params.get('krxClosed') === '1' || params.get('usClosed') === '1';
 const locEnabled = params.get('loc') === 'enabled';
 const conditionalRow = (id, state, extra = {}) => ({
   id, assetId: 'SUI', asset: { id: 'SUI', symbol: 'SUIUSDT', name: assets.find((a) => a.id === 'SUI').name, market: 'BINANCE', assetType: 'crypto' },
@@ -305,12 +308,13 @@ export const apiClient = {
       const page = rows.slice(offset, offset + limit);
       // `usOfficial=1`: the server lists US (US_STOCK_PRICE_PROVIDER=tiingo, 2026-10-17).
       return response({ tradingAccountId: id, capabilities: { enabled: conditionalEnabled, canCreate: conditionalEnabled, canCancel: true,
-        canUseLimit: conditionalEnabled && params.get('conditionalLimit') !== 'off', markets: ['KRX', 'CRYPTO_SPOT', ...(usOfficial ? ['US'] : [])], maxLivePerAccount: 20 },
+        canUseLimit: conditionalEnabled && params.get('conditionalLimit') !== 'off', markets: ['KRX', 'CRYPTO_SPOT', ...(usOfficial ? ['US'] : [])], ...offSessionMarkets, maxLivePerAccount: 20 },
         conditionalOrders: page, pagination: { limit, offset, total: rows.length, returned: page.length, nextOffset: offset + page.length < rows.length ? offset + page.length : null } });
     }
     if (path.endsWith('/order-capabilities')) {
       const id = path.split('/')[2];
-      return response({ tradingAccountId: id, limitOrder: { enabled: true, autoExecutionEnabled: false },
+      // `limitSell=enabled`: limits are registered AND matched, so a SELL limit is offered (2026-10-18).
+      return response({ tradingAccountId: id, limitOrder: { enabled: true, autoExecutionEnabled: params.get('limitSell') === 'enabled' },
         limitOnClose: { enabled: locEnabled, markets: ['KRX', ...(usOfficial ? ['US'] : [])], sides: ['buy'], attachedProtection: false },
         limitOnCloseSell: { enabled: params.get('locSell') === 'enabled', markets: ['KRX', ...(usOfficial ? ['US'] : [])] } });
     }
@@ -328,7 +332,7 @@ export const apiClient = {
       const offset = Number(query.offset ?? 0), limit = Number(query.limit ?? 30);
       const page = rows.slice(offset, offset + limit);
       const family = { enabled: sellEnabled, canCreate: sellEnabled, canUseLimit: sellEnabled };
-      return response({ tradingAccountId: id, capabilities: { enabled: sellEnabled, condition: family, protection: family, canCancel: true,
+      return response({ tradingAccountId: id, capabilities: { enabled: sellEnabled, condition: { ...family, ...offSessionMarkets }, protection: family, canCancel: true,
         markets: ['KRX', 'CRYPTO_SPOT', ...(usOfficial ? ['US'] : [])], maxLivePerAccount: 30 },
         conditionalOrders: page, pagination: { limit, offset, total: rows.length, returned: page.length, nextOffset: offset + page.length < rows.length ? offset + page.length : null } });
     }
@@ -471,7 +475,8 @@ export const apiClient = {
     const result = params.get('conditionalResult');
     if (path.endsWith('/conditional-buy-orders'))
       return response({ tradingAccountId: state.accountId, duplicate: !!result, conditionalOrder: { ...conditionalRow('cb-new', result ?? 'watching'), ...body,
-        assetId: body.assetId, limitPrice: body.limitPrice ?? null, quantity: body.quantity ?? null, amount: body.amount ?? null } });
+        assetId: body.assetId, limitPrice: body.limitPrice ?? null, quantity: body.quantity ?? null, amount: body.amount ?? null,
+        ...(offSessionMarkets.offSessionMarkets && marketClosed ? { registeredOffSession: true } : {}) } });
     // `conditionalCancel=fail`: the cancel lost the race (the watch already ordered).
     const conditionalCancel = path.includes('/conditional-buy-orders/') && path.endsWith('/cancel');
     if (conditionalCancel && params.get('conditionalCancel') === 'fail')
@@ -483,7 +488,8 @@ export const apiClient = {
         : [['stop_loss', body.stopLoss], ['take_profit', body.takeProfit]].filter((leg) => leg[1]);
       return response({ tradingAccountId: state.accountId, duplicate: false, conditionalOrders: legs.map(([kind, leg], i) => ({
         ...sellRow(`new-${kind}-${i}`, kind, 'watching'), triggerPrice: leg.triggerPrice, executionType: leg.executionType,
-        limitPrice: leg.limitPrice ?? null, quantity: leg.quantity, position: null })) });
+        limitPrice: leg.limitPrice ?? null, quantity: leg.quantity, position: null,
+        ...(kind === 'condition' && offSessionMarkets.offSessionMarkets && marketClosed ? { registeredOffSession: true } : {}) })) });
     }
     if (path.endsWith('/entry-tp-sl-plans'))
       return response({ tradingAccountId: state.accountId, duplicate: false, entry: spotEntry(body.entryId),

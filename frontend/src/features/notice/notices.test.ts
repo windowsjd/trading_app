@@ -33,14 +33,22 @@ it('the order-method notice is newest and states how each method fills', () => {
   assert.equal(notices[0].id, NOTICE_IDS.orderMethodsAndExecution);
   const notice = findNotice(NOTICE_IDS.orderMethodsAndExecution)!;
   assert.equal(notice.title, '주문방식 및 체결 기준 안내');
-  assert.equal(notice.publishedOn, '2026-10-17');
+  assert.equal(notice.publishedOn, '2026-10-18');
   assert.deepEqual(notice.sections.map((section) => section.heading), ['시장가', '지정가', '조건주문', 'LOC 주문', '손절가/익절가 설정', '선물']);
   const text = notice.sections.flatMap((section) => [section.heading, ...section.paragraphs]).join('\n');
   for (const required of [
     '실제 거래소로 전송되지 않고',
     '화면에서 본 가격과 최종 체결가격은 다를 수 있으며',
     '주문 접수는 체결이 아닙니다',
-    '감시 방향(이상·이하)은 직접 고르지 않습니다',
+    // 2026-10-18: a new SELL limit, and stock conditions registered off-session.
+    '매도 지정가는 시세가 지정가격 이상으로 확인되면',
+    '매도 수량만큼 보유 수량을 예약합니다',
+    '자동으로 체결하고 있을 때만 선택할 수 있습니다',
+    '정규장 외 시간(주말·휴장일 포함)에도 조건주문을 등록할 수 있습니다',
+    '감시 방향을 직접 선택해야 하며, 선택한 방향은 바뀌지 않습니다',
+    '정규장 외 가격이나 이전 종가로는 발동하지 않습니다',
+    '정규장 외 시간으로 보지 않고',
+    '감시 방향(이상·이하)을 직접 고르지 않습니다',
     '매수·매도(선물은 롱·숏) 모두 같은 비교 원칙을 사용합니다',
     '미국 주식의 프리마켓·애프터마켓 거래는 지원하지 않습니다',
     '서비스에서 열려 있을 때만 선택할 수 있습니다',
@@ -102,7 +110,7 @@ it('merges published important notices by KST date without replacing app notices
   assert.equal(kstDate('2026-10-19T15:30:00.000Z'), '2026-10-20');
   assert.equal(kstDate('2026-10-19T14:59:00.000Z'), '2026-10-19');
   const merged = mergeNotices(notices, [
-    { id: 'server-1', title: '점검', publishedAt: '2026-10-17T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
+    { id: 'server-1', title: '점검', publishedAt: '2026-10-18T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
     { id: 'draft', title: '초안', publishedAt: null, sections: [] },
     { id: NOTICE_IDS.executionGapProtection, title: '덮어쓰기', publishedAt: '2026-10-18T00:00:00.000Z', sections: [] },
   ]);

@@ -165,9 +165,12 @@ const ENDED_NEXT = '아래 대기 목록의 종료 이력에서 확인할 수 �
  * different sentences.
  */
 export function getConditionalSellResultNotice(
-  rows: Array<Pick<ConditionalSellOrderDto, 'state' | 'kind' | 'failureCode' | 'terminalReason' | 'order'>>,
+  rows: Array<Pick<ConditionalSellOrderDto, 'state' | 'kind' | 'failureCode' | 'terminalReason' | 'order' | 'registeredOffSession'>>,
 ): ConditionalSellResultNotice {
   const label = rows.map((row) => getConditionalSellKindLabel(row.kind)).join('·');
+  // Registered while the market was closed: waiting, not yet watched.
+  if (rows.length && rows.every((row) => row.state === 'watching' && row.registeredOffSession))
+    return { title: `${label} 설정이 등록되었습니다. 다음 정규장부터 감시합니다.`, detail: '정규장 외 시간의 가격이나 이전 종가로는 발동하지 않아요. 감시 중에도 보유 수량을 예약하지 않아요.', next: OPEN_NEXT, tone: 'success' };
   if (rows.every((row) => row.state === 'watching'))
     return { title: `${label} 설정이 등록되었습니다. 감시 중입니다.`, detail: '감시 중에는 보유 수량을 예약하지 않아요.', next: OPEN_NEXT, tone: 'success' };
   if (rows.some((row) => row.state === 'filled'))

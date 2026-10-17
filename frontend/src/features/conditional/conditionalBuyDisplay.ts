@@ -104,6 +104,8 @@ export type ConditionalBuyResultNotice = {
 };
 
 const OPEN_NEXT = '아래 대기 목록의 조건주문에서 상태를 확인하고 취소할 수 있어요.';
+/** An off-session registration: what starts it, and what never does. */
+export const OFF_SESSION_DETAIL = '정규장 외 시간의 가격이나 이전 종가로는 발동하지 않아요. 등록은 체결이 아니에요.';
 const ENDED_NEXT = '아래 대기 목록의 조건주문 종료 이력에서 확인할 수 있어요.';
 
 /**
@@ -113,11 +115,14 @@ const ENDED_NEXT = '아래 대기 목록의 조건주문 종료 이력에서 확
  * fill stay four different sentences, and an ended row never reads 감시 중.
  */
 export function getConditionalBuyResultNotice(
-  row: Pick<ConditionalBuyOrderDto, 'state' | 'failureCode' | 'terminalReason' | 'order'>,
+  row: Pick<ConditionalBuyOrderDto, 'state' | 'failureCode' | 'terminalReason' | 'order' | 'registeredOffSession'>,
 ): ConditionalBuyResultNotice {
   switch (row.state) {
     case 'watching':
-      return { title: '조건주문이 등록되었습니다. 감시 중입니다.', detail: null, next: OPEN_NEXT, tone: 'success' };
+      // Registered while the market was closed: waiting, not yet watched.
+      return row.registeredOffSession
+        ? { title: '조건주문이 등록되었습니다. 다음 정규장부터 감시합니다.', detail: OFF_SESSION_DETAIL, next: OPEN_NEXT, tone: 'success' }
+        : { title: '조건주문이 등록되었습니다. 감시 중입니다.', detail: null, next: OPEN_NEXT, tone: 'success' };
     case 'triggered':
       return { title: '조건이 충족되어 주문을 처리하고 있어요.', detail: '아직 체결된 것은 아니에요.', next: OPEN_NEXT, tone: 'progress' };
     case 'order_pending':

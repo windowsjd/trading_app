@@ -54,6 +54,9 @@ export interface ConditionalBuyOrderDto {
   currencyCode: string;
   status: ConditionalBuyStatus;
   state: ConditionalBuyState;
+  /** Registered while its stock market was closed: watching starts in the next
+   * regular session (2026-10-18). Absent on an older server. */
+  registeredOffSession?: boolean;
   trigger: { triggeredAt: string; snapshotId: string | null; evidence: Record<string, unknown> | null } | null;
   order: ConditionalBuyLinkedOrderDto | null;
   attemptCount: number;
@@ -71,6 +74,10 @@ export interface ConditionalBuyCapabilitiesDto {
   canCancel: boolean;
   canUseLimit: boolean;
   markets: string[];
+  /** Stock markets where a watch may also be registered while the market is
+   * closed, with a chosen 이상/이하 (2026-10-18). Absent on an older server:
+   * then a closed market cannot register. */
+  offSessionMarkets?: string[];
   maxLivePerAccount: number;
 }
 

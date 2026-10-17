@@ -51,6 +51,10 @@ import { sessionDateText } from '../src/orders/limit-on-close.policy';
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { lockSeasonTradingContext } from '../src/seasons/season-trading-lock';
+import {
+  markMarketSessionOverrideStoreRequired,
+  resetMarketSessionOverrideStoreForTest,
+} from '../src/orders/market-calendar/market-session-override.store';
 
 if (
   process.env.NODE_ENV !== 'test' ||
@@ -2119,6 +2123,102 @@ async function flags() {
   });
 }
 
+/**
+ * Off-session registration (2026-10-18). A SELL condition on a
+ * confirmed-closed KRX market registers without a price and with its
+ * direction as sent (one an open session would refuse as already met
+ * included), reserves nothing and is never evaluated against an off-hours
+ * trade. The next regular session's first eligible trade after its open
+ * decides it — a gap past the watch price included — through the ordinary
+ * order core. Stop-loss/take-profit settings keep requiring a fresh price;
+ * an undecidable calendar refuses a condition.
+ */
+async function offSessionRegistration() {
+  await sellScenario('general', 'KRX', '10', async (s) => {
+    // The fixture's last regular-session trade is 100; then the market closes.
+    const clock = await now();
+    tradingSessions.set(clock, clock, ['KRX', 'US']);
+    const below = await condition(s, {
+      triggerCondition: 'at_or_below',
+      triggerPrice: '95',
+      quantity: '4',
+    });
+    // 100 already meets "at or above 90": an open session refuses it, a
+    // closed one keeps the user's choice as sent.
+    const above = await condition(s, {
+      triggerCondition: 'at_or_above',
+      triggerPrice: '90',
+      executionType: 'limit',
+      limitPrice: '89',
+      quantity: '3',
+    });
+    for (const id of [below, above]) {
+      const row = await intent(id);
+      assert.equal(row.status, 'watching');
+      assert.equal(row.registrationSnapshotId, null);
+      assert.equal(row.orderId, null);
+    }
+    assert.equal((await intent(above)).triggerCondition, 'at_or_above');
+    assert.equal((await view(s, below)).registeredOffSession, true);
+    const listed = await conditionalSell.list(s.userId, s.accountId, {});
+    assert.deepEqual(listed.data.capabilities.condition.offSessionMarkets, [
+      'KRX',
+    ]);
+    assert.equal(
+      'offSessionMarkets' in listed.data.capabilities.protection,
+      false,
+    );
+    assert.equal((await position(s)).reservedQuantity.toFixed(8), '0.00000000');
+    // Stop-loss/take-profit settings keep the existing rule.
+    await rejects(
+      tpSl(s, { stopLoss: { triggerPrice: '80', quantity: '1' } }),
+      'CONDITIONAL_PRICE_UNAVAILABLE',
+    );
+    // An off-hours trade that meets both is not evidence while closed.
+    await quote(s, 'KRX', '50');
+    for (const id of [below, above])
+      assert.equal(await evaluate(id), 'price_unavailable');
+    // An undecidable calendar is never taken for a closure.
+    markMarketSessionOverrideStoreRequired();
+    try {
+      await rejects(
+        condition(s, {
+          triggerCondition: 'at_or_below',
+          triggerPrice: '70',
+          quantity: '1',
+        }),
+        'MARKET_CALENDAR_UNAVAILABLE',
+      );
+    } finally {
+      resetMarketSessionOverrideStoreForTest();
+    }
+    // The next regular session opens after those trades.
+    const open = (await now()).getTime() + 300;
+    tradingSessions.set(new Date(open + 86_400_000), undefined, ['KRX', 'US']);
+    await untilDb(open + 50);
+    for (const id of [below, above])
+      assert.equal(await evaluate(id), 'price_unavailable');
+    // Its first eligible trade gaps below 95: sold at that session price.
+    await quote(s, 'KRX', '92');
+    assert.equal(await evaluate(below), 'ordered');
+    const sold = (await intent(below)).order;
+    assert.equal(sold?.status, 'executed');
+    assert.equal(sold?.executedPrice?.toFixed(0), '92');
+    assert.equal(sold?.quantity.toFixed(0), '4');
+    // The direction chosen off-session was never flipped: 92 ≥ 90.
+    assert.equal(await evaluate(above), 'ordered');
+    const limit = (await intent(above)).order;
+    assert.equal(limit?.status, 'submitted');
+    assert.equal(limit?.limitPrice?.toFixed(0), '89');
+    assert.equal(limit?.reservedQuantity?.toFixed(0), '3');
+    assert.equal(await evaluate(below), 'terminal');
+    await invariants(s);
+    pass(
+      'KRX SELL condition off-session: direction as sent, no reservation, no off-hours trigger, next-session first trade (gap) decides; TP/SL still need a price; calendar unavailable refused',
+    );
+  });
+}
+
 async function evidenceAndSession() {
   await sellScenario('general', 'KRX', '10', async (s) => {
     const id = await condition(s, {
@@ -2719,6 +2819,7 @@ async function run() {
   await tpSlConcurrentRegistrations();
   await flags();
   await evidenceAndSession();
+  await offSessionRegistration();
   await lifecycle();
   await executionWindow();
   await scopeAndBeginner();

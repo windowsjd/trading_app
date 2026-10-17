@@ -47,20 +47,17 @@ for (const accountId of ['general', 'season']) {
         h.assetId = 'samsung';
         h.assets.samsung.assetType = assetType;
         h.assets.samsung.marketStatus = 'closed';
+        // A SELL limit (2026-10-18) is offered while limits are matched.
+        if (side === 'sell') h.orderCapabilities = { tradingAccountId: accountId, limitOrder: { enabled: true, autoExecutionEnabled: true },
+          limitOnClose: { enabled: false, markets: [], sides: ['buy'], attachedProtection: false } };
         await h.mount();
         t.after(h.close);
         if (side === 'sell') await h.press(TEST_IDS.assetDetail.sellButton);
         await h.input(input, '0.5');
         assert.notEqual(h.node(submit).props.state, 'disabled');
-        assert.match(json(h), /정규장 외에는 시장가 주문을 할 수 없습니다/);
+        assert.match(json(h), /정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다/);
+        // The closed session never switches the method by itself.
         assert.equal(h.orderType(), '시장가');
-        if (side === 'sell') {
-          // New sell limits are not offered; the closed session never switches the method.
-          await h.press(TEST_IDS.order.typeSelect);
-          assert.equal(h.node('order-method-limit') === undefined, true);
-          assert.equal(h.orderType(), '시장가');
-          return;
-        }
         await h.selectOrderType('limit');
         // A method change starts the new method's draft empty.
         assert.equal(h.node(input).props.value, '');
@@ -76,9 +73,29 @@ for (const accountId of ['general', 'season']) {
         await h.flush();
         assert.equal(h.requests[0].body.quantity, '1.000000');
         assert.equal(h.requests[0].body.amount, undefined);
+        assert.equal(h.requests[0].body.side, side);
+        assert.equal(h.requests[0].body.orderType, 'limit');
         assert.equal(h.success().payload.execution.state, 'submitted');
       });
     }
+    test(`${accountId} ${assetType} closed sell without automatic limit matching: 지정가 is not suggested and cannot be chosen`, async (t) => {
+      const h = inlineTradingHarness();
+      h.accountId = accountId;
+      h.assetId = 'samsung';
+      h.assets.samsung.assetType = assetType;
+      h.assets.samsung.marketStatus = 'closed';
+      // The default capabilities register limits but never match them.
+      await h.mount();
+      t.after(h.close);
+      await h.press(TEST_IDS.assetDetail.sellButton);
+      await h.input(input, '1');
+      assert.match(json(h), /정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요/);
+      assert.doesNotMatch(json(h), /지정가를 선택하면/);
+      await h.press(TEST_IDS.order.typeSelect);
+      assert.equal(h.node('order-method-limit').props.disabled, true);
+      assert.equal(h.node('order-method-limit-badge').props.children, '이용 불가');
+      assert.equal(h.orderType(), '시장가');
+    });
   }
 }
 for (const failure of ['missing-price', 'stale-price', 'fee']) {

@@ -203,18 +203,84 @@ async function run() {
       await page.getByTestId('order-quantity-input').fill('2');
       await shot('krx-loc');
 
-      // 4. KRX SELL: market plus the server-gated 조건주문/LOC rows; no direct limit and
-      // no 손절가/익절가 row (it lives on the holding card).
+      // 4. KRX SELL: market plus the server-gated 지정가 (2026-10-18), 조건주문 and LOC
+      // rows; no 손절가/익절가 row (it lives on the holding card). Without automatic
+      // matching the SELL limit is listed but unavailable.
       await go('krx=1&asset=SAMSUNG&longName=1');
       await page.getByTestId('asset-detail-sell-button').click();
       await defaultField();
       await field().click();
       await row('loc').waitFor();
-      assert.equal(await row('limit').count(), 0, 'no new sell limit');
+      assert.equal(await row('limit').count(), 1, 'the SELL limit is listed');
+      assert.equal(await page.getByTestId('order-method-limit-badge').innerText(), '이용 불가', `unmatched SELL limit unavailable (${tag})`);
       assert.equal(await row('protection').count(), 0, 'no 손절가/익절가 주문방식');
       await shot('krx-sell-sheet');
-      await sheetReachable(['market', 'conditional', 'loc']);
+      await sheetReachable(['market', 'limit', 'conditional', 'loc']);
       await page.getByTestId('order-method-sheet-close').click();
+
+      // 4a. KRX SELL limit once limits are matched: 100% is the unreserved part
+      // (10 held − 4 reserved), whole shares; the card shows the expected proceeds.
+      await go('krx=1&asset=SAMSUNG&longName=1&limitSell=enabled&stock=1&holding=10&reserved=4');
+      await page.getByTestId('asset-detail-sell-button').click();
+      await field().click();
+      await row('limit').click();
+      await page.getByTestId('order-limit-price-input').fill('71000');
+      await page.getByTestId('order-ratio-100').click();
+      assert.equal(await page.getByTestId('order-quantity-input').inputValue(), '6', `100% = unreserved part (${tag})`);
+      await shot('krx-sell-limit');
+
+      // 4b'. KRX closed: a conditional BUY takes a chosen 이상/이하 (none preselected);
+      // market-execution ratio picks are off without a current price, a limit
+      // price restores them; the result says watching starts next session.
+      await go('krx=1&krxClosed=1&asset=SAMSUNG&conditional=enabled&offSession=1&longName=1&stock=1');
+      await field().click();
+      await row('conditional').click();
+      await page.getByTestId('conditional-buy-form').waitFor();
+      assert.equal(await page.getByTestId('conditional-off-session-notice').innerText(),
+        '정규장 외 시간입니다. 감시 방향을 선택하면 조건주문을 등록할 수 있으며, 다음 정규장부터 감시합니다.', `off-session notice (${tag})`);
+      for (const condition of ['at_or_above', 'at_or_below'])
+        assert.equal(await page.getByTestId(`conditional-trigger-${condition}`).getAttribute('aria-checked'), 'false', `${condition} not preselected (${tag})`);
+      await page.getByTestId('conditional-trigger-price').fill('72000');
+      await page.getByTestId('conditional-trigger-at_or_above').click();
+      assert.equal(await page.getByTestId('conditional-trigger-direction').innerText(), '감시 조건 · 72000 KRW 이상 도달 시', `chosen direction (${tag})`);
+      assert.equal(await page.getByTestId('conditional-ratio-reason').count(), 1, `market ratio off while closed (${tag})`);
+      await shot('krx-closed-conditional');
+      await page.getByTestId('conditional-execution-limit').click();
+      await page.getByTestId('conditional-limit-price').fill('72500');
+      await page.getByTestId('conditional-ratio-100').click();
+      assert.ok(Number(await page.getByTestId('conditional-size').inputValue()) >= 1, `limit ratio sizes the watch (${tag})`);
+      await page.getByTestId('conditional-ratio').scrollIntoViewIfNeeded();
+      await shot('krx-closed-conditional-ratio');
+      await page.getByTestId('conditional-submit').click();
+      await page.getByTestId('conditional-registered').waitFor();
+      assert.ok((await page.getByTestId('conditional-registered-title').innerText()).includes('다음 정규장부터 감시합니다'), `off-session result (${tag})`);
+      await page.getByTestId('conditional-registered').scrollIntoViewIfNeeded();
+      await shot('krx-closed-conditional-registered');
+
+      // 4c. KRX closed: a SELL condition takes a chosen direction and a share of the holding.
+      await go('krx=1&krxClosed=1&asset=SAMSUNG&sell=enabled&offSession=1&stock=1&holding=10&longName=1');
+      await page.getByTestId('asset-detail-sell-button').click();
+      await field().click();
+      await row('conditional').click();
+      await page.getByTestId('sell-condition-form').waitFor();
+      await page.getByTestId('sell-condition-trigger-price').fill('65000');
+      await page.getByTestId('sell-trigger-at_or_below').click();
+      await page.getByTestId('sell-condition-ratio-50').click();
+      assert.equal(await page.getByTestId('sell-condition-quantity').inputValue(), '5', `50% of 10 held (${tag})`);
+      await page.getByTestId('sell-condition-ratio').scrollIntoViewIfNeeded();
+      await shot('krx-closed-sell-condition');
+
+      // 4d. KRX open: the direction follows the price; ratio picks size the watch.
+      await go('krx=1&asset=SAMSUNG&conditional=enabled&longName=1&stock=1');
+      await field().click();
+      await row('conditional').click();
+      await page.getByTestId('conditional-trigger-price').fill('69000');
+      assert.equal(await page.getByTestId('conditional-trigger-direction').innerText(), '감시 조건 · 69000 KRW 이하 도달 시', `auto direction (${tag})`);
+      assert.equal(await page.locator('[data-testid^="conditional-trigger-at_or"]').count(), 0, `no chosen direction in session (${tag})`);
+      await page.getByTestId('conditional-ratio-50').click();
+      assert.ok(Number(await page.getByTestId('conditional-size').inputValue()) > 0, `50% sizes the watch (${tag})`);
+      await page.getByTestId('conditional-ratio').scrollIntoViewIfNeeded();
+      await shot('krx-conditional-ratio');
 
       // 4b. US stocks once the server lists US (US_STOCK_PRICE_PROVIDER=tiingo,
       // 2026-10-17): 조건주문 and LOC open like KRX, the LOC form shows the
@@ -240,6 +306,8 @@ async function run() {
         await row(method).waitFor();
         assert.equal(await page.getByTestId(`order-method-${method}-badge`).count(), 0, `US sell ${method} available (${tag})`);
       }
+      // The SELL limit follows automatic matching (off in this fixture).
+      assert.equal(await row('limit').count(), 1, `US sell limit listed (${tag})`);
       await shot('us-sell-sheet');
       await page.getByTestId('order-method-sheet-close').click();
 

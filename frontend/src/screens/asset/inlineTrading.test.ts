@@ -11,18 +11,25 @@ const {
 const qty = TEST_IDS.order.quantityInput;
 const submit = TEST_IDS.order.executeSubmit;
 const sell = TEST_IDS.assetDetail.sellButton;
+/** Order capabilities with ordinary limits registered AND matched. */
+const matchedLimits = (accountId: string) => ({ tradingAccountId: accountId,
+  limitOrder: { enabled: true, autoExecutionEnabled: true },
+  limitOnClose: { enabled: false, markets: [], sides: ['buy'], attachedProtection: false } });
 
 describe('Order screen lifecycle with real React and query mutations', () => {
   for (const accountId of ['general', 'season'])
-    it(`${accountId} sell offers no new limit: 시장가, plus a server-gated condition (손절가/익절가 lives on the holding)`, async (t) => {
+    it(`${accountId} sell offers 시장가, a server-gated limit and condition (손절가/익절가 lives on the holding)`, async (t) => {
       const h = inlineTradingHarness();
       h.accountId = accountId;
       await h.mount();
       t.after(h.close);
       await h.press(sell);
       await h.press('order-type-select');
-      assert.equal(h.node('order-method-limit') === undefined, true);
       assert.equal(h.node('order-method-market').props.disabled, false);
+      // Automatic matching is off in the default capabilities: a SELL limit
+      // that could only wait unmatched is shown, not selectable.
+      assert.equal(h.node('order-method-limit').props.disabled, true);
+      assert.equal(h.node('order-method-limit-badge').props.children, '이용 불가');
       // The server's SELL flag is off by default: shown, not selectable.
       assert.equal(h.node('order-method-conditional').props.disabled, true);
       assert.equal(h.node('order-method-conditional-badge').props.children, '이용 불가');
@@ -31,14 +38,25 @@ describe('Order screen lifecycle with real React and query mutations', () => {
       assert.equal(h.node('order-method-loc') === undefined, true);
     });
   for (const accountId of ['general', 'season'])
+    it(`${accountId} sell limit is selectable once limits are registered and matched`, async (t) => {
+      const h = inlineTradingHarness();
+      h.accountId = accountId;
+      h.orderCapabilities = matchedLimits(accountId);
+      await h.mount();
+      t.after(h.close);
+      await h.press(sell);
+      await h.press('order-type-select');
+      assert.equal(h.node('order-method-limit').props.disabled, false);
+      assert.equal(h.node('order-method-limit-badge') === undefined, true);
+    });
+  for (const accountId of ['general', 'season'])
     for (const side of ['buy', 'sell'])
       for (const type of ['market', 'limit']) {
-        // A new sell limit is not offered any more (see the test above);
-        // accepted sell limits keep their server fill/list/cancel paths.
-        if (side === 'sell' && type === 'limit') continue;
         it(`${accountId} ${type} ${side} preserves quote/create, canonical inputs, account and success`, async (t) => {
           const h = inlineTradingHarness();
           h.accountId = accountId;
+          // A SELL limit is offered only while limits are matched (2026-10-18).
+          if (side === 'sell' && type === 'limit') h.orderCapabilities = matchedLimits(accountId);
           await h.mount();
           t.after(h.close);
           if (side === 'sell') await h.press(sell);

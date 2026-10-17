@@ -40,6 +40,10 @@ import {
 import { OpsJobLockService } from '../src/ops/ops-job-lock.service';
 import { OpsJobRunService } from '../src/ops/ops-job-run.service';
 import { lockSeasonTradingContext } from '../src/seasons/season-trading-lock';
+import {
+  markMarketSessionOverrideStoreRequired,
+  resetMarketSessionOverrideStoreForTest,
+} from '../src/orders/market-calendar/market-session-override.store';
 
 if (
   process.env.NODE_ENV !== 'test' ||
@@ -471,15 +475,8 @@ async function evidenceAndSession() {
       (await conditionalBuy.evaluate(id)).state,
       'price_unavailable',
     );
-    await rejects(
-      register(s, {
-        triggerCondition: 'at_or_above',
-        triggerPrice: '200',
-        executionType: 'market',
-        quantity: '1',
-      }),
-      'CONDITIONAL_PRICE_UNAVAILABLE',
-    );
+    // A new watch may register while closed (2026-10-18): see
+    // offSessionRegistration. This one keeps waiting either way.
     assert.equal((await watch(id)).status, 'watching');
     tradingSessions.set(await now(), undefined, ['KRX']);
     await quote(s, 'KRX', '106');
@@ -489,6 +486,176 @@ async function evidenceAndSession() {
       'KRX freshness/source/registration-time gates and closed-session pause',
     );
   });
+}
+
+/**
+ * Off-session registration (2026-10-18). A confirmed-closed stock market
+ * registers a watch without a price and with the direction exactly as sent —
+ * including one an open session would refuse as already met. While closed it
+ * is never evaluated against a price (off-hours trades included) and reserves
+ * nothing. The next regular session's first eligible trade after its open
+ * decides it, a gap past the watch price included, and the order goes
+ * through the ordinary core. An undecidable calendar refuses registration.
+ */
+async function offSessionRegistration(kind: 'KRX' | 'US') {
+  const previous = process.env.US_STOCK_PRICE_PROVIDER;
+  if (kind === 'US') process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+  try {
+    await scenario('season', async (s) => {
+      tradingSessions.set(await now(), undefined, ['KRX', 'US']);
+      const currency = kind === 'KRX' ? 'KRW' : 'USD';
+      const asset = await db.asset.update({
+        where: { id: s.instruments[0].asset.id },
+        data:
+          kind === 'KRX'
+            ? {
+                market: 'KRX',
+                assetType: 'domestic_stock',
+                currencyCode: 'KRW',
+                priceCurrency: 'KRW',
+                settlementCurrency: 'KRW',
+              }
+            : {
+                market: 'NAS',
+                assetType: 'us_stock',
+                currencyCode: 'USD',
+                priceCurrency: 'USD',
+                settlementCurrency: 'USD',
+              },
+      });
+      const cash = {
+        tradingAccountId: s.accountId,
+        walletScope: 'securities' as const,
+        currencyCode: currency,
+      };
+      // A realistic balance per currency (a 1,000,000 USD fixture would
+      // overflow the season return-rate column of the equity snapshot).
+      await db.cashWallet.updateMany({
+        where: cash,
+        data: { balanceAmount: kind === 'KRX' ? '1000000' : '10000' },
+      });
+      const trade = async (value: string) => {
+        const at = await now();
+        return db.assetPriceSnapshot.create({
+          data: {
+            assetId: asset.id,
+            price: value,
+            currencyCode: currency,
+            sourceType: 'provider_api',
+            sourceName:
+              kind === 'KRX'
+                ? 'koscom_krx_realtime_price'
+                : 'tiingo_us_reference_price',
+            effectiveAt: at,
+            capturedAt: at,
+          },
+        });
+      };
+      const funds = async () => {
+        const row = await db.cashWallet.findFirstOrThrow({ where: cash });
+        return `${row.balanceAmount.toFixed(8)}/${row.reservedAmount.toFixed(8)}`;
+      };
+      // The last regular-session trade, then the market closes.
+      await trade('100');
+      const clock = await now();
+      tradingSessions.set(clock, clock, ['KRX', 'US']);
+      const before = await funds();
+      const above = await register(s, {
+        triggerCondition: 'at_or_above',
+        triggerPrice: '105',
+        executionType: 'market',
+        quantity: '2',
+      });
+      // 100 already meets "at or below 200": an open session refuses it, a
+      // closed one keeps the user's choice as sent.
+      const below = await register(s, {
+        triggerCondition: 'at_or_below',
+        triggerPrice: '200',
+        executionType: 'limit',
+        limitPrice: '210',
+        quantity: '1',
+      });
+      for (const id of [above, below]) {
+        const row = await watch(id);
+        assert.equal(row.status, 'watching');
+        assert.equal(row.registrationSnapshotId, null);
+        assert.equal(row.orderId, null);
+      }
+      assert.equal((await watch(below)).triggerCondition, 'at_or_below');
+      const listed = await conditionalBuy.list(s.userId, s.accountId, {});
+      assert.deepEqual(
+        listed.data.capabilities.offSessionMarkets,
+        kind === 'KRX' ? ['KRX'] : ['KRX', 'US'],
+      );
+      assert.deepEqual(
+        listed.data.conditionalOrders.map((row) => row.registeredOffSession),
+        [true, true],
+      );
+      // Nothing is reserved, and an off-hours trade (one that meets both
+      // conditions) is not evidence while the market is closed.
+      assert.equal(await funds(), before);
+      await trade('300');
+      for (const id of [above, below])
+        assert.equal(
+          (await conditionalBuy.evaluate(id)).state,
+          'price_unavailable',
+        );
+      // An undecidable calendar is never taken for a closure.
+      markMarketSessionOverrideStoreRequired();
+      try {
+        await rejects(
+          register(s, {
+            triggerCondition: 'at_or_above',
+            triggerPrice: '150',
+            executionType: 'market',
+            quantity: '1',
+          }),
+          'MARKET_CALENDAR_UNAVAILABLE',
+        );
+      } finally {
+        resetMarketSessionOverrideStoreForTest();
+      }
+      // The next regular session opens after those trades: neither the
+      // off-hours trade nor the previous close is its evidence.
+      const open = (await now()).getTime() + 300;
+      tradingSessions.set(new Date(open + 86_400_000), undefined, [
+        'KRX',
+        'US',
+      ]);
+      await untilDb(open + 50);
+      for (const id of [above, below])
+        assert.equal(
+          (await conditionalBuy.evaluate(id)).state,
+          'price_unavailable',
+        );
+      assert.equal((await watch(above)).status, 'watching');
+      // Its first eligible trade gaps past 105: met at once, bought at that
+      // session price through the ordinary market core.
+      await trade('110');
+      assert.equal((await conditionalBuy.evaluate(above)).state, 'ordered');
+      const bought = (await watch(above)).order;
+      assert.equal(bought?.status, 'executed');
+      assert.equal(bought?.executedPrice?.toFixed(0), '110');
+      assert.equal(
+        ((await watch(above)).triggerEvidenceJson as { price: string }).price,
+        '110.00000000',
+      );
+      // The direction chosen off-session was never flipped: 110 ≤ 200.
+      assert.equal((await conditionalBuy.evaluate(below)).state, 'ordered');
+      const limit = (await watch(below)).order;
+      assert.equal(limit?.status, 'submitted');
+      assert.equal(limit?.limitPrice?.toFixed(0), '210');
+      // One order per watch; a repeated evaluation creates nothing new.
+      assert.equal((await conditionalBuy.evaluate(above)).state, 'terminal');
+      assert.equal(await orderCount(s), 2);
+      pass(
+        `${kind} off-session registration: direction as sent, no reservation, no off-hours trigger, next-session first trade (gap) decides, calendar unavailable refused`,
+      );
+    });
+  } finally {
+    if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+    else process.env.US_STOCK_PRICE_PROVIDER = previous;
+  }
 }
 
 async function cryptoSourceSeparation() {
@@ -1665,6 +1832,8 @@ async function run() {
     await races(kind);
   }
   await evidenceAndSession();
+  await offSessionRegistration('KRX');
+  await offSessionRegistration('US');
   await cryptoSourceSeparation();
   await staleTrigger();
   await lifecycle();

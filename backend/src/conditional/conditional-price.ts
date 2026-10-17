@@ -1,5 +1,6 @@
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { type Asset, Prisma } from '../generated/prisma/client';
+import { createApiError } from '../common/api-error';
 import { readFuturesLastPrice } from '../futures/futures-last-price';
 import { futuresInstrumentInclude } from '../futures/futures.presenter';
 import { findMarketAwareAssetPriceCandidates } from '../providers/asset-price-snapshot-query';
@@ -7,7 +8,10 @@ import {
   resolveAssetProviderEligibility,
   selectMarketAwareAssetPriceSnapshotBySourcePriority,
 } from '../providers/source-eligibility.policy';
-import { assertOrderSessionAllowed } from '../orders/market-hours.policy';
+import {
+  assertOrderSessionAllowed,
+  getAssetTradingStatus,
+} from '../orders/market-hours.policy';
 
 export type ConditionalPriceEvidence = {
   /** Spot: AssetPriceSnapshot id. Futures: FuturesLastPriceSnapshot id. */
@@ -107,4 +111,40 @@ export async function conditionalPrice(
     effectiveAt: row.effectiveAt,
     capturedAt: row.capturedAt,
   };
+}
+
+/**
+ * Registration reference of a NEW Spot conditional BUY or SELL condition
+ * (2026-10-18), decided at the caller's post-lock DB clock. Crypto Spot and a
+ * stock inside its regular session keep the existing rule: fresh eligible
+ * evidence, and the caller refuses a condition that is already met. A stock
+ * market that is CONFIRMED closed (outside the regular session, weekend,
+ * holiday, operator closure) returns `off_session`: the watch is registered
+ * without a price and with the user's 이상/이하 exactly as sent. Nothing
+ * changes for its evaluation — `conditionalPrice` never reads a closed market,
+ * and only the next regular session's evidence of a trade after registration
+ * can trigger it. An undecidable session fails closed with its own code (it
+ * is never taken for a closure). Stop-loss/take-profit settings, protection
+ * and Futures keep requiring `conditionalPrice` directly.
+ */
+export async function conditionalRegistrationReference(
+  tx: Pick<
+    Prisma.TransactionClient,
+    'assetPriceSnapshot' | 'futuresInstrument' | 'futuresLastPriceSnapshot'
+  >,
+  asset: Asset,
+  now: Date,
+): Promise<ConditionalPriceEvidence | 'off_session' | null> {
+  if (asset.isActive && asset.assetType !== 'crypto') {
+    const status = getAssetTradingStatus(asset, now);
+    if (!status.tradable && status.reason === 'MARKET_CLOSED')
+      return 'off_session';
+    if (!status.tradable && status.reason === 'MARKET_CALENDAR_UNAVAILABLE')
+      throw createApiError(
+        'MARKET_CALENDAR_UNAVAILABLE',
+        'Market calendar is unavailable.',
+        409,
+      );
+  }
+  return conditionalPrice(tx, asset, 'spot', now);
 }

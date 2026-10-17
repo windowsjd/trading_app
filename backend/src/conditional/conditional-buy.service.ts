@@ -1,5 +1,6 @@
 import {
   conditionalMarkets,
+  conditionalOffSessionMarkets,
   usConditionalOrdersSupported,
 } from './conditional-markets';
 import { Injectable } from '@nestjs/common';
@@ -20,7 +21,10 @@ import { assertOrderInputPolicy } from '../orders/order-input-policy';
 import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { conditionalTradable } from './conditional-policy';
-import { conditionalPrice } from './conditional-price';
+import {
+  conditionalPrice,
+  conditionalRegistrationReference,
+} from './conditional-price';
 import {
   assertConditionalBuyEnabled,
   CONDITIONAL_BUY_MAX_ATTEMPTS,
@@ -194,7 +198,10 @@ export class ConditionalBuyService {
           'Too many active conditional buy orders.',
           409,
         );
-      const price = await conditionalPrice(tx, asset, 'spot', now);
+      // A confirmed-closed stock market registers without a price (the
+      // user's direction as sent, watched from the next regular session);
+      // in session and for crypto the fresh price must not already meet it.
+      const price = await conditionalRegistrationReference(tx, asset, now);
       if (!price) {
         setAdminDiagnosticContext({
           domain: 'CONDITIONAL',
@@ -213,6 +220,7 @@ export class ConditionalBuyService {
         );
       }
       if (
+        price !== 'off_session' &&
         isConditionalBuyMet(
           input.triggerCondition,
           price.price,
@@ -235,7 +243,8 @@ export class ConditionalBuyService {
           quantity: input.quantity,
           amount: input.amount,
           currencyCode: asset.settlementCurrency,
-          registrationSnapshotId: price.id,
+          // Null exactly for an off-session registration (no price referenced).
+          registrationSnapshotId: price === 'off_session' ? null : price.id,
           idempotencyKey: input.idempotencyKey,
           requestHash: hash,
           createdAt: now,
@@ -367,6 +376,9 @@ export class ConditionalBuyService {
             isLimitOrderEnabled() &&
             readLimitOrderMatchingConfig().matchingEnabled,
           markets: conditionalMarkets(),
+          // Additive (2026-10-18): stock markets where a watch may also be
+          // registered while the market is closed, with a chosen direction.
+          offSessionMarkets: conditionalOffSessionMarkets(),
           maxLivePerAccount: CONDITIONAL_BUY_MAX_LIVE_PER_ACCOUNT,
         },
         conditionalOrders: rows.map((row) => presentConditionalBuy(row)),
@@ -646,6 +658,9 @@ export function presentConditionalBuy(row: ConditionalBuyRecord) {
             : order?.status === 'canceled'
               ? 'order_canceled'
               : 'order_rejected',
+    // Registered while its stock market was closed (no price referenced):
+    // watching starts in the next regular session.
+    registeredOffSession: row.registrationSnapshotId === null,
     trigger: row.triggeredAt
       ? {
           triggeredAt: row.triggeredAt.toISOString(),

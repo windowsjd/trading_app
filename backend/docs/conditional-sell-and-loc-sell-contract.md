@@ -123,6 +123,17 @@ per-family total and distinct price (`CONDITIONAL_SELL_TOTAL_EXCEEDS_HOLDING`,
 (`CONDITIONAL_PRICE_UNAVAILABLE`) and a condition not already met
 (`CONDITIONAL_SELL_ALREADY_MET`).
 
+Off-session registration (2026-10-18), **user conditions only**: on a stock
+market that is confirmed closed (`MARKET_CLOSED` at the post-lock DB clock) a
+`kind: "condition"` registers without a price (`registrationSnapshotId = null`)
+and with its `triggerCondition` exactly as sent; nothing is reserved and every
+other rule above still applies. It is evaluated from the next regular session
+with that session's evidence after registration only (an opening gap past the
+watch price triggers at once; off-hours trades and the previous close never
+do). An undecidable session → `409 MARKET_CALENDAR_UNAVAILABLE`.
+Stop-loss/take-profit settings keep requiring fresh evidence while closed
+(`CONDITIONAL_PRICE_UNAVAILABLE`).
+
 Each row returns money as strings: `kind`, `triggerCondition`, `triggerPrice`,
 `executionType`, `limitPrice`, `quantity` (target), `status`, `state`
 (`watching` / `triggered` / `order_pending` / `filled` / `order_canceled` /
@@ -130,15 +141,19 @@ Each row returns money as strings: `kind`, `triggerCondition`, `triggerPrice`,
 `holdingQuantity`, `reservedQuantity`, `availableQuantity`,
 `executableQuantity` — what a trigger now would sell; informational),
 `executionAvailableQuantity` (unreserved holding when the order was sized),
+`registeredOffSession` (2026-10-18, additive: a condition registered while its
+stock market was closed),
 `quantityLimited` (`order.quantity < quantity`), `trigger` (time + copied
 evidence), `order` (`orderId`, `orderType`, `status`, `quantity` = submitted,
 `executedQuantity`, `reservedQuantity`, executed price/gross/fee/net,
 `cancelReason`, timestamps), `attemptCount`, `failureCode`, `terminalReason`.
 `filled` means the linked Order executed — never that a price was reached.
 
-`capabilities`: `{ enabled, condition: { enabled, canCreate, canUseLimit },
-protection: { enabled, canCreate, canUseLimit }, canCancel: true,
-markets: ['KRX','CRYPTO_SPOT'], maxLivePerAccount: 30 }`.
+`capabilities`: `{ enabled, condition: { enabled, canCreate, canUseLimit,
+offSessionMarkets }, protection: { enabled, canCreate, canUseLimit },
+canCancel: true, markets: ['KRX','CRYPTO_SPOT'], maxLivePerAccount: 30 }`
+(`condition.offSessionMarkets`, 2026-10-18, additive: the listed stock markets
+where a condition may also register while closed).
 
 The account order list adds `conditionalSell: { id, kind } | null` to each
 order (the setting that submitted it).

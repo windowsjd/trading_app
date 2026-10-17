@@ -23,3 +23,17 @@ export function conditionalMarkets(
     ...(usConditionalOrdersSupported(env) ? (['US'] as const) : []),
   ];
 }
+
+/**
+ * Capability `offSessionMarkets` (2026-10-18): the supported stock markets
+ * where a conditional BUY or SELL condition may also be registered while the
+ * market is confirmed closed (the user chooses 이상/이하; watching starts in
+ * the next regular session). Crypto Spot never closes, so it is not listed.
+ */
+export function conditionalOffSessionMarkets(
+  env: Record<string, string | undefined> = process.env,
+): Array<'KRX' | 'US'> {
+  return conditionalMarkets(env).filter(
+    (market): market is 'KRX' | 'US' => market !== 'CRYPTO_SPOT',
+  );
+}

@@ -70,6 +70,9 @@ export interface ConditionalSellOrderDto {
   currencyCode: string;
   status: ConditionalSellStatus;
   state: ConditionalSellState;
+  /** A condition registered while its stock market was closed: watching starts
+   * in the next regular session (2026-10-18). Absent on an older server. */
+  registeredOffSession?: boolean;
   position: ConditionalSellPositionDto | null;
   /** Unreserved holding when the order was sized (evidence for a smaller order). */
   executionAvailableQuantity: string | null;
@@ -90,6 +93,10 @@ export interface ConditionalSellKindCapabilitiesDto {
   enabled: boolean;
   canCreate: boolean;
   canUseLimit: boolean;
+  /** Conditions only: stock markets where one may also be registered while the
+   * market is closed, with a chosen 이상/이하 (2026-10-18). Absent on an older
+   * server: then a closed market cannot register. */
+  offSessionMarkets?: string[];
 }
 
 export interface ConditionalSellCapabilitiesDto {

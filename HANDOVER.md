@@ -10,6 +10,41 @@
 
 ---
 
+## 2026-10-18 현물 매도 지정가·조건주문 비율 슬라이더·감시 방향 메시지 구분·주식 조건주문 장외 등록
+
+- **구현 목표:** ① 현물 매도에 지정가 노출, ② 조건부 매수·매도에 비율 슬라이더·25/50/75/100%, ③ 「현재가를 확인할 수 없어 감시 방향을 정할 수 없어요」를
+  장외/시세 장애/시장 상태 불명으로 구분, ④ 국내·미국 주식 일반 조건주문(매수, 매도 조건)의 정규장 외 등록. 시작 `origin/main`=`edbc396a`(clean).
+  PR #8·`feature/stock-conditional-offhours-registration-20261018`은 참고하지 않았다. **스키마·migration·운영 설정 변경 없음.**
+- **원인:** ① `orderMethods.ts`가 SELL에서 지정가를 빼 두었을 뿐, 서버 매도 지정가(보유 수량 원자 예약·경로 A/B·취소 해제)는 그대로 동작했다.
+  ③④ 등록 경로가 `conditionalPrice`(정규장 밖이면 null)를 그대로 써서 장외 등록은 `CONDITIONAL_PRICE_UNAVAILABLE`, 앱은 기준가가 없으면
+  어떤 상황이든 같은 문구로 막았다.
+- **기능 구현 의도:**
+  - **매도 지정가는 자동 체결이 켜져 있을 때만 선택 가능.** `order-capabilities.limitOrder`의 `enabled && autoExecutionEnabled`를 게이트로 쓴다
+    (매칭이 꺼지면 접수만 되고 체결되지 않으므로 「이용 불가」). 매도 가능 수량(보유−예약) 초과는 서버와 같은 이유로 미리 막고, 장외 시장가 안내는
+    매도 지정가를 쓸 수 있을 때만 「지정가를 선택하면…」을 붙인다. 매수 지정가 노출·게이트는 바꾸지 않았다.
+  - **비율(`OrderRatioControls` + 공용 `QuantityRatioSlider`, 계산은 `features/conditional/conditionalRatio.ts`):** 모두 내림이라 잔액·보유를 넘지 않는다.
+    주식 매수 = 주문 가능 금액 ÷ (기준가 × (1+max(0.2%, 수수료))), 기준가는 지정가 발동이면 지정가격, 시장가 발동이면 신선한 현재가와 감시가격 중
+    높은 값(현재가가 없으면 비율 끔·직접 입력 유지 — 장외에 전일 종가를 쓰지 않음). 암호화폐 매수는 기존 원금 계산(`buyAmountAtRatio`), 매도는 보유
+    수량 기준(감시 중 무예약이므로 예약분 제외 아님; 발동 시 서버가 다시 계산). 입력값 → 비율 표시만 역산하고 서로 쓰지 않아 무한 갱신이 없다.
+    기존 「보유 전량」 칩은 100%로 대체했다.
+  - **감시 방향 3상태(`features/conditional/directionMode.ts`):** 정규장·암호화폐 = 기존 자동 결정(시세 없으면 「현재가를 확인할 수 없습니다. 시세가
+    업데이트된 후 다시 시도해주세요.」 + 시세 다시 불러오기), 확정 휴장(`marketStatus=closed`) + 서버 `offSessionMarkets`에 그 시장 = 사용자가 이상/이하를
+    고름(미선택 불가, 미리 선택 없음), 그 밖(`unknown`, 구버전 서버의 휴장) = 등록 제한과 원인 문구. 장이 열리면 고른 방향을 버리고 가격으로 다시 정한다.
+  - **서버(`conditionalRegistrationReference`):** 잠금 뒤 DB 시각으로 세션 판정. 정규장·암호화폐는 기존(신선한 가격 + `*_ALREADY_MET`), 확정 휴장은
+    가격 없이 저장(`registrationSnapshotId=null`, 방향은 보낸 그대로), 캘린더 불명은 `MARKET_CALENDAR_UNAVAILABLE`. 감시·발동 코드는 그대로라 장외에는
+    평가하지 않고, 다음 정규장 세션 안·등록 이후 체결 증거만 쓰며 개장 갭은 첫 시세로 바로 충족된다. 손절가/익절가·선물·LOC는 범위 밖(손절/익절은
+    휴장 중 계속 가격 필요). 응답에 `offSessionMarkets`(매도는 `condition.offSessionMarkets`)와 행별 `registeredOffSession` 추가.
+- **설계·변경 파일:** backend `conditional/conditional-price.ts`·`conditional-buy.service.ts`·`conditional-sell.service.ts`·`conditional-markets.ts`,
+  신규 `conditional-registration-reference.spec.ts`, PG 러너 `scripts/conditional-{buy,sell}-orders-integration.ts`(`offSessionRegistration`), 계약 2종·
+  `policy-decisions.md`. frontend `orderMethods.ts`(`getLimitSellGate`), `OrderPanel.tsx`, `ConditionalBuyForm.tsx`, `SellIntentForm.tsx`, 신규
+  `OrderRatioControls.tsx`·`TriggerDirectionChoice.tsx`·`directionMode.ts`·`conditionalRatio.ts`, DTO·결과 문구, 공지 「주문방식 및 체결 기준 안내」(10-18 개정),
+  `lint:accounts:check` 범위에 새 컴포넌트 2개 추가, 브라우저 `orderMethodBrowser.cjs`·`tradingMocks.js`(`limitSell=enabled`, `offSession=1`).
+- **검증:** backend typecheck·`lint:accounts:check`·conditional 단위(+5), PG(격리 PG16 UTC): 조건부 매수 37/37(KRX·US 장외 등록 시나리오 포함),
+  조건부 매도 73/73, 지정가 관련 기존 스위트 4종(order-input-policy·reservation·matching·general-account) 통과. frontend typecheck·lint·진단 게이트,
+  신규/갱신 테스트, 전체 `npm test`, RN-Web `orderMethodBrowser`(320~430 × 라이트/다크 × 글꼴 1/1.5/2배).
+- **주의:** 프론트의 장외 방향 선택은 서버가 `offSessionMarkets`를 줄 때만 열린다 — 이 커밋의 백엔드가 배포되기 전 앱은 휴장 중 등록을 막는다.
+  커밋은 `[skip render]`로 push했으므로 운영 반영은 별도 배포가 필요하다. Android/iOS 실기기 확인은 하지 않았다(RN-Web만).
+
 ## 2026-10-18 운영진 문의 답변 UI·문의 화면 갱신·문의 DB 통합 CI 편입
 
 - **구현 목표:** 운영자·관리자가 앱(MY > 문의하기)에서 전체 문의를 보고 공식 답변을 등록하고, 사용자는 화면에 돌아오면 새 답변을 보며,

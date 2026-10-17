@@ -204,7 +204,7 @@ describe('주문방식 field and sheet', () => {
         assert.equal(h.node(`order-method-${method}-badge`).props.children, badge);
       }
     });
-    it(`${assetType} SELL lists 시장가 and two server-gated methods, never a new 지정가 or 손절가/익절가`, async (t) => {
+    it(`${assetType} SELL lists 시장가 and three server-gated methods (지정가 2026-10-18), never 손절가/익절가`, async (t) => {
       const h = inlineTradingHarness();
       h.method = null;
       h.assetId = 'samsung';
@@ -212,9 +212,10 @@ describe('주문방식 field and sheet', () => {
       await h.mount(); t.after(h.close);
       await h.press(sell);
       await h.press(TEST_IDS.order.typeSelect);
-      assert.deepEqual(methods(h), ['market', 'conditional', 'loc']);
-      // Both markets follow the (default off) server gates.
-      for (const method of ['conditional', 'loc']) {
+      assert.deepEqual(methods(h), ['market', 'limit', 'conditional', 'loc']);
+      // Every one follows its (default off) server gate: the default
+      // capabilities register limits but do not match them.
+      for (const method of ['limit', 'conditional', 'loc']) {
         assert.equal(h.node(`order-method-${method}`).props.disabled, true, method);
         assert.equal(h.node(`order-method-${method}-badge`).props.children, '이용 불가');
       }

@@ -21,6 +21,7 @@ import {
   getConditionalSellGate,
   getLimitOnCloseGate,
   getLimitOnCloseSellGate,
+  getLimitSellGate,
   getOrderMethodOptions,
   getOrderTypeForMethod,
   isEntryTpSlMarketSupported,
@@ -593,10 +594,11 @@ export function OrderForm({
     enabled: accountKnown && side === 'buy' && (isStock || asset?.assetType === 'crypto'),
     retry: 1,
   });
+  // LOC (stocks) and the SELL limit (stocks and Spot crypto) are server-gated.
   const orderCapabilitiesQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.orderCapabilities(accountId),
     queryFn: ({ signal }) => getTradingAccountOrderCapabilities(accountId, signal),
-    enabled: accountKnown && isStock,
+    enabled: accountKnown && (isStock || (side === 'sell' && asset?.assetType === 'crypto')),
     retry: 1,
     staleTime: 30_000,
   });
@@ -621,8 +623,11 @@ export function OrderForm({
     side,
     conditional: getConditionalSellGate({ ...sellIntentsQuery, data: sellIntentData }, asset?.assetType, 'condition'),
     loc: getLimitOnCloseSellGate({ ...orderCapabilitiesQuery, data: capabilityData }, asset?.assetType),
+    limit: getLimitSellGate({ ...orderCapabilitiesQuery, data: capabilityData }),
   });
   const selectedMethodOption = methodOptions.find((option) => option.method === orderMethod) ?? null;
+  const limitOption = methodOptions.find((option) => option.method === 'limit');
+  const limitSelectable = !!limitOption && isOrderMethodSelectable(limitOption);
   // A method the server stopped allowing stays shown but cannot submit.
   const methodReady = !!selectedMethodOption && isOrderMethodSelectable(selectedMethodOption);
   const inputInvalidReason = useMemo(() => {
@@ -747,9 +752,9 @@ export function OrderForm({
   // Never change the selected order type automatically.
   const sessionNotice =
     stockMarketClosed && orderMethod === 'market'
-      ? side === 'buy'
+      ? limitSelectable
         ? '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 선택하면 다음 정규장을 기다리는 주문을 등록할 수 있습니다.'
-        // A new sell limit is not offered, so nothing else is suggested.
+        // The SELL limit is not available now, so nothing else is suggested.
         : '정규장 외에는 시장가 주문을 할 수 없습니다. 정규장에 다시 주문해주세요.'
       : stockMarketClosed && limitOnClose
         ? `LOC ${side === 'buy' ? '매수' : '매도'}는 정규장 중에만 등록할 수 있습니다. 서버가 등록 시점의 장 상태를 최종 확인합니다.`
@@ -792,7 +797,10 @@ export function OrderForm({
             ? '보유 수량을 초과하여 매도할 수 없습니다.'
             : side === 'sell' && limitOnClose && positionAvailable !== null && Number(positionAvailable) < 1
               ? 'LOC 매도로 접수할 수 있는 수량이 없습니다. 다른 주문이 보유 수량을 예약하고 있습니다.'
-              : side === 'sell' && orderMethod === 'market' && positionAvailable !== null && Number(orderInput) > Number(positionAvailable)
+              // A limit SELL reserves its quantity at submission: like a market
+              // sell it can use only what other orders have not reserved.
+              : side === 'sell' && (orderMethod === 'market' || orderMethod === 'limit') && positionAvailable !== null
+                && Number(orderInput) > Number(positionAvailable)
                 ? '매도 가능 수량을 초과했습니다. 다른 주문이 예약한 수량은 매도할 수 없습니다.'
                 : null;
 
@@ -1191,11 +1199,15 @@ export function OrderForm({
           asset={asset}
           capabilities={conditionalCapabilities}
           blockedReason={accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason}
-          buyAvailable={buyAvailable}
+          // Unknown (loading or failed) is not "nothing available".
+          buyAvailable={walletsQuery.isError || !walletsQuery.data ? null : buyAvailable}
+          feeRate={tradeFeeRate ?? null}
           currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
+          marketStatus={asset.marketStatus ?? null}
           learning={advancedGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
+          onRefreshPrice={() => void assetQuery.refetch()}
         />
       ) : null}
       {orderMethod === 'conditional' && side === 'sell' ? (
@@ -1209,9 +1221,11 @@ export function OrderForm({
           available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
           reserved={positionReserved}
           currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
+          marketStatus={asset.marketStatus ?? null}
           learning={advancedGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
+          onRefreshPrice={() => void assetQuery.refetch()}
         />
       ) : null}
       {ordinaryForm ? (

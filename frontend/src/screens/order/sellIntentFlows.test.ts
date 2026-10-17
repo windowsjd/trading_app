@@ -80,7 +80,8 @@ describe('SELL condition (KRX, crypto)', () => {
       expectText(h, /^감시 조건 · 69000 KRW 이하 도달 시$/m);
       await h.press('sell-condition-execution-limit');
       await h.input('sell-condition-limit-price', '68500');
-      await h.press('sell-condition-all');
+      // 100% of the holding (the ratio picks replaced the old 보유 전량 chip).
+      await h.press('sell-condition-ratio-100');
       assert.equal(h.node('sell-condition-quantity').props.value, '10');
       expectText(h, /감시 중에는 수량을 예약하지 않아요/);
       await h.press('sell-intent-submit'); await h.flush();

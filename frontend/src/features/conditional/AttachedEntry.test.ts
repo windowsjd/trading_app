@@ -34,11 +34,15 @@ for(const account of ['general','season'])test(`${account} BUY Limit sends 손�
 });
 
 test('plans are optional and never offered for Market, LOC or Sell',async t=>{
- const h=inlineTradingHarness();h.entryTpSlList=plans('general');await h.mount();t.after(h.close);
+ const h=inlineTradingHarness();h.entryTpSlList=plans('general');
+ h.orderCapabilities={tradingAccountId:'general',limitOrder:{enabled:true,autoExecutionEnabled:true},limitOnClose:{enabled:false,markets:[],sides:['buy'],attachedProtection:false}};
+ await h.mount();t.after(h.close);
  assert.equal(h.node('order-tp-sl-button')===undefined,true,'시장가 has no entry to attach plans to');
  await h.press(TEST_IDS.assetDetail.sellButton);
- // Sell offers no new limit, so there is nothing to attach plans to.
- await h.press(TEST_IDS.order.typeSelect);assert.equal(h.node('order-method-limit')===undefined,true);assert.equal(h.node('order-tp-sl-button')===undefined,true);
+ // A SELL limit (2026-10-18) exits a holding: there is no entry to attach plans to.
+ await h.selectOrderType('limit');
+ assert.equal(h.node(TEST_IDS.order.limitPriceInput)!==undefined,true,'the SELL limit form is shown');
+ assert.equal(h.node('order-tp-sl-button')===undefined,true);
 });
 
 test('plan prices must sit on the protective side of the limit price',async t=>{

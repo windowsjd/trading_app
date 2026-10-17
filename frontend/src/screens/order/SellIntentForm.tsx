@@ -23,7 +23,24 @@ import {
   getSellLegDraftError,
   type SellLegDraft,
 } from '../../features/conditional/conditionalSellDisplay';
-import { getTriggerDirectionText, isTriggerDirectionValid } from '../../features/conditional/autoDirection';
+import {
+  getTriggerDirectionText,
+  isTriggerDirectionValid,
+  type TriggerCondition,
+} from '../../features/conditional/autoDirection';
+import {
+  DIRECTION_REQUIRED,
+  LIVE_PRICE_UNAVAILABLE,
+  OFF_SESSION_REGISTRATION_NOTICE,
+  getConditionalRegistrationErrorMessage,
+  resolveConditionalDirectionMode,
+  shouldRefreshAfterRegistrationError,
+} from '../../features/conditional/directionMode';
+import {
+  conditionalSellQuantityAtRatio,
+  getConditionalSellRatioBlock,
+  ratioOfCapacity,
+} from '../../features/conditional/conditionalRatio';
 import { useTriggerDirection } from '../../features/conditional/useTriggerDirection';
 import { emitOrderFillEvent } from '../../features/order/fillEvents';
 import { SELL_COLOR } from '../../features/order/sideColors';
@@ -31,6 +48,8 @@ import { getApiErrorCode, getApiErrorInfo, getErrorMessageFromCode } from '../..
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatDisplayDecimal } from '../../utils/format';
 import OrderNumberInput, { orderInputStyle } from './OrderNumberInput';
+import OrderRatioControls from './OrderRatioControls';
+import TriggerDirectionChoice from './TriggerDirectionChoice';
 
 type LearningGate = { allowed: boolean; locked: boolean; message: string | null; guard: (work: () => void) => void };
 type Request = { accountId: string; epoch: number; body: ConditionalSellCreateDto };
@@ -41,13 +60,16 @@ const ID = 'sell-condition';
 const UNCERTAIN_CREATE = '등록 결과를 확인하지 못했어요. 대기 목록의 매도 설정을 먼저 확인해 주세요. 같은 내용으로 다시 누르면 중복 없이 다시 확인해요.';
 
 /**
- * A new SELL condition on an open KRX/crypto Spot holding (조건주문 매도):
- * a watch price (이상/이하 follows it against the current price, never chosen
- * by hand), market or limit execution and its own target quantity. Nothing
- * is reserved while watching; several settings may target more than the
- * holding, and a firing one sells at most the unreserved remainder at that
- * moment — the server sizes and validates everything. 손절가/익절가 are set
- * from the holding card's sheet, not here.
+ * A new SELL condition on an open KRX/US/crypto Spot holding (조건주문 매도):
+ * a watch price, market or limit execution and its own target quantity, typed
+ * or picked as a share of the holding (ratio controls). During the session
+ * (and always for crypto) 이상/이하 follows the watch price against the fresh
+ * current price; while a stock market is closed the user chooses it and the
+ * server watches from the next regular session (2026-10-18); an unknown
+ * market state registers nothing. Nothing is reserved while watching; several
+ * settings may target more than the holding, and a firing one sells at most
+ * the unreserved remainder at that moment — the server sizes and validates
+ * everything. 손절가/익절가 are set from the holding card's sheet, not here.
  */
 export default function SellIntentForm({
   accountId,
@@ -58,9 +80,11 @@ export default function SellIntentForm({
   available,
   reserved,
   currentPrice,
+  marketStatus = null,
   learning,
   onInputFocus,
   onInputBlur,
+  onRefreshPrice,
 }: {
   accountId: string;
   asset: { assetType?: string | null; settlementCurrency?: string | null; symbol?: string | null; id: string };
@@ -74,18 +98,35 @@ export default function SellIntentForm({
   reserved: string | null;
   /** The screen's fresh current price: the reference for 이상/이하. */
   currentPrice: string | null;
+  /** The screen's market state: automatic or chosen 이상/이하. */
+  marketStatus?: string | null;
   learning: LearningGate;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
+  /** Reads the screen's price and market state again. */
+  onRefreshPrice?: () => void;
 }) {
   const queryClient = useQueryClient();
   const currency = asset.settlementCurrency ?? '';
   const stock = asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock';
   const family = capabilities?.condition;
   const canUseLimit = family?.canUseLimit === true;
+  const directionMode = resolveConditionalDirectionMode({
+    assetType: asset.assetType, marketStatus, offSessionMarkets: family?.offSessionMarkets,
+  });
+  const manual = directionMode.mode === 'manual';
   const [leg, setLeg] = useState<SellLegDraft>(EMPTY_LEG);
-  const trigger = useTriggerDirection(leg.triggerPrice, currentPrice);
-  const condition = trigger.condition;
+  // Automatic only in session: a closed market's last price is no reference.
+  const trigger = useTriggerDirection(leg.triggerPrice, manual ? null : currentPrice);
+  const [chosenCondition, setChosenCondition] = useState<TriggerCondition | null>(null);
+  // Every closed period starts without a choice; nothing is ever assumed.
+  useEffect(() => {
+    if (!manual) setChosenCondition(null);
+  }, [manual]);
+  const condition = directionMode.mode === 'auto' ? trigger.condition : manual ? chosenCondition : null;
+  // The pick that produced the quantity (kept only while it still does).
+  const [chosenRatio, setChosenRatio] = useState<number | null>(null);
+  const [ratioNotice, setRatioNotice] = useState<string | null>(null);
   const [directionNotice, setDirectionNotice] = useState<string | null>(null);
   const [registered, setRegistered] = useState<ConditionalSellOrderDto[] | null>(null);
   // The original error only; its public copy is mapped where it is shown.
@@ -115,6 +156,8 @@ export default function SellIntentForm({
         setRegistered(result.conditionalOrders);
         setError(null);
         setLeg(EMPTY_LEG);
+        setChosenRatio(null);
+        setChosenCondition(null);
       }
       await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.conditionalSell.all(request.accountId) });
     },
@@ -126,6 +169,8 @@ export default function SellIntentForm({
       // The server's own price had already crossed the watch price: decide
       // the direction again from the latest price before another try.
       if (info.serverCode === 'CONDITIONAL_SELL_ALREADY_MET') trigger.reset();
+      // The server saw another price or session than this screen: read both again.
+      if (shouldRefreshAfterRegistrationError(info.serverCode)) onRefreshPrice?.();
       setError({ cause, uncertain });
     },
   });
@@ -139,22 +184,49 @@ export default function SellIntentForm({
     setRegistered(null);
     setError(null);
     setDirectionNotice(null);
+    setRatioNotice(null);
   };
   const patchLeg = (patch: Partial<SellLegDraft>) => edit(() => setLeg((previous) => ({ ...previous, ...patch })));
 
   const legError = getSellLegDraftError(leg, { assetType: asset.assetType, holding })
     ?? (leg.executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
-  // No usable current price, or a watch price equal to it: no direction yet.
-  const directionError = trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
-    ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency) : null;
+  // Automatic: no usable current price (a price failure, never a closure) or a
+  // watch price equal to it. Chosen: nothing chosen yet. Blocked: the cause.
+  const directionError = directionMode.mode === 'blocked' ? directionMode.reason
+    : manual ? chosenCondition ? null : DIRECTION_REQUIRED
+      : trigger.direction.state === 'no_reference' ? LIVE_PRICE_UNAVAILABLE
+        : trigger.direction.state === 'equal' ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency) : null;
   const draftError = legError ?? directionError;
-  const directionText = getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency);
+  // A chosen direction reads like an automatic one once a valid price is typed.
+  const triggerEntered = trigger.direction.state !== 'empty' && trigger.direction.state !== 'invalid';
+  const directionText = getTriggerDirectionText(manual && chosenCondition && triggerEntered
+    ? { state: 'ready', condition: chosenCondition } : trigger.direction, leg.triggerPrice, currency);
   // The market moved past the watch price after the direction was decided.
-  const crossed = !!condition && !!currentPrice && !isTriggerDirectionValid(condition, leg.triggerPrice, currentPrice);
+  const crossed = !manual && !!condition && !!currentPrice && !isTriggerDirectionValid(condition, leg.triggerPrice, currentPrice);
   const createBlocked = !family?.canCreate ? '현재 조건주문 매도를 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(leg.triggerPrice.trim() || leg.quantity.trim() || leg.limitPrice.trim());
   const result = registered ? getConditionalSellResultNotice(registered) : null;
+  // Ratio picks: a share of the HOLDING (nothing is reserved while watching;
+  // the server sizes the sale from the unreserved part when it fires).
+  const ratioInput = { holding, wholeShares: stock && leg.executionType === 'limit' };
+  const ratioBlock = getConditionalSellRatioBlock(ratioInput);
+  const ratioDisabled = pending || !!blockedReason || !!createBlocked || !!ratioBlock;
+  const quantityAtRatio = (ratio: number) => (ratioBlock ? null : conditionalSellQuantityAtRatio(ratioInput, ratio));
+  const activeRatio = !ratioBlock && chosenRatio !== null
+    && (chosenRatio === 0 ? leg.quantity === '' : quantityAtRatio(chosenRatio) === leg.quantity) ? chosenRatio : null;
+  const shownRatio = activeRatio ?? (ratioBlock ? 0 : ratioOfCapacity(leg.quantity, quantityAtRatio(1)));
+  const applyRatio = (value: number) => {
+    if (ratioDisabled || !Number.isFinite(value)) return;
+    const ratio = Math.max(0, Math.min(1, value));
+    const next = ratio === 0 ? '' : quantityAtRatio(ratio);
+    if (next === null) {
+      setRatioNotice('계산된 수량이 너무 작아요.');
+      return;
+    }
+    patchLeg({ quantity: next });
+    setChosenRatio(ratio);
+  };
 
   const legBody = (): ConditionalSellLegDto => ({
     triggerPrice: leg.triggerPrice.trim(),
@@ -169,8 +241,9 @@ export default function SellIntentForm({
     }
     if (!canSubmit || !condition) return;
     setError(null);
-    // Never send a direction the latest price no longer supports.
-    if (!actionRef.current) {
+    // Never send an automatic direction the latest price no longer supports;
+    // a chosen one (market closed) is sent as chosen.
+    if (!actionRef.current && directionMode.mode === 'auto') {
       const changed = trigger.recheck(currentPrice);
       if (changed) { setDirectionNotice(changed); return; }
     }
@@ -182,12 +255,6 @@ export default function SellIntentForm({
         idempotencyKey: createIdempotencyKey('conditional_sell') },
     };
     mutation.mutate(actionRef.current);
-  };
-  /** 전량: the whole holding (cut to whole shares for a stock limit). */
-  const fillAll = () => {
-    if (holding === null || Number(holding) <= 0) return;
-    const whole = stock && leg.executionType === 'limit';
-    patchLeg({ quantity: whole ? String(Math.floor(Number(holding))) : trimDecimal(holding) });
   };
 
   const fields = () => {
@@ -210,7 +277,44 @@ export default function SellIntentForm({
             onFieldFocus={onInputFocus}
             onBlur={onInputBlur}
           />
-          {directionText ? (
+          {manual ? (
+            <>
+              <Text testID="sell-off-session-notice" style={styles.notice}>{OFF_SESSION_REGISTRATION_NOTICE}</Text>
+              <TriggerDirectionChoice
+                testID="sell-trigger"
+                value={chosenCondition}
+                disabled={pending}
+                onChange={(next) => edit(() => setChosenCondition(next))}
+              />
+              {chosenCondition && triggerEntered && directionText ? (
+                <Text testID="sell-trigger-direction" accessibilityLiveRegion="polite" style={styles.direction}>
+                  {`감시 조건 · ${directionText}`}
+                </Text>
+              ) : null}
+            </>
+          ) : directionMode.mode === 'blocked' ? (
+            <Text testID="sell-trigger-direction" accessibilityLiveRegion="polite" style={styles.error}>
+              {directionMode.reason}
+            </Text>
+          ) : trigger.direction.state === 'no_reference' ? (
+            <>
+              <Text testID="sell-trigger-direction" accessibilityLiveRegion="polite" style={styles.error}>
+                {LIVE_PRICE_UNAVAILABLE}
+              </Text>
+              {onRefreshPrice ? (
+                <ActionPressable
+                  testID="sell-price-refresh"
+                  accessibilityRole="button"
+                  accessibilityLabel="시세 다시 불러오기"
+                  disabled={pending}
+                  onPress={onRefreshPrice}
+                  style={styles.chip}
+                >
+                  <Text style={styles.chipText}>시세 다시 불러오기</Text>
+                </ActionPressable>
+              ) : null}
+            </>
+          ) : directionText ? (
             <Text testID="sell-trigger-direction" accessibilityLiveRegion="polite"
               style={trigger.direction.state === 'ready' ? styles.direction : styles.error}>
               {trigger.direction.state === 'ready' ? `감시 조건 · ${directionText}` : directionText}
@@ -256,28 +360,17 @@ export default function SellIntentForm({
           </View>
         ) : null}
         <View style={styles.group}>
-          <View style={styles.quantityHeader}>
-            <Text style={styles.label}>매도 수량</Text>
-            <ActionPressable
-              testID={`${id}-all`}
-              accessibilityRole="button"
-              accessibilityLabel="수량을 보유 수량 전체로 입력"
-              accessibilityState={{ disabled: pending || holding === null }}
-              disabled={pending || holding === null}
-              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-              onPress={fillAll}
-              style={styles.chip}
-            >
-              <Text style={styles.chipText}>보유 전량</Text>
-            </ActionPressable>
-          </View>
+          <Text style={styles.label}>매도 수량</Text>
           <OrderNumberInput
             testID={`${id}-quantity`}
             accessibilityLabel="매도 수량"
             editable={!pending}
             style={orderInputStyle}
             value={leg.quantity}
-            onChangeText={(value) => patchLeg({ quantity: value })}
+            onChangeText={(value) => {
+              patchLeg({ quantity: value });
+              setChosenRatio(null);
+            }}
             keyboardType="decimal-pad"
             placeholder="수량 입력"
             onFieldFocus={onInputFocus}
@@ -289,6 +382,19 @@ export default function SellIntentForm({
             </Text>
           ) : null}
         </View>
+        <OrderRatioControls
+          testID={`${id}-ratio`}
+          label="수량 비율"
+          accessibilityLabel="매도 수량 비율, 보유 수량 기준"
+          pickLabel="보유 수량의"
+          tint={stock ? SELL_COLOR : undefined}
+          value={shownRatio}
+          active={activeRatio}
+          disabled={ratioDisabled}
+          reason={blockedReason || createBlocked ? null : ratioBlock}
+          notice={ratioNotice}
+          onChange={applyRatio}
+        />
       </View>
     );
   };
@@ -312,7 +418,9 @@ export default function SellIntentForm({
         <Text testID="sell-direction-changed" accessibilityLiveRegion="polite" style={styles.warning}>{directionNotice}</Text>
       ) : null}
       {error ? (
-        <ErrorNotice error={error.cause} message={error.uncertain ? UNCERTAIN_CREATE : getErrorMessageFromCode(getApiErrorCode(error.cause))}
+        <ErrorNotice error={error.cause}
+          message={error.uncertain ? UNCERTAIN_CREATE
+            : getConditionalRegistrationErrorMessage(getApiErrorCode(error.cause)) ?? getErrorMessageFromCode(getApiErrorCode(error.cause))}
           testID="sell-intent-error" style={styles.error} />
       ) : null}
       {registered && result ? (
@@ -342,14 +450,6 @@ export default function SellIntentForm({
   );
 }
 
-function trimDecimal(value: string) {
-  if (!value.includes('.')) return value;
-  const trimmed = value.replace(/0+$/u, '').replace(/\.$/u, '');
-  // Inputs accept at most 6 decimals; never round a holding up.
-  const [whole, fraction = ''] = trimmed.split('.');
-  return fraction ? `${whole}.${fraction.slice(0, 6)}` : whole;
-}
-
 // Plain objects: loaded by harnesses with minimal native mocks.
 const styles = {
   form: { gap: 12, minWidth: 0 },
@@ -360,8 +460,9 @@ const styles = {
   warning: { fontSize: 12, lineHeight: 17, color: semantic.warning },
   error: { fontSize: 12, lineHeight: 17, color: semantic.error },
   direction: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: semantic.info },
-  quantityHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: 8, rowGap: 4 },
+  notice: { fontSize: 12, lineHeight: 17, color: semantic.info },
   chip: {
+    alignSelf: 'flex-start',
     minHeight: 32,
     paddingHorizontal: 10,
     paddingVertical: 4,
