@@ -63,6 +63,25 @@ async function openTpSl(h: any, assetId = 'bnb') {
 }
 
 describe('SELL condition (KRX, crypto)', () => {
+  it('stock outside the regular session registers with an explicit direction', async (t) => {
+    const h = inlineTradingHarness();
+    stock(h);
+    h.assets.samsung.marketStatus = 'closed';
+    h.assets.samsung.tradable = false;
+    h.positions.general = '10';
+    h.sellList = sellList('general');
+    await h.mount(); t.after(h.close);
+    await sellWith(h, 'conditional');
+    await h.input('sell-condition-trigger-price', '69000');
+    await h.input('sell-condition-quantity', '2');
+    assert.equal(h.node('sell-intent-submit').props.state, 'disabled', 'direction is required');
+    await h.press('sell-trigger-at_or_below');
+    assert.equal(h.node('sell-intent-submit').props.state, 'enabled');
+    await h.press('sell-intent-submit'); await h.flush();
+    assert.equal(h.requests[0].body.triggerCondition, 'at_or_below');
+    assert.equal(h.requests[0].body.kind, 'condition');
+  });
+
   for (const accountId of ['general', 'season'])
     it(`${accountId} KRX: watch and limit prices separate; a 10-share setting on 10 held; registration is not a sale`, async (t) => {
       const h = inlineTradingHarness();
