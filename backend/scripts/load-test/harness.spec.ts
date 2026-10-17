@@ -273,7 +273,27 @@ describe('deterministic provider transports retain real parsers', () => {
     expect(kosdaq.includes('005930')).toBe(false);
     expect(kosdaq.includes('086520')).toBe(true);
     expect(kospi.includes('086520')).toBe(false);
-    expect(kosdaq).toEqual(['086520', '247540', '028300']);
+    // KRX KIND membership: the 3 first-phase KOSDAQ stocks, then the 13 of
+    // the 2026-10-17 expansion (KOSPI 54 / KOSDAQ 16 in all).
+    expect(kosdaq).toEqual([
+      '086520',
+      '247540',
+      '028300',
+      '036930',
+      '010170',
+      '032820',
+      '080220',
+      '196170',
+      '403870',
+      '240810',
+      '090710',
+      '000250',
+      '277810',
+      '108490',
+      '058470',
+      '298380',
+    ]);
+    expect(kospi).toHaveLength(54);
     expect(konex.length).toBe(0);
     expect(kospi.some((symbol) => kosdaq.includes(symbol))).toBe(false);
     // Every fixed domestic stock is listed exactly once, and nothing else is.
@@ -281,7 +301,7 @@ describe('deterministic provider transports retain real parsers', () => {
       (a) => a.symbol,
     );
     const listed = [...kospi, ...kosdaq, ...konex];
-    expect(domestic.length).toBe(15);
+    expect(domestic.length).toBe(70);
     expect(new Set(listed).size).toBe(listed.length);
     expect([...listed].sort()).toEqual([...domestic].sort());
     expect(listed.every((symbol) => /^\d{6}$/.test(symbol))).toBe(true);

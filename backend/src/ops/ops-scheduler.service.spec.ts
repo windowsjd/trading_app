@@ -1225,6 +1225,8 @@ describe('OpsSchedulerService KOSCOM price slot loop', () => {
       KOSCOM_API_KEY: 'k',
       PROVIDER_INGESTION_ENABLED: 'true',
       KOSCOM_POLLING_ENABLED: 'true',
+      // Explicit cadence: the slot arithmetic below is written for T.
+      KOSCOM_POLL_INTERVAL_MS: String(T),
       ...env,
     };
     const koscom = {
@@ -1331,7 +1333,7 @@ describe('OpsSchedulerService KOSCOM price slot loop', () => {
     expect(details).toContainEqual({
       setting: 'KOSCOM_POLL_INTERVAL_MS',
       reason: 'out_of_range',
-      fallback: 3000,
+      fallback: 5000,
     });
     await service.onModuleDestroy();
     warn.mockRestore();

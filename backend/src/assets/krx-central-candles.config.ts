@@ -33,10 +33,42 @@ export type KrxCollectionCohort = {
  * Versioned cohort registry. The first cohort (the domestic universe live at
  * activation) is added with A = the activation date's 00:00 KST in the same
  * change that is deployed before `KOSCOM_CENTRAL_CANDLES_ENABLED` is set;
- * each expansion step (25 → 50 → 100) appends a cohort before its symbols
- * are activated (design v2.1 §5.6, §10.5). Empty until then.
+ * each later expansion appends a cohort before its symbols are activated
+ * (design v2.1 §5.6, §10.5).
+ *
+ * 2026-10-17 (US 100 / KRX 70 expansion, one step instead of 25 → 50 → 100):
+ * the 15 first-phase stocks and the 55 new ones start their obligation
+ * together on the first KRX session after the deploy, 2026-10-19 (Mon).
+ * While undeployed, A may still move to a later session date; once deployed
+ * it never changes (append a new cohort instead).
  */
-export const KRX_COLLECTION_COHORTS: readonly KrxCollectionCohort[] = [];
+// Seven codes per line keeps each cohort reviewable as a table.
+// prettier-ignore
+export const KRX_COLLECTION_COHORTS: readonly KrxCollectionCohort[] = [
+  {
+    id: 'krx-first-phase-15-2026-10-19',
+    obligationStart: '2026-10-18T15:00:00.000Z', // 2026-10-19 00:00 KST
+    symbols: [
+      '005930', '000660', '034020', '010140', '042660', '005380', '000270',
+      '035420', '035720', '068270', '051910', '066570', '086520', '247540',
+      '028300',
+    ],
+  },
+  {
+    id: 'krx-expansion-55-2026-10-19',
+    obligationStart: '2026-10-18T15:00:00.000Z', // 2026-10-19 00:00 KST
+    symbols: [
+      '009150', '402340', '006400', '042700', '047040', '036930', '010170',
+      '012450', '012330', '032820', '011070', '080220', '001440', '105560',
+      '006800', '079550', '196170', '329180', '010120', '028260', '403870',
+      '272210', '009830', '005490', '373220', '000720', '298040', '267260',
+      '475150', '064350', '007660', '055550', '240810', '000150', '278470',
+      '090710', '032830', '000250', '006340', '277810', '353200', '017670',
+      '034730', '015760', '047810', '322000', '064400', '086790', '307950',
+      '028050', '454910', '096770', '108490', '058470', '298380',
+    ],
+  },
+];
 
 export type KrxCentralCandlesConfig = {
   enabled: boolean;

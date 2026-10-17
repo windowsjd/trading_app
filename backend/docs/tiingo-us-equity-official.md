@@ -1,4 +1,4 @@
-# Tiingo 미국주식 정식 공급자 (2026-10-17)
+# Tiingo 미국주식 정식 공급자 (2026-10-17, 100종목 확대 반영)
 
 정책 근거: [policy-decisions.md](policy-decisions.md) "Tiingo 미국주식 정식 공급자·미국 LOC". 체험 모드는
 [tiingo-us-equity-trial.md](tiingo-us-equity-trial.md). 미국 LOC 계약은
@@ -6,8 +6,9 @@
 
 ## 1. 범위와 현재 상태
 
-- 대상: 고정 미국 25종목(`kis-fixed-asset-universe.ts`, NAS 20 · NYS 5). Asset ID·주문·보유·가격 이력은 그대로다.
-  ETF·지수·100종목 확대는 후속이다.
+- 대상: 고정 미국 100종목(`kis-fixed-asset-universe.ts`: 1차 25 + 2026-10-17 확대 75, NAS·NYS). 기존 25종목의 Asset ID·주문·보유·가격 이력은
+  그대로다. 선정 근거(2026 YTD 누적 거래대금)는 [docs/investigations/2026-10-17-stock-expansion-us100-kr70](../../docs/investigations/2026-10-17-stock-expansion-us100-kr70/report.md).
+  ETF·지수는 후속이다.
 - 코드 기본값은 모두 꺼져 있다(`TIINGO_ENABLED=false`, `TIINGO_TRIAL_MODE=true`, `US_STOCK_PRICE_PROVIDER=kis`,
   `LOC_US_*=false`). 이 상태로 배포하면 동작이 바뀌지 않는다.
 - 운영 활성화(정식 모드, 금융 원천 전환, LOC 플래그, 운영 DB 백필)는 **별도 승인 후** §5 순서로만 한다.
@@ -23,6 +24,7 @@
 | 저장 | `TiingoSnapshotWriterService` | 정규장 tick만, 종목당 `TIINGO_SNAPSHOT_THROTTLE_MS`(기본 5초)마다 1행 + 창 끝의 마지막 tick. `asset_price_snapshots(provider_api, tiingo_us_reference_price)`. `effectiveAt`=Tiingo 시각(앞당기지 않음), `capturedAt`=수신 시각. 같거나 오래된 값은 저장하지 않는다(재시작 후 DB 확인 포함). |
 | 전파 | Redis `PROVIDER_PRICE_PUBSUB_CHANNEL` | 저장 성공 후 `market_price` 이벤트. Redis 실패 시에만 프로세스 내 버스. |
 | 보충 | writer `topUp()` 30초 | 소켓이 60초 넘게 조용할 때만 REST 스냅샷으로 오래된 종목을 보충한다. |
+| (끔) 유동성 추정 | `TIINGO_WS_LIQUIDITY_ENABLED` | thresholdLevel 4 통계 추정 소켓. 금융 경로가 쓰지 않으며 2026-10-17부터 기본 꺼짐(명시 `true`일 때만 연다). |
 
 - 저장 이름 `tiingo_us_reference_price`는 체험 모드의 메모리 전용 표시값 `tiingo_equity_reference_price`와 다르다.
   앱의 체험 표시(`isTrialPriceSource`)와 자격 판정이 둘을 섞지 않는다.
@@ -95,10 +97,11 @@
 | 변수 | 기본 | 의미 |
 |---|---|---|
 | `TIINGO_ENABLED` | false | Tiingo 사용 |
-| `TIINGO_TRIAL_MODE` | true | false = 정식 모드(저장·lease·25종목) |
-| `TIINGO_ALLOWED_SYMBOLS` | (빈 값) | 정식: 비우면 고정 25, 최대 100 |
+| `TIINGO_TRIAL_MODE` | true | false = 정식 모드(저장·lease·고정 100종목) |
+| `TIINGO_ALLOWED_SYMBOLS` | (빈 값) | 정식: 비우면 고정 100(최대 100) |
+| `TIINGO_WS_LIQUIDITY_ENABLED` | false | 유동성 추정 소켓(thresholdLevel 4). 2026-10-17 정책으로 기본 꺼짐 |
 | `TIINGO_SNAPSHOT_THROTTLE_MS` | 5000 | 종목별 저장 간격(1000–60000) |
-| `TIINGO_REST_REQUESTS_PER_MINUTE` / `_PER_HOUR` | 정식 120 / 3000 | 자체 제한(계약 30,000/시간) |
+| `TIINGO_REST_REQUESTS_PER_MINUTE` / `_PER_HOUR` | 정식 300 / 12000 | 자체 제한(계약 30,000/시간·400,000/일). 100종목 기준, §4 |
 | `TIINGO_WS_HEARTBEAT_TIMEOUT_MS` | 300000 | 120초 heartbeat의 2.5배 |
 | `US_STOCK_PRICE_PROVIDER` | kis | `tiingo` = 미국 금융 원천 전환 |
 | `LOC_US_ORDERS_ENABLED` / `LOC_US_SELL_ORDERS_ENABLED` | false | 미국 LOC 등록 |
@@ -109,21 +112,23 @@
 
 앱 공지(주문방식 안내)의 21:10·5분·23:00 문구는 기본값이다. 값을 바꾸면 공지도 함께 고친다.
 
-## 4. 호출량·DB 부하 추정 (25종목)
+## 4. 호출량·DB 부하 추정 (100종목, 2026-10-17)
 
-- WebSocket 1개(정식 모드 lease 소유 서버). 2026-10-16 체험 AAPL 실측: 초당 약 1.6 tick, 최신 tick 나이 p99 5.7초,
-  heartbeat 120.0초.
-- 가격 스냅샷: 정규장 6.5시간 × 5초 간격이면 종목당 최대 4,680행/일, 25종목 최대 약 11.7만 행/일이다.
-  기존 가격 보관(14일) 정리 대상이다. Binance Spot 100종목 저장량보다 한 자릿수 작다.
-- 캔들 행: 5m 1,950행/일, 4h 약 50행/일, 1d 25행/일.
-- REST:
-  - 캔들 sync(10분마다 5m·1d·1w × 25 = 75회) 최대 약 1.1만 회/일;
-  - 소켓이 끊긴 동안의 보충은 정규장에만, 종목당 최대 분당 1회(최대 약 1,500회/시간). 장외에는 하지 않는다(소켓이 원래
-    조용하고 결과도 저장하지 않으므로, 밤의 LOC 종가 조회 예산을 지킨다);
-  - LOC는 종목·거래일당 21:10–23:00 사이 최대 22회, 재조회는 final 1건당 1회;
-  - 계약(일 400,000·시간 30,000) 대비 작다.
-- 백필: 5m 45일 25종목은 약 125회, 1d·1w 50회다. 자체 분당 제한 120을 넘으면 `TIINGO_BUDGET_EXHAUSTED`로 그 feed가
-  멈추고 재실행하면 체크포인트부터 이어간다(필요하면 백필 프로세스에만 제한을 올린다).
+- WebSocket 1개(정식 모드 lease 소유 서버, thresholdLevel 6, 100종목을 한 subscribe 프레임으로). 유동성 추정 소켓은 열지 않는다.
+  2026-10-16 체험 AAPL 실측: 초당 약 1.6 tick, heartbeat 120.0초. 거래가 없는 종목은 메시지가 없을 수 있고, 인위적인 5초 행을 만들지 않는다.
+- 가격 스냅샷: 정규장 6.5시간 × 5초 간격이면 종목당 최대 4,680행/일, 100종목 최대 약 46.8만 행/일이다.
+  가격 보관(14일, `ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED`) 정리 대상이다.
+- 캔들 행: 5m 7,800행/일, 4h 약 200행/일, 1d 100행/일.
+- REST(자체 제한 분당 300·시간당 12,000, 계약 시간 30,000·일 400,000):
+  - 캔들 sync: 10분마다 5m·1d·1w × 100 = 300회(시간당 1,800, 일 약 4.3만). 미국 종목은 한 번에 하나씩 순서대로 돈다.
+    입장 거절(`TIINGO_BUDGET_EXHAUSTED`)은 기다리지 않고 바로 실패하므로, 분당 제한이 한 번의 sync(300회)보다 작으면 뒤쪽 종목이
+    매번 실패한다. 그래서 정식 기본값을 120/3,000에서 300/12,000으로 올렸다;
+  - 소켓이 끊긴 동안의 보충은 정규장에만, 종목당 최대 분당 1회(최악 시간당 6,000회);
+  - LOC는 LOC 주문이 있는 종목·거래일당 21:10–23:00 사이 최대 22회, 재조회는 final 1건당 1회;
+  - 시간당 제한만으로도 프로세스 하나는 일 계약을 넘지 못한다(12,000 × 24 = 288,000).
+- 백필(1회): 5m 97세션 이상(약 150일) × 100종목 ≈ 10페이지/종목 = 약 1,000회, 1d·1w 875일 200회. 백필 CLI는 자기 프로세스의
+  제한(기본 300/분)을 따로 쓴다. 서버와 합쳐도 시간 계약(30,000)의 절반 이하다.
+- 월 전송량: sync 응답은 작다(증분). 5m 백필 약 1,000페이지 × 수십 KB로 1TB 계약 대비 무시할 수준이다.
 
 ## 5. 운영 활성화 런북 (승인 후에만)
 
@@ -178,6 +183,33 @@
    - capability `limitOnClose.markets`에 `US`가 있는지 확인한다.
    - 첫 거래일 21:10–23:00 ET의 `ops_job_runs(limit_on_close_settlement)` 관측·final·체결을 확인한다.
 
+### 5.6 100종목 확대 적용 (2026-10-17, 승인 후에만)
+
+운영은 이미 정식 모드·`US_STOCK_PRICE_PROVIDER=tiingo`다(2026-10-16 22:32Z 배포 기준). 확대는 아래 순서로 한다.
+CLI는 Tiingo 토큰과 운영 DB가 있는 곳(Render Shell·일회성 작업)에서, `US_STOCK_PRICE_PROVIDER=tiingo`로 실행한다.
+
+1. **환경변수(배포 전)**: `TIINGO_REST_REQUESTS_PER_MINUTE`·`_PER_HOUR`가 120·3000으로 명시돼 있으면 지우거나 300·12000으로 바꾼다
+   (남기면 100종목 sync의 뒤쪽 종목이 매번 `TIINGO_BUDGET_EXHAUSTED`). `TIINGO_WS_LIQUIDITY_ENABLED=false`(또는 지움).
+   `TIINGO_ALLOWED_SYMBOLS`는 빈 값 그대로(= 고정 100).
+2. **코드 배포**: 기본 허용 목록이 100이 된다. 등록 전 신규 75는 활성 Asset이 없어 `mapping.unmapped`에 `TIINGO_ASSET_NOT_MAPPED`로
+   남을 뿐 수집·주문에 영향이 없다.
+3. **종목 등록**: `DATABASE_URL=<운영> pnpm dev:seed-kis-universe --dry-run`(국내 55 포함, 미국만이면 `--us-only`)으로 create 130·
+   unchanged 40·update 0을 확인한 뒤 같은 명령을 `--dry-run` 없이 실행한다(기본이 적용이다). 기존 행의 ID는 바뀌지 않는다.
+4. **수집 반영**: asset map이 5분마다 다시 읽혀 소켓이 100종목으로 재구독한다(재시작 불필요). `/readiness` `data.tiingo`의
+   `allowedSymbols` 100, `mapping.unmapped` 빈 목록, `stream.reference.tickers` 100을 본다.
+5. **과거 캔들(미국 정규장 밖, 한 창에서)**:
+   1. 5m: `pnpm exec tsx scripts/candle-baseline-sync.ts --apply --asset-type us_stock --target 5m --days 150`
+      — 97세션 이상이다. 4h 96세션은 저장 5m에서만 합성되므로 45일(약 31세션)로는 부족하다.
+   2. 4h: `pnpm candle:long-backfill --market us --apply --sessions 97`
+   3. 1d·1w: `pnpm exec tsx scripts/candle-baseline-sync.ts --apply --asset-type us_stock --mode repair --days 875 --target 1d --target 1w`
+   4. 점검: `pnpm exec tsx scripts/stock-chart-history-audit.ts --market us`. 4h 96·1d 576이 `complete`이거나 상장일 때문에
+      `limited_by_listing`이어야 한다. `incomplete`는 백필 결과(페이지별 `data_incomplete`)와 smoke의 깊이 결과로 원인을 가린다.
+   5. 5분봉 보존(45일, `SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED`)은 4h 합성이 끝난 뒤에 켠다. 켜진 뒤의 실행이 45일 밖 5m를 지우고,
+      합성된 4h는 180일 보존된다. 순서를 바꾸면 합성 전에 원천이 지워진다.
+   - Tiingo가 오래된 세션의 5m를 주지 않으면 그 세션의 4h는 만들지 않는다(보간·IEX 대체·조정가 없음). smoke의
+     `intraday5mDepth96Sessions`·`historyDepth.intradayHistoryReach`로 제공 깊이를 확인하고, audit의 `leadingMissing`으로 보고한다.
+   - 중단·재실행: 5m·1d는 체크포인트에서 이어가고, 4h는 이미 저장된 버킷을 다시 쓰지 않는다(같은 Ops 잠금).
+
 ## 6. 롤백
 
 1. **LOC**: `LOC_US_*=false`. 새 미국 LOC만 막고, 접수분은 기존대로 체결·만료된다(worker는 플래그와 무관).
@@ -217,7 +249,9 @@
 - 조건 SELL·조건 BUY·독립 TP/SL PostgreSQL suite에 Tiingo 모드 미국 시나리오가 하나씩 있다. 새 KIS 가격으로는 발동하지 않고,
   등록 뒤 Tiingo 가격으로 발동해 USD 지갑으로 체결한다. 진입 계획은 KIS 모드에서 거부된다.
 - 지정가 매칭 PostgreSQL 통합(`scripts/limit-order-matching-integration.ts`)과 국내 LOC 통합 31개 시나리오로 회귀를 확인했다.
-- 실제 Tiingo(정식 계약 토큰)로는 아직 검증하지 않았다(§5-1 smoke 필요). 확인할 것: EOD 공개·정정 시각, 25종목 메타데이터, 5m 과거 보관 깊이(96세션), 다중 종목 구독.
+- 실제 Tiingo(정식 계약 토큰)로는 아직 검증하지 않았다(§5-1 smoke 필요). 확인할 것: EOD 공개·정정 시각, 100종목 메타데이터, 5m 과거 보관 깊이(96세션),
+  576세션 EOD, 다중 종목 구독. smoke가 96번째 이전 세션의 5m와 576번째 이전 세션의 EOD를 종목마다 조회하고, 5m가 없으면 한 종목을 이분 탐색해
+  `historyDepth.intradayHistoryReach`(5m가 온전히 남은 가장 오래된 세션)를 낸다.
 
 ## 9. 알려진 제약
 
@@ -233,7 +267,9 @@
 - 장중 Tiingo 5m sync는 정산 경계 때문에 coverage를 완료로 남기지 못한다(장 마감 뒤 run이 그날을 증명). 장중 차트는 기존 1일 tail 허용으로 제공된다.
 - 사후 재조회 표시는 프로세스마다 기억한다. 서버가 여러 대면 같은 증거를 한 번 더 조회·기록할 수 있다(진단만, 체결 영향 없음).
 - 미국 LOC는 `TIINGO_ALLOWED_SYMBOLS` 밖 종목이나 NAS/NYS 밖 시장이면 등록은 되지만 증거를 못 받아 23:00 ET에 만료된다.
-  정식 운영은 빈 값(고정 25종목)으로 둔다.
+  정식 운영은 빈 값(고정 100종목)으로 둔다.
+- KIS 롤백 범위: KIS 실시간 구독은 최대 41종목이라 KIS 기본 목록은 1차 25종목뿐이다. `US_STOCK_PRICE_PROVIDER=kis`로 되돌리면 확대 75종목은
+  KIS 가격이 없어 견적·체결이 unavailable로 막힌다(대체 원천 없음).
 
 ### 미해결 결정 (제품 정책, 승인 필요)
 

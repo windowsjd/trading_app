@@ -10,6 +10,42 @@
 
 ---
 
+## 2026-10-17 미국주식 100·국내주식 70 확대, 중앙 시세·캔들 수집 전환 (코드·테스트·런북, 운영 미적용)
+
+- **구현 목표:** 기존 40종목을 그대로 두고 미국 75·국내 55를 더해 미국 100·국내 70이 기존 시세·차트·주문 경로를 똑같이 쓰게 한다.
+  시작 `main`=`9c1307e5`. 커밋·push·배포·운영 DB·환경변수 변경 없음. 보고서:
+  [docs/investigations/2026-10-17-stock-expansion-us100-kr70/report.md](docs/investigations/2026-10-17-stock-expansion-us100-kr70/report.md).
+- **시작 시 발견:** 운영 env에 `KOSCOM_CENTRAL_CANDLES_ENABLED=true`가 이미 있어 `9c1307e5` 수동 배포 2회가 부팅 실패
+  (`KrxCentralCandlesConfigError`, 코호트 없음). 이 변경의 코호트 등록이 해소한다. live는 `f9cd0813`.
+- **선정(2026-01-02 ~ 10-16 누적 거래대금):**
+  - 국내: 실제 KRX 거래대금 합계(KIS 시장코드 J, NXT 제외). 70 = KOSPI 54·KOSDAQ 16 → 가격 요청 4개/주기.
+  - 미국: Σ(종가 × 통합 거래량) **추정치**(공개 자료에 거래소 집계 체결대금이 없음). 보통주·직접 상장 보통주식만, ADR 제외.
+  - 기능 구현 의도: 순위를 한 측정 기준으로 고정하고, 추정치는 추정으로 표시한다. 예비 후보는 하루 거래대금 순위였고 확정에 쓰지 않았다.
+- **설계(스키마·마이그레이션·새 스케줄러 없음):**
+  - 종목: `kis-fixed-asset-universe.ts` = `FIRST_PHASE_UNIVERSE`(40, 그대로) + `EXPANSION_2026_10_17`(130). 시드·Tiingo 기본 목록이 따라간다.
+    `listedOn`은 576세션 창 안 상장 종목만(점검이 상장 전 구간을 결함으로 세지 않게).
+  - KIS 기본 목록은 1차 40으로 고정. 기능 구현 의도: KIS 감시 목록 41 한도 검사가 모든 공급자 설정 읽기에서 돌기 때문에, 미국 100이 기본값이 되면
+    Binance·FX 설정까지 예외로 실패한다(숨은 결함, 수정).
+  - KOSCOM: 기본값 5000ms·호가 수집 false(정책·70종목 예산). 코호트 2개(기존 15·신규 55, A = 2026-10-19 00:00 KST). 배포가 10-19 09:00 KST보다
+    늦으면 배포 전에 A를 옮긴다.
+  - Tiingo: 유동성 소켓 기본 false, 정식 REST 자체 제한 기본 300/분·12,000/시간. 기능 구현 의도: 입장 거절이 즉시 실패라 분당 한도가 sync 한 번(300회)보다
+    작으면 뒤쪽 종목이 매번 실패한다.
+  - 과거 캔들: 미국 4h 96세션은 저장 5m에서만 합성되므로 5m를 97세션 이상(약 150일) 백필 → `candle:long-backfill --market us --sessions 97` → 5m는
+    45일 보존이 정리. 보존 기간은 늘리지 않는다. 국내 5m 계열은 KOSCOM 1분이 당일 전용이라 A부터 채워진다(4h·1d는 백필).
+  - 점검: `scripts/stock-chart-history-audit.ts`(읽기 전용, 6개 차트 창 × 170종목, `complete`/`limited_by_listing`/
+    `limited_by_collection_start`/`limited_by_provider`/`incomplete`). 공급자 한계는 smoke로 잰 값을 줄 때만 인정한다.
+  - smoke: `smoke:tiingo-official`이 96번째 세션 5m·576번째 세션 EOD 깊이를 보고, 5m가 없으면 한 종목을 이분 탐색한다.
+- **결정 대기:** ① ASML(NY Registry Shares) 포함 여부 — 포함하면 PEP 대신 신규 #18. ② WBD 상장폐지(2026-10-06 Form 25-NSE) — 유지(거래 가능 99)
+  또는 비활성화 + ABT(#76) 추가. 지금은 지침대로 유지.
+- **운영 적용(승인 필요):** 배포 전 `TIINGO_REST_REQUESTS_PER_MINUTE`/`_PER_HOUR`(120/3000) 제거, `TIINGO_WS_LIQUIDITY_ENABLED=false` → push →
+  시드(create 130) → 미국·국내 이력 백필 → 점검 → `SCHEDULER_MARKET_CANDLE_RETENTION_ENABLED=true`. 순서·명령은 보고서 §6.
+- **지켜야 할 정책:** 차트 표시 기간 불변, 보간·가짜 OHLCV 없음, 사용자 요청이 공급자를 부르지 않음, 주문·체결·원장 산식 불변,
+  `CANDLE_LIVE_STREAMING_ENABLED=false` 유지(켜면 KOSCOM 1분 조회가 더해져 70종목에서 일 한도 초과).
+- **검증:** 백엔드 단위 331 스위트·5,410건 통과, typecheck PASS, 부하 하네스 110, 시드 로컬 PostgreSQL(create 130·재실행 0, 1차 ID 불변),
+  주문 회귀 로컬 PostgreSQL 5/6(1회 미분류 실패, 이후 4회 PASS), KOSCOM 모의 L1 5초 PASS, 이력 점검 CLI 로컬 실행.
+- **NOT_RUN / BLOCKED:** Tiingo 실토큰 검증(구독·과거 5m 깊이 — 96세션 = 2026-06-01, 통합 제품 출시는 2026-07-07), 운영 DB 이력 점검(읽기 거부),
+  운영 백필·배포, 프런트엔드(변경 없음).
+
 ## 2026-10-17 Tiingo 미국주식 정식 공급자·미국 LOC BUY/SELL (코드·테스트·운영 준비, 운영 미적용)
 
 - **구현 목표:** 고정 미국 25종목의 금융 가격·캔들·등락률 원천을 Tiingo로 바꿀 수 있게 하고, 미국 LOC 매수·매도를 국내 LOC 엔진 그대로 연다.

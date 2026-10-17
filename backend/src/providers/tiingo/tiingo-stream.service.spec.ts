@@ -96,6 +96,8 @@ function createStream(
       TIINGO_ENABLED: 'true',
       TIINGO_API_TOKEN: TOKEN,
       TIINGO_ALLOWED_SYMBOLS: 'AAPL',
+      // Most cases exercise both channels; the default (off) has its own case.
+      TIINGO_WS_LIQUIDITY_ENABLED: 'true',
       ...env,
     }),
   );
@@ -152,6 +154,49 @@ describe('TiingoStreamService', () => {
       },
     ]);
     expect(stream.getStatus().reference.state).toBe('subscribing');
+    await stream.stop();
+  });
+
+  it('opens only the reference socket by default (no liquidity estimate stream)', async () => {
+    const { stream, sockets, byLevel } = createStream({
+      TIINGO_WS_LIQUIDITY_ENABLED: '',
+    });
+    await stream.start();
+    expect(sockets).toHaveLength(1);
+    sockets[0].open();
+    expect(byLevel(6)).toHaveLength(1);
+    expect(byLevel(4)).toHaveLength(0);
+    expect(stream.getStatus().liquidity.state).toBe('disabled');
+    await stream.stop();
+  });
+
+  it('subscribes every mapped ticker of a 100-symbol universe in one frame', async () => {
+    const targets = Array.from({ length: 100 }, (_, index) => ({
+      assetId: `asset-${index}`,
+      symbol: `S${index}`,
+      market: 'NAS',
+      ticker: `s${index}`,
+    }));
+    const { stream, sockets } = createStream(
+      {
+        TIINGO_WS_LIQUIDITY_ENABLED: 'false',
+        TIINGO_TRIAL_MODE: 'false',
+        TIINGO_ALLOWED_SYMBOLS: targets.map((t) => t.symbol).join(','),
+      },
+      targets,
+    );
+    await stream.start();
+    expect(sockets).toHaveLength(1);
+    sockets[0].open();
+    const frame = sockets[0].sent[0] as {
+      eventData: { thresholdLevel: number; tickers: string[] };
+    };
+    expect(frame.eventData.thresholdLevel).toBe(6);
+    expect(frame.eventData.tickers).toHaveLength(100);
+    expect(new Set(frame.eventData.tickers).size).toBe(100);
+    sockets[0].frame(ack(9));
+    expect(stream.getStatus().reference.state).toBe('subscribed');
+    expect(stream.getStatus().reference.tickers).toHaveLength(100);
     await stream.stop();
   });
 

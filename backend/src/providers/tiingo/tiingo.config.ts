@@ -13,8 +13,8 @@ import { KIS_FIXED_ASSET_UNIVERSE } from '../kis/kis-fixed-asset-universe';
  * licensed provider for the US universe. One lease-holding server collects
  * the reference price and persists regular-session snapshots, candles and LOC
  * close evidence (policy-decisions "Tiingo 미국주식 정식 공급자"). The symbol
- * list defaults to the fixed US universe; financial use still requires
- * `US_STOCK_PRICE_PROVIDER=tiingo`.
+ * list defaults to the fixed US universe (100 stocks since the 2026-10-17
+ * expansion); financial use still requires `US_STOCK_PRICE_PROVIDER=tiingo`.
  */
 export const TIINGO_PROVIDER = 'tiingo' as const;
 /** Tiingo consolidated reference price (`tngoLast`, WebSocket thresholdLevel 6).
@@ -37,7 +37,7 @@ export const TIINGO_EOD_CANDLE_SOURCE = 'tiingo_eod';
 
 /** Trial guard: a small explicit test universe, never the full US list. */
 export const TIINGO_MAX_ALLOWED_SYMBOLS = 5;
-/** Official mode: the 25-symbol first phase, room for the 100-symbol phase. */
+/** Official mode: the whole fixed US universe (25 → 100 on 2026-10-17). */
 export const TIINGO_MAX_OFFICIAL_SYMBOLS = 100;
 /** Official mode default list: the fixed US universe (Asset IDs unchanged). */
 export const TIINGO_DEFAULT_OFFICIAL_SYMBOLS: readonly string[] =
@@ -105,7 +105,10 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
   const trialMode = flag('TIINGO_TRIAL_MODE', true);
   const allowProductionTrial = flag('TIINGO_ALLOW_PRODUCTION_TRIAL', false);
   const streamEnabled = flag('TIINGO_WS_ENABLED', true);
-  const liquidityStreamEnabled = flag('TIINGO_WS_LIQUIDITY_ENABLED', true);
+  // The statistical liquidity estimate (thresholdLevel 4, a second socket)
+  // feeds no financial path; it is off unless explicitly enabled
+  // (2026-10-17 expansion policy: no estimated order-book stream).
+  const liquidityStreamEnabled = flag('TIINGO_WS_LIQUIDITY_ENABLED', false);
   const token = env.TIINGO_API_TOKEN?.trim() ?? '';
   const restBaseUrl = normalizeUrl(
     env.TIINGO_REST_BASE_URL,
@@ -166,9 +169,16 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
       16_000_000,
     ),
     // Local self-limits, far below the contract (30,000/hour, 400,000/day).
+    // Official mode is sized for the 100-symbol universe: one interval
+    // candle sync is 300 calls (5m + 1d + 1w per symbol, every 10 min =
+    // 1,800/h), a socket outage tops up at most one call per symbol per
+    // minute (6,000/h), and the US LOC close reads stay inside the hour.
+    // The hourly cap alone keeps one process under the daily contract
+    // (12,000 × 24 = 288,000). Admission fails fast, so a per-minute cap
+    // below one sync run would fail the rest of every run.
     requestsPerMinute: integer(
       env.TIINGO_REST_REQUESTS_PER_MINUTE,
-      trialMode ? 30 : 120,
+      trialMode ? 30 : 300,
       1,
       600,
     ),
@@ -180,7 +190,7 @@ export function readTiingoConfig(env: Env = process.env): TiingoConfig {
     ),
     requestsPerHour: integer(
       env.TIINGO_REST_REQUESTS_PER_HOUR,
-      trialMode ? 600 : 3_000,
+      trialMode ? 600 : 12_000,
       1,
       20_000,
     ),

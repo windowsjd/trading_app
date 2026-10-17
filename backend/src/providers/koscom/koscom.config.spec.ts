@@ -7,8 +7,9 @@ import {
 describe('KOSCOM collection switches', () => {
   it('keeps every collection behaviour production runs today by default', () => {
     const config = readKoscomConfig({});
-    expect(config.orderbookCollectionEnabled).toBe(true);
-    expect(config.pollIntervalMs).toBe(3000);
+    // 2026-10-17 policy: no domestic order-book calls, 5 s price cadence.
+    expect(config.orderbookCollectionEnabled).toBe(false);
+    expect(config.pollIntervalMs).toBe(5000);
     expect(config.pollLogEnabled).toBe(false);
     // Observation only: counters and the per-minute cycle summary.
     expect(config.callMetricsEnabled).toBe(true);
@@ -20,18 +21,22 @@ describe('KOSCOM collection switches', () => {
   it('turns the price raw slim profile on only explicitly', () => {
     const config = readKoscomConfig({ KOSCOM_PRICE_RAW_SLIM_ENABLED: 'true' });
     expect(config.priceRawSlimEnabled).toBe(true);
-    // Order-book collection is a separate switch and stays on.
-    expect(config.orderbookCollectionEnabled).toBe(true);
+    // Order-book collection is a separate switch and stays off.
+    expect(config.orderbookCollectionEnabled).toBe(false);
   });
 
   it('turns each switch on or off explicitly', () => {
     const config = readKoscomConfig({
-      KOSCOM_ORDERBOOK_COLLECTION_ENABLED: 'false',
+      KOSCOM_ORDERBOOK_COLLECTION_ENABLED: 'true',
       KOSCOM_CALL_METRICS_ENABLED: '0',
       KOSCOM_CYCLE_METRICS_ENABLED: 'FALSE',
       KOSCOM_POLL_LOG_ENABLED: '1',
     });
-    expect(config.orderbookCollectionEnabled).toBe(false);
+    expect(config.orderbookCollectionEnabled).toBe(true);
+    expect(
+      readKoscomConfig({ KOSCOM_ORDERBOOK_COLLECTION_ENABLED: 'false' })
+        .orderbookCollectionEnabled,
+    ).toBe(false);
     expect(config.callMetricsEnabled).toBe(false);
     expect(config.cycleMetricsEnabled).toBe(false);
     expect(config.pollLogEnabled).toBe(true);
@@ -78,13 +83,13 @@ describe('KOSCOM setting warnings (F16)', () => {
       {
         setting: 'KOSCOM_POLL_INTERVAL_MS',
         reason: 'out_of_range',
-        fallback: 3000,
+        fallback: 5000,
       },
       { setting: 'KOSCOM_HTTP_TIMEOUT_MS', reason: 'invalid', fallback: 5000 },
       {
         setting: 'KOSCOM_ORDERBOOK_COLLECTION_ENABLED',
         reason: 'invalid',
-        fallback: true,
+        fallback: false,
       },
     ]);
     const serialized = JSON.stringify(warnings);
@@ -94,7 +99,7 @@ describe('KOSCOM setting warnings (F16)', () => {
     // The value itself still falls back exactly as before.
     expect(
       readKoscomConfig({ KOSCOM_POLL_INTERVAL_MS: '777' }).pollIntervalMs,
-    ).toBe(3000);
+    ).toBe(5000);
   });
 
   it('is silent for unset, blank and in-range values', () => {

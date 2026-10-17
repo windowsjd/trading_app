@@ -1,0 +1,38 @@
+{
+ "coverage_rule": "all R1-eligible new names with Nasdaq EST_close >= 70% of the #75 cutoff",
+ "symbols_required": 121,
+ "symbols_missing_yahoo": [],
+ "same_set": true,
+ "yahoo_top75_not_in_nasdaq_top75": [],
+ "nasdaq_top75_not_in_yahoo_top75": [],
+ "yahoo_cutoff_symbol": "PEP",
+ "rank_moves_gt_2": [],
+ "ratio_min": 0.9826544221290551,
+ "ratio_max": 1.0126614187361827,
+ "largest_ratio_deviations": [
+  {
+   "symbol": "SPCX",
+   "yahoo_over_nasdaq": 0.98265
+  },
+  {
+   "symbol": "SPGI",
+   "yahoo_over_nasdaq": 1.01266
+  },
+  {
+   "symbol": "HON",
+   "yahoo_over_nasdaq": 1.01023
+  },
+  {
+   "symbol": "MELI",
+   "yahoo_over_nasdaq": 0.9996
+  },
+  {
+   "symbol": "GEV",
+   "yahoo_over_nasdaq": 0.99965
+  },
+  {
+   "symbol": "COST",
+   "yahoo_over_nasdaq": 0.99969
+  }
+ ]
+}

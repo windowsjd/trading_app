@@ -14,7 +14,9 @@ export type KoscomMarket = (typeof KOSCOM_MARKETS)[number];
  * (unchanged behaviour) and is reported once by `koscomConfigWarnings`.
  */
 const INTEGER_SETTINGS = {
-  pollIntervalMs: ['KOSCOM_POLL_INTERVAL_MS', 3000, 1000, 60000],
+  // 5 s central price cadence (2026-10-17 product policy for the 70-stock
+  // universe; 3 s would exceed the monthly budget at 70 stocks, design §10).
+  pollIntervalMs: ['KOSCOM_POLL_INTERVAL_MS', 5000, 1000, 60000],
   timeoutMs: ['KOSCOM_HTTP_TIMEOUT_MS', 5000, 100, 15000],
   concurrency: ['KOSCOM_MAX_CONCURRENCY', 2, 1, 4],
   minIntervalMs: ['KOSCOM_MIN_REQUEST_INTERVAL_MS', 200, 50, 10000],
@@ -37,8 +39,10 @@ const INTEGER_SETTINGS = {
  * approved env change (design v2.1 §10, §13).
  */
 const FLAG_SETTINGS = {
-  // Stage 1: stop the unused KOSCOM order-book poll/storage when false.
-  orderbookCollectionEnabled: ['KOSCOM_ORDERBOOK_COLLECTION_ENABLED', true],
+  // Stage 1: the unused KOSCOM order-book poll/storage. Off by default since
+  // the 2026-10-17 product policy (no domestic order-book calls; production
+  // already ran with it off). `true` restores the poll.
+  orderbookCollectionEnabled: ['KOSCOM_ORDERBOOK_COLLECTION_ENABLED', false],
   // Stage 1 observation (never blocks a call): per-category attempt counters
   // and the provider daily-quota headers, in Redis.
   callMetricsEnabled: ['KOSCOM_CALL_METRICS_ENABLED', true],

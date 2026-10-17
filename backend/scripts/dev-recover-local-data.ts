@@ -45,7 +45,7 @@ import { runProviderIngestionCheck } from './dev-run-provider-ingestions';
  *
  * Does ONLY additive, idempotent work: keeps the dev season open, creates the
  * dev user/participant/wallets/grant when absent (never resetting existing
- * balances or ledgers), and registers the fixed 40 KIS stocks + 100 Binance
+ * balances or ledgers), and registers the fixed 170 stocks (70 KRX + 100 US) + 100 Binance
  * crypto assets. It never drops, truncates, deletes, or resets anything.
  *
  * `--dry-run` (default) plans without writing; `--apply` writes;
@@ -96,7 +96,7 @@ async function main(argv: string[]) {
       console.log(`  - ${note}`);
     }
 
-    // 3) KIS fixed universe (40).
+    // 3) Fixed stock universe (70 KRX + 100 US).
     console.log('\n[3/5] KIS fixed asset universe');
     const kis = await seedKisFixedAssetUniverse({ prisma, apply: flags.apply });
     for (const line of describeAssetUniverseResult('  KIS', kis)) {

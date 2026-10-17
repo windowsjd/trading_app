@@ -21,7 +21,7 @@ describe('tiingoExchangeMatchesAssetMarket', () => {
         (entry) => entry.assetType === 'us_stock',
       ).map((entry) => [entry.symbol, entry.market]),
     );
-    expect(TIINGO_DEFAULT_OFFICIAL_SYMBOLS.length).toBe(25);
+    expect(TIINGO_DEFAULT_OFFICIAL_SYMBOLS.length).toBe(100);
     for (const symbol of TIINGO_DEFAULT_OFFICIAL_SYMBOLS)
       expect(['NAS', 'NYS'].includes(markets.get(symbol) ?? '')).toBe(true);
   });

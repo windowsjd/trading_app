@@ -5,6 +5,9 @@
 - 범위: 단계 1–3 구현과 단계 4·5 준비. 운영 활성화·운영 DB 삭제·종목 확대는 하지 않았다.
 - 2026-10-15 후속 감사: [followup-audit-2026-10-15.md](followup-audit-2026-10-15.md) — 보존 ③ 날짜, G4-H 4h·1d, G4-I 공집합 통과를 고쳤고, 옵트인 통합 테스트를 CI에 넣었다. 아래 §3.1·§4.2–§4.4는 그 결과를 반영했다.
 - 이 문서는 운영자가 무엇을 언제 어떤 승인으로 켜는지, 어떻게 되돌리는지를 정리한다. 설계 근거는 report.md를 따른다.
+- **2026-10-17 갱신(70종목 한 번에 확대):** 제품 결정으로 5초 수집(P4)·국내 호가 호출 중단·중앙 캔들(P1–P3)이 확정됐다. 코드 기본값이
+  `KOSCOM_POLL_INTERVAL_MS=5000`, `KOSCOM_ORDERBOOK_COLLECTION_ENABLED=false`로 바뀌었고, 코호트 두 개(기존 15·신규 55, `A`=2026-10-19
+  00:00 KST)가 등록됐다. 25→50→100 단계는 없다. 확대 근거·순서: [2026-10-17 보고서](../2026-10-17-stock-expansion-us100-kr70/report.md).
 
 ## 1. 플래그
 
@@ -12,7 +15,7 @@
 
 | env | 기본 | 단계 | 켜면 | 승인 | 끄면 |
 |---|---|---|---|---|---|
-| `KOSCOM_ORDERBOOK_COLLECTION_ENABLED` | `true` | 1 | `false`로 호가 조회·저장 중단 | 운영 env 변경 | 다시 `true` |
+| `KOSCOM_ORDERBOOK_COLLECTION_ENABLED` | `false`(2026-10-17부터) | 1 | `false`면 호가 조회·저장 없음(정책) | 운영 env 변경 | `true`로 되살림 |
 | `KOSCOM_CALL_METRICS_ENABLED` | `true` | 1 | 카테고리별 시도 수·잔여 헤더 집계(관찰, 차단 없음) | — | 집계 중단 |
 | `KOSCOM_CYCLE_METRICS_ENABLED` | `true` | 1 | 분당 가격 사이클 요약 로그 | — | 로그 중단 |
 | `KOSCOM_POLL_LOG_ENABLED` | `false` | 1 | 배치마다 `koscom_poll` 한 줄(Q2‴ 측정용) | 측정 기간만 | 끈다 |
@@ -22,7 +25,7 @@
 | `KOSCOM_LIST_BACKOFF_ENABLED` | `false` | 2c | 시장 목록 지수 백오프(최대 30분) + 단일 비행 | 운영 env 변경 | 기존 30초 재시도 |
 | `KOSCOM_CLOSE_RECOVERY_MAX_ATTEMPTS` | `0`(무제한) | 2c | 종목·일당 종가 복구 시도 상한(설계 3) | 운영 env 변경 | `0` |
 | `CANDLE_LIVE_RECOVERY_MAX_ATTEMPTS` | `0`(무제한) | 2c | finalizer 시도 상한(설계 2) + 당일 기한 뒤 held | 운영 env 변경 | `0` |
-| `KOSCOM_CENTRAL_CANDLES_ENABLED` | `false` | 3b | KRX 중앙 수집기 + KRX 차트 DB 전용 조회 + 05:00 압축 | **§13 P1·P2·P3** + 코호트 기록 배포 | KRX가 관리형 on-demand로 돌아간다 |
+| `KOSCOM_CENTRAL_CANDLES_ENABLED` | `false` | 3b | KRX 중앙 수집기 + KRX 차트 DB 전용 조회 + 05:00 압축 | P1–P3은 2026-10-17 제품 결정으로 확정. 코호트 기록 배포가 먼저 | KRX가 관리형 on-demand로 돌아간다 |
 | `KOSCOM_CENTRAL_CANDLE_TICK_DELAY_MS` | `70000` | 3b | 버킷 종료 뒤 틱 지연(30–240초) | — | — |
 | `KOSCOM_CENTRAL_WEEKLY_SYNC_ENABLED` | `true` | 3b | 주 마지막 거래일 장후 1w 종목당 1회. 1w 탭 없는 앱이 정착하면 `false` | 앱 배포 뒤 | — |
 | `KOSCOM_BUDGET_ENFORCEMENT_ENABLED` | `false` | 3c | 우선순위별 입장 제한(꺼져 있으면 같은 판정을 `shadow_denied:<범주>`로만 센다) | 운영 env 변경. 3거래일 집계 뒤 | 집계만 계속 |

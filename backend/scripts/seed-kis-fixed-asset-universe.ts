@@ -14,15 +14,15 @@ import {
 import type { AssetUniverseDesired } from './lib/asset-universe-upsert';
 
 /**
- * Seed the fixed 40-symbol KIS stock universe (15 domestic + 25 US) into
- * `assets`. Additive and idempotent: creates missing rows and refreshes the
+ * Seed the fixed stock universe (70 domestic + 100 US since the 2026-10-17
+ * expansion; `kis-fixed-asset-universe.ts`) into `assets`. Additive and idempotent: creates missing rows and refreshes the
  * contract fields (name/currencies/assetType/isActive) on existing rows without
  * touching prices, orders, positions, or the symbol list itself.
  *
  * Default run applies; `--dry-run` prints the plan without writing. Env is
  * loaded like the backend so it targets the same DB.
  *
- * `--us-only` (2026-10-17) scopes the plan to the 25 US stocks — the Tiingo
+ * `--us-only` (2026-10-17) scopes the plan to the US stocks — the Tiingo
  * official universe — e.g. `--dry-run --us-only` to check that every one is
  * registered, active and listed on NAS/NYS before switching their provider.
  * Applying it against a production database is an approved operator step.
@@ -72,7 +72,9 @@ export async function runSeedKisFixedAssetUniverse(argv: string[]) {
       usOnly,
     });
     for (const line of describeAssetUniverseResult(
-      usOnly ? 'US stock universe (25)' : 'KIS fixed asset universe',
+      usOnly
+        ? `US stock universe (${result.counts.total})`
+        : 'KIS fixed asset universe',
       result,
     )) {
       console.log(line);

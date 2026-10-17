@@ -1,0 +1,46 @@
+{
+ "calendar": {
+  "symbols_scanned": 2927,
+  "weekdays_in_window": 206,
+  "weekdays_without_any_row": [
+   "2026-01-19",
+   "2026-02-16",
+   "2026-04-03",
+   "2026-05-25",
+   "2026-06-19",
+   "2026-07-03",
+   "2026-09-07"
+  ],
+  "assumed_holidays_in_window": [
+   "2026-01-19",
+   "2026-02-16",
+   "2026-04-03",
+   "2026-05-25",
+   "2026-06-19",
+   "2026-07-03",
+   "2026-09-07"
+  ],
+  "match": true,
+  "holidays_with_rows": {},
+  "dates_with_rows_for_lt_half_of_symbols": {},
+  "trading_days_observed": 199
+ },
+ "gainbot_order": {
+  "rows": 100,
+  "matched": 100,
+  "missing": [],
+  "spearman_page_order_vs_latest_session_price_x_volume": 0.9997,
+  "spearman_page_order_vs_our_ytd_est_close": 0.8248
+ },
+ "preliminary_vs_1015_single_session": {
+  "positions_compared": 84,
+  "identical_order": true,
+  "first_mismatch": null,
+  "non_common_names_removed_from_top120": [
+   "TSM",
+   "SKHY",
+   "ASML",
+   "ARM"
+  ]
+ }
+}

@@ -1,0 +1,457 @@
+{
+ "cutoff_symbol": "PEP",
+ "cutoff_est_close_usd": 235425248455.04,
+ "r1_new75": [
+  "SNDK",
+  "AVGO",
+  "SPCX",
+  "GOOG",
+  "MRVL",
+  "ORCL",
+  "LITE",
+  "AMAT",
+  "WDC",
+  "NFLX",
+  "NBIS",
+  "LLY",
+  "STX",
+  "LRCX",
+  "WMT",
+  "JPM",
+  "BE",
+  "CRWV",
+  "XOM",
+  "CRM",
+  "DELL",
+  "UNH",
+  "V",
+  "HOOD",
+  "GEV",
+  "APP",
+  "NOW",
+  "BRK.B",
+  "CAT",
+  "GS",
+  "COST",
+  "KLAC",
+  "PANW",
+  "IREN",
+  "CVX",
+  "RKLB",
+  "JNJ",
+  "COHR",
+  "TXN",
+  "CRWD",
+  "GLW",
+  "IBM",
+  "MA",
+  "COIN",
+  "VRT",
+  "GE",
+  "C",
+  "INTU",
+  "HD",
+  "BA",
+  "ABBV",
+  "ADI",
+  "SNOW",
+  "BKNG",
+  "PG",
+  "ADBE",
+  "ASTS",
+  "CRDO",
+  "KO",
+  "WFC",
+  "MRK",
+  "SHOP",
+  "CRCL",
+  "ALAB",
+  "ACN",
+  "MRNA",
+  "AAOI",
+  "APH",
+  "VZ",
+  "ANET",
+  "TMO",
+  "TER",
+  "MCD",
+  "MS",
+  "PEP"
+ ],
+ "next_excluded": [
+  {
+   "symbol": "ABT",
+   "r1_new_rank": 76,
+   "est_close_usd": 226825833776,
+   "pct_vs_cutoff": -3.65
+  },
+  {
+   "symbol": "LIN",
+   "r1_new_rank": 77,
+   "est_close_usd": 226549014392,
+   "pct_vs_cutoff": -3.77
+  },
+  {
+   "symbol": "CIEN",
+   "r1_new_rank": 78,
+   "est_close_usd": 225643531630,
+   "pct_vs_cutoff": -4.15
+  },
+  {
+   "symbol": "NKE",
+   "r1_new_rank": 79,
+   "est_close_usd": 219747615506,
+   "pct_vs_cutoff": -6.66
+  },
+  {
+   "symbol": "IONQ",
+   "r1_new_rank": 80,
+   "est_close_usd": 218059355308,
+   "pct_vs_cutoff": -7.38
+  },
+  {
+   "symbol": "AAL",
+   "r1_new_rank": 81,
+   "est_close_usd": 217697295564,
+   "pct_vs_cutoff": -7.53
+  },
+  {
+   "symbol": "SPOT",
+   "r1_new_rank": 82,
+   "est_close_usd": 214748071933,
+   "pct_vs_cutoff": -8.78
+  },
+  {
+   "symbol": "TMUS",
+   "r1_new_rank": 83,
+   "est_close_usd": 212622581006,
+   "pct_vs_cutoff": -9.69
+  },
+  {
+   "symbol": "BSX",
+   "r1_new_rank": 84,
+   "est_close_usd": 210585021608,
+   "pct_vs_cutoff": -10.55
+  },
+  {
+   "symbol": "AXP",
+   "r1_new_rank": 85,
+   "est_close_usd": 210557804157,
+   "pct_vs_cutoff": -10.56
+  }
+ ],
+ "band_pm5pct": [
+  {
+   "symbol": "TMO",
+   "r1_new_rank": 71,
+   "est_close_usd": 245492421145,
+   "pct_vs_cutoff": 4.28
+  },
+  {
+   "symbol": "TER",
+   "r1_new_rank": 72,
+   "est_close_usd": 244635318390,
+   "pct_vs_cutoff": 3.91
+  },
+  {
+   "symbol": "MCD",
+   "r1_new_rank": 73,
+   "est_close_usd": 237570905732,
+   "pct_vs_cutoff": 0.91
+  },
+  {
+   "symbol": "MS",
+   "r1_new_rank": 74,
+   "est_close_usd": 236471244402,
+   "pct_vs_cutoff": 0.44
+  },
+  {
+   "symbol": "PEP",
+   "r1_new_rank": 75,
+   "est_close_usd": 235425248455,
+   "pct_vs_cutoff": 0.0
+  },
+  {
+   "symbol": "ABT",
+   "r1_new_rank": 76,
+   "est_close_usd": 226825833776,
+   "pct_vs_cutoff": -3.65
+  },
+  {
+   "symbol": "LIN",
+   "r1_new_rank": 77,
+   "est_close_usd": 226549014392,
+   "pct_vs_cutoff": -3.77
+  },
+  {
+   "symbol": "CIEN",
+   "r1_new_rank": 78,
+   "est_close_usd": 225643531630,
+   "pct_vs_cutoff": -4.15
+  }
+ ],
+ "r2_entering": [
+  "TSM",
+  "ARM",
+  "SKHY",
+  "BABA"
+ ],
+ "r2_pushed_out": [
+  "TER",
+  "MCD",
+  "MS",
+  "PEP"
+ ],
+ "r2_entering_detail": [
+  {
+   "symbol": "TSM",
+   "r2_new_rank": 6,
+   "est_close_usd": 1022737921328,
+   "class": "adr_ads"
+  },
+  {
+   "symbol": "ARM",
+   "r2_new_rank": 46,
+   "est_close_usd": 359112644734,
+   "class": "adr_ads"
+  },
+  {
+   "symbol": "SKHY",
+   "r2_new_rank": 48,
+   "est_close_usd": 322861382665,
+   "class": "adr_ads"
+  },
+  {
+   "symbol": "BABA",
+   "r2_new_rank": 52,
+   "est_close_usd": 298578356198,
+   "class": "adr_ads"
+  }
+ ],
+ "nyrs_entering": [
+  "ASML"
+ ],
+ "nyrs_pushed_out": [
+  "PEP"
+ ],
+ "r2ny_entering": [
+  "TSM",
+  "ASML",
+  "ARM",
+  "SKHY",
+  "BABA"
+ ],
+ "r2ny_pushed_out": [
+  "TMO",
+  "TER",
+  "MCD",
+  "MS",
+  "PEP"
+ ],
+ "typical_entering": [],
+ "typical_leaving": [],
+ "existing25": [
+  {
+   "symbol": "NVDA",
+   "overall_rank": 1,
+   "r1_rank_incl_existing": 1,
+   "est_close_usd": 6049290402697,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "TSLA",
+   "overall_rank": 3,
+   "r1_rank_incl_existing": 3,
+   "est_close_usd": 3954530909417,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "AMD",
+   "overall_rank": 7,
+   "r1_rank_incl_existing": 7,
+   "est_close_usd": 2367401610989,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "AAPL",
+   "overall_rank": 6,
+   "r1_rank_incl_existing": 6,
+   "est_close_usd": 2823431128319,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "AMZN",
+   "overall_rank": 8,
+   "r1_rank_incl_existing": 8,
+   "est_close_usd": 2213144653358,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "MSFT",
+   "overall_rank": 5,
+   "r1_rank_incl_existing": 5,
+   "est_close_usd": 2889022082169,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "GOOGL",
+   "overall_rank": 10,
+   "r1_rank_incl_existing": 10,
+   "est_close_usd": 2065917021196,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "META",
+   "overall_rank": 9,
+   "r1_rank_incl_existing": 9,
+   "est_close_usd": 2210147322555,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "PLTR",
+   "overall_rank": 15,
+   "r1_rank_incl_existing": 15,
+   "est_close_usd": 1256981764360,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "INTC",
+   "overall_rank": 11,
+   "r1_rank_incl_existing": 11,
+   "est_close_usd": 2004374494586,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "SOFI",
+   "overall_rank": 99,
+   "r1_rank_incl_existing": 94,
+   "est_close_usd": 232012829639,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "RIVN",
+   "overall_rank": 277,
+   "r1_rank_incl_existing": 264,
+   "est_close_usd": 92891277793,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "MARA",
+   "overall_rank": 262,
+   "r1_rank_incl_existing": 250,
+   "est_close_usd": 99161291022,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "WBD",
+   "overall_rank": null,
+   "r1_rank_incl_existing": null,
+   "est_close_usd": null,
+   "last_trade_date": "",
+   "r1_exclusion_reason": "no 2026 history (nodata:Symbol not exists.)"
+  },
+  {
+   "symbol": "CSCO",
+   "overall_rank": 45,
+   "r1_rank_incl_existing": 43,
+   "est_close_usd": 442408568258,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "MU",
+   "overall_rank": 2,
+   "r1_rank_incl_existing": 2,
+   "est_close_usd": 5872748732223,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "QCOM",
+   "overall_rank": 34,
+   "r1_rank_incl_existing": 32,
+   "est_close_usd": 539492981277,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "PYPL",
+   "overall_rank": 146,
+   "r1_rank_incl_existing": 140,
+   "est_close_usd": 168359439474,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "MSTR",
+   "overall_rank": 29,
+   "r1_rank_incl_existing": 28,
+   "est_close_usd": 580040645905,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "SMCI",
+   "overall_rank": 77,
+   "r1_rank_incl_existing": 72,
+   "est_close_usd": 282108499551,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "F",
+   "overall_rank": 162,
+   "r1_rank_incl_existing": 156,
+   "est_close_usd": 152994222894,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "BAC",
+   "overall_rank": 48,
+   "r1_rank_incl_existing": 46,
+   "est_close_usd": 410911200408,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "PFE",
+   "overall_rank": 108,
+   "r1_rank_incl_existing": 103,
+   "est_close_usd": 211400549563,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "T",
+   "overall_rank": 95,
+   "r1_rank_incl_existing": 90,
+   "est_close_usd": 238030734103,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  },
+  {
+   "symbol": "UBER",
+   "overall_rank": 78,
+   "r1_rank_incl_existing": 73,
+   "est_close_usd": 279658845174,
+   "last_trade_date": "2026-10-16",
+   "r1_exclusion_reason": ""
+  }
+ ],
+ "pool_size": 2931,
+ "ranked": 2927
+}

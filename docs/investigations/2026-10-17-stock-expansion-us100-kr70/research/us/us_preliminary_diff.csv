@@ -1,0 +1,93 @@
+symbol,in_preliminary75,in_alternates,in_final_new75,change,r1_new_rank,overall_rank,est_close_usd,pct_vs_cutoff,security_class,reason
+SNDK,1,0,1,kept,1,4,3321540626516,1310.87,common,
+SPCX,1,0,1,kept,3,13,1396464442663,493.17,common,
+AVGO,1,0,1,kept,2,12,1828106799494,676.51,common,
+CRWV,1,0,1,kept,18,32,547488799458,132.55,common,
+NBIS,1,0,1,kept,11,23,646882983179,174.77,ordinary,
+DELL,1,0,1,kept,21,36,525963693201,123.41,common,
+LITE,1,0,1,kept,7,19,854064263056,262.78,common,
+MRVL,1,0,1,kept,5,16,1105655067361,369.64,common,
+GOOG,1,0,1,kept,4,14,1366476257389,480.43,common,
+AMAT,1,0,1,kept,8,20,709998010392,201.58,common,
+MDT,1,0,0,dropped,91,116,199903967807,-15.09,ordinary,rank: R1 new-rank 91 (EST_close below the #75 cutoff)
+LLY,1,0,1,kept,12,24,631095228365,168.07,common,
+WDC,1,0,1,kept,9,21,701035193103,197.77,common,
+ORCL,1,0,1,kept,6,18,926734987099,293.64,common,
+BE,1,0,1,kept,17,30,567833077570,141.19,common,
+UNH,1,0,1,kept,22,37,510080921986,116.66,common,
+MRNA,1,0,1,kept,66,88,256419358116,8.92,common,
+STX,1,0,1,kept,13,25,602963070784,156.12,ordinary,
+WMT,1,0,1,kept,15,27,588627142383,150.03,common,
+LRCX,1,0,1,kept,14,26,598980793589,154.43,common,
+GEV,1,0,1,kept,25,40,486990705507,106.86,common,
+V,1,0,1,kept,23,38,507276122822,115.47,common,
+CAT,1,0,1,kept,29,44,458143271573,94.60,common,
+IREN,1,0,1,kept,34,51,393953341650,67.34,ordinary,
+COST,1,0,1,kept,31,47,421000770412,78.83,common,
+NFLX,1,0,1,kept,10,22,698694023916,196.78,common,
+JPM,1,0,1,kept,16,28,585255456976,148.60,common,
+VRT,1,0,1,kept,45,63,339072762831,44.03,common,
+TMO,1,0,1,kept,71,93,245492421145,4.28,common,
+RKLB,1,0,1,kept,36,53,387544292070,64.61,common,
+CRWD,1,0,1,kept,40,57,381384868664,62.00,common,
+NOW,1,0,1,kept,27,42,475934501755,102.16,common,
+MA,1,0,1,kept,43,60,370590202775,57.41,common,
+PG,1,0,1,kept,55,75,286265942559,21.60,common,
+COHR,1,0,1,kept,38,55,386038858370,63.98,common,
+CCC,1,0,0,dropped,1025,1119,17089184954,-92.74,common,rank: R1 new-rank 1025 (EST_close below the #75 cutoff)
+KLAC,1,0,1,kept,32,49,406745051420,72.77,common,
+JNJ,1,0,1,kept,37,54,386671000081,64.24,common,
+GS,1,0,1,kept,30,46,422780287666,79.58,common,
+HOOD,1,0,1,kept,24,39,491728920297,108.87,common,
+BRK.B,1,0,1,kept,28,43,465247624410,97.62,common,
+ABBV,1,0,1,kept,51,71,296181317263,25.81,common,
+CRM,1,0,1,kept,20,35,529983547330,125.12,common,
+PANW,1,0,1,kept,33,50,395929968930,68.18,common,
+HD,1,0,1,kept,49,69,297954811962,26.56,common,
+HPE,1,0,0,dropped,113,139,177009543832,-24.81,common,rank: R1 new-rank 113 (EST_close below the #75 cutoff)
+MRK,1,0,1,kept,61,83,264017617013,12.14,common,
+AMGN,1,0,0,dropped,90,115,202375191023,-14.04,common,rank: R1 new-rank 90 (EST_close below the #75 cutoff)
+XOM,1,0,1,kept,19,33,540470870912,129.57,common,
+ANET,1,0,1,kept,70,92,249927123881,6.16,common,
+TXN,1,0,1,kept,39,56,385881168689,63.91,common,
+SHOP,1,0,1,kept,62,84,262041216929,11.31,common,
+SNOW,1,0,1,kept,53,73,289075964919,22.79,common,
+ACN,1,0,1,kept,65,87,257017780593,9.17,ordinary,
+ETN,1,0,0,dropped,93,118,195980310173,-16.75,ordinary,rank: R1 new-rank 93 (EST_close below the #75 cutoff)
+ADI,1,0,1,kept,52,72,295980561789,25.72,common,
+KO,1,0,1,kept,59,81,272026846173,15.55,common,
+CRDO,1,0,1,kept,58,80,272762947500,15.86,ordinary,
+SCHW,1,0,0,dropped,94,119,194876365956,-17.22,common,rank: R1 new-rank 94 (EST_close below the #75 cutoff)
+NKE,1,0,0,dropped,79,103,219747615506,-6.66,common,rank: R1 new-rank 79 (EST_close below the #75 cutoff)
+WFC,1,0,1,kept,60,82,269828964821,14.61,common,
+ADBE,1,0,1,kept,56,76,284476202825,20.84,common,
+IONQ,1,0,0,dropped,80,104,218059355308,-7.38,common,rank: R1 new-rank 80 (EST_close below the #75 cutoff)
+MS,1,0,1,kept,74,97,236471244402,0.44,common,
+COIN,1,0,1,kept,44,61,368741890244,56.63,common,
+MCD,1,0,1,kept,73,96,237570905732,0.91,common,
+PM,1,0,0,dropped,109,134,178300448394,-24.26,common,rank: R1 new-rank 109 (EST_close below the #75 cutoff)
+GLW,1,0,1,kept,41,58,379622451941,61.25,common,
+CVX,1,0,1,kept,35,52,392379731473,66.67,common,
+TER,1,0,1,kept,72,94,244635318390,3.91,common,
+PEP,1,0,1,kept,75,98,235425248455,0.00,common,
+SBUX,1,0,0,dropped,126,153,159877618606,-32.09,common,rank: R1 new-rank 126 (EST_close below the #75 cutoff)
+AAOI,1,0,1,kept,67,89,254979289333,8.31,common,
+SNPS,1,0,0,dropped,107,132,182551883846,-22.46,common,rank: R1 new-rank 107 (EST_close below the #75 cutoff)
+INTU,1,0,1,kept,48,67,305000060761,29.55,common,
+NET,0,1,0,alternate_not_selected,100,125,189264059422,-19.61,common,rank: R1 new-rank 100 (EST_close below the #75 cutoff)
+SMTC,0,1,0,alternate_not_selected,307,348,75414883447,-67.97,common,rank: R1 new-rank 307 (EST_close below the #75 cutoff)
+C,0,1,1,alternate_promoted,47,66,310150956357,31.74,common,
+CRCL,0,1,1,alternate_promoted,63,85,258900483156,9.97,common,
+BLK,0,1,0,alternate_not_selected,133,160,155782275046,-33.83,common,rank: R1 new-rank 133 (EST_close below the #75 cutoff)
+WULF,0,1,0,alternate_not_selected,186,217,114595991642,-51.32,common,rank: R1 new-rank 186 (EST_close below the #75 cutoff)
+ABT,0,1,0,alternate_not_selected,76,100,226825833776,-3.65,common,rank: R1 new-rank 76 (EST_close below the #75 cutoff)
+CVS,0,1,0,alternate_not_selected,137,166,146337330565,-37.84,common,rank: R1 new-rank 137 (EST_close below the #75 cutoff)
+IBM,0,1,1,alternate_promoted,42,59,373311280558,58.57,common,
+APP,0,0,1,added (not in preliminary/alternates),26,41,479306872270,103.59,common,R1 new-rank 26 by EST_close
+GE,0,0,1,added (not in preliminary/alternates),46,65,322689726799,37.07,common,R1 new-rank 46 by EST_close
+BA,0,0,1,added (not in preliminary/alternates),50,70,297458328323,26.35,common,R1 new-rank 50 by EST_close
+BKNG,0,0,1,added (not in preliminary/alternates),54,74,286776969990,21.81,common,R1 new-rank 54 by EST_close
+ASTS,0,0,1,added (not in preliminary/alternates),57,79,274855901987,16.75,common,R1 new-rank 57 by EST_close
+ALAB,0,0,1,added (not in preliminary/alternates),64,86,257167757521,9.24,common,R1 new-rank 64 by EST_close
+APH,0,0,1,added (not in preliminary/alternates),68,90,253173440223,7.54,common,R1 new-rank 68 by EST_close
+VZ,0,0,1,added (not in preliminary/alternates),69,91,251120695265,6.67,common,R1 new-rank 69 by EST_close

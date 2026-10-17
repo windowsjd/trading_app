@@ -24,7 +24,7 @@ import { loadRuntimeEnv } from './lib/load-runtime-env';
 
 /**
  * Opt-in REAL Tiingo check of the OFFICIAL mode (2026-10-17) for the fixed
- * US universe (25 symbols by default), as the production collector, the US
+ * US universe (100 symbols by default), as the production collector, the US
  * LOC close evidence and the candle sync use Tiingo:
  *
  *   TIINGO_LIVE_SMOKE=1 TIINGO_API_TOKEN=... pnpm smoke:tiingo-official
@@ -32,12 +32,18 @@ import { loadRuntimeEnv } from './lib/load-runtime-env';
  * Per symbol: Tiingo's metadata identity (ticker, and the exchange equal to
  * the Asset's NAS/NYS listing), the end-of-day bar of the latest completed New
  * York session (exactly one bar of that date with raw close, volume and
- * adjusted values), and that session's regular 5-minute bars (count vs the
- * calendar). Then one WebSocket (thresholdLevel 6) for all symbols: per-symbol
- * tick counts and heartbeat spacing.
+ * adjusted values), that session's regular 5-minute bars (count vs the
+ * calendar), and the history depth the charts need: the regular 5m bars of
+ * the 96th previous session (the oldest session the 96-session 4h chart is
+ * synthesized from) and the end-of-day bar of the 576th previous session (the
+ * daily chart). A stock whose Tiingo `startDate` is later than a probed
+ * session is reported as listed later, not as missing. When the 96th session
+ * has no 5m bars, the first such symbol is bisected once to report how far
+ * back Tiingo's intraday history reaches. Then one WebSocket (thresholdLevel
+ * 6) for all symbols: per-symbol tick counts and heartbeat spacing.
  *
  * Read-only and memory-only: no database, no file output, REST paced below
- * 40 requests/minute (3 per symbol). It prints counts, dates, booleans and
+ * 40 requests/minute (5 per symbol). It prints counts, dates, booleans and
  * exchange codes — never a price, size, payload or the token. Refused under
  * NODE_ENV=production; without the flag it reports NOT_RUN and exits 0. A
  * check without real data is never PASS.
@@ -112,8 +118,25 @@ async function main() {
   const expectedBars = Math.round(
     (session.closeTime.getTime() - session.openTime.getTime()) / 300_000,
   );
+  // History depth the charts need (frontend chartTimeframes.ts): 96 sessions
+  // of 4h (synthesized from stored 5m) and 576 sessions of 1d.
+  const depthSession5m = findPreviousMarketSession(asset, now, 96);
+  const depthSessionDaily = findPreviousMarketSession(asset, now, 576);
   const perSymbol: Record<string, SymbolFacts> = {};
-  const tally = { identity: 0, eod: 0, intraday: 0, adjustedDiffers: 0 };
+  const tally = {
+    identity: 0,
+    eod: 0,
+    intraday: 0,
+    adjustedDiffers: 0,
+    intradayDepth96: 0,
+    intradayDepth96ListedLater: 0,
+    eodDepth576: 0,
+    eodDepth576ListedLater: 0,
+  };
+  let depthBisectSymbol: string | null = null;
+  let intradayHistoryReach: Awaited<
+    ReturnType<typeof bisectIntradayReach>
+  > | null = null;
   try {
     for (const symbol of symbols) {
       const facts: SymbolFacts = { listing: listing.get(symbol) ?? null };
@@ -192,7 +215,58 @@ async function main() {
         facts.intraday5m = { errorCode: tiingoFailureCode(error) };
       }
       await delay(PACE_MS);
+      const startDate =
+        typeof facts.startDate === 'string' ? facts.startDate : null;
+      if (depthSession5m) {
+        if (startDate !== null && startDate > depthSession5m.localDate) {
+          facts.intraday5mDepth96 = { listedLater: true };
+          tally.intradayDepth96ListedLater += 1;
+        } else {
+          const bars = await regularBarsOn(rest, symbol, depthSession5m);
+          facts.intraday5mDepth96 = bars;
+          if (bars.regularBars === bars.expected) tally.intradayDepth96 += 1;
+          else if (bars.regularBars === 0 && depthBisectSymbol === null)
+            depthBisectSymbol = symbol;
+          await delay(PACE_MS);
+        }
+      }
+      if (depthSessionDaily) {
+        if (startDate !== null && startDate > depthSessionDaily.localDate) {
+          facts.eodDepth576 = { listedLater: true };
+          tally.eodDepth576ListedLater += 1;
+        } else {
+          try {
+            const daily = parseTiingoDailyBars(
+              (
+                await rest.getDailyPrices(symbol, {
+                  startDate: depthSessionDaily.localDate,
+                  endDate: depthSessionDaily.localDate,
+                })
+              ).json,
+            );
+            const ok =
+              daily.bars.length === 1 &&
+              daily.bars[0].date === depthSessionDaily.localDate;
+            facts.eodDepth576 = { ok, bars: daily.bars.length };
+            if (ok) tally.eodDepth576 += 1;
+          } catch (error) {
+            facts.eodDepth576 = {
+              ok: false,
+              errorCode: tiingoFailureCode(error),
+            };
+          }
+          await delay(PACE_MS);
+        }
+      }
     }
+    // How far back intraday history reaches, bisected on one symbol only.
+    if (depthBisectSymbol !== null)
+      intradayHistoryReach = await bisectIntradayReach(
+        rest,
+        depthBisectSymbol,
+        now,
+        96,
+      );
   } finally {
     rest.onModuleDestroy();
   }
@@ -209,10 +283,22 @@ async function main() {
   const verdict = (passed: number): Verdict =>
     passed === symbols.length ? 'PASS' : passed > 0 ? 'PARTIAL' : 'FAIL';
   const earliest = usSessionWallTime(session.localDate, 21 * 60 + 10);
+  // Stocks listed after a probed session cannot have it; they are excluded.
+  const depthVerdict = (passed: number, listedLater: number): Verdict => {
+    const judged = symbols.length - listedLater;
+    if (judged === 0) return 'PASS';
+    return passed === judged ? 'PASS' : passed > 0 ? 'PARTIAL' : 'FAIL';
+  };
   const results = {
     identity: verdict(tally.identity),
     eodLatestSession: verdict(tally.eod),
     intraday5mLatestSession: verdict(tally.intraday),
+    intraday5mDepth96Sessions: depthSession5m
+      ? depthVerdict(tally.intradayDepth96, tally.intradayDepth96ListedLater)
+      : 'FAIL',
+    eodDepth576Sessions: depthSessionDaily
+      ? depthVerdict(tally.eodDepth576, tally.eodDepth576ListedLater)
+      : 'FAIL',
     stream: stream.verdict,
   };
   console.log(
@@ -230,6 +316,11 @@ async function main() {
           locEvidenceWindowOpen: earliest ? now >= earliest : null,
         },
         symbols: symbols.length,
+        historyDepth: {
+          intraday5mSession96: depthSession5m?.localDate ?? null,
+          dailySession576: depthSessionDaily?.localDate ?? null,
+          intradayHistoryReach,
+        },
         passed: tally,
         results,
         stream: stream.facts,
@@ -241,6 +332,98 @@ async function main() {
     ),
   );
   if (Object.values(results).includes('FAIL')) process.exitCode = 1;
+}
+
+/** Regular-session 5m bar count of one session (vs the calendar's slots). */
+async function regularBarsOn(
+  rest: TiingoRestClient,
+  symbol: string,
+  session: { localDate: string; openTime: Date; closeTime: Date },
+): Promise<{
+  date: string;
+  regularBars: number;
+  expected: number;
+  errorCode?: string;
+}> {
+  const expected = Math.round(
+    (session.closeTime.getTime() - session.openTime.getTime()) / 300_000,
+  );
+  try {
+    const intraday = parseTiingoIntradayBars(
+      (
+        await rest.getIntradayPrices(symbol, {
+          startDate: session.localDate,
+          endDate: session.localDate,
+        })
+      ).json,
+    );
+    return {
+      date: session.localDate,
+      regularBars: intraday.bars.filter(
+        (bar) =>
+          bar.openTime >= session.openTime && bar.openTime < session.closeTime,
+      ).length,
+      expected,
+    };
+  } catch (error) {
+    return {
+      date: session.localDate,
+      regularBars: 0,
+      expected,
+      errorCode: tiingoFailureCode(error),
+    };
+  }
+}
+
+/**
+ * The oldest of the previous `maxBack` sessions that still has a full set of
+ * regular 5m bars for `symbol`, assuming history is contiguous from some
+ * date on (at most ⌈log2(maxBack)⌉ + 1 requests, paced).
+ */
+async function bisectIntradayReach(
+  rest: TiingoRestClient,
+  symbol: string,
+  now: Date,
+  maxBack: number,
+): Promise<{
+  symbol: string;
+  oldestFullSessionsBack: number;
+  oldestFullSessionDate: string | null;
+  requests: number;
+}> {
+  const asset = { assetType: 'us_stock' as never, market: 'NAS' };
+  let requests = 0;
+  const full = async (back: number) => {
+    const session = findPreviousMarketSession(asset, now, back);
+    if (!session) return false;
+    requests += 1;
+    await delay(PACE_MS);
+    const bars = await regularBarsOn(rest, symbol, session);
+    return bars.regularBars === bars.expected;
+  };
+  // Invariant: `low` sessions back is full (0 = none proven), `high` is not.
+  let low = 0;
+  let high = maxBack;
+  if (await full(1)) low = 1;
+  else
+    return {
+      symbol,
+      oldestFullSessionsBack: 0,
+      oldestFullSessionDate: null,
+      requests,
+    };
+  while (high - low > 1) {
+    const mid = Math.floor((low + high) / 2);
+    if (await full(mid)) low = mid;
+    else high = mid;
+  }
+  return {
+    symbol,
+    oldestFullSessionsBack: low,
+    oldestFullSessionDate:
+      findPreviousMarketSession(asset, now, low)?.localDate ?? null,
+    requests,
+  };
 }
 
 function checkStream(

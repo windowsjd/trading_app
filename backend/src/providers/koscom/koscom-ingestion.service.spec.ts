@@ -58,6 +58,9 @@ function create(count = 1, env: Record<string, string> = {}, budget?: object) {
       readKoscomConfig({
         KOSCOM_API_KEY: key,
         PROVIDER_INGESTION_ENABLED: 'true',
+        // These cases cover the (now opt-in) order-book poll as well; the
+        // switch's own case passes 'false'.
+        KOSCOM_ORDERBOOK_COLLECTION_ENABLED: 'true',
         ...env,
       }),
   };
@@ -391,7 +394,7 @@ describe('KOSCOM stage-1 collection switches and instrumentation', () => {
     expect(summary.cycles).toBe(2);
     expect(summary.completedCycles).toBe(2);
     expect(summary.requests).toBe(4);
-    expect(summary.periodMs).toBe(3000);
+    expect(summary.periodMs).toBe(5000);
   });
 });
 
@@ -679,7 +682,8 @@ describe('KOSCOM 3c price priority lane, price plan and pacing', () => {
     expect(timeline.filter((e) => e === 'lane:released').length).toBe(1);
     const [laneKey, , laneTtl] = h.redis.setNxPx.mock.calls[0];
     expect(laneKey).toBe(`koscom:${h.config.getConfig().namespace}:price-lane`);
-    expect(laneTtl).toBe(3000);
+    // min(T, 10 s) with the 5 s default cadence.
+    expect(laneTtl).toBe(5000);
   });
 
   it('leaves the request order and Redis untouched without the lane', async () => {
@@ -702,7 +706,7 @@ describe('KOSCOM 3c price priority lane, price plan and pacing', () => {
     await h.service.collect({ now });
     expect(b.publishPricePlan).toHaveBeenCalledWith(
       h.config.getConfig().namespace,
-      { batches: 3, periodMs: 3000, assets: 43 },
+      { batches: 3, periodMs: 5000, assets: 43 },
     );
     // A manual symbol subset never rewrites the plan.
     await h.service.collect({ now, symbols: ['000001'] });

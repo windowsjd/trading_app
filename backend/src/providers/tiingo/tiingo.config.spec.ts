@@ -33,7 +33,12 @@ describe('readTiingoConfig', () => {
     expect(config.enabled).toBe(true);
     expect(config.allowedSymbols).toEqual(['AAPL']);
     expect(config.streamEnabled).toBe(true);
-    expect(config.liquidityStreamEnabled).toBe(true);
+    // The estimated-liquidity socket is opt-in (2026-10-17 expansion policy).
+    expect(config.liquidityStreamEnabled).toBe(false);
+    expect(
+      readTiingoConfig(enabledEnv({ TIINGO_WS_LIQUIDITY_ENABLED: 'true' }))
+        .liquidityStreamEnabled,
+    ).toBe(true);
   });
 
   it.each([
@@ -103,7 +108,7 @@ describe('readTiingoConfig', () => {
     ).toBe(180_000);
   });
 
-  it('official mode (2026-10-17): persisted, production-ready, the fixed 25 US symbols by default', () => {
+  it('official mode (2026-10-17): persisted, production-ready, the fixed 100 US symbols by default', () => {
     const config = readTiingoConfig(
       enabledEnv({
         TIINGO_TRIAL_MODE: 'false',
@@ -118,13 +123,17 @@ describe('readTiingoConfig', () => {
       trialMode: false,
       persistenceEnabled: true,
       snapshotThrottleMs: 5_000,
-      requestsPerMinute: 120,
-      requestsPerHour: 3_000,
+      // Sized for 100 symbols: one interval sync run is 300 calls.
+      requestsPerMinute: 300,
+      requestsPerHour: 12_000,
     });
     expect(config.allowedSymbols).toEqual([...TIINGO_DEFAULT_OFFICIAL_SYMBOLS]);
-    expect(config.allowedSymbols.length).toBe(25);
+    expect(config.allowedSymbols.length).toBe(100);
     expect(config.allowedSymbols.includes('AAPL')).toBe(true);
     expect(config.allowedSymbols.includes('UBER')).toBe(true);
+    // The hourly self-limit alone keeps one process under the daily contract.
+    expect(config.requestsPerHour * 24).toBeLessThan(400_000);
+    expect(config.requestsPerHour).toBeLessThan(30_000);
     // The trial stays memory-only and capped at 5.
     expect(readTiingoConfig(enabledEnv()).persistenceEnabled).toBe(false);
   });

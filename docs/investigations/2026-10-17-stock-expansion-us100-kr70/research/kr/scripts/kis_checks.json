@@ -1,0 +1,50 @@
+[
+ {
+  "code": "005930",
+  "d1": "20261013",
+  "d2": "20261016",
+  "mrkt": "UN",
+  "adj": "0",
+  "why": "J vs UN/NX (NXT exclusion check)"
+ },
+ {
+  "code": "005930",
+  "d1": "20261013",
+  "d2": "20261016",
+  "mrkt": "NX",
+  "adj": "0",
+  "why": "J vs UN/NX (NXT exclusion check)"
+ },
+ {
+  "code": "000660",
+  "d1": "20261013",
+  "d2": "20261016",
+  "mrkt": "UN",
+  "adj": "0",
+  "why": "J vs UN/NX (NXT exclusion check)"
+ },
+ {
+  "code": "000660",
+  "d1": "20261013",
+  "d2": "20261016",
+  "mrkt": "NX",
+  "adj": "0",
+  "why": "J vs UN/NX (NXT exclusion check)"
+ },
+ {
+  "code": "009150",
+  "d1": "20261013",
+  "d2": "20261016",
+  "mrkt": "UN",
+  "adj": "0",
+  "why": "J vs UN/NX (NXT exclusion check)"
+ },
+ {
+  "code": "009150",
+  "d1": "20261013",
+  "d2": "20261016",
+  "mrkt": "NX",
+  "adj": "0",
+  "why": "J vs UN/NX (NXT exclusion check)"
+ }
+]
