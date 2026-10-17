@@ -222,9 +222,10 @@ export default function SellIntentForm({
                 accessibilityLabel="감시 방향"
                 compact
                 value={offHoursDirection ?? ''}
-                onChange={(value) => edit(() => setOffHoursDirection(value))}
-                options={(['at_or_above', 'at_or_below'] as const).map((value) => ({
-                  key: value, label: SELL_TRIGGER_CONDITION_LABEL[value], testID: `sell-trigger-${value}`, disabled: pending,
+                onChange={(value) => edit(() => setOffHoursDirection(value || null))}
+                options={(['', 'at_or_above', 'at_or_below'] as const).map((value) => ({
+                  key: value, label: value === '' ? '방향 선택' : SELL_TRIGGER_CONDITION_LABEL[value],
+                  testID: `sell-trigger-${value || 'choose'}`, disabled: pending,
                 }))}
               />
             </View>
