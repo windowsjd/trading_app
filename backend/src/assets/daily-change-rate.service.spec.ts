@@ -505,5 +505,85 @@ describe('canonical daily return', () => {
       ).toBeNull();
       expect(findRange).not.toHaveBeenCalled();
     });
+
+    describe('findLatestSessionTurnovers (market-list sort only)', () => {
+      const msft = {
+        id: 'msft',
+        assetType: 'us_stock' as AssetType,
+        market: 'NAS',
+      };
+      const turnoverSetup = (rows: unknown[]) => {
+        const findManyAtOpenTime = jest.fn().mockResolvedValue(rows);
+        return {
+          findManyAtOpenTime,
+          service: new DailyChangeRateService({ findManyAtOpenTime } as never),
+        };
+      };
+      const withVolume = (
+        row: ReturnType<typeof eodRow>,
+        assetId: string,
+        volume: string,
+      ) => ({
+        ...row,
+        assetId,
+        volume: new Prisma.Decimal(volume),
+      });
+
+      it('multiplies the raw close by the raw volume of the previous session while the market is open, in one read', async () => {
+        process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+        // Friday 10:00 EDT: latest completed session = Thursday 10-15.
+        const now = new Date('2026-10-16T14:00:00Z');
+        const row = eodRow(
+          '2026-10-15T04:00:00Z',
+          '2026-10-16T04:00:00Z',
+          '183.25',
+        );
+        const { service, findManyAtOpenTime } = turnoverSetup([
+          withVolume(row, 'aapl', '1000000'),
+          withVolume(row, 'msft', '-1'),
+        ]);
+        const result = await service.findLatestSessionTurnovers(
+          [us, msft],
+          now,
+        );
+        expect(
+          [...result.entries()].map(([id, value]) => [id, value.toFixed()]),
+        ).toEqual([['aapl', '183250000']]);
+        expect(findManyAtOpenTime).toHaveBeenCalledTimes(1);
+        expect(findManyAtOpenTime).toHaveBeenCalledWith({
+          assetIds: ['aapl', 'msft'],
+          interval: '1d',
+          openTime: new Date('2026-10-15T04:00:00Z'),
+        });
+      });
+
+      it('skips unconfirmed or other-provider rows and anything outside Tiingo mode', async () => {
+        process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+        const now = new Date('2026-10-16T14:00:00Z');
+        const row = eodRow(
+          '2026-10-15T04:00:00Z',
+          '2026-10-16T04:00:00Z',
+          '100',
+        );
+        const { service } = turnoverSetup([
+          { ...withVolume(row, 'aapl', '10'), isClosed: false },
+          withVolume(
+            { ...row, sourceProvider: 'kis_overseas_period' },
+            'msft',
+            '10',
+          ),
+        ]);
+        expect(
+          (await service.findLatestSessionTurnovers([us, msft], now)).size,
+        ).toBe(0);
+
+        process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+        const kis = turnoverSetup([withVolume(row, 'aapl', '10')]);
+        expect(
+          (await kis.service.findLatestSessionTurnovers([us], now)).size,
+        ).toBe(0);
+        expect(kis.findManyAtOpenTime).not.toHaveBeenCalled();
+      });
+    });
   });
 });

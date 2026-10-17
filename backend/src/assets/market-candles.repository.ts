@@ -162,6 +162,26 @@ export class MarketCandlesRepository {
    * included. When `limit` is given, the LATEST `limit` candles inside the
    * range are selected and still returned in ascending order.
    */
+  /**
+   * Rows of many assets at one exact openTime (one read on the
+   * (asset_id, interval, open_time) unique index). Used where every asset
+   * shares the same bucket, e.g. one US session's daily row.
+   */
+  async findManyAtOpenTime(params: {
+    assetIds: readonly string[];
+    interval: MarketCandleInterval;
+    openTime: Date;
+  }): Promise<MarketCandle[]> {
+    if (params.assetIds.length === 0) return [];
+    return this.prisma.marketCandle.findMany({
+      where: {
+        assetId: { in: [...params.assetIds] },
+        interval: this.requireInterval(params.interval),
+        openTime: this.requireValidDate(params.openTime, 'openTime'),
+      },
+    });
+  }
+
   async findRange(
     params: MarketCandleFindRangeParams,
   ): Promise<MarketCandle[]> {

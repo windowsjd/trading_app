@@ -3055,6 +3055,84 @@ describe('AssetsService', () => {
       expect(prisma.marketCandle.findMany).not.toHaveBeenCalled();
     });
 
+    it('sorts US stocks by the latest completed session end-of-day turnover (raw close × raw volume)', async () => {
+      // Saturday: latest completed session = Fri 10-16; its EOD rows only.
+      jest.setSystemTime(new Date('2026-10-17T15:00:00.000Z'));
+      const msft = asset({
+        id: 'msft',
+        symbol: 'MSFT',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      });
+      const tsla = asset({
+        id: 'tsla',
+        symbol: 'TSLA',
+        market: 'NAS',
+        assetType: AssetType.us_stock,
+        currencyCode: CurrencyCode.USD,
+      });
+      const rows = [
+        { ...eod('2026-10-16', '250.5'), volume: new Prisma.Decimal('1000') },
+        { ...eod('2026-10-16', '100'), assetId: 'msft', volume: new Prisma.Decimal('5000') },
+        // TSLA: only an older session's row — never shown as current.
+        { ...eod('2026-10-15', '300'), assetId: 'tsla', volume: new Prisma.Decimal('9000') },
+      ];
+      const { prisma, service } = createService();
+      prisma.marketCandle.findMany.mockImplementation(
+        ({ where }: { where: { assetId: string | { in: string[] }; openTime: Date | { gte: Date; lt: Date } } }) =>
+          Promise.resolve(
+            rows.filter(
+              (row) =>
+                (typeof where.assetId === 'string'
+                  ? row.assetId === where.assetId
+                  : where.assetId.in.includes(row.assetId)) &&
+                (where.openTime instanceof Date
+                  ? row.openTime.getTime() === where.openTime.getTime()
+                  : row.openTime >= where.openTime.gte &&
+                    row.openTime < where.openTime.lt),
+            ),
+          ),
+      );
+      prisma.asset.count.mockResolvedValue(3);
+      prisma.asset.findMany.mockResolvedValue([usAsset, msft, tsla]);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue(
+        freshUsdKrwProviderSnapshots(),
+      );
+
+      for (const [sortOrder, symbols] of [
+        ['desc', ['MSFT', 'AAPL', 'TSLA']],
+        ['asc', ['AAPL', 'MSFT', 'TSLA']],
+      ] as const) {
+        const response = await service.getAssets('user-1', {
+          assetType: 'us_stock',
+          sortBy: 'turnover',
+          sortOrder,
+          sortRefresh: 'true',
+        });
+        expect(response.data.assets.map((a) => a.symbol)).toEqual(symbols);
+        const bySymbol = new Map(response.data.assets.map((a) => [a.symbol, a]));
+        expect(bySymbol.get('MSFT')).toMatchObject({
+          turnover: '500000',
+          turnoverPeriod: 'last_completed_session',
+        });
+        expect(bySymbol.get('AAPL')).toMatchObject({
+          turnover: '250500',
+          turnoverPeriod: 'last_completed_session',
+        });
+        // No confirmed 10-16 row: price and turnover both unavailable.
+        expect(bySymbol.get('TSLA')?.turnover ?? null).toBe(null);
+      }
+      // The turnover read is one query on the shared session bucket.
+      const batched = (
+        prisma.marketCandle.findMany.mock.calls as [
+          { where: { assetId: unknown; openTime: unknown } },
+        ][]
+      ).filter(([args]) => args.where.openTime instanceof Date);
+      expect(batched.length).toBe(2);
+      expect(batched[0][0].where.assetId).toEqual({ in: ['aapl', 'msft'] });
+    });
+
     it("keeps the data-shortage state without that session's confirmed close (older or unconfirmed rows only)", async () => {
       jest.setSystemTime(new Date('2026-10-17T15:00:00.000Z'));
       const { prisma, service } = withCandles([

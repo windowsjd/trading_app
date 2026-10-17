@@ -213,14 +213,61 @@ export const EXPANSION_2026_10_17: readonly KisFixedAssetUniverseEntry[] = [
 ];
 
 /**
+ * 2026-10-17 replacement for the delisted WBD (see `RETIRED_FIXED_ASSETS`):
+ * the next stock by the same 2026 YTD trading-value ranking and rule R1 —
+ * ABT, new-name rank #76 right after PEP (#75), overall #100 (evidence:
+ * docs/investigations/2026-10-17-stock-expansion-us100-kr70/research/us/
+ * us_ranked_pool.csv; NYSE common stock, Tiingo row NYSE|Stock|USD).
+ */
+// prettier-ignore
+export const REPLACEMENT_2026_10_17: readonly KisFixedAssetUniverseEntry[] = [
+  { symbol: 'ABT', kisSymbol: 'NYS:ABT', name: 'Abbott Laboratories', market: 'NYS', assetType: 'us_stock', currencyCode: 'USD' },
+];
+
+export type KisRetiredAssetEntry = {
+  symbol: string;
+  market: string;
+  assetType: 'domestic_stock' | 'us_stock';
+  /** KST date the stock left the universe (YYYY-MM-DD). */
+  retiredOn: string;
+  reason: string;
+};
+
+/**
+ * Former members that are no longer tradable. Their `assets` rows stay (Asset
+ * id, candles, orders, positions are history); the seed only keeps them
+ * `isActive=false`, so a rerun never re-activates them, and they leave every
+ * default list derived below (Tiingo official symbols, KIS defaults).
+ */
+export const RETIRED_FIXED_ASSETS: readonly KisRetiredAssetEntry[] = [
+  {
+    symbol: 'WBD',
+    market: 'NAS',
+    assetType: 'us_stock',
+    retiredOn: '2026-10-17',
+    reason:
+      'Delisted 2026-10-06 (SEC Form 25-NSE; Form 15 2026-10-16); replaced by ABT',
+  },
+];
+
+function isRetired(entry: { market: string; symbol: string }): boolean {
+  return RETIRED_FIXED_ASSETS.some(
+    (retired) =>
+      retired.market === entry.market && retired.symbol === entry.symbol,
+  );
+}
+
+/**
  * The fixed stock universe: 70 domestic + 100 US. It is the seed source for
  * `scripts/seed-kis-fixed-asset-universe.ts` and the Tiingo official symbol
- * default. Existing rows keep their Asset IDs; entries are only appended.
+ * default. Existing rows keep their Asset IDs; entries are only appended, and
+ * a retired member is filtered out (its row is deactivated, never deleted).
  */
 export const KIS_FIXED_ASSET_UNIVERSE: readonly KisFixedAssetUniverseEntry[] = [
   ...FIRST_PHASE_UNIVERSE,
   ...EXPANSION_2026_10_17,
-];
+  ...REPLACEMENT_2026_10_17,
+].filter((entry) => !isRetired(entry));
 
 /**
  * KIS runtime defaults when KIS_DOMESTIC_SYMBOLS/KIS_US_SYMBOLS are not set:
@@ -230,10 +277,10 @@ export const KIS_FIXED_ASSET_UNIVERSE: readonly KisFixedAssetUniverseEntry[] = [
  */
 export const KIS_FIXED_DOMESTIC_SYMBOLS: readonly string[] =
   FIRST_PHASE_UNIVERSE.filter(
-    (entry) => entry.assetType === 'domestic_stock',
+    (entry) => entry.assetType === 'domestic_stock' && !isRetired(entry),
   ).map((entry) => entry.kisSymbol);
 
 export const KIS_FIXED_US_SYMBOLS: readonly string[] =
-  FIRST_PHASE_UNIVERSE.filter((entry) => entry.assetType === 'us_stock').map(
-    (entry) => entry.kisSymbol,
-  );
+  FIRST_PHASE_UNIVERSE.filter(
+    (entry) => entry.assetType === 'us_stock' && !isRetired(entry),
+  ).map((entry) => entry.kisSymbol);

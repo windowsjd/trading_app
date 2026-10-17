@@ -7,11 +7,27 @@ const record = (value: unknown): Record<string, unknown> | null =>
 
 export type AssetListTurnover = {
   turnover: string | null;
-  turnoverPeriod: 'session' | 'rolling_24h' | null;
+  turnoverPeriod: 'session' | 'rolling_24h' | 'last_completed_session' | null;
 };
 
+/**
+ * US stocks on Tiingo: the latest completed regular session's RAW close ×
+ * RAW volume from its confirmed end-of-day row
+ * (`DailyChangeRateService.findLatestSessionTurnovers`). Market-list sorting
+ * only; null when that session's row is absent or invalid.
+ */
+export function usSessionTurnover(
+  value: Prisma.Decimal | undefined,
+): AssetListTurnover {
+  return value?.isFinite() && value.gte(0)
+    ? { turnover: value.toFixed(), turnoverPeriod: 'last_completed_session' }
+    : { turnover: null, turnoverPeriod: null };
+}
+
 /** Only evidence attached to the price selected by the existing read policy.
- * Never synthesize notional from quantity/price or use manual/truncated evidence. */
+ * Never synthesize notional from quantity/price or use manual/truncated evidence.
+ * The single exception is US stocks on Tiingo, whose evidence has no notional:
+ * `usSessionTurnover` (2026-10-17 product decision, assets-api-contract). */
 export function readAssetListTurnover(
   snapshot:
     | {

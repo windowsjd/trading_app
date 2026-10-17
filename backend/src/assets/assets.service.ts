@@ -55,6 +55,7 @@ import { RedisService } from '../redis/redis.service';
 import {
   compareAssetListMetric,
   readAssetListTurnover,
+  usSessionTurnover,
   type AssetListTurnover,
 } from './asset-list-turnover';
 import {
@@ -536,14 +537,36 @@ export class AssetsService {
         })
       : [];
     const byId = new Map(evidence.map((row) => [row.id, row]));
-    const assets = priced.assets.map((asset) => ({
-      ...asset,
-      ...readAssetListTurnover(
+    // US stocks on Tiingo carry no notional in their price evidence; their
+    // list turnover is the latest completed session's end-of-day value, read
+    // for every priced US row at once. A failed read leaves turnover null.
+    const usTurnovers =
+      (await this.dailyChangeRate
+        ?.findLatestSessionTurnovers(
+          priced.assets
+            .filter((asset) => asset.price?.state === 'available')
+            .map((asset) => ({
+              id: asset.assetId,
+              assetType: asset.assetType,
+              market: asset.market,
+            })),
+          new Date(valuationAt),
+        )
+        .catch(() => null)) ?? new Map<string, Prisma.Decimal>();
+    const assets = priced.assets.map((asset) => {
+      const available = asset.price?.state === 'available';
+      const turnover = readAssetListTurnover(
         asset.price?.state === 'available' && asset.price.assetPriceSnapshotId
           ? byId.get(asset.price.assetPriceSnapshotId)
           : undefined,
-      ),
-    }));
+      );
+      return {
+        ...asset,
+        ...(turnover.turnover === null && available
+          ? usSessionTurnover(usTurnovers.get(asset.assetId))
+          : turnover),
+      };
+    });
     assets.sort((a, b) =>
       compareAssetListMetric(a, b, query.sortBy!, query.sortOrder),
     );

@@ -20,7 +20,8 @@ import {
  * Idempotent and additive: it only ever creates missing `assets` rows or
  * updates the small contract field set (name/currencies/assetType/isActive) on
  * existing rows, all inside one transaction. It never deletes, and never
- * touches price snapshots, candles, orders, quotes, or positions.
+ * touches price snapshots, candles, orders, quotes, or positions. Retired
+ * members are only ever deactivated (`isActive=false`), never deleted.
  */
 
 function toAssetType(value: string): AssetType {
@@ -90,12 +91,18 @@ export async function readExistingUniverseAssets(
   });
 }
 
+/** A retired universe member: kept in the DB, only `isActive=false`. */
+export type AssetUniverseRetired = { market: string; symbol: string };
+
 export type AssetUniverseApplyResult = {
   plan: AssetUniversePlan;
   counts: AssetUniversePlanCounts;
   applied: boolean;
   created: number;
   updated: number;
+  /** Retired rows found active (deactivated when applied). */
+  deactivations: { existingId: string; market: string; symbol: string }[];
+  deactivated: number;
 };
 
 /**
@@ -121,6 +128,9 @@ export function describeAssetUniverseResult(
       `  ~ update ${update.desired.market}:${update.desired.symbol} [${update.changedFields.join(', ')}]`,
     );
   }
+  for (const retired of result.deactivations) {
+    lines.push(`  - deactivate ${retired.market}:${retired.symbol} (retired)`);
+  }
 
   return lines;
 }
@@ -129,21 +139,64 @@ export async function applyAssetUniverse(input: {
   prisma: PrismaClient;
   desired: readonly AssetUniverseDesired[];
   apply: boolean;
+  /**
+   * Members retired from the universe (e.g. delisted). Their rows keep the
+   * Asset id, candles, orders and positions; a still-active row is only set
+   * `isActive=false`, so a rerun of the seed never re-activates it.
+   */
+  retired?: readonly AssetUniverseRetired[];
 }): Promise<AssetUniverseApplyResult> {
   const { prisma, desired, apply } = input;
+  const retired = input.retired ?? [];
 
   // Fail fast on an invalid enum value in the fixed universe BEFORE any write,
   // even in dry-run, so a bad list can never reach the DB.
   for (const entry of desired) {
     toCreateData(entry);
   }
+  const desiredKeys = new Set(
+    desired.map((entry) => assetUniverseKey(entry.market, entry.symbol)),
+  );
+  for (const entry of retired) {
+    if (desiredKeys.has(assetUniverseKey(entry.market, entry.symbol)))
+      throw new Error(
+        `Retired asset is still in the fixed universe: ${entry.market}:${entry.symbol}`,
+      );
+  }
 
   const existing = await readExistingUniverseAssets(prisma, desired);
   const plan = planAssetUniverseUpserts(desired, existing);
   const counts = summarizeAssetUniversePlan(plan);
+  const deactivations = retired.length
+    ? (
+        await prisma.asset.findMany({
+          where: {
+            isActive: true,
+            OR: retired.map((entry) => ({
+              market: entry.market,
+              symbol: entry.symbol,
+            })),
+          },
+          select: { id: true, market: true, symbol: true },
+          orderBy: [{ market: 'asc' }, { symbol: 'asc' }],
+        })
+      ).map((row) => ({
+        existingId: row.id,
+        market: row.market,
+        symbol: row.symbol,
+      }))
+    : [];
 
   if (!apply) {
-    return { plan, counts, applied: false, created: 0, updated: 0 };
+    return {
+      plan,
+      counts,
+      applied: false,
+      created: 0,
+      updated: 0,
+      deactivations,
+      deactivated: 0,
+    };
   }
 
   // One statement per row: 75 new Binance assets against a remote database
@@ -159,6 +212,12 @@ export async function applyAssetUniverse(input: {
           data: toUpdateData(update.desired),
         });
       }
+      for (const retiredRow of deactivations) {
+        await tx.asset.update({
+          where: { id: retiredRow.existingId },
+          data: { isActive: false },
+        });
+      }
     },
     { timeout: 120_000 },
   );
@@ -169,6 +228,8 @@ export async function applyAssetUniverse(input: {
     applied: true,
     created: plan.creates.length,
     updated: plan.updates.length,
+    deactivations,
+    deactivated: deactivations.length,
   };
 }
 

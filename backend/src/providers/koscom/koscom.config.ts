@@ -31,6 +31,10 @@ const INTEGER_SETTINGS = {
     10000,
     1000000000,
   ],
+  // Past-date 1m intraday reach for operator backfills only (2026-10-17 live
+  // probe: whole sessions 24–25 sessions back, rows undated). 0 = today only,
+  // the behaviour every runtime path keeps; a backfill job sets it explicitly.
+  intradayHistorySessions: ['KOSCOM_INTRADAY_HISTORY_SESSIONS', 0, 0, 30],
 } as const;
 
 /**
@@ -97,6 +101,10 @@ export function readKoscomConfig(env = process.env) {
     ),
     budgetDailyLimit: integer(env, INTEGER_SETTINGS.budgetDailyLimit),
     budgetMonthlyLimit: integer(env, INTEGER_SETTINGS.budgetMonthlyLimit),
+    intradayHistorySessions: integer(
+      env,
+      INTEGER_SETTINGS.intradayHistorySessions,
+    ),
     orderbookCollectionEnabled: flag(
       env,
       FLAG_SETTINGS.orderbookCollectionEnabled,

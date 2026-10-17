@@ -54,7 +54,7 @@ Existing candle serving, backfill/reconcile jobs and `/api/v1/assets/:assetId/ca
 | `stocks/{code}/price`, `orderbook` | Single-symbol KONEX fallback; no assumed KONEX batch support |
 | `closed/{market}/lists` | Cached mapping of existing active assets; only positive list membership is accepted; another market’s list failure does not disable proven symbols |
 | `closed/{market}/{code}/master` | Validated adapter method for inspection; not an extra per-poll request |
-| `stocks/{code}/intraday` | 1-minute feed, current KST date only, HHMM request windows ≤95 minutes and response ≤100 rows; 10-minute cycle (`600`) for one whole completed session per request (long-range 4h, live-verified 96–97 sessions back) |
+| `stocks/{code}/intraday` | 1-minute feed, current KST date only at runtime, HHMM request windows ≤95 minutes and response ≤100 rows; operator backfills may read past sessions with `KOSCOM_INTRADAY_HISTORY_SESSIONS` (default 0, max 30; live-verified whole sessions 24–25 back, rows undated, each session kept only when it corroborates the dated daily bar — see policy-decisions); 10-minute cycle (`600`) for one whole completed session per request (long-range 4h, live-verified 96–97 sessions back) |
 | `closed/{market}/{code}/history` | D/W with date-window paging, max 100 rows per request; completed-session close recovery |
 | `closeprice` | Deliberately unused: documented result has no trading date; recovery uses dated history |
 | M history, all-market lists/ohlclists/quotelists, indices | Not called; existing app does not require these features |

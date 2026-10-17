@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '../generated/prisma/client';
+import { Prisma, type MarketCandle } from '../generated/prisma/client';
 import {
   findPreviousMarketSession,
   resolveStockMarketSessionState,
@@ -119,6 +119,60 @@ export class DailyChangeRateService {
       : null;
   }
 
+  /**
+   * Market-list turnover of US stocks (sort and home TOP 5 only, 2026-10-17):
+   * RAW close × RAW volume of the confirmed Tiingo end-of-day row of the
+   * LATEST COMPLETED regular session — while the market is open, the previous
+   * session. It is derived from end-of-day data, not a provider-summed
+   * notional. Same row checks as `findLatestSessionClose` plus a finite,
+   * non-negative volume, one read for every asset. An asset without that
+   * session's confirmed row (e.g. after the close, before the end-of-day row
+   * arrives) is absent: never an older session's value. Orders, valuation,
+   * ranking and settlement never call this.
+   */
+  async findLatestSessionTurnovers(
+    assets: readonly (MarketCalendarAsset & { id: string })[],
+    now: Date,
+  ): Promise<Map<string, Prisma.Decimal>> {
+    const turnovers = new Map<string, Prisma.Decimal>();
+    const usAssets = assets.filter(
+      (asset) => asset.assetType === 'us_stock' && usCandlesFromTiingo(asset),
+    );
+    if (!usAssets.length) return turnovers;
+    const session = resolveStockMarketSessionState(
+      usAssets[0],
+      now,
+    )?.latestCompletedSession;
+    if (!session || session.closeTime > now) return turnovers;
+    const period = resolvePeriodWindowForDate(
+      'US',
+      session.localDate.replaceAll('-', ''),
+      '1d',
+    );
+    if (!period) return turnovers;
+    const window: BaselineWindow = {
+      openTime: period.openTime,
+      closeTime: period.closeTime,
+      completedAt: session.closeTime,
+      provider: MARKET_DAILY_CANDLE_SOURCE.usStock,
+    };
+    const rows = await this.candles.findManyAtOpenTime({
+      assetIds: usAssets.map((asset) => asset.id),
+      interval: '1d',
+      openTime: window.openTime,
+    });
+    for (const row of rows) {
+      if (
+        !isConfirmedDailyRow(row, row.assetId, window, now) ||
+        !row.volume.isFinite() ||
+        row.volume.lt(0)
+      )
+        continue;
+      turnovers.set(row.assetId, row.close.times(row.volume));
+    }
+    return turnovers;
+  }
+
   private async readCachedClose(
     cacheId: string,
     assetId: string,
@@ -166,30 +220,47 @@ export class DailyChangeRateService {
     });
     if (rows.length !== 1) return null;
     const row = rows[0];
-    if (
-      row.assetId !== assetId ||
-      row.interval !== '1d' ||
-      !row.isClosed ||
-      (row.sourceProvider !== window.provider && !(window.provider === MARKET_DAILY_CANDLE_SOURCE.domesticStock && row.sourceProvider === 'koscom_history')) ||
-      row.openTime.getTime() !== window.openTime.getTime() ||
-      row.closeTime.getTime() !== window.closeTime.getTime() ||
-      !Number.isFinite(row.sourceUpdatedAt.getTime()) ||
-      row.sourceUpdatedAt < window.completedAt ||
-      row.sourceUpdatedAt > now
-    )
-      return null;
-    const values = [row.open, row.high, row.low, row.close];
-    if (
-      values.some((value) => !value.isFinite() || value.lte(0)) ||
-      row.high.lt(row.low) ||
-      row.high.lt(row.open) ||
-      row.high.lt(row.close) ||
-      row.low.gt(row.open) ||
-      row.low.gt(row.close)
-    )
-      return null;
+    if (!isConfirmedDailyRow(row, assetId, window, now)) return null;
     return { close: row.close, receivedAt: row.sourceUpdatedAt };
   }
+}
+
+/**
+ * The confirmed daily row of exactly `window` for `assetId` from the
+ * window's provider: closed, received after the session close and not in
+ * the future, with positive, consistent O/H/L/C.
+ */
+function isConfirmedDailyRow(
+  row: MarketCandle,
+  assetId: string,
+  window: BaselineWindow,
+  now: Date,
+): boolean {
+  if (
+    row.assetId !== assetId ||
+    row.interval !== '1d' ||
+    !row.isClosed ||
+    (row.sourceProvider !== window.provider &&
+      !(
+        window.provider === MARKET_DAILY_CANDLE_SOURCE.domesticStock &&
+        row.sourceProvider === 'koscom_history'
+      )) ||
+    row.openTime.getTime() !== window.openTime.getTime() ||
+    row.closeTime.getTime() !== window.closeTime.getTime() ||
+    !Number.isFinite(row.sourceUpdatedAt.getTime()) ||
+    row.sourceUpdatedAt < window.completedAt ||
+    row.sourceUpdatedAt > now
+  )
+    return false;
+  const values = [row.open, row.high, row.low, row.close];
+  return !(
+    values.some((value) => !value.isFinite() || value.lte(0)) ||
+    row.high.lt(row.low) ||
+    row.high.lt(row.open) ||
+    row.high.lt(row.close) ||
+    row.low.gt(row.open) ||
+    row.low.gt(row.close)
+  );
 }
 
 function dailyBaselineWindow(input: {

@@ -487,13 +487,28 @@ Concurrent identical misses coalesce per process; simultaneous misses on differe
 instances can each build an immutable result without a distributed lock.
 
 Sorted list items expose nullable decimal-string `turnover` and `turnoverPeriod`
-(`session` or `rolling_24h`). Turnover comes only from the selected eligible
-provider price snapshot's stored, untruncated evidence:
+(`session`, `rolling_24h` or `last_completed_session`). Turnover comes from the
+selected eligible provider price snapshot's stored, untruncated evidence — with
+the single US-on-Tiingo exception below:
 
 - KRX: WebSocket ACML_TR_PBMN, REST current-price acml_tr_pbmn, or exact-date
   session-close acml_tr_pbmn; cumulative session notional in KRW.
-- US: WebSocket TAMT or REST current-price tamt; cumulative session notional in
-  USD, with the existing delayed-feed semantics.
+- US (KIS provider): WebSocket TAMT or REST current-price tamt; cumulative
+  session notional in USD, with the existing delayed-feed semantics.
+- US (`US_STOCK_PRICE_PROVIDER=tiingo`, 2026-10-17 product decision): Tiingo
+  price evidence carries no notional, so turnover is computed, not
+  provider-summed: **raw `close` × raw `volume` of the confirmed `tiingo_eod`
+  1d row of the latest completed US regular session**, in USD,
+  `turnoverPeriod=last_completed_session`. While the market is open that is the
+  previous session; never an older session (between the close and the arrival
+  of that session's end-of-day row, turnover is null). Same row checks as the
+  closed-market last close (closed row of exactly that session's New York
+  daily window, received after the close, positive consistent O/H/L/C) plus a
+  finite, non-negative volume; adjusted fields are never used. Only rows whose
+  price is available get it. It is read for all US candidates in one query
+  from stored rows (no provider call on a list request) and serves sorting and
+  the home TOP 5 only — never orders, fills, valuation, ranking, settlement or
+  any ledger. The UI label stays `거래대금`.
 - Crypto: Binance REST 24hr ticker quoteVolume or WebSocket 24hr ticker q;
   rolling 24-hour USDT notional, following the existing USDT-as-USD policy.
   This is not a UTC calendar-day candle amount.
@@ -509,7 +524,9 @@ Closed stocks use the last eligible observation from the latest completed
 session under the existing price selector. The last observation is not guaranteed
 to be the final full-session aggregate. Missing, truncated, invalid, unsupported
 or manual evidence yields null, never zero. Quantity/volume, price-times-volume
-and candle aggregations are not turnover fallbacks. No FX conversion is introduced
+and candle aggregations are not turnover fallbacks (the US-on-Tiingo
+end-of-day value above is a defined source for that provider, not a
+fallback for missing evidence). No FX conversion is introduced
 for sorting. All-market search keeps the existing name/symbol filter and sorts its
 matches by the chosen native metric; it does not introduce relevance ranking or
 cross-currency conversion. The removed volume sort is rejected rather than aliased.

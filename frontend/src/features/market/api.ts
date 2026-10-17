@@ -42,7 +42,7 @@ export interface MarketAssetItemDto {
   changeRate?: PercentString | null;
   settlementCurrency: CurrencyCode;
   turnover?: string | null;
-  turnoverPeriod?: 'session' | 'rolling_24h' | null;
+  turnoverPeriod?: 'session' | 'rolling_24h' | 'last_completed_session' | null;
   isActive: boolean;
   marketStatus: string;
   tradable: boolean;

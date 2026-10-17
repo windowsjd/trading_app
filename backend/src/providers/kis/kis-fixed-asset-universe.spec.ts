@@ -10,6 +10,8 @@ import {
   KIS_FIXED_ASSET_UNIVERSE,
   KIS_FIXED_DOMESTIC_SYMBOLS,
   KIS_FIXED_US_SYMBOLS,
+  REPLACEMENT_2026_10_17,
+  RETIRED_FIXED_ASSETS,
 } from './kis-fixed-asset-universe';
 import { buildProviderConfig } from '../provider-config.service';
 import {
@@ -35,8 +37,12 @@ describe('fixed stock universe (2026-10-17: US 100, KRX 70)', () => {
     expect(us(EXPANSION_2026_10_17)).toHaveLength(75);
     expect(domestic(KIS_FIXED_ASSET_UNIVERSE)).toHaveLength(70);
     expect(us(KIS_FIXED_ASSET_UNIVERSE)).toHaveLength(100);
-    // Append-only: the first phase is the unchanged head, in its order.
-    expect(KIS_FIXED_ASSET_UNIVERSE.slice(0, 40)).toEqual(FIRST_PHASE_UNIVERSE);
+    // Append-only: the first phase is the unchanged head, in its order, minus
+    // the retired WBD; its replacement ABT is appended at the end.
+    expect(KIS_FIXED_ASSET_UNIVERSE.slice(0, 39)).toEqual(
+      FIRST_PHASE_UNIVERSE.filter((entry) => entry.symbol !== 'WBD'),
+    );
+    expect(KIS_FIXED_ASSET_UNIVERSE.at(-1)).toEqual(REPLACEMENT_2026_10_17[0]);
     expect(FIRST_PHASE_UNIVERSE.map((entry) => entry.symbol)).toEqual([
       '005930',
       '000660',
@@ -136,23 +142,26 @@ describe('fixed stock universe (2026-10-17: US 100, KRX 70)', () => {
   it('keeps the KIS runtime defaults on the first phase, inside the 41-symbol watchlist cap', () => {
     expect(KIS_FIXED_DOMESTIC_SYMBOLS).toHaveLength(15);
     expect(KIS_FIXED_US_SYMBOLS).toEqual(
-      us(FIRST_PHASE_UNIVERSE).map((entry) => entry.kisSymbol),
+      us(FIRST_PHASE_UNIVERSE)
+        .filter((entry) => entry.symbol !== 'WBD')
+        .map((entry) => entry.kisSymbol),
     );
     // Every provider-config read builds the KIS watchlist: it must not throw.
     expect(() => buildProviderConfig({})).not.toThrow();
-    expect(buildProviderConfig({}).kis.usSymbols).toHaveLength(25);
+    expect(buildProviderConfig({}).kis.usSymbols).toHaveLength(24);
   });
 
   it('seeds idempotently: existing rows keep their IDs, a rerun changes nothing', () => {
     const desired = buildKisDesiredUniverse();
     expect(desired).toHaveLength(170);
-    const existingFirstPhase = desired.slice(0, 40).map((row, index) => ({
+    const existingFirstPhase = desired.slice(0, 39).map((row, index) => ({
       ...row,
       id: `existing-${index}`,
       isActive: true,
     }));
     const firstRun = planAssetUniverseUpserts(desired, existingFirstPhase);
-    expect(firstRun.creates).toHaveLength(130);
+    // 130 expansion stocks + the WBD replacement ABT.
+    expect(firstRun.creates).toHaveLength(131);
     expect(firstRun.updates).toHaveLength(0);
     expect(firstRun.unchanged.map((row) => row.existingId)).toEqual(
       existingFirstPhase.map((row) => row.id),
@@ -166,5 +175,30 @@ describe('fixed stock universe (2026-10-17: US 100, KRX 70)', () => {
     expect(rerun.creates).toHaveLength(0);
     expect(rerun.updates).toHaveLength(0);
     expect(rerun.unchanged).toHaveLength(170);
+  });
+
+  it('retires the delisted WBD: out of every default list, never re-seeded', () => {
+    expect(
+      RETIRED_FIXED_ASSETS.map((entry) => `${entry.market}:${entry.symbol}`),
+    ).toEqual(['NAS:WBD']);
+    expect(
+      KIS_FIXED_ASSET_UNIVERSE.some((entry) => entry.symbol === 'WBD'),
+    ).toBe(false);
+    expect(TIINGO_DEFAULT_OFFICIAL_SYMBOLS).not.toContain('WBD');
+    expect(TIINGO_DEFAULT_OFFICIAL_SYMBOLS).toContain('ABT');
+    expect(KIS_FIXED_US_SYMBOLS).not.toContain('NAS:WBD');
+    expect(buildKisDesiredUniverse().some((row) => row.symbol === 'WBD')).toBe(
+      false,
+    );
+    expect(REPLACEMENT_2026_10_17).toEqual([
+      {
+        symbol: 'ABT',
+        kisSymbol: 'NYS:ABT',
+        name: 'Abbott Laboratories',
+        market: 'NYS',
+        assetType: 'us_stock',
+        currencyCode: 'USD',
+      },
+    ]);
   });
 });

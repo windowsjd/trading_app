@@ -13,7 +13,10 @@ jest.mock('../../generated/prisma/client', () => ({
   CurrencyCode: { KRW: 'KRW', USD: 'USD' },
 }));
 import type { KoscomClient, KoscomResponse } from './koscom.client';
-import { KoscomCandleAdapter } from './koscom-candle.adapter';
+import {
+  KoscomCandleAdapter,
+  corroborateKoscomMinuteSession,
+} from './koscom-candle.adapter';
 import { KisCandleNormalizerService } from '../kis/candles/kis-candle-normalizer.service';
 import { KisDomesticFiveMinuteBuilder } from '../kis/candles/kis-domestic-five-minute.builder';
 import { KisPeriodCandleNormalizerService } from '../kis/candles/kis-period-candle-normalizer.service';
@@ -413,5 +416,168 @@ describe('KoscomCandleAdapter.fetchDomesticTenMinuteSession', () => {
         hisLists: Array.from({ length: 101 }, () => tenMinute('0910', 1)),
       }),
     ).toBe('KOSCOM_MALFORMED_CANDLES');
+  });
+});
+
+describe('KoscomCandleAdapter past-session 1m history (operator backfill)', () => {
+  const session = {
+    from: new Date('2026-09-29T00:00:00Z'),
+    to: new Date('2026-09-29T06:30:00Z'),
+  };
+  const label = (minuteOfDay: number) =>
+    String(Math.floor(minuteOfDay / 60) * 1000000 + (minuteOfDay % 60) * 10000);
+  const bar = (k: number) => {
+    const open = 100 + (k % 5);
+    return {
+      inddTm: label(9 * 60 + k + 1),
+      inddOpnprc: String(open),
+      inddHgprc: String(open + 2),
+      inddLwprc: String(open - 1),
+      inddClsprc: String(open + 1),
+      inddTrdvol: '2',
+      inddTrdval: '200',
+    };
+  };
+  const daily = (date: string, open: string, close = '105') => ({
+    trdDd: date,
+    opnprc: open,
+    hgprc: '106',
+    lwprc: '99',
+    trdPrc: close,
+    accTrdvol: '1000',
+    accTrdval: '100000',
+  });
+  function historyHarness(
+    options: {
+      skipMinute?: number;
+      dailyClose?: string;
+      previousOpen?: string;
+    } = {},
+  ) {
+    const h = harness([]);
+    h.client.get.mockImplementation((path, query) => {
+      const q = query as Record<string, string>;
+      if (path.endsWith('/history'))
+        return Promise.resolve({
+          result: {
+            isuSrtCd: '005930',
+            hisLists: [
+              daily(q.inqStrtDd, options.previousOpen ?? '101'),
+              daily(q.inqEndDd, '100', options.dailyClose),
+            ],
+          },
+          receivedAt: now,
+        });
+      const toMinute = (hhmm: string) =>
+        Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(2, 4));
+      const rows: ReturnType<typeof bar>[] = [];
+      for (let m = toMinute(q.strtTm) + 1; m <= toMinute(q.endTm); m++) {
+        const k = m - 9 * 60 - 1;
+        if (k !== options.skipMinute) rows.push(bar(k));
+      }
+      return Promise.resolve({
+        result: { isuSrtCd: '005930', hisLists: rows },
+        receivedAt: now,
+      });
+    });
+    return h;
+  }
+  beforeEach(() => {
+    process.env.KOSCOM_INTRADAY_HISTORY_SESSIONS = '25';
+  });
+  afterEach(() => {
+    delete process.env.KOSCOM_INTRADAY_HISTORY_SESSIONS;
+  });
+
+  it('keeps a whole past session only when it corroborates the dated daily bar', async () => {
+    const h = historyHarness();
+    const result = await h.adapter.fetchDomesticOneMinuteRows({
+      asset,
+      ...session,
+      now,
+    });
+    expect(result.complete).toBe(true);
+    expect(result.stopReason).toBe('target_reached');
+    expect(result.rows.length).toBe(390);
+    // five 95-minute windows + one dated daily call
+    expect(result.pagesFetched).toBe(6);
+    const intraday = h.client.get.mock.calls.filter(([path]) =>
+      path.endsWith('/intraday'),
+    );
+    expect(
+      intraday.map(([, q]) => (q as Record<string, string>).inqStrtDd),
+    ).toEqual(Array(5).fill('20260929'));
+    expect(result.rows[0].value).toMatchObject({
+      stck_bsop_date: '20260929',
+      stck_cntg_hour: '090000',
+    });
+    expect(result.rows.at(-1)!.value).toMatchObject({
+      stck_cntg_hour: '152900',
+    });
+
+    const built = new MarketCandleIngestionService(
+      h.adapter,
+      {} as never,
+      new KisCandleNormalizerService(),
+      new KisDomesticFiveMinuteBuilder(),
+      {} as never,
+      {} as never,
+    );
+    const fiveMinutes = await built.fetchDomesticFiveMinuteCandles({
+      asset,
+      ...session,
+      now,
+    });
+    expect(fiveMinutes.incompleteBuckets).toBe(0);
+    expect(fiveMinutes.candles[0].openTime.toISOString()).toBe(
+      '2026-09-29T00:00:00.000Z',
+    );
+  });
+
+  it.each([
+    ['the daily close differs', { dailyClose: '104' }],
+    ['the previous session has the same daily bar', { previousOpen: '100' }],
+    ['a minute is missing', { skipMinute: 200 }],
+  ])('holds the session when %s and keeps sweeping', async (_name, options) => {
+    const result = await historyHarness(
+      options,
+    ).adapter.fetchDomesticOneMinuteRows({
+      asset,
+      ...session,
+      now,
+    });
+    expect(result.rows).toHaveLength(0);
+    expect(result.complete).toBe(false);
+    expect(result.stopReason).toBe('target_reached');
+  });
+
+  it('ends the sweep beyond the configured session reach without calling', async () => {
+    process.env.KOSCOM_INTRADAY_HISTORY_SESSIONS = '1';
+    const h = historyHarness();
+    const result = await h.adapter.fetchDomesticOneMinuteRows({
+      asset,
+      from: new Date('2026-09-22T00:00:00Z'),
+      to: new Date('2026-09-22T06:30:00Z'),
+      now,
+    });
+    expect(result.stopReason).toBe('provider_exhausted');
+    expect(result.complete).toBe(false);
+    expect(h.client.get).not.toHaveBeenCalled();
+  });
+
+  it('rejects minute volume above the daily volume', () => {
+    const minutes = [
+      { open: '1', high: '2', low: '1', close: '2', volume: '11' },
+    ];
+    const day = { open: '1', high: '2', low: '1', close: '2', volume: '10' };
+    const previous = { ...day, close: '1' };
+    expect(corroborateKoscomMinuteSession(minutes, day, previous)).toBe(false);
+    expect(
+      corroborateKoscomMinuteSession(
+        minutes,
+        { ...day, volume: '11' },
+        previous,
+      ),
+    ).toBe(true);
   });
 });

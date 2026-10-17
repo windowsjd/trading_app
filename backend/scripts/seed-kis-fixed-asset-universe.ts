@@ -1,6 +1,9 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client';
-import { KIS_FIXED_ASSET_UNIVERSE } from '../src/providers/kis/kis-fixed-asset-universe';
+import {
+  KIS_FIXED_ASSET_UNIVERSE,
+  RETIRED_FIXED_ASSETS,
+} from '../src/providers/kis/kis-fixed-asset-universe';
 import {
   formatDatabaseTarget,
   loadRuntimeEnv,
@@ -18,6 +21,10 @@ import type { AssetUniverseDesired } from './lib/asset-universe-upsert';
  * expansion; `kis-fixed-asset-universe.ts`) into `assets`. Additive and idempotent: creates missing rows and refreshes the
  * contract fields (name/currencies/assetType/isActive) on existing rows without
  * touching prices, orders, positions, or the symbol list itself.
+ *
+ * Retired members (`RETIRED_FIXED_ASSETS`, e.g. the delisted WBD) are only
+ * deactivated: their rows, Asset IDs and history stay, and a rerun keeps them
+ * inactive.
  *
  * Default run applies; `--dry-run` prints the plan without writing. Env is
  * loaded like the backend so it targets the same DB.
@@ -53,6 +60,9 @@ export async function seedKisFixedAssetUniverse(input: {
     prisma: input.prisma,
     desired: buildKisDesiredUniverse({ usOnly: input.usOnly }),
     apply: input.apply,
+    retired: RETIRED_FIXED_ASSETS.filter(
+      (entry) => !input.usOnly || entry.assetType === 'us_stock',
+    ),
   });
 }
 
