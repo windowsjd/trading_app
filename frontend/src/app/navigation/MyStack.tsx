@@ -11,6 +11,7 @@ import type { MyStackParamList } from './types';
 import OverallScreen from '../../screens/my/OverallScreen';
 import NoticesScreen from '../../screens/my/NoticesScreen';
 import InquiryScreen from '../../screens/my/InquiryScreen';
+import InquiryAnswerScreen from '../../screens/my/InquiryAnswerScreen';
 import FriendsScreen from '../../screens/friends/FriendsScreen';
 import UserSeasonSummaryScreen from '../../screens/ranking/UserSeasonSummaryScreen';
 import MyScreen from '../../screens/my/MyScreen';
@@ -44,6 +45,11 @@ export default function MyStack() {
         name="Inquiry"
         component={InquiryScreen}
         options={{ title: '문의하기' }}
+      />
+      <Stack.Screen
+        name="InquiryAnswer"
+        component={InquiryAnswerScreen}
+        options={{ title: '문의 답변' }}
       />
       <Stack.Screen
         name="UserSeasonSummary"

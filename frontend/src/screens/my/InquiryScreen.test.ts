@@ -14,21 +14,36 @@ const deferred = () => { let done!: () => void; const promise = new Promise<void
 const httpError = (status: number, code: string) => Object.assign(new Error(code), { isAxiosError: true, request: {}, response: { status, data: { success: false, error: { code } } } });
 const networkError = () => Object.assign(new Error('Network Error'), { isAxiosError: true, request: {} });
 
-function harness() {
-  const h: any = { posts: [], gets: 0, getPaths: [] as string[], getFailures: [] as unknown[], getGate: null, failures: [] as unknown[], items: [], gate: null, mismatch: false };
+function harness(me: Record<string, unknown> = { id: 'user-a' }) {
+  const h: any = { posts: [], gets: 0, getPaths: [] as string[], getFailures: [] as unknown[], getGate: null, failures: [] as unknown[], items: [], gate: null, mismatch: false,
+    operatorItems: [] as any[], operatorFailures: [] as unknown[], navigations: [] as unknown[][] };
   const api = load(resolve('src/features/inquiry/api.ts'), {
     '../../services/api/client': { apiClient: {
       get: async (path: string) => {
         h.gets++;
         h.getPaths.push(path);
         if (h.getGate) await h.getGate.promise;
-        const failure = h.getFailures.shift();
-        if (failure) throw failure;
         const params = new URLSearchParams(path.split('?')[1]);
         const limit = Number(params.get('limit')), offset = Number(params.get('offset'));
-        const items = h.items.slice(offset, offset + limit);
-        const nextOffset = offset + items.length < h.items.length ? offset + items.length : null;
-        return { data: { success: true, data: { items, pagination: { limit, offset, total: h.items.length, returned: items.length, nextOffset } } } };
+        const page = (all: any[]) => {
+          const items = all.slice(offset, offset + limit);
+          return { limit, offset, total: all.length, returned: items.length, nextOffset: offset + items.length < all.length ? offset + items.length : null, items };
+        };
+        if (path.startsWith('/operator/inquiries?')) {
+          const failure = h.operatorFailures.shift();
+          if (failure) throw failure;
+          // The server's queue orders: pending oldest first, answered latest answer first, all newest first.
+          const status = params.get('status');
+          const all = h.operatorItems.filter((item: any) => !status || item.status === status)
+            .sort((a: any, b: any) => status === 'pending' ? a.createdAt.localeCompare(b.createdAt)
+              : status === 'answered' ? b.answer.answeredAt.localeCompare(a.answer.answeredAt) : b.createdAt.localeCompare(a.createdAt));
+          const { items, ...pagination } = page(all);
+          return { data: { success: true, data: { inquiries: items, pagination } } };
+        }
+        const failure = h.getFailures.shift();
+        if (failure) throw failure;
+        const { items, ...pagination } = page(h.items);
+        return { data: { success: true, data: { items, pagination } } };
       },
       post: async (_path: string, body: any) => {
         h.posts.push(body);
@@ -43,18 +58,30 @@ function harness() {
   });
   const native = Object.fromEntries(['View', 'Text', 'ScrollView', 'TextInput', 'KeyboardAvoidingView', 'SafeAreaView'].map(name => [name, name]));
   Object.assign(native, { Platform: { OS: 'android' }, StyleSheet: { create: (value: unknown) => value }, Keyboard: { dismiss() {}, addListener: () => ({ remove() {} }) } });
+  // A focused stack screen: the effect runs on mount and again on every return.
+  const focusEffects = new Set<() => unknown>();
   const Screen = load(resolve('src/screens/my/InquiryScreen.tsx'), {
     'react-native': native,
     '@react-navigation/elements': { useHeaderHeight: () => 56 },
+    '@react-navigation/native': { useFocusEffect: (effect: () => unknown) => React.useEffect(() => {
+      focusEffects.add(effect);
+      const cleanup = effect();
+      return () => { focusEffects.delete(effect); if (typeof cleanup === 'function') cleanup(); };
+    }, [effect]) },
     '../../features/inquiry/api': api,
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+    '../../components/common/SegmentedControl': { default: 'SegmentedControl', __esModule: true },
+    '../../components/states/ErrorNotice': { default: ({ message, testID }: any) => React.createElement('Text', { testID }, message), __esModule: true },
     '../../components/states/WhaleLoader': { default: 'WhaleLoader', __esModule: true },
   }).default;
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   // Sign-in seeds `me`; the history is keyed by that user.
-  client.setQueryData(['me'], { id: 'user-a' });
+  client.setQueryData(['me'], me);
   h.client = client;
-  h.start = async () => { await act(async () => { h.renderer = create(React.createElement(query.QueryClientProvider, { client }, React.createElement(Screen))); }); await h.flush(); };
+  const navigation = { navigate: (...args: unknown[]) => h.navigations.push(args) };
+  h.start = async () => { await act(async () => { h.renderer = create(React.createElement(query.QueryClientProvider, { client }, React.createElement(Screen, { navigation }))); }); await h.flush(); };
+  h.refocus = async () => { await act(async () => { for (const effect of [...focusEffects]) effect(); }); await h.flush(); };
+  h.setMe = async (next: Record<string, unknown>) => { await act(async () => { client.setQueryData(['me'], next); }); await h.flush(); };
   h.flush = async () => { await act(async () => { await new Promise(done => setTimeout(done, 10)); }); };
   h.node = (id: string) => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id)[0];
   h.type = async (id: string, value: string) => { await act(async () => h.node(id).props.onChangeText(value)); };
@@ -220,3 +247,151 @@ describe('내 문의 내역', () => {
     assert.equal(h.node('inquiry-history-more') === undefined, true);
   });
 });
+
+describe('문의 화면 갱신', () => {
+  it('back on the screen, the history is read again and shows an answer posted meanwhile', async (t) => {
+    const h = harness();
+    h.items = [inquiry(1)];
+    await h.start(); t.after(h.close);
+    assert.equal(h.node('inquiry-item-q-1-status').props.children, '답변 대기');
+    const reads = h.gets;
+    h.items = [answered(1)];
+    await h.refocus();
+    assert.equal(h.gets > reads, true, 'a return reads the server again');
+    assert.equal(h.node('inquiry-item-q-1-status').props.children, '답변 완료');
+    await h.press('inquiry-item-q-1-toggle');
+    assert.ok(h.node('inquiry-item-q-1-answer'));
+  });
+
+  it('새로고침 reads again; a failed refresh keeps the shown rows and says so', async (t) => {
+    const h = harness();
+    h.items = [inquiry(1)];
+    await h.start(); t.after(h.close);
+    h.items = [answered(1)];
+    await h.press('inquiry-history-refresh'); await h.flush();
+    assert.equal(h.node('inquiry-item-q-1-status').props.children, '답변 완료');
+    h.getFailures.push(networkError());
+    await h.press('inquiry-history-refresh'); await h.flush();
+    assert.ok(h.node('inquiry-item-q-1'), 'the rows already shown stay');
+    assert.ok(h.node('inquiry-history-stale'));
+    assert.equal(h.node('inquiry-history-error') === undefined, true);
+    await h.press('inquiry-history-refresh'); await h.flush();
+    assert.equal(h.node('inquiry-history-stale') === undefined, true, 'a later success clears the notice');
+  });
+});
+
+const operatorInquiry = (index: number, patch: Record<string, unknown> = {}) => ({
+  ...inquiry(index), user: { id: `author-${index}`, nickname: `작성자${index}`, status: 'active' }, ...patch,
+});
+const operatorAnswered = (index: number, by = 'op-2') => operatorInquiry(index, {
+  status: 'answered', answer: { content: `문의 ${index} 답변입니다.`, answeredAt: new Date(Date.UTC(2026, 9, 17, 7, 0) + index * 60_000).toISOString(), answeredByUserId: by },
+});
+const operatorRows = (h: any) => h.renderer.root.findAll((n: any) => typeof n.type === 'string' && /^operator-inquiry-q-\d+$/.test(n.props.testID ?? ''));
+
+describe('문의 관리 (운영진)', () => {
+  it('a user, or a session whose role is not known yet, gets no 문의 관리 and no operator read', async (t) => {
+    for (const me of [{ id: 'user-a', role: 'user' }, { id: 'user-a' }]) {
+      const h = harness(me);
+      h.operatorItems = [operatorInquiry(1)];
+      await h.start(); t.after(h.close);
+      assert.equal(h.node('inquiry-tabs') === undefined, true);
+      assert.equal(h.node('operator-inquiries') === undefined, true);
+      assert.equal(h.getPaths.some((path: string) => path.startsWith('/operator/')), false);
+      assert.ok(h.node('inquiry-submit'), 'the user form is unchanged');
+    }
+  });
+
+  it('operator and admin: 답변 대기 first (oldest first), with author, type, time and status, page by page', async (t) => {
+    for (const role of ['operator', 'admin']) {
+      const h = harness({ id: 'op-1', role });
+      h.operatorItems = [...Array.from({ length: 23 }, (_, index) => operatorInquiry(index)), operatorAnswered(30), operatorAnswered(31)];
+      await h.start(); t.after(h.close);
+      assert.equal(h.node('inquiry-tabs').props.value, 'mine', '내 문의 stays the first view');
+      assert.equal(h.getPaths.some((path: string) => path.startsWith('/operator/')), false, 'nothing is read before the tab opens');
+      await act(async () => h.node('inquiry-tabs').props.onChange('manage')); await h.flush();
+      assert.equal(h.node('inquiry-submit') === undefined, true, 'the author form is not on the management view');
+      assert.equal(h.node('operator-inquiry-filter').props.value, 'pending');
+      assert.match(h.getPaths.at(-1), /^\/operator\/inquiries\?limit=20&offset=0&status=pending$/);
+      assert.equal(operatorRows(h).length, 20);
+      // Oldest first: index 22 is the oldest of the 23.
+      assert.equal(operatorRows(h)[0].props.testID, 'operator-inquiry-q-22');
+      const row = h.node('operator-inquiry-q-22');
+      assert.match(row.props.accessibilityLabel, /^문의 22, 주문·거래, 작성자 작성자22, 답변 대기, 접수 2026\.10\.17/);
+      assert.match(h.text(), /주문·거래 · 작성자22/);
+      assert.equal(h.node('operator-inquiry-q-22-status').props.children, '답변 대기');
+      await h.press('operator-inquiries-more'); await h.flush();
+      assert.equal(operatorRows(h).length, 23);
+      assert.equal(h.node('operator-inquiries-more') === undefined, true, 'the newest pending inquiry is reachable');
+      await act(async () => h.node('operator-inquiry-filter').props.onChange('answered')); await h.flush();
+      assert.match(h.getPaths.at(-1), /status=answered$/);
+      assert.deepEqual(operatorRows(h).map((n: any) => n.props.testID), ['operator-inquiry-q-31', 'operator-inquiry-q-30']);
+      assert.equal(h.node('operator-inquiry-q-31-status').props.children, '답변 완료');
+      await act(async () => h.node('operator-inquiry-filter').props.onChange('all')); await h.flush();
+      assert.match(h.getPaths.at(-1), /^\/operator\/inquiries\?limit=20&offset=0$/);
+      await h.press('operator-inquiry-q-0');
+      assert.deepEqual(h.navigations.at(-1), ['InquiryAnswer', { inquiryId: 'q-0' }]);
+    }
+  });
+
+  it('back from an answer, the list is read again', async (t) => {
+    const h = harness({ id: 'op-1', role: 'operator' });
+    h.operatorItems = [operatorInquiry(1), operatorInquiry(2)];
+    await h.start(); t.after(h.close);
+    await act(async () => h.node('inquiry-tabs').props.onChange('manage')); await h.flush();
+    assert.equal(operatorRows(h).length, 2);
+    h.operatorItems = [operatorAnswered(1), operatorInquiry(2)];
+    await h.refocus();
+    assert.deepEqual(operatorRows(h).map((n: any) => n.props.testID), ['operator-inquiry-q-2'], 'the answered one left 답변 대기');
+    h.operatorFailures.push(networkError());
+    await h.press('operator-inquiries-refresh'); await h.flush();
+    assert.ok(h.node('operator-inquiry-q-2'), 'a failed refresh keeps the rows');
+    assert.ok(h.node('operator-inquiries-stale'));
+  });
+
+  it('a row that is not a valid operator inquiry is an error, never shown', async (t) => {
+    const h = harness({ id: 'op-1', role: 'operator' });
+    h.operatorItems = [{ ...operatorInquiry(1), user: undefined }];
+    await h.start(); t.after(h.close);
+    await act(async () => h.node('inquiry-tabs').props.onChange('manage')); await h.flush();
+    assert.ok(h.node('operator-inquiries-error'));
+    assert.equal(/문의 1/.test(h.text()), false);
+  });
+
+  it('a 403 hides 문의 관리, drops its pages and reads the role again; losing the role removes the tab', async (t) => {
+    const h = harness({ id: 'op-1', role: 'operator' });
+    h.operatorItems = [operatorInquiry(1, { title: '운영진만 보는 문의' })];
+    await h.start(); t.after(h.close);
+    await act(async () => h.node('inquiry-tabs').props.onChange('manage')); await h.flush();
+    assert.ok(h.node('operator-inquiry-q-1'));
+    h.operatorFailures.push(httpError(403, 'OPERATOR_FORBIDDEN'));
+    await h.refocus();
+    assert.ok(h.node('operator-inquiries-denied'));
+    assert.equal(/운영진만 보는 문의/.test(h.text()), false, 'nothing read before the refusal is painted');
+    const cached = h.client.getQueryCache().findAll({ queryKey: ['inquiries', 'operator', 'op-1'] });
+    assert.equal(cached.every((entry: any) => entry.state.data === undefined), true, 'the pages are dropped');
+    assert.equal(h.client.getQueryState(['me']).isInvalidated, true, 'the role is read again');
+    const operatorReads = () => h.getPaths.filter((path: string) => path.startsWith('/operator/')).length;
+    const reads = operatorReads();
+    await h.refocus();
+    assert.equal(operatorReads(), reads, 'a refused list is not read again on its own');
+    await h.setMe({ id: 'op-1', role: 'user' });
+    assert.equal(h.node('inquiry-tabs') === undefined, true);
+    assert.ok(h.node('inquiry-submit'), 'back to 내 문의');
+  });
+
+  it("another signed-in user never sees the previous operator's view, rows or draft", async (t) => {
+    const h = harness({ id: 'op-1', role: 'operator' });
+    h.operatorItems = [operatorInquiry(1, { title: '이전 운영자가 본 문의' })];
+    await h.start(); t.after(h.close);
+    await h.type('inquiry-title', '작성 중이던 제목');
+    await act(async () => h.node('inquiry-tabs').props.onChange('manage')); await h.flush();
+    assert.ok(h.node('operator-inquiry-q-1'));
+    await h.setMe({ id: 'user-b', role: 'user' });
+    assert.equal(h.node('inquiry-tabs') === undefined, true);
+    assert.equal(/이전 운영자가 본 문의/.test(h.text()), false);
+    assert.equal(h.node('inquiry-title').props.value, '', 'the form starts empty for the new user');
+    await h.setMe({ id: 'op-3', role: 'admin' });
+    assert.equal(h.node('inquiry-tabs').props.value, 'mine', 'a new operator starts on 내 문의');
+  });
+});
+

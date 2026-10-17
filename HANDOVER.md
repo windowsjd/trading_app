@@ -10,6 +10,66 @@
 
 ---
 
+## 2026-10-18 운영진 문의 답변 UI·문의 화면 갱신·문의 DB 통합 CI 편입
+
+- **구현 목표:** 운영자·관리자가 앱(MY > 문의하기)에서 전체 문의를 보고 공식 답변을 등록하고, 사용자는 화면에 돌아오면 새 답변을 보며,
+  문의 PostgreSQL 통합 테스트가 CI에서 자동 실행되게 한다. 시작 `main`=`origin/main`=`839c4002`(clean; 지시서 기준 `64b72d7a` 이후 2개
+  커밋은 문의 코드와 무관 — 문의·운영자·CI 파일 diff 없음 확인). **새 API·테이블·migration 없음**, backend 제품 코드 무변경
+  (통합 스크립트·jest 래퍼만). 커밋·push·배포·운영 DB 변경 없음.
+- **원인 조사 결과(가설 4개 모두 코드로 확인):** ① 운영자 API 3개는 있었지만 frontend에 호출·화면이 전혀 없었다(역할은 관리자 진단에만 사용).
+  ② 앱 QueryClient가 `refetchOnWindowFocus: false`·`staleTime: 5s`이고 InquiryScreen에 포커스 갱신이 없어, 화면이 마운트된 채 탭을
+  오가거나 위에 다른 화면을 올렸다 돌아오면 다시 읽지 않았다(재진입 시 재마운트될 때만 읽음). ③ 답변은 수정 불가인데 확인 단계를 둘 UI가
+  없었다. ④ `inquiries.integration.spec.ts`는 어느 CI job 목록에도 없고 `INQUIRIES_DB_INTEGRATION`도 설정되지 않아 항상 skip이었다.
+- **기능 구현 의도:**
+  - **역할 탭은 표시 게이트일 뿐, 권한은 서버.** `me.role`이 operator/admin일 때만 `내 문의 | 문의 관리` 탭이 생긴다(역할 미확인 = 탭 없음,
+    운영자 조회 0건). 모든 조회·답변은 기존 `OperatorGuard`(요청마다 DB의 현재 역할·상태)를 그대로 지나므로 강등·정지 즉시 403이다. 403을
+    받으면 화면 데이터와 작성 중 답변을 숨기고 `['inquiries','operator',<운영자 id>]` 캐시 전체를 지운 뒤 `me`를 다시 읽는다(역할이 user가
+    되면 탭이 사라짐). 거부 상태는 그 화면에서 고정(enabled=false)해 지운 캐시를 즉시 다시 읽는 반복을 막고, `권한 다시 확인`으로만 재시도한다.
+  - **계정 전환 격리:** 운영자 캐시 키에 운영자 id를 넣고(기존 `mine(userId)` 방식), 두 화면 본문을 `key={userId}`로 감싸 사용자가 바뀌면 폼·탭·
+    작성 중 답변이 모두 새로 시작한다. 로그아웃은 기존대로 `queryClient.clear()` + 루트 reset. 답변 응답이 세션 종료 뒤 도착하면
+    (`sessionOwnership` 세대 비교) 캐시에 쓰지 않는다.
+  - **답변 1건·멱등성은 서버 정책을 그대로 사용.** 본문마다 키 1개(`inquiry_answer_<uuid>`), 전송은 동기 fence로 연타 1회. 201이고 저장된
+    답변 본문이 보낸 본문과 같을 때만 답변 완료 → 해당 문의·모든 문의 목록을 서버에서 다시 읽는다. 결과 불명(무응답·타임아웃·5xx·검증 불가 본문)은
+    본문·키를 유지(같은 본문 재전송 = replay)하고 문의를 다시 읽어, 실제로 저장됐다면 서버 데이터로 완료가 보인다. 4xx 거절은 키를 버린다.
+    409는 문의를 다시 읽어 먼저 등록된 답변(`다른 운영진이 등록한 답변`)을 보여 주고 폼을 없앤다. 로컬 상태로 완료를 만드는 경로는 없다.
+  - **확인은 새 모달 없이 인라인.** `답변 등록` → 같은 자리에 "이 답변을 등록할까요?"(제목 텍스트가 버튼 자리에 오므로 연타가 확인을 통과하지
+    못함) + `등록하기`/`계속 작성`. 확인 중에는 입력이 잠기고, 취소는 본문을 유지한다. RN `Alert`는 웹에서 동작하지 않고 레이아웃 검증도 안 돼
+    쓰지 않았다. 등록 전 폼에 "수정·삭제 불가, 사용자에게 공식 답변으로 그대로 보임"을 항상 표시.
+  - **화면 갱신:** 내 문의 목록·문의 관리 목록은 `useFocusEffect`로 포커스마다 로드된 모든 페이지를 다시 읽고(첫 방문은 초기 조회에 합류,
+    `cancelRefetch:false`), 카드 머리에 `새로고침` 버튼을 둔다. 재조회 실패 시 기존 행은 남기고 "이전에 불러온 내역" 안내만 붙인다. 폴링·WebSocket 없음.
+- **설계·변경 파일:**
+  - `frontend/src/features/inquiry/api.ts` — 운영자 DTO 검증(`toOperatorInquiry`: 명시적 status, 작성자 id/닉네임/상태, 답변자 id),
+    `getOperatorInquiries`(필터 결과가 필터와 다르면 거부)/`getOperatorInquiry`/`answerInquiry`, `canManageInquiries`, `isOperatorAccessDenied`,
+    `INQUIRY_ANSWER_LIMITS`, 화면 공용 표시 함수(글자 수·유형·시각·작성자) — InquiryScreen 로컬 함수를 옮김.
+  - `frontend/src/screens/my/InquiryScreen.tsx` — 역할 탭(`SegmentedControl`), 사용자별 key 래퍼, 포커스 재조회·새로고침·재조회 실패 안내,
+    역할 상실 시 운영자 캐시 제거. 내 문의 블록은 탭 분기 안으로 들여쓰기만 바뀜(`git diff -w`로 보면 로직 변경만 남음).
+  - `frontend/src/screens/my/OperatorInquiryList.tsx`(신규) — 답변 대기(기본·오래된 순)/답변 완료/전체, 20건씩 `문의 더 보기`, 행 = 제목·
+    상태 배지·유형·작성자·접수 시각, 403 처리.
+  - `frontend/src/screens/my/InquiryAnswerScreen.tsx`(신규) — `MyStack`의 `InquiryAnswer`(`{ inquiryId }`, 제목 `문의 답변`): 원문·작성자·
+    유형·시각·상태, 답변 폼·확인·전송·실패/충돌/403 처리, 답변 완료 읽기 전용. 오류는 `ErrorNotice`(원본 오류 유지 → 관리자 진단 패널).
+  - `frontend/src/app/navigation/{types.ts,MyStack.tsx}`, `frontend/src/constants/queryKeys.ts`(`inquiries.operator/operatorList/operatorDetail`).
+  - 테스트: `InquiryScreen.test.ts`(+8: 일반·역할 미확인 무탭/무조회, operator·admin 목록·정렬·작성자·페이지·필터·이동, 복귀 재조회, 잘못된 행 거부,
+    403 숨김·캐시 제거·me 재조회·탭 제거, 계정 전환, 포커스 재조회, 새로고침·실패 유지), `InquiryAnswerScreen.test.ts`(신규 12).
+    브라우저 `test/browser/inquiryAnswer{Browser.cjs,Fixture.jsx,Mocks.js}`에 운영자 시나리오(아래).
+  - Backend: `scripts/inquiries-integration.ts`(+4 assertions: 운영자 토큰 발급 후 DB에서 강등 → 같은 토큰 목록 403 `OPERATOR_FORBIDDEN`·답변 403·
+    행 0, 정지 → 상세 403 `USER_NOT_ACTIVE`; 운영자 상세의 작성자 필드가 id/nickname/status뿐), `inquiries.integration.spec.ts`(자식 프로세스가
+    타임아웃·시그널·spawn 오류로 끝나면 그 사유를 메시지에 표시).
+  - CI: `.github/workflows/ci.yml` 기존 `core-account-db-integration` job(같은 spawn 방식의 푸시 통합이 이미 있는 곳, `migrate deploy`·status·drift 뒤
+    `--runInBand` 순차 실행)에 `INQUIRIES_DB_INTEGRATION: "1"`과 스펙 경로 1줄. 새 job 없음. 스크립트는 고유 tag 사용자만 만들고 끝에 지우며,
+    금융 4개 테이블 행 수 불변을 검사한다.
+  - 문서: `backend/docs/inquiries-contract.md` §5(앱 사용, curl 절차 유지)·§6(운영자 UI 계약), `operator-api-contract.md` 한 줄, 브라우저 README.
+- **검증:** frontend typecheck·`lint:accounts:check`·diagnostic gate PASS, 문의 화면 17/17·답변 화면 12/12(돌연변이 4종 — 거절 키 재사용,
+  409 재조회 제거, 로컬 상태로 완료 표시, 확인 생략 — 모두 실패로 잡힘), 전체 `npm run check` 결과는 최종 보고 참조. backend `typecheck`·
+  diagnostic gate PASS, inquiries·operator guard·auth 단위 10 스위트 134건 PASS. 격리 PG16(`127.0.0.1:55433`, DB `trading_app_inquiry_test`,
+  UTC)에서 `migrate deploy`·`status`·`migrate diff --exit-code` 0 후 CI와 같은 jest 명령으로 통합 PASS(57 assertions, 직접 실행 확인), guard를 일부러
+  깨면 실패함을 확인 후 복구. RN-Web 브라우저 검사 216 레이아웃(320/375/430 × Light/Dark × 글꼴 1/2: 기존 72 + 운영자 탭·대기 목록·2페이지·답변 완료·
+  빈 폼·2000자급 답변·확인 창·전송 중·420px 높이(키보드 대용)·응답 유실·등록 완료·읽기 전용) PASS, 운영자 행 배지 겹침 탐지 자체 검증 포함.
+- **NOT_RUN / 한계:** 실기기(Android/iOS) 소프트 키보드·VoiceOver/TalkBack 낭독 순서는 NOT_RUN(웹 420px 높이로 대체 확인). 웹 Chrome은 textarea
+  `maxlength`에서 줄바꿈을 2자로 세어 긴 초안이 2000자보다 조금 짧게 들어간다(네이티브는 코드 포인트 기준; 서버도 코드 포인트). GitHub Actions에서의
+  실제 실행은 push 후 확인 필요(로컬은 CI와 같은 명령·환경 변수로 PASS).
+- **주의:** 운영자 화면에서 문의를 여는 것 자체가 기존 정책대로 감사 로그(`operator.inquiry.get`)를 남긴다. 답변 수정·삭제·다중 댓글·알림은 여전히 없다
+  (사용자는 문의하기 화면을 열거나 돌아오면 본다). 답변 탭 이탈 시 작성 중 답변은 보관하지 않는다(실패 시에는 화면에 그대로 유지).
+
 ## 2026-10-18 A차 통합 개선 (내 뱃지·미국주식 한글명/로고·계정 선택 설명·총자산 정렬·랭킹 수익률 색)
 
 - **구현 목표:** MY `내 뱃지`(정산 완료 시즌별 최종 티어·순위·수익률 카드), 미국주식 한국어 이름과 종목 원형 로고, 계정 선택 화면 설명 문구,
@@ -108,7 +168,7 @@
   FCM(`google-services.json` + gradle 플러그인 + EAS FCM V1 키), 알림 아이콘 에셋, iOS bundle id·APNs는 사용자 작업이 필요해 BLOCKED
   (QA 문서 F 표). 운영 푸시·운영 DB migration·배포는 하지 않았다.
 - **주의:** 기존 7종 알림 설정은 그대로이며 문의 답변 알림은 없다(앱을 다시 열면 보인다). 이 변경 이전에 만들어진 order_failure outbox 행에는 ids가
-  없어 탭해도 열리지 않는다(워커가 켜진 적이 없어 실제 발송분은 없음). 문의·푸시 DB 통합 스위트는 CI에 편입되어 있지 않다(권고).
+  없어 탭해도 열리지 않는다(워커가 켜진 적이 없어 실제 발송분은 없음). 문의·푸시 DB 통합 스위트는 CI에 편입되어 있지 않다(권고). → 이후 둘 다 CI `core-account-db-integration`에 편입(푸시 `56c72584`, 문의 2026-10-18).
 
 ---
 

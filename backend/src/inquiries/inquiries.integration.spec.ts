@@ -14,7 +14,11 @@ describe('inquiries PostgreSQL + HTTP invariants', () => {
           timeout: 120000,
         },
       );
-      if (result.status !== 0) throw new Error(result.stdout + result.stderr);
+      // A timeout, signal or spawn error has no exit code: name it.
+      if (result.status !== 0)
+        throw new Error(
+          `inquiries integration exited ${result.status ?? result.signal ?? result.error?.message}\n${result.stdout}${result.stderr}`,
+        );
       expect(result.stdout).toContain('inquiries PostgreSQL + HTTP ok');
     },
     150000,

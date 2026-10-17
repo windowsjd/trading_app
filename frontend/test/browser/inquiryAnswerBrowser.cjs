@@ -1,6 +1,8 @@
-// Real InquiryScreen (문의 내역 + 답변) and OrderFailureScreen on RN-Web with a
-// fixture transport: 320/375/430 dp, light/dark, font scale 1/2. Checks every
-// glyph stays inside its card and the viewport, nothing is clipped by an
+// Real InquiryScreen (문의 내역 + 답변, operator 문의 관리), InquiryAnswerScreen
+// (long original, full-length draft, confirmation, sending, failure, answered,
+// a keyboard-height viewport) and OrderFailureScreen on RN-Web with a fixture
+// transport: 320/375/430 dp, light/dark, font scale 1/2. Checks every glyph
+// stays inside its card and the viewport, nothing is clipped by an
 // overflow:hidden box, the status badge never covers the title, and the
 // buttons are hit-testable. A self-test proves the detector fires.
 const assert = require('node:assert/strict');
@@ -30,9 +32,9 @@ const scales = [1, 2], modes = ['light', 'dark'];
   const browser = await chromium.launch({ headless: true, executablePath: process.env.BROWSER_EXECUTABLE_PATH, args: ['--no-sandbox'] });
   let page, checked = 0;
   const id = name => page.getByTestId(name);
-  const visit = async (query, width, mode) => {
+  const visit = async (query, width, mode, height = 900) => {
     if (page) await page.context().close();
-    page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' });
+    page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce' });
     page.on('pageerror', e => errors.push(`${query} ${width} ${mode}: ${e.message}`));
     await page.route('**/*', route => route.request().url().startsWith(base) ? route.continue() : route.abort());
     await page.addInitScript(mode => localStorage.setItem('trading-app:appearance', mode), mode);
@@ -67,7 +69,7 @@ const scales = [1, 2], modes = ['light', 'dark'];
       }
     }
     // A row's status badge never sits on its title.
-    for (const header of document.querySelectorAll('[data-testid$="-toggle"][data-testid^="inquiry-item-"]')) {
+    for (const header of document.querySelectorAll('[data-testid$="-toggle"][data-testid^="inquiry-item-"], [data-testid^="operator-inquiry-"]:not([data-testid$="-status"]):not([data-testid^="operator-inquiry-filter"])')) {
       const badge = header.querySelector('[data-testid$="-status"]'), title = header.querySelector('[dir="auto"]');
       if (!badge || !title || title === badge) { found.push(`no title/badge in ${header.dataset.testid}`); continue; }
       const b = badge.getBoundingClientRect(), titleRange = document.createRange();
@@ -97,6 +99,11 @@ const scales = [1, 2], modes = ['light', 'dark'];
   await id('inquiry-item-long').waitFor();
   await page.evaluate(() => { const badge = document.querySelector('[data-testid="inquiry-item-long-status"]'); badge.style.transform = 'translateY(-24px)'; });
   assert.ok((await inspect()).some(p => p.startsWith('badge overlaps title in inquiry-item-long')), 'overlap self-test');
+  await visit('screen=inquiry&role=operator', 320, 'light');
+  await id('inquiry-tab-manage').click();
+  await id('operator-inquiry-long-pending').waitFor();
+  await page.evaluate(() => { document.querySelector('[data-testid="operator-inquiry-long-pending-status"]').style.transform = 'translateY(-24px)'; });
+  assert.ok((await inspect()).some(p => p.startsWith('badge overlaps title in operator-inquiry-long-pending')), 'operator row overlap self-test');
 
   for (const width of widths) for (const mode of modes) for (const scale of scales) {
     const label = `${width}/${mode}/${scale}x`;
@@ -121,6 +128,70 @@ const scales = [1, 2], modes = ['light', 'dark'];
     await id('inquiry-item-old-22').waitFor();
     assert.equal(await id('inquiry-history-more').count(), 0, 'all pages read');
     await record(`${label} all pages`, more ? [] : ['더 보기 covered']);
+    // 문의 관리 (operator): the tabs, the queue, a second page, 답변 완료.
+    const shot = name => page.screenshot({ path: path.join(out, `${name}-${label.replaceAll('/', '-')}.png`) });
+    const reach = async (...ids) => { const missing = []; for (const testId of ids) if (!(await reachable(testId))) missing.push(`${testId} covered`); return missing; };
+    await visit(`screen=inquiry&role=operator&fontScale=${scale}`, width, mode);
+    await id('inquiry-tabs').waitFor();
+    await id('inquiry-item-long').waitFor();
+    await record(`${label} operator 내 문의`);
+    await id('inquiry-tab-manage').click();
+    await id('operator-inquiry-long-pending').waitFor();
+    await record(`${label} 문의 관리 queue`, await reach('operator-inquiries-refresh', 'operator-inquiry-filter-answered'));
+    if (width === 320 && scale === 2) await shot('operator-queue');
+    const moreMissing = await reach('operator-inquiries-more');
+    await id('operator-inquiries-more').click();
+    await id('operator-inquiry-p-22').waitFor();
+    await record(`${label} 문의 관리 all pages`, moreMissing);
+    await id('operator-inquiry-filter-answered').click();
+    await id('operator-inquiry-long-answered').waitFor();
+    assert.equal(await id('operator-inquiry-long-pending').count(), 0, '답변 완료 lists answered only');
+    await record(`${label} 문의 관리 answered`);
+    // 문의 답변: the 2000-character original, a 2000-character draft, the
+    // confirmation and the sending state (the request never returns).
+    const draft = '안녕하세요. 문의하신 내용을 확인했습니다.\n'.repeat(80).slice(0, 2000);
+    await visit(`screen=answer&id=long-pending&role=operator&post=hang&fontScale=${scale}`, width, mode);
+    await id('inquiry-answer-form').waitFor();
+    await record(`${label} answer empty`);
+    await id('inquiry-answer-input').fill(draft);
+    await record(`${label} answer full draft`, await reach('inquiry-answer-submit'));
+    await id('inquiry-answer-submit').click();
+    await id('inquiry-answer-confirm').waitFor();
+    await record(`${label} answer confirm`, await reach('inquiry-answer-confirm-submit', 'inquiry-answer-confirm-cancel'));
+    if (width === 320 && scale === 2 || width === 430 && scale === 1) await shot('answer-confirm');
+    await id('inquiry-answer-confirm-submit').click();
+    await page.getByLabel('등록하기 처리 중').waitFor();
+    assert.equal(await id('inquiry-answer-answer').count(), 0, 'not answered while sending');
+    await record(`${label} answer sending`);
+    // A keyboard-height viewport: the focused field and 답변 등록 stay reachable.
+    await visit(`screen=answer&id=long-pending&role=operator&fontScale=${scale}`, width, mode, 420);
+    await id('inquiry-answer-form').waitFor();
+    await id('inquiry-answer-input').fill(draft.slice(0, 600));
+    await id('inquiry-answer-input').focus();
+    await record(`${label} answer short viewport`, await reach('inquiry-answer-input', 'inquiry-answer-submit'));
+    // A lost response: the error, the text kept, never 답변 완료.
+    await visit(`screen=answer&id=long-pending&role=operator&post=fail&fontScale=${scale}`, width, mode);
+    await id('inquiry-answer-form').waitFor();
+    await id('inquiry-answer-input').fill(draft);
+    await id('inquiry-answer-submit').click();
+    await id('inquiry-answer-confirm-submit').click();
+    await id('inquiry-answer-error').waitFor();
+    assert.equal(await id('inquiry-answer-input').inputValue(), draft, 'the text is kept');
+    assert.equal(await id('inquiry-answer-answer').count(), 0, 'a failure is never shown as answered');
+    await record(`${label} answer failed`, await reach('inquiry-answer-submit'));
+    if (width === 320 && scale === 2) await shot('answer-failed');
+    // Answered now, and an inquiry answered by another operator.
+    await visit(`screen=answer&id=long-pending&role=operator&fontScale=${scale}`, width, mode);
+    await id('inquiry-answer-input').fill(draft);
+    await id('inquiry-answer-submit').click();
+    await id('inquiry-answer-confirm-submit').click();
+    await id('inquiry-answer-answer').waitFor();
+    assert.equal(await id('inquiry-answer-form').count(), 0, 'no form once answered');
+    await record(`${label} answer posted`);
+    await visit(`screen=answer&id=long-answered&role=operator&fontScale=${scale}`, width, mode);
+    await id('inquiry-answer-answer').waitFor();
+    await record(`${label} answer read-only`);
+    if (width === 320 && scale === 2) await shot('answer-read-only');
     for (const failure of ['failure-loc', 'failure-tpsl']) {
       await visit(`screen=${failure}&fontScale=${scale}`, width, mode);
       await id('order-failure-screen').waitFor();

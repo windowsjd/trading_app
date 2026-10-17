@@ -1,12 +1,17 @@
 # Trading UI browser regression
 
-문의 답변·주문 실패 화면 (2026-10-17) use `NODE_PATH=/path/to/browser-tools/node_modules
-BROWSER_EXECUTABLE_PATH=… node test/browser/inquiryAnswerBrowser.cjs`. The production
-InquiryScreen (long answered/pending rows, all pages, a filled long form) and
-OrderFailureScreen (LOC with its 거래 내역 link, Futures TP/SL) run on fixture
-transport at 320/375/430px × Light/Dark × font scale 1/2 (72 layouts): every glyph
-inside its card and the viewport, no overflow:hidden cut, the status badge never on
-the title, buttons hit-testable; both detectors are self-tested first.
+문의 답변·주문 실패 화면 (2026-10-17; 운영진 문의 관리 2026-10-18) use `NODE_PATH=/path/to/browser-tools/node_modules
+BROWSER_EXECUTABLE_PATH=… node test/browser/inquiryAnswerBrowser.cjs` (`INQUIRY_BROWSER_WIDTHS=320` for one width).
+The production InquiryScreen (long answered/pending rows, all pages, a filled long form;
+with `role=operator` the 내 문의 | 문의 관리 tabs, the 답변 대기 queue with long
+titles/nicknames, its second page and 답변 완료), InquiryAnswerScreen (2000-character
+original, a long draft, the confirmation, sending, a lost response, posted, read-only,
+and a 420px-high "keyboard" viewport) and OrderFailureScreen (LOC with its 거래 내역 link,
+Futures TP/SL) run on fixture transport at 320/375/430px × Light/Dark × font scale 1/2
+(216 layouts): every glyph inside its card and the viewport, no overflow:hidden cut,
+the status badge never on the title (user and operator rows), buttons hit-testable;
+the detectors are self-tested first. Chrome counts a textarea newline as two characters
+for `maxlength`, so the long web draft stops a little short of 2000 (native counts code points).
 
 The ranking tab uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/rankingTierBrowser.cjs`. The production RankingScreen (내 순위 on its

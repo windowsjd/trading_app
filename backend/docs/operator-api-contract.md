@@ -843,7 +843,9 @@ replays, conflicts and failures are `operator.inquiry.answer.replay` /
 `operator.inquiry.answer.failed` (error code only, never the text). Reads are
 audited as `operator.inquiries.list` / `operator.inquiry.get`. Contract, error
 codes and the operator procedure: [inquiries contract](inquiries-contract.md).
-Requires migration `20261017180000_add_inquiry_answers` (additive).
+Requires migration `20261017180000_add_inquiry_answers` (additive). Since
+2026-10-18 the app's MY > 문의하기 > 문의 관리 tab (operator/admin sessions)
+uses these three routes unchanged (inquiries contract §6).
 
 ## Not Implemented In This MVP
 

@@ -7,6 +7,11 @@ export const QUERY_KEYS = {
     all: ['inquiries'] as const,
     /** The signed-in author's own pages; keyed by user like the push switches. */
     mine: (userId: string) => ['inquiries', 'me', userId] as const,
+    /** 문의 관리 (operator/admin) reads, keyed by the signed-in operator so
+     * another session never reads them; removed when the role is lost. */
+    operator: (userId: string) => ['inquiries', 'operator', userId] as const,
+    operatorList: (userId: string, filter: string) => ['inquiries', 'operator', userId, 'list', filter] as const,
+    operatorDetail: (userId: string, inquiryId: string) => ['inquiries', 'operator', userId, 'detail', inquiryId] as const,
   },
   notifications: {
     /** The signed-in user's push switches; keyed by user so another user's

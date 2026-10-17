@@ -80,6 +80,8 @@ export type MyStackParamList = {
   /** `noticeId` opens and scrolls to that notice (links from guides, pushes). */
   Notices: { noticeId?: string; pushAt?: number } | undefined;
   Inquiry: undefined;
+  /** 문의 관리 (operator/admin): one inquiry and its official answer. */
+  InquiryAnswer: { inquiryId: string };
   UserSeasonSummary: { userId: string };
   My: undefined;
   /** 내 뱃지: my settled seasons' final tier, rank and return. */

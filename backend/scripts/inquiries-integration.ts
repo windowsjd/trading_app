@@ -132,7 +132,8 @@ async function financialState() {
 
 async function run() {
   await migrationShape();
-  // 0, 1: users; 2: suspended user; 3, 4: operator, admin; 5: suspended operator.
+  // 0, 1: users; 2: suspended user; 3, 4: operator, admin; 5: suspended
+  // operator; 6: an operator demoted, then suspended, mid-session.
   for (const [index, [status, role]] of (
     [
       ['active', 'user'],
@@ -141,6 +142,7 @@ async function run() {
       ['active', 'operator'],
       ['active', 'admin'],
       ['suspended', 'operator'],
+      ['active', 'operator'],
     ] as const
   ).entries()) {
     const user = await db.user.create({
@@ -350,6 +352,31 @@ async function operatorAnswers(
     'a suspended operator cannot answer',
   );
 
+  // The guard reads the current DB role on every request: a token issued
+  // while operator stops working the moment the role or status changes.
+  r = await operatorGet(6, '?status=pending');
+  check(r.status === 200, 'an operator lists inquiries');
+  await db.user.update({ where: { id: userIds[6] }, data: { role: 'user' } });
+  r = await operatorGet(6, '?status=pending');
+  check(
+    r.status === 403 && r.body.error.code === 'OPERATOR_FORBIDDEN',
+    'a demoted operator is refused with the same token',
+  );
+  r = await answer(6, { content: '강등 후 답변', idempotencyKey: 'demoted-1' });
+  check(
+    r.status === 403 && (await answers()) === 0,
+    'a demoted operator cannot answer',
+  );
+  await db.user.update({
+    where: { id: userIds[6] },
+    data: { role: 'operator', status: 'suspended' },
+  });
+  r = await operatorGet(6, `/${inquiryId}`);
+  check(
+    r.status === 403 && r.body.error.code === 'USER_NOT_ACTIVE',
+    'a suspended operator cannot read an inquiry',
+  );
+
   r = await mine(0);
   check(
     r.body.data.items.every(
@@ -370,8 +397,10 @@ async function operatorAnswers(
   check(
     r.status === 200 &&
       r.body.data.inquiry.content === original.content &&
-      r.body.data.inquiry.user.id === userIds[0],
-    'operator reads the original inquiry',
+      r.body.data.inquiry.user.id === userIds[0] &&
+      JSON.stringify(Object.keys(r.body.data.inquiry.user).sort()) ===
+        '["id","nickname","status"]',
+    'operator reads the original inquiry and only the author id/nickname/status',
   );
   r = await operatorGet(3, '/missing-inquiry');
   check(r.status === 404, 'unknown inquiry 404');
