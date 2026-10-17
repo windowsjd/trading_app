@@ -206,9 +206,10 @@ export default function ConditionalBuyForm({
                 accessibilityLabel="감시 방향"
                 compact
                 value={offHoursDirection ?? ''}
-                onChange={(value) => edit(() => setOffHoursDirection(value))}
-                options={(['at_or_above', 'at_or_below'] as const).map((value) => ({
-                  key: value, label: TRIGGER_CONDITION_LABEL[value], testID: `conditional-trigger-${value}`, disabled: pending,
+                onChange={(value) => edit(() => setOffHoursDirection(value || null))}
+                options={(['', 'at_or_above', 'at_or_below'] as const).map((value) => ({
+                  key: value, label: value === '' ? '방향 선택' : TRIGGER_CONDITION_LABEL[value],
+                  testID: `conditional-trigger-${value || 'choose'}`, disabled: pending,
                 }))}
               />
             </View>
