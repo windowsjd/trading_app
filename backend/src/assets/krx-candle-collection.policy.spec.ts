@@ -95,9 +95,15 @@ describe('KRX required slots and ticks', () => {
     expect(new Date(afterClose!.atMs).toISOString()).toBe(
       '2026-10-16T06:40:00.000Z',
     );
+    // Monday's first run re-reads Friday's provisional daily before the open.
     const weekend = nextKrxCentralRun(kst('2026-10-16T23:00:00'), 70_000);
     expect(weekend?.session.localDate).toBe('2026-10-19');
-    expect(weekend?.phase).toBe('intraday');
+    expect(weekend?.phase).toBe('daily');
+    expect(new Date(weekend!.atMs).toISOString()).toBe(
+      '2026-10-18T23:30:00.000Z',
+    );
+    const preOpen = nextKrxCentralRun(kst('2026-10-19T08:30:00'), 70_000);
+    expect(preOpen?.phase).toBe('intraday');
     expect(nextKrxCentralRun(kst('2027-12-30T20:00:00'), 70_000)).toBeNull();
   });
 });

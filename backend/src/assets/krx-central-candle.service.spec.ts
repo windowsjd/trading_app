@@ -113,3 +113,80 @@ describe('central KRX 1m cadence under the budget governor (3c)', () => {
     expect(h.sync.syncAsset).toHaveBeenCalledTimes(2);
   });
 });
+
+/**
+ * 2026-10-18: the latest session's KOSCOM daily is provisional when the
+ * post-close phases store it (NXT after-market until 20:00), so the daily
+ * phase also re-reads the previous session — before the open on its own,
+ * and inside today's first post-close request.
+ */
+describe('central KRX daily re-read of the previous session', () => {
+  it('before the open re-reads only the previous session, one 1d request per asset', async () => {
+    const { service, sync } = create(false);
+    sync.syncAsset.mockResolvedValue({
+      feeds: [{ status: 'completed', pagesFetched: 1, coverageComplete: true }],
+    });
+
+    // Monday 2026-10-19 08:30 KST → Friday 10-16.
+    const summary = await service.runDaily({ now: kst('2026-10-19T08:30:00') });
+
+    expect(summary.sessionDate).toBe('2026-10-16');
+    expect(summary.attempted).toBe(2);
+    expect(summary.proven).toBe(2);
+    expect(sync.syncAsset).toHaveBeenCalledTimes(2);
+    for (const [call] of sync.syncAsset.mock.calls)
+      expect(call).toMatchObject({
+        targets: ['1d'],
+        mode: 'repair',
+        from: kst('2026-10-16T00:00:00'),
+        to: kst('2026-10-17T00:00:00'),
+      });
+  });
+
+  it('reports a previous-session bar that is still unconfirmed', async () => {
+    const { service, sync } = create(false);
+    sync.syncAsset.mockResolvedValue({
+      feeds: [
+        {
+          status: 'completed',
+          pagesFetched: 1,
+          coverageComplete: false,
+          completionReason: 'unconfirmed',
+        },
+      ],
+    });
+
+    const summary = await service.runDaily({ now: kst('2026-10-19T08:30:00') });
+
+    expect(summary.proven).toBe(0);
+    expect(summary.partial).toBe(2);
+    expect(summary.unprovenAssets.map((entry) => entry.symbol)).toEqual([
+      '000660',
+      '005930',
+    ]);
+  });
+
+  it("still refuses an open session and starts today's post-close request at the previous session", async () => {
+    const { service, sync } = create(false);
+    expect(
+      (await service.runDaily({ now: kst('2026-10-19T10:00:00') }))
+        .skippedReason,
+    ).toBe('SESSION_NOT_CLOSED');
+    expect(sync.syncAsset).not.toHaveBeenCalled();
+
+    (service as unknown as { states: object }).states = {
+      findCandleCoverage: jest.fn().mockResolvedValue({
+        contiguousCoveredTo: kst('2026-10-19T00:00:00'),
+        hasInteriorGap: false,
+      }),
+    };
+    await service.runDaily({ now: kst('2026-10-19T15:50:00') });
+    for (const [call] of sync.syncAsset.mock.calls)
+      expect(call).toMatchObject({
+        targets: ['1d'],
+        from: kst('2026-10-16T00:00:00'),
+        to: kst('2026-10-19T15:50:00'),
+      });
+    expect(sync.syncAsset).toHaveBeenCalledTimes(2);
+  });
+});

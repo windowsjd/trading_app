@@ -2933,6 +2933,135 @@ describe('AssetsService', () => {
     });
   });
 
+  describe('closed KRX market: last KOSCOM close (display only, no date)', () => {
+    const krxAsset = asset({ id: 'samsung', symbol: '005930' });
+    // KST daily windows [00:00, next 00:00); the 15:25–15:30 KST 5m bucket
+    // holds the 15:30 closing auction.
+    const candle = (
+      interval: '1d' | '5m',
+      date: string,
+      close: string,
+      sourceProvider = interval === '1d' ? 'koscom_history' : 'koscom_intraday',
+    ) => {
+      const openTime =
+        interval === '1d'
+          ? new Date(new Date(`${date}T00:00:00.000+09:00`).getTime())
+          : new Date(`${date}T15:25:00.000+09:00`);
+      const closeTime = new Date(
+        openTime.getTime() + (interval === '1d' ? 86_400_000 : 300_000),
+      );
+      return {
+        assetId: krxAsset.id,
+        interval,
+        openTime,
+        closeTime,
+        sourceUpdatedAt: new Date(`${date}T16:00:00.000+09:00`),
+        sourceProvider,
+        isClosed: true,
+        open: new Prisma.Decimal(close),
+        high: new Prisma.Decimal(close),
+        low: new Prisma.Decimal(close),
+        close: new Prisma.Decimal(close),
+        volume: new Prisma.Decimal('1000'),
+      };
+    };
+    const withCandles = (rows: ReturnType<typeof candle>[]) => {
+      const { prisma, service } = createService();
+      prisma.marketCandle.findMany.mockImplementation(
+        ({
+          where,
+        }: {
+          where: { interval: string; openTime: { gte: Date; lt: Date } };
+        }) =>
+          Promise.resolve(
+            rows.filter(
+              (row) =>
+                row.interval === where.interval &&
+                row.openTime >= where.openTime.gte &&
+                row.openTime < where.openTime.lt,
+            ),
+          ),
+      );
+      prisma.asset.count.mockResolvedValue(1);
+      prisma.asset.findMany.mockResolvedValue([krxAsset]);
+      prisma.asset.findUnique.mockResolvedValue(krxAsset);
+      return { prisma, service };
+    };
+    // Saturday 2026-10-17 12:00 KST: latest completed session = Fri 10-16.
+    const saturday = new Date('2026-10-17T03:00:00.000Z');
+
+    it('shows the close both KOSCOM feeds agree on, under a reason the app does not label with a date', async () => {
+      jest.setSystemTime(saturday);
+      const { prisma, service } = withCandles([
+        candle('1d', '2026-10-15', '210000'),
+        candle('1d', '2026-10-16', '215500'),
+        candle('5m', '2026-10-16', '215500'),
+      ]);
+
+      const list = await service.getAssets('user-1');
+      const price = await service.getAssetPrice('user-1', 'samsung');
+
+      expect(list.data.priceErrors).toHaveLength(0);
+      expect(list.data.assets[0]).toMatchObject({
+        marketStatus: 'closed',
+        tradable: false,
+        tradeBlockedReason: 'MARKET_CLOSED',
+        price: {
+          state: 'available',
+          currentPrice: '215500.00000000',
+          priceCurrency: CurrencyCode.KRW,
+          priceKrw: '215500.00000000',
+          // Against the previous session's (10-15) confirmed close.
+          changeRate: '2.61904762',
+          assetPriceSnapshotId: null,
+          priceEffectiveAt: '2026-10-16T06:30:00.000Z',
+          priceSource: {
+            sourceType: 'provider_api',
+            sourceName: 'koscom_history',
+            snapshotId: null,
+            fallbackUsed: true,
+            fallbackReason: 'market_closed_krx_last_close',
+          },
+        },
+      });
+      expect(price.data.state === 'available').toBe(true);
+      expect(price.data.assetPriceSnapshotId === null).toBe(true);
+      expectNoAssetWrites(prisma);
+    });
+
+    it('stays unavailable when the daily is provisional (NXT last price ≠ auction close)', async () => {
+      jest.setSystemTime(saturday);
+      const { service } = withCandles([
+        candle('1d', '2026-10-15', '210000'),
+        candle('1d', '2026-10-16', '217000'),
+        candle('5m', '2026-10-16', '215500'),
+      ]);
+
+      const list = await service.getAssets('user-1');
+
+      expect(list.data.assets[0]?.price?.state).toBe('unavailable');
+      expect(list.data.priceErrors[0]?.code).toBe('ASSET_PRICE_UNAVAILABLE');
+    });
+
+    it('never substitutes a past close during the regular session', async () => {
+      // Friday 2026-10-16 11:00 KST: open, no eligible KOSCOM snapshot.
+      jest.setSystemTime(new Date('2026-10-16T02:00:00.000Z'));
+      const { prisma, service } = withCandles([
+        candle('1d', '2026-10-15', '210000'),
+        candle('5m', '2026-10-15', '210000'),
+      ]);
+
+      const list = await service.getAssets('user-1');
+
+      expect(list.data.assets[0]).toMatchObject({
+        marketStatus: 'open',
+        tradeBlockedReason: 'PRICE_UNAVAILABLE',
+        price: { state: 'unavailable', reason: 'ASSET_PRICE_UNAVAILABLE' },
+      });
+      expect(prisma.marketCandle.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe('closed US market: last confirmed Tiingo close (display only)', () => {
     const usAsset = asset({
       id: 'aapl',

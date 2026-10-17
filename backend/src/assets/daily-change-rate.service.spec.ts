@@ -587,3 +587,108 @@ describe('canonical daily return', () => {
     });
   });
 });
+
+describe('KRX latest session close (closed-market display only)', () => {
+  // Saturday 2026-10-17 12:00 KST: latest completed session = Fri 10-16,
+  // closing at 15:30 KST (06:30Z); its closing-auction 5m bucket is 15:25–15:30.
+  const saturday = new Date('2026-10-17T03:00:00Z');
+  const daily = (close: string, overrides: object = {}) => ({
+    ...candle('2026-10-15T15:00:00Z', 'koscom_history', close),
+    assetId: krx.id,
+    open: new Prisma.Decimal('215000'),
+    high: new Prisma.Decimal('222500'),
+    low: new Prisma.Decimal('210500'),
+    sourceUpdatedAt: new Date('2026-10-16T21:30:00Z'),
+    ...overrides,
+  });
+  const auction = (close: string, overrides: object = {}) => ({
+    assetId: krx.id,
+    interval: '5m',
+    openTime: new Date('2026-10-16T06:25:00Z'),
+    closeTime: new Date('2026-10-16T06:30:00Z'),
+    sourceUpdatedAt: new Date('2026-10-16T06:31:10Z'),
+    sourceProvider: 'koscom_intraday',
+    isClosed: true,
+    open: new Prisma.Decimal(close),
+    high: new Prisma.Decimal(close),
+    low: new Prisma.Decimal(close),
+    close: new Prisma.Decimal(close),
+    ...overrides,
+  });
+  function krxSetup(dailyRows: unknown[], bucketRows: unknown[]) {
+    const findRange = jest.fn(({ interval }: { interval: string }) =>
+      Promise.resolve(interval === '1d' ? dailyRows : bucketRows),
+    );
+    return {
+      findRange,
+      service: new DailyChangeRateService({ findRange } as never),
+    };
+  }
+
+  it('returns the close when the KOSCOM daily and the closing-auction bucket agree', async () => {
+    const { service, findRange } = krxSetup(
+      [daily('215500')],
+      [auction('215500')],
+    );
+    const close = await service.findLatestSessionClose(krx, saturday);
+    expect(close?.close.toFixed(0)).toBe('215500');
+    expect(close?.sessionCloseAt.toISOString()).toBe(
+      '2026-10-16T06:30:00.000Z',
+    );
+    expect(close?.receivedAt.toISOString()).toBe('2026-10-16T21:30:00.000Z');
+    expect(findRange).toHaveBeenCalledWith({
+      assetId: krx.id,
+      interval: '5m',
+      from: new Date('2026-10-16T06:25:00Z'),
+      to: new Date('2026-10-16T06:25:00.001Z'),
+    });
+  });
+
+  it('is null while the market is open, without touching the store', async () => {
+    const { service, findRange } = krxSetup(
+      [daily('215500')],
+      [auction('215500')],
+    );
+    // Friday 2026-10-16 11:00 KST.
+    expect(
+      await service.findLatestSessionClose(
+        krx,
+        new Date('2026-10-16T02:00:00Z'),
+      ),
+    ).toBeNull();
+    expect(findRange).not.toHaveBeenCalled();
+  });
+
+  it('is null for a provisional daily, a missing/unclosed/foreign bucket or a non-KOSCOM daily', async () => {
+    for (const [dailyRows, bucketRows] of [
+      // 10-16 as stored: NXT after-market last price vs the auction close.
+      [[daily('217000')], [auction('215500')]],
+      [[daily('215500')], []],
+      [[daily('215500')], [auction('215500', { isClosed: false })]],
+      [
+        [daily('215500')],
+        [auction('215500', { sourceProvider: 'kis_domestic_minute' })],
+      ],
+      [
+        [daily('215500', { sourceProvider: 'kis_domestic_period' })],
+        [auction('215500')],
+      ],
+      // Received before the close: not confirmed.
+      [
+        [
+          daily('215500', {
+            sourceUpdatedAt: new Date('2026-10-16T06:00:00Z'),
+          }),
+        ],
+        [auction('215500')],
+      ],
+      [[], [auction('215500')]],
+    ] as const)
+      expect(
+        await krxSetup(
+          [...dailyRows],
+          [...bucketRows],
+        ).service.findLatestSessionClose(krx, saturday),
+      ).toBeNull();
+  });
+});

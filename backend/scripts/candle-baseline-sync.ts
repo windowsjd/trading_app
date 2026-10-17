@@ -44,6 +44,8 @@ import { KoscomCandleAdapter } from '../src/providers/koscom/koscom-candle.adapt
  *   --apply | --dry-run      run for real / plan only (default: --dry-run)
  *   --mode initial|incremental|repair   default: initial
  *   --days N                 baseline window, default 35, at most 900
+ *   --from ISO --to ISO      repair only: explicit window (offset required),
+ *                            e.g. one held KRX session without re-reading others
  *   --target 5m|1d|1w        repeatable; default: 5m
  *   --asset-type domestic_stock|us_stock|crypto   repeatable
  *   --asset-id <uuid>        repeatable; overrides --asset-type
@@ -262,18 +264,17 @@ export async function main(
     redis = new RedisService(readRedisConfig());
     const syncService = createSyncService(prisma, redis);
     const now = new Date();
-    const from = new Date(now.getTime() - args.days * DAY_MS);
+    const from = args.from ?? new Date(now.getTime() - args.days * DAY_MS);
+    const to = args.to && args.to < now ? args.to : now;
     console.log(
-      `mode=${args.mode} dryRun=${!args.apply} window=${iso(from)} → ${iso(now)} feeds=${args.targets.join(',')}`,
+      `mode=${args.mode} dryRun=${!args.apply} window=${iso(from)} → ${iso(to)} feeds=${args.targets.join(',')}`,
     );
     const summary = await syncService.syncAssets({
       targets: args.targets,
       mode: args.mode,
       // incremental resolves its own start from the newest stored candle; an
       // explicit from/to is what makes initial/repair cover the baseline.
-      ...(args.mode === MarketCandleSyncMode.incremental
-        ? {}
-        : { from, to: now }),
+      ...(args.mode === MarketCandleSyncMode.incremental ? {} : { from, to }),
       // Named assets may be backfilled before activation (design v2.1 Q12).
       activeOnly: !args.includeInactive,
       resume: args.resume,

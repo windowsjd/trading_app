@@ -7,6 +7,7 @@ import {
 } from '../generated/prisma/client';
 import {
   findLastMarketSessionOfWeek,
+  findPreviousMarketSession,
   resolveMarketSession,
   type MarketSessionWindow,
 } from '../orders/market-calendar.policy';
@@ -38,6 +39,10 @@ import { MarketCandleSyncService } from './market-candle-sync.service';
 import type { MarketCandleFeedResult } from './market-candle-sync.types';
 
 const DAY_MS = 24 * 60 * 60_000;
+const KRX_CALENDAR_ASSET = {
+  assetType: AssetType.domestic_stock,
+  market: 'KRX',
+} as const;
 const CONCURRENCY = 2;
 // Post-close repair caps (design v2.1 §4.2 rule 5): per asset and per day.
 const REPAIR_CALLS_PER_ASSET = 3;
@@ -259,12 +264,16 @@ export class KrxCentralCandleService {
    * Post-close daily upkeep (§4.2 rule 6, §5.4): confirms today's daily bar
    * through the existing dated 1d audit (`inspectKisDailyEvidence`), and
    * on the week's last session the weekly bar while old apps still show it.
+   * Before today's open it re-reads the previous session's daily instead
+   * (`KRX_PRE_OPEN_DAILY_OFFSET_MS`): that bar was provisional when stored.
    */
   async runDaily(input: {
     now: Date;
     signal?: AbortSignal;
   }): Promise<KrxCentralRunSummary> {
     const session = this.todaySession(input.now);
+    if (session && input.now.getTime() < session.openTime.getTime())
+      return this.rereadPreviousDaily(session, input);
     if (!session || input.now.getTime() < session.closeTime.getTime())
       return this.empty('daily', session, 'SESSION_NOT_CLOSED');
     const summary = this.empty('daily', session);
@@ -276,6 +285,12 @@ export class KrxCentralCandleService {
         session.localDate;
     const nowMs = input.now.getTime();
     const todayStart = kstDayStartMs(session.localDate);
+    const previous = findPreviousMarketSession(
+      KRX_CALENDAR_ASSET,
+      session.openTime,
+      1,
+    );
+    const previousStart = previous ? kstDayStartMs(previous.localDate) : null;
     await forEachConcurrent(assets, CONCURRENCY, async (asset) => {
       if (input.signal?.aborted) return;
       const bridge = krxDailyBridge(nowMs);
@@ -300,8 +315,11 @@ export class KrxCentralCandleService {
           input.now,
           { bridge },
         );
+        // Also the previous session: the same one request re-reads its
+        // (by now final) bar if the pre-open re-read did not run.
         const fromMs = Math.min(
           todayStart,
+          previousStart ?? todayStart,
           Math.max(
             catchUpFrom,
             frontier.contiguousCoveredTo?.getTime() ?? catchUpFrom,
@@ -353,6 +371,57 @@ export class KrxCentralCandleService {
     return summary;
   }
 
+  /**
+   * Pre-open re-read of the previous session's dated daily bar, one request
+   * per asset. The upsert rewrites a bar only when KOSCOM's values changed;
+   * an asset whose bar is not confirmed afterwards is reported, not retried.
+   */
+  private async rereadPreviousDaily(
+    today: MarketSessionWindow,
+    input: { now: Date; signal?: AbortSignal },
+  ): Promise<KrxCentralRunSummary> {
+    const previous = findPreviousMarketSession(
+      KRX_CALENDAR_ASSET,
+      today.openTime,
+      1,
+    );
+    if (!previous || previous.closeTime > input.now)
+      return this.empty('daily', today, 'SESSION_NOT_CLOSED');
+    const summary = this.empty('daily', previous);
+    const assets = await this.targets(input.now);
+    summary.assets = assets.length;
+    const fromMs = kstDayStartMs(previous.localDate);
+    await forEachConcurrent(assets, CONCURRENCY, async (asset) => {
+      if (input.signal?.aborted) return;
+      summary.attempted += 1;
+      const feed = await this.syncPeriod(asset, '1d', fromMs, input, 'daily', {
+        toMs: fromMs + DAY_MS,
+      });
+      summary.providerPages += feed?.pagesFetched ?? 0;
+      if (feed?.coverageComplete) {
+        summary.proven += 1;
+        return;
+      }
+      if (feed) summary.partial += 1;
+      else summary.failed += 1;
+      summary.unprovenAssets.push({
+        assetId: asset.id,
+        symbol: asset.symbol,
+        status: feed ? 'partial' : 'failed',
+        reason: feed?.errorCode ?? feed?.completionReason ?? 'SYNC_NOT_RUN',
+      });
+    });
+    if (summary.unprovenAssets.length > 0)
+      this.logger.warn(
+        JSON.stringify({
+          event: 'krx_central_daily_unconfirmed',
+          sessionDate: previous.localDate,
+          assets: summary.unprovenAssets.map((entry) => entry.symbol),
+        }),
+      );
+    return summary;
+  }
+
   private async syncFiveMinute(
     asset: TargetAsset,
     plan: { fromMs: number; toMs: number },
@@ -390,8 +459,10 @@ export class KrxCentralCandleService {
     fromMs: number,
     input: { now: Date; signal?: AbortSignal },
     category: 'daily' | 'weekly',
+    window: { toMs?: number } = {},
   ): Promise<MarketCandleFeedResult | null> {
-    if (fromMs >= input.now.getTime()) return null;
+    const toMs = Math.min(window.toMs ?? Infinity, input.now.getTime());
+    if (fromMs >= toMs) return null;
     try {
       const result = await runWithKoscomCallCategory(category, () =>
         this.sync.syncAsset({
@@ -399,7 +470,7 @@ export class KrxCentralCandleService {
           targets: [feed],
           mode: MarketCandleSyncMode.repair,
           from: new Date(fromMs),
-          to: input.now,
+          to: new Date(toMs),
           resume: false,
           now: input.now,
           signal: input.signal,

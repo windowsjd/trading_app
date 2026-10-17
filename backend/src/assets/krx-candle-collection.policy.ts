@@ -274,6 +274,18 @@ export const KRX_POST_CLOSE_PHASES = [
   { offsetMs: 150 * 60_000, phase: 'daily' },
 ] as const;
 
+/**
+ * Pre-open daily re-read (2026-10-18): 30 min before each session's open the
+ * daily phase re-reads the PREVIOUS session's dated KOSCOM daily bar. The
+ * latest session's KOSCOM daily is provisional — after the close it tracks
+ * the integrated after-market (NXT, to 20:00) last price, not the 15:30
+ * closing-auction close (10-16: 217,000 vs 215,500; unchanged through 10-17
+ * 18:11 KST) — while 10-15's bar read at 06:33 KST on 10-16 already was the
+ * KRX close. The post-close phases run before 20:00, so without this re-read
+ * a provisional close would stay stored.
+ */
+export const KRX_PRE_OPEN_DAILY_OFFSET_MS = 30 * 60_000;
+
 export type KrxCentralPhase = 'intraday' | 'repair' | 'daily';
 
 /**
@@ -295,6 +307,10 @@ export function nextKrxCentralRun(
     const session = resolveMarketSession('KRX', date.replace(/-/gu, ''));
     if (!session) continue;
     const runs: { atMs: number; phase: KrxCentralPhase }[] = [
+      {
+        atMs: session.openTime.getTime() - KRX_PRE_OPEN_DAILY_OFFSET_MS,
+        phase: 'daily' as const,
+      },
       ...krxIntradayTickTimes(session, delayMs).map((atMs) => ({
         atMs,
         phase: 'intraday' as const,

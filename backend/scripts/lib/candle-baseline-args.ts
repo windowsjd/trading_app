@@ -15,6 +15,9 @@ export type CandleBaselineArgs = {
   assetTypes: AssetType[];
   assetIds: string[];
   maxAssets?: number;
+  /** Repair only: an explicit [from, to) instead of the last `days` days. */
+  from?: Date;
+  to?: Date;
   resume: boolean;
   /** Only with explicit --asset-id: backfill named assets before activation. */
   includeInactive: boolean;
@@ -105,6 +108,23 @@ export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
         args.assetIds.push(value);
         index += 1;
         break;
+      case '--from':
+      case '--to': {
+        // An offset is required so the window cannot depend on the host TZ.
+        const at = new Date(value ?? '');
+        if (
+          !/^\d{4}-\d{2}-\d{2}T[\d:.]+(Z|[+-]\d{2}:\d{2})$/.test(value ?? '') ||
+          !Number.isFinite(at.getTime())
+        ) {
+          throw new Error(
+            `${flag} must be an ISO date-time with an offset, e.g. 2026-10-16T00:00:00+09:00.`,
+          );
+        }
+        if (flag === '--from') args.from = at;
+        else args.to = at;
+        index += 1;
+        break;
+      }
       case '--max-assets': {
         const max = Number(value);
         if (!Number.isSafeInteger(max) || max < 1) {
@@ -121,6 +141,12 @@ export function parseCandleBaselineArgs(argv: string[]): CandleBaselineArgs {
 
   if (args.includeInactive && args.assetIds.length === 0) {
     throw new Error('--include-inactive requires explicit --asset-id values.');
+  }
+  if (args.from || args.to) {
+    if (args.mode !== 'repair' || !args.from || !args.to) {
+      throw new Error('--from/--to require --mode repair and both bounds.');
+    }
+    if (args.from >= args.to) throw new Error('--from must be before --to.');
   }
   if (args.targets.length === 0) args.targets.push('5m');
   if (args.report && (args.targets.length !== 1 || args.targets[0] !== '5m')) {

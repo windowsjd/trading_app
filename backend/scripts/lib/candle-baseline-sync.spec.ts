@@ -59,4 +59,37 @@ describe('candle baseline operator arguments', () => {
       parseCandleBaselineArgs(['--report', '--target', '1d']),
     ).toThrow('--report only supports the 5m baseline.');
   });
+  it('accepts an explicit repair window with offsets only', () => {
+    const args = parseCandleBaselineArgs([
+      '--mode',
+      'repair',
+      '--from',
+      '2026-10-16T00:00:00+09:00',
+      '--to',
+      '2026-10-17T00:00:00+09:00',
+    ]);
+    expect(args.from?.toISOString()).toBe('2026-10-15T15:00:00.000Z');
+    expect(args.to?.toISOString()).toBe('2026-10-16T15:00:00.000Z');
+    expect(() =>
+      parseCandleBaselineArgs(['--mode', 'repair', '--from', '2026-10-16']),
+    ).toThrow('--from must be an ISO date-time with an offset');
+    expect(() =>
+      parseCandleBaselineArgs([
+        '--from',
+        '2026-10-16T00:00:00+09:00',
+        '--to',
+        '2026-10-17T00:00:00+09:00',
+      ]),
+    ).toThrow('--from/--to require --mode repair and both bounds.');
+    expect(() =>
+      parseCandleBaselineArgs([
+        '--mode',
+        'repair',
+        '--from',
+        '2026-10-17T00:00:00+09:00',
+        '--to',
+        '2026-10-16T00:00:00+09:00',
+      ]),
+    ).toThrow('--from must be before --to.');
+  });
 });
