@@ -1,6 +1,6 @@
 {
   "android": {
-    "package": "com.anonymous.leagueoftrading",
+    "package": "com.leagueoftrading",
     "softwareKeyboardLayoutMode": "resize"
   },
   "extra": {
@@ -19,5 +19,6 @@
       "defaultChannel": "default"
     }]
   ],
+  "scheme": "leagueoftrading",
   "userInterfaceStyle": "automatic"
 }
