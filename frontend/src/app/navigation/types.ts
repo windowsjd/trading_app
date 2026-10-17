@@ -1,5 +1,6 @@
 import type { GuideChapter } from '../../screens/guide/guideTopics';
 import type { RecordOrderAccountScope } from '../../features/record/seasonAccountLookup';
+import type { OrderFailureKind } from '../../features/notifications/orderFailure';
 import type {
   CompositeScreenProps,
   NavigatorScreenParams,
@@ -102,6 +103,14 @@ export type RootStackParamList = {
     market?: 'spot' | 'futures';
     futuresView?: 'executions' | 'liquidations';
     /** Changes per push tap, so a repeated tap selects its view again. */
+    pushAt?: number;
+  };
+  /** 주문 실패·만료: the one failure row an order_failure push names. */
+  OrderFailure: {
+    accountId: string;
+    kind: OrderFailureKind;
+    failureId: string;
+    /** Changes per push tap, so a repeated tap reads the row again. */
     pushAt?: number;
   };
   AssetChart: { assetId: string };

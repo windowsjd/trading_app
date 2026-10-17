@@ -55,7 +55,7 @@ function harness() {
   rootMocks['../../features/order/OrderFillNotifier'] = { default: () => null, __esModule: true };
   rootMocks['../../features/notifications/PushNotificationsHost'] = { default: () => null, __esModule: true };
   for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
-    '../../screens/history/TradeHistoryScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
+    '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
     rootMocks[name] = { default: name, __esModule: true };
   }
   const Root = load(resolve('src/app/navigation/RootNavigator.tsx'), rootMocks).default;

@@ -15,6 +15,7 @@ import {
   seasonFinalResultCopy,
   spotFillCopy,
   type FuturesFillOrigin,
+  type OrderFailureKind,
 } from './push-copy';
 
 /**
@@ -155,7 +156,11 @@ function accountCandidate(
   sourceKey: string,
   copy: PushCopy,
   eventAt: Date,
-  route: { market: PushMarket; futuresView?: 'executions' | 'liquidations' },
+  route: {
+    market: PushMarket;
+    futuresView?: 'executions' | 'liquidations';
+    extra?: Pick<PushData, 'failureKind' | 'failureId' | 'liquidationId'>;
+  },
 ): PushCandidate {
   return {
     userId: account.userId,
@@ -170,6 +175,7 @@ function accountCandidate(
       accountId: account.id,
       market: route.market,
       ...(route.futuresView ? { futuresView: route.futuresView } : {}),
+      ...route.extra,
     },
     eventAt,
     expiresAt: expiry(type, eventAt),
@@ -357,7 +363,11 @@ export async function readLiquidations(
         })),
       }),
       row.executedAt,
-      { market: 'futures', futuresView: 'liquidations' },
+      {
+        market: 'futures',
+        futuresView: 'liquidations',
+        extra: { liquidationId: row.id },
+      },
     ),
   );
   return page(
@@ -370,19 +380,27 @@ export async function readLiquidations(
 }
 
 /** §2.3 helper: anything decided at or after its Season's end is Season
- * cleanup, never a failure. */
+ * cleanup, never a failure. The key and the payload name the same row. */
 function failureCandidate(
   account: AccountRow,
-  sourceKey: string,
+  failure: { kind: OrderFailureKind; id: string },
   eventAt: Date | null,
   market: PushMarket,
   build: () => PushCopy,
 ): PushCandidate[] {
   if (!eventAt || isSeasonEndCleanup(account, eventAt)) return [];
   return [
-    accountCandidate('order_failure', account, sourceKey, build(), eventAt, {
-      market,
-    }),
+    accountCandidate(
+      'order_failure',
+      account,
+      `${failure.kind}:${failure.id}`,
+      build(),
+      eventAt,
+      {
+        market,
+        extra: { failureKind: failure.kind, failureId: failure.id },
+      },
+    ),
   ];
 }
 
@@ -416,7 +434,7 @@ export async function readLocFailures(
     rows.flatMap((row) =>
       failureCandidate(
         row.tradingAccount,
-        `loc:${row.orderId}`,
+        { kind: 'loc', id: row.orderId },
         row.decidedAt,
         'spot',
         () =>
@@ -459,7 +477,7 @@ export async function readConditionalBuyFailures(
     rows.flatMap((row) =>
       failureCandidate(
         row.tradingAccount,
-        `conditional_buy:${row.id}`,
+        { kind: 'conditional_buy', id: row.id },
         row.endedAt,
         'spot',
         () =>
@@ -502,7 +520,7 @@ export async function readConditionalSellFailures(
     rows.flatMap((row) =>
       failureCandidate(
         row.tradingAccount,
-        `conditional_sell:${row.id}`,
+        { kind: 'conditional_sell', id: row.id },
         row.endedAt,
         'spot',
         () =>
@@ -548,7 +566,7 @@ export async function readFuturesConditionalEntryFailures(
     rows.flatMap((row) =>
       failureCandidate(
         row.tradingAccount,
-        `futures_conditional_entry:${row.id}`,
+        { kind: 'futures_conditional_entry', id: row.id },
         row.endedAt,
         'futures',
         () =>
@@ -593,7 +611,7 @@ export async function readFuturesTpSlFailures(
     rows.flatMap((row) =>
       failureCandidate(
         row.tradingAccount,
-        `futures_tp_sl:${row.id}`,
+        { kind: 'futures_tp_sl', id: row.id },
         row.endedAt,
         'futures',
         () =>
@@ -638,7 +656,7 @@ export async function readEntryPlanFailures(
     rows.flatMap((row) =>
       failureCandidate(
         row.tradingAccount,
-        `entry_tp_sl_plan:${row.id}`,
+        { kind: 'entry_tp_sl_plan', id: row.id },
         row.endedAt,
         row.domain,
         () =>

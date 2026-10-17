@@ -227,6 +227,34 @@ describe('real-fill banner', () => {
     assert.deepEqual(h.banner(), [], "a new session never shows the previous user's fill");
   });
 
+  it('shows a foreground liquidation once, after a fill already on screen, and opens its liquidation history', async (t) => {
+    const h = notifierHarness();
+    await h.mount(); t.after(h.close);
+    const liquidation = (accountId: string, liquidationId: string) => fillEvents.emitOrderFillEvent({
+      kind: 'liquidation', accountId, liquidationId, title: '선물 강제청산', detail: '일반모드 · BTC 롱 포지션이 강제청산되었어요.',
+    });
+    await act(async () => liquidation('someone-else', 'liq-x'));
+    assert.deepEqual(h.banner(), [], 'an account this session does not watch is ignored');
+    await act(async () => fillEvents.emitOrderFillEvent({ kind: 'filled', accountId: 'general', order: executed('x9') }));
+    await act(async () => liquidation('general', 'liq-1'));
+    await act(async () => liquidation('general', 'liq-1'));
+    // One banner at a time: the fill first, the liquidation queued behind it.
+    assert.deepEqual(h.banner(), ['삼성전자 매수 체결 완료']);
+    await h.pressHistory();
+    await h.finishAnimations();
+    assert.deepEqual(h.banner(), ['선물 강제청산']);
+    assert.deepEqual(h.detail(), ['일반모드 · BTC 롱 포지션이 강제청산되었어요.']);
+    await h.pressHistory();
+    const [name, params] = h.navigation.at(-1);
+    assert.equal(name, 'TradeHistory');
+    assert.deepEqual({ ...params, pushAt: undefined }, { accountId: 'general', market: 'futures', futuresView: 'liquidations', pushAt: undefined });
+    assert.equal(typeof params.pushAt, 'number', 'an open history selects the liquidation view again');
+    await h.finishAnimations();
+    assert.deepEqual(h.banner(), [], 'the repeated delivery of the same liquidation is not shown again');
+    await act(async () => liquidation('general', 'liq-1'));
+    assert.deepEqual(h.banner(), [], 'nor later');
+  });
+
   it('pauses reads in the background and re-reads on return', async (t) => {
     const h = notifierHarness();
     h.pending.general = [submitted('o1')];

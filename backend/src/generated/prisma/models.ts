@@ -10,6 +10,7 @@
  */
 export type * from './models/User.js'
 export type * from './models/Inquiry.js'
+export type * from './models/InquiryAnswer.js'
 export type * from './models/Friendship.js'
 export type * from './models/OperatorAuditLog.js'
 export type * from './models/RefreshTokenSession.js'

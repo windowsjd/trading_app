@@ -7,7 +7,9 @@ import {
   NoticesController,
   NotificationsController,
   OperatorNoticesController,
+  OrderFailuresController,
 } from './notifications.controller';
+import { OrderFailuresService } from './order-failures.service';
 import { NotificationPreferencesService } from './notification-preferences.service';
 import { PushDevicesService } from './push-devices.service';
 import { ImportantNoticesService } from './important-notices.service';
@@ -23,8 +25,10 @@ import { PushNotificationWorker } from './push-notification.worker';
     NotificationsController,
     NoticesController,
     OperatorNoticesController,
+    OrderFailuresController,
   ],
   providers: [
+    OrderFailuresService,
     NotificationPreferencesService,
     PushDevicesService,
     ImportantNoticesService,

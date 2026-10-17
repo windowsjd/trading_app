@@ -12,9 +12,10 @@ import { bootstrapNotificationPermission, toDevicePermission } from './pushPermi
 import { createPushRegistrar } from './pushRegistration';
 import { intentGuardName, parsePushData, resolvePushIntent, type PushIntent } from './pushIntent';
 import { refreshForPush } from './pushRefresh';
+import { emitOrderFillEvent } from '../order/fillEvents';
 
 /** Root routes that are only reachable after sign-in and the mode choice. */
-const MAIN_ROUTES = new Set(['MainTabs', 'TradeHistory', 'AssetChart']);
+const MAIN_ROUTES = new Set(['MainTabs', 'TradeHistory', 'OrderFailure', 'AssetChart']);
 
 /**
  * Push notifications (backend docs/push-notifications-contract.md), mounted
@@ -25,7 +26,9 @@ const MAIN_ROUTES = new Set(['MainTabs', 'TradeHistory', 'AssetChart']);
  * 2. Server registration follows the session: register after sign-in or
  *    restore, release on logout/expiry or when the OS permission is off.
  * 3. In the foreground the OS banner is suppressed; the push only refreshes
- *    the reads it changed (the fill banner keeps announcing Spot fills).
+ *    the reads it changed (the fill banner keeps announcing Spot fills). A
+ *    Futures liquidation, which no in-app watcher sees, is handed to that
+ *    same banner queue, once per liquidation event.
  * 4. A tap is applied after sign-in and the mode choice, only for the user it
  *    was sent to and only to an account that user owns.
  * Draws nothing. Web has no push and renders nothing.
@@ -75,6 +78,14 @@ function navigateTo(intent: PushIntent, pushAt: number) {
         accountId: intent.accountId,
         market: intent.market,
         ...(intent.futuresView ? { futuresView: intent.futuresView } : {}),
+        pushAt,
+      });
+      return;
+    case 'order_failure':
+      rootNavigationRef.navigate('OrderFailure', {
+        accountId: intent.accountId,
+        kind: intent.failureKind,
+        failureId: intent.failureId,
         pushAt,
       });
       return;
@@ -144,6 +155,7 @@ function NativePushHost() {
       requestPermission: () => nativePush.requestPermission(),
       readRequested: () => nativePush.readPermissionRequested(),
       writeRequested: () => nativePush.writePermissionRequested(),
+      clearRequested: () => nativePush.clearPermissionRequested(),
     }).finally(() => {
       if (mounted) setPermissionReady(true);
     });
@@ -170,11 +182,19 @@ function NativePushHost() {
       const intent = parsePushData(push.data);
       const current = latest.current;
       if (!intent || !current.userId || intent.uid !== current.userId) return;
-      if (intent.kind !== 'trade_history')
+      if (intent.kind !== 'trade_history' && intent.kind !== 'order_failure')
         return refreshForPush(queryClient, intent, { seasonUi: false });
       const account = current.accounts.find((item) => item.id === intent.accountId);
-      if (account)
-        refreshForPush(queryClient, intent, { seasonUi: account.mode === 'season' });
+      if (!account) return;
+      refreshForPush(queryClient, intent, { seasonUi: account.mode === 'season' });
+      if (intent.kind === 'trade_history' && intent.type === 'futures_liquidation' && intent.liquidationId)
+        emitOrderFillEvent({
+          kind: 'liquidation',
+          accountId: intent.accountId,
+          liquidationId: intent.liquidationId,
+          title: push.title?.trim() || '선물 강제청산',
+          detail: push.body?.trim() || null,
+        });
     });
     const token = nativePush.onTokenChanged(() => setWake((value) => value + 1));
     const appState = AppState.addEventListener('change', (state) => {

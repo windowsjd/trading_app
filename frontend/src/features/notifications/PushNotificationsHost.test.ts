@@ -11,7 +11,7 @@ const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-type Push = { identifier: string; data: unknown };
+type Push = { identifier: string; data: unknown; title?: string | null; body?: string | null };
 
 function harness(t: TestContext, options: {
   supported?: boolean;
@@ -24,6 +24,7 @@ function harness(t: TestContext, options: {
     route: 'Splash' as string,
     stateListeners: [] as Array<() => void>,
     navigations: [] as Array<{ name: string; params: unknown }>,
+    events: [] as Array<Record<string, unknown>>,
     tapped: null as null | ((push: Push) => void),
     received: null as null | ((push: Push) => void),
     account: {
@@ -47,6 +48,7 @@ function harness(t: TestContext, options: {
     requestPermission: async () => { h.log.push('request-permission'); h.permission = 'granted'; return snapshot(); },
     readPermissionRequested: async () => false,
     writePermissionRequested: async () => {},
+    clearPermissionRequested: async () => {},
     getToken: async () => 'ExponentPushToken[device]',
     readStoredToken: async () => (h as any).stored ?? null,
     writeStoredToken: async (token: string | null) => { (h as any).stored = token; },
@@ -75,6 +77,7 @@ function harness(t: TestContext, options: {
     },
     '../../app/navigation/navigationRef': { rootNavigationRef },
     '../quest/questNavigationGuard': { questNavigationAllowed: () => true },
+    '../order/fillEvents': { emitOrderFillEvent: (event: Record<string, unknown>) => { h.events.push(event); } },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => h.account },
   }).default;
   const flush = () => act(async () => { await new Promise((done) => setTimeout(done, 0)); });
@@ -214,6 +217,61 @@ describe('push notifications host', () => {
     invalidated.length = 0;
     await act(async () => x.h.received!(fillPush('user-other')));
     assert.deepEqual(invalidated, []);
+  });
+
+  it('opens a tapped failure on its own row, never the fill history', async (t) => {
+    const x = harness(t);
+    await x.mount();
+    await x.go('MainTabs');
+    await x.signIn('user-a');
+    const failure = (identifier: string, data: Record<string, unknown> = {}) => ({
+      identifier,
+      data: {
+        v: 1, type: 'order_failure', uid: 'user-a', accountId: 'acct-a', market: 'futures',
+        failureKind: 'futures_conditional_entry', failureId: 'entry-1', ...data,
+      },
+    });
+    await act(async () => x.h.tapped!(failure('fail-1')));
+    await x.settle();
+    // Without the row it names, or for an account the user does not own, nothing opens.
+    await act(async () => x.h.tapped!(failure('fail-2', { failureKind: undefined, failureId: undefined })));
+    await x.settle();
+    await act(async () => x.h.tapped!(failure('fail-3', { accountId: 'acct-of-someone-else' })));
+    await x.settle();
+    assert.equal(x.h.navigations.length, 1);
+    const [{ name, params }] = x.h.navigations as Array<{ name: string; params: Record<string, unknown> }>;
+    assert.equal(name, 'OrderFailure');
+    assert.deepEqual({ ...params, pushAt: undefined }, {
+      accountId: 'acct-a', kind: 'futures_conditional_entry', failureId: 'entry-1', pushAt: undefined,
+    });
+    assert.equal(typeof params.pushAt, 'number');
+  });
+
+  it('hands a foreground liquidation of an owned account to the in-app banner', async (t) => {
+    const x = harness(t);
+    await x.mount();
+    await x.go('MainTabs');
+    await x.signIn('user-a');
+    const liquidation = (uid: string, accountId: string, liquidationId?: string): Push => ({
+      identifier: `liq-${uid}-${accountId}-${liquidationId}`,
+      title: '선물 강제청산',
+      body: '일반모드 · BTC 롱 포지션이 강제청산되었어요.',
+      data: { v: 1, type: 'futures_liquidation', uid, accountId, market: 'futures', futuresView: 'liquidations', ...(liquidationId ? { liquidationId } : {}) },
+    });
+    await act(async () => x.h.received!(liquidation('user-a', 'acct-a', 'liq-1')));
+    await act(async () => x.h.received!(liquidation('user-b', 'acct-a', 'liq-2')));
+    await act(async () => x.h.received!(liquidation('user-a', 'acct-other', 'liq-3')));
+    await act(async () => x.h.received!(fillPush('user-a')));
+    assert.deepEqual(x.h.events, [{
+      kind: 'liquidation',
+      accountId: 'acct-a',
+      liquidationId: 'liq-1',
+      title: '선물 강제청산',
+      detail: '일반모드 · BTC 롱 포지션이 강제청산되었어요.',
+    }]);
+    // The OS banner stays off and nothing is opened in the foreground.
+    assert.deepEqual(x.h.navigations, []);
+    assert.equal(x.h.log.includes('suppress-foreground'), true);
   });
 
   it('does nothing on web', async (t) => {

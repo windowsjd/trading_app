@@ -17,6 +17,7 @@ import { OperatorGuard } from '../operator/operator.guard';
 import { NotificationPreferencesService } from './notification-preferences.service';
 import { PushDevicesService } from './push-devices.service';
 import { ImportantNoticesService } from './important-notices.service';
+import { OrderFailuresService } from './order-failures.service';
 
 /** The caller's own settings and devices (global access-token guard),
  * except `devices/release`, which proves possession of the token itself. */
@@ -50,6 +51,23 @@ export class NotificationsController {
   @Post('devices/release')
   releaseDevice(@Body() body: unknown) {
     return this.devices.release(body);
+  }
+}
+
+/** The stored result of the failure an `order_failure` push names, read
+ * only inside the caller's own account (authenticated, read-only). */
+@Controller('api/v1/trading-accounts/:accountId/order-failures')
+export class OrderFailuresController {
+  constructor(private readonly failures: OrderFailuresService) {}
+
+  @Get(':kind/:failureId')
+  get(
+    @Req() request: AuthenticatedRequest,
+    @Param('accountId') accountId: string,
+    @Param('kind') kind: string,
+    @Param('failureId') failureId: string,
+  ) {
+    return this.failures.get(request.user?.userId, accountId, kind, failureId);
   }
 }
 

@@ -20,6 +20,7 @@ import { PushDevicesService } from '../src/notifications/push-devices.service';
 import { NotificationPreferencesService } from '../src/notifications/notification-preferences.service';
 import { ImportantNoticesService } from '../src/notifications/important-notices.service';
 import { pushNotificationsConfig } from '../src/notifications/push-notifications.config';
+import { OrderFailuresService } from '../src/notifications/order-failures.service';
 
 const url = process.env.DATABASE_URL ?? '';
 if (
@@ -665,6 +666,73 @@ async function run() {
             row.tradingAccountId),
     ),
     'payload recipient and account match the row',
+  );
+
+  // A failure tap reads exactly the row its payload names, owner only.
+  const failures = new OrderFailuresService(db);
+  for (const row of rows.filter((item) => item.type === 'order_failure')) {
+    const data = row.data as { failureKind: string; failureId: string };
+    const read = await failures.get(
+      row.userId,
+      row.tradingAccountId!,
+      data.failureKind,
+      data.failureId,
+    );
+    check(
+      `${read.data.failure.kind}:${read.data.failure.id}` === row.sourceKey &&
+        read.data.failure.final &&
+        read.data.failure.tradingAccountId === row.tradingAccountId,
+      `failure tap ${data.failureKind} reads its own final row`,
+    );
+  }
+  const notFound = (promise: Promise<unknown>) =>
+    promise.then(
+      () => false,
+      (error: { getStatus?: () => number }) => error.getStatus?.() === 404,
+    );
+  check(
+    await notFound(
+      failures.get(
+        bob.id,
+        aliceGeneral.id,
+        'conditional_buy',
+        failedConditional.id,
+      ),
+    ),
+    'another user cannot read the failure',
+  );
+  check(
+    await notFound(
+      failures.get(
+        alice.id,
+        aliceSeason.id,
+        'conditional_buy',
+        failedConditional.id,
+      ),
+    ),
+    'the same user’s other account does not hold it',
+  );
+  const retrying = await db.conditionalBuyOrder.findFirstOrThrow({
+    where: { tradingAccountId: aliceGeneral.id, status: 'triggered' },
+  });
+  check(
+    !(
+      await failures.get(
+        alice.id,
+        aliceGeneral.id,
+        'conditional_buy',
+        retrying.id,
+      )
+    ).data.failure.final,
+    'a retrying watch is never reported as a final failure',
+  );
+  const liquidationRow = rows.find(
+    (item) => item.sourceKey === `futures_liquidation:${liquidation.id}`,
+  );
+  check(
+    (liquidationRow?.data as { liquidationId?: string }).liquidationId ===
+      liquidation.id,
+    'a liquidation payload names its event',
   );
 
   // The request is rejected before dispatch: no stale request push.

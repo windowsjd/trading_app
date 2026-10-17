@@ -3,7 +3,11 @@
 // prefixes stay intact for existing mutation invalidation and session teardown.
 export const QUERY_KEYS = {
   me: ['me'] as const,
-  inquiries: { mine: ['inquiries', 'me'] as const },
+  inquiries: {
+    all: ['inquiries'] as const,
+    /** The signed-in author's own pages; keyed by user like the push switches. */
+    mine: (userId: string) => ['inquiries', 'me', userId] as const,
+  },
   notifications: {
     /** The signed-in user's push switches; keyed by user so another user's
      * session can never read them, independent of the teardown clear. */
@@ -461,6 +465,9 @@ export const QUERY_KEYS = {
       ] as const,
     orderDetail: (accountId: string, orderId: string) =>
       ['tradingAccount', 'orders', accountId, 'detail', orderId] as const,
+    /** The failure row an order_failure push names (read-only). */
+    orderFailure: (accountId: string, kind: string, id: string) =>
+      ['tradingAccount', 'orderFailure', accountId, kind, id] as const,
 
     quote: (accountId: string, quoteId: string) =>
       ['tradingAccount', 'quotes', accountId, quoteId] as const,

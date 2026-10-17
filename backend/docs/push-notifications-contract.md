@@ -1,6 +1,9 @@
 # Push Notifications Contract
 
 Status (2026-10-17): implemented, **default OFF** (`PUSH_NOTIFICATIONS_ENABLED=false`).
+Follow-up the same day: a failure tap opens the failed row itself (§2.3a), a
+foreground liquidation shows the in-app banner (§7), and a failed permission
+request no longer blocks the next first-launch prompt (§7).
 Device, preference and notice APIs work with the worker off. Real delivery has
 not been verified on a device: Android needs Firebase (FCM) credentials and iOS
 needs APNs credentials in EAS first (§8).
@@ -84,9 +87,10 @@ of the event's own account, read in the same query as the event.
 ### 2.2 Futures liquidation (`futures_liquidation`)
 
 One notification per `futures_liquidations` row (key
-`futures_liquidation:<id>`). A Cross liquidation that closed several positions
-is one row, hence one notification listing the count. A user close or a
-Season final exit (`futures_season_settlements`) is not a liquidation.
+`futures_liquidation:<id>`, payload `liquidationId: <id>`). A Cross
+liquidation that closed several positions is one row, hence one notification
+listing the count. A user close or a Season final exit
+(`futures_season_settlements`) is not a liquidation.
 
 ### 2.3 Order failure / expiry (`order_failure`)
 
@@ -109,6 +113,28 @@ Only terminal rows whose retries are over:
 - Futures limit entries have no failure or expiry state (they end `executed`
   or `canceled`), and a user market order fails synchronously in its own
   request, so neither produces a failure notification.
+- The payload names the row: `failureKind` = the key prefix (`loc`,
+  `conditional_buy`, `conditional_sell`, `futures_conditional_entry`,
+  `futures_tp_sl`, `entry_tp_sl_plan`) and `failureId` = the id after it.
+
+### 2.3a Reading a failure on tap (read-only)
+
+`GET /api/v1/trading-accounts/:accountId/order-failures/:failureKind/:failureId`
+(access token). Reads that one row only where `trading_account_id =
+:accountId` **and** the account's `user_id` is the caller; anything else —
+another user's or account's row, an unknown kind, a malformed id, a row that
+is gone — is the same 404 `ORDER_FAILURE_NOT_FOUND`. It never executes,
+retries, cancels or repairs anything.
+
+Answer `{ failure: { kind, id, tradingAccountId, market, status, final,
+instrument: { name, symbol }, side, direction, protection, reasonCode,
+failureCode, endedAt, createdAt } }`. `status` is the stored status as is;
+`final` is true only for the outcome this section announces (LOC
+`unfilled`/`expired`, otherwise `failed`) — a watching, triggered (retrying),
+ordered or pending row is `final: false` and the app does not call it a
+failure. `reasonCode` is the LOC `decision_reason` or the row's
+`terminal_reason`; `endedAt` is `decided_at` / `ended_at`. Codes are mapped
+to words in the app; no raw code is shown.
 
 ### 2.4 Friend request (`friend_request`)
 
@@ -240,8 +266,11 @@ Expiry after the event: fills 2 h, liquidations/failures 6 h, friend requests
 Message: `{ to, title, body, data, sound: 'default', channelId: 'default',
 priority: high (trading outcomes) | default, ttl: seconds to expiry }`.
 `data` = `{ v: 1, type, uid, accountId?, market?, futuresView?, seasonId?,
-noticeId? }` — ids only. `uid` is the recipient; the app ignores a tap for
-another signed-in user.
+noticeId?, failureKind?, failureId?, liquidationId? }` — ids only. `uid` is
+the recipient; the app ignores a tap for another signed-in user. The payload
+is fixed when the outbox row is created, so rows created before 2026-10-17's
+follow-up lack `failureKind`/`failureId`; the app opens nothing for such a
+failure tap (none were ever delivered: the worker has never been enabled).
 
 Observability: one Ops run (`job_name = push_notifications`) per minute with
 counts (`created` per source, `sent`, `retried`, `failed`, `skipped` per reason,
@@ -266,21 +295,36 @@ seven values. No row = all on. The OS permission is separate device state.
   it is undetermined and this install has not asked
   (`trading-app:push-permission-requested`). Android ≤12 is granted at
   install. Allowed/denied is never asked again; a denial blocks nothing. Web
-  does nothing.
+  does nothing. The marker is written before the prompt (a crash mid-prompt
+  counts as asked) but **removed again when the request throws or answers
+  "not determined"**, so a native failure never blocks the prompt on later
+  launches; each launch re-reads the OS state before asking. Errors never
+  reach sign-in, signup or app start.
 - **Registration** follows the session: register after sign-in/restore,
   release on logout/expiry, on OS permission off, on a token change (old
   token), and once per launch while signed out (reinstall case). Serialized,
   so a logout's release reaches the server before the next user's register.
 - **Foreground:** no OS banner/list/sound; the push refreshes only the reads
-  it changed (the in-app fill banner keeps announcing Spot fills).
+  it changed (the in-app fill banner keeps announcing Spot fills). A
+  `futures_liquidation` push for one of the signed-in user's own accounts is
+  also handed to that same banner queue (`선물 강제청산` + the push body,
+  내역 보기 → 선물 > 강제청산 기록): one banner at a time, never stacked on a fill
+  banner, and one liquidation event (`liquidationId`) is shown once even if
+  delivered again. It depends on the push actually arriving (worker on,
+  permission granted, type on); without it the futures screen's own position
+  list is the only foreground signal — there is no app-side liquidation
+  polling.
 - **Tap:** applied after sign-in and the investment-mode choice (main tabs),
   only for `uid` = the signed-in user, and an account target only if the
   account is in the user's own list; otherwise dropped (no screen opens).
-  Targets: fills/failures → 거래 내역 (`TradeHistory {accountId, market}`),
-  liquidation → 거래 내역 > 선물 > 강제청산 기록, friend request → 친구 >
-  받은 요청, notice → 공지사항 (opened), final result / ending soon → 시즌
-  전적 상세 (`RecordSeasonDetail`). A beginner's active quest holds the move
-  like any other navigation.
+  Targets: fills → 거래 내역 (`TradeHistory {accountId, market}`),
+  failures/expiries → 주문 실패·만료 (`OrderFailure {accountId, kind,
+  failureId}`, §2.3a: the stored result and reason, plus where the row is also
+  listed; a LOC links to 거래 내역 > 현물), liquidation → 거래 내역 > 선물 >
+  강제청산 기록, friend request → 친구 > 받은 요청, notice → 공지사항
+  (opened), final result / ending soon → 시즌 전적 상세
+  (`RecordSeasonDetail`). A beginner's active quest holds the move like any
+  other navigation.
 - **Settings:** seven server switches (saving state shown, failed saves
   revert with an error) and the OS permission state with 알림 허용하기 /
   기기 설정 열기.
@@ -294,24 +338,43 @@ seven values. No row = all on. The OS permission is separate device state.
 | `PUSH_NOTIFICATIONS_INTERVAL_MS` | `10000` | Tick, 2000–300000. |
 | `EXPO_ACCESS_TOKEN` | unset | Only with Expo enhanced push security; secret. |
 
-Required outside the code before any real delivery (none done yet):
+Required outside the code before any real delivery (none done yet; checked
+2026-10-17 against `2e0a60ae`):
 
-- **Android (FCM v1):** Firebase project for the package that is actually
-  built — the committed `frontend/android` uses **`com.leagueoftrading`**
-  (`app.json` says `com.anonymous.leagueoftrading`; the native project wins
-  while `android/` is committed). Add `google-services.json` to
-  `frontend/android/app/`, the `com.google.gms:google-services` Gradle
-  classpath/plugin, and upload the FCM v1 service-account key with
-  `eas credentials`. Without it the app cannot obtain a push token on Android
-  (registration fails silently; the permission prompt still works).
-- **iOS (APNs):** set `ios.bundleIdentifier` in `app.json`, an Apple Developer
-  account with Push Notifications, and an APNs key through `eas credentials`.
-  The `expo-notifications` config plugin adds the `aps-environment`
-  entitlement at prebuild.
-- A new native build (EAS) is required; the JS bundle alone cannot add the
-  module. Expo Go cannot receive remote pushes on Android.
-- Android notification icon: none is configured (the launcher icon is used);
-  add a monochrome icon via the plugin's `icon` option before release.
+- **Android package:** `com.leagueoftrading` everywhere — `android/app/build.gradle`
+  `namespace`/`applicationId` and `app.json` `android.package` (aligned in
+  `2e0a60ae`). EAS **skips prebuild** because `frontend/android/` is committed,
+  so `app.json` `android.*` and `plugins` (incl. the `expo-notifications`
+  options) are not applied to Android builds: native changes go into
+  `android/` by hand. (`app.json.bak` is stale and unused.)
+- **Android (FCM v1)** — not in the repo yet:
+  1. Firebase project → Android app `com.leagueoftrading` → download
+     `google-services.json` into `frontend/android/app/` (client config; decide
+     whether to commit it — EAS uploads git-tracked files — or inject it as an
+     EAS file secret).
+  2. In the same change (a build without the file would fail):
+     `classpath('com.google.gms:google-services:<4.4.x>')` in
+     `android/build.gradle` and `apply plugin: "com.google.gms.google-services"`
+     in `android/app/build.gradle`. Not done here because it cannot be built or
+     verified without the file.
+  3. `eas credentials` → Android → FCM V1 → upload the **service-account key**
+     (a secret: never commit it; `frontend/.gitignore` now ignores common key
+     file names).
+  Without these the app cannot obtain an Expo push token on Android
+  (registration fails silently; the permission prompt and channel still work —
+  `POST_NOTIFICATIONS` comes from the expo-notifications manifest merge).
+- **Android notification icon:** none configured; the launcher icon is used,
+  which renders as a white square on many devices. Add a white-on-transparent
+  `res/drawable-*/notification_icon.png` and, in the manifest `<application>`,
+  `meta-data` `expo.modules.notifications.default_notification_icon` (and
+  optionally `..._color`) — the plugin's `icon` option does not reach the
+  committed `android/`. Needs a designed asset.
+- **iOS (APNs):** no `ios` block in `app.json` and no `frontend/ios/`. Needs an
+  Apple Developer account, a registered bundle id set as `ios.bundleIdentifier`,
+  and an APNs key (.p8) through `eas credentials`; an iOS EAS build runs
+  prebuild, where the plugin adds `aps-environment`. Not invented here.
+- A new native build (EAS) is required for any of the above; the JS bundle
+  alone cannot add them. Expo Go cannot receive remote pushes on Android.
 
 ## 9. Rollout and rollback
 

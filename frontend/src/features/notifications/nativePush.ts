@@ -29,7 +29,9 @@ function snapshot(response: Notifications.NotificationPermissionsStatus): Permis
   };
 }
 
-export type ReceivedPush = { identifier: string; data: unknown };
+/** `title`/`body` are the server's copy (shown in-app for a foreground
+ * liquidation only); routing reads `data`. */
+export type ReceivedPush = { identifier: string; data: unknown; title?: string | null; body?: string | null };
 
 export const nativePush = {
   supported,
@@ -78,6 +80,8 @@ export const nativePush = {
       listener({
         identifier: notification.request.identifier,
         data: notification.request.content.data,
+        title: notification.request.content.title,
+        body: notification.request.content.body,
       }),
     );
   },
@@ -112,6 +116,10 @@ export const nativePush = {
 
   async writePermissionRequested() {
     await AsyncStorage.setItem(PERMISSION_REQUESTED_KEY, '1');
+  },
+
+  async clearPermissionRequested() {
+    await AsyncStorage.removeItem(PERMISSION_REQUESTED_KEY);
   },
 
   readStoredToken: () => AsyncStorage.getItem(REGISTERED_TOKEN_KEY),

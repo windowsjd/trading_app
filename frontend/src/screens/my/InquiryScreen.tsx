@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo, useRef, useState } from 'react';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useHeaderHeight } from '@react-navigation/elements';
 import { Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, View } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
@@ -13,6 +13,7 @@ import {
   createInquiry, getMyInquiries, INQUIRY_CATEGORIES, INQUIRY_LIMITS, InquiryResponseError,
   type InquiryCategory, type InquiryDto, type InquiryRequest,
 } from '../../features/inquiry/api';
+import type { MeDto } from '../../features/me/api';
 import ActionPressable from '../../components/common/ActionPressable';
 import CTAButton from '../../components/common/CTAButton';
 import WhaleLoader from '../../components/states/WhaleLoader';
@@ -30,9 +31,18 @@ const formatDate = (iso: string) => {
  * receipt is shown only for a server-confirmed inquiry. A repeated tap or a
  * retry after an unknown result reuses the same request id, so the same
  * inquiry is never filed twice; any edit starts a new request.
+ *
+ * 내 문의 내역 lists every page of the author's own inquiries (keyed by user,
+ * read again on every visit). A row opens in place to the original text and,
+ * only once the server holds an operator's answer, that answer and its time;
+ * until then it says 답변 대기 and nothing else.
  */
 export default function InquiryScreen() {
   const queryClient = useQueryClient();
+  // Observes the session's `me` (seeded at sign-in, fetched by the account
+  // provider); this screen never fetches it itself.
+  const userId = useQuery<MeDto>({ queryKey: QUERY_KEYS.me, enabled: false }).data?.id ?? null;
+  const [openId, setOpenId] = useState<string | null>(null);
   const headerHeight = useHeaderHeight();
   const inputScroll = useFocusedInputScroll();
   const titleRef = useRef<View>(null);
@@ -43,7 +53,18 @@ export default function InquiryScreen() {
   const [receipt, setReceipt] = useState<InquiryDto | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const attempt = useRef<Attempt | null>(null);
-  const list = useQuery({ queryKey: QUERY_KEYS.inquiries.mine, queryFn: ({ signal }) => getMyInquiries(signal) });
+  const list = useInfiniteQuery({
+    queryKey: QUERY_KEYS.inquiries.mine(userId ?? ''),
+    queryFn: ({ pageParam, signal }) => getMyInquiries(pageParam, signal),
+    initialPageParam: 0,
+    getNextPageParam: (page) => page.nextOffset ?? undefined,
+    enabled: !!userId,
+  });
+  // A row filed between page reads can repeat at a page edge: show it once.
+  const items = useMemo(() => {
+    const seen = new Set<string>();
+    return (list.data?.pages ?? []).flatMap((page) => page.items).filter((item) => !seen.has(item.id) && !!seen.add(item.id));
+  }, [list.data]);
   const mutation = useMutation({
     mutationFn: createInquiry,
     retry: false,
@@ -51,7 +72,7 @@ export default function InquiryScreen() {
       attempt.current = null;
       setReceipt(inquiry);
       setCategory(null); setTitle(''); setContent(''); setFailure(null);
-      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.inquiries.mine });
+      void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.inquiries.all });
     },
     onError: (error) => {
       const current = attempt.current;
@@ -160,23 +181,79 @@ export default function InquiryScreen() {
           )}
           <View style={styles.card} testID="inquiry-history">
             <Text style={styles.heading}>내 문의 내역</Text>
-            {list.isLoading ? <WhaleLoader size={28} accessibilityLabel="문의 내역을 불러오는 중" />
-              : list.isError ? (
+            {!userId || list.isLoading ? <WhaleLoader size={28} accessibilityLabel="문의 내역을 불러오는 중" />
+              : list.isError && !items.length ? (
                 <View style={styles.historyError}>
-                  <Text style={styles.error}>문의 내역을 불러오지 못했습니다.</Text>
-                  <CTAButton variant="neutral" label="다시 시도" onPress={() => void list.refetch()} />
+                  <Text testID="inquiry-history-error" style={styles.error}>문의 내역을 불러오지 못했습니다.</Text>
+                  <CTAButton testID="inquiry-history-retry" variant="neutral" label="다시 시도" onPress={() => void list.refetch()} />
                 </View>
-              ) : !list.data?.length ? <Text style={styles.caption}>아직 접수한 문의가 없습니다.</Text>
-                : list.data.map(item => (
-                  <View key={item.id} testID={`inquiry-item-${item.id}`} style={styles.historyRow}>
-                    <Text style={styles.historyTitle}>{item.title}</Text>
-                    <Text style={styles.caption}>{categoryLabel(item.category)} · {formatDate(item.createdAt)} · 접수됨</Text>
-                  </View>
-                ))}
+              ) : !items.length ? <Text style={styles.caption}>아직 접수한 문의가 없습니다.</Text>
+                : (
+                  <>
+                    {items.map(item => (
+                      <InquiryRow key={item.id} item={item} open={openId === item.id}
+                        onToggle={() => setOpenId(current => (current === item.id ? null : item.id))} />
+                    ))}
+                    {list.isFetchNextPageError ? (
+                      <Text testID="inquiry-history-more-error" accessibilityLiveRegion="polite" style={styles.error}>
+                        이전 문의를 불러오지 못했습니다. 다시 눌러 주세요.
+                      </Text>
+                    ) : null}
+                    {list.hasNextPage ? (
+                      <CTAButton testID="inquiry-history-more" variant="neutral"
+                        label={list.isFetchingNextPage ? '불러오는 중...' : '이전 문의 더 보기'}
+                        state={list.isFetchingNextPage ? 'loading' : 'enabled'}
+                        onPress={() => { if (!list.isFetchingNextPage) void list.fetchNextPage(); }} />
+                    ) : null}
+                  </>
+                )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+/** One inquiry: a summary that opens in place to the original and, once the
+ * server has it, the operator's answer. */
+function InquiryRow({ item, open, onToggle }: { item: InquiryDto; open: boolean; onToggle: () => void }) {
+  const answered = item.status === 'answered' && !!item.answer;
+  const status = answered ? '답변 완료' : '답변 대기';
+  return (
+    <View testID={`inquiry-item-${item.id}`} style={styles.historyRow}>
+      <ActionPressable testID={`inquiry-item-${item.id}-toggle`} accessibilityRole="button"
+        accessibilityLabel={`${item.title}, ${categoryLabel(item.category)}, ${status}`}
+        accessibilityHint={open ? '문의 내용을 접습니다.' : '문의 내용과 답변을 펼칩니다.'}
+        accessibilityState={{ expanded: open }} aria-expanded={open} onPress={onToggle} style={styles.rowHeader}>
+        {/* The title keeps the full width; the status sits on the meta line
+            so large text never squeezes it into a narrow column. */}
+        <View style={styles.rowText}>
+          <Text style={styles.historyTitle}>{item.title}</Text>
+          <View style={styles.meta}>
+            <Text testID={`inquiry-item-${item.id}-status`} style={[styles.status, answered ? styles.statusAnswered : styles.statusPending]}>{status}</Text>
+            <Text style={styles.caption}>{categoryLabel(item.category)} · {formatDate(item.createdAt)}</Text>
+          </View>
+        </View>
+        <Text style={styles.chevron} accessible={false}>{open ? '▲' : '▼'}</Text>
+      </ActionPressable>
+      {open ? (
+        <View testID={`inquiry-item-${item.id}-body`} style={styles.rowBody}>
+          <Text style={styles.label}>문의 내용</Text>
+          <Text selectable style={styles.paragraph}>{item.content}</Text>
+          {answered && item.answer ? (
+            <View testID={`inquiry-item-${item.id}-answer`} style={styles.answer}>
+              <Text style={styles.label}>운영팀 답변</Text>
+              <Text selectable style={styles.paragraph}>{item.answer.content}</Text>
+              <Text style={styles.caption}>답변 시각 {formatDate(item.answer.answeredAt)}</Text>
+            </View>
+          ) : (
+            <Text testID={`inquiry-item-${item.id}-waiting`} style={styles.caption}>
+              아직 답변을 준비하고 있어요. 답변이 등록되면 이곳에서 확인할 수 있어요.
+            </Text>
+          )}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -201,6 +278,17 @@ const styles = StyleSheet.create({
   iconText: { fontSize: 24, fontWeight: '700', color: semantic.success },
   receiptTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700', textAlign: 'center' },
   historyError: { gap: 8 },
-  historyRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: semantic.border, gap: 2 },
+  historyRow: { paddingVertical: 10, borderTopWidth: 1, borderTopColor: semantic.border, gap: 8 },
+  rowHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, minHeight: 44 },
+  rowText: { flex: 1, minWidth: 0, gap: 4 },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 6, rowGap: 2 },
   historyTitle: { fontSize: 15, lineHeight: 22, fontWeight: '600' },
+  status: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999, overflow: 'hidden', fontSize: 12, lineHeight: 18, fontWeight: '700', textAlign: 'center' },
+  statusPending: { color: semantic.secondary, backgroundColor: semantic.raised },
+  statusAnswered: { color: semantic.success, backgroundColor: semantic.successSurface },
+  chevron: { flexShrink: 0, fontSize: 12, lineHeight: 22, color: semantic.secondary },
+  rowBody: { gap: 6, paddingTop: 2 },
+  label: { fontSize: 13, lineHeight: 18, fontWeight: '700', color: semantic.secondary },
+  paragraph: { fontSize: 15, lineHeight: 22 },
+  answer: { gap: 4, marginTop: 4, padding: 12, borderRadius: 10, backgroundColor: semantic.raised },
 });

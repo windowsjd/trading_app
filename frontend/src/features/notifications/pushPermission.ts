@@ -7,6 +7,11 @@
  * whether a prompt can appear at all, e.g. after a reinstall). Android 12 and
  * below grant notifications at install, so they report `granted` and skip the
  * prompt. A denial never blocks sign-in or any screen.
+ *
+ * A request that ends without a decision — the native call throws, or it
+ * answers "not decided" (no prompt could be shown) — does not count as asked:
+ * the marker is removed, so a later launch asks again while the OS is still
+ * undecided. Only a crash while the prompt is up keeps the marker.
  */
 
 /** expo-notifications' IosAuthorizationStatus values. */
@@ -59,6 +64,7 @@ export type PermissionBootstrapDeps = {
   requestPermission: () => Promise<PermissionSnapshot>;
   readRequested: () => Promise<boolean>;
   writeRequested: () => Promise<void>;
+  clearRequested: () => Promise<void>;
 };
 
 /** Runs once per app start; never throws (a failure only skips the prompt). */
@@ -74,7 +80,17 @@ export async function bootstrapNotificationPermission(
     if (!shouldRequestOnFirstLaunch(current, requested)) return toDevicePermission(current);
     // Recorded before the prompt: a crash mid-prompt still counts as asked.
     await deps.writeRequested().catch(() => undefined);
-    return toDevicePermission(await deps.requestPermission());
+    let answer: PermissionSnapshot;
+    try {
+      answer = await deps.requestPermission();
+    } catch {
+      // No decision was made; the next launch re-reads the OS first.
+      await deps.clearRequested().catch(() => undefined);
+      return 'unavailable';
+    }
+    const result = toDevicePermission(answer);
+    if (result === 'undetermined') await deps.clearRequested().catch(() => undefined);
+    return result;
   } catch {
     return 'unavailable';
   }

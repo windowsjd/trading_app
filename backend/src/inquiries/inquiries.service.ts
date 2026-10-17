@@ -10,7 +10,7 @@ export const INQUIRY_CONTENT_LIMITS = { min: 10, max: 2000 } as const;
 export const INQUIRY_RATE_LIMIT = { count: 5, windowMs: 10 * 60_000 } as const;
 const CLIENT_REQUEST_ID = /^[A-Za-z0-9_-]{8,100}$/;
 // Control characters other than tab/newline/carriage return never belong in a form.
-const hasControlCharacter = (value: string) =>
+export const hasControlCharacter = (value: string) =>
   [...value].some((char) => {
     const code = char.charCodeAt(0);
     return (
@@ -26,12 +26,18 @@ export type InquiryBody = {
 };
 export type InquiriesQuery = { limit?: string; offset?: string };
 
+/** 답변 대기 until an operator's answer row exists, then 답변 완료. */
+export type InquiryStatus = 'pending' | 'answered';
+
 type InquiryView = {
   id: string;
   category: InquiryCategory;
   title: string;
   content: string;
   createdAt: string;
+  status: InquiryStatus;
+  /** The official answer; never who wrote it (operators stay internal). */
+  answer: { content: string; answeredAt: string } | null;
 };
 
 const SELECT = {
@@ -40,11 +46,16 @@ const SELECT = {
   title: true,
   content: true,
   createdAt: true,
+  answer: { select: { content: true, answeredAt: true } },
 } satisfies Prisma.InquirySelect;
+
+type InquiryRow = Prisma.InquiryGetPayload<{ select: typeof SELECT }>;
 
 /**
  * Support inquiries. Only the authenticated author can create or read their
- * own inquiries; there is no lookup by id and no other user's data. A form
+ * own inquiries (with the operator's answer, if any); there is no lookup by
+ * id and no other user's data. Operators answer through
+ * OperatorInquiriesService. A form
  * submit carries a client request id: the same id returns the stored inquiry
  * (a retried tap after a lost response never files twice), a different body
  * under the same id is a conflict.
@@ -124,14 +135,18 @@ export class InquiriesService {
     };
   }
 
-  private view(row: {
-    id: string;
-    category: InquiryCategory;
-    title: string;
-    content: string;
-    createdAt: Date;
-  }): InquiryView {
-    return { ...row, createdAt: row.createdAt.toISOString() };
+  private view({ answer, ...row }: InquiryRow): InquiryView {
+    return {
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      status: answer ? 'answered' : 'pending',
+      answer: answer
+        ? {
+            content: answer.content,
+            answeredAt: answer.answeredAt.toISOString(),
+          }
+        : null,
+    };
   }
 
   async create(userId: string | undefined, body: InquiryBody | undefined) {

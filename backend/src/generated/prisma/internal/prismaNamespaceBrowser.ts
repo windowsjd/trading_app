@@ -53,6 +53,7 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   User: 'User',
   Inquiry: 'Inquiry',
+  InquiryAnswer: 'InquiryAnswer',
   Friendship: 'Friendship',
   OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
@@ -166,6 +167,18 @@ export const InquiryScalarFieldEnum = {
 } as const
 
 export type InquiryScalarFieldEnum = (typeof InquiryScalarFieldEnum)[keyof typeof InquiryScalarFieldEnum]
+
+
+export const InquiryAnswerScalarFieldEnum = {
+  id: 'id',
+  inquiryId: 'inquiryId',
+  answeredByUserId: 'answeredByUserId',
+  idempotencyKey: 'idempotencyKey',
+  content: 'content',
+  answeredAt: 'answeredAt'
+} as const
+
+export type InquiryAnswerScalarFieldEnum = (typeof InquiryAnswerScalarFieldEnum)[keyof typeof InquiryAnswerScalarFieldEnum]
 
 
 export const FriendshipScalarFieldEnum = {

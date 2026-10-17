@@ -38,3 +38,11 @@ pnpm-debug.log*
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+
+# Push credentials (FCM v1 service-account keys, APNs keys, keystores): upload
+# them with `eas credentials`, never commit them.
+*-firebase-adminsdk-*.json
+*service-account*.json
+*.p8
+*.p12
+*.jks

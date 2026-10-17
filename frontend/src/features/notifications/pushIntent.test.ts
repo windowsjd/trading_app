@@ -12,6 +12,10 @@ import { refreshForPush } from './pushRefresh.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 
 const fill = { v: 1, type: 'trade_fill', uid: 'user-a', accountId: 'acct-1', market: 'spot' };
+const failure = {
+  v: 1, type: 'order_failure', uid: 'user-a', accountId: 'acct-1', market: 'futures',
+  failureKind: 'futures_tp_sl', failureId: 'tpsl-1',
+};
 
 function context(overrides: Partial<IntentContext> = {}): IntentContext {
   return {
@@ -48,7 +52,26 @@ describe('push payloads', () => {
       (parsePushData({ ...fill, market: 'futures' }) as { futuresView?: string }).futuresView,
       'executions',
     );
-    assert.equal(parsePushData({ ...fill, type: 'order_failure' })?.kind, 'trade_history');
+    // A failure opens its own row, never the fill history.
+    assert.deepEqual(parsePushData(failure), {
+      kind: 'order_failure',
+      type: 'order_failure',
+      uid: 'user-a',
+      accountId: 'acct-1',
+      market: 'futures',
+      failureKind: 'futures_tp_sl',
+      failureId: 'tpsl-1',
+    });
+    assert.equal(
+      (parsePushData({ ...fill, type: 'futures_liquidation', market: 'futures', liquidationId: 'liq-1' }) as { liquidationId?: string })
+        .liquidationId,
+      'liq-1',
+    );
+    assert.equal(
+      'liquidationId' in (parsePushData({ ...fill, liquidationId: 'liq-1' }) as object),
+      false,
+      'only a liquidation carries its event id',
+    );
     assert.equal(parsePushData({ v: 1, type: 'friend_request', uid: 'u' })?.kind, 'friend_requests');
     assert.equal(
       parsePushData({ v: 1, type: 'important_notice', uid: 'u', noticeId: 'n-1' })?.kind,
@@ -69,6 +92,12 @@ describe('push payloads', () => {
       { v: 1, type: 'marketing', uid: 'u' },
       { v: 1, type: 'important_notice', uid: 'u' },
       { v: 1, type: 'season_final_result', uid: 'u', seasonId: 'a b' },
+      // A failure without the row it names has nothing true to open.
+      { ...fill, type: 'order_failure' },
+      { ...failure, failureKind: 'refund' },
+      { ...failure, failureId: '../x' },
+      { ...failure, failureId: undefined },
+      { ...failure, market: undefined },
     ])
       assert.equal(parsePushData(data), null);
   });
@@ -93,6 +122,21 @@ describe('applying a tapped push', () => {
       action: 'discard',
       reason: 'account_not_owned',
     });
+  });
+
+  it('opens a failure only in an owned account, guarded as its own screen', () => {
+    const tap = parsePushData(failure)!;
+    assert.deepEqual(resolvePushIntent(tap, context()), { action: 'navigate', intent: tap });
+    assert.deepEqual(resolvePushIntent(tap, context({ ownedAccountIds: null })), { action: 'wait' });
+    assert.deepEqual(resolvePushIntent(tap, context({ ownedAccountIds: ['acct-2'] })), {
+      action: 'discard',
+      reason: 'account_not_owned',
+    });
+    assert.deepEqual(resolvePushIntent(tap, context({ userId: 'user-b' })), {
+      action: 'discard',
+      reason: 'other_user',
+    });
+    assert.equal(intentGuardName(tap), 'OrderFailure');
   });
 
   it('drops a tap that waited too long for a sign-in', () => {
@@ -139,6 +183,14 @@ describe('foreground refresh', () => {
     const notice = client();
     refreshForPush(notice, parsePushData({ v: 1, type: 'important_notice', uid: 'u', noticeId: 'n' })!, { seasonUi: false });
     assert.deepEqual(notice.keys, [JSON.stringify(QUERY_KEYS.notices.important)]);
+    const spotFailure = client();
+    refreshForPush(spotFailure, parsePushData({ ...failure, market: 'spot', failureKind: 'conditional_buy' })!, { seasonUi: false });
+    assert.equal(spotFailure.keys.includes(JSON.stringify(QUERY_KEYS.tradingAccount.conditionalBuy.all('acct-1'))), true);
+    assert.equal(spotFailure.keys.includes(JSON.stringify(QUERY_KEYS.tradingAccount.entryTpSl.all('acct-1'))), true);
+    const futuresFailure = client();
+    refreshForPush(futuresFailure, parsePushData(failure)!, { seasonUi: false });
+    assert.equal(futuresFailure.keys.includes(JSON.stringify(QUERY_KEYS.tradingAccount.futures.all('acct-1'))), true);
+    assert.equal(futuresFailure.keys.some((key) => key.includes('acct-2')), false);
     const season = client();
     refreshForPush(season, parsePushData({ v: 1, type: 'season_ending_soon', uid: 'u', seasonId: 's' })!, { seasonUi: false });
     assert.equal(season.keys.includes(JSON.stringify(QUERY_KEYS.record.all)), true);

@@ -41,6 +41,11 @@ const FAILURE: Record<string, string> = {
   FUTURES_MARK_STALE: 'Mark 시세를 확인할 수 없었습니다.',
 };
 
+/** A Futures execution refusal in words (conditional entry or TP/SL); null if unknown. */
+export function getFuturesFailureText(code: string | null | undefined) {
+  return (code && FAILURE[code]) || null;
+}
+
 /** Why a row ended, in words; null while it is still open. */
 export function getFuturesConditionalEndReason(entry: Pick<FuturesConditionalEntry, 'state' | 'terminalReason' | 'failureCode'>) {
   if (entry.state === 'failed')

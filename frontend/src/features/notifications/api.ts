@@ -3,6 +3,32 @@ import { apiClient } from '../../services/api/client';
 import { API_BASE_URL } from '../../constants/env';
 import type { ApiSuccessResponse } from '../../models/dto/common';
 import type { NotificationPreferences } from './types';
+import { parseOrderFailure, type OrderFailureKind } from './orderFailure';
+
+export class OrderFailureResponseError extends Error {
+  constructor() {
+    super('주문 결과를 확인할 수 없습니다.');
+    this.name = 'OrderFailureResponseError';
+  }
+}
+
+/** The stored result of one failure row in the caller's own account; a
+ * 404 means it is not (or no longer) this account's. Read-only. */
+export async function getOrderFailure(
+  accountId: string,
+  kind: OrderFailureKind,
+  failureId: string,
+  signal?: AbortSignal,
+) {
+  const response = await apiClient.get<ApiSuccessResponse<{ failure: unknown }>>(
+    `/trading-accounts/${encodeURIComponent(accountId)}/order-failures/${kind}/${encodeURIComponent(failureId)}`,
+    { signal },
+  );
+  const failure = parseOrderFailure(response.data?.data?.failure);
+  if (!failure || failure.tradingAccountId !== accountId || failure.kind !== kind || failure.id !== failureId)
+    throw new OrderFailureResponseError();
+  return failure;
+}
 
 export async function getNotificationPreferences(signal?: AbortSignal) {
   const response = await apiClient.get<

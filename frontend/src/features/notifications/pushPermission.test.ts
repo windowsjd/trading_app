@@ -13,17 +13,22 @@ const undetermined: PermissionSnapshot = { status: 'undetermined', granted: fals
 const granted: PermissionSnapshot = { status: 'granted', granted: true, canAskAgain: true };
 const denied: PermissionSnapshot = { status: 'denied', granted: false, canAskAgain: false };
 
-function deps(initial: PermissionSnapshot, answer: PermissionSnapshot, requested = false) {
+function deps(initial: PermissionSnapshot, answer: PermissionSnapshot | Error, requested = false) {
   const calls: string[] = [];
-  let flag = requested;
+  const state = { flag: requested };
   const d: PermissionBootstrapDeps = {
     ensureChannel: async () => { calls.push('channel'); },
     getPermission: async () => { calls.push('get'); return initial; },
-    requestPermission: async () => { calls.push('request'); return answer; },
-    readRequested: async () => flag,
-    writeRequested: async () => { calls.push('mark'); flag = true; },
+    requestPermission: async () => {
+      calls.push('request');
+      if (answer instanceof Error) throw answer;
+      return answer;
+    },
+    readRequested: async () => state.flag,
+    writeRequested: async () => { calls.push('mark'); state.flag = true; },
+    clearRequested: async () => { calls.push('clear'); state.flag = false; },
   };
-  return { d, calls };
+  return { d, calls, state };
 }
 
 describe('first-launch notification permission', () => {
@@ -71,6 +76,53 @@ describe('first-launch notification permission', () => {
       writeRequested: async () => { throw new Error('storage'); },
     });
     assert.equal(calls.includes('request'), true);
+  });
+
+  it('keeps the marker after a real answer, so the next launch does not ask', async () => {
+    for (const answer of [granted, denied, { ...denied, iosStatus: 1 }]) {
+      const { d, calls, state } = deps(undetermined, answer);
+      await bootstrapNotificationPermission(d);
+      assert.equal(calls.includes('clear'), false);
+      assert.equal(state.flag, true);
+    }
+  });
+
+  it('a request that fails before any decision leaves the next launch free to ask', async () => {
+    const { d, calls, state } = deps(undetermined, new Error('no current activity'));
+    assert.equal(await bootstrapNotificationPermission(d), 'unavailable');
+    assert.deepEqual(calls, ['channel', 'get', 'mark', 'request', 'clear']);
+    assert.equal(state.flag, false);
+    // Next launch: still undecided, so it asks once more.
+    const next = deps(undetermined, granted, state.flag);
+    assert.equal(await bootstrapNotificationPermission(next.d), 'granted');
+    assert.equal(next.calls.includes('request'), true);
+  });
+
+  it('an answer that is still undecided (no prompt shown) is not counted as asked', async () => {
+    const { d, state } = deps(undetermined, undetermined);
+    assert.equal(await bootstrapNotificationPermission(d), 'undetermined');
+    assert.equal(state.flag, false);
+    // iOS reports "not determined" through its own status.
+    const ios = deps({ ...undetermined, iosStatus: 0 }, { ...granted, iosStatus: 0 });
+    await bootstrapNotificationPermission(ios.d);
+    assert.equal(ios.state.flag, false);
+  });
+
+  it('never throws when the marker cannot be cleared either', async () => {
+    const { d } = deps(undetermined, new Error('native'));
+    const result = await bootstrapNotificationPermission({
+      ...d,
+      clearRequested: async () => { throw new Error('storage'); },
+    });
+    assert.equal(result, 'unavailable');
+  });
+
+  it('a later launch whose OS already decided never asks, even after a failed request', async () => {
+    for (const current of [granted, denied]) {
+      const { d, calls } = deps(current, granted, false);
+      await bootstrapNotificationPermission(d);
+      assert.equal(calls.includes('request'), false);
+    }
   });
 
   it('reads iOS through its authorization status', () => {

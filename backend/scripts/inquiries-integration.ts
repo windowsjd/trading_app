@@ -1,4 +1,5 @@
-/** Isolated PostgreSQL + real HTTP/guard integration for support inquiries; no financial writes. */
+/** Isolated PostgreSQL + real HTTP/guard integration for support inquiries
+ * and their operator answers; no financial writes. */
 import 'reflect-metadata';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -11,11 +12,17 @@ import { ConfigService } from '@nestjs/config';
 import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
-import { InquiriesController } from '../src/inquiries/inquiries.controller';
+import {
+  InquiriesController,
+  OperatorInquiriesController,
+} from '../src/inquiries/inquiries.controller';
 import {
   InquiriesService,
   INQUIRY_RATE_LIMIT,
 } from '../src/inquiries/inquiries.service';
+import { OperatorInquiriesService } from '../src/inquiries/operator-inquiries.service';
+import { OperatorAuditService } from '../src/operator/operator-audit.service';
+import { OperatorGuard } from '../src/operator/operator.guard';
 
 const url = process.env.DATABASE_URL ?? '';
 if (
@@ -37,7 +44,11 @@ function check(condition: unknown, message: string): asserts condition {
   assertions++;
 }
 
-/** The migration SQL itself, in a throwaway schema (rolled back). */
+const migration = (name: string) =>
+  readFileSync(`prisma/migrations/${name}/migration.sql`, 'utf8');
+
+/** The migration SQL itself, in a throwaway schema (rolled back): an inquiry
+ * filed before the answer migration survives it unchanged and unanswered. */
 async function migrationShape() {
   const pool = new Pool({ connectionString: url });
   const client = await pool.connect();
@@ -47,16 +58,45 @@ async function migrationShape() {
     await client.query(`CREATE SCHEMA "${schema}"`);
     await client.query(`SET LOCAL search_path TO "${schema}"`);
     await client.query('CREATE TABLE users (id TEXT PRIMARY KEY)');
-    await client.query(
-      readFileSync(
-        'prisma/migrations/20261012120000_add_user_inquiries/migration.sql',
-        'utf8',
-      ),
-    );
-    await client.query("INSERT INTO users VALUES ('u1')");
+    await client.query(migration('20261012120000_add_user_inquiries'));
+    await client.query("INSERT INTO users VALUES ('u1'), ('op1')");
     await client.query(
       "INSERT INTO inquiries (id, user_id, client_request_id, category, title, content) VALUES ('i1', 'u1', 'k1', 'bug', 'title', 'content body')",
     );
+    const before = await client.query('SELECT * FROM inquiries ORDER BY id');
+    await client.query(migration('20261017180000_add_inquiry_answers'));
+    const after = await client.query('SELECT * FROM inquiries ORDER BY id');
+    check(
+      JSON.stringify(after.rows) === JSON.stringify(before.rows),
+      'answer migration: existing inquiries unchanged',
+    );
+    const unanswered = await client.query(
+      'SELECT count(*)::int AS n FROM inquiries i LEFT JOIN inquiry_answers a ON a.inquiry_id = i.id WHERE a.id IS NULL',
+    );
+    check(unanswered.rows[0].n === 1, 'answer migration: old inquiry pending');
+    await client.query(
+      "INSERT INTO inquiry_answers (id, inquiry_id, answered_by_user_id, idempotency_key, content) VALUES ('a1', 'i1', 'op1', 'key-1', '답변입니다')",
+    );
+    for (const [label, sql] of [
+      [
+        'a second answer',
+        "INSERT INTO inquiry_answers (id, inquiry_id, answered_by_user_id, idempotency_key, content) VALUES ('a2', 'i1', 'op1', 'key-2', '두 번째')",
+      ],
+      [
+        'a blank answer',
+        "INSERT INTO inquiry_answers (id, inquiry_id, answered_by_user_id, idempotency_key, content) VALUES ('a3', 'i1', 'op1', 'key-3', '   ')",
+      ],
+      [
+        'an unknown inquiry',
+        "INSERT INTO inquiry_answers (id, inquiry_id, answered_by_user_id, idempotency_key, content) VALUES ('a4', 'nope', 'op1', 'key-4', '답변')",
+      ],
+      ['deleting an answered inquiry', "DELETE FROM inquiries WHERE id = 'i1'"],
+    ]) {
+      await client.query('SAVEPOINT answer_check');
+      await assert.rejects(client.query(sql), label);
+      await client.query('ROLLBACK TO SAVEPOINT answer_check');
+    }
+    check(true, 'answer migration: one non-blank answer per existing inquiry');
     await client.query('SAVEPOINT duplicate');
     await assert.rejects(
       client.query(
@@ -92,8 +132,16 @@ async function financialState() {
 
 async function run() {
   await migrationShape();
-  for (const [index, status] of (
-    ['active', 'active', 'suspended'] as const
+  // 0, 1: users; 2: suspended user; 3, 4: operator, admin; 5: suspended operator.
+  for (const [index, [status, role]] of (
+    [
+      ['active', 'user'],
+      ['active', 'user'],
+      ['suspended', 'user'],
+      ['active', 'operator'],
+      ['active', 'admin'],
+      ['suspended', 'operator'],
+    ] as const
   ).entries()) {
     const user = await db.user.create({
       data: {
@@ -101,6 +149,7 @@ async function run() {
         nickname: `inquiry-${tag}-${index}`,
         passwordHash: 'test-only',
         status,
+        role,
       },
     });
     userIds.push(user.id);
@@ -119,10 +168,21 @@ async function run() {
     [InquiriesService],
     InquiriesController,
   );
+  Reflect.defineMetadata(
+    'design:paramtypes',
+    [OperatorInquiriesService],
+    OperatorInquiriesController,
+  );
+  const audit = new OperatorAuditService(db);
   const app = await Test.createTestingModule({
-    controllers: [InquiriesController],
+    controllers: [InquiriesController, OperatorInquiriesController],
     providers: [
       { provide: InquiriesService, useValue: new InquiriesService(db) },
+      {
+        provide: OperatorInquiriesService,
+        useValue: new OperatorInquiriesService(db, audit),
+      },
+      OperatorGuard,
     ],
   }).compile();
   const http = app.createNestApplication();
@@ -238,6 +298,8 @@ async function run() {
     'a replay is still answered when limited',
   );
 
+  await operatorAnswers(server, token, mine, first.id);
+
   check(
     (await financialState()) === baseline,
     'inquiries never change financial rows',
@@ -245,9 +307,292 @@ async function run() {
   console.log(`inquiries PostgreSQL + HTTP ok (${assertions} assertions)`);
 }
 
+type Server = Parameters<typeof request>[0];
+
+/** Operator answers over real HTTP + guards against the same database. */
+async function operatorAnswers(
+  server: Server,
+  token: (index: number) => string,
+  mine: (index?: number, query?: string) => request.Test,
+  inquiryId: string,
+) {
+  const operatorGet = (index: number, path = '') =>
+    request(server)
+      .get(`/api/v1/operator/inquiries${path}`)
+      .auth(token(index), { type: 'bearer' });
+  const answer = (index: number, body: object, id = inquiryId) =>
+    request(server)
+      .post(`/api/v1/operator/inquiries/${id}/answer`)
+      .auth(token(index), { type: 'bearer' })
+      .set('x-request-id', `req-${tag}`)
+      .send(body);
+  const answers = () =>
+    db.inquiryAnswer.count({ where: { inquiry: { userId: userIds[0] } } });
+  const original = await db.inquiry.findUniqueOrThrow({
+    where: { id: inquiryId },
+  });
+
+  let r = await request(server).get('/api/v1/operator/inquiries');
+  check(r.status === 401, 'operator list needs a token');
+  r = await operatorGet(0);
+  check(
+    r.status === 403 && r.body.error.code === 'OPERATOR_FORBIDDEN',
+    'a user cannot list inquiries',
+  );
+  r = await answer(0, { content: '셀프 답변입니다', idempotencyKey: 'self-1' });
+  check(
+    r.status === 403 && (await answers()) === 0,
+    'a user cannot answer, even their own inquiry',
+  );
+  r = await answer(5, { content: '정지된 운영자', idempotencyKey: 'sus-1' });
+  check(
+    r.status === 403 && r.body.error.code === 'USER_NOT_ACTIVE',
+    'a suspended operator cannot answer',
+  );
+
+  r = await mine(0);
+  check(
+    r.body.data.items.every(
+      (item: { status: string; answer: unknown }) =>
+        item.status === 'pending' && item.answer === null,
+    ),
+    'before any answer every inquiry reads 답변 대기',
+  );
+  r = await operatorGet(3, '?status=pending&limit=50');
+  check(
+    r.status === 200 &&
+      r.body.data.inquiries.some(
+        (item: { id: string }) => item.id === inquiryId,
+      ),
+    'operator sees the pending inquiry',
+  );
+  r = await operatorGet(3, `/${inquiryId}`);
+  check(
+    r.status === 200 &&
+      r.body.data.inquiry.content === original.content &&
+      r.body.data.inquiry.user.id === userIds[0],
+    'operator reads the original inquiry',
+  );
+  r = await operatorGet(3, '/missing-inquiry');
+  check(r.status === 404, 'unknown inquiry 404');
+  r = await answer(3, { content: ' ', idempotencyKey: 'blank-1' });
+  check(
+    r.status === 400 && r.body.error.code === 'INVALID_INQUIRY_ANSWER',
+    'blank answer rejected',
+  );
+  r = await answer(3, { content: '답변', idempotencyKey: 'x' }, 'missing');
+  check(r.status === 404, 'answer to a missing inquiry 404');
+
+  // Operator and admin race to answer the same inquiry.
+  const race = await Promise.all([
+    answer(3, { content: '운영자 답변입니다.', idempotencyKey: `op-${tag}` }),
+    answer(4, { content: '관리자 답변입니다.', idempotencyKey: `ad-${tag}` }),
+  ]);
+  const statuses = race.map((response) => response.status).sort();
+  check(
+    statuses[0] === 201 && statuses[1] === 409,
+    'concurrent answers: exactly one wins',
+  );
+  check((await answers()) === 1, 'concurrent answers: one stored answer');
+  const winner = race.find((response) => response.status === 201)!;
+  const loser = race.find((response) => response.status === 409)!;
+  check(
+    loser.body.error.code === 'INQUIRY_ALREADY_ANSWERED',
+    'the loser is told it was already answered',
+  );
+  const winnerIndex = winner === race[0] ? 3 : 4;
+  const winnerBody =
+    winnerIndex === 3
+      ? { content: '운영자 답변입니다.', idempotencyKey: `op-${tag}` }
+      : { content: '관리자 답변입니다.', idempotencyKey: `ad-${tag}` };
+
+  // A lost response retried (several times at once) replays, never adds.
+  const retries = await Promise.all(
+    [1, 2, 3].map(() => answer(winnerIndex, winnerBody)),
+  );
+  check(
+    retries.every(
+      (response) => response.status === 201 && response.body.data.replayed,
+    ) && (await answers()) === 1,
+    'retried answer replays the stored one',
+  );
+  r = await answer(winnerIndex, { ...winnerBody, content: '고친 답변입니다.' });
+  check(
+    r.status === 409 &&
+      r.body.error.code === 'INQUIRY_ANSWER_IDEMPOTENCY_CONFLICT',
+    'same key, different text: conflict, no overwrite',
+  );
+  const stored = await db.inquiryAnswer.findUniqueOrThrow({
+    where: { inquiryId },
+  });
+  check(
+    stored.content === winnerBody.content &&
+      stored.answeredByUserId === userIds[winnerIndex],
+    'the first committed answer is kept with its operator',
+  );
+  const unchanged = await db.inquiry.findUniqueOrThrow({
+    where: { id: inquiryId },
+  });
+  check(
+    JSON.stringify(unchanged) === JSON.stringify(original),
+    'answering never changes the inquiry row',
+  );
+
+  r = await mine(0);
+  const shown = r.body.data.items.find(
+    (item: { id: string }) => item.id === inquiryId,
+  );
+  check(
+    shown.status === 'answered' &&
+      shown.answer.content === winnerBody.content &&
+      shown.answer.answeredAt === stored.answeredAt.toISOString() &&
+      !JSON.stringify(shown).includes(userIds[winnerIndex]),
+    'author sees the answer and time, not the operator',
+  );
+  r = await mine(0);
+  check(
+    JSON.stringify(
+      r.body.data.items.find((item: { id: string }) => item.id === inquiryId),
+    ) === JSON.stringify(shown),
+    're-reading shows the same answer',
+  );
+  r = await mine(1);
+  check(
+    r.body.data.items.length === 0,
+    'another user still sees none of these',
+  );
+
+  // An answer whose success audit fails is rolled back.
+  const second = await db.inquiry.findFirstOrThrow({
+    where: { userId: userIds[0], id: { not: inquiryId } },
+  });
+  const failingAudit = new OperatorAuditService(db);
+  const realRecordSuccess = failingAudit.recordSuccess.bind(failingAudit);
+  failingAudit.recordSuccess = ((input, client) =>
+    client
+      ? Promise.reject(new Error('audit insert failed'))
+      : realRecordSuccess(input, client)) as typeof failingAudit.recordSuccess;
+  const failing = new OperatorInquiriesService(db, failingAudit);
+  await assert.rejects(
+    failing.answer({ userId: userIds[3], role: 'operator' }, second.id, {
+      content: '롤백될 답변입니다.',
+      idempotencyKey: `rb-${tag}`,
+    }),
+    /audit insert failed/,
+  );
+  check(
+    (await db.inquiryAnswer.count({ where: { inquiryId: second.id } })) === 0,
+    'a failed audit leaves no answer',
+  );
+  r = await mine(0);
+  check(
+    r.body.data.items.find((item: { id: string }) => item.id === second.id)
+      .status === 'pending',
+    'and the inquiry still reads 답변 대기',
+  );
+
+  const audits = await db.operatorAuditLog.findMany({
+    where: { actorUserId: { in: userIds } },
+    orderBy: { createdAt: 'asc' },
+  });
+  const count = (action: string, result: string, code?: string) =>
+    audits.filter(
+      (row) =>
+        row.action === action &&
+        row.result === result &&
+        (code === undefined || row.errorCode === code),
+    ).length;
+  check(
+    count('operator.inquiry.answer', 'success') === 1,
+    'one success audit for the one answer',
+  );
+  check(
+    count('operator.inquiry.answer.replay', 'success') === 3,
+    'replays are audited separately',
+  );
+  check(
+    count(
+      'operator.inquiry.answer.failed',
+      'failure',
+      'INQUIRY_ALREADY_ANSWERED',
+    ) === 1 &&
+      count(
+        'operator.inquiry.answer.failed',
+        'failure',
+        'INQUIRY_ANSWER_IDEMPOTENCY_CONFLICT',
+      ) === 1 &&
+      count(
+        'operator.inquiry.answer.failed',
+        'failure',
+        'INVALID_INQUIRY_ANSWER',
+      ) === 1 &&
+      count(
+        'operator.inquiry.answer.failed',
+        'failure',
+        'INQUIRY_NOT_FOUND',
+      ) === 1 &&
+      count(
+        'operator.inquiry.answer.failed',
+        'failure',
+        'INQUIRY_ANSWER_FAILED',
+      ) === 1,
+    'conflict, invalid, not-found and failed attempts are told apart',
+  );
+  check(
+    count('operator.inquiries.list', 'success') >= 1 &&
+      count('operator.inquiry.get', 'success') === 1,
+    'operator reads are audited',
+  );
+  check(
+    audits.every((row) => {
+      const text = JSON.stringify(row);
+      return !text.includes(original.content) && !text.includes('답변입니다');
+    }),
+    'audits hold no inquiry or answer text',
+  );
+
+  // Paging reaches the oldest inquiry across the 20-row boundary.
+  const base = Date.now() - 86_400_000;
+  await db.inquiry.createMany({
+    data: Array.from({ length: 23 }, (_, index) => ({
+      userId: userIds[1],
+      clientRequestId: `inquiry_${tag}_page_${index}`,
+      category: 'other' as const,
+      title: `페이지 문의 ${index}`,
+      content: '페이지 경계 확인용 문의입니다.',
+      createdAt: new Date(base + index * 1000),
+    })),
+  });
+  const page1 = await mine(1, '?limit=20&offset=0');
+  const page2 = await mine(
+    1,
+    `?limit=20&offset=${page1.body.data.pagination.nextOffset}`,
+  );
+  const ids = new Set(
+    [...page1.body.data.items, ...page2.body.data.items].map(
+      (item: { id: string }) => item.id,
+    ),
+  );
+  check(
+    page1.body.data.pagination.total === 23 &&
+      page2.body.data.pagination.nextOffset === null &&
+      ids.size === 23 &&
+      page2.body.data.items.some(
+        (item: { title: string }) => item.title === '페이지 문의 0',
+      ),
+    'two pages hold every inquiry once, the oldest included',
+  );
+}
+
 run()
   .finally(async () => {
     if (closeHttp) await closeHttp();
+    await db.operatorAuditLog.deleteMany({
+      where: { actorUserId: { in: userIds } },
+    });
+    await db.inquiryAnswer.deleteMany({
+      where: { inquiry: { userId: { in: userIds } } },
+    });
     await db.inquiry.deleteMany({ where: { userId: { in: userIds } } });
     await db.user.deleteMany({ where: { id: { in: userIds } } });
     await db.$disconnect();

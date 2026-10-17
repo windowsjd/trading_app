@@ -200,6 +200,7 @@ export type InquiryWhereInput = {
   content?: Prisma.StringFilter<"Inquiry"> | string
   createdAt?: Prisma.DateTimeFilter<"Inquiry"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  answer?: Prisma.XOR<Prisma.InquiryAnswerNullableScalarRelationFilter, Prisma.InquiryAnswerWhereInput> | null
 }
 
 export type InquiryOrderByWithRelationInput = {
@@ -211,6 +212,7 @@ export type InquiryOrderByWithRelationInput = {
   content?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
+  answer?: Prisma.InquiryAnswerOrderByWithRelationInput
 }
 
 export type InquiryWhereUniqueInput = Prisma.AtLeast<{
@@ -226,6 +228,7 @@ export type InquiryWhereUniqueInput = Prisma.AtLeast<{
   content?: Prisma.StringFilter<"Inquiry"> | string
   createdAt?: Prisma.DateTimeFilter<"Inquiry"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
+  answer?: Prisma.XOR<Prisma.InquiryAnswerNullableScalarRelationFilter, Prisma.InquiryAnswerWhereInput> | null
 }, "id" | "userId_clientRequestId">
 
 export type InquiryOrderByWithAggregationInput = {
@@ -262,6 +265,7 @@ export type InquiryCreateInput = {
   content: string
   createdAt?: Date | string
   user: Prisma.UserCreateNestedOneWithoutInquiriesInput
+  answer?: Prisma.InquiryAnswerCreateNestedOneWithoutInquiryInput
 }
 
 export type InquiryUncheckedCreateInput = {
@@ -272,6 +276,7 @@ export type InquiryUncheckedCreateInput = {
   title: string
   content: string
   createdAt?: Date | string
+  answer?: Prisma.InquiryAnswerUncheckedCreateNestedOneWithoutInquiryInput
 }
 
 export type InquiryUpdateInput = {
@@ -282,6 +287,7 @@ export type InquiryUpdateInput = {
   content?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneRequiredWithoutInquiriesNestedInput
+  answer?: Prisma.InquiryAnswerUpdateOneWithoutInquiryNestedInput
 }
 
 export type InquiryUncheckedUpdateInput = {
@@ -292,6 +298,7 @@ export type InquiryUncheckedUpdateInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  answer?: Prisma.InquiryAnswerUncheckedUpdateOneWithoutInquiryNestedInput
 }
 
 export type InquiryCreateManyInput = {
@@ -368,6 +375,11 @@ export type InquiryMinOrderByAggregateInput = {
   createdAt?: Prisma.SortOrder
 }
 
+export type InquiryScalarRelationFilter = {
+  is?: Prisma.InquiryWhereInput
+  isNot?: Prisma.InquiryWhereInput
+}
+
 export type InquiryCreateNestedManyWithoutUserInput = {
   create?: Prisma.XOR<Prisma.InquiryCreateWithoutUserInput, Prisma.InquiryUncheckedCreateWithoutUserInput> | Prisma.InquiryCreateWithoutUserInput[] | Prisma.InquiryUncheckedCreateWithoutUserInput[]
   connectOrCreate?: Prisma.InquiryCreateOrConnectWithoutUserInput | Prisma.InquiryCreateOrConnectWithoutUserInput[]
@@ -414,6 +426,20 @@ export type EnumInquiryCategoryFieldUpdateOperationsInput = {
   set?: $Enums.InquiryCategory
 }
 
+export type InquiryCreateNestedOneWithoutAnswerInput = {
+  create?: Prisma.XOR<Prisma.InquiryCreateWithoutAnswerInput, Prisma.InquiryUncheckedCreateWithoutAnswerInput>
+  connectOrCreate?: Prisma.InquiryCreateOrConnectWithoutAnswerInput
+  connect?: Prisma.InquiryWhereUniqueInput
+}
+
+export type InquiryUpdateOneRequiredWithoutAnswerNestedInput = {
+  create?: Prisma.XOR<Prisma.InquiryCreateWithoutAnswerInput, Prisma.InquiryUncheckedCreateWithoutAnswerInput>
+  connectOrCreate?: Prisma.InquiryCreateOrConnectWithoutAnswerInput
+  upsert?: Prisma.InquiryUpsertWithoutAnswerInput
+  connect?: Prisma.InquiryWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.InquiryUpdateToOneWithWhereWithoutAnswerInput, Prisma.InquiryUpdateWithoutAnswerInput>, Prisma.InquiryUncheckedUpdateWithoutAnswerInput>
+}
+
 export type InquiryCreateWithoutUserInput = {
   id?: string
   clientRequestId: string
@@ -421,6 +447,7 @@ export type InquiryCreateWithoutUserInput = {
   title: string
   content: string
   createdAt?: Date | string
+  answer?: Prisma.InquiryAnswerCreateNestedOneWithoutInquiryInput
 }
 
 export type InquiryUncheckedCreateWithoutUserInput = {
@@ -430,6 +457,7 @@ export type InquiryUncheckedCreateWithoutUserInput = {
   title: string
   content: string
   createdAt?: Date | string
+  answer?: Prisma.InquiryAnswerUncheckedCreateNestedOneWithoutInquiryInput
 }
 
 export type InquiryCreateOrConnectWithoutUserInput = {
@@ -471,6 +499,62 @@ export type InquiryScalarWhereInput = {
   createdAt?: Prisma.DateTimeFilter<"Inquiry"> | Date | string
 }
 
+export type InquiryCreateWithoutAnswerInput = {
+  id?: string
+  clientRequestId: string
+  category: $Enums.InquiryCategory
+  title: string
+  content: string
+  createdAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutInquiriesInput
+}
+
+export type InquiryUncheckedCreateWithoutAnswerInput = {
+  id?: string
+  userId: string
+  clientRequestId: string
+  category: $Enums.InquiryCategory
+  title: string
+  content: string
+  createdAt?: Date | string
+}
+
+export type InquiryCreateOrConnectWithoutAnswerInput = {
+  where: Prisma.InquiryWhereUniqueInput
+  create: Prisma.XOR<Prisma.InquiryCreateWithoutAnswerInput, Prisma.InquiryUncheckedCreateWithoutAnswerInput>
+}
+
+export type InquiryUpsertWithoutAnswerInput = {
+  update: Prisma.XOR<Prisma.InquiryUpdateWithoutAnswerInput, Prisma.InquiryUncheckedUpdateWithoutAnswerInput>
+  create: Prisma.XOR<Prisma.InquiryCreateWithoutAnswerInput, Prisma.InquiryUncheckedCreateWithoutAnswerInput>
+  where?: Prisma.InquiryWhereInput
+}
+
+export type InquiryUpdateToOneWithWhereWithoutAnswerInput = {
+  where?: Prisma.InquiryWhereInput
+  data: Prisma.XOR<Prisma.InquiryUpdateWithoutAnswerInput, Prisma.InquiryUncheckedUpdateWithoutAnswerInput>
+}
+
+export type InquiryUpdateWithoutAnswerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  clientRequestId?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.EnumInquiryCategoryFieldUpdateOperationsInput | $Enums.InquiryCategory
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutInquiriesNestedInput
+}
+
+export type InquiryUncheckedUpdateWithoutAnswerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  clientRequestId?: Prisma.StringFieldUpdateOperationsInput | string
+  category?: Prisma.EnumInquiryCategoryFieldUpdateOperationsInput | $Enums.InquiryCategory
+  title?: Prisma.StringFieldUpdateOperationsInput | string
+  content?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type InquiryCreateManyUserInput = {
   id?: string
   clientRequestId: string
@@ -487,6 +571,7 @@ export type InquiryUpdateWithoutUserInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  answer?: Prisma.InquiryAnswerUpdateOneWithoutInquiryNestedInput
 }
 
 export type InquiryUncheckedUpdateWithoutUserInput = {
@@ -496,6 +581,7 @@ export type InquiryUncheckedUpdateWithoutUserInput = {
   title?: Prisma.StringFieldUpdateOperationsInput | string
   content?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  answer?: Prisma.InquiryAnswerUncheckedUpdateOneWithoutInquiryNestedInput
 }
 
 export type InquiryUncheckedUpdateManyWithoutUserInput = {
@@ -518,6 +604,7 @@ export type InquirySelect<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   content?: boolean
   createdAt?: boolean
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  answer?: boolean | Prisma.Inquiry$answerArgs<ExtArgs>
 }, ExtArgs["result"]["inquiry"]>
 
 export type InquirySelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -555,6 +642,7 @@ export type InquirySelectScalar = {
 export type InquiryOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "clientRequestId" | "category" | "title" | "content" | "createdAt", ExtArgs["result"]["inquiry"]>
 export type InquiryInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
+  answer?: boolean | Prisma.Inquiry$answerArgs<ExtArgs>
 }
 export type InquiryIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
@@ -567,6 +655,7 @@ export type $InquiryPayload<ExtArgs extends runtime.Types.Extensions.InternalArg
   name: "Inquiry"
   objects: {
     user: Prisma.$UserPayload<ExtArgs>
+    answer: Prisma.$InquiryAnswerPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -971,6 +1060,7 @@ readonly fields: InquiryFieldRefs;
 export interface Prisma__InquiryClient<T, Null = never, ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
   readonly [Symbol.toStringTag]: "PrismaPromise"
   user<T extends Prisma.UserDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.UserDefaultArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+  answer<T extends Prisma.Inquiry$answerArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Inquiry$answerArgs<ExtArgs>>): Prisma.Prisma__InquiryAnswerClient<runtime.Types.Result.GetResult<Prisma.$InquiryAnswerPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1405,6 +1495,25 @@ export type InquiryDeleteManyArgs<ExtArgs extends runtime.Types.Extensions.Inter
    * Limit how many Inquiries to delete.
    */
   limit?: number
+}
+
+/**
+ * Inquiry.answer
+ */
+export type Inquiry$answerArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the InquiryAnswer
+   */
+  select?: Prisma.InquiryAnswerSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the InquiryAnswer
+   */
+  omit?: Prisma.InquiryAnswerOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.InquiryAnswerInclude<ExtArgs> | null
+  where?: Prisma.InquiryAnswerWhereInput
 }
 
 /**

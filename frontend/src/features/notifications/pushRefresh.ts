@@ -31,6 +31,16 @@ export function refreshForPush(
         invalidate(QUERY_KEYS.ranking.all);
       }
       return;
+    case 'order_failure':
+      // The ended lists of the order/futures screens hold the row; the
+      // failure lookup itself is read on open.
+      invalidate(QUERY_KEYS.tradingAccount.entryTpSl.all(intent.accountId));
+      if (intent.market === 'spot') {
+        void invalidateAfterOrderCreate(client, intent.accountId, options);
+        return;
+      }
+      invalidate(QUERY_KEYS.tradingAccount.futures.all(intent.accountId));
+      return;
     case 'friend_requests':
       invalidate(QUERY_KEYS.friends.all);
       return;

@@ -1,5 +1,13 @@
 # Trading UI browser regression
 
+문의 답변·주문 실패 화면 (2026-10-17) use `NODE_PATH=/path/to/browser-tools/node_modules
+BROWSER_EXECUTABLE_PATH=… node test/browser/inquiryAnswerBrowser.cjs`. The production
+InquiryScreen (long answered/pending rows, all pages, a filled long form) and
+OrderFailureScreen (LOC with its 거래 내역 link, Futures TP/SL) run on fixture
+transport at 320/375/430px × Light/Dark × font scale 1/2 (72 layouts): every glyph
+inside its card and the viewport, no overflow:hidden cut, the status badge never on
+the title, buttons hit-testable; both detectors are self-tested first.
+
 The ranking tab uses `NODE_PATH=/path/to/browser-tools/node_modules node
 test/browser/rankingTierBrowser.cjs`. The production RankingScreen (내 순위 on its
 tier card art, plain list rows, the 순위 안내 slot), theme, React Query, formatters

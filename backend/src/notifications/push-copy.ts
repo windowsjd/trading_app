@@ -26,7 +26,24 @@ export type PushData = {
   futuresView?: 'executions' | 'liquidations';
   seasonId?: string;
   noticeId?: string;
+  /** order_failure: which failure row (`<failureKind>:<failureId>` is its
+   * source key); the app reads that row's stored result on tap. */
+  failureKind?: OrderFailureKind;
+  failureId?: string;
+  /** futures_liquidation: the event, so the app announces it once. */
+  liquidationId?: string;
 };
+
+/** The failure tables of §2.3, named like their source-key prefixes. */
+export const ORDER_FAILURE_KINDS = [
+  'loc',
+  'conditional_buy',
+  'conditional_sell',
+  'futures_conditional_entry',
+  'futures_tp_sl',
+  'entry_tp_sl_plan',
+] as const;
+export type OrderFailureKind = (typeof ORDER_FAILURE_KINDS)[number];
 
 export type PushCopy = { title: string; body: string };
 

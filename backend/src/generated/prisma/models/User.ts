@@ -238,6 +238,7 @@ export type UserWhereInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestListRelationFilter
   inquiries?: Prisma.InquiryListRelationFilter
+  inquiryAnswers?: Prisma.InquiryAnswerListRelationFilter
   pushDevices?: Prisma.PushDeviceListRelationFilter
   notificationPreference?: Prisma.XOR<Prisma.NotificationPreferenceNullableScalarRelationFilter, Prisma.NotificationPreferenceWhereInput> | null
   pushNotifications?: Prisma.PushNotificationListRelationFilter
@@ -270,6 +271,7 @@ export type UserOrderByWithRelationInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
   inquiries?: Prisma.InquiryOrderByRelationAggregateInput
+  inquiryAnswers?: Prisma.InquiryAnswerOrderByRelationAggregateInput
   pushDevices?: Prisma.PushDeviceOrderByRelationAggregateInput
   notificationPreference?: Prisma.NotificationPreferenceOrderByWithRelationInput
   pushNotifications?: Prisma.PushNotificationOrderByRelationAggregateInput
@@ -305,6 +307,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestListRelationFilter
   inquiries?: Prisma.InquiryListRelationFilter
+  inquiryAnswers?: Prisma.InquiryAnswerListRelationFilter
   pushDevices?: Prisma.PushDeviceListRelationFilter
   notificationPreference?: Prisma.XOR<Prisma.NotificationPreferenceNullableScalarRelationFilter, Prisma.NotificationPreferenceWhereInput> | null
   pushNotifications?: Prisma.PushNotificationListRelationFilter
@@ -369,6 +372,7 @@ export type UserCreateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -401,6 +405,7 @@ export type UserUncheckedCreateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -433,6 +438,7 @@ export type UserUpdateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -465,6 +471,7 @@ export type UserUncheckedUpdateInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -594,6 +601,20 @@ export type UserUpdateOneRequiredWithoutInquiriesNestedInput = {
   upsert?: Prisma.UserUpsertWithoutInquiriesInput
   connect?: Prisma.UserWhereUniqueInput
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInquiriesInput, Prisma.UserUpdateWithoutInquiriesInput>, Prisma.UserUncheckedUpdateWithoutInquiriesInput>
+}
+
+export type UserCreateNestedOneWithoutInquiryAnswersInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutInquiryAnswersInput, Prisma.UserUncheckedCreateWithoutInquiryAnswersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInquiryAnswersInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutInquiryAnswersNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutInquiryAnswersInput, Prisma.UserUncheckedCreateWithoutInquiryAnswersInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutInquiryAnswersInput
+  upsert?: Prisma.UserUpsertWithoutInquiryAnswersInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutInquiryAnswersInput, Prisma.UserUpdateWithoutInquiryAnswersInput>, Prisma.UserUncheckedUpdateWithoutInquiryAnswersInput>
 }
 
 export type UserCreateNestedOneWithoutFriendshipsLowInput = {
@@ -878,6 +899,7 @@ export type UserCreateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -909,6 +931,7 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -956,6 +979,7 @@ export type UserUpdateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -987,6 +1011,151 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutInquiryAnswersInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutInquiryAnswersInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutInquiryAnswersInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutInquiryAnswersInput, Prisma.UserUncheckedCreateWithoutInquiryAnswersInput>
+}
+
+export type UserUpsertWithoutInquiryAnswersInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutInquiryAnswersInput, Prisma.UserUncheckedUpdateWithoutInquiryAnswersInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutInquiryAnswersInput, Prisma.UserUncheckedCreateWithoutInquiryAnswersInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutInquiryAnswersInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutInquiryAnswersInput, Prisma.UserUncheckedUpdateWithoutInquiryAnswersInput>
+}
+
+export type UserUpdateWithoutInquiryAnswersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1018,6 +1187,7 @@ export type UserCreateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1049,6 +1219,7 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1085,6 +1256,7 @@ export type UserCreateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1116,6 +1288,7 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1163,6 +1336,7 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1194,6 +1368,7 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1236,6 +1411,7 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1267,6 +1443,7 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1298,6 +1475,7 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1329,6 +1507,7 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1376,6 +1555,7 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1407,6 +1587,7 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1438,6 +1619,7 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1469,6 +1651,7 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1516,6 +1699,7 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1547,6 +1731,7 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1578,6 +1763,7 @@ export type UserCreateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1609,6 +1795,7 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1656,6 +1843,7 @@ export type UserUpdateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1687,6 +1875,7 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1718,6 +1907,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1749,6 +1939,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1796,6 +1987,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1827,6 +2019,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1858,6 +2051,7 @@ export type UserCreateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -1889,6 +2083,7 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -1936,6 +2131,7 @@ export type UserUpdateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -1967,6 +2163,7 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -1998,6 +2195,7 @@ export type UserCreateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2029,6 +2227,7 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2076,6 +2275,7 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2107,6 +2307,7 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2138,6 +2339,7 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2169,6 +2371,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2205,6 +2408,7 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2236,6 +2440,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2272,6 +2477,7 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2303,6 +2509,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2339,6 +2546,7 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2370,6 +2578,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2417,6 +2626,7 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2448,6 +2658,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2490,6 +2701,7 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2521,6 +2733,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2563,6 +2776,7 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2594,6 +2808,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2636,6 +2851,7 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2667,6 +2883,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2698,6 +2915,7 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2729,6 +2947,7 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2776,6 +2995,7 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2807,6 +3027,7 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2838,6 +3059,7 @@ export type UserCreateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -2869,6 +3091,7 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -2916,6 +3139,7 @@ export type UserUpdateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -2947,6 +3171,7 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -2978,6 +3203,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
@@ -3009,6 +3235,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
@@ -3056,6 +3283,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
@@ -3087,6 +3315,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
@@ -3119,6 +3348,7 @@ export type UserCreateWithoutPushDevicesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
 }
@@ -3150,6 +3380,7 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
 }
@@ -3197,6 +3428,7 @@ export type UserUpdateWithoutPushDevicesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
 }
@@ -3228,6 +3460,7 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -3259,6 +3492,7 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
 }
@@ -3290,6 +3524,7 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
 }
@@ -3337,6 +3572,7 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
 }
@@ -3368,6 +3604,7 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -3399,6 +3636,7 @@ export type UserCreateWithoutPushNotificationsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
 }
@@ -3430,6 +3668,7 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
   inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
   pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
 }
@@ -3477,6 +3716,7 @@ export type UserUpdateWithoutPushNotificationsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
 }
@@ -3508,6 +3748,7 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
   inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
   pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
   notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
 }
@@ -3534,6 +3775,7 @@ export type UserCountOutputType = {
   rewardFulfillmentsProcessed: number
   rewardFulfillmentsCanceled: number
   inquiries: number
+  inquiryAnswers: number
   pushDevices: number
   pushNotifications: number
 }
@@ -3555,6 +3797,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   rewardFulfillmentsProcessed?: boolean | UserCountOutputTypeCountRewardFulfillmentsProcessedArgs
   rewardFulfillmentsCanceled?: boolean | UserCountOutputTypeCountRewardFulfillmentsCanceledArgs
   inquiries?: boolean | UserCountOutputTypeCountInquiriesArgs
+  inquiryAnswers?: boolean | UserCountOutputTypeCountInquiryAnswersArgs
   pushDevices?: boolean | UserCountOutputTypeCountPushDevicesArgs
   pushNotifications?: boolean | UserCountOutputTypeCountPushNotificationsArgs
 }
@@ -3684,6 +3927,13 @@ export type UserCountOutputTypeCountInquiriesArgs<ExtArgs extends runtime.Types.
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountInquiryAnswersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.InquiryAnswerWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountPushDevicesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.PushDeviceWhereInput
 }
@@ -3723,6 +3973,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
   rewardFulfillmentsCanceled?: boolean | Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>
   inquiries?: boolean | Prisma.User$inquiriesArgs<ExtArgs>
+  inquiryAnswers?: boolean | Prisma.User$inquiryAnswersArgs<ExtArgs>
   pushDevices?: boolean | Prisma.User$pushDevicesArgs<ExtArgs>
   notificationPreference?: boolean | Prisma.User$notificationPreferenceArgs<ExtArgs>
   pushNotifications?: boolean | Prisma.User$pushNotificationsArgs<ExtArgs>
@@ -3786,6 +4037,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
   rewardFulfillmentsCanceled?: boolean | Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>
   inquiries?: boolean | Prisma.User$inquiriesArgs<ExtArgs>
+  inquiryAnswers?: boolean | Prisma.User$inquiryAnswersArgs<ExtArgs>
   pushDevices?: boolean | Prisma.User$pushDevicesArgs<ExtArgs>
   notificationPreference?: boolean | Prisma.User$notificationPreferenceArgs<ExtArgs>
   pushNotifications?: boolean | Prisma.User$pushNotificationsArgs<ExtArgs>
@@ -3813,6 +4065,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     rewardFulfillmentsProcessed: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
     rewardFulfillmentsCanceled: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
     inquiries: Prisma.$InquiryPayload<ExtArgs>[]
+    inquiryAnswers: Prisma.$InquiryAnswerPayload<ExtArgs>[]
     pushDevices: Prisma.$PushDevicePayload<ExtArgs>[]
     notificationPreference: Prisma.$NotificationPreferencePayload<ExtArgs> | null
     pushNotifications: Prisma.$PushNotificationPayload<ExtArgs>[]
@@ -4238,6 +4491,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   rewardFulfillmentsProcessed<T extends Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rewardFulfillmentsCanceled<T extends Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsCanceledArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   inquiries<T extends Prisma.User$inquiriesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$inquiriesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InquiryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  inquiryAnswers<T extends Prisma.User$inquiryAnswersArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$inquiryAnswersArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$InquiryAnswerPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   pushDevices<T extends Prisma.User$pushDevicesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$pushDevicesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PushDevicePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   notificationPreference<T extends Prisma.User$notificationPreferenceArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$notificationPreferenceArgs<ExtArgs>>): Prisma.Prisma__NotificationPreferenceClient<runtime.Types.Result.GetResult<Prisma.$NotificationPreferencePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   pushNotifications<T extends Prisma.User$pushNotificationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$pushNotificationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$PushNotificationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5054,6 +5308,30 @@ export type User$inquiriesArgs<ExtArgs extends runtime.Types.Extensions.Internal
   take?: number
   skip?: number
   distinct?: Prisma.InquiryScalarFieldEnum | Prisma.InquiryScalarFieldEnum[]
+}
+
+/**
+ * User.inquiryAnswers
+ */
+export type User$inquiryAnswersArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the InquiryAnswer
+   */
+  select?: Prisma.InquiryAnswerSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the InquiryAnswer
+   */
+  omit?: Prisma.InquiryAnswerOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.InquiryAnswerInclude<ExtArgs> | null
+  where?: Prisma.InquiryAnswerWhereInput
+  orderBy?: Prisma.InquiryAnswerOrderByWithRelationInput | Prisma.InquiryAnswerOrderByWithRelationInput[]
+  cursor?: Prisma.InquiryAnswerWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.InquiryAnswerScalarFieldEnum | Prisma.InquiryAnswerScalarFieldEnum[]
 }
 
 /**

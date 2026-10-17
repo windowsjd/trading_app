@@ -10,6 +10,53 @@
 
 ---
 
+## 2026-10-17 문의 답변 기능·푸시 알림 보완 (주문 실패 이동·권한 재요청·전면 강제청산 안내)
+
+- **구현 목표:** 운영자·관리자가 문의를 조회하고 공식 답변 1건을 등록하며, 사용자는 MY > 문의하기에서 처리 상태와 답변을 본다.
+  주문 실패·만료 알림은 실제 실패 행과 사유로 이동하고, 최초 권한 요청 실패가 이후 요청을 막지 않으며, 앱 전면 실행 중 선물 강제청산을
+  알아차릴 수 있게 한다. 시작 `main`=`origin/main`=`2e0a60ae`(작업 트리 clean). 커밋·push·배포·운영 DB 변경 없음.
+  계약: [backend/docs/inquiries-contract.md](backend/docs/inquiries-contract.md),
+  [backend/docs/push-notifications-contract.md](backend/docs/push-notifications-contract.md) §2.3a·§7·§8, QA: [frontend/docs/push-notifications-qa.md](frontend/docs/push-notifications-qa.md) C5·D6–D8·F.
+- **기능 구현 의도:**
+  - **답변은 별도 행 1개, 문의 행은 불변.** `inquiry_answers.inquiry_id` UNIQUE가 "문의 1건 = 공식 답변 1건"을 DB에서 보장한다. 두 운영자의
+    동시 답변·응답 유실 후 재시도는 삽입 경쟁(P2002)으로 하나만 커밋되고, 같은 운영자·같은 키·같은 본문만 replay, 나머지는 409다. 문의 행을
+    UPDATE하지 않으므로 원문·접수 시각·멱등키가 구조적으로 보존된다. 상태 컬럼을 두지 않고 답변 행 존재로 파생해 "완료 표시와 답변 불일치"가
+    생길 수 없다. **이후 변경 시:** 답변 수정/철회를 넣으려면 덮어쓰지 말고 새 이력 테이블로 추가하고, 사용자 응답에 운영자 id를 넣지 않는다.
+  - **답변 저장과 성공 감사는 한 트랜잭션.** 감사 기록이 실패하면 답변도 없다(사용자에게 "답변 대기"로 남는다). 실패·충돌·replay는 별도 action으로
+    구분하고 본문은 절대 감사에 쓰지 않는다(길이만). 운영자 읽기도 개인정보 열람이라 기존 admin 사용자 조회처럼 감사한다.
+  - **실패 알림은 실패 행 자체로 이동.** 체결이 없는 실패를 체결 기록으로 보내면 사용자는 아무것도 찾지 못한다. payload에 `failureKind/failureId`
+    (= 기존 source key)를 실어 같은 행을 가리키게 하고, 읽기 전용 조회(`GET /trading-accounts/:accountId/order-failures/:kind/:id`)는 푸시가
+    "실패"를 정의하는 notifications 모듈에 두어 정의가 한곳에 있다(LOC unfilled/expired, 그 외 failed만 `final`). 계정+소유자 조건으로만 읽고,
+    남의 행·다른 계정·사라진 행은 모두 같은 404다. 금융 모듈은 한 줄도 바꾸지 않았다. **이후 변경 시:** 새 실패 소스를 추가하면 push-sources와
+    order-failures 두 곳의 kind 목록·final 조건을 함께 바꾼다.
+  - **전면 강제청산 안내는 새 인프라 없이 기존 두 경로를 잇는다.** 전면 수신 푸시(확정 청산 행에서만 생성)를 기존 체결 배너 큐에 넘겨 배너가
+    겹치지 않고, `liquidationId`로 같은 이벤트를 한 번만 보인다. 폴링·WebSocket은 추가하지 않았다(푸시가 꺼져 있으면 전면 안내도 없다 — 한계로 문서화).
+  - **권한 표시는 "결정이 있었을 때만 요청한 것으로".** 요청 전 표시(중간 크래시 대비)는 유지하되, 요청이 throw하거나 "미결정"으로 끝나면 표시를
+    지워 다음 실행에서 OS 상태를 다시 읽고 묻는다. 허용·거부는 그대로 존중한다.
+- **설계·변경:**
+  - Backend: 추가형 migration `20261017180000_add_inquiry_answers`(새 테이블 1, 비공백 CHECK, FK RESTRICT; 기존 행·인덱스 무변경),
+    `OperatorInquiriesService`/`OperatorInquiriesController`(`/api/v1/operator/inquiries`, `OperatorGuard`), 사용자 응답에 `status`·`answer`,
+    `OrderFailuresService`/`OrderFailuresController`, push payload `failureKind/failureId/liquidationId`, 공개 오류 문구 6개.
+  - Frontend: 문의 내역 전체 페이지(20건씩 "이전 문의 더 보기", 사용자 id 포함 키), 행을 펼쳐 원문·답변(답변 대기 시 안내만), 상태 배지는 제목 아래
+    메타 줄(320dp·2배 글꼴에서도 제목 폭 유지). 루트 `OrderFailure` 화면(저장된 상태·사유·결과·종료 시각, LOC는 거래 내역 링크).
+    `pushIntent`(order_failure 별도 intent, ids 없으면 이동 안 함), `PushNotificationsHost`(OrderFailure 이동, 전면 청산 → `fillEvents`),
+    `OrderFillNotifier`/`fillTracker`(청산 배너 → 선물 강제청산 기록), `pushPermission`(`clearRequested`), `features/inquiry` 린트 게이트 편입,
+    `.gitignore`에 FCM 서비스 계정 키·APNs 키 패턴.
+- **검증:** backend 전체 단위 342 스위트·5,544건 통과(실패 0, opt-in DB 82 스위트 skip), typecheck·변경 파일 eslint(스크립트의 기존 supertest any 패턴 제외)·
+  prettier·diagnostic gate PASS. 격리 PG16에서 문의 HTTP+DB 통합 53 assertions(권한 401/403/USER_NOT_ACTIVE, 운영자 vs 관리자 동시 답변 1건,
+  재시도 3중 replay, 같은 키 다른 본문 409, 감사 실패 롤백, 원문 행 불변, 감사에 본문 없음, 23건 2페이지 경계, 금융 행 불변, 마이그레이션 전 문의 보존),
+  푸시 통합 49 assertions(실패 탭 조회 owner-only·다른 계정 404·retrying은 final 아님·liquidationId). HEAD 스키마 DB에 기존 문의를 넣고
+  `migrate deploy` → 행 보존·답변 없음, `migrate diff` 빈 결과. frontend typecheck·`lint:accounts:check`·diagnostic gate PASS, 단위 테스트 신규
+  (문의 9, 실패 화면 6, 실패 모델 3, 권한 12, 호스트·배너 36 등) 및 전체 실행(결과는 아래 보고 참조). RN-Web 브라우저 검사
+  `test/browser/inquiryAnswerBrowser.cjs` 72 레이아웃(320/375/430 × Light/Dark × 글꼴 1/2, 탐지기 자체 검증 포함) 통과.
+- **NOT_RUN / BLOCKED:** 실기기 푸시 수신·권한 프롬프트·키보드 가림(웹에는 소프트 키보드 없음)·Android/iOS 네이티브 빌드는 NOT_RUN.
+  FCM(`google-services.json` + gradle 플러그인 + EAS FCM V1 키), 알림 아이콘 에셋, iOS bundle id·APNs는 사용자 작업이 필요해 BLOCKED
+  (QA 문서 F 표). 운영 푸시·운영 DB migration·배포는 하지 않았다.
+- **주의:** 기존 7종 알림 설정은 그대로이며 문의 답변 알림은 없다(앱을 다시 열면 보인다). 이 변경 이전에 만들어진 order_failure outbox 행에는 ids가
+  없어 탭해도 열리지 않는다(워커가 켜진 적이 없어 실제 발송분은 없음). 문의·푸시 DB 통합 스위트는 CI에 편입되어 있지 않다(권고).
+
+---
+
 ## 2026-10-17 푸시 알림 7종 (Expo Push, 기본 OFF, 실기기 미검증)
 
 - **구현 목표:** 거래 체결·선물 강제청산·주문 실패/만료·친구 요청·주요 공지·시즌 최종 순위/등급 확정·시즌 종료 24시간 전 알림을

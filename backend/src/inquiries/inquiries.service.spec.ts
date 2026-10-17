@@ -32,6 +32,7 @@ type Row = {
   title: string;
   content: string;
   createdAt: Date;
+  answer?: { content: string; answeredAt: Date; answeredByUserId: string };
 };
 
 /* eslint-disable @typescript-eslint/require-await -- the in-memory fake mirrors Prisma's async client methods */
@@ -45,6 +46,10 @@ function createService() {
     title: row.title,
     content: row.content,
     createdAt: row.createdAt,
+    // Mirrors the service's select: the operator id is never read here.
+    answer: row.answer
+      ? { content: row.answer.content, answeredAt: row.answer.answeredAt }
+      : null,
   });
   const prisma = {
     inquiry: {
@@ -310,6 +315,40 @@ describe('InquiriesService', () => {
       '두 번째 문의',
       '첫 번째 문의',
     ]);
+  });
+
+  it('shows 답변 대기 until an answer exists, then the answer text and time only', async () => {
+    const { service, rows, prisma } = createService();
+    await service.create(
+      'user-1',
+      body({ clientRequestId: 'inquiry_answer_1', title: '답변 받을 문의' }),
+    );
+    await service.create(
+      'user-1',
+      body({ clientRequestId: 'inquiry_answer_2', title: '대기 중 문의' }),
+    );
+    rows[0].answer = {
+      content: '확인 결과 정상 체결되었습니다.',
+      answeredAt: new Date('2026-10-17T05:00:00.000Z'),
+      answeredByUserId: 'operator-1',
+    };
+    const { items } = (await service.listMine('user-1')).data;
+    const answered = items.find((item) => item.title === '답변 받을 문의')!;
+    const pending = items.find((item) => item.title === '대기 중 문의')!;
+    expect(answered.status).toBe('answered');
+    expect(answered.answer).toEqual({
+      content: '확인 결과 정상 체결되었습니다.',
+      answeredAt: '2026-10-17T05:00:00.000Z',
+    });
+    expect(JSON.stringify(answered).includes('operator-1')).toBe(false);
+    expect(pending.status).toBe('pending');
+    expect(pending.answer).toBeNull();
+    const select = (
+      prisma.inquiry.findMany.mock.calls[0] as unknown as [
+        { select: { answer: { select: Record<string, boolean> } } },
+      ]
+    )[0].select.answer.select;
+    expect(Object.keys(select).sort()).toEqual(['answeredAt', 'content']);
   });
 
   it.each([['0'], ['51'], ['-1'], ['1.5'], ['abc']])(

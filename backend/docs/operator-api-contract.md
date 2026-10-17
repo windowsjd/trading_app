@@ -9,6 +9,7 @@
 - Provider ingestion trigger API is implemented for operator/admin market-data ingestion dry-runs and explicit non-dry-runs.
 - Season participant moderation APIs are implemented for operator/admin exclusion, ranking hide/unhide, and verified final result correction. Reward payout/revoke and reward fulfillment are outside this scope.
 - Internal reward fulfillment operator/admin APIs are documented in `docs/rewards-api-contract.md`.
+- Important notice publishing (2026-10-17) and support inquiry answers (2026-10-17) are operator/admin APIs; see their sections below.
 - No batch run trigger, scheduler HTTP API, external reward provider API, real trading/account/balance, deposit/withdrawal, or external order API exists. Scheduler/Ops foundation exists internally and is disabled by default.
 - `provider_api` source eligibility is open only inside explicitly allowed services: read-only/quote services, `/fx execute`, orders execute, the separate operator-run daily snapshot valuation job, and explicit operator/admin provider ingestion triggers. No batch HTTP API, ranking/reward workflow source eligibility, hoga-based execution, or real trading/account API is opened by this contract.
 
@@ -808,6 +809,41 @@ requires `{ "confirm": true }`, happens once per notice and pushes it to every
 user with important notices on; each step writes `operator.notice.<verb>` (or
 `.failed`) to `operator_audit_logs` with `targetType = important_notice`.
 Request/response and error codes: [push notifications §4](push-notifications-contract.md#4-important-notices).
+
+Procedure (no admin web UI; checked against `ImportantNoticesService`):
+
+1. **Draft** — `POST /api/v1/operator/notices` with `{ title ≤100, summary ≤200,
+   sections: [{ heading ≤100, paragraphs: [≤2000, …1–30] }, …1–20] (≤30,000
+   characters as JSON), idempotencyKey [A-Za-z0-9._:-]{1,100} }` → 201 `{ notice }` with `status: "draft"`. Nothing is shown
+   or sent. A resend with the same key and content returns the same draft;
+   different content → 409 `NOTICE_IDEMPOTENCY_CONFLICT`; missing/invalid
+   fields → 400 `INVALID_NOTICE`.
+2. **Review** — `GET /api/v1/operator/notices` (newest 100, full content,
+   `status`, delivery counts). There is no edit: fix a draft by creating a new
+   one; an unpublished draft is never shown or sent.
+3. **Publish** — `POST /api/v1/operator/notices/:id/publish` with
+   `{ "confirm": true }` → 200, `status: "published"`; the app lists it and the
+   push fan-out starts. Without `confirm: true` → 400
+   `NOTICE_PUBLISH_CONFIRMATION_REQUIRED`; again → 409
+   `NOTICE_ALREADY_PUBLISHED`; withdrawn → 409 `NOTICE_WITHDRAWN`; unknown → 404
+   `NOTICE_NOT_FOUND`.
+4. **Withdraw** (optional) — `POST /api/v1/operator/notices/:id/withdraw` → 200,
+   `status: "withdrawn"`: hidden in the app, unsent pushes skipped. A draft →
+   409 `NOTICE_NOT_PUBLISHED`; already withdrawn → 409 `NOTICE_WITHDRAWN`;
+   unknown → 404 `NOTICE_NOT_FOUND`. Sent pushes cannot be recalled.
+
+## Support Inquiry Answers (2026-10-17)
+
+Operator/admin (`OperatorGuard`) read every inquiry and post its one official
+answer under `/api/v1/operator/inquiries` (list with `status=pending|answered`,
+read one, `POST /:inquiryId/answer` with `{ content 2–2000, idempotencyKey }`).
+One answer per inquiry is enforced by a unique `inquiry_answers.inquiry_id`;
+the answer and its `operator.inquiry.answer` success audit commit together;
+replays, conflicts and failures are `operator.inquiry.answer.replay` /
+`operator.inquiry.answer.failed` (error code only, never the text). Reads are
+audited as `operator.inquiries.list` / `operator.inquiry.get`. Contract, error
+codes and the operator procedure: [inquiries contract](inquiries-contract.md).
+Requires migration `20261017180000_add_inquiry_answers` (additive).
 
 ## Not Implemented In This MVP
 

@@ -227,7 +227,27 @@ export type FillNotice = {
   detail: string | null;
   /** Further notices folded into this one when the queue is full. */
   overflow?: number;
+  /** 내역 보기 target inside 거래 내역; the Spot list when absent. */
+  history?: { market: 'futures'; futuresView: 'liquidations' };
 };
+
+/** A foreground liquidation push as a banner (its own copy, its own key). */
+export function buildLiquidationNotice(event: {
+  accountId: string;
+  liquidationId: string;
+  title: string;
+  detail: string | null;
+}): FillNotice {
+  const orderId = `liquidation:${event.liquidationId}`;
+  return {
+    id: `${event.accountId}:${orderId}`,
+    accountId: event.accountId,
+    orderId,
+    title: event.title,
+    detail: event.detail,
+    history: { market: 'futures', futuresView: 'liquidations' },
+  };
+}
 
 /** The order fields a notice may use; all read from the server's order. */
 export type FilledOrderFacts = {

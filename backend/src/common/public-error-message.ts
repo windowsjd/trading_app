@@ -3,6 +3,14 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  // Support inquiry answers by operators (2026-10-17).
+  'Status must be pending or answered.',
+  'An answer of 2-2000 characters and an idempotency key are required.',
+  'This idempotency key was already used for a different answer.',
+  'The inquiry has already been answered.',
+  'Inquiry not found.',
+  // Push tap: the stored result of a failed order (2026-10-17).
+  'The order result was not found.',
   // Push notifications: devices, preferences, important notices (2026-10-17).
   'A preferences object is required.',
   'Only known notification types with true/false values are accepted.',

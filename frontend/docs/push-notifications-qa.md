@@ -24,6 +24,7 @@ Record for each row: device/OS version, build, result, and the matching
 | A5 | Relaunch after allow or deny | No prompt again |
 | A6 | Reinstall | OS decides whether the prompt can show again; app asks only if undetermined |
 | A7 | Web build | No prompt, no errors; Settings explains web has no push |
+| A8 | Force the request to fail before any decision (e.g. Android: launch and background the app before the prompt can attach; iOS: none known) | App starts, login works; next launch asks again while the OS is still undetermined (unit-tested in `pushPermission.test.ts`; device result NOT_RUN) |
 
 ## B. Registration lifecycle
 
@@ -47,7 +48,11 @@ For each: app in background, then repeat with the app swiped away.
 | C2 | Spot limit / LOC / conditional / 손절·익절 fill | Same, with origin label (LOC/조건주문/손절/익절) |
 | C3 | Futures fill (limit, conditional entry, TP/SL) | "… 체결"; tap → 거래 내역 > 선물 > 체결 기록 |
 | C4 | Futures liquidation (Cross with 2+ positions) | One push; tap → 선물 > 강제청산 기록 |
-| C5 | LOC unfilled / expired; conditional/TP-SL final failure | "… 미체결 / 만료 / 실행 실패"; tap → 거래 내역 |
+| C5 | LOC unfilled / expired | "… LOC 매수 미체결 / 만료"; tap → 주문 실패·만료 with the reason; 거래 내역 보기 → 현물 list of that account |
+| C5a | Conditional BUY / SELL / 손절·익절 final failure (Spot) | "… 실행 실패"; tap → 주문 실패·만료 with the reason (e.g. 잔액 부족, 수량 없음); never a fill screen |
+| C5b | Futures conditional entry / TP·SL / entry plan failure | Tap → 주문 실패·만료 (선물) with the reason; never 체결 기록 |
+| C5c | Tap a failure push of account A after switching the selected account to B (same user) | Opens A's failure (route account), not B's |
+| C5d | Tap a failure push for an account of another user (or a row that is gone) | Nothing opens / "해당 기록을 찾을 수 없어요." |
 | C6 | Friend request received | "○○님이 친구 요청을 보냈어요."; tap → 친구 > 받은 요청 |
 | C7 | Operator publishes an important notice | "[공지] …"; tap → 공지사항 with it opened |
 | C8 | Season settled with rank and tier | "시즌 최종 결과 확정"; tap → 시즌 전적 상세 |
@@ -72,6 +77,9 @@ Negative cases (no push; row absent or `skipped`):
 | D3 | Tap a push while logged out | Login first; after login and mode selection the target opens |
 | D4 | Tap a push for user A while B is logged in | Nothing opens (B stays where they are) |
 | D5 | Beginner account mid-quest taps a push | Quest guide holds the move and explains why |
+| D6 | App open when a Futures liquidation of the user's account arrives | No OS banner; in-app banner "선물 강제청산" with the push text; 내역 보기 → 선물 > 강제청산 기록 |
+| D7 | Spot fill banner on screen when a liquidation arrives | Banners show one after the other, never stacked |
+| D8 | The same liquidation push delivered twice | Banner shown once |
 
 ## E. Settings
 
@@ -81,3 +89,24 @@ Negative cases (no push; row absent or `skipped`):
 | E2 | Toggle one off | "저장 중…", then off; persists after app restart and on another device |
 | E3 | Toggle with the network off | Switch returns to the saved value with an error |
 | E4 | Log out, log in as another user | The other user's switches, never the previous ones |
+
+## F. Native readiness (before any row above can run)
+
+Status 2026-10-17 (`2e0a60ae` + this change): Android package
+`com.leagueoftrading` matches in `android/app/build.gradle` and `app.json`;
+expo-notifications 55 is autolinked; `POST_NOTIFICATIONS` arrives through
+the library manifest. EAS skips prebuild (committed `android/`), so
+`app.json` plugin options are not applied to Android.
+
+| # | Item | State |
+|---|---|---|
+| F1 | `google-services.json` for `com.leagueoftrading` in `android/app/` + google-services Gradle classpath/plugin (one change) | BLOCKED — needs the Firebase project (user) |
+| F2 | FCM V1 service-account key uploaded with `eas credentials` | BLOCKED — user; never commit the key (`.gitignore` covers common names) |
+| F3 | Monochrome notification icon drawable + manifest `default_notification_icon` meta-data | NOT_RUN — needs a designed asset |
+| F4 | iOS bundle id in `app.json`, Apple App ID with Push, APNs key in `eas credentials` | BLOCKED — no Apple account/bundle id |
+| F5 | New EAS development build, then preview build, with F1–F4 | NOT_RUN |
+| F6 | Staging backend `PUSH_NOTIFICATIONS_ENABLED=true` + `PUSH_NOTIFICATIONS_DRY_RUN=true`, then `DRY_RUN=false` for internal devices | NOT_RUN — never enable in production unasked |
+
+Development build: verify A–E with a staging backend. Production build:
+repeat C1, C4, C5, D1, D6 and B4 on a release-signed build before turning
+the worker on in production.

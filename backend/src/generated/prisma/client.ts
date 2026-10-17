@@ -51,6 +51,14 @@ export type User = Prisma.UserModel
  */
 export type Inquiry = Prisma.InquiryModel
 /**
+ * Model InquiryAnswer
+ * The operator's official answer to one inquiry (docs/inquiries-contract.md).
+ * At most one per inquiry (`inquiry_id` is unique), inserted once and never
+ * updated; the inquiry row itself is never changed. No row = 답변 대기.
+ * `idempotencyKey` lets the answering operator's retry replay the stored answer.
+ */
+export type InquiryAnswer = Prisma.InquiryAnswerModel
+/**
  * Model Friendship
  * 
  */

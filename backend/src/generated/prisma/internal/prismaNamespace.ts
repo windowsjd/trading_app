@@ -386,6 +386,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   User: 'User',
   Inquiry: 'Inquiry',
+  InquiryAnswer: 'InquiryAnswer',
   Friendship: 'Friendship',
   OperatorAuditLog: 'OperatorAuditLog',
   RefreshTokenSession: 'RefreshTokenSession',
@@ -469,7 +470,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -618,6 +619,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.InquiryCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.InquiryCountAggregateOutputType> | number
+        }
+      }
+    }
+    InquiryAnswer: {
+      payload: Prisma.$InquiryAnswerPayload<ExtArgs>
+      fields: Prisma.InquiryAnswerFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.InquiryAnswerFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.InquiryAnswerFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>
+        }
+        findFirst: {
+          args: Prisma.InquiryAnswerFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.InquiryAnswerFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>
+        }
+        findMany: {
+          args: Prisma.InquiryAnswerFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>[]
+        }
+        create: {
+          args: Prisma.InquiryAnswerCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>
+        }
+        createMany: {
+          args: Prisma.InquiryAnswerCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.InquiryAnswerCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>[]
+        }
+        delete: {
+          args: Prisma.InquiryAnswerDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>
+        }
+        update: {
+          args: Prisma.InquiryAnswerUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>
+        }
+        deleteMany: {
+          args: Prisma.InquiryAnswerDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.InquiryAnswerUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.InquiryAnswerUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>[]
+        }
+        upsert: {
+          args: Prisma.InquiryAnswerUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$InquiryAnswerPayload>
+        }
+        aggregate: {
+          args: Prisma.InquiryAnswerAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateInquiryAnswer>
+        }
+        groupBy: {
+          args: Prisma.InquiryAnswerGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.InquiryAnswerGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.InquiryAnswerCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.InquiryAnswerCountAggregateOutputType> | number
         }
       }
     }
@@ -5721,6 +5796,18 @@ export const InquiryScalarFieldEnum = {
 export type InquiryScalarFieldEnum = (typeof InquiryScalarFieldEnum)[keyof typeof InquiryScalarFieldEnum]
 
 
+export const InquiryAnswerScalarFieldEnum = {
+  id: 'id',
+  inquiryId: 'inquiryId',
+  answeredByUserId: 'answeredByUserId',
+  idempotencyKey: 'idempotencyKey',
+  content: 'content',
+  answeredAt: 'answeredAt'
+} as const
+
+export type InquiryAnswerScalarFieldEnum = (typeof InquiryAnswerScalarFieldEnum)[keyof typeof InquiryAnswerScalarFieldEnum]
+
+
 export const FriendshipScalarFieldEnum = {
   id: 'id',
   lowUserId: 'lowUserId',
@@ -8248,6 +8335,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   inquiry?: Prisma.InquiryOmit
+  inquiryAnswer?: Prisma.InquiryAnswerOmit
   friendship?: Prisma.FriendshipOmit
   operatorAuditLog?: Prisma.OperatorAuditLogOmit
   refreshTokenSession?: Prisma.RefreshTokenSessionOmit

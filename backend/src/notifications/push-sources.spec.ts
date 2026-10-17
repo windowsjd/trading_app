@@ -255,6 +255,8 @@ describe('push sources', () => {
     expect(scan.candidates[0].type).toBe('futures_liquidation');
     expect(scan.candidates[0].sourceKey).toBe('futures_liquidation:liq-1');
     expect(scan.candidates[0].data.futuresView).toBe('liquidations');
+    // The app announces a foreground liquidation once per event.
+    expect(scan.candidates[0].data.liquidationId).toBe('liq-1');
     expect(scan.candidates[0].copy.body).toContain('교차 포지션 2개');
   });
 
@@ -341,6 +343,20 @@ describe('push sources', () => {
       'entry_tp_sl_plan:plan-1',
     ]);
     expect(candidates.every((c) => c.type === 'order_failure')).toBe(true);
+    // The payload names the same row as the key, so a tap opens that row.
+    for (const candidate of candidates)
+      expect(`${candidate.data.failureKind}:${candidate.data.failureId}`).toBe(
+        candidate.sourceKey,
+      );
+    expect(candidates[0].data).toEqual({
+      v: 1,
+      type: 'order_failure',
+      uid: 'user-a',
+      accountId: 'account-a',
+      market: 'spot',
+      failureKind: 'loc',
+      failureId: 'loc-1',
+    });
     expect(candidates[2].data.market).toBe('futures');
     expect(candidates[3].copy.title).toBe('BTC 익절가 설정 실패');
     // The skipped cleanup row still advances the scan.

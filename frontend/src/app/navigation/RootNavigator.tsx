@@ -12,6 +12,7 @@ import { rootNavigationRef } from './navigationRef';
 import { questNavigationRouter } from '../../features/quest/questNavigationGuard';
 import AssetChartScreen from '../../screens/asset/AssetChartScreen';
 import TradeHistoryScreen from '../../screens/history/TradeHistoryScreen';
+import OrderFailureScreen from '../../screens/history/OrderFailureScreen';
 import AuthStack from './AuthStack';
 import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
@@ -65,6 +66,13 @@ export default function RootNavigator() {
           ...stackTransition(reducedMotion, Platform.OS),
           headerShown: true,
           title: '거래 내역',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+        }} />
+        <Stack.Screen name="OrderFailure" component={OrderFailureScreen} layout={pushedRootLayout} options={{
+          ...stackTransition(reducedMotion, Platform.OS),
+          headerShown: true,
+          title: '주문 실패·만료',
           headerStyle: { backgroundColor: colors.surface },
           headerTintColor: colors.text,
         }} />

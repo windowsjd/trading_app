@@ -1,10 +1,10 @@
-import type { PushNotificationType } from './types.ts';
+import { isOrderFailureKind, type OrderFailureKind } from './orderFailure.ts';
 
 /**
  * Where a tapped push leads (pure; node --test loads it).
  *
- * The payload carries ids only: the recipient (`uid`), an account, a Season or
- * a notice. A tap is applied only for the signed-in user it was sent to, only
+ * The payload carries ids only: the recipient (`uid`), an account, a Season,
+ * a notice or the failure row. A tap is applied only for the signed-in user it was sent to, only
  * after sign-in and the investment-mode choice have finished (the main tabs
  * are showing), and an account target only when that account is in the
  * user's own account list. Anything else is dropped without opening a screen,
@@ -14,11 +14,23 @@ import type { PushNotificationType } from './types.ts';
 export type PushIntent =
   | {
       kind: 'trade_history';
-      type: PushNotificationType;
+      type: 'trade_fill' | 'futures_liquidation';
       uid: string;
       accountId: string;
       market: 'spot' | 'futures';
       futuresView?: 'executions' | 'liquidations';
+      /** A liquidation's event id: its in-app notice is shown once. */
+      liquidationId?: string;
+    }
+  | {
+      /** The failure row itself: a failed order has no fill to show. */
+      kind: 'order_failure';
+      type: 'order_failure';
+      uid: string;
+      accountId: string;
+      market: 'spot' | 'futures';
+      failureKind: OrderFailureKind;
+      failureId: string;
     }
   | { kind: 'friend_requests'; type: 'friend_request'; uid: string }
   | { kind: 'notice'; type: 'important_notice'; uid: string; noticeId: string }
@@ -40,8 +52,7 @@ export function parsePushData(data: unknown): PushIntent | null {
   if (value.v !== 1 || !uid) return null;
   switch (value.type) {
     case 'trade_fill':
-    case 'futures_liquidation':
-    case 'order_failure': {
+    case 'futures_liquidation': {
       const accountId = id(value.accountId);
       const market = value.market === 'spot' || value.market === 'futures' ? value.market : null;
       if (!accountId || !market) return null;
@@ -51,6 +62,7 @@ export function parsePushData(data: unknown): PushIntent | null {
             ? ('liquidations' as const)
             : ('executions' as const)
           : undefined;
+      const liquidationId = value.type === 'futures_liquidation' ? id(value.liquidationId) : null;
       return {
         kind: 'trade_history',
         type: value.type,
@@ -58,6 +70,24 @@ export function parsePushData(data: unknown): PushIntent | null {
         accountId,
         market,
         ...(futuresView ? { futuresView } : {}),
+        ...(liquidationId ? { liquidationId } : {}),
+      };
+    }
+    case 'order_failure': {
+      // Without the row it names there is nothing true to open: a failure is
+      // not in the fill history (every server payload carries both ids).
+      const accountId = id(value.accountId);
+      const market = value.market === 'spot' || value.market === 'futures' ? value.market : null;
+      const failureId = id(value.failureId);
+      if (!accountId || !market || !failureId || !isOrderFailureKind(value.failureKind)) return null;
+      return {
+        kind: 'order_failure',
+        type: 'order_failure',
+        uid,
+        accountId,
+        market,
+        failureKind: value.failureKind,
+        failureId,
       };
     }
     case 'friend_request':
@@ -100,7 +130,7 @@ export function resolvePushIntent(intent: PushIntent, context: IntentContext): I
     return { action: 'discard', reason: 'expired' };
   if (!context.userId || !context.mainReady) return { action: 'wait' };
   if (intent.uid !== context.userId) return { action: 'discard', reason: 'other_user' };
-  if (intent.kind === 'trade_history') {
+  if (intent.kind === 'trade_history' || intent.kind === 'order_failure') {
     if (!context.ownedAccountIds) return { action: 'wait' };
     if (!context.ownedAccountIds.includes(intent.accountId))
       return { action: 'discard', reason: 'account_not_owned' };
@@ -108,8 +138,9 @@ export function resolvePushIntent(intent: PushIntent, context: IntentContext): I
   return { action: 'navigate', intent };
 }
 
-/** The screen the beginner-quest guard checks: the pushed history, or the
- * 전체(MyTab) stack every other target opens in. */
-export function intentGuardName(intent: PushIntent): 'TradeHistory' | 'MyTab' {
-  return intent.kind === 'trade_history' ? 'TradeHistory' : 'MyTab';
+/** The screen the beginner-quest guard checks: the pushed history or
+ * failure, or the 전체(MyTab) stack every other target opens in. */
+export function intentGuardName(intent: PushIntent): 'TradeHistory' | 'OrderFailure' | 'MyTab' {
+  if (intent.kind === 'trade_history') return 'TradeHistory';
+  return intent.kind === 'order_failure' ? 'OrderFailure' : 'MyTab';
 }

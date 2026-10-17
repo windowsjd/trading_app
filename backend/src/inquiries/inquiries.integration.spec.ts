@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 const itDb = process.env.INQUIRIES_DB_INTEGRATION === '1' ? it : it.skip;
 describe('inquiries PostgreSQL + HTTP invariants', () => {
   itDb(
-    'authenticates, validates, owns, deduplicates and rate-limits inquiries',
+    'authenticates, validates, owns, deduplicates, rate-limits and answers inquiries',
     () => {
       const result = spawnSync(
         'pnpm',

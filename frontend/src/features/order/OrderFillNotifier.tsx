@@ -18,6 +18,7 @@ import { rootNavigationRef } from '../../app/navigation/navigationRef';
 import { questNavigationAllowed } from '../quest/questNavigationGuard';
 import {
   buildFillNotice,
+  buildLiquidationNotice,
   createFillTracker,
   enqueueFillNotice,
   isFillWatchAccount,
@@ -172,7 +173,12 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
     if (event.kind === 'order') tracker.trackOrder(event.accountId, event.orderId, event.origin);
     else if (event.kind === 'watch' && event.side === 'sell') tracker.trackSellWatch(event.accountId, event.watchId);
     else if (event.kind === 'watch') tracker.trackWatch(event.accountId, event.watchId);
-    else announce(event.accountId, event.order, 'order');
+    else if (event.kind === 'liquidation') {
+      // Same queue as fills: one banner at a time, never stacked; the
+      // settled set keeps a re-delivered push from showing again.
+      const notice = buildLiquidationNotice(event);
+      if (tracker.settle(event.accountId, notice.orderId)) setQueue((previous) => enqueueFillNotice(previous, notice));
+    } else announce(event.accountId, event.order, 'order');
     touched();
   }), [announce, current, touched, tracker, watchedIds]);
 
@@ -202,7 +208,11 @@ function FillSession({ generation, accounts }: { generation: number; accounts: T
 function openHistory(notice: FillNotice): FillHistoryOutcome {
   if (!rootNavigationRef.isReady()) return 'unavailable';
   if (!questNavigationAllowed('TradeHistory')) return 'held';
-  rootNavigationRef.navigate('TradeHistory', { accountId: notice.accountId });
+  // A view target carries a per-press stamp so an open history selects it again.
+  rootNavigationRef.navigate('TradeHistory', {
+    accountId: notice.accountId,
+    ...(notice.history ? { ...notice.history, pushAt: Date.now() } : {}),
+  });
   return 'opened';
 }
 
