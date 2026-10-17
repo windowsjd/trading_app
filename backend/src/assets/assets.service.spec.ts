@@ -2932,4 +2932,152 @@ describe('AssetsService', () => {
       }
     });
   });
+
+  describe('closed US market: last confirmed Tiingo close (display only)', () => {
+    const usAsset = asset({
+      id: 'aapl',
+      symbol: 'AAPL',
+      market: 'NAS',
+      assetType: AssetType.us_stock,
+      currencyCode: CurrencyCode.USD,
+    });
+    // New York daily windows: [local midnight, next local midnight).
+    const eod = (date: string, close: string, isClosed = true) => {
+      const openTime = new Date(`${date}T04:00:00.000Z`);
+      return {
+        assetId: usAsset.id,
+        interval: '1d',
+        openTime,
+        closeTime: new Date(openTime.getTime() + 86_400_000),
+        // Received after the 16:00 EDT (20:00Z) session close.
+        sourceUpdatedAt: new Date(`${date}T22:10:00.000Z`),
+        sourceProvider: 'tiingo_eod',
+        isClosed,
+        open: new Prisma.Decimal(close),
+        high: new Prisma.Decimal(close),
+        low: new Prisma.Decimal(close),
+        close: new Prisma.Decimal(close),
+        volume: new Prisma.Decimal('1000'),
+      };
+    };
+    const withCandles = (rows: ReturnType<typeof eod>[]) => {
+      const { prisma, service } = createService();
+      prisma.marketCandle.findMany.mockImplementation(
+        ({ where }: { where: { openTime: { gte: Date; lt: Date } } }) =>
+          Promise.resolve(
+            rows.filter(
+              (row) =>
+                row.openTime >= where.openTime.gte &&
+                row.openTime < where.openTime.lt,
+            ),
+          ),
+      );
+      prisma.asset.count.mockResolvedValue(1);
+      prisma.asset.findMany.mockResolvedValue([usAsset]);
+      prisma.asset.findUnique.mockResolvedValue(usAsset);
+      prisma.fxRateSnapshot.findMany.mockResolvedValue(
+        freshUsdKrwProviderSnapshots(),
+      );
+      return { prisma, service };
+    };
+    const previous = process.env.US_STOCK_PRICE_PROVIDER;
+    beforeEach(() => {
+      process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+    });
+    afterEach(() => {
+      if (previous === undefined) delete process.env.US_STOCK_PRICE_PROVIDER;
+      else process.env.US_STOCK_PRICE_PROVIDER = previous;
+    });
+
+    it('shows the latest session close and its date when no stored price exists, still MARKET_CLOSED and never written', async () => {
+      // Saturday 2026-10-17 11:00 EDT: latest completed session = Fri 10-16.
+      jest.setSystemTime(new Date('2026-10-17T15:00:00.000Z'));
+      const { prisma, service } = withCandles([
+        eod('2026-10-15', '240'),
+        eod('2026-10-16', '250'),
+      ]);
+
+      const list = await service.getAssets('user-1');
+      const price = await service.getAssetPrice('user-1', 'aapl');
+
+      expect(list.data.priceErrors).toHaveLength(0);
+      expect(list.data.assets[0]).toMatchObject({
+        marketStatus: 'closed',
+        tradable: false,
+        tradeBlockedReason: 'MARKET_CLOSED',
+        price: {
+          state: 'available',
+          currentPrice: '250.00000000',
+          priceCurrency: CurrencyCode.USD,
+          priceKrwState: 'available',
+          priceKrw: '350000.00000000',
+          // Against the previous session's (10-15) confirmed close.
+          changeRate: '4.16666667',
+          assetPriceSnapshotId: null,
+          // The 10-16 regular close: New York date 2026-10-16.
+          priceEffectiveAt: '2026-10-16T20:00:00.000Z',
+          priceCapturedAt: '2026-10-16T22:10:00.000Z',
+          priceSource: {
+            sourceType: 'provider_api',
+            sourceName: 'tiingo_eod',
+            snapshotId: null,
+            fallbackUsed: true,
+            fallbackReason: 'market_closed_last_close',
+          },
+        },
+      });
+      expect(price.data).toMatchObject({
+        state: 'available',
+        currentPrice: '250.00000000',
+        assetPriceSnapshotId: null,
+        priceEffectiveAt: '2026-10-16T20:00:00.000Z',
+      });
+      // Display only: no snapshot (or any other) row is created for it.
+      expectNoAssetWrites(prisma);
+    });
+
+    it('never substitutes a past close during the regular session', async () => {
+      // Friday 2026-10-16 11:00 EDT: open, no eligible Tiingo snapshot.
+      jest.setSystemTime(new Date('2026-10-16T15:00:00.000Z'));
+      const { prisma, service } = withCandles([eod('2026-10-15', '240')]);
+
+      const list = await service.getAssets('user-1');
+      const price = await service.getAssetPrice('user-1', 'aapl');
+
+      expect(list.data.assets[0]).toMatchObject({
+        marketStatus: 'open',
+        tradable: false,
+        tradeBlockedReason: 'PRICE_UNAVAILABLE',
+        price: { state: 'unavailable', reason: 'ASSET_PRICE_UNAVAILABLE' },
+      });
+      expect(list.data.priceErrors[0]?.code).toBe('ASSET_PRICE_UNAVAILABLE');
+      expect(price.data.state).toBe('unavailable');
+      expect(prisma.marketCandle.findMany).not.toHaveBeenCalled();
+    });
+
+    it("keeps the data-shortage state without that session's confirmed close (older or unconfirmed rows only)", async () => {
+      jest.setSystemTime(new Date('2026-10-17T15:00:00.000Z'));
+      const { prisma, service } = withCandles([
+        eod('2026-10-15', '240'),
+        eod('2026-10-16', '250', false),
+      ]);
+
+      const list = await service.getAssets('user-1');
+
+      expect(list.data.assets[0]).toMatchObject({
+        marketStatus: 'closed',
+        tradeBlockedReason: 'MARKET_CLOSED',
+        price: { state: 'unavailable', reason: 'ASSET_PRICE_UNAVAILABLE' },
+      });
+      expect(list.data.priceErrors[0]?.code).toBe('ASSET_PRICE_UNAVAILABLE');
+      // Only the 10-16 window was read: no walk back to an older session.
+      expect(
+        (
+          prisma.marketCandle.findMany.mock.calls as [
+            { where: { openTime: { gte: Date } } },
+          ][]
+        ).map(([args]) => args.where.openTime.gte.toISOString()),
+      ).toEqual(['2026-10-16T04:00:00.000Z']);
+    });
+  });
 });

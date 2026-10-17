@@ -36,6 +36,7 @@ import {
   isTrialPriceSource,
   TRIAL_ORDER_NOTICE,
 } from '../../features/asset/trialDataSource';
+import { getLastSessionCloseLabel } from '../../features/asset/lastSessionClose';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import AccountHoldings from '../asset/AccountHoldings';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -193,6 +194,9 @@ export function OrderTradingScreen({
     displayPrice.priceKrwState === 'available' &&
     displayPrice.priceKrw !== null;
   const converted = showKrw && asset.priceCurrency !== 'KRW';
+  // A closed US market's last confirmed close is labeled by its date, not 현재가.
+  const lastCloseLabel =
+    displayPrice.priceLocal === null ? null : getLastSessionCloseLabel(displayPrice);
   const priceText = converted
     ? krwAvailable
       ? `₩${formatKrw(displayPrice.priceKrw)}`
@@ -243,7 +247,7 @@ export function OrderTradingScreen({
   const currentPrice = (
     <View style={styles.currentPrice} testID="asset-current-price">
       <Text style={styles.priceLabel}>
-        현재가 {converted ? 'KRW' : asset.priceCurrency}
+        {lastCloseLabel ?? '현재가'} {converted ? 'KRW' : asset.priceCurrency}
       </Text>
       <Text style={styles.price} selectable>
         {priceText}
@@ -260,8 +264,8 @@ export function OrderTradingScreen({
   // price contract; no amount or day range is derived from it), US estimate.
   const stockQuote = stock ? (
     <View style={styles.stockQuote} testID="asset-current-price">
-      <Text style={styles.quoteLabel}>
-        현재가 · {converted ? 'KRW' : asset.priceCurrency}
+      <Text testID="order-price-label" style={styles.quoteLabel}>
+        {lastCloseLabel ?? '현재가'} · {converted ? 'KRW' : asset.priceCurrency}
       </Text>
       <Text style={[styles.stockPriceText, { fontSize: fitPriceFontSize(priceText, quoteWidth, fontScale) }]} selectable>
         {priceText}

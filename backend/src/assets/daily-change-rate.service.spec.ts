@@ -434,6 +434,61 @@ describe('canonical daily return', () => {
       ).toBeNull();
     });
 
+    describe('latest session close (closed-market display only)', () => {
+      // Saturday 2026-10-17 11:00 EDT: latest completed session = Fri 10-16.
+      const saturday = new Date('2026-10-17T15:00:00Z');
+      const friday = () =>
+        eodRow('2026-10-16T04:00:00Z', '2026-10-17T04:00:00Z', '250');
+
+      it("returns that session's confirmed raw close, its close time and receipt", async () => {
+        process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+        const { service, findRange } = setup([friday()]);
+        const close = await service.findLatestSessionClose(us, saturday);
+        expect(close?.close.toFixed(2)).toBe('250.00');
+        expect(close?.sessionCloseAt.toISOString()).toBe(
+          '2026-10-16T20:00:00.000Z',
+        );
+        expect(close?.receivedAt.toISOString()).toBe(
+          '2026-10-17T03:00:00.000Z',
+        );
+        expect(findRange).toHaveBeenCalledWith({
+          assetId: us.id,
+          interval: '1d',
+          from: new Date('2026-10-16T04:00:00Z'),
+          to: new Date('2026-10-16T04:00:00.001Z'),
+        });
+      });
+
+      it('is null while open, on KIS, or without a confirmed Tiingo row of exactly that session', async () => {
+        process.env.US_STOCK_PRICE_PROVIDER = 'tiingo';
+        const open = setup([friday()]);
+        expect(
+          await open.service.findLatestSessionClose(
+            us,
+            new Date('2026-10-16T15:00:00Z'),
+          ),
+        ).toBeNull();
+        expect(open.findRange).not.toHaveBeenCalled();
+        for (const row of [
+          { ...friday(), isClosed: false },
+          { ...friday(), sourceProvider: 'kis_overseas_period' },
+          // Received before the 16:00 EDT close: not final.
+          { ...friday(), sourceUpdatedAt: new Date('2026-10-16T19:59:00Z') },
+          // The previous session's row is never served for this one.
+          eodRow('2026-10-15T04:00:00Z', '2026-10-16T04:00:00Z', '240'),
+        ])
+          expect(
+            await setup([row]).service.findLatestSessionClose(us, saturday),
+          ).toBeNull();
+        process.env.US_STOCK_PRICE_PROVIDER = 'kis';
+        const kis = setup([friday()]);
+        expect(
+          await kis.service.findLatestSessionClose(us, saturday),
+        ).toBeNull();
+        expect(kis.findRange).not.toHaveBeenCalled();
+      });
+    });
+
     it('stays null for US stocks on the KIS provider (no raw daily close exists)', async () => {
       process.env.US_STOCK_PRICE_PROVIDER = 'kis';
       const now = new Date('2026-10-16T14:00:00Z');

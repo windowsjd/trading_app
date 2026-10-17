@@ -11,6 +11,7 @@ import {
 } from '../../utils/format';
 import type { AssetTickerMessage } from '../asset/assetTickerPolicy';
 import { getMarketChangeDisplay, getMarketException } from './marketPresentation';
+import { getLastSessionCloseLabel } from '../asset/lastSessionClose';
 import type { AssetPriceErrorDto, MarketAssetItemDto } from './api';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { mergeMarketAssetTicker } from './mergeMarketAssetTicker';
@@ -54,6 +55,11 @@ function MarketAssetRowComponent({
   const symbolMarketDisplay = getAssetSymbolMarketDisplay(displayItem);
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
+  // A closed US market's last confirmed close is named by its date, never "live".
+  const lastClose =
+    displayItem.price?.state === 'available'
+      ? getLastSessionCloseLabel(displayItem.price)
+      : null;
 
   return (
     <View>
@@ -81,6 +87,9 @@ function MarketAssetRowComponent({
             {getAssetPriceText(displayItem)}
           </Text>
           <Text testID={changeTestID ?? `market-change-${item.id}`} style={[styles.helper, { color: change.color }]}>{change.text}</Text>
+          {lastClose ? (
+            <Text testID={`market-last-close-${item.id}`} style={styles.lastClose}>{lastClose}</Text>
+          ) : null}
           {exception ? <Text style={styles.exception}>{exception}</Text> : null}
         </View>
       </ActionPressable>
@@ -123,6 +132,7 @@ const styles = StyleSheet.create({
   itemPriceStale: { color: semantic.warning },
   alignEnd: { alignItems: 'flex-end', flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   helper: { fontSize: 14, color: semantic.secondary },
+  lastClose: { fontSize: 12, color: semantic.secondary, textAlign: 'right' },
   exception: { fontSize: 12, color: semantic.warning, textAlign: 'right' },
 });
 

@@ -24,6 +24,7 @@ import {
   trialCandleNotice,
   TRIAL_PRICE_NOTICE,
 } from '../../features/asset/trialDataSource';
+import { getLastSessionCloseNotice } from '../../features/asset/lastSessionClose';
 import { useAssetTicker } from '../../features/asset/useAssetTicker';
 import { applyTickerMarketState } from '../../features/asset/assetTickerPolicy';
 import { selectDisplayPrice } from '../../features/asset/displayPricePolicy';
@@ -175,6 +176,8 @@ export function AssetMarketChart({
   const usdPrice = formatAssetPrice(displayPrice.priceLocal, displayPrice.priceCurrency, displayPrice.displayPriceDecimals);
   const krwPrice = krwAvailable ? `${formatKrw(displayPrice.priceKrw)}원` : '원 환산 불가';
   const useKrw = usdAsset && krwAvailable && displayCurrency === 'KRW';
+  const lastCloseNotice =
+    displayPrice.priceLocal === null ? null : getLastSessionCloseNotice(displayPrice);
   const chartBody = (
     <>
       {detailView ? (
@@ -304,6 +307,11 @@ export function AssetMarketChart({
       {isTrialPriceSource(displayPrice.priceSource) ? (
         <Text testID="asset-trial-price-notice" style={styles.notice}>
           {TRIAL_PRICE_NOTICE}
+        </Text>
+      ) : null}
+      {lastCloseNotice ? (
+        <Text testID="asset-last-close-notice" style={styles.notice}>
+          {lastCloseNotice}
         </Text>
       ) : null}
       {trialCandleNotice(candlesQuery.data?.source) ? (

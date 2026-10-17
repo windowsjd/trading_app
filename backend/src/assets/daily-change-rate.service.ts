@@ -19,17 +19,32 @@ type BaselineWindow = {
   completedAt: Date;
   provider: (typeof MARKET_DAILY_CANDLE_SOURCE)[keyof typeof MARKET_DAILY_CANDLE_SOURCE];
 };
+type ConfirmedDailyClose = { close: Prisma.Decimal; receivedAt: Date };
 type CacheEntry = {
   key: string;
-  close: Prisma.Decimal | null;
+  close: ConfirmedDailyClose | null;
   expiresAt: number;
+};
+
+/**
+ * The confirmed end-of-day close of one completed US session (display only).
+ */
+export type LatestSessionClose = {
+  close: Prisma.Decimal;
+  /** The session's regular close: the moment the close price is as of. */
+  sessionCloseAt: Date;
+  /** When the confirmed end-of-day row was received from the provider. */
+  receivedAt: Date;
 };
 
 /** Read-only daily return shared by REST and provider ticker presentation. */
 @Injectable()
 export class DailyChangeRateService {
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly inFlight = new Map<string, Promise<Prisma.Decimal | null>>();
+  private readonly inFlight = new Map<
+    string,
+    Promise<ConfirmedDailyClose | null>
+  >();
 
   constructor(private readonly candles: MarketCandlesRepository) {}
 
@@ -44,35 +59,14 @@ export class DailyChangeRateService {
       if (!price.isFinite() || price.lte(0)) return null;
       const window = dailyBaselineWindow(input);
       if (!window) return null;
-      const key = `${window.provider}:${window.openTime.toISOString()}:${window.closeTime.toISOString()}:${window.completedAt.toISOString()}`;
-      const cached = this.cache.get(input.asset.id);
-      let close: Prisma.Decimal | null;
-      if (cached?.key === key && Date.now() < cached.expiresAt) {
-        close = cached.close;
-      } else {
-        const pendingKey = `${input.asset.id}:${key}`;
-        let pending = this.inFlight.get(pendingKey);
-        if (!pending) {
-          pending = this.readClose(input.asset.id, window, input.now)
-            .catch(() => null)
-            .then((value) => {
-              this.cache.delete(input.asset.id);
-              this.cache.set(input.asset.id, {
-                key,
-                close: value,
-                expiresAt: Date.now() + (value ? 30_000 : 5_000),
-              });
-              if (this.cache.size > MAX_CACHE_ASSETS) {
-                const oldest = this.cache.keys().next();
-                if (!oldest.done) this.cache.delete(oldest.value);
-              }
-              return value;
-            })
-            .finally(() => this.inFlight.delete(pendingKey));
-          this.inFlight.set(pendingKey, pending);
-        }
-        close = await pending;
-      }
+      const close = (
+        await this.readCachedClose(
+          input.asset.id,
+          input.asset.id,
+          window,
+          input.now,
+        )
+      )?.close;
       return close ? price.minus(close).div(close).mul(100).toFixed(8) : null;
     } catch {
       // Invalid/missing baseline must not take the current price away.
@@ -80,7 +74,90 @@ export class DailyChangeRateService {
     }
   }
 
-  private async readClose(assetId: string, window: BaselineWindow, now: Date) {
+  /**
+   * Display only, for the asset read paths of a CLOSED US market: the
+   * confirmed Tiingo end-of-day RAW close of exactly the latest completed
+   * session (the same row checks as the change-rate baseline). Null while the
+   * market is open or its calendar is unavailable, outside the Tiingo
+   * provider, or without that session's confirmed row: never an older
+   * session's close and never another provider's price. Nothing is written,
+   * and orders, valuation and settlement never call this.
+   */
+  async findLatestSessionClose(
+    asset: MarketCalendarAsset & { id: string },
+    now: Date,
+  ): Promise<LatestSessionClose | null> {
+    if (asset.assetType !== 'us_stock' || !usCandlesFromTiingo(asset))
+      return null;
+    const state = resolveStockMarketSessionState(asset, now);
+    const session =
+      state?.state === 'closed' ? state.latestCompletedSession : null;
+    if (!session || session.closeTime > now) return null;
+    const window = resolvePeriodWindowForDate(
+      'US',
+      session.localDate.replaceAll('-', ''),
+      '1d',
+    );
+    if (!window) return null;
+    const confirmed = await this.readCachedClose(
+      `session-close:${asset.id}`,
+      asset.id,
+      {
+        openTime: window.openTime,
+        closeTime: window.closeTime,
+        completedAt: session.closeTime,
+        provider: MARKET_DAILY_CANDLE_SOURCE.usStock,
+      },
+      now,
+    );
+    return confirmed
+      ? {
+          close: confirmed.close,
+          sessionCloseAt: session.closeTime,
+          receivedAt: confirmed.receivedAt,
+        }
+      : null;
+  }
+
+  private async readCachedClose(
+    cacheId: string,
+    assetId: string,
+    window: BaselineWindow,
+    now: Date,
+  ): Promise<ConfirmedDailyClose | null> {
+    const key = `${window.provider}:${window.openTime.toISOString()}:${window.closeTime.toISOString()}:${window.completedAt.toISOString()}`;
+    const cached = this.cache.get(cacheId);
+    if (cached?.key === key && Date.now() < cached.expiresAt)
+      return cached.close;
+    const pendingKey = `${cacheId}:${key}`;
+    let pending = this.inFlight.get(pendingKey);
+    if (!pending) {
+      pending = this.readClose(assetId, window, now)
+        .catch(() => null)
+        .then((value) => {
+          this.cache.delete(cacheId);
+          this.cache.set(cacheId, {
+            key,
+            close: value,
+            expiresAt: Date.now() + (value ? 30_000 : 5_000),
+          });
+          if (this.cache.size > MAX_CACHE_ASSETS) {
+            const oldest = this.cache.keys().next();
+            if (!oldest.done) this.cache.delete(oldest.value);
+          }
+          return value;
+        })
+        .finally(() => this.inFlight.delete(pendingKey));
+      this.inFlight.set(pendingKey, pending);
+    }
+    return pending;
+  }
+
+  private async readClose(
+    assetId: string,
+    window: BaselineWindow,
+    now: Date,
+  ): Promise<ConfirmedDailyClose | null> {
     const rows = await this.candles.findRange({
       assetId,
       interval: '1d',
@@ -111,7 +188,7 @@ export class DailyChangeRateService {
       row.low.gt(row.close)
     )
       return null;
-    return row.close;
+    return { close: row.close, receivedAt: row.sourceUpdatedAt };
   }
 }
 

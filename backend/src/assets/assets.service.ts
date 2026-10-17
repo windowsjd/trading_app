@@ -49,6 +49,7 @@ import { buildPagination, type Pagination } from '../common/pagination';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { DailyChangeRateService } from './daily-change-rate.service';
+import { TIINGO_EOD_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
 import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -328,6 +329,12 @@ type AssetPriceResponse = {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+/**
+ * `priceSource.fallbackReason` of a closed US market's display price: the
+ * latest completed session's confirmed end-of-day close (no stored snapshot,
+ * never executable). The app labels it as that date's close.
+ */
+export const LAST_SESSION_CLOSE_FALLBACK_REASON = 'market_closed_last_close';
 /**
  * Realtime-fanout-only USD/KRW selection cache TTL. Short on purpose: display
  * conversion may lag a brand-new FX row by at most this long, while realtime
@@ -1308,6 +1315,14 @@ export class AssetsService {
     });
 
     if (!fallbackSnapshot) {
+      const lastClose = closedScope
+        ? await this.findLatestSessionCloseSnapshot(
+            asset,
+            valuationAt,
+            providerSelection.decision,
+          )
+        : null;
+      if (lastClose) return { snapshot: lastClose };
       const latestCandidate = providerCandidates[0];
       const failureContext: DiagnosticContextUpdate = {
         failureStage: 'asset_price_selection',
@@ -1328,6 +1343,7 @@ export class AssetsService {
               ...(closedScope ? ['last_completed_session'] : []),
             ],
           }),
+          ...(closedScope ? { lastSessionClose: 'unavailable' } : {}),
         },
       };
       recordAdminDiagnosticEvent(
@@ -1349,6 +1365,49 @@ export class AssetsService {
           selectedCapturedAt: fallbackSnapshot.capturedAt,
           providerDecision: providerSelection.decision,
         }),
+      },
+    };
+  }
+
+  /**
+   * A closed US market without an eligible stored price: the latest completed
+   * session's confirmed Tiingo end-of-day close, DISPLAY only, for the asset
+   * read paths (list, search, detail, price, snapshot ticker). It has no
+   * stored row (`id: null`) and is never written: orders, valuation, ranking
+   * and settlement select `asset_price_snapshots` under their own freshness
+   * policies and never call this, so it cannot become an executable price.
+   * The market is closed, so the asset stays MARKET_CLOSED / not tradable.
+   */
+  private async findLatestSessionCloseSnapshot(
+    asset: AssetRecord,
+    valuationAt: Date,
+    providerDecision: SourceDecision,
+  ): Promise<AssetPriceSnapshotRecord | null> {
+    if (this.getAssetPriceCurrency(asset) !== CurrencyCode.USD) return null;
+    const close = await this.dailyChangeRate?.findLatestSessionClose(
+      asset,
+      valuationAt,
+    );
+    if (!close) return null;
+    return {
+      id: null,
+      price: close.close,
+      priceKrw: null,
+      currencyCode: CurrencyCode.USD,
+      sourceType: AssetPriceSourceType.provider_api,
+      sourceName: TIINGO_EOD_CANDLE_SOURCE,
+      effectiveAt: close.sessionCloseAt,
+      capturedAt: close.receivedAt,
+      sourceDecision: {
+        selectedSourceType: 'provider_api',
+        selectedSourceName: TIINGO_EOD_CANDLE_SOURCE,
+        selectedSnapshotId: null,
+        selectedEffectiveAt: close.sessionCloseAt,
+        selectedCapturedAt: close.receivedAt,
+        fallbackUsed: true,
+        fallbackReason: LAST_SESSION_CLOSE_FALLBACK_REASON,
+        rejectedProviderReason: providerDecision.rejectedProviderReason,
+        freshnessAgeSeconds: null,
       },
     };
   }
