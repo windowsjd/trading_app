@@ -40,6 +40,24 @@ function stock(h: any, accountId = 'general') {
 }
 
 describe('Conditional BUY', () => {
+  it('stock outside the regular session accepts an explicit direction while keeping registration separate from execution', async (t) => {
+    const h = inlineTradingHarness();
+    stock(h);
+    h.assets.samsung.marketStatus = 'closed';
+    h.assets.samsung.tradable = false;
+    h.conditionalList = capabilities()('general');
+    h.method = 'conditional';
+    await h.mount(); t.after(h.close);
+    await h.input('conditional-trigger-price', '69000');
+    await h.input('conditional-size', '1');
+    assert.equal(h.node('conditional-submit').props.state, 'disabled', 'direction is required');
+    await h.press('conditional-trigger-at_or_below');
+    assert.equal(h.node('conditional-submit').props.state, 'enabled');
+    await h.press('conditional-submit'); await h.flush();
+    assert.equal(h.requests[0].body.triggerCondition, 'at_or_below');
+    assert.equal(h.requests[0].body.triggerPrice, '69000');
+  });
+
   for (const accountId of ['general', 'season'])
     it(`${accountId} KRX: watch and limit prices stay separate; registration is not a fill`, async (t) => {
       const h = inlineTradingHarness();
