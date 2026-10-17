@@ -4,6 +4,13 @@
 export const QUERY_KEYS = {
   me: ['me'] as const,
   inquiries: { mine: ['inquiries', 'me'] as const },
+  notifications: {
+    /** The signed-in user's push switches; keyed by user so another user's
+     * session can never read them, independent of the teardown clear. */
+    preferences: (userId: string) => ['notifications', 'preferences', userId] as const,
+  },
+  /** Operator-published important notices (공지사항, alongside the app's own). */
+  notices: { important: ['notices', 'important'] as const },
   friends: {
     all: ['friends'] as const,
     list: ['friends', 'list', 'infinite'] as const,

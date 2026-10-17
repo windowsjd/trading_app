@@ -19,6 +19,7 @@ import ModeSelectionScreen from '../../screens/entry/ModeSelectionScreen';
 import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
 import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 import OrderFillNotifier from '../../features/order/OrderFillNotifier';
+import PushNotificationsHost from '../../features/notifications/PushNotificationsHost';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -73,6 +74,9 @@ export default function RootNavigator() {
       {/* Real-fill banner over every tab and pushed screen; it watches the
           signed-in user's accounts only and draws nothing otherwise. */}
       <OrderFillNotifier />
+      {/* Push permission (first launch, before sign-in), device registration
+          after sign-in, and tap routing. Draws nothing; no-op on web. */}
+      <PushNotificationsHost />
     </NavigationContainer>
   );
 }

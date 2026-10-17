@@ -391,3 +391,44 @@ export type FuturesSeasonSettlement = Prisma.FuturesSeasonSettlementModel
  * 
  */
 export type FuturesSeasonClose = Prisma.FuturesSeasonCloseModel
+/**
+ * Model PushDevice
+ * One Expo push token (one installed app) and the signed-in user who
+ * registered it last. Registration happens only after login; a release
+ * (logout, session end, OS permission off) or an Expo DeviceNotRegistered
+ * result deletes the row, so a signed-out app never keeps an owner here.
+ */
+export type PushDevice = Prisma.PushDeviceModel
+/**
+ * Model NotificationPreference
+ * The user's in-app switch per push type. No row = every type on (default).
+ * Independent of the device's OS notification permission.
+ */
+export type NotificationPreference = Prisma.NotificationPreferenceModel
+/**
+ * Model PushNotification
+ * Outbox row: one per (user, type, committed source event). The unique key
+ * makes rescans, restarts and concurrent workers idempotent. Copy and the
+ * route payload are fixed when the row is created from the source rows.
+ */
+export type PushNotification = Prisma.PushNotificationModel
+/**
+ * Model PushDelivery
+ * One Expo push ticket (or ticket error) per notification and device, later
+ * resolved by its push receipt. Token values are never copied here.
+ */
+export type PushDelivery = Prisma.PushDeliveryModel
+/**
+ * Model PushScanCursor
+ * Per-source scan high-water mark of the push worker. A source without a
+ * row starts at the moment it is first scanned: nothing is sent for events
+ * committed before the feature was enabled.
+ */
+export type PushScanCursor = Prisma.PushScanCursorModel
+/**
+ * Model ImportantNotice
+ * An important notice published by an operator. Only a published notice is
+ * shown in the app and pushed (once, to users with the type on); withdrawal
+ * hides it and stops unsent pushes. Actors are also in operator_audit_logs.
+ */
+export type ImportantNotice = Prisma.ImportantNoticeModel

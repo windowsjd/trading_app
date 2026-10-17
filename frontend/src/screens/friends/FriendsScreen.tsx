@@ -3,7 +3,7 @@ import ProfileAvatar from '../../components/common/ProfileAvatar';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useAppearance } from '../../theme/appearance';
 import { semantic } from '../../theme/tokens';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -39,9 +39,16 @@ const tabs = [
   { key: 'requests', label: '받은 요청' },
   { key: 'search', label: '친구 찾기' },
 ] as const;
-export default function FriendsScreen({ navigation }: Props) {
+export default function FriendsScreen({ navigation, route }: Props) {
   const { colors } = useAppearance();
-  const [tab, setTab] = useState<'list' | 'requests' | 'search'>('list');
+  const requestedTab = route?.params?.tab;
+  const pushAt = route?.params?.pushAt;
+  const [tab, setTab] = useState<'list' | 'requests' | 'search'>(requestedTab ?? 'list');
+  // A friend-request push opens 받은 요청 even when this screen is already
+  // open (`pushAt` changes per tap).
+  useEffect(() => {
+    if (requestedTab) setTab(requestedTab);
+  }, [requestedTab, pushAt]);
   const [input, setInput] = useState('');
   const [search, setSearch] = useState('');
   const client = useQueryClient();

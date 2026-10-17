@@ -15,6 +15,7 @@ import { FxModule } from './fx/fx.module';
 import { FuturesModule } from './futures/futures.module';
 import { HomeModule } from './home/home.module';
 import { InquiriesModule } from './inquiries/inquiries.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OperatorModule } from './operator/operator.module';
 import { OpsModule } from './ops/ops.module';
 import { OrdersModule } from './orders/orders.module';
@@ -50,6 +51,7 @@ import { WalletsModule } from './wallets/wallets.module';
     ConditionalModule,
     HomeModule,
     InquiriesModule,
+    NotificationsModule,
     OperatorModule,
     OpsModule,
     OrdersModule,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
-import { findNotice, notices } from './notices.ts';
+import { findNotice, kstDate, mergeNotices, notices } from './notices.ts';
 import { NOTICE_IDS } from '../../constants/noticeIds.ts';
 import { formatPercent } from '../../utils/format.ts';
 
@@ -97,3 +97,20 @@ it('the return-rate notice follows and states the cumulative-principal policy wi
   assert.equal(rate(10_000_000, 9_000_000), '-10');
   assert.equal(rate(12_000_000, 11_000_000), '-8.33');
 });
+
+it('merges published important notices by KST date without replacing app notices', () => {
+  assert.equal(kstDate('2026-10-19T15:30:00.000Z'), '2026-10-20');
+  assert.equal(kstDate('2026-10-19T14:59:00.000Z'), '2026-10-19');
+  const merged = mergeNotices(notices, [
+    { id: 'server-1', title: '점검', publishedAt: '2026-10-17T00:00:00.000Z', sections: [{ heading: 'h', paragraphs: ['p'] }] },
+    { id: 'draft', title: '초안', publishedAt: null, sections: [] },
+    { id: NOTICE_IDS.executionGapProtection, title: '덮어쓰기', publishedAt: '2026-10-18T00:00:00.000Z', sections: [] },
+  ]);
+  assert.equal(merged.length, notices.length + 1);
+  // Same date as the newest app notice: the important one comes first.
+  assert.equal(merged[0].id, 'server-1');
+  assert.equal(merged[0].important, true);
+  assert.equal(merged.find((notice) => notice.id === NOTICE_IDS.executionGapProtection)?.title, '체결괴리 방지시스템 안내');
+  assert.equal(merged.some((notice) => notice.id === 'draft'), false);
+});
+

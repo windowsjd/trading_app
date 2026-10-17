@@ -10,6 +10,50 @@
 
 ---
 
+## 2026-10-17 푸시 알림 7종 (Expo Push, 기본 OFF, 실기기 미검증)
+
+- **구현 목표:** 거래 체결·선물 강제청산·주문 실패/만료·친구 요청·주요 공지·시즌 최종 순위/등급 확정·시즌 종료 24시간 전 알림을
+  Android/iOS 푸시로 보내고, 설정에서 종류별로 켜고 끈다. 시작 `main`=`96c1d031`. 커밋·push·배포·운영 DB 변경 없음.
+  계약·런북: [backend/docs/push-notifications-contract.md](backend/docs/push-notifications-contract.md), 기기 QA: [frontend/docs/push-notifications-qa.md](frontend/docs/push-notifications-qa.md).
+- **기능 구현 의도:**
+  - **확정 이벤트만 근거로 쓴다.** 알림은 이미 커밋된 최종 행(`orders.status=executed`, `futures_executions`, `futures_liquidations`,
+    `failed`/`unfilled`/`expired` 행, `pending` 친구 요청, 발행된 공지, `settled` 시즌)에서만 만든다. 접수·조건 충족·재시도·잠정 순위는
+    결과가 아니고, 커밋 전에 알리면 롤백된 거래를 알릴 수 있기 때문이다. 현물 체결은 두 writer, 선물 체결은 한 writer로만 생기고 청산·시즌 종료는
+    별도 테이블이라 이 구분이 데이터로 보장된다.
+  - **금융 트랜잭션과 푸시 전송을 분리한다.** 금융 코드는 한 줄도 바꾸지 않았다. 별도 worker(Ops lease)가 트랜잭션이 찍은 시각으로 커밋된 행을
+    읽어 outbox(`push_notifications`, (user,type,source) 유일)에 넣고 Expo로 보낸다. 푸시 장애·지연이 체결을 실패시키거나 늦추지 않고,
+    외부 I/O가 금융 락 안에 들어가지 않으며, 재시작·중복 실행은 DB 유일키가 막는다.
+  - **권한 요청(로그인 전)과 토큰 등록(로그인 후)을 나눈다.** 권한은 기기의 것이라 최초 실행 시 한 번 묻고, 토큰은 사용자 것이라 로그인·세션 복원
+    뒤에만 서버에 묶는다. 로그아웃·만료·권한 해제·재설치 때는 토큰 소지 증명(비인증 release)으로 풀 수 있어, 오프라인 로그아웃 뒤에도 다음 실행에서
+    이전 사용자의 알림이 이 기기로 오지 않게 한다.
+- **설계:**
+  - 백엔드 `src/notifications`: 소스 스캔(커서 + 2분 lookback, 활성화 이전 이벤트 미발송) → claim(`SKIP LOCKED` + 2분 lease) →
+    발송 직전 재확인(만료·소스 무효·사용자 비활성·설정 OFF·기기 없음) → Expo 100건 단위 → ticket/receipt(15분 후) → 30일 보존.
+    재시도는 네트워크·429·5xx·MessageRateExceeded만(30초/2분/10분, 4회). DeviceNotRegistered는 기기 삭제.
+  - 시즌 종료 이후 자동 정리(시즌 종료로 만료된 LOC 등)와 사용자 취소는 실패로 알리지 않는다. 선물 지정가 진입은 실패·만료 상태가 없다.
+  - 주요 공지: 운영자 draft → `confirm: true` 발행(1회, 감사 로그) → 철회 가능. 앱 공지 목록에 "중요"로 합쳐 보이고 푸시 탭으로 열린다.
+  - 앱: 루트 옆 `PushNotificationsHost`(권한·등록·탭), 설정 7개 스위치(서버 저장, 실패 시 원복), 거래 내역 `market/futuresView`·친구 `tab` 파라미터.
+    전면 실행 중에는 OS 배너 없이 데이터만 갱신한다. 탭은 로그인·모드 선택 뒤, 받는 사용자 본인·본인 계정일 때만 연다.
+  - 마이그레이션 2개: `20261017120000_add_push_notifications`(새 테이블 6, enum 5, Ops job 1)와
+    `20261017120100_add_push_scan_indexes`(`orders/futures_executions.executed_at` 인덱스, `CONCURRENTLY` — 배포 중 주문 쓰기를 막지 않음).
+- **검증:** backend 단위 340 스위트·5,507건 통과(실패 0, opt-in DB/실연동 82 스위트 skip, 신규 9 스위트 포함), typecheck·신규 파일 eslint·
+  diagnostic gate PASS. PostgreSQL 16 통합 43 assertions(양·음성 이벤트, 동시 스캔/claim 중복 없음, 사용자·기기 격리, 소유권 이전, 설정 OFF,
+  재시도, 발송 중 기기 해제, receipt, 보존, CHECK, 금융 행 불변) — CI core-account 목록에 추가. 마이그레이션 적용 후 schema drift 없음.
+  frontend `npm run check` 2,917/2,917(lint 2종·typecheck 포함), diagnostic gate·web export·Android JS export PASS.
+- **리뷰(자체 + 독립 리뷰어)로 고친 결함:**
+  - 한 페이지(500)를 넘는 이벤트가 lookback 안에 몰리면 스캔이 첫 페이지만 반복해 멈춤 → (시각,id) keyset + `resume_id` 재개.
+    재개 지점은 스캔 30초 이전 행으로 잡아 늦게 커밋된 행도 다시 읽는다.
+  - 발송 중 기기 해제(로그아웃) 시 delivery insert가 FK로 실패해 결과 기록이 안 되고 lease 후 전체 재발송 → 결과를 먼저 기록,
+    delivery는 사라진 기기 링크만 비움(실DB 회귀 테스트).
+  - 요청 직전 기기 소유권 재확인, 다른 Expo 프로젝트 토큰 하나가 요청 전체를 거절시키면 개별 재발송, 알림 단위 패킹,
+    lease 절반 시간 예산, 체결·청산 등을 공지 fan-out보다 먼저 claim(배치 1,000).
+  - 최종 결과: 14일 이내 종료 시즌만 읽고 해당 outbox 행은 보존 삭제 대상에서 제외(정산 재실행 시 중복 방지).
+  - 앱: 공지 목록이 오래된 캐시면 한 번 다시 읽은 뒤에만 "찾을 수 없음", 같은 화면 재탭도 `pushAt`으로 해당 보기 재선택.
+  - 공지 생성 실패도 감사 로그, Ops 실행 기록은 분당 1회.
+- **NOT_RUN / 출시 전 필수:** 실기기 수신·탭·전면 억제(QA 문서 A–E 전부), FCM v1 자격 증명·`google-services.json`(실제 빌드 패키지
+  `com.leagueoftrading`), iOS bundle id·APNs 키, 새 EAS 빌드, Android 단색 알림 아이콘, 운영 DRY_RUN 검증.
+- **결정 대기:** 전면 실행 중 선물 체결·청산을 앱 내 배너로도 보일지(현재는 데이터 갱신만), 조건주문 실패 탭의 목적지(현재 거래 내역).
+
 ## 2026-10-17 미국주식 100·국내주식 70 확대, 중앙 시세·캔들 수집 전환 (코드·테스트·런북, 운영 미적용)
 
 - **구현 목표:** 기존 40종목을 그대로 두고 미국 75·국내 55를 더해 미국 100·국내 70이 기존 시세·차트·주문 경로를 똑같이 쓰게 한다.

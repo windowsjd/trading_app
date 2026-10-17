@@ -73,9 +73,11 @@ export type RecordStackParamList = {
 export type MyStackParamList = {
   Overall: undefined;
   Record: NavigatorScreenParams<RecordStackParamList> | undefined;
-  Friends: undefined;
-  /** `noticeId` opens and scrolls to that notice (links from guides). */
-  Notices: { noticeId?: string } | undefined;
+  /** `tab: 'requests'` opens 받은 요청 (friend-request push); `pushAt`
+   * changes per tap so a repeated tap selects it again. */
+  Friends: { tab?: 'requests'; pushAt?: number } | undefined;
+  /** `noticeId` opens and scrolls to that notice (links from guides, pushes). */
+  Notices: { noticeId?: string; pushAt?: number } | undefined;
   Inquiry: undefined;
   UserSeasonSummary: { userId: string };
   My: undefined;
@@ -94,7 +96,14 @@ export type MainTabParamList = {
 };
 
 export type RootStackParamList = {
-  TradeHistory: RecordOrderAccountScope;
+  /** `market`/`futuresView` preselect the 현물|선물 and 체결|강제청산 views
+   * (push taps); the account stays the route's own subject. */
+  TradeHistory: RecordOrderAccountScope & {
+    market?: 'spot' | 'futures';
+    futuresView?: 'executions' | 'liquidations';
+    /** Changes per push tap, so a repeated tap selects its view again. */
+    pushAt?: number;
+  };
   AssetChart: { assetId: string };
   Splash: undefined;
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;

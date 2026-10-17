@@ -14,6 +14,17 @@ cutoff and failures are persisted in Ops history. This job never changes financi
 settlement or trading mode. Configuration and audit details are in
 [F3.1](futures-f31-contract.md).
 
+## Push notifications worker (2026-10-17)
+
+`push_notifications` is a dedicated worker (`PUSH_NOTIFICATIONS_ENABLED`,
+default false; interval `PUSH_NOTIFICATIONS_INTERVAL_MS`, default 10 s) under
+the Ops lease `push_notifications:current`; its generic scheduler map entry is
+disabled. Each tick derives outbox rows from committed source rows, sends due
+rows to Expo, resolves receipts (every 60 s) and prunes rows older than 30 days
+(hourly). It records one Ops run per minute (or on a failing step) with counts
+only. It only reads financial tables and runs outside every financial
+transaction. See [push notifications](push-notifications-contract.md).
+
 ## Futures Last Price ingestion and retention (2026-10-10)
 
 `FuturesLastPriceIngestion` is a dedicated 1-second service, separate from Mark:

@@ -363,7 +363,8 @@ export const OpsJobName = {
   futures_conditional_entries: 'futures_conditional_entries',
   asset_price_snapshot_retention: 'asset_price_snapshot_retention',
   futures_tp_sl_settings: 'futures_tp_sl_settings',
-  crypto_order_book_retention: 'crypto_order_book_retention'
+  crypto_order_book_retention: 'crypto_order_book_retention',
+  push_notifications: 'push_notifications'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -573,3 +574,55 @@ export const FuturesLastPriceSource = {
 } as const
 
 export type FuturesLastPriceSource = (typeof FuturesLastPriceSource)[keyof typeof FuturesLastPriceSource]
+
+
+export const PushNotificationType = {
+  trade_fill: 'trade_fill',
+  futures_liquidation: 'futures_liquidation',
+  order_failure: 'order_failure',
+  friend_request: 'friend_request',
+  important_notice: 'important_notice',
+  season_final_result: 'season_final_result',
+  season_ending_soon: 'season_ending_soon'
+} as const
+
+export type PushNotificationType = (typeof PushNotificationType)[keyof typeof PushNotificationType]
+
+
+export const PushNotificationStatus = {
+  pending: 'pending',
+  sending: 'sending',
+  sent: 'sent',
+  skipped: 'skipped',
+  failed: 'failed'
+} as const
+
+export type PushNotificationStatus = (typeof PushNotificationStatus)[keyof typeof PushNotificationStatus]
+
+
+export const PushDevicePlatform = {
+  ios: 'ios',
+  android: 'android'
+} as const
+
+export type PushDevicePlatform = (typeof PushDevicePlatform)[keyof typeof PushDevicePlatform]
+
+
+export const PushDeliveryStatus = {
+  ticket_ok: 'ticket_ok',
+  ticket_error: 'ticket_error',
+  receipt_ok: 'receipt_ok',
+  receipt_error: 'receipt_error',
+  receipt_missing: 'receipt_missing'
+} as const
+
+export type PushDeliveryStatus = (typeof PushDeliveryStatus)[keyof typeof PushDeliveryStatus]
+
+
+export const ImportantNoticeStatus = {
+  draft: 'draft',
+  published: 'published',
+  withdrawn: 'withdrawn'
+} as const
+
+export type ImportantNoticeStatus = (typeof ImportantNoticeStatus)[keyof typeof ImportantNoticeStatus]

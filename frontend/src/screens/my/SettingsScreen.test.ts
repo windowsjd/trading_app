@@ -115,6 +115,12 @@ function settingsHarness(portfolioPublic = true) {
         setPreference: (value: string) => { h.appearanceChoices.push(value); select(value); } };
     } },
     '../../features/auth/useLogout': { useLogout: () => async () => {} },
+    // The server-backed notification switches have their own tests
+    // (features/notifications/NotificationSettingsSection.test.ts).
+    '../../features/notifications/NotificationSettingsSection': {
+      default: (props: { userId: string }) => React.createElement('NotificationSettingsSection', props),
+      __esModule: true,
+    },
     '../../components/states/FullPageLoading': {
       default: 'FullPageLoading',
       __esModule: true,
@@ -161,21 +167,20 @@ function settingsHarness(portfolioPublic = true) {
 }
 
 describe('Settings portfolio privacy switch', () => {
-  it('uses matching compact Secondary switches while notifications remain local', async t => {
+  it('uses the compact Secondary switch and hands notifications to the server-backed section', async t => {
     const x = settingsHarness(true); t.after(x.close); await x.mount();
-    assert.doesNotMatch(x.text(), /이 기기에만 저장됩니다|친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다|알림 켜짐/);
+    assert.doesNotMatch(x.text(), /이 기기에만 저장됩니다|친구가 내 현재 시즌 포트폴리오를 볼 수 있습니다|알림 켜짐|서버 연동 알림 설정 API는 아직/);
     for (const mode of ['light', 'dark'] as const) {
       await act(async () => x.node(TEST_IDS.settings.appearance(mode)).props.onPress()); await x.flush();
-      const privacy = x.node('settings-portfolio-public').props, notifications = x.node('settings-notifications').props;
-      assert.deepEqual(privacy.trackColor, notifications.trackColor);
-      assert.equal(privacy.thumbColor, notifications.thumbColor);
-      assert.equal(privacy.activeThumbColor, notifications.activeThumbColor);
+      const privacy = x.node('settings-portfolio-public').props;
       assert.equal(privacy.trackColor.true, mode === 'light' ? '#EAF4FC' : '#1C3042');
       assert.equal(privacy.thumbColor, mode === 'light' ? '#285B85' : '#B9DDFC');
     }
-    await act(async () => x.node('settings-notifications').props.onValueChange(false));
-    assert.equal(x.node('settings-notifications').props.value, false);
-    assert.equal(x.node('settings-notifications').props.trackColor.false, '#ddd');
+    // The old device-local switch is gone; the section is scoped to this user.
+    const sections = x.h.renderer.root.findAll((item: any) => item.type === 'NotificationSettingsSection');
+    assert.equal(sections.length, 1);
+    assert.equal(sections[0].props.userId, 'settings-user');
+    assert.equal(x.node('settings-notifications') === undefined, true);
     assert.deepEqual(x.h.patches, []);
   });
 

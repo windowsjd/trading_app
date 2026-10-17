@@ -800,6 +800,15 @@ or unnecessary personal data are stored.
 Announcements/notices to end users are a separate operational procedure —
 this API only changes the trading calendar, it does not publish notices.
 
+## Important Notice Publishing (2026-10-17)
+
+Operator/admin (`OperatorGuard`) create → review → publish → optionally
+withdraw an important notice under `/api/v1/operator/notices`. Publishing
+requires `{ "confirm": true }`, happens once per notice and pushes it to every
+user with important notices on; each step writes `operator.notice.<verb>` (or
+`.failed`) to `operator_audit_logs` with `targetType = important_notice`.
+Request/response and error codes: [push notifications §4](push-notifications-contract.md#4-important-notices).
+
 ## Not Implemented In This MVP
 
 - HTTP batch execution API.

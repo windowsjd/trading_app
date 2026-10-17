@@ -21,6 +21,7 @@ import { readLimitOnCloseConfig } from '../orders/limit-on-close.config';
 import { readDatabaseStorageMonitorConfig } from '../ops/database-storage-monitor.config';
 import { assetPriceSnapshotRetentionConfig } from '../providers/asset-price-snapshot-retention.config';
 import { cryptoOrderBookHistoryConfig } from '../providers/crypto-order-book-history.config';
+import { pushNotificationsConfig } from '../notifications/push-notifications.config';
 import { readUsStockPriceProvider } from '../providers/us-stock-price-provider.config';
 import { readTiingoConfig } from '../providers/tiingo/tiingo.config';
 
@@ -66,6 +67,7 @@ export function validateEnv(
   collect(errors, () => readDatabaseStorageMonitorConfig(env));
   collect(errors, () => assetPriceSnapshotRetentionConfig(env));
   collect(errors, () => cryptoOrderBookHistoryConfig(env));
+  collect(errors, () => pushNotificationsConfig(env));
   collect(errors, () => conditionalEnabled(env));
   collect(errors, () => legacyOcoRegistrationEnabled(env));
   collect(errors, () => conditionalBuyEnabled(env));

@@ -32,6 +32,7 @@ import { useAppearance } from '../../theme/appearance';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
+import NotificationSettingsSection from '../../features/notifications/NotificationSettingsSection';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
@@ -47,7 +48,6 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
   });
 
   const [nickname, setNickname] = useState('');
-  const [notificationEnabled, setNotificationEnabled] = useState(true);
   const switchTrackColor = { false: colors.border, true: colors.secondaryActionSurface };
   // RN Web selects the active thumb through a separate prop; native uses thumbColor.
   const activeSwitchColor = Platform.OS === 'web' ? { activeThumbColor: colors.secondaryActionForeground } : {};
@@ -331,26 +331,7 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
           {privacyMutation.isError && privacyMutation.context?.userId === meQuery.data.id && isCurrentSession(privacyMutation.context.generation) ? <AdminDiagnosticPanel error={privacyMutation.error} /> : null}
         </View>
 
-        <View style={styles.card}>
-          <View style={styles.switchRow}>
-            <Text style={[styles.sectionTitle, styles.switchLabel]}>알림 설정</Text>
-            <Switch
-              {...activeSwitchColor}
-              testID="settings-notifications"
-              accessibilityLabel="알림 설정"
-              trackColor={switchTrackColor}
-              thumbColor={notificationEnabled ? colors.secondaryActionForeground : colors.text}
-              ios_backgroundColor={colors.border}
-              value={notificationEnabled}
-              onValueChange={setNotificationEnabled}
-            />
-          </View>
-
-          <Text style={styles.helper}>
-            현재 문서 기준으로 서버 연동 알림 설정 API는 아직 명시되지
-            않았습니다.
-          </Text>
-        </View>
+        <NotificationSettingsSection userId={meQuery.data.id} />
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>앱 정보</Text>

@@ -66,6 +66,9 @@ unchanged. `near_me` is removed; MY and season Home use `all&limit=1` for myRank
 No ranking writer, financial transaction, balance or snapshot is modified.
 
 UI: fifth tab is 전체 (same internal MyTab/MyStack names), with MY, 친구,
-공지사항 and 설정. Notices are an empty independent screen without an API.
+공지사항 and 설정. Notices are the app's shipped notices plus important notices an
+operator published (`GET /notices`, see push-notifications-contract.md §4).
+A new pending request can be pushed to its recipient (§2.4 there); accepting,
+rejecting or re-reading never pushes.
 Friend mutations invalidate friends/search/requests, friend ranking and the
 affected user summary; privacy saves use the returned `/me` value.

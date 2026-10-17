@@ -114,7 +114,13 @@ export const ModelName = {
   FuturesLiquidationClose: 'FuturesLiquidationClose',
   FuturesSeasonPrice: 'FuturesSeasonPrice',
   FuturesSeasonSettlement: 'FuturesSeasonSettlement',
-  FuturesSeasonClose: 'FuturesSeasonClose'
+  FuturesSeasonClose: 'FuturesSeasonClose',
+  PushDevice: 'PushDevice',
+  NotificationPreference: 'NotificationPreference',
+  PushNotification: 'PushNotification',
+  PushDelivery: 'PushDelivery',
+  PushScanCursor: 'PushScanCursor',
+  ImportantNotice: 'ImportantNotice'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1466,6 +1472,104 @@ export const FuturesSeasonCloseScalarFieldEnum = {
 } as const
 
 export type FuturesSeasonCloseScalarFieldEnum = (typeof FuturesSeasonCloseScalarFieldEnum)[keyof typeof FuturesSeasonCloseScalarFieldEnum]
+
+
+export const PushDeviceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  token: 'token',
+  platform: 'platform',
+  registeredAt: 'registeredAt',
+  createdAt: 'createdAt'
+} as const
+
+export type PushDeviceScalarFieldEnum = (typeof PushDeviceScalarFieldEnum)[keyof typeof PushDeviceScalarFieldEnum]
+
+
+export const NotificationPreferenceScalarFieldEnum = {
+  userId: 'userId',
+  tradeFill: 'tradeFill',
+  futuresLiquidation: 'futuresLiquidation',
+  orderFailure: 'orderFailure',
+  friendRequest: 'friendRequest',
+  importantNotice: 'importantNotice',
+  seasonFinalResult: 'seasonFinalResult',
+  seasonEndingSoon: 'seasonEndingSoon',
+  updatedAt: 'updatedAt'
+} as const
+
+export type NotificationPreferenceScalarFieldEnum = (typeof NotificationPreferenceScalarFieldEnum)[keyof typeof NotificationPreferenceScalarFieldEnum]
+
+
+export const PushNotificationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  type: 'type',
+  sourceKey: 'sourceKey',
+  tradingAccountId: 'tradingAccountId',
+  title: 'title',
+  body: 'body',
+  data: 'data',
+  status: 'status',
+  skipReason: 'skipReason',
+  lastErrorCode: 'lastErrorCode',
+  eventAt: 'eventAt',
+  expiresAt: 'expiresAt',
+  attemptCount: 'attemptCount',
+  nextAttemptAt: 'nextAttemptAt',
+  claimedUntil: 'claimedUntil',
+  sentAt: 'sentAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PushNotificationScalarFieldEnum = (typeof PushNotificationScalarFieldEnum)[keyof typeof PushNotificationScalarFieldEnum]
+
+
+export const PushDeliveryScalarFieldEnum = {
+  id: 'id',
+  notificationId: 'notificationId',
+  deviceId: 'deviceId',
+  ticketId: 'ticketId',
+  status: 'status',
+  errorCode: 'errorCode',
+  receiptCheckedAt: 'receiptCheckedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type PushDeliveryScalarFieldEnum = (typeof PushDeliveryScalarFieldEnum)[keyof typeof PushDeliveryScalarFieldEnum]
+
+
+export const PushScanCursorScalarFieldEnum = {
+  source: 'source',
+  startedAt: 'startedAt',
+  scannedTo: 'scannedTo',
+  resumeId: 'resumeId',
+  updatedAt: 'updatedAt'
+} as const
+
+export type PushScanCursorScalarFieldEnum = (typeof PushScanCursorScalarFieldEnum)[keyof typeof PushScanCursorScalarFieldEnum]
+
+
+export const ImportantNoticeScalarFieldEnum = {
+  id: 'id',
+  title: 'title',
+  summary: 'summary',
+  sections: 'sections',
+  status: 'status',
+  idempotencyKey: 'idempotencyKey',
+  createdByUserId: 'createdByUserId',
+  publishedByUserId: 'publishedByUserId',
+  publishedAt: 'publishedAt',
+  withdrawnByUserId: 'withdrawnByUserId',
+  withdrawnAt: 'withdrawnAt',
+  fanoutCursor: 'fanoutCursor',
+  fanoutCompletedAt: 'fanoutCompletedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ImportantNoticeScalarFieldEnum = (typeof ImportantNoticeScalarFieldEnum)[keyof typeof ImportantNoticeScalarFieldEnum]
 
 
 export const SortOrder = {

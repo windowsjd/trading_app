@@ -279,6 +279,7 @@ enum OpsJobName {
   asset_price_snapshot_retention
   futures_tp_sl_settings
   crypto_order_book_retention
+  push_notifications
 }
 
 enum MarketCandleSyncMode {
@@ -350,6 +351,9 @@ model User {
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
   rewardFulfillmentsCanceled  RewardFulfillmentRequest[] @relation("RewardFulfillmentCanceledBy")
   inquiries                   Inquiry[]
+  pushDevices                 PushDevice[]
+  notificationPreference      NotificationPreference?
+  pushNotifications           PushNotification[]
 
   @@map("users")
 }
@@ -1100,6 +1104,8 @@ model FuturesExecution {
   @@index([assetPriceSnapshotId])
   @@index([lastPriceSnapshotId])
   @@index([fxRateSnapshotId])
+  // Push notification scan of committed executions.
+  @@index([executedAt])
   @@map("futures_executions")
 }
 
@@ -1390,6 +1396,8 @@ model Order {
   @@index([status])
   @@index([limitOrderCandleEvidenceId])
   @@index([sessionCloseEvidenceId])
+  // Push notification scan of committed fills (docs/push-notifications-contract.md).
+  @@index([executedAt])
   @@map("orders")
 }
 
@@ -2604,4 +2612,181 @@ model FuturesSeasonClose {
   @@unique([positionId, tradingAccountId, instrumentId])
   @@index([settlementId, tradingAccountId])
   @@map("futures_season_closes")
+}
+
+// ---------------------------------------------------------------------------
+// Push notifications (docs/push-notifications-contract.md). Auxiliary delivery
+// only: nothing here is financial or season evidence, and no financial
+// transaction reads or writes these tables. Notifications are derived from
+// already committed rows by the push worker; SQL CHECKs are migration only.
+// ---------------------------------------------------------------------------
+
+enum PushNotificationType {
+  trade_fill
+  futures_liquidation
+  order_failure
+  friend_request
+  important_notice
+  season_final_result
+  season_ending_soon
+}
+
+enum PushNotificationStatus {
+  pending
+  sending
+  sent
+  skipped
+  failed
+}
+
+enum PushDevicePlatform {
+  ios
+  android
+}
+
+enum PushDeliveryStatus {
+  ticket_ok
+  ticket_error
+  receipt_ok
+  receipt_error
+  receipt_missing
+}
+
+enum ImportantNoticeStatus {
+  draft
+  published
+  withdrawn
+}
+
+/// One Expo push token (one installed app) and the signed-in user who
+/// registered it last. Registration happens only after login; a release
+/// (logout, session end, OS permission off) or an Expo DeviceNotRegistered
+/// result deletes the row, so a signed-out app never keeps an owner here.
+model PushDevice {
+  id           String             @id @default(uuid(7))
+  userId       String             @map("user_id")
+  token        String             @unique @db.VarChar(255)
+  platform     PushDevicePlatform
+  registeredAt DateTime           @map("registered_at")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries   PushDelivery[]
+
+  @@index([userId])
+  @@map("push_devices")
+}
+
+/// The user's in-app switch per push type. No row = every type on (default).
+/// Independent of the device's OS notification permission.
+model NotificationPreference {
+  userId             String   @id @map("user_id")
+  tradeFill          Boolean  @default(true) @map("trade_fill")
+  futuresLiquidation Boolean  @default(true) @map("futures_liquidation")
+  orderFailure       Boolean  @default(true) @map("order_failure")
+  friendRequest      Boolean  @default(true) @map("friend_request")
+  importantNotice    Boolean  @default(true) @map("important_notice")
+  seasonFinalResult  Boolean  @default(true) @map("season_final_result")
+  seasonEndingSoon   Boolean  @default(true) @map("season_ending_soon")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+/// Outbox row: one per (user, type, committed source event). The unique key
+/// makes rescans, restarts and concurrent workers idempotent. Copy and the
+/// route payload are fixed when the row is created from the source rows.
+model PushNotification {
+  id               String                 @id @default(uuid(7))
+  userId           String                 @map("user_id")
+  type             PushNotificationType
+  sourceKey        String                 @map("source_key") @db.VarChar(200)
+  /// The owning account of an account-scoped event (routing and audit only).
+  tradingAccountId String?                @map("trading_account_id")
+  title            String                 @db.VarChar(120)
+  body             String                 @db.VarChar(400)
+  data             Json
+  status           PushNotificationStatus @default(pending)
+  skipReason       String?                @map("skip_reason") @db.VarChar(64)
+  lastErrorCode    String?                @map("last_error_code") @db.VarChar(64)
+  eventAt          DateTime               @map("event_at")
+  /// Never sent at or after this instant (stale events are skipped).
+  expiresAt        DateTime               @map("expires_at")
+  attemptCount     Int                    @default(0) @map("attempt_count")
+  nextAttemptAt    DateTime               @map("next_attempt_at")
+  claimedUntil     DateTime?              @map("claimed_until")
+  sentAt           DateTime?              @map("sent_at")
+  createdAt        DateTime               @default(now()) @map("created_at")
+  updatedAt        DateTime               @updatedAt @map("updated_at")
+  user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries       PushDelivery[]
+
+  @@unique([userId, type, sourceKey])
+  @@index([status, nextAttemptAt])
+  @@index([createdAt])
+  @@map("push_notifications")
+}
+
+/// One Expo push ticket (or ticket error) per notification and device, later
+/// resolved by its push receipt. Token values are never copied here.
+model PushDelivery {
+  id               String             @id @default(uuid(7))
+  notificationId   String             @map("notification_id")
+  deviceId         String?            @map("device_id")
+  ticketId         String?            @map("ticket_id") @db.VarChar(100)
+  status           PushDeliveryStatus
+  errorCode        String?            @map("error_code") @db.VarChar(64)
+  receiptCheckedAt DateTime?          @map("receipt_checked_at")
+  createdAt        DateTime           @default(now()) @map("created_at")
+  notification     PushNotification   @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  device           PushDevice?        @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([notificationId])
+  @@index([deviceId])
+  @@map("push_deliveries")
+}
+
+/// Per-source scan high-water mark of the push worker. A source without a
+/// row starts at the moment it is first scanned: nothing is sent for events
+/// committed before the feature was enabled.
+model PushScanCursor {
+  source    String   @id @db.VarChar(64)
+  /// First scan of this source; no window ever starts before it.
+  startedAt DateTime @map("started_at")
+  scannedTo DateTime @map("scanned_to")
+  /// Set when a scan stopped on a full page: the next scan resumes exactly
+  /// after (scannedTo, resumeId) instead of re-reading the lookback.
+  resumeId  String?  @map("resume_id") @db.VarChar(64)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("push_scan_cursors")
+}
+
+/// An important notice published by an operator. Only a published notice is
+/// shown in the app and pushed (once, to users with the type on); withdrawal
+/// hides it and stops unsent pushes. Actors are also in operator_audit_logs.
+model ImportantNotice {
+  id                String                @id @default(uuid(7))
+  title             String                @db.VarChar(100)
+  /// The push body and list summary.
+  summary           String                @db.VarChar(200)
+  /// [{ heading, paragraphs[] }], the app's notice section shape.
+  sections          Json
+  status            ImportantNoticeStatus @default(draft)
+  idempotencyKey    String                @map("idempotency_key") @db.VarChar(100)
+  createdByUserId   String                @map("created_by_user_id")
+  publishedByUserId String?               @map("published_by_user_id")
+  publishedAt       DateTime?             @map("published_at")
+  withdrawnByUserId String?               @map("withdrawn_by_user_id")
+  withdrawnAt       DateTime?             @map("withdrawn_at")
+  /// Last user id the push fan-out has processed (ascending id order).
+  fanoutCursor      String?               @map("fanout_cursor")
+  fanoutCompletedAt DateTime?             @map("fanout_completed_at")
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @updatedAt @map("updated_at")
+
+  @@unique([createdByUserId, idempotencyKey])
+  @@index([status, publishedAt])
+  @@map("important_notices")
 }

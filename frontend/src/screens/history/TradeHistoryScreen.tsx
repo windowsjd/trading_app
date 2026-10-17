@@ -75,7 +75,13 @@ export default function TradeHistoryScreen({ route }: Props) {
   const isAccountScope = 'accountId' in recordScope;
   const [filter, setFilter] = useState<Filter>('all');
   // 현물 orders and 선물 executions/liquidations: two existing record APIs.
-  const [market, setMarket] = useState<Market>('spot');
+  // A push tap preselects the view; the user can still switch.
+  const requestedMarket = route.params.market;
+  const pushAt = route.params.pushAt;
+  const [market, setMarket] = useState<Market>(requestedMarket ?? 'spot');
+  useEffect(() => {
+    if (requestedMarket) setMarket(requestedMarket);
+  }, [requestedMarket, pushAt]);
   const queryClient = useQueryClient();
   const {
     accounts,
@@ -334,7 +340,13 @@ export default function TradeHistoryScreen({ route }: Props) {
         <ScrollView testID="trade-history-futures-screen" contentContainerStyle={styles.content}>
           {accountLine}
           {marketSwitch}
-          {hasAccount ? <FuturesHistory key={accountId} accountId={accountId} /> : null}
+          {hasAccount ? (
+            <FuturesHistory
+              key={`${accountId}:${route.params.futuresView ?? 'executions'}:${pushAt ?? ''}`}
+              accountId={accountId}
+              initialKind={route.params.futuresView}
+            />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
     );

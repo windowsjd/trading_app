@@ -23,6 +23,7 @@ for (const mode of ['light', 'dark'] as const) {
       './navigationRef': { rootNavigationRef: {} },
       '../../components/states/ScreenErrorBoundary': { default: 'ScreenErrorBoundary', __esModule: true },
       '../../features/order/OrderFillNotifier': { default: 'OrderFillNotifier', __esModule: true },
+      '../../features/notifications/PushNotificationsHost': { default: 'PushNotificationsHost', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
       '../../screens/history/TradeHistoryScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
@@ -44,6 +45,9 @@ for (const mode of ['light', 'dark'] as const) {
     // The fill banner sits beside the root stack, inside navigation, so it
     // overlays every tab and pushed screen and can open TradeHistory.
     assert.equal(elements(tree, 'OrderFillNotifier').length, 1);
+    // Push permission/registration/tap routing also lives inside navigation,
+    // mounted once for every route (sign-in included).
+    assert.equal(elements(tree, 'PushNotificationsHost').length, 1);
     const chart = screens.find((s: any) => s.props.name === 'AssetChart');
     assert.equal(chart.props.options.presentation, 'fullScreenModal');
     assert.equal(chart.props.options.animation, 'fade');

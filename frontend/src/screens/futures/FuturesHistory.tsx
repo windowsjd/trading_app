@@ -28,9 +28,16 @@ const operationLabel = {
  * executed on, and liquidation separates economic loss, the cash settled and
  * the uncovered shortfall.
  */
-export default function FuturesHistory({ accountId }: { accountId: string }) {
+export default function FuturesHistory({
+  accountId,
+  initialKind = 'executions',
+}: {
+  accountId: string;
+  /** 강제청산 기록 for a liquidation push; 체결 기록 otherwise. */
+  initialKind?: 'executions' | 'liquidations';
+}) {
   const focused = useIsFocused();
-  const [historyKind, setHistoryKind] = useState<'executions' | 'liquidations'>('executions');
+  const [historyKind, setHistoryKind] = useState<'executions' | 'liquidations'>(initialKind);
   const [offset, setOffset] = useState(0);
   const history = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.futures.history(accountId, historyKind, offset),

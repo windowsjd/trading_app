@@ -1,9 +1,11 @@
 import { NOTICE_IDS } from '../../constants/noticeIds.ts';
 
 /**
- * In-app notices (전체 > 공지사항). There is no notice API: these are reviewed
- * product copy shipped with the app, newest first. Other screens link to a
- * notice by its id, never by its title or position.
+ * In-app notices (전체 > 공지사항): reviewed product copy shipped with the app,
+ * newest first. Other screens link to a notice by its id, never by its title
+ * or position. Notices an operator publishes as important come from the
+ * server (GET /notices) and are merged in by `mergeNotices`; shipping or
+ * editing a notice here never sends a push.
  */
 export type NoticeSection = { heading: string; paragraphs: readonly string[] };
 export type Notice = {
@@ -12,6 +14,8 @@ export type Notice = {
   /** Publication date (KST, YYYY-MM-DD). */
   publishedOn: string;
   sections: readonly NoticeSection[];
+  /** Published by an operator as an important notice (server). */
+  important?: boolean;
 };
 
 export const notices: readonly Notice[] = [
@@ -175,4 +179,30 @@ export const notices: readonly Notice[] = [
 
 export function findNotice(id: string | undefined): Notice | undefined {
   return id === undefined ? undefined : notices.find((notice) => notice.id === id);
+}
+
+export type PublishedNotice = {
+  id: string;
+  title: string;
+  publishedAt: string | null;
+  sections: readonly NoticeSection[];
+};
+
+/** The KST calendar date of an instant (Asia/Seoul has no DST). */
+export function kstDate(iso: string): string {
+  return new Date(Date.parse(iso) + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+/** App notices plus published important notices, newest first; on the same
+ * date an important notice comes first. An id the app already ships wins. */
+export function mergeNotices(
+  local: readonly Notice[],
+  published: readonly PublishedNotice[],
+): Notice[] {
+  const server: Notice[] = published.flatMap((notice) =>
+    notice.publishedAt && !local.some((item) => item.id === notice.id)
+      ? [{ id: notice.id, title: notice.title, publishedOn: kstDate(notice.publishedAt), sections: notice.sections, important: true }]
+      : [],
+  );
+  return [...server, ...local].sort((a, b) => b.publishedOn.localeCompare(a.publishedOn));
 }

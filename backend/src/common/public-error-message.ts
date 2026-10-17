@@ -3,6 +3,18 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  // Push notifications: devices, preferences, important notices (2026-10-17).
+  'A preferences object is required.',
+  'Only known notification types with true/false values are accepted.',
+  'A valid Expo push token is required.',
+  'Platform must be ios or android.',
+  'A title, a summary, sections and an idempotency key are required.',
+  'This idempotency key was already used for different content.',
+  'Confirm publishing: it pushes the notice to users.',
+  'Notice not found.',
+  'The notice was withdrawn.',
+  'The notice is already published.',
+  'The notice is not published.',
   // Independent TP/SL: Futures settings, entry plans, OCO retirement (2026-10-16).
   'New TP/SL protection uses independent stop-loss and take-profit settings.',
   'Futures stop-loss and take-profit settings are currently disabled.',

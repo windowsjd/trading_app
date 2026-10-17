@@ -35,6 +35,7 @@ First compare current implementation, tests and migrations with explicit current
    - `docs/trading-account-orders-api-contract.md`
    - `docs/general-account-and-ad-rewards-api-contract.md`
    - `docs/operator-api-contract.md`
+   - `docs/push-notifications-contract.md` — 2026-10-17: Expo push for 7 types derived from committed rows (outbox, Ops lease, receipts), device/preference APIs, operator-published important notices, app permission/registration/tap rules; default OFF
    - `docs/tiingo-us-equity-official.md` — Tiingo as the official US provider (2026-10-17): collector lease, stored reference prices, `US_STOCK_PRICE_PROVIDER` switch, stored Tiingo candles, US LOC, activation runbook and rollback; default OFF
    - `docs/tiingo-us-equity-trial.md` — Tiingo US-equity trial: display-only, memory-only prices/candles/estimated quote; default OFF
 2. `docs/policy-decisions.md` — freshness thresholds, execute repricing/maxChangeBps, source-type priority, crypto USD settlement, and final provider selection, each with a one-line rationale. This is the policy source of truth; it replaces `realtime-execution-policy.md`, `asset-price-freshness-policy.md`, `crypto-usd-settlement-policy-update.md`, and `provider-final-selection-readiness-recheck.md`.

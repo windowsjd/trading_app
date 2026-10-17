@@ -25,7 +25,7 @@ function screenHarness() {
     '../../features/friends/cache': { refreshFriendship: async () => {} },
     '../../components/states/InlineEmptyState': { __esModule: true, default: 'InlineEmptyState' },
   }).default;
-  h.render = () => { index = 0; return Screen({ navigation: { navigate: (...args: any[]) => navigations.push(args) } }); };
+  h.render = (route?: unknown) => { index = 0; return Screen({ navigation: { navigate: (...args: any[]) => navigations.push(args) }, route }); };
   return h;
 }
 function pressText(tree: any, text: string) {
@@ -33,6 +33,16 @@ function pressText(tree: any, text: string) {
   assert.ok(button, `Missing button ${text}`); button.props.onPress();
 }
 describe('friends user flow', () => {
+  it('a friend-request push opens 받은 요청; without it the list opens', () => {
+    const pushed = screenHarness();
+    const tree = pushed.render({ params: { tab: 'requests' } });
+    assert.deepEqual(pushed.option.queryKey, QUERY_KEYS.friends.requests);
+    const tabs = elements(tree.props.ListHeaderComponent, 'Pressable').filter((node: any) => node.props.accessibilityRole === 'tab');
+    assert.deepEqual(tabs.map((node: any) => node.props['aria-selected']), [false, true, false]);
+    const plain = screenHarness();
+    plain.render();
+    assert.deepEqual(plain.option.queryKey, QUERY_KEYS.friends.list);
+  });
   it('searches the submitted nickname with its own key and server pagination', () => {
     const h = screenHarness(); let tree = h.render();
     pressText(tree.props.ListHeaderComponent, '친구 찾기'); tree = h.render();
@@ -160,6 +170,7 @@ describe('overall menu and server privacy setting', () => {
       '../../features/me/profileImageCache': { applyProfileImageResponse: async () => {} },
       '../../features/auth/useLogout': { useLogout: () => () => {} },
       '../../components/states/FullPageLoading': { default: 'Loading' }, '../../components/states/ErrorState': { default: 'Error' },
+      '../../features/notifications/NotificationSettingsSection': { default: 'NotificationSettingsSection', __esModule: true },
     }).default;
     const toggle = elements(Screen({}), 'Switch')[0];
     assert.equal(toggle.props.value, false);

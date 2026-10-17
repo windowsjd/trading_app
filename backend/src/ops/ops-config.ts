@@ -249,6 +249,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.asset_price_snapshot_retention]: false, // Dedicated bounded retention worker.
       [OpsJobName.futures_tp_sl_settings]: false, // Dedicated bounded Futures TP/SL worker.
       [OpsJobName.crypto_order_book_retention]: false, // Dedicated bounded retention worker.
+      [OpsJobName.push_notifications]: false, // Dedicated push notification worker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,
