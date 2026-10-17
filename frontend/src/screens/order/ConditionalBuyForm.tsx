@@ -48,6 +48,7 @@ export default function ConditionalBuyForm({
   blockedReason,
   buyAvailable,
   currentPrice,
+  marketClosed,
   learning,
   onInputFocus,
   onInputBlur,
@@ -60,6 +61,7 @@ export default function ConditionalBuyForm({
   buyAvailable: string | null;
   /** The screen's fresh current price: the reference for 이상/이하. */
   currentPrice: string | null;
+  marketClosed: boolean;
   learning: LearningGate;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
@@ -68,8 +70,9 @@ export default function ConditionalBuyForm({
   const crypto = asset.assetType === 'crypto';
   const currency = asset.settlementCurrency ?? '';
   const [triggerPrice, setTriggerPrice] = useState('');
+  const [offHoursDirection, setOffHoursDirection] = useState<'at_or_above' | 'at_or_below' | null>(null);
   const trigger = useTriggerDirection(triggerPrice, currentPrice);
-  const condition = trigger.condition;
+  const condition = marketClosed ? offHoursDirection : trigger.condition;
   const [directionNotice, setDirectionNotice] = useState<string | null>(null);
   const [executionType, setExecutionType] = useState<ConditionalBuyExecutionType>('market');
   const [limitPrice, setLimitPrice] = useState('');
@@ -133,15 +136,16 @@ export default function ConditionalBuyForm({
 
   const canUseLimit = capabilities?.canUseLimit === true;
   // No usable current price, or a watch price equal to it: no direction yet.
-  const directionError = trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
-    ? getTriggerDirectionText(trigger.direction, triggerPrice, currency) : null;
+  const directionError = marketClosed ? (!offHoursDirection ? '감시 방향을 선택해주세요.' : null)
+    : trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
+      ? getTriggerDirectionText(trigger.direction, triggerPrice, currency) : null;
   // A limit choice that became unavailable falls back to nothing, not to market.
   const draftError = getConditionalBuyDraftError({
     assetType: asset.assetType, triggerPrice, executionType, limitPrice, size,
   }) ?? directionError ?? (executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
-  const directionText = getTriggerDirectionText(trigger.direction, triggerPrice, currency);
+  const directionText = marketClosed ? null : getTriggerDirectionText(trigger.direction, triggerPrice, currency);
   // The market moved past the watch price after the direction was decided.
-  const crossed = !!condition && !!currentPrice && !isTriggerDirectionValid(condition, triggerPrice, currentPrice);
+  const crossed = !marketClosed && !!condition && !!currentPrice && !isTriggerDirectionValid(condition, triggerPrice, currentPrice);
   const createBlocked = !capabilities?.canCreate ? '현재 조건주문을 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(triggerPrice.trim() || size.trim() || limitPrice.trim());
@@ -158,7 +162,7 @@ export default function ConditionalBuyForm({
     setError(null);
     // Never send a direction the latest price no longer supports.
     if (!actionRef.current) {
-      const changed = trigger.recheck(currentPrice);
+      const changed = marketClosed ? null : trigger.recheck(currentPrice);
       if (changed) { setDirectionNotice(changed); return; }
     }
     setDirectionNotice(null);
@@ -194,6 +198,22 @@ export default function ConditionalBuyForm({
           onFieldFocus={onInputFocus}
           onBlur={onInputBlur}
         />
+        {marketClosed ? (
+            <View style={styles.group}>
+              <Text style={styles.helper}>정규장 외 등록 · 다음 정규장부터 감시합니다. 감시 방향을 선택해주세요.</Text>
+              <SegmentedControl
+                testID="conditional-offhours-direction"
+                accessibilityLabel="감시 방향"
+                compact
+                value={offHoursDirection ?? ''}
+                onChange={(value) => edit(() => setOffHoursDirection(value || null))}
+                options={(['', 'at_or_above', 'at_or_below'] as const).map((value) => ({
+                  key: value, label: value === '' ? '방향 선택' : TRIGGER_CONDITION_LABEL[value],
+                  testID: `conditional-trigger-${value || 'choose'}`, disabled: pending,
+                }))}
+              />
+            </View>
+          ) : null}
         {directionText ? (
           <Text testID="conditional-trigger-direction" accessibilityLiveRegion="polite"
             style={trigger.direction.state === 'ready' ? styles.direction : styles.error}>

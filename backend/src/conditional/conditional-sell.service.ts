@@ -17,6 +17,7 @@ import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learn
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { OrdersService } from '../orders/orders.service';
 import { assertOrderInputPolicy } from '../orders/order-input-policy';
+import { getAssetTradingStatus } from '../orders/market-hours.policy';
 import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { conditionalTradable } from './conditional-policy';
@@ -300,8 +301,15 @@ export class ConditionalSellService {
             409,
           );
       }
-      const price = await conditionalPrice(tx, asset, 'spot', now);
-      if (!price) {
+      // Only user-defined stock SELL watches may be queued off-hours. Keep
+      // independent TP/SL and open-session registration on fresh price evidence.
+      const marketStatus = getAssetTradingStatus(asset, now);
+      const offHoursStock =
+        input.intents.every((intent) => intent.kind === 'condition') &&
+        (asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock') &&
+        !marketStatus.tradable && marketStatus.reason === 'MARKET_CLOSED';
+      const price = offHoursStock ? null : await conditionalPrice(tx, asset, 'spot', now);
+      if (!price && !offHoursStock) {
         setAdminDiagnosticContext({
           domain: 'CONDITIONAL',
           operation: 'CONDITIONAL_SELL_CREATE',
@@ -319,7 +327,7 @@ export class ConditionalSellService {
         );
       }
       if (
-        input.intents.some((intent) =>
+        price && input.intents.some((intent) =>
           isConditionalSellMet(
             intent.triggerCondition,
             price.price,
@@ -347,7 +355,7 @@ export class ConditionalSellService {
               limitPrice: intent.limitPrice,
               quantity: intent.quantity,
               currencyCode: asset.settlementCurrency,
-              registrationSnapshotId: price.id,
+              registrationSnapshotId: price?.id ?? null,
               idempotencyKey: input.idempotencyKey,
               requestHash: hash,
               createdAt: now,

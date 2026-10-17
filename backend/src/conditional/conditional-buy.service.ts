@@ -17,6 +17,7 @@ import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learn
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { OrdersService } from '../orders/orders.service';
 import { assertOrderInputPolicy } from '../orders/order-input-policy';
+import { getAssetTradingStatus } from '../orders/market-hours.policy';
 import { isLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
 import { conditionalTradable } from './conditional-policy';
@@ -194,8 +195,15 @@ export class ConditionalBuyService {
           'Too many active conditional buy orders.',
           409,
         );
-      const price = await conditionalPrice(tx, asset, 'spot', now);
-      if (!price) {
+      // A confirmed stock-market closure may queue a user-defined watch without
+      // an execution-price snapshot. An open session still needs fresh evidence;
+      // unknown calendars, unsupported assets and crypto never bypass the gate.
+      const marketStatus = getAssetTradingStatus(asset, now);
+      const offHoursStock =
+        (asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock') &&
+        !marketStatus.tradable && marketStatus.reason === 'MARKET_CLOSED';
+      const price = offHoursStock ? null : await conditionalPrice(tx, asset, 'spot', now);
+      if (!price && !offHoursStock) {
         setAdminDiagnosticContext({
           domain: 'CONDITIONAL',
           operation: 'CONDITIONAL_BUY_CREATE',
@@ -213,7 +221,7 @@ export class ConditionalBuyService {
         );
       }
       if (
-        isConditionalBuyMet(
+        price && isConditionalBuyMet(
           input.triggerCondition,
           price.price,
           input.triggerPrice,
@@ -235,7 +243,7 @@ export class ConditionalBuyService {
           quantity: input.quantity,
           amount: input.amount,
           currencyCode: asset.settlementCurrency,
-          registrationSnapshotId: price.id,
+          registrationSnapshotId: price?.id ?? null,
           idempotencyKey: input.idempotencyKey,
           requestHash: hash,
           createdAt: now,

@@ -58,6 +58,7 @@ export default function SellIntentForm({
   available,
   reserved,
   currentPrice,
+  marketClosed,
   learning,
   onInputFocus,
   onInputBlur,
@@ -74,6 +75,7 @@ export default function SellIntentForm({
   reserved: string | null;
   /** The screen's fresh current price: the reference for 이상/이하. */
   currentPrice: string | null;
+  marketClosed: boolean;
   learning: LearningGate;
   onInputFocus?: (input: View | null) => void;
   onInputBlur?: () => void;
@@ -84,8 +86,9 @@ export default function SellIntentForm({
   const family = capabilities?.condition;
   const canUseLimit = family?.canUseLimit === true;
   const [leg, setLeg] = useState<SellLegDraft>(EMPTY_LEG);
+  const [offHoursDirection, setOffHoursDirection] = useState<'at_or_above' | 'at_or_below' | null>(null);
   const trigger = useTriggerDirection(leg.triggerPrice, currentPrice);
-  const condition = trigger.condition;
+  const condition = marketClosed ? offHoursDirection : trigger.condition;
   const [directionNotice, setDirectionNotice] = useState<string | null>(null);
   const [registered, setRegistered] = useState<ConditionalSellOrderDto[] | null>(null);
   // The original error only; its public copy is mapped where it is shown.
@@ -145,12 +148,13 @@ export default function SellIntentForm({
   const legError = getSellLegDraftError(leg, { assetType: asset.assetType, holding })
     ?? (leg.executionType === 'limit' && !canUseLimit ? '지정가 발동은 현재 운영 상태에서 이용할 수 없어요.' : null);
   // No usable current price, or a watch price equal to it: no direction yet.
-  const directionError = trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
-    ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency) : null;
+  const directionError = marketClosed ? (!offHoursDirection ? '감시 방향을 선택해주세요.' : null)
+    : trigger.direction.state === 'no_reference' || trigger.direction.state === 'equal'
+      ? getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency) : null;
   const draftError = legError ?? directionError;
-  const directionText = getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency);
+  const directionText = marketClosed ? null : getTriggerDirectionText(trigger.direction, leg.triggerPrice, currency);
   // The market moved past the watch price after the direction was decided.
-  const crossed = !!condition && !!currentPrice && !isTriggerDirectionValid(condition, leg.triggerPrice, currentPrice);
+  const crossed = !marketClosed && !!condition && !!currentPrice && !isTriggerDirectionValid(condition, leg.triggerPrice, currentPrice);
   const createBlocked = !family?.canCreate ? '현재 조건주문 매도를 새로 등록할 수 없어요.' : null;
   const canSubmit = !blockedReason && !createBlocked && !draftError && !pending;
   const typed = !!(leg.triggerPrice.trim() || leg.quantity.trim() || leg.limitPrice.trim());
@@ -171,7 +175,7 @@ export default function SellIntentForm({
     setError(null);
     // Never send a direction the latest price no longer supports.
     if (!actionRef.current) {
-      const changed = trigger.recheck(currentPrice);
+      const changed = marketClosed ? null : trigger.recheck(currentPrice);
       if (changed) { setDirectionNotice(changed); return; }
     }
     setDirectionNotice(null);
@@ -210,6 +214,22 @@ export default function SellIntentForm({
             onFieldFocus={onInputFocus}
             onBlur={onInputBlur}
           />
+          {marketClosed ? (
+            <View style={styles.group}>
+              <Text style={styles.helper}>정규장 외 등록 · 다음 정규장부터 감시합니다. 감시 방향을 선택해주세요.</Text>
+              <SegmentedControl
+                testID="sell-offhours-direction"
+                accessibilityLabel="감시 방향"
+                compact
+                value={offHoursDirection ?? ''}
+                onChange={(value) => edit(() => setOffHoursDirection(value || null))}
+                options={(['', 'at_or_above', 'at_or_below'] as const).map((value) => ({
+                  key: value, label: value === '' ? '방향 선택' : SELL_TRIGGER_CONDITION_LABEL[value],
+                  testID: `sell-trigger-${value || 'choose'}`, disabled: pending,
+                }))}
+              />
+            </View>
+          ) : null}
           {directionText ? (
             <Text testID="sell-trigger-direction" accessibilityLiveRegion="polite"
               style={trigger.direction.state === 'ready' ? styles.direction : styles.error}>

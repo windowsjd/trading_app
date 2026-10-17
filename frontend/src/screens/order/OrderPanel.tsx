@@ -1193,6 +1193,7 @@ export function OrderForm({
           blockedReason={accountBlockedReason ?? assetHardBlockedReason ?? methodUnavailableReason}
           buyAvailable={buyAvailable}
           currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
+          marketClosed={stockMarketClosed}
           learning={advancedGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
@@ -1209,6 +1210,7 @@ export function OrderForm({
           available={positionQuery.isLoading || positionUnavailable ? null : positionAvailable}
           reserved={positionReserved}
           currentPrice={previewPriceAvailable ? displayPrice.priceLocal : null}
+          marketClosed={stockMarketClosed}
           learning={advancedGate}
           onInputFocus={onInputFocus}
           onInputBlur={onInputBlur}
