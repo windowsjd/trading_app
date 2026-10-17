@@ -1050,6 +1050,7 @@ export class MarketCandleLongSyncService {
                 low: String(value.stck_lwpr),
                 close: String(value.stck_clpr),
                 volume: String(value.acml_vol),
+                receivedAt: row.receivedAt,
               });
             }
           } catch (error) {
@@ -1235,6 +1236,7 @@ export class MarketCandleLongSyncService {
         low: row.low,
         close: row.close,
         volume: row.volume,
+        receivedAt: row.sourceUpdatedAt,
       });
     }
     return refs;

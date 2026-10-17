@@ -327,6 +327,44 @@ export function nextKrxCentralRun(
 }
 
 /**
+ * The closing single-price auction window `[close − 10m, close)` of a KRX
+ * session (2026-10-18). Its 5m buckets are never REQUIRED slots — candle
+ * completeness is unchanged — but they are the session's KRX close
+ * evidence: the last one ends with the closing-auction print that the
+ * closed-market display shows. KOSCOM publishes that print minutes after the
+ * close (10-16: the 15:20 bucket was stored at 15:31 KST, the 15:25 bucket
+ * only at 15:42), so the close + delay tick usually misses it and the
+ * post-close repair requests it instead.
+ */
+export function krxClosingAuctionWindow(session: MarketSessionWindow): {
+  fromMs: number;
+  toMs: number;
+} {
+  return {
+    fromMs: resolveRequiredFiveMinuteSlotEndMs(session),
+    toMs: session.closeTime.getTime(),
+  };
+}
+
+/** At most this many post-close requests per session for the auction window. */
+export const KRX_CLOSING_AUCTION_REPAIR_ATTEMPTS = 2;
+
+/** Post-close repair runs that already requested exactly the auction window. */
+export function closingAuctionAttempts(
+  rows: readonly KrxCheckpointRow[],
+  window: { fromMs: number; toMs: number },
+  closeMs: number,
+): number {
+  return rows.filter(
+    (row) =>
+      row.auditPhase === 'repair' &&
+      row.targetFrom.getTime() === window.fromMs &&
+      row.targetTo.getTime() === window.toMs &&
+      row.createdAt.getTime() >= closeMs,
+  ).length;
+}
+
+/**
  * Post-close repair target of one asset (§4.2 rule 5): the first unproven
  * closed required slot that an audited post-close run has not already found
  * missing twice, extended over the following unproven slots up to one page.

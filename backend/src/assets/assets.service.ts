@@ -50,7 +50,7 @@ import { resolveStockMarketSessionState } from '../orders/market-calendar.policy
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { DailyChangeRateService } from './daily-change-rate.service';
 import { TIINGO_EOD_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
-import { KOSCOM_HISTORY_SOURCE } from '../providers/koscom/koscom.config';
+import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
 import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
 import {
@@ -1404,11 +1404,12 @@ export class AssetsService {
   /**
    * A closed US market without an eligible stored price: the latest completed
    * session's confirmed Tiingo end-of-day close (a closed KRX market: the
-   * KOSCOM close both KOSCOM feeds agree on), DISPLAY only, for the asset
-   * read paths (list, search, detail, price, snapshot ticker). It has no
-   * stored row (`id: null`) and is never written: orders, valuation, ranking
-   * and settlement select `asset_price_snapshots` under their own freshness
-   * policies and never call this, so it cannot become an executable price.
+   * KOSCOM closing-auction print, dated by the KOSCOM daily bar), DISPLAY
+   * only, for the asset read paths (list, search, detail, price, snapshot
+   * ticker). It has no stored row (`id: null`) and is never written: orders,
+   * valuation, ranking and settlement select `asset_price_snapshots` under
+   * their own freshness policies and never call this, so it cannot become an
+   * executable price.
    * The market is closed, so the asset stays MARKET_CLOSED / not tradable.
    */
   private async findLatestSessionCloseSnapshot(
@@ -1426,7 +1427,7 @@ export class AssetsService {
       valuationAt,
     );
     if (!close) return null;
-    const sourceName = krx ? KOSCOM_HISTORY_SOURCE : TIINGO_EOD_CANDLE_SOURCE;
+    const sourceName = krx ? KOSCOM_MINUTE_SOURCE : TIINGO_EOD_CANDLE_SOURCE;
     return {
       id: null,
       price: close.close,

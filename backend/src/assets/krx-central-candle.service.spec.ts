@@ -12,6 +12,7 @@ jest.mock('./market-candle-sync-state.repository', () => ({
   MarketCandleSyncStateRepository: class MarketCandleSyncStateRepository {},
 }));
 
+import { Logger } from '@nestjs/common';
 import { readKoscomConfig } from '../providers/koscom/koscom.config';
 import { KrxCentralCandleService } from './krx-central-candle.service';
 import { readKrxCentralCandlesConfig } from './krx-central-candles.config';
@@ -188,5 +189,117 @@ describe('central KRX daily re-read of the previous session', () => {
         to: kst('2026-10-19T15:50:00'),
       });
     expect(sync.syncAsset).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * Closing-price evidence (2026-10-18): the closing-auction buckets are never
+ * required slots, yet they hold the KRX close the closed-market display
+ * shows. KOSCOM publishes the 15:30 print minutes late (10-16: 15:25 bucket
+ * stored at 15:42), so post-close repair requests the window when missing.
+ */
+describe('central KRX post-close repair of the closing-auction window', () => {
+  // Thu 2026-10-15, 09:00–15:30 KST; repair phase at 15:40.
+  const at = kst('2026-10-15T15:40:00');
+  const provenThrough1520 = {
+    mode: 'repair',
+    status: 'completed',
+    coverageComplete: true,
+    targetFrom: kst('2026-10-15T09:00:00'),
+    targetTo: kst('2026-10-15T15:20:00'),
+    coveredFrom: kst('2026-10-15T09:00:00'),
+    coveredTo: kst('2026-10-15T15:20:00'),
+    createdAt: kst('2026-10-15T15:21:10'),
+    auditPhase: 'intraday',
+    auditFirstMissingMs: null,
+  };
+  const auctionAttempt = {
+    ...provenThrough1520,
+    targetFrom: kst('2026-10-15T15:20:00'),
+    targetTo: kst('2026-10-15T15:30:00'),
+    coveredFrom: kst('2026-10-15T15:20:00'),
+    coveredTo: kst('2026-10-15T15:30:00'),
+    createdAt: kst('2026-10-15T15:40:05'),
+    auditPhase: 'repair',
+  };
+  function repairHarness(storedCounts: number[], rows: object[] = []) {
+    const { service, sync } = create(false);
+    const count = jest.fn();
+    for (const stored of storedCounts) count.mockResolvedValueOnce(stored);
+    const internals = service as unknown as {
+      prisma: { asset: unknown; marketCandle: unknown };
+      states: unknown;
+    };
+    internals.prisma.marketCandle = { count };
+    internals.states = {
+      countAuditedRuns: jest.fn().mockResolvedValue(0),
+      findCheckpointsOverlapping: jest
+        .fn()
+        .mockResolvedValue([provenThrough1520, ...rows]),
+    };
+    return { service, sync, count };
+  }
+
+  it('requests the auction window once when its buckets are missing, then reports it stored', async () => {
+    // Per asset: missing before, stored after the request.
+    const { service, sync, count } = repairHarness([0, 2, 0, 2]);
+
+    const summary = await service.runRepair({ now: at });
+
+    expect(sync.syncAsset).toHaveBeenCalledTimes(2);
+    for (const [call] of sync.syncAsset.mock.calls)
+      expect(call).toMatchObject({
+        targets: ['5m'],
+        mode: 'repair',
+        from: kst('2026-10-15T15:20:00'),
+        to: kst('2026-10-15T15:30:00'),
+        krxAudit: { phase: 'repair' },
+      });
+    expect(count).toHaveBeenCalledWith({
+      where: {
+        assetId: 'a1',
+        interval: '5m',
+        isClosed: true,
+        sourceProvider: 'koscom_intraday',
+        openTime: {
+          gte: kst('2026-10-15T15:20:00'),
+          lt: kst('2026-10-15T15:30:00'),
+        },
+      },
+    });
+    expect(summary.closingAuctionMissing).toEqual([]);
+    // Required-slot completeness is judged separately and was already proven.
+    expect(summary.proven).toBe(2);
+    expect(summary.unprovenAssets).toEqual([]);
+  });
+
+  it('makes no request when the auction buckets are already stored', async () => {
+    const { service, sync } = repairHarness([2, 2]);
+    const summary = await service.runRepair({ now: at });
+    expect(sync.syncAsset).not.toHaveBeenCalled();
+    expect(summary.closingAuctionMissing).toEqual([]);
+  });
+
+  it('reports a still-missing auction (never a silent success) and stops after two requests', async () => {
+    const warn = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    try {
+      const first = repairHarness([0, 1, 0, 0]);
+      const summary = await first.service.runRepair({ now: at });
+      expect(first.sync.syncAsset).toHaveBeenCalledTimes(2);
+      expect(summary.closingAuctionMissing).toEqual(['000660', '005930']);
+      expect(summary.proven).toBe(2);
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('krx_central_closing_auction_missing'),
+      );
+
+      const exhausted = repairHarness([0, 0], [auctionAttempt, auctionAttempt]);
+      const again = await exhausted.service.runRepair({ now: at });
+      expect(exhausted.sync.syncAsset).not.toHaveBeenCalled();
+      expect(again.closingAuctionMissing).toEqual(['000660', '005930']);
+    } finally {
+      warn.mockRestore();
+    }
   });
 });

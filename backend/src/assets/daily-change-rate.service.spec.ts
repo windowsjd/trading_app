@@ -590,14 +590,18 @@ describe('canonical daily return', () => {
 
 describe('KRX latest session close (closed-market display only)', () => {
   // Saturday 2026-10-17 12:00 KST: latest completed session = Fri 10-16,
-  // closing at 15:30 KST (06:30Z); its closing-auction 5m bucket is 15:25–15:30.
+  // 09:00–15:30 KST (00:00–06:30Z); its closing-auction 5m bucket is
+  // 15:25–15:30. The next session opens Mon 10-19 09:00 KST, so a daily bar
+  // received before then may still be provisional.
   const saturday = new Date('2026-10-17T03:00:00Z');
+  const sessionOpenMs = Date.parse('2026-10-16T00:00:00Z');
   const daily = (close: string, overrides: object = {}) => ({
     ...candle('2026-10-15T15:00:00Z', 'koscom_history', close),
     assetId: krx.id,
     open: new Prisma.Decimal('215000'),
     high: new Prisma.Decimal('222500'),
     low: new Prisma.Decimal('210500'),
+    volume: new Prisma.Decimal('18908560'),
     sourceUpdatedAt: new Date('2026-10-16T21:30:00Z'),
     ...overrides,
   });
@@ -606,18 +610,56 @@ describe('KRX latest session close (closed-market display only)', () => {
     interval: '5m',
     openTime: new Date('2026-10-16T06:25:00Z'),
     closeTime: new Date('2026-10-16T06:30:00Z'),
-    sourceUpdatedAt: new Date('2026-10-16T06:31:10Z'),
+    sourceUpdatedAt: new Date('2026-10-16T06:42:10Z'),
     sourceProvider: 'koscom_intraday',
     isClosed: true,
     open: new Prisma.Decimal(close),
     high: new Prisma.Decimal(close),
     low: new Prisma.Decimal(close),
     close: new Prisma.Decimal(close),
+    volume: new Prisma.Decimal('1388246'),
     ...overrides,
   });
-  function krxSetup(dailyRows: unknown[], bucketRows: unknown[]) {
-    const findRange = jest.fn(({ interval }: { interval: string }) =>
-      Promise.resolve(interval === '1d' ? dailyRows : bucketRows),
+  /** All 78 stored buckets of 10-16 whose O/H/L reproduce `daily()`. */
+  const wholeSession = (
+    auctionClose: string,
+    edit: (rows: Record<string, unknown>[]) => void = () => undefined,
+  ) => {
+    const rows: Record<string, unknown>[] = Array.from(
+      { length: 77 },
+      (_, index) => {
+        const openTime = new Date(sessionOpenMs + index * 5 * 60_000);
+        const price = (value: string) => new Prisma.Decimal(value);
+        return {
+          ...auction('216000'),
+          openTime,
+          closeTime: new Date(openTime.getTime() + 5 * 60_000),
+          sourceUpdatedAt: new Date(openTime.getTime() + 6 * 60_000),
+          open: price(index === 0 ? '215000' : '216000'),
+          high: price(index === 10 ? '222500' : '217000'),
+          low: price(index === 20 ? '210500' : '215500'),
+          volume: price('200000'),
+        };
+      },
+    );
+    rows.push(auction(auctionClose));
+    edit(rows);
+    return rows;
+  };
+  function krxSetup(
+    dailyRows: unknown[],
+    bucketRows: unknown[],
+    sessionRows: unknown[] = bucketRows,
+  ) {
+    const findRange = jest.fn(
+      ({ interval, from }: { interval: string; from: Date }) =>
+        Promise.resolve(
+          interval === '1d'
+            ? dailyRows
+            : from.getTime() === sessionOpenMs
+              ? sessionRows
+              : bucketRows,
+        ),
     );
     return {
       findRange,
@@ -625,7 +667,7 @@ describe('KRX latest session close (closed-market display only)', () => {
     };
   }
 
-  it('returns the close when the KOSCOM daily and the closing-auction bucket agree', async () => {
+  it('returns the auction close when the KOSCOM daily and the closing-auction bucket agree', async () => {
     const { service, findRange } = krxSetup(
       [daily('215500')],
       [auction('215500')],
@@ -635,13 +677,86 @@ describe('KRX latest session close (closed-market display only)', () => {
     expect(close?.sessionCloseAt.toISOString()).toBe(
       '2026-10-16T06:30:00.000Z',
     );
-    expect(close?.receivedAt.toISOString()).toBe('2026-10-16T21:30:00.000Z');
+    // The price is the closing-auction bucket's: its receipt, not the daily's.
+    expect(close?.receivedAt.toISOString()).toBe('2026-10-16T06:42:10.000Z');
     expect(findRange).toHaveBeenCalledWith({
       assetId: krx.id,
       interval: '5m',
       from: new Date('2026-10-16T06:25:00Z'),
       to: new Date('2026-10-16T06:25:00.001Z'),
     });
+    // Agreeing closes need no whole-session read.
+    expect(findRange).toHaveBeenCalledTimes(2);
+  });
+
+  it('dates the auction close by the KRX O/H/L when the provisional daily close is the NXT after-market price', async () => {
+    // 10-16 as stored: daily close 217,000 (NXT 19:59 print) vs 215,500.
+    const { service, findRange } = krxSetup(
+      [daily('217000')],
+      [auction('215500')],
+      wholeSession('215500'),
+    );
+    const close = await service.findLatestSessionClose(krx, saturday);
+    expect(close?.close.toFixed(0)).toBe('215500');
+    expect(close?.sessionCloseAt.toISOString()).toBe(
+      '2026-10-16T06:30:00.000Z',
+    );
+    expect(findRange).toHaveBeenLastCalledWith({
+      assetId: krx.id,
+      interval: '5m',
+      from: new Date('2026-10-16T00:00:00Z'),
+      to: new Date('2026-10-16T06:30:00Z'),
+    });
+  });
+
+  it('refuses a differing close the stored session cannot date, or a final daily that differs', async () => {
+    const cases: [string, unknown[]][] = [
+      ['no whole session stored', [auction('215500')]],
+      [
+        'a bucket is missing',
+        wholeSession('215500', (rows) => rows.splice(40, 1)),
+      ],
+      [
+        'the session high differs',
+        wholeSession('215500', (rows) => {
+          rows[10].high = new Prisma.Decimal('223000');
+        }),
+      ],
+      [
+        'the session open differs',
+        wholeSession('215500', (rows) => {
+          rows[0].open = new Prisma.Decimal('214000');
+        }),
+      ],
+      [
+        'more volume than the daily',
+        wholeSession('215500', (rows) => {
+          rows[5].volume = new Prisma.Decimal('99999999');
+        }),
+      ],
+      [
+        'a bucket from another source',
+        wholeSession('215500', (rows) => {
+          rows[30].sourceProvider = 'kis_domestic_minute';
+        }),
+      ],
+      [
+        'an unclosed bucket',
+        wholeSession('215500', (rows) => {
+          rows[30].isClosed = false;
+        }),
+      ],
+    ];
+    for (const [, sessionRows] of cases)
+      expect(
+        await krxSetup(
+          [daily('217000')],
+          [auction('215500')],
+          sessionRows,
+        ).service.findLatestSessionClose(krx, saturday),
+      ).toBeNull();
+    // While closed, the latest session's daily can only be provisional; the
+    // final-daily rule (closes must agree) is pinned in the adapter spec.
   });
 
   it('is null while the market is open, without touching the store', async () => {
@@ -659,15 +774,21 @@ describe('KRX latest session close (closed-market display only)', () => {
     expect(findRange).not.toHaveBeenCalled();
   });
 
-  it('is null for a provisional daily, a missing/unclosed/foreign bucket or a non-KOSCOM daily', async () => {
+  it('is null for a missing/unclosed/foreign bucket or a non-KOSCOM / unconfirmed daily', async () => {
     for (const [dailyRows, bucketRows] of [
-      // 10-16 as stored: NXT after-market last price vs the auction close.
-      [[daily('217000')], [auction('215500')]],
       [[daily('215500')], []],
       [[daily('215500')], [auction('215500', { isClosed: false })]],
       [
         [daily('215500')],
         [auction('215500', { sourceProvider: 'kis_domestic_minute' })],
+      ],
+      [
+        [daily('215500')],
+        [
+          auction('215500', {
+            closeTime: new Date('2026-10-16T06:29:00Z'),
+          }),
+        ],
       ],
       [
         [daily('215500', { sourceProvider: 'kis_domestic_period' })],

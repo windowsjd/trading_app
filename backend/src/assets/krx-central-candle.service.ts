@@ -15,12 +15,18 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { KoscomP3Cadence } from '../providers/koscom/koscom-budget-policy';
 import { KoscomCallBudgetService } from '../providers/koscom/koscom-call-budget.service';
 import { runWithKoscomCallCategory } from '../providers/koscom/koscom-call-context';
-import { KoscomConfigService } from '../providers/koscom/koscom.config';
+import {
+  KOSCOM_MINUTE_SOURCE,
+  KoscomConfigService,
+} from '../providers/koscom/koscom.config';
 import { RedisService } from '../redis/redis.service';
 import {
   FIVE_MINUTES_MS,
+  KRX_CLOSING_AUCTION_REPAIR_ATTEMPTS,
+  closingAuctionAttempts,
   kstDate,
   kstDayStartMs,
+  krxClosingAuctionWindow,
   krxDailyBridge,
   krxIntradayTickTimes,
   krxSessionSlotState,
@@ -77,6 +83,11 @@ export type KrxCentralRunSummary = {
   providerPages: number;
   /** Assets with unproven required slots after this run (G4-I evidence). */
   unprovenAssets: KrxCentralAssetOutcome[];
+  /**
+   * Repair only: symbols whose closing-auction buckets (the KRX close
+   * evidence, `krxClosingAuctionWindow`) are still not stored after it.
+   */
+  closingAuctionMissing?: string[];
 };
 
 /**
@@ -204,7 +215,11 @@ export class KrxCentralCandleService {
    * Post-close repair (§4.2 rule 5, same KST day only: the minute source is
    * trusted for the current day): re-requests unproven required slots, at
    * most 2 audited attempts per missing slot, 3 calls per asset and 300 per
-   * day. What stays unproven is alerted and remains a visible gap.
+   * day. What stays unproven is alerted and remains a visible gap. Then,
+   * within the same caps, the closing-auction window when its buckets are
+   * not stored (KRX close evidence, never a required slot; at most 2
+   * requests); still missing → `closingAuctionMissing` and an alert, never a
+   * silent success.
    */
   async runRepair(input: {
     now: Date;
@@ -219,6 +234,8 @@ export class KrxCentralCandleService {
     const closeAt = session.closeTime;
     let dayCalls = await this.states.countAuditedRuns('5m', 'repair', closeAt);
     const startedAt = new Date();
+    const auction = krxClosingAuctionWindow(session);
+    const closingAuctionMissing: string[] = [];
     for (const asset of assets) {
       if (input.signal?.aborted) break;
       let rows = await this.sessionRows(asset, session);
@@ -245,6 +262,23 @@ export class KrxCentralCandleService {
         dayCalls += 1;
         rows = await this.sessionRows(asset, session);
       }
+      let auctionStored = await this.closingAuctionStored(asset.id, auction);
+      if (
+        !auctionStored &&
+        closingAuctionAttempts(rows, auction, closeAt.getTime()) <
+          KRX_CLOSING_AUCTION_REPAIR_ATTEMPTS &&
+        assetCalls < REPAIR_CALLS_PER_ASSET &&
+        dayCalls < REPAIR_CALLS_PER_DAY &&
+        !input.signal?.aborted
+      ) {
+        const feed = await this.syncFiveMinute(asset, auction, input, 'repair');
+        summary.providerPages += feed?.pagesFetched ?? 0;
+        assetCalls += 1;
+        dayCalls += 1;
+        rows = await this.sessionRows(asset, session);
+        auctionStored = await this.closingAuctionStored(asset.id, auction);
+      }
+      if (!auctionStored) closingAuctionMissing.push(asset.symbol);
       this.record(
         summary,
         asset,
@@ -257,7 +291,32 @@ export class KrxCentralCandleService {
         true,
       );
     }
-    return summary;
+    if (closingAuctionMissing.length > 0)
+      this.logger.warn(
+        JSON.stringify({
+          event: 'krx_central_closing_auction_missing',
+          sessionDate: session.localDate,
+          assets: closingAuctionMissing,
+        }),
+      );
+    return { ...summary, closingAuctionMissing };
+  }
+
+  /** Every 5m bucket of the closing-auction window is stored, closed, from KOSCOM. */
+  private async closingAuctionStored(
+    assetId: string,
+    window: { fromMs: number; toMs: number },
+  ): Promise<boolean> {
+    const stored = await this.prisma.marketCandle.count({
+      where: {
+        assetId,
+        interval: '5m',
+        isClosed: true,
+        sourceProvider: KOSCOM_MINUTE_SOURCE,
+        openTime: { gte: new Date(window.fromMs), lt: new Date(window.toMs) },
+      },
+    });
+    return stored === (window.toMs - window.fromMs) / FIVE_MINUTES_MS;
   }
 
   /**

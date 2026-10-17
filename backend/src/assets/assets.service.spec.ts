@@ -3017,7 +3017,8 @@ describe('AssetsService', () => {
           priceEffectiveAt: '2026-10-16T06:30:00.000Z',
           priceSource: {
             sourceType: 'provider_api',
-            sourceName: 'koscom_history',
+            // The closing-auction print of the KOSCOM intraday feed.
+            sourceName: 'koscom_intraday',
             snapshotId: null,
             fallbackUsed: true,
             fallbackReason: 'market_closed_krx_last_close',
@@ -3029,11 +3030,67 @@ describe('AssetsService', () => {
       expectNoAssetWrites(prisma);
     });
 
-    it('stays unavailable when the daily is provisional (NXT last price ≠ auction close)', async () => {
+    // 10-16 as stored: the provisional daily close is the NXT after-market
+    // last price (217,000); the 15:30 auction (KRX close) was 215,500.
+    const provisionalDaily = () => ({
+      ...candle('1d', '2026-10-16', '217000'),
+      open: new Prisma.Decimal('215000'),
+      high: new Prisma.Decimal('222500'),
+      low: new Prisma.Decimal('210500'),
+      volume: new Prisma.Decimal('18908560'),
+    });
+    /** All 78 stored KOSCOM 5m buckets of 10-16, reproducing the daily O/H/L. */
+    const wholeSession = () =>
+      Array.from({ length: 78 }, (_, index) => {
+        const openTime = new Date(
+          Date.parse('2026-10-16T00:00:00.000Z') + index * 300_000,
+        );
+        const price = (value: string) => new Prisma.Decimal(value);
+        return {
+          ...candle('5m', '2026-10-16', '216000'),
+          openTime,
+          closeTime: new Date(openTime.getTime() + 300_000),
+          open: price(index === 0 ? '215000' : '216000'),
+          high: price(index === 10 ? '222500' : '216000'),
+          low: price(index === 20 ? '210500' : '216000'),
+          close: price(index === 77 ? '215500' : '216000'),
+        };
+      });
+
+    it('shows the KRX auction close when the provisional daily close is the NXT price and the stored session dates it', async () => {
+      jest.setSystemTime(saturday);
+      const { prisma, service } = withCandles([
+        candle('1d', '2026-10-15', '210000'),
+        provisionalDaily(),
+        ...wholeSession(),
+      ]);
+
+      const list = await service.getAssets('user-1');
+
+      expect(list.data.priceErrors).toHaveLength(0);
+      expect(list.data.assets[0]).toMatchObject({
+        marketStatus: 'closed',
+        tradable: false,
+        tradeBlockedReason: 'MARKET_CLOSED',
+        price: {
+          state: 'available',
+          currentPrice: '215500.00000000',
+          assetPriceSnapshotId: null,
+          priceEffectiveAt: '2026-10-16T06:30:00.000Z',
+          priceSource: {
+            sourceName: 'koscom_intraday',
+            fallbackReason: 'market_closed_krx_last_close',
+          },
+        },
+      });
+      expectNoAssetWrites(prisma);
+    });
+
+    it('stays unavailable when a differing (provisional) daily close has no whole stored session to date the auction', async () => {
       jest.setSystemTime(saturday);
       const { service } = withCandles([
         candle('1d', '2026-10-15', '210000'),
-        candle('1d', '2026-10-16', '217000'),
+        provisionalDaily(),
         candle('5m', '2026-10-16', '215500'),
       ]);
 

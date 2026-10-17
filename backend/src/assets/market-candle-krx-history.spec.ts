@@ -180,6 +180,61 @@ describe('KRX 10-minute history → 4h', () => {
     );
   });
 
+  it('compares the close only against a final daily: a provisional (NXT after-market) close is not the KRX close', () => {
+    // 10-12 closes at 15:30 KST; 10-13 opens at 09:00 KST (00:00Z).
+    const rows = sessionRows('20261012');
+    const nxtClose = { ...dailyOf(rows), close: '99999' };
+    const provisional = verifyKrxTenMinuteSession({
+      session: session('20261012'),
+      rows,
+      invalidRows: 0,
+      daily: { ...nxtClose, receivedAt: new Date('2026-10-12T10:59:00Z') },
+      receivedAt,
+    });
+    expect(provisional.status).toBe('verified');
+    // The 4h close is the 15:30 auction row's, never the daily's.
+    expect(
+      provisional.status === 'verified' &&
+        provisional.candles.at(-1)!.close.toFixed(),
+    ).toBe(rows.at(-1)!.close);
+    for (const final of [
+      new Date('2026-10-13T00:00:00Z'),
+      undefined, // unknown receipt: compared
+    ]) {
+      const verdict = verifyKrxTenMinuteSession({
+        session: session('20261012'),
+        rows,
+        invalidRows: 0,
+        daily: { ...nxtClose, receivedAt: final },
+        receivedAt,
+      });
+      expect(verdict.status === 'held' && verdict.reason).toBe(
+        'DAILY_OHLC_MISMATCH',
+      );
+    }
+  });
+
+  it('still dates a provisional-daily session by its exact O/H/L', () => {
+    const rows = sessionRows('20261012');
+    for (const field of ['open', 'high', 'low'] as const) {
+      const verdict = verifyKrxTenMinuteSession({
+        session: session('20261012'),
+        rows,
+        invalidRows: 0,
+        daily: {
+          ...dailyOf(rows),
+          [field]: '1',
+          close: '99999',
+          receivedAt: new Date('2026-10-12T10:59:00Z'),
+        },
+        receivedAt,
+      });
+      expect(verdict.status === 'held' && verdict.reason).toBe(
+        'DAILY_OHLC_MISMATCH',
+      );
+    }
+  });
+
   it('records a volume difference without discarding an OHLC-verified session', () => {
     const rows = sessionRows('20261012');
     const less = verifyKrxTenMinuteSession({

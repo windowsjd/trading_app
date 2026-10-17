@@ -16,7 +16,9 @@ import type { KoscomClient, KoscomResponse } from './koscom.client';
 import {
   KoscomCandleAdapter,
   corroborateKoscomMinuteSession,
+  koscomDailyCloseMayBeProvisional,
 } from './koscom-candle.adapter';
+import { resolveMarketSession } from '../../orders/market-calendar.policy';
 import { KisCandleNormalizerService } from '../kis/candles/kis-candle-normalizer.service';
 import { KisDomesticFiveMinuteBuilder } from '../kis/candles/kis-domestic-five-minute.builder';
 import { KisPeriodCandleNormalizerService } from '../kis/candles/kis-period-candle-normalizer.service';
@@ -452,6 +454,8 @@ describe('KoscomCandleAdapter past-session 1m history (operator backfill)', () =
       skipMinute?: number;
       dailyClose?: string;
       previousOpen?: string;
+      dailyOpen?: string;
+      receivedAt?: Date;
     } = {},
   ) {
     const h = harness([]);
@@ -463,10 +467,10 @@ describe('KoscomCandleAdapter past-session 1m history (operator backfill)', () =
             isuSrtCd: '005930',
             hisLists: [
               daily(q.inqStrtDd, options.previousOpen ?? '101'),
-              daily(q.inqEndDd, '100', options.dailyClose),
+              daily(q.inqEndDd, options.dailyOpen ?? '100', options.dailyClose),
             ],
           },
-          receivedAt: now,
+          receivedAt: options.receivedAt ?? now,
         });
       const toMinute = (hhmm: string) =>
         Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(2, 4));
@@ -477,7 +481,7 @@ describe('KoscomCandleAdapter past-session 1m history (operator backfill)', () =
       }
       return Promise.resolve({
         result: { isuSrtCd: '005930', hisLists: rows },
-        receivedAt: now,
+        receivedAt: options.receivedAt ?? now,
       });
     });
     return h;
@@ -551,6 +555,32 @@ describe('KoscomCandleAdapter past-session 1m history (operator backfill)', () =
     expect(result.stopReason).toBe('target_reached');
   });
 
+  it('keeps the latest session when only its provisional daily close differs (NXT after-market)', async () => {
+    // 09-30 07:00 KST: 09-29 is the latest completed session and its daily
+    // is read before the 09-30 open, so its close may still be the NXT last
+    // price; O/H/L, volume and the previous-day check still date the rows.
+    const early = new Date('2026-09-29T22:00:00Z');
+    const result = await historyHarness({
+      dailyClose: '104',
+      receivedAt: early,
+    }).adapter.fetchDomesticOneMinuteRows({ asset, ...session, now: early });
+    expect(result.complete).toBe(true);
+    expect(result.rows).toHaveLength(390);
+    // The kept close is the minute feed's own last row, never the daily's.
+    expect(result.rows.at(-1)!.value.stck_prpr).toBe('105');
+  });
+
+  it('still holds a provisional-daily session whose O/H/L do not match', async () => {
+    const early = new Date('2026-09-29T22:00:00Z');
+    const result = await historyHarness({
+      dailyOpen: '101',
+      dailyClose: '104',
+      receivedAt: early,
+    }).adapter.fetchDomesticOneMinuteRows({ asset, ...session, now: early });
+    expect(result.rows).toHaveLength(0);
+    expect(result.complete).toBe(false);
+  });
+
   it('ends the sweep beyond the configured session reach without calling', async () => {
     process.env.KOSCOM_INTRADAY_HISTORY_SESSIONS = '1';
     const h = historyHarness();
@@ -579,5 +609,52 @@ describe('KoscomCandleAdapter past-session 1m history (operator backfill)', () =
         previous,
       ),
     ).toBe(true);
+  });
+
+  it('dates by O/H/L and compares the close only against a final daily', () => {
+    const minutes = [
+      { open: '10', high: '12', low: '9', close: '11', volume: '5' },
+      { open: '11', high: '11', low: '10', close: '10', volume: '5' },
+    ];
+    const day = { open: '10', high: '12', low: '9', close: '10', volume: '20' };
+    const previous = { ...day, open: '9' };
+    const nxtClose = { ...day, close: '13' };
+    expect(corroborateKoscomMinuteSession(minutes, day, previous)).toBe(true);
+    expect(corroborateKoscomMinuteSession(minutes, nxtClose, previous)).toBe(
+      false,
+    );
+    expect(
+      corroborateKoscomMinuteSession(minutes, nxtClose, previous, false),
+    ).toBe(true);
+    for (const wrongDate of [
+      { ...nxtClose, open: '11' },
+      { ...nxtClose, high: '13' },
+      { ...nxtClose, low: '8' },
+    ])
+      expect(
+        corroborateKoscomMinuteSession(minutes, wrongDate, previous, false),
+      ).toBe(false);
+  });
+});
+
+describe('koscomDailyCloseMayBeProvisional (2026-10-18)', () => {
+  // Fri 2026-10-16; the next session opens Mon 10-19 09:00 KST (00:00Z).
+  const friday = resolveMarketSession('KRX', '20261016')!;
+  it('is provisional until the next session opens, then final', () => {
+    for (const [at, provisional] of [
+      ['2026-10-16T10:00:00Z', true], // 19:00 KST, NXT still trading
+      ['2026-10-17T13:45:00Z', true], // Saturday
+      ['2026-10-18T23:30:00Z', true], // Mon 08:30 KST pre-open re-read
+      ['2026-10-19T00:00:00Z', false], // Mon 09:00 KST open
+      ['2026-10-20T06:33:00Z', false],
+    ] as const)
+      expect(koscomDailyCloseMayBeProvisional(friday, new Date(at))).toBe(
+        provisional,
+      );
+  });
+
+  it('compares the close when the receipt time is unknown', () => {
+    expect(koscomDailyCloseMayBeProvisional(friday, undefined)).toBe(false);
+    expect(koscomDailyCloseMayBeProvisional(friday, new Date(NaN))).toBe(false);
   });
 });

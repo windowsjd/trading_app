@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../generated/prisma/client';
 import {
+  findFirstMarketSessionOnOrAfter,
   findPreviousMarketSession,
   resolveMarketSession,
   inspectMarketSessionsInRange,
@@ -449,12 +450,16 @@ export class KoscomCandleAdapter {
                 : null;
             };
             const dated = bar(sessionDate);
+            const datedReceivedAt = daily.rows.find(
+              (row) => row.value.stck_bsop_date === sessionDate,
+            )?.receivedAt;
             verified =
               dated !== null &&
               corroborateKoscomMinuteSession(
                 minutes.rows.map((entry) => entry.values),
                 dated,
                 bar(compactDate(previous.localDate)),
+                !koscomDailyCloseMayBeProvisional(session, datedReceivedAt),
               );
           }
           if (!verified) {
@@ -834,18 +839,50 @@ type SessionBar = {
 };
 
 /**
+ * Whether KOSCOM's dated daily bar of KRX `session`, received at
+ * `receivedAt`, may still carry a provisional close (2026-10-18). The latest
+ * session's daily row follows the live quote: O/H/L stay the KRX regular
+ * session's, but the close tracks the NXT after-market (to 20:00) last trade
+ * — 10-16 005930/000660/000270 closes equal their 19:59 NXT prints and differ
+ * from both the 15:30 auction and the 18:00 prints — until KOSCOM finalizes
+ * it to the KRX close. Observed final by the next session's open (10-15 was
+ * final at 06:33 KST on 10-16; 10-12…10-15 closes equal the auction for all
+ * 70 stocks), so a bar received before the next session's open may be
+ * provisional. Unknown receipt or calendar: false (the close is compared).
+ */
+export function koscomDailyCloseMayBeProvisional(
+  session: MarketSessionWindow,
+  receivedAt: Date | undefined,
+): boolean {
+  if (!receivedAt || !Number.isFinite(receivedAt.getTime())) return false;
+  const day = compactDate(session.localDate);
+  const next = findFirstMarketSessionOnOrAfter(
+    'KRX',
+    shiftCompactDate(day, 1),
+    shiftCompactDate(day, 15),
+  );
+  return next !== null && receivedAt.getTime() < next.openTime.getTime();
+}
+
+/**
  * Whether one past session of undated KOSCOM 1m rows (ordered, whole
- * session) belongs to the dated daily bar: the session's O/H/L/C equal the
- * daily O/H/L/C exactly (round-2 rule `DATED_DAILY_OHLC_EXACT`), the minute
- * volume does not exceed the daily volume (the daily also counts off-session
- * trades), and the previous session's daily differs — otherwise a
- * "previous session returned again" response could not be told apart.
- * Both sources are KOSCOM: corroboration, never independent date proof.
+ * session) belongs to the dated daily bar. Date attribution uses only
+ * fields of the same KRX price basis in both feeds: the session's O/H/L
+ * equal the daily O/H/L exactly (round-2 rule `DATED_DAILY_OHLC_EXACT`), the
+ * minute volume does not exceed the daily volume (the daily also counts
+ * off-session trades), and the previous session's daily differs — otherwise
+ * a "previous session returned again" response could not be told apart.
+ * The close is a price-basis check: the last minute is the closing auction
+ * (the KRX close), equal to a FINAL daily close; a provisional daily close
+ * (`koscomDailyCloseMayBeProvisional`) is an after-market price and is not
+ * compared (`compareClose=false`). Both sources are KOSCOM: corroboration,
+ * never independent date proof.
  */
 export function corroborateKoscomMinuteSession(
   minutes: readonly SessionBar[],
   daily: SessionBar,
   previousDaily: SessionBar | null,
+  compareClose = true,
 ): boolean {
   if (!minutes.length || !previousDaily) return false;
   const d = (value: string) => new Prisma.Decimal(value);
@@ -863,16 +900,10 @@ export function corroborateKoscomMinuteSession(
     d(a.low).eq(b.low) &&
     d(a.close).eq(b.close);
   return (
-    sameOhlc(
-      {
-        open: minutes[0].open,
-        high: high.toFixed(),
-        low: low.toFixed(),
-        close: minutes.at(-1)!.close,
-        volume: volume.toFixed(),
-      },
-      daily,
-    ) &&
+    d(minutes[0].open).eq(daily.open) &&
+    high.eq(daily.high) &&
+    low.eq(daily.low) &&
+    (!compareClose || d(minutes.at(-1)!.close).eq(daily.close)) &&
     volume.lte(daily.volume) &&
     !sameOhlc(daily, previousDaily)
   );
@@ -884,9 +915,13 @@ function compactDate(localDate: string): string {
 }
 
 function previousCompactDate(date: string): string {
+  return shiftCompactDate(date, -1);
+}
+
+function shiftCompactDate(date: string, days: number): string {
   return new Date(
-    Date.UTC(+date.slice(0, 4), +date.slice(4, 6) - 1, +date.slice(6, 8)) -
-      86_400_000,
+    Date.UTC(+date.slice(0, 4), +date.slice(4, 6) - 1, +date.slice(6, 8)) +
+      days * 86_400_000,
   )
     .toISOString()
     .slice(0, 10)

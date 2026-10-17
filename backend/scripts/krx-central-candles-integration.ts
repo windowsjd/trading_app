@@ -106,6 +106,7 @@ const COHORTS = [
 
 // ---- KOSCOM fixture ---------------------------------------------------------
 let fakeNow = kst(`${DAY1}T08:00:00`);
+const AUCTION_PUBLISH_DELAY_MS = 5 * MIN;
 const requests: { path: string; query: Record<string, string> }[] = [];
 
 function minuteHidden(symbol: string, endMs: number): boolean {
@@ -166,19 +167,34 @@ const server = createServer((req, res) => {
       `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}T${query.endTm.slice(0, 2)}:${query.endTm.slice(2)}:00+09:00`,
     );
     const session = resolveMarketSession('KRX', date)!;
+    const closeMs = session.closeTime.getTime();
+    const auctionStart = closeMs - 10 * MIN;
+    const priceAt = (open: number) => 70000 + ((open / MIN) % 7) * 10;
+    // KOSCOM's shape (prod 10-16): flat zero-volume minutes through the
+    // closing auction at the last continuous close, then the auction print
+    // at the close — published minutes late (the 15:25 bucket was first
+    // complete at 15:42 KST), so the close + delay tick misses it.
+    const flatPrice = String(priceAt(auctionStart - MIN) + 10);
     const hisLists: Record<string, string>[] = [];
     for (let end = startMs + MIN; end <= endMs; end += MIN) {
       if (end > fakeNow || minuteHidden(symbol, end)) continue;
       const open = end - MIN;
-      const auctionStart = session.closeTime.getTime() - 10 * MIN;
-      // Continuous trading prints, then one closing-auction row at the close.
-      if (open >= auctionStart && end !== session.closeTime.getTime()) continue;
-      if (
-        open < session.openTime.getTime() ||
-        end > session.closeTime.getTime()
-      )
+      if (end === closeMs && fakeNow < closeMs + AUCTION_PUBLISH_DELAY_MS)
         continue;
-      const price = 70000 + ((open / MIN) % 7) * 10;
+      if (open < session.openTime.getTime() || end > closeMs) continue;
+      if (open >= auctionStart && end !== closeMs) {
+        hisLists.push({
+          inddTm: `${hhmmss(end)}00`,
+          inddOpnprc: flatPrice,
+          inddHgprc: flatPrice,
+          inddLwprc: flatPrice,
+          inddClsprc: flatPrice,
+          inddTrdvol: '0',
+          inddTrdval: '0',
+        });
+        continue;
+      }
+      const price = priceAt(open);
       hisLists.push({
         inddTm: `${hhmmss(end)}00`,
         inddOpnprc: String(price),
@@ -517,6 +533,26 @@ async function main() {
       'the crashed running row was superseded by the next tick',
     );
 
+    // Closing-price evidence: the late auction print missed the last tick.
+    const auctionBuckets = (symbol: string) =>
+      prisma.marketCandle.count({
+        where: {
+          assetId: assetIds.get(symbol)!,
+          interval: '5m',
+          isClosed: true,
+          sourceProvider: KOSCOM_MINUTE_SOURCE,
+          openTime: {
+            gte: new Date(day1.closeTime.getTime() - 10 * MIN),
+            lt: day1.closeTime,
+          },
+        },
+      });
+    assert.equal(
+      await auctionBuckets(SYMBOLS.clean),
+      1,
+      'only the flat 15:20 bucket before the auction print is published',
+    );
+
     // ---- day 1 post-close: repair, daily, repair, daily --------------------
     const beforeRepair = requests.length;
     setNow(day1.closeTime.getTime() + 10 * MIN);
@@ -554,7 +590,24 @@ async function main() {
       return cursor?.auditPhase === 'repair' && 'auditFirstMissing' in cursor;
     }).length;
     assert.ok(missingRepairs <= 3, 'at most 3 repair calls for one asset');
-    assert.ok(repairRequests <= 1 + 3, 'repair requests stay inside the caps');
+    // late slot + missing slot (2 attempts) + one auction request per asset.
+    assert.equal(
+      repairRequests,
+      1 + 2 + 3,
+      'repair requests stay inside the caps',
+    );
+    for (const symbol of [SYMBOLS.clean, SYMBOLS.missing, SYMBOLS.late])
+      assert.equal(
+        await auctionBuckets(symbol),
+        2,
+        `closing-auction buckets stored by the post-close repair (${symbol})`,
+      );
+    assert.ok(
+      !warnings.some((line) =>
+        line.includes('krx_central_closing_auction_missing'),
+      ),
+      'no closing-auction alert once the print is stored',
+    );
     assert.ok(
       warnings.some(
         (line) =>

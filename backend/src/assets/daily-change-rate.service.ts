@@ -4,6 +4,7 @@ import {
   findPreviousMarketSession,
   resolveStockMarketSessionState,
   type MarketCalendarAsset,
+  type MarketSessionWindow,
 } from '../orders/market-calendar.policy';
 import { zonedDateTimeToUtc } from '../providers/kis/candles/kis-candle-time';
 import { MARKET_DAILY_CANDLE_SOURCE } from '../providers/market-daily-candle-source';
@@ -12,6 +13,7 @@ import {
   KOSCOM_HISTORY_SOURCE,
   KOSCOM_MINUTE_SOURCE,
 } from '../providers/koscom/koscom.config';
+import { koscomDailyCloseMayBeProvisional } from '../providers/koscom/koscom-candle.adapter';
 import { usCandlesFromTiingo } from './us-candle-provider';
 import { MarketCandlesRepository } from './market-candles.repository';
 
@@ -24,11 +26,11 @@ type BaselineWindow = {
   completedAt: Date;
   provider: (typeof MARKET_DAILY_CANDLE_SOURCE)[keyof typeof MARKET_DAILY_CANDLE_SOURCE];
   /**
-   * KRX display close only: the stored KOSCOM 5m bucket ending at the
-   * session close (it holds the 15:30 closing-auction print). The KOSCOM
-   * daily close must equal its close.
+   * KRX display close only: the session whose KRX close — the stored KOSCOM
+   * 5m bucket ending at its close, which holds the closing-auction print —
+   * is shown, dated by the KOSCOM daily (`krxAuctionClose`).
    */
-  closingBucket?: { openTime: Date; closeTime: Date };
+  krxSession?: MarketSessionWindow;
 };
 type ConfirmedDailyClose = { close: Prisma.Decimal; receivedAt: Date };
 type CacheEntry = {
@@ -44,7 +46,10 @@ export type LatestSessionClose = {
   close: Prisma.Decimal;
   /** The session's regular close: the moment the close price is as of. */
   sessionCloseAt: Date;
-  /** When the confirmed end-of-day row was received from the provider. */
+  /**
+   * When the row the close comes from was received from the provider: the
+   * US end-of-day row, the KRX closing-auction 5m bucket.
+   */
   receivedAt: Date;
 };
 
@@ -133,17 +138,17 @@ export class DailyChangeRateService {
   }
 
   /**
-   * Display only, for the asset read paths of a CLOSED KRX market: the KOSCOM
-   * close of exactly the latest completed session, accepted only when two
-   * KOSCOM feeds agree on it — the confirmed dated daily bar
-   * (`koscom_history`, same row checks as the change-rate baseline) and the
-   * stored closed 5m bucket ending at the session close (`koscom_intraday`,
-   * the 15:30 closing auction). The latest session's daily is provisional
-   * until KOSCOM finalizes it (it tracks the NXT after-market last price,
-   * 2026-10-16: 217,000 vs the 215,500 auction close), so a disagreement or
-   * a missing bucket returns null: never an older session's close and never
-   * another provider's price. Nothing is written; orders, valuation and
-   * settlement never call this.
+   * Display only, for the asset read paths of a CLOSED KRX market: the KRX
+   * close of exactly the latest completed session — the closing-auction
+   * print of the stored closed KOSCOM 5m bucket ending at the session close
+   * (`koscom_intraday`) — dated by the confirmed KOSCOM daily bar
+   * (`koscom_history`, same row checks as the change-rate baseline). See
+   * `krxAuctionClose`: the closes agree, or the daily close may still be
+   * provisional (the NXT after-market last price, 2026-10-16: 217,000 vs the
+   * 215,500 auction) and the stored session reproduces the daily's KRX
+   * O/H/L. Otherwise null: never an older session's close and never another
+   * provider's price. Nothing is written; orders, valuation and settlement
+   * never call this.
    */
   private async findKrxLatestSessionClose(
     asset: MarketCalendarAsset & { id: string },
@@ -167,10 +172,7 @@ export class DailyChangeRateService {
         closeTime: new Date(openTime.getTime() + DAY_MS),
         completedAt: session.closeTime,
         provider: MARKET_DAILY_CANDLE_SOURCE.domesticStock,
-        closingBucket: {
-          openTime: new Date(session.closeTime.getTime() - FIVE_MINUTES_MS),
-          closeTime: session.closeTime,
-        },
+        krxSession: session,
       },
       now,
     );
@@ -285,39 +287,96 @@ export class DailyChangeRateService {
     if (rows.length !== 1) return null;
     const row = rows[0];
     if (!isConfirmedDailyRow(row, assetId, window, now)) return null;
-    if (
-      window.closingBucket &&
-      (row.sourceProvider !== KOSCOM_HISTORY_SOURCE ||
-        !(await this.closingBucketAgrees(row, window.closingBucket, now)))
-    )
-      return null;
+    if (window.krxSession)
+      return row.sourceProvider === KOSCOM_HISTORY_SOURCE
+        ? this.krxAuctionClose(row, window.krxSession, now)
+        : null;
     return { close: row.close, receivedAt: row.sourceUpdatedAt };
   }
 
-  /** The stored closed KOSCOM 5m bucket ending at the close has the daily's close. */
-  private async closingBucketAgrees(
+  /**
+   * The KRX close of `session` (2026-10-18): the stored closed KOSCOM 5m
+   * bucket ending at the close, which the builder only writes with every
+   * minute present, so its close is the closing-auction print. The confirmed
+   * dated daily bar dates it, by price basis:
+   * - the daily close equals it (a final daily, or a provisional one that
+   *   happens to agree): accepted;
+   * - the daily close may still be provisional
+   *   (`koscomDailyCloseMayBeProvisional`, the NXT after-market last price):
+   *   accepted only when the whole stored KOSCOM 5m session reproduces the
+   *   daily's KRX open/high/low with no more volume — the backfill's date
+   *   attribution rule;
+   * - a final daily close that differs: null.
+   */
+  private async krxAuctionClose(
     daily: MarketCandle,
-    bucket: { openTime: Date; closeTime: Date },
+    session: MarketSessionWindow,
     now: Date,
-  ): Promise<boolean> {
+  ): Promise<ConfirmedDailyClose | null> {
+    const closeMs = session.closeTime.getTime();
+    const bucketOpenMs = closeMs - FIVE_MINUTES_MS;
+    const [bucket, ...extra] = await this.candles.findRange({
+      assetId: daily.assetId,
+      interval: '5m',
+      from: new Date(bucketOpenMs),
+      to: new Date(bucketOpenMs + 1),
+    });
+    if (
+      !bucket ||
+      extra.length > 0 ||
+      !isStoredKoscomBucket(bucket, bucketOpenMs, now) ||
+      bucket.closeTime.getTime() !== closeMs ||
+      !bucket.close.isFinite() ||
+      bucket.close.lte(0)
+    )
+      return null;
+    const auction = { close: bucket.close, receivedAt: bucket.sourceUpdatedAt };
+    if (bucket.close.eq(daily.close)) return auction;
+    if (!koscomDailyCloseMayBeProvisional(session, daily.sourceUpdatedAt))
+      return null;
     const rows = await this.candles.findRange({
       assetId: daily.assetId,
       interval: '5m',
-      from: bucket.openTime,
-      to: new Date(bucket.openTime.getTime() + 1),
+      from: session.openTime,
+      to: session.closeTime,
     });
-    if (rows.length !== 1) return false;
-    const minute = rows[0];
-    return (
-      minute.isClosed &&
-      minute.sourceProvider === KOSCOM_MINUTE_SOURCE &&
-      minute.openTime.getTime() === bucket.openTime.getTime() &&
-      minute.closeTime.getTime() === bucket.closeTime.getTime() &&
-      minute.sourceUpdatedAt <= now &&
-      minute.close.isFinite() &&
-      minute.close.eq(daily.close)
-    );
+    const openMs = session.openTime.getTime();
+    if (
+      rows.length !== (closeMs - openMs) / FIVE_MINUTES_MS ||
+      !rows.every((row, index) =>
+        isStoredKoscomBucket(row, openMs + index * FIVE_MINUTES_MS, now),
+      )
+    )
+      return null;
+    let high = rows[0].high;
+    let low = rows[0].low;
+    let volume = new Prisma.Decimal(0);
+    for (const row of rows) {
+      if (row.high.gt(high)) high = row.high;
+      if (row.low.lt(low)) low = row.low;
+      volume = volume.plus(row.volume);
+    }
+    return rows[0].open.eq(daily.open) &&
+      high.eq(daily.high) &&
+      low.eq(daily.low) &&
+      volume.lte(daily.volume)
+      ? auction
+      : null;
   }
+}
+
+/** A closed KOSCOM intraday 5m row stored for exactly `openMs`. */
+function isStoredKoscomBucket(
+  row: MarketCandle,
+  openMs: number,
+  now: Date,
+): boolean {
+  return (
+    row.isClosed &&
+    row.sourceProvider === KOSCOM_MINUTE_SOURCE &&
+    row.openTime.getTime() === openMs &&
+    row.sourceUpdatedAt <= now
+  );
 }
 
 /**

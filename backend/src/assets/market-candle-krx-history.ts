@@ -1,6 +1,7 @@
 import { Prisma } from '../generated/prisma/client';
 import type { MarketSessionWindow } from '../orders/market-calendar.policy';
 import { formatZonedCursor } from '../providers/kis/candles/kis-candle-time';
+import { koscomDailyCloseMayBeProvisional } from '../providers/koscom/koscom-candle.adapter';
 
 /**
  * Source name of KRX 4h rows built from verified KOSCOM 10-minute history.
@@ -40,6 +41,15 @@ export type KrxDailyReference = {
   low: Prisma.Decimal | string;
   close: Prisma.Decimal | string;
   volume: Prisma.Decimal | string;
+  /**
+   * When KOSCOM returned this dated bar (a stored bar: `sourceUpdatedAt`).
+   * Received before the next session's open, its close may still be
+   * provisional (`koscomDailyCloseMayBeProvisional`) and is not compared;
+   * O/H/L always are. A stored bar re-read unchanged keeps its first receipt
+   * (the upsert leaves confirmed unchanged bars alone), so it stays in that
+   * state. Absent = compared as final.
+   */
+  receivedAt?: Date;
 };
 
 export type KrxFourHourBucketPlan = {
@@ -190,8 +200,12 @@ export function isStoredKrxSessionComplete(
  *
  * Fail-closed, in order: no rows / possible truncation / unparsable rows /
  * conflicting duplicates / any label off the session's 10-minute END grid /
- * a missing required row / aggregate O/H/L/C not EXACTLY equal to the dated
- * daily bar / the same 4h result as the previous session. Nothing is ever
+ * a missing required row / aggregate O/H/L not EXACTLY equal to the dated
+ * daily bar (date attribution) / aggregate close not equal to a FINAL daily
+ * close (price basis) / the same 4h result as the previous session. A daily
+ * close that may still be provisional is the NXT after-market last price, not
+ * the KRX close the 15:30 auction row carries, so it is not compared
+ * (`koscomDailyCloseMayBeProvisional`, 2026-10-18). Nothing is ever
  * interpolated or split into 5-minute rows. A volume difference against the
  * daily bar is recorded, not rejected (after-hours volume is plausible).
  */
@@ -279,12 +293,20 @@ export function verifyKrxTenMinuteSession(input: {
   if (
     !session.open.eq(daily.open) ||
     !session.high.eq(daily.high) ||
-    !session.low.eq(daily.low) ||
-    !session.close.eq(daily.close)
+    !session.low.eq(daily.low)
   ) {
     return held(
       'DAILY_OHLC_MISMATCH',
-      'Aggregate O/H/L/C does not exactly match the dated daily bar; date attribution is unconfirmed.',
+      'Aggregate O/H/L does not exactly match the dated daily bar; date attribution is unconfirmed.',
+    );
+  }
+  if (
+    !session.close.eq(daily.close) &&
+    !koscomDailyCloseMayBeProvisional(input.session, input.daily.receivedAt)
+  ) {
+    return held(
+      'DAILY_OHLC_MISMATCH',
+      'Aggregate close does not equal the final dated daily close; the KRX close is unconfirmed.',
     );
   }
 
