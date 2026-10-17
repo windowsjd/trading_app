@@ -1,4 +1,5 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { useHeaderHeight } from '@react-navigation/elements';
 import MarketSortControl from '../../features/market/MarketSortControl';
 import type { MarketSort } from '../../features/market/marketSort';
 import {
@@ -19,6 +20,7 @@ import {
   SafeAreaView,
   TextInput,
   FlatList,
+  KeyboardAvoidingView,
   Platform,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -38,6 +40,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const [assetType, setAssetType] = useState<MarketSearchScope>('all');
   const [searchText, setSearchText] = useState('');
+  const headerHeight = useHeaderHeight();
   // Search screen policy: no request until there is a search text.
   const { searchQuery, items, hasPriceErrors, trimmedSearchText, refreshSort } =
     useMarketAssetSearch({
@@ -94,10 +97,14 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Results stay reachable above the keyboard: Android draws edge to
+          edge, so the keyboard covers the list instead of resizing it. */}
+      <KeyboardAvoidingView style={styles.container} behavior="padding" keyboardVerticalOffset={headerHeight}>
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
         onEndReached={() => {
           if (searchQuery.hasNextPage && !searchQuery.isFetching && !searchQuery.isError) {
             void searchQuery.fetchNextPage();
@@ -188,6 +195,7 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
           ) : null
         }
       />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

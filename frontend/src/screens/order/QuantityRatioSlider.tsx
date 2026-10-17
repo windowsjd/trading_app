@@ -17,6 +17,8 @@ export type QuantityRatioSliderProps = {
   valueText?: (step: number) => string;
   /** One step for the accessibility actions (default `1%`). */
   stepLabel?: string;
+  /** Track fill and thumb color (the order side's color); default: selection. */
+  tint?: string;
 };
 
 const THUMB_SIZE = 20;
@@ -87,11 +89,11 @@ export default function QuantityRatioSlider(props: QuantityRatioSliderProps) {
         style={[styles.control, props.disabled && styles.disabled]}
       >
         <View pointerEvents="none" style={styles.track}>
-          <View style={[styles.fill, { width: `${props.value * 100}%` }]} />
+          <View style={[styles.fill, { width: `${props.value * 100}%` }, props.tint ? { backgroundColor: props.tint } : null]} />
         </View>
         <View
           pointerEvents="none"
-          style={[styles.thumb, { left: trackWidth * props.value }]}
+          style={[styles.thumb, { left: trackWidth * props.value }, props.tint ? [styles.tintedThumb, { backgroundColor: props.tint }] : null]}
         />
       </View>
     </GestureDetector>
@@ -115,4 +117,6 @@ const styles = StyleSheet.create({
     borderRadius: THUMB_SIZE / 2,
     backgroundColor: semantic.selected,
   },
+  // A tinted thumb keeps a light ring so it reads on its own colored fill.
+  tintedThumb: { borderWidth: 3, borderColor: semantic.surface },
 });

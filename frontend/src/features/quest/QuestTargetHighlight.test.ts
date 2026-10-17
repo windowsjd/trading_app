@@ -9,41 +9,43 @@ const Renderer = require('react-test-renderer');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-test('highlight measures the surface, sweeps every 2.5s and stops on reduced motion, exit and unmount', async t => {
-  let reduced = false; let starts = 0; let stops = 0;
-  const timings: any[] = [], delays: number[] = [];
-  class Value { setValue() {} interpolate(config: unknown) { return config; } }
+const flatten = (style: unknown): Record<string, unknown> =>
+  Array.isArray(style) ? Object.assign({}, ...style.map(flatten)) : (style as Record<string, unknown>) ?? {};
+
+test('the highlight is a steady glow outside the control: nothing paints over it, nothing moves', async t => {
+  const animations: string[] = [];
   const Highlight = load(resolve('src/features/quest/QuestTargetHighlight.tsx'), {
-    'react-native': { View: 'View', Platform: { OS: 'ios' }, StyleSheet: { create: (x: unknown) => x, absoluteFill: {}, absoluteFillObject: {} },
-      Easing: { linear: () => 0 }, Animated: { View: 'Animated.View', Value,
-        timing: (_value: unknown, config: unknown) => { timings.push(config); return {}; },
-        delay: (ms: number) => { delays.push(ms); return {}; }, sequence: () => ({}),
-        loop: () => ({ start: () => { starts++; }, stop: () => { stops++; } }),
-      } },
-    '../../theme/useReducedMotion': { useReducedMotion: () => reduced },
-    'react-native-svg': { default: 'Svg', Defs: 'Defs', LinearGradient: 'LinearGradient', Rect: 'Rect', Stop: 'Stop', __esModule: true },
+    'react-native': { View: 'View', Platform: { OS: 'android' },
+      StyleSheet: { create: (x: unknown) => x, absoluteFill: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } },
+      // Any motion would go through these; the highlight must not start one.
+      Animated: { View: 'Animated.View', Value: class {}, timing: () => { animations.push('timing'); return { start() {} }; },
+        loop: () => { animations.push('loop'); return { start() {}, stop() {} }; } } },
   }).default;
   let renderer: any;
-  const render = async (active = true) => Renderer.act(async () => {
-    const element = React.createElement(Highlight, { active, radius: 12 });
+  const render = async (active: boolean, radius = 12) => Renderer.act(async () => {
+    const element = React.createElement(Highlight, { active, radius });
     if (renderer) renderer.update(element); else renderer = Renderer.create(element);
   });
-  const nodes = (id: string) => renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id);
-  await render(); t.after(async () => { await Renderer.act(async () => renderer.unmount()); });
-  assert.equal(nodes('quest-target-shimmer').length, 0, 'no motion until laid out');
-  const host = nodes('quest-target-highlight')[0]; assert.equal(host.props.pointerEvents, 'none');
+  const hosts = () => renderer.root.findAll((n: any) => typeof n.type === 'string');
+  await render(true); t.after(async () => { await Renderer.act(async () => renderer.unmount()); });
+
+  const host = hosts().find((n: any) => n.props.testID === 'quest-target-highlight');
+  assert.equal(host.props.pointerEvents, 'none', 'the control keeps every press');
   assert.equal(host.props.importantForAccessibility, 'no-hide-descendants');
-  await Renderer.act(async () => host.props.onLayout({ nativeEvent: { layout: { width: 52, height: 52 } } }));
-  assert.equal(starts, 1); assert.equal(nodes('quest-target-glow').length, 1);
-  assert.equal(nodes('quest-target-shimmer').length, 1);
-  assert.equal(timings[0].duration, 720); assert.equal(timings[0].useNativeDriver, true);
-  assert.equal(timings[0].duration + delays[0], 2500);
-  const sweep = nodes('quest-target-shimmer')[0].props.style.transform[0].translateX;
-  assert.equal(sweep.outputRange[0] < 0 && sweep.outputRange[1] > 52, true, 'left to right');
-  reduced = true; await render(); assert.equal(stops, 1);
-  assert.equal(nodes('quest-target-shimmer').length, 0); assert.equal(nodes('quest-target-glow').length, 1);
-  reduced = false; await render(); assert.equal(starts, 2);
-  await render(false); assert.equal(stops, 2); assert.equal(renderer.toJSON() === null, true);
-  await render(); assert.equal(starts, 3);
-  await Renderer.act(async () => renderer.unmount()); assert.equal(stops, 3);
+  assert.deepEqual(hosts().map((n: any) => n.props.testID), ['quest-target-highlight', 'quest-target-glow'],
+    'no fill, inner border or shine layer over the control');
+  assert.equal(hosts().some((n: any) => n.type === 'Animated.View' || n.type === 'Svg'), false);
+  assert.deepEqual(animations, []);
+
+  const glow = flatten(hosts().find((n: any) => n.props.testID === 'quest-target-glow').props.style);
+  const width = glow.borderWidth as number;
+  assert.ok(width > 0);
+  // The band spans [-width, 0] around the control: entirely outside its edge.
+  assert.deepEqual([glow.top, glow.right, glow.bottom, glow.left], [-width, -width, -width, -width]);
+  assert.equal(glow.backgroundColor, undefined, 'no tint over the control');
+  assert.equal(glow.shadowRadius ?? glow.shadowOpacity ?? glow.elevation, undefined, 'no blurred shadow bleeding inward');
+  assert.equal(glow.borderRadius, 12 + width, 'the inner corners follow the control radius');
+
+  await render(false);
+  assert.equal(renderer.toJSON() === null, true);
 });

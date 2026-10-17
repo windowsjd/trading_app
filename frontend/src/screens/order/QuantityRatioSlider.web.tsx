@@ -1,6 +1,7 @@
 import React from 'react';
 import type { QuantityRatioSliderProps } from './QuantityRatioSlider';
 import { useAppearance } from '../../theme/appearance';
+import { resolveSemanticColor } from '../../theme/tokens';
 
 /** The browser owns pointer capture, touch, keyboard and slider semantics. */
 export default function QuantityRatioSlider({
@@ -12,8 +13,11 @@ export default function QuantityRatioSlider({
   onChange,
   steps = 100,
   valueText = (step: number) => `${step}%`,
+  tint,
 }: QuantityRatioSliderProps) {
-  const { colors } = useAppearance();
+  const { colors, mode, financialPreference } = useAppearance();
+  // `tint` is a theme/financial role token; the browser needs a real color.
+  const accent = (tint ? resolveSemanticColor(tint, colors, mode, financialPreference) : null) ?? colors.selected;
   return (
     <input
       type="range"
@@ -34,7 +38,7 @@ export default function QuantityRatioSlider({
         minWidth: 0,
         height: 44,
         margin: 0,
-        accentColor: colors.selected,
+        accentColor: accent as string,
         cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
       }}

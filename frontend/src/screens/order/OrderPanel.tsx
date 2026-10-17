@@ -126,6 +126,9 @@ import SectionSkeleton from '../../components/states/SectionSkeleton';
 import CTAButton from '../../components/common/CTAButton';
 import OrderSuccessBottomSheet from './OrderSuccessBottomSheet';
 import QuantityRatioSlider from './QuantityRatioSlider';
+import { OrderAsidePortal } from './OrderAside';
+import { OrderSummaryCard, SummaryRow, styles as asideStyles } from './StockOrderAside';
+import { formatEnteredAmount, getOrderSummaryBadge } from './stockOrderSummary';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { isTradingAccountScopeMismatchError } from '../../features/tradingAccount/accountScope';
 import type { RuntimeFacts } from '../../services/ws/runtimeDiagnostics';
@@ -237,6 +240,15 @@ function exceedsAvailable(total: string | null | undefined, available: string | 
     return new Decimal(total).gt(new Decimal(available));
   } catch {
     return false;
+  }
+}
+
+/** a − b on decimal strings; null when either is not a number. */
+function decimalDifference(a: string, b: string) {
+  try {
+    return new Decimal(a).minus(new Decimal(b));
+  } catch {
+    return null;
   }
 }
 
@@ -569,6 +581,10 @@ export function OrderForm({
   const isAmountBuy = asset?.assetType === 'crypto' && side === 'buy';
   const isStock =
     asset?.assetType === 'domestic_stock' || asset?.assetType === 'us_stock';
+  // Domestic and US stocks use the A-2 order card: this column keeps the
+  // inputs, and the expected order is drawn in the card's right column.
+  // Crypto keeps its form beside the live order book unchanged.
+  const stockLayout = isStock;
   // Server answers whether NEW conditional/LOC orders may be created; the
   // live watch list doubles as the app-wide fill watcher's (same cache entry).
   const conditionalQuery = useQuery({
@@ -1079,6 +1095,80 @@ export function OrderForm({
     ?? (positionQuery.isLoading ? '보유 수량을 확인하는 중입니다.'
       : positionUnavailable ? '보유 수량을 확인할 수 없어 매도 설정을 등록할 수 없습니다.'
       : Number(positionQuantity) <= 0 ? '보유 수량이 없어 매도 설정을 등록할 수 없습니다.' : null);
+  // A-2 order card (stocks): the expected order before anything is sent. The
+  // badge is the expected handling under the current session (a limit order
+  // while the market is closed waits for the regular session), never an
+  // accepted or filled state; amounts are the same preview/quote as before.
+  const maxQuantity = side === 'buy' && !isAmountBuy && !ratioDisabledReason ? inputAtRatio(1) : null;
+  const summaryBadge = stockLayout ? getOrderSummaryBadge(asset.marketStatus, orderMethod) : null;
+  // An order the session does not accept (주문 불가) shows no amounts, as before.
+  const summaryPreview = summaryBadge?.tone === 'error' ? null : preview;
+  const summaryPrice = orderType === 'limit'
+    ? limitPriceInvalidReason ? '-' : formatEnteredAmount(limitPrice.trim(), asset.settlementCurrency)
+    : '시장가';
+  const summaryQuantityValue = quotedPreview?.quantity ?? (validateQuantity(orderInput) ? null : orderInput.trim());
+  const summaryQuantity = summaryQuantityValue ? `${formatEnteredAmount(summaryQuantityValue, null)}주` : '-';
+  const totalLabel = side === 'sell' ? '예상 수령액' : orderType === 'limit' ? '예상 예약금액' : '예상 결제금액';
+  // A LOC SELL above the unreserved part is accepted at that part (the form
+  // says so); within the holding it never leaves less than nothing.
+  const sellAccepted = summaryQuantityValue && limitOnClose && Number(summaryQuantityValue) <= Number(positionQuantity)
+    && Number(summaryQuantityValue) > Number(sellCapacity) ? sellCapacity : summaryQuantityValue;
+  const remaining = side === 'buy'
+    ? summaryPreview && buyAvailable !== null && !walletsQuery.isError ? decimalDifference(buyAvailable, summaryPreview.totalAmount) : null
+    : sellAccepted && summaryPreview !== null && !positionQuery.isLoading && !positionUnavailable ? decimalDifference(sellCapacity, sellAccepted) : null;
+  const summaryAfter = {
+    label: side === 'buy' ? '주문 후 사용 가능' : '주문 후 매도 가능',
+    testID: 'order-summary-after',
+    value: remaining === null ? '-'
+      : remaining.isNegative() ? '부족'
+        : side === 'buy' ? formatPreviewMoney(remaining.toFixed(), asset.settlementCurrency) : `${formatEnteredAmount(remaining.toFixed(), null)}주`,
+    short: !!remaining?.isNegative(),
+  };
+  // Why there is no expected amount yet, and the reads that would give one.
+  const previewProblem = (
+    <>
+      <Text style={styles.warningText}>{previewNotice}</Text>
+      {orderMethod === 'market' && !previewPriceAvailable && !assetWarningReason ? (
+        <AdminDiagnosticPanel
+          diagnostic={showAssetPriceDiagnostic &&
+            displayPrice.priceLocal === null &&
+            displayPrice.basis !== 'realtime' &&
+            displayPrice.basis !== 'snapshot'
+            ? assetQuery.data?.priceErrors?.find(
+            (error) => error.assetId === assetId && error.diagnostic,
+          )?.diagnostic : undefined}
+          runtime={displayPrice.priceLocal !== null ||
+            displayPrice.basis === 'realtime' ||
+            displayPrice.basis === 'snapshot' ? {
+            assetId,
+            ...tickerRuntime,
+            displayedPriceBasis: displayPrice.basis,
+            displayedPriceAvailable: displayPrice.priceLocal !== null,
+            priceCapturedAt: displayPrice.priceCapturedAt,
+            previewPriceAvailable,
+          } : null}
+        />
+      ) : null}
+      {feeQuery.isError ? (
+        <AdminDiagnosticPanel error={feeQuery.error} />
+      ) : null}
+      {orderMethod === 'market' && !previewPriceAvailable ? (
+        <CTAButton
+          variant="neutral" label="시세 다시 불러오기"
+          onPress={() => void assetQuery.refetch()}
+        />
+      ) : null}
+      {feeQuery.isError ? (
+        <CTAButton
+          variant="neutral" label="수수료 다시 불러오기"
+          onPress={() => void feeQuery.refetch()}
+        />
+      ) : null}
+    </>
+  );
+  const summaryHint = stockMarketClosed && orderMethod !== 'limit' ? null
+    : orderType === 'limit' && (!limitPrice.trim() || !orderInput.trim()) ? '가격과 수량을 입력하면 예상 금액을 보여 드려요.'
+      : !orderInput.trim() ? '수량을 입력하면 예상 금액을 보여 드려요.' : null;
   return (
     <View style={styles.panel} testID={TEST_IDS.order.screen}>
       <QuestTarget id="order-type"><OrderTypeSelect
@@ -1162,6 +1252,7 @@ export function OrderForm({
           onChangeText={(value) => resetInput(() => setOrderInput(value))}
           keyboardType="decimal-pad"
           placeholder={isAmountBuy ? '매수 금액 입력' : '수량 입력'}
+          unit={stockLayout ? '주' : undefined}
           onFieldFocus={onInputFocus}
           onBlur={onInputBlur}
         />
@@ -1213,6 +1304,7 @@ export function OrderForm({
         </View>
         <QuantityRatioSlider
           accessibilityLabel={isAmountBuy ? '매수 금액 비율' : '주문 수량 비율'}
+          tint={stockLayout ? side === 'buy' ? BUY_COLOR : SELL_COLOR : undefined}
           value={displayedRatio}
           disabled={pending || !!ratioDisabledReason}
           disabledReason={ratioDisabledReason ?? undefined}
@@ -1254,7 +1346,26 @@ export function OrderForm({
       </View>
         </>
       ) : null}
-      {!automationForm ? (
+      {!automationForm && stockLayout ? (
+        <View style={styles.capacity} testID="order-available-helper">
+          {side === 'buy' ? (
+            <>
+              <SummaryRow testID="order-available-amount" label="주문 가능"
+                value={`${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`.trim()} />
+              <SummaryRow testID="order-max-quantity" label="최대 수량"
+                value={maxQuantity ? `${formatEnteredAmount(maxQuantity, null)}주` : '-'} />
+            </>
+          ) : (
+            <>
+              <SummaryRow testID="order-sell-capacity" label="매도 가능"
+                value={positionQuery.isLoading || positionUnavailable ? '-' : `${formatEnteredAmount(sellCapacity, null)}주`} />
+              {positionReserved !== null && Number(positionReserved) > 0 ? (
+                <SummaryRow testID="order-sell-reserved" label="다른 주문 예약" value={`${formatEnteredAmount(positionReserved, null)}주`} />
+              ) : null}
+            </>
+          )}
+        </View>
+      ) : !automationForm ? (
         <Text style={styles.helper} testID="order-available-helper">
           {side === 'buy'
             ? `주문 가능 ${walletsQuery.isError ? '-' : formatCurrency(buyAvailable, settlementCurrency)} ${settlementCurrency ?? ''}`
@@ -1379,7 +1490,23 @@ export function OrderForm({
           }
         />
       ) : null}
-      {ordinaryForm && !(stockMarketClosed && orderMethod === 'market') ? (
+      {ordinaryForm && stockLayout ? (
+        <OrderAsidePortal name="preview">
+          <OrderSummaryCard targetRef={questGuideTarget('order-preview')} badge={summaryBadge}
+            rows={[
+              { label: '주문 가격', value: summaryPrice, testID: 'order-summary-price' },
+              { label: '수량', value: summaryQuantity, testID: 'order-summary-quantity' },
+            ]}
+            fee={{ label: '예상 수수료', value: summaryPreview ? formatPreviewMoney(summaryPreview.feeAmount, asset.settlementCurrency) : '-', testID: 'order-summary-fee' }}
+            total={{ label: totalLabel, value: summaryPreview ? formatPreviewMoney(summaryPreview.totalAmount, asset.settlementCurrency) : '-', testID: 'order-summary-total' }}
+            after={summaryAfter}
+          >
+            {summaryHint ? <Text style={asideStyles.stateText}>{summaryHint}</Text> : null}
+            {!preview && !inputInvalidReason && summaryBadge?.tone !== 'error' ? previewProblem : null}
+          </OrderSummaryCard>
+        </OrderAsidePortal>
+      ) : null}
+      {ordinaryForm && !stockLayout && !(stockMarketClosed && orderMethod === 'market') ? (
         <>
           {!inputInvalidReason ? (
             <View ref={questGuideTarget('order-preview')} collapsable={false} style={styles.preview} testID="order-indicative-preview">
@@ -1410,45 +1537,7 @@ export function OrderForm({
                   />
                 </>
               ) : (
-                <>
-                  <Text style={styles.warningText}>{previewNotice}</Text>
-                  {orderMethod === 'market' && !previewPriceAvailable && !assetWarningReason ? (
-                    <AdminDiagnosticPanel
-                      diagnostic={showAssetPriceDiagnostic &&
-                        displayPrice.priceLocal === null &&
-                        displayPrice.basis !== 'realtime' &&
-                        displayPrice.basis !== 'snapshot'
-                        ? assetQuery.data?.priceErrors?.find(
-                        (error) => error.assetId === assetId && error.diagnostic,
-                      )?.diagnostic : undefined}
-                      runtime={displayPrice.priceLocal !== null ||
-                        displayPrice.basis === 'realtime' ||
-                        displayPrice.basis === 'snapshot' ? {
-                        assetId,
-                        ...tickerRuntime,
-                        displayedPriceBasis: displayPrice.basis,
-                        displayedPriceAvailable: displayPrice.priceLocal !== null,
-                        priceCapturedAt: displayPrice.priceCapturedAt,
-                        previewPriceAvailable,
-                      } : null}
-                    />
-                  ) : null}
-                  {feeQuery.isError ? (
-                    <AdminDiagnosticPanel error={feeQuery.error} />
-                  ) : null}
-                  {orderMethod === 'market' && !previewPriceAvailable ? (
-                    <CTAButton
-                      variant="neutral" label="시세 다시 불러오기"
-                      onPress={() => void assetQuery.refetch()}
-                    />
-                  ) : null}
-                  {feeQuery.isError ? (
-                    <CTAButton
-                      variant="neutral" label="수수료 다시 불러오기"
-                      onPress={() => void feeQuery.refetch()}
-                    />
-                  ) : null}
-                </>
+                previewProblem
               )}
             </View>
           ) : null}
@@ -1457,7 +1546,9 @@ export function OrderForm({
       {!automationForm ? <View ref={submitRef} collapsable={false}><QuestTarget id="order-submit">
         <CTAButton
           testID={TEST_IDS.order.executeSubmit}
-          label={side === 'buy' ? '매수' : '매도'}
+          label={stockLayout ? side === 'buy' ? '매수 주문' : '매도 주문' : side === 'buy' ? '매수' : '매도'}
+          // 예상 주문 is in the card's right column, read after this button.
+          accessibilityHint={stockLayout && summaryPreview ? `${totalLabel} ${formatPreviewMoney(summaryPreview.totalAmount, asset.settlementCurrency)}` : undefined}
           style={side === 'buy' ? styles.buyActive : styles.sellActive}
           state={pending ? 'loading' : canExecute ? 'enabled' : 'disabled'}
           learningHint={tradeGate.locked ? tradeGate.message : null}
@@ -1516,6 +1607,7 @@ const styles = StyleSheet.create({
   group: { gap: 4, minWidth: 0 },
   label: { fontSize: 12, color: semantic.muted },
   helper: { fontSize: 12, color: semantic.secondary },
+  capacity: { gap: 4, minWidth: 0 },
   amount: {
     fontSize: 14,
     fontWeight: '600',

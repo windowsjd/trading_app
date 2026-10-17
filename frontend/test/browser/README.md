@@ -489,3 +489,22 @@ control and the checkbox state of the TP/SL toggles. Fixture switches:
 `reserved=<qty>`, `fillBanner=sell`. `BEGINNER_CHROMIUM` selects Chromium,
 `SELL_ORDER_BROWSER_OUTPUT` the screenshots/report.json (default
 `/tmp/trading-sell-order-browser`), `SELL_ORDER_QUICK=1` two combinations only.
+
+The stock order card (A-2: inputs left; 시세, 내 보유 and 예상 주문 right) uses
+`stockOrderBrowser.cjs` on the same trading fixture and `?viewport=1` root. It
+checks 112 screens: 320/360/390/430px × Light/Dark × font scales 1/1.5 × a KRX
+limit BUY, a closed-market limit (정규장 대기, with another holding listed below
+and the current one not listed twice), a market SELL, no holding, long names
+and 12-digit amounts, and a US market BUY in USD, plus 접기 and the crypto
+order book left unchanged. Every screen requires two side-by-side columns,
+the three right-column parts inside the right column, the card's figures for
+the typed order and the 주 unit clear of the typed value; glyph runs cut by a
+clipping ancestor (per axis; a scroll container's own axis is not a cut),
+overlapping glyph runs and sideways page scroll fail the run. Two forced
+negative controls (a clipped total, an overlapping row) must fire first.
+Fixture switches: `krx=1`, `krxClosed=1`, `krxPrice=<n>`, `us=1`, `stock=1`
+(securities wallets; the holding in its own currency with a live valuation),
+`holding=<qty>`, `otherHolding=1`, `krwBalance=<n>`, `usdBalance=<n>`,
+`longName=1`. `BEGINNER_CHROMIUM` or `BROWSER_EXECUTABLE_PATH` selects Chromium,
+`STOCK_ORDER_BROWSER_OUTPUT` the screenshots/report.json (default
+`/tmp/trading-stock-order-browser`), `STOCK_ORDER_QUICK=1` two combinations only.

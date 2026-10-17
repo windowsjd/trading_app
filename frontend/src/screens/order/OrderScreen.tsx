@@ -5,7 +5,6 @@ import { useAdminDiagnostics } from '../../features/auth/useAdminDiagnostics';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -55,6 +54,8 @@ import InlineEmptyState from '../../components/states/InlineEmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import OrderPanel from './OrderPanel';
 import OrderAssetSheet from './OrderAssetSheet';
+import { OrderAsideProvider, OrderAsideSlot } from './OrderAside';
+import { fitPriceFontSize } from './stockOrderSummary';
 import type { OrderSide } from './OrderSideSegment';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { safeRuntimeCode } from '../../services/ws/runtimeDiagnostics';
@@ -125,10 +126,13 @@ export function OrderTradingScreen({
   const inputScroll = useFocusedInputScroll();
   const { revealView } = inputScroll;
   useEffect(() => { registerQuestGuideReveal('order', node => revealView(node, 'start')); return () => registerQuestGuideReveal('order', null); }, [revealView]);
-  const { width } = useWindowDimensions();
+  const { width, fontScale } = useWindowDimensions();
   const { colors } = useAppearance();
   const compact = width < 600;
   const [showKrw, setShowKrw] = useState(false);
+  // The stock card's 시세 section (A-2): open by default, folded by the user.
+  const [quoteOpen, setQuoteOpen] = useState(true);
+  const [quoteWidth, setQuoteWidth] = useState(0);
   const wsUrl = useMemo(() => buildWsUrl('/api/v1/ws'), []);
   const { accounts } = useTradingAccount();
   const account = accounts.find((item) => item.id === accountId) ?? null;
@@ -202,6 +206,40 @@ export function OrderTradingScreen({
       : getUnavailablePriceText(asset);
   const changeRate = formatPercent(displayPrice.changeRate);
   const pair = getTradingPair(asset);
+  // Domestic and US stocks: the A-2 card (order inputs left; 시세, 내 보유 and
+  // 예상 주문 right). Crypto keeps its form beside the live order book.
+  const stock = asset.assetType === 'domestic_stock' || asset.assetType === 'us_stock';
+  const changeDirection = Number(displayPrice.changeRate) > 0 ? 'up' : Number(displayPrice.changeRate) < 0 ? 'down' : null;
+  const changeText = changeRate === '-'
+    ? '-'
+    : `${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`;
+  const priceDiagnostic = displayPrice.priceLocal === null || (converted && !krwAvailable) ? (
+    <AdminDiagnosticPanel
+      diagnostic={
+        displayPrice.basis === 'realtime' ||
+        displayPrice.basis === 'snapshot'
+          ? undefined
+          : detailQuery.data.priceErrors?.find(
+              (error) => error.assetId === assetId && error.diagnostic,
+            )?.diagnostic
+      }
+      runtime={
+        displayPrice.basis === 'realtime' ||
+        displayPrice.basis === 'snapshot'
+          ? {
+              assetId,
+              ...tickerRuntime,
+              connectionState,
+              tickerPriceAvailable: ticker?.priceLocal != null,
+              tickerReason: safeRuntimeCode(ticker?.reason) ?? 'not_observed',
+              priceKrwState: displayPrice.priceKrwState,
+              priceKrwReason: safeRuntimeCode(displayPrice.priceKrwReason) ?? 'not_observed',
+              priceCapturedAt: displayPrice.priceCapturedAt,
+            }
+          : null
+      }
+    />
+  ) : null;
   const currentPrice = (
     <View style={styles.currentPrice} testID="asset-current-price">
       <Text style={styles.priceLabel}>
@@ -215,41 +253,76 @@ export function OrderTradingScreen({
           {TRIAL_ORDER_NOTICE}
         </Text>
       ) : null}
-      {displayPrice.priceLocal === null || (converted && !krwAvailable) ? (
-        <AdminDiagnosticPanel
-          diagnostic={
-            displayPrice.basis === 'realtime' ||
-            displayPrice.basis === 'snapshot'
-              ? undefined
-              : detailQuery.data.priceErrors?.find(
-                  (error) => error.assetId === assetId && error.diagnostic,
-                )?.diagnostic
-          }
-          runtime={
-            displayPrice.basis === 'realtime' ||
-            displayPrice.basis === 'snapshot'
-              ? {
-                  assetId,
-                  ...tickerRuntime,
-                  connectionState,
-                  tickerPriceAvailable: ticker?.priceLocal != null,
-                  tickerReason: safeRuntimeCode(ticker?.reason) ?? 'not_observed',
-                  priceKrwState: displayPrice.priceKrwState,
-                  priceKrwReason: safeRuntimeCode(displayPrice.priceKrwReason) ?? 'not_observed',
-                  priceCapturedAt: displayPrice.priceCapturedAt,
-                }
-              : null
-          }
-        />
-      ) : null}
+      {priceDiagnostic}
     </View>
+  );
+  // The A-2 시세 section: current price, change (only the rate exists in the
+  // price contract; no amount or day range is derived from it), US estimate.
+  const stockQuote = stock ? (
+    <View style={styles.stockQuote} testID="asset-current-price">
+      <Text style={styles.quoteLabel}>
+        현재가 · {converted ? 'KRW' : asset.priceCurrency}
+      </Text>
+      <Text style={[styles.stockPriceText, { fontSize: fitPriceFontSize(priceText, quoteWidth, fontScale) }]} selectable>
+        {priceText}
+      </Text>
+      <Text testID="order-change-rate" style={styles.changeLabel}
+        accessibilityLabel={changeText === '-' ? '전일대비 정보 없음' : `전일대비 ${changeDirection === 'up' ? '상승 ' : changeDirection === 'down' ? '하락 ' : ''}${changeText}`}>
+        전일대비{' '}
+        <Text style={[styles.changeValue, changeDirection === 'up' ? styles.up : changeDirection === 'down' ? styles.down : null]}>
+          {changeDirection === 'up' ? '▲ ' : changeDirection === 'down' ? '▼ ' : ''}{changeText}
+        </Text>
+      </Text>
+      {priceDiagnostic}
+    </View>
+  ) : null;
+  // Folding 시세 never hides what the order's amounts are based on.
+  const trialNotice = isTrialPriceSource(displayPrice.priceSource) ? (
+    <Text testID="asset-trial-price-notice" style={styles.trialNotice}>
+      {TRIAL_ORDER_NOTICE}
+    </Text>
+  ) : null;
+  const orderPanel = account ? (
+    <OrderPanel
+      key={`${assetId}:${accountId}:${side}`}
+      assetId={assetId}
+      accountId={accountId}
+      initialSide={side}
+      enabled={isFocused}
+      showAssetPriceDiagnostic={false}
+      onInputFocus={inputScroll.onInputFocus}
+      onInputBlur={inputScroll.onInputBlur}
+      submitRef={inputScroll.submitRef}
+      onSideChange={onSideChange}
+      onReturnToAsset={onReturnToAsset ?? (() => navigation.goBack())}
+    />
+  ) : (
+    <InlineEmptyState
+      title="계정이 없습니다."
+      message="계정을 개설하면 주문할 수 있습니다."
+    />
+  );
+  const holdings = (
+    <AccountHoldings
+      onInputFocus={inputScroll.onInputFocus}
+      onInputBlur={inputScroll.onInputBlur}
+      isFocused={isFocused}
+      key={accountId}
+      accountId={accountId}
+      account={account}
+      assetId={assetId}
+      onSelectAsset={onSelectAsset}
+      currentInAside={stock}
+    />
   );
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
+      {/* Android draws edge to edge, so the keyboard no longer resizes the
+          window (adjustResize): pad for it on both platforms. */}
       <KeyboardAvoidingView
         style={styles.container}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={headerHeight}
+        behavior="padding"
       >
       <View ref={questGuideTarget('order-viewport')} collapsable={false} style={{ flex: 1 }}>
         <ScrollView
@@ -328,7 +401,7 @@ export function OrderTradingScreen({
               </ActionPressable>
             </View>
           </View>
-          <View style={styles.subheader}>
+          {!stock ? <View style={styles.subheader}>
             <Text
               style={[
                 styles.changeRate,
@@ -343,7 +416,7 @@ export function OrderTradingScreen({
                 ? '전일대비 -'
                 : `전일대비 ${Number(displayPrice.changeRate) > 0 ? '+' : ''}${changeRate}%`}
             </Text>
-          </View>
+          </View> : null}
           {isAdmin && showReconnectBanner ? (
             <Text
               testID={TEST_IDS.assetDetail.reconnectBanner}
@@ -367,75 +440,105 @@ export function OrderTradingScreen({
               runtime={tickerRuntime}
             />
           ) : null}
-          {/* The quote column stays beside the order inputs for every order type:
-              stacking it under a limit buy's TP/SL editor pushed the order book
-              below the whole form, so it looked gone. */}
-          <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="asset-trading-columns">
-            <View style={styles.orderColumn} testID="asset-order-column">
-              {account ? (
-                <OrderPanel
-                  key={`${assetId}:${accountId}:${side}`}
-                  assetId={assetId}
-                  accountId={accountId}
-                  initialSide={side}
-                  enabled={isFocused}
-                  showAssetPriceDiagnostic={false}
-                  onInputFocus={inputScroll.onInputFocus}
-                  onInputBlur={inputScroll.onInputBlur}
-                  submitRef={inputScroll.submitRef}
-                  onSideChange={onSideChange}
-                  onReturnToAsset={onReturnToAsset ?? (() => navigation.goBack())}
-                />
-              ) : (
-                <InlineEmptyState
-                  title="계정이 없습니다."
-                  message="계정을 개설하면 주문할 수 있습니다."
-                />
-              )}
-            </View>
-            <View style={styles.priceColumn} testID="asset-price-column">
-              {liveOrderBookEnabled ? (
-                <>
-                  <AssetOrderLadder
-                    book={latestOrderBook?.assetId === assetId ? latestOrderBook : null}
-                    statusMessage={statusMessage}
-                    currentPrice={currentPrice}
-                  />
-                  {isAdmin && statusMessage ? (
-                    <AdminDiagnosticPanel runtime={orderBookRuntime} />
-                  ) : null}
-                </>
-              ) : (
-                <View style={styles.stockPrice}>
-                  {currentPrice}
-                  {estimateSupported ? (
-                    <AssetEstimatedQuoteCard
-                      estimate={
-                        latestEstimate?.assetId === assetId
-                          ? latestEstimate
-                          : null
-                      }
-                      statusMessage={estimateStatus}
-                      marketOpen={asset.marketStatus === 'open'}
-                    />
-                  ) : null}
-                  {isAdmin && estimateSupported && estimateStatus ? (
-                    <AdminDiagnosticPanel runtime={estimateRuntime} />
-                  ) : null}
+          {stock ? (
+            <OrderAsideProvider>
+              {/* A-2: one card, two columns at every width. The right column
+                  shows 시세, then the holding and the expected order, which
+                  AccountHoldings and the order form draw into its slots. */}
+              <View style={[styles.stockCard, compact && styles.compactStockCard]} testID="asset-trading-columns">
+                <View style={styles.stockOrderColumn} testID="asset-order-column">
+                  {orderPanel}
                 </View>
-              )}
-            </View>
-          </View>
-          <AccountHoldings
-            onInputFocus={inputScroll.onInputFocus}
-            onInputBlur={inputScroll.onInputBlur}
-            isFocused={isFocused}
-            key={accountId}
-            accountId={accountId}
-            account={account}
-            assetId={assetId}
-            onSelectAsset={onSelectAsset}
-          />
+                <View style={styles.stockQuoteColumn} testID="asset-price-column"
+                  onLayout={(event) => {
+                    const next = Math.round(event.nativeEvent.layout.width);
+                    setQuoteWidth((previous) => (previous === next ? previous : next));
+                  }}>
+                  <View style={styles.quoteHeader}>
+                    <Text style={styles.quoteTitle} accessibilityRole="header">시세</Text>
+                    <ActionPressable
+                      testID="order-quote-toggle"
+                      style={styles.quoteToggle}
+                      accessibilityRole="button"
+                      accessibilityLabel={quoteOpen ? '시세 접기' : '시세 펼치기'}
+                      accessibilityState={{ expanded: quoteOpen }}
+                      aria-expanded={quoteOpen}
+                      onPress={() => setQuoteOpen((open) => !open)}
+                    >
+                      <Text style={styles.quoteToggleText}>{quoteOpen ? '접기' : '펼치기'}</Text>
+                    </ActionPressable>
+                  </View>
+                  {quoteOpen ? (
+                    <>
+                      {stockQuote}
+                      {estimateSupported ? (
+                        <AssetEstimatedQuoteCard
+                          estimate={
+                            latestEstimate?.assetId === assetId
+                              ? latestEstimate
+                              : null
+                          }
+                          statusMessage={estimateStatus}
+                          marketOpen={asset.marketStatus === 'open'}
+                        />
+                      ) : null}
+                      {isAdmin && estimateSupported && estimateStatus ? (
+                        <AdminDiagnosticPanel runtime={estimateRuntime} />
+                      ) : null}
+                    </>
+                  ) : null}
+                  {trialNotice}
+                  <OrderAsideSlot name="holding" />
+                  <OrderAsideSlot name="preview" />
+                </View>
+              </View>
+              {holdings}
+            </OrderAsideProvider>
+          ) : (
+            <>
+              {/* The quote column stays beside the order inputs for every order type:
+                  stacking it under a limit buy's TP/SL editor pushed the order book
+                  below the whole form, so it looked gone. */}
+              <View style={[styles.tradingRow, compact && styles.compactTradingRow]} testID="asset-trading-columns">
+                <View style={styles.orderColumn} testID="asset-order-column">
+                  {orderPanel}
+                </View>
+                <View style={styles.priceColumn} testID="asset-price-column">
+                  {liveOrderBookEnabled ? (
+                    <>
+                      <AssetOrderLadder
+                        book={latestOrderBook?.assetId === assetId ? latestOrderBook : null}
+                        statusMessage={statusMessage}
+                        currentPrice={currentPrice}
+                      />
+                      {isAdmin && statusMessage ? (
+                        <AdminDiagnosticPanel runtime={orderBookRuntime} />
+                      ) : null}
+                    </>
+                  ) : (
+                    <View style={styles.stockPrice}>
+                      {currentPrice}
+                      {estimateSupported ? (
+                        <AssetEstimatedQuoteCard
+                          estimate={
+                            latestEstimate?.assetId === assetId
+                              ? latestEstimate
+                              : null
+                          }
+                          statusMessage={estimateStatus}
+                          marketOpen={asset.marketStatus === 'open'}
+                        />
+                      ) : null}
+                      {isAdmin && estimateSupported && estimateStatus ? (
+                        <AdminDiagnosticPanel runtime={estimateRuntime} />
+                      ) : null}
+                    </View>
+                  )}
+                </View>
+              </View>
+              {holdings}
+            </>
+          )}
         </ScrollView>
       </View>
     </KeyboardAvoidingView>
@@ -515,6 +618,50 @@ const styles = StyleSheet.create({
     color: semantic.text,
   },
   stockPrice: { flex: 1, justifyContent: 'center', minHeight: 280 },
+  // A-2 stock card: the inputs left, 시세/내 보유/예상 주문 right.
+  stockCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: semantic.border,
+    backgroundColor: semantic.surface,
+  },
+  compactStockCard: { gap: 10, padding: 10 },
+  stockOrderColumn: { flex: 1.2, minWidth: 0 },
+  stockQuoteColumn: { flex: 1, minWidth: 0, gap: 12 },
+  quoteHeader: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: 6,
+    rowGap: 4,
+    minHeight: 44,
+  },
+  quoteTitle: { flexShrink: 1, fontSize: 17, lineHeight: 24, fontWeight: '700', color: semantic.text },
+  quoteToggle: {
+    marginLeft: 'auto',
+    minWidth: 44,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: semantic.raised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quoteToggleText: { fontSize: 13, fontWeight: '600', color: semantic.secondary },
+  stockQuote: { gap: 4, minWidth: 0 },
+  quoteLabel: { fontSize: 12, color: semantic.muted },
+  stockPriceText: {
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+    color: semantic.text,
+  },
+  changeLabel: { fontSize: 12, lineHeight: 18, color: semantic.muted },
+  changeValue: { fontSize: 13, fontWeight: '600', color: semantic.secondary, fontVariant: ['tabular-nums'] },
   bannerText: { fontSize: 12, color: semantic.warning },
   trialNotice: { fontSize: 10, color: semantic.warning },
 });

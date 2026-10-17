@@ -19,13 +19,23 @@ function screenHarness() {
     useMemo: (fn: any) => fn(),
     useState: (initial: any) => [initial, () => {}],
     useRef: (initial: any) => ({ current: initial }),
+    // The form's keyboard scrolling subscribes in an effect; nothing renders here.
+    useEffect: () => {},
   });
   h.mocks.set('react-native', {
     View: 'View',
     Text: 'Text',
     TextInput: 'TextInput',
     SafeAreaView: 'SafeAreaView',
+    ScrollView: 'ScrollView',
+    KeyboardAvoidingView: 'KeyboardAvoidingView',
+    Keyboard: { addListener: () => ({ remove() {} }) },
+    Platform: { OS: 'android' },
     StyleSheet: { create: (s: unknown) => s },
+  });
+  h.mocks.set('react-native-safe-area-context', {
+    SafeAreaView: 'SafeAreaView',
+    useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   });
   h.mocks.set('@tanstack/react-query', {
     useQueryClient: () => h.queryClient,

@@ -27,7 +27,7 @@ async function run() {
   await new Promise(resolve => server.once('listening', resolve));
   let browser, page;
   const results = [], flows = [], errors = [], compactSteps = [];
-  let shimmerMeasured = false;
+  let highlightPixelsChecked = false;
   try {
     browser = await chromium.launch({ headless: true, args: ['--no-sandbox'],
       ...(process.env.BEGINNER_CHROMIUM ? { executablePath: process.env.BEGINNER_CHROMIUM } : {}) });
@@ -171,32 +171,33 @@ async function run() {
       assert.equal(await surface.getByTestId('quest-target-glow').count(), 1);
       assert.equal(await page.getByTestId('quest-target-glow').count(), 1, 'only the current button glows');
       assert.equal(await surface.getByTestId('quest-target-highlight').evaluate(el => getComputedStyle(el).pointerEvents), 'none');
-      const reduced = await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
-      assert.equal(await surface.getByTestId('quest-target-shimmer').count(), reduced ? 0 : 1);
+      // Nothing moves or paints over the control: the control's own pixels are
+      // the same with the highlight hidden (a tint, inner border or sweeping
+      // shine over it made its text look smeared inside the ring).
+      assert.equal(await page.locator('[data-testid="quest-target-shimmer"]').count(), 0, 'no shine sweeps the control');
       await contentFits(`${button}-guide-target`);
-      if (!reduced && button === 'wallet-exchange' && !shimmerMeasured) {
-        const samples = await page.evaluate(() => new Promise(resolve => {
-          const samples = [], started = performance.now(); let sampledAt = -100;
-          function tick(now) {
-            if (now - sampledAt >= 40) {
-              const el = document.querySelector('[data-testid="quest-target-shimmer"]');
-              const surface = el.closest('[data-testid="wallet-exchange-surface"]');
-              const rect = surface.getBoundingClientRect();
-              samples.push({ ms: now - started, x: new DOMMatrix(getComputedStyle(el).transform).m41, width: rect.width, height: rect.height });
-              sampledAt = now;
-            }
-            if (now - started < 3000) requestAnimationFrame(tick); else resolve(samples);
-          }
-          requestAnimationFrame(tick);
-        }));
-        assert.ok(Math.max(...samples.map(s => s.x)) - Math.min(...samples.map(s => s.x)) > 100, 'shimmer crosses the whole surface');
-        assert.ok(samples.some((s, i) => i && s.x < samples[i - 1].x - 50), 'the 2.5s cycle restarts');
-        assert.ok(samples.some((s, i) => i && s.x > samples[i - 1].x + 2), 'sweep moves from left to right');
-        assert.ok(samples.filter((s, i) => i && Math.abs(s.x - samples[i - 1].x) < 0.1).length > samples.length / 2, 'most of the cycle has no moving shine');
-        assert.ok(samples.every(s => Math.abs(s.width - 52) < 1 && Math.abs(s.height - 52) < 1), 'the icon stays fixed size');
-        fs.writeFileSync(path.join(out, 'shimmer-motion.json'), JSON.stringify(samples, null, 2));
-        shimmerMeasured = true;
-        flows.push({ context: 'shimmer-motion', direction: 'left-to-right', cycleRestart: true, fixedIcon: true });
+      if (!highlightPixelsChecked) {
+        // Inside the control's rounded shape only: its bounding box corners lie
+        // outside it, where the outside glow may legitimately show.
+        const r = await box(surface);
+        const inset = Math.ceil(await surface.evaluate(el => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0) * 0.3) + 1;
+        const clip = { x: Math.ceil(r.left) + inset, y: Math.ceil(r.top) + inset,
+          width: Math.floor(r.right) - Math.ceil(r.left) - 2 * inset, height: Math.floor(r.bottom) - Math.ceil(r.top) - 2 * inset };
+        const shown = await page.screenshot({ clip });
+        await page.evaluate(() => document.querySelectorAll('[data-testid="quest-target-highlight"]').forEach(el => { el.style.visibility = 'hidden'; }));
+        const hidden = await page.screenshot({ clip });
+        await page.evaluate(() => document.querySelectorAll('[data-testid="quest-target-highlight"]').forEach(el => { el.style.visibility = ''; }));
+        assert.equal(Buffer.compare(shown, hidden), 0, `${button}: the highlight leaves the control's own pixels untouched`);
+        const glow = await surface.getByTestId('quest-target-glow').evaluate(el => {
+          const g = el.getBoundingClientRect(), c = el.closest('[data-testid$="-surface"]').getBoundingClientRect();
+          return { outside: g.left <= c.left - 3 && g.top <= c.top - 3 && g.right >= c.right + 3 && g.bottom >= c.bottom + 3,
+            fill: getComputedStyle(el).backgroundColor };
+        });
+        assert.equal(glow.outside, true, 'the glow band lies outside the control');
+        assert.match(glow.fill, /rgba\(0, 0, 0, 0\)|transparent/);
+        fs.writeFileSync(path.join(out, 'highlight-pixels.json'), JSON.stringify({ button, clip, identical: true }, null, 2));
+        highlightPixelsChecked = true;
+        flows.push({ context: 'highlight-inside-unchanged', button });
       }
 
     }

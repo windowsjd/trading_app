@@ -27,6 +27,12 @@ describe('order screen asset sheet', () => {
     assert.equal(h.marketRequests[0].withPrice, true);
     assert.equal(h.marketRequests[0].sortBy, 'turnover');
     assert.deepEqual([has(h, row('bnb')), has(h, row('btc')), has(h, row('samsung'))], [true, true, true]);
+    // Crypto rows show the symbol alone; the provider (market BINANCE) stays internal.
+    const rowTexts = (id: string) => h.node(row(id)).findAll((n: any) => n.type === 'Text')
+      .map((n: any) => [n.props.children].flat().join(''));
+    assert.equal(rowTexts('btc').includes('BTCUSDT'), true);
+    assert.equal(rowTexts('btc').some((text: string) => text.includes('BINANCE')), false);
+    assert.equal(rowTexts('samsung').includes('KRX'), true, 'stock market labels stay');
     assert.equal(h.marketTickerOptions.enabled, true);
     assert.deepEqual(h.marketTickerOptions.assetIds, ['bnb', 'btc', 'samsung']);
   });

@@ -12,7 +12,9 @@ const { load } = require('../../../test/ledgerTestHarness.cjs');
 for (const kind of ['Login', 'Signup'] as const) it(`${kind}: one request per tap burst, a busy brand button with the whale, and a retry after it settles`, () => {
   const h: any = { pending: false, mutates: [] as unknown[], options: null };
   const Screen = load(resolve(`src/screens/auth/${kind}Screen.tsx`), {
-    'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', SafeAreaView: 'SafeAreaView', StyleSheet: { create: (s: unknown) => s } },
+    'react-native': { View: 'View', Text: 'Text', TextInput: 'TextInput', ScrollView: 'ScrollView', KeyboardAvoidingView: 'KeyboardAvoidingView',
+      Keyboard: { addListener: () => ({ remove() {} }) }, Platform: { OS: 'android' }, StyleSheet: { create: (s: unknown) => s } },
+    'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 48, left: 0, right: 0 }) },
     '@tanstack/react-query': {
       useQueryClient: () => ({}),
       useMutation: (options: unknown) => { h.options = options; return { isPending: h.pending, mutate: (payload: unknown) => h.mutates.push(payload) }; },

@@ -427,12 +427,23 @@ export function getAssetNameDisplay(
   return { primary: '-', secondary: null };
 }
 
+/**
+ * Market identifiers that stay internal: the crypto price provider is not a
+ * market the user chooses, so a Spot row reads `BTCUSDT`, not
+ * `BTCUSDT · BINANCE`. The asset's `market` value itself is unchanged.
+ */
+const HIDDEN_MARKET_LABELS = new Set(['BINANCE']);
+
 /** Symbol/market secondary line with empty parts and separators removed. */
 export function getAssetSymbolMarketDisplay(
   asset?: { symbol?: string | null; market?: string | null } | null,
 ): string | null {
   const symbol = getAssetSymbolDisplay(asset?.symbol);
-  const market = asset?.market?.trim() || null;
+  const rawMarket = asset?.market?.trim() || null;
+  const market =
+    rawMarket && !HIDDEN_MARKET_LABELS.has(rawMarket.toUpperCase())
+      ? rawMarket
+      : null;
   const display = [symbol, market].filter((value): value is string => !!value);
   return display.length > 0 ? display.join(' · ') : null;
 }

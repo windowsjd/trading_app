@@ -11,9 +11,11 @@ const preview: TradingGuideStep = { screen: 'order', target: 'order-preview', ti
 const submit: TradingGuideStep = { screen: 'order', target: 'order-submit', title: '주문 실행', body: '화면의 주문 버튼으로 실행해 주세요. 실패하거나 시세를 확인할 수 없으면 화면 안내에 따라 다시 확인해 주세요.' };
 // Holdings (and their TP/SL and limit review) live under the order screen only.
 const holdings: TradingGuideStep = { screen: 'order', target: 'asset-holdings', title: '보유종목과 수익률', body: '주문 화면 아래 보유종목에서 보유수량과 수익률을 확인해 주세요. 수익률은 가격과 수수료에 따라 음수일 수도 있어요. 표시를 확인한 뒤 다음을 눌러 주세요.', next: true };
+// Stocks show the holding as 내 보유 in the order card's right column (A-2).
+const stockHoldings: TradingGuideStep = { ...holdings, body: '주문 카드의 내 보유에서 보유수량과 수익률을 확인해 주세요. 수익률은 가격과 수수료에 따라 음수일 수도 있어요. 표시를 확인한 뒤 다음을 눌러 주세요.' };
 const stock = (us: boolean): TradingGuideStep[] => [market, { ...price, body: us
   ? '미국 주식은 미국 시장 운영시간에 증권 USD 지갑으로 거래해요. 환율도 원화 기준 자산 평가에 영향을 줘요. 휴장 또는 시세 미준비 시 다른 심화 퀘스트를 진행할 수 있어요.'
-  : '국내 주식은 한국 시장 운영시간에 KRW로 거래해요. 휴장 중에는 다른 심화 퀘스트를 진행할 수 있어요.' }, buy, marketType, amount, preview, submit, holdings];
+  : '국내 주식은 한국 시장 운영시간에 KRW로 거래해요. 휴장 중에는 다른 심화 퀘스트를 진행할 수 있어요.' }, buy, marketType, amount, preview, submit, stockHoldings];
 const futures = (short: boolean): TradingGuideStep[] => [
   { screen: 'futures', target: 'futures-funding', title: '선물 지갑 준비', body: '주문가능 USD에서 선물 지갑으로 주문할 수 있는 금액을 확인해 주세요. 부족하면 지갑 탭에서 USD를 이체한 뒤 마켓 탭의 선물 화면으로 돌아와 진행해 주세요.', next: true },
   { screen: 'futures', target: 'futures-instrument', title: '선물 종목', body: '거래 가능한 선물 상품을 선택해 주세요. 같은 종목은 One-way 방식이에요. 반대 포지션이 열려 있다면 먼저 종료해야 해요.', next: true },

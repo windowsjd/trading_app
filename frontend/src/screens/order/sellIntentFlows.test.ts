@@ -449,7 +449,11 @@ describe('KRX LOC SELL and available quantity', () => {
     await h.mount(); t.after(h.close);
     await sellWith(h, 'loc');
     expectText(h, /접수할 때 매도 수량만큼 보유 수량을 예약해요/);
-    expectText(h, /보유 10 · 매도 가능 4 \(다른 주문 예약 6\)/);
+    // A-2 stock card: 매도 가능 and the other orders' reservation sit beside the
+    // inputs; the holding itself is 내 보유 in the card's right column.
+    await h.flush();
+    assert.deepEqual(['order-sell-capacity-value', 'order-sell-reserved-value', 'order-holding-quantity-value']
+      .map((id) => h.node(id)?.props.children), ['4주', '6주', '10주']);
     await h.input(limitPrice, '70000');
     await h.input(qty, '10');
     assert.equal(h.node('loc-sell-adjust-notice') !== undefined, true);

@@ -17,6 +17,8 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
       SafeAreaView: 'SafeAreaView',
       FlatList: 'FlatList',
       TextInput: 'TextInput',
+      // The search list sits in a keyboard-avoiding view (below the header).
+      KeyboardAvoidingView: 'KeyboardAvoidingView',
     });
     h.native.FlatList = (props: { ListHeaderComponent?: unknown }) =>
       React.createElement('FlatList', props, props.ListHeaderComponent);
@@ -42,6 +44,7 @@ for (const screen of ['MarketScreen', 'MarketSearchScreen']) {
       },
     };
     const Screen = h.load(`src/screens/market/${screen}.tsx`, {
+      '@react-navigation/elements': { useHeaderHeight: () => 56 },
       './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
       '../../features/market/MarketSortControl': {
         __esModule: true,

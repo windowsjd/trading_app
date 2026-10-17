@@ -298,6 +298,26 @@ test('asset symbol display policy', async (t) => {
       null,
     );
   });
+
+  await t.test('shows a crypto symbol without the BINANCE provider label', () => {
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: 'BTCUSDT', market: 'BINANCE' }),
+      'BTCUSDT',
+    );
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: '1INCHUSDT', market: ' binance ' }),
+      '1INCHUSDT',
+    );
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: null, market: 'BINANCE' }),
+      null,
+    );
+    // Other market labels are unchanged (stocks, the futures list label).
+    assert.equal(
+      getAssetSymbolMarketDisplay({ symbol: 'BTCUSDT', market: 'USDⓈ-M 무기한' }),
+      'BTCUSDT · USDⓈ-M 무기한',
+    );
+  });
 });
 
 test('formatKstDateTime', async (t) => {

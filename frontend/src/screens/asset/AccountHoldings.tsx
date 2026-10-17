@@ -2,6 +2,7 @@ import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import QuestTarget from '../../features/quest/QuestTarget';
 import QuestLimitReview from '../../features/quest/QuestLimitReview';
+import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import { StyleSheet, Text, View } from '../../theme/native';
@@ -26,6 +27,8 @@ import { getConditionalSellOrders } from '../../features/conditional/conditional
 import { getOpenConditionalSellOrders } from '../../features/conditional/conditionalSellLists';
 import { tpSlCountSummary } from '../../features/conditional/tpSlModel';
 import PendingOrders from './PendingOrders';
+import { OrderAsidePortal } from '../order/OrderAside';
+import { HoldingSummaryCard } from '../order/StockOrderAside';
 
 type Props = {
   accountId: string | null;
@@ -37,6 +40,12 @@ type Props = {
   onInputBlur?: () => void;
   /** Order screen: a holding of another asset switches the order to it. */
   onSelectAsset?: (assetId: string) => void;
+  /**
+   * Stock order card (A-2): this asset's holding is drawn as 내 보유 in the
+   * card's right column, with its 손절가/익절가 button and guide target; this
+   * section then lists the account's OTHER holdings, so nothing shows twice.
+   */
+  currentInAside?: boolean;
 };
 
 export default function AccountHoldings({
@@ -45,15 +54,17 @@ export default function AccountHoldings({
   assetId,
   isFocused,
   onSelectAsset,
+  currentInAside = false,
 }: Props) {
-  const [filter, setFilter] = useState<'all' | 'current' | 'pending'>('current');
+  const [filter, setFilter] = useState<'all' | 'current' | 'pending'>(currentInAside ? 'all' : 'current');
   const guide = useQuestGuide();
   const reviewOrderId = guide?.active?.quest === 'limitBuy' && guide.active.accountId === accountId && guide.active.assetId === assetId ? guide.active.orderId : undefined;
   const query = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.holdings(accountId ?? ''),
     queryFn: () =>
       getAccountHoldings(accountId ?? '', getTradingAccountPositions),
-    enabled: !!accountId && isFocused && filter !== 'pending',
+    // 내 보유 in the order card needs this read whatever the list shows.
+    enabled: !!accountId && isFocused && (currentInAside || filter !== 'pending'),
     refetchInterval: isFocused ? 4000 : false,
   });
   // No previous-account placeholder; the envelope check also protects display
@@ -64,40 +75,60 @@ export default function AccountHoldings({
     ? getIntegrityErrorMessage(query.error)
     : null;
   const positions = data?.positions ?? [];
-  const visible =
-    filter === 'current'
+  const visible = currentInAside
+    ? positions.filter((position) => position.assetId !== assetId)
+    : filter === 'current'
       ? positions.filter((position) => position.assetId === assetId)
       : positions;
 
-  const ownPosition = visible.find(p => p.assetId === assetId);
-  useTradingGuideFacts({ screen: 'holdings', accountId: accountId ?? '', assetId, holdingsVisible: isFocused && filter !== 'pending' && !query.isError && !!ownPosition && ownPosition.valuation.state !== 'unavailable' }, isFocused);
+  const ownPosition = (currentInAside ? positions : visible).find(p => p.assetId === assetId);
+  // In the A-2 card 내 보유 is always on screen; otherwise the list must show it.
+  const ownShown = currentInAside || filter !== 'pending';
+  useTradingGuideFacts({ screen: 'holdings', accountId: accountId ?? '', assetId, holdingsVisible: isFocused && ownShown && !query.isError && !!ownPosition && ownPosition.valuation.state !== 'unavailable' }, isFocused);
+  const tpSlScope = currentInAside && ownPosition ? [...visible, ownPosition] : visible;
   // Live independent 손절가/익절가 per holding (the count beside each button).
   const tpSlQuery = useQuery({
     queryKey: QUERY_KEYS.tradingAccount.conditionalSell.open(accountId ?? '', 'protection'),
     queryFn: ({ signal }) => getOpenConditionalSellOrders(accountId ?? '', 'protection', getConditionalSellOrders, signal),
-    enabled: !!accountId && isFocused && filter !== 'pending' && visible.some(isTpSlCandidate),
+    enabled: !!accountId && isFocused && ownShown && tpSlScope.some(isTpSlCandidate),
     // US-only holdings: one read learns the server's markets; keep polling
     // only while some visible holding can carry 손절가/익절가.
     refetchInterval: (query) => isFocused && (!query.state.data
-      || visible.some((position) => isTpSlMarket(position, query.state.data?.capabilities.markets ?? null)))
+      || tpSlScope.some((position) => isTpSlMarket(position, query.state.data?.capabilities.markets ?? null)))
       ? 4000 : false,
   });
   const tpSlRows = !tpSlQuery.isError && tpSlQuery.data?.tradingAccountId === accountId ? tpSlQuery.data.conditionalOrders : null;
   const tpSlMarkets = !tpSlQuery.isError && tpSlQuery.data?.tradingAccountId === accountId ? tpSlQuery.data.capabilities.markets : null;
   const [tpSlTarget, setTpSlTarget] = useState<TpSlTarget | null>(null);
+  const tpSlSummary = (target: string) => tpSlRows
+    ? tpSlCountSummary(tpSlRows.filter(row => row.assetId === target && (row.state === 'watching' || row.state === 'triggered')))
+    : null;
+  // 내 보유 (A-2): this asset's holding, drawn in the order card's right column.
+  const ownTpSl = currentInAside && accountId && ownPosition && !query.isError && isTpSlMarket(ownPosition, tpSlMarkets) ? (
+    <TpSlButton testID={`holding-${assetId}-tp-sl`} summary={tpSlSummary(assetId)}
+      onPress={() => setTpSlTarget({ type: 'spot_holding', accountId, assetId })} />
+  ) : null;
+  const ownCard = currentInAside && accountId ? (
+    <HoldingSummaryCard state={query.isError ? 'error' : !data ? 'loading' : 'ready'} position={ownPosition ?? null}
+      onRetry={() => void query.refetch()} figuresRef={isFocused ? questGuideTarget('asset-holdings') : undefined}>
+      {ownTpSl && isFocused ? <QuestTarget id="asset-protection">{ownTpSl}</QuestTarget> : ownTpSl}
+    </HoldingSummaryCard>
+  ) : null;
 
   return (
     <View style={styles.section} testID="account-holdings">
       {reviewOrderId && accountId ? <QuestLimitReview key={`${accountId}:${reviewOrderId}`} accountId={accountId} orderId={reviewOrderId} focused={isFocused} /> : null}
+      {ownCard ? <OrderAsidePortal name="holding">{ownCard}</OrderAsidePortal> : null}
       <View style={styles.header}>
         <Text style={styles.title} testID="holdings-count">
-          {filter === 'pending' ? '대기 주문' : `보유 종목${data && !query.isError ? ` ${positions.length}` : ''}`}
+          {filter === 'pending' ? '대기 주문'
+            : `${currentInAside ? '다른 보유 종목' : '보유 종목'}${data && !query.isError ? ` ${currentInAside ? visible.length : positions.length}` : ''}`}
         </Text>
       </View>
       <SegmentedControl testID="holdings-filters" accessibilityLabel="보유 목록 보기" compact value={filter} onChange={setFilter}
-        options={(['current', 'all', 'pending'] as const).map(value => ({
+        options={(currentInAside ? ['all', 'pending'] as const : ['current', 'all', 'pending'] as const).map(value => ({
           key: value,
-          label: value === 'all' ? '전체 보유' : value === 'current' ? '현재 종목' : '대기 목록',
+          label: value === 'all' ? currentInAside ? '다른 보유' : '전체 보유' : value === 'current' ? '현재 종목' : '대기 목록',
           testID: `holdings-filter-${value}`,
         }))} />
       {!accountId ? (
@@ -138,15 +169,17 @@ export default function AccountHoldings({
         <InlineEmptyState
           message=""
           title={
-            filter === 'all'
-              ? '보유 중인 종목이 없습니다.'
-              : '현재 종목을 보유하고 있지 않습니다.'
+            currentInAside
+              ? '다른 보유 종목이 없습니다.'
+              : filter === 'all'
+                ? '보유 중인 종목이 없습니다.'
+                : '현재 종목을 보유하고 있지 않습니다.'
           }
         />
       ) : (
         visible.map((position) => (
           <HoldingRow key={`${accountId}:${position.assetId}`} position={position} guideTarget={isFocused && position.assetId === assetId}
-            tpSlSummary={tpSlRows ? tpSlCountSummary(tpSlRows.filter(row => row.assetId === position.assetId && (row.state === 'watching' || row.state === 'triggered'))) : null}
+            tpSlSummary={tpSlSummary(position.assetId)}
             onTpSl={accountId && isTpSlMarket(position, tpSlMarkets) ? () => setTpSlTarget({ type: 'spot_holding', accountId, assetId: position.assetId }) : undefined}
             onSelect={onSelectAsset && position.assetId !== assetId ? () => onSelectAsset(position.assetId) : undefined} />
         ))

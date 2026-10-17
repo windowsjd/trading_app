@@ -97,6 +97,16 @@ function createTradingUiHarness(screenName) {
           effects.push(fn);
         }
       },
+      // Same positional slots: layout effects run with the passive ones here.
+      useLayoutEffect: (fn, deps) => {
+        const slot = index++;
+        if (!slots[slot] || deps?.some((dep, i) => !Object.is(dep, slots[slot][i]))) {
+          slots[slot] = deps;
+          effects.push(fn);
+        }
+      },
+      // No provider renders here (see useContext): a store reads its snapshot.
+      useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot(),
     },
     'react-native': native,
     '@tanstack/react-query': {

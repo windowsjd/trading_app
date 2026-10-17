@@ -596,6 +596,10 @@ function inlineTradingHarness() {
       return { tickersByAssetId: new Map(), staleAssetIds: new Set() };
     },
   };
+  // One slot store for the order card: the screen, its form and the holdings
+  // must share it (every `load` would otherwise get its own context).
+  mocks['./OrderAside'] = load(resolve('src/screens/order/OrderAside.tsx'), mocks);
+  mocks['../order/OrderAside'] = mocks['./OrderAside'];
   mocks['../order/OrderPanel'] = load(
     resolve('src/screens/order/OrderPanel.tsx'),
     mocks,

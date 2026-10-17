@@ -654,9 +654,11 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const compactSides = width < 220 * fontScale + 80;
   const compact = width < 600;
   return (
+    // Android draws edge to edge, so the keyboard no longer resizes the
+    // window (adjustResize): pad for it on both platforms.
     <KeyboardAvoidingView
       style={styles.screen}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior="padding"
       keyboardVerticalOffset={headerHeight}
     >
       <View ref={questGuideTarget('futures-viewport')} collapsable={false} style={{ flex: 1 }}>

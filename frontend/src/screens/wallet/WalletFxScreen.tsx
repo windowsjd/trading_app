@@ -7,7 +7,6 @@ import {
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
-  Platform,
 } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
 import { useHeaderHeight } from '@react-navigation/elements';
@@ -552,9 +551,9 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
-      <KeyboardAvoidingView style={styles.flex}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android draws edge to edge, so the keyboard no longer resizes the
+          window (adjustResize): pad for it on both platforms. */}
+      <KeyboardAvoidingView style={styles.flex} keyboardVerticalOffset={headerHeight} behavior="padding">
       <View ref={questGuideTarget('fx-viewport')} collapsable={false} style={styles.flex}>
       <ScrollView
         ref={inputScroll.scrollRef}

@@ -26,6 +26,8 @@ interface CTAButtonProps {
   variant?: 'primary' | 'secondary' | 'neutral' | 'logout';
   /** Trade-executing commands pass `subtle`. */
   ripple?: RippleTone;
+  /** What pressing does, read after the label (e.g. the expected order total). */
+  accessibilityHint?: string;
 }
 
 export default function CTAButton({
@@ -38,6 +40,7 @@ export default function CTAButton({
   testID,
   variant = 'primary',
   ripple,
+  accessibilityHint,
 }: CTAButtonProps) {
   const disabled = state === 'disabled' || state === 'loading' || state === 'blocked';
 
@@ -50,6 +53,7 @@ export default function CTAButton({
       testID={testID}
       accessibilityRole="button"
       accessibilityLabel={learningHint ? `${label}, 학습 제한. ${learningHint}` : label}
+      accessibilityHint={accessibilityHint}
       accessibilityState={{ disabled: disabled || !!learningHint, busy: state === 'loading' }}
       style={[
         styles.button,

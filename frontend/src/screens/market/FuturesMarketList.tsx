@@ -75,7 +75,6 @@ export default function FuturesMarketList({ onSelect, sort, onSortChange, refres
       <Text testID="futures-list-summary" style={styles.summary}>USDⓈ-M 무기한 · 24시간 기준</Text>
       <MarketSortControl value={sort} onChange={onSortChange} />
     </View>
-    <Text style={styles.hint}>현재가는 선물 Last 거래 기준, 등락률·거래대금은 선물 계약의 24시간 통계입니다.</Text>
     {data.capabilities.tradingMode !== 'ENABLED' ? <Text style={styles.hint}>현재 신규 선물 거래가 제한되어 있습니다. 상품과 보유 현황은 확인할 수 있습니다.</Text> : null}
     <View>
       {rows.map(({ id, item }) => (

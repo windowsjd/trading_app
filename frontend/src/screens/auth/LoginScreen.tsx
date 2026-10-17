@@ -1,12 +1,9 @@
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  SafeAreaView,
-} from '../../theme/native';
+import { View, Text, StyleSheet } from '../../theme/native';
+import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
+import AuthFormLayout, { AuthField, AuthSubmitBox } from './AuthFormLayout';
+import { APP_BRAND_NAME } from '../../constants/brand';
 import ActionPressable from '../../components/common/ActionPressable';
 import WhaleLoader from '../../components/states/WhaleLoader';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -53,6 +50,7 @@ function getBlockedAuthMessage(state: AuthViewState | null) {
 export default function LoginScreen({ navigation }: LoginScreenProps) {
   const enterApp = useEnterApp();
   const queryClient = useQueryClient();
+  const scroll = useFocusedInputScroll();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -149,42 +147,44 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View testID={TEST_IDS.auth.loginScreen} style={styles.content}>
-        <Text style={styles.logo}>Trading League</Text>
+    <AuthFormLayout testID={TEST_IDS.auth.loginScreen} scroll={scroll}>
+      <Text style={styles.logo}>{APP_BRAND_NAME}</Text>
 
-        <TextInput
-          testID={TEST_IDS.auth.loginEmailInput}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="이메일"
-          placeholderTextColor={semantic.placeholder}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          style={styles.input}
-        />
+      <AuthField
+        scroll={scroll}
+        testID={TEST_IDS.auth.loginEmailInput}
+        value={email}
+        onChangeText={setEmail}
+        placeholder="이메일"
+        placeholderTextColor={semantic.placeholder}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        style={styles.input}
+      />
 
-        <TextInput
-          testID={TEST_IDS.auth.loginPasswordInput}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="비밀번호"
-          placeholderTextColor={semantic.placeholder}
-          secureTextEntry
-          style={styles.input}
-        />
+      <AuthField
+        scroll={scroll}
+        testID={TEST_IDS.auth.loginPasswordInput}
+        value={password}
+        onChangeText={setPassword}
+        placeholder="비밀번호"
+        placeholderTextColor={semantic.placeholder}
+        secureTextEntry
+        style={styles.input}
+      />
 
-        {authState === 'auth_invalid_input' && fieldError ? (
-          <Text style={styles.errorText}>{fieldError}</Text>
-        ) : null}
+      {authState === 'auth_invalid_input' && fieldError ? (
+        <Text style={styles.errorText}>{fieldError}</Text>
+      ) : null}
 
-        {(authState === 'auth_failed' ||
-          authState === 'auth_suspended' ||
-          authState === 'auth_deleted') &&
-        submitError ? (
-          <Text style={styles.errorText}>{submitError}</Text>
-        ) : null}
+      {(authState === 'auth_failed' ||
+        authState === 'auth_suspended' ||
+        authState === 'auth_deleted') &&
+      submitError ? (
+        <Text style={styles.errorText}>{submitError}</Text>
+      ) : null}
 
+      <AuthSubmitBox scroll={scroll}>
         <ActionPressable
           testID={TEST_IDS.auth.loginSubmit}
           primary
@@ -204,26 +204,19 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
             )}
           </View>
         </ActionPressable>
+      </AuthSubmitBox>
 
-        <ActionPressable
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('Signup')}
-        >
-          <Text style={styles.secondaryButtonText}>회원가입</Text>
-        </ActionPressable>
-      </View>
-    </SafeAreaView>
+      <ActionPressable
+        style={styles.secondaryButton}
+        onPress={() => navigation.navigate('Signup')}
+      >
+        <Text style={styles.secondaryButtonText}>회원가입</Text>
+      </ActionPressable>
+    </AuthFormLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: semantic.screen },
-  content: {
-    flex: 1,
-    padding: 24,
-    justifyContent: 'center',
-    gap: 12,
-  },
   logo: {
     fontSize: 28,
     fontWeight: '700',

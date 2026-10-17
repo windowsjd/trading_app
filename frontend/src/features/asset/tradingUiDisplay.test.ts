@@ -13,6 +13,10 @@ function setPosition(h: any, quantity: string) {
 }
 
 describe('Order screen information and trading controls', () => {
+  // The stock card (A-2) marks the direction with ▲/▼ before the same signed
+  // rate; crypto keeps the plain line beside the order book.
+  const withArrow = (assetType: string, expected: string) => assetType !== 'domestic_stock' ? expected
+    : expected.startsWith('+') ? `▲ ${expected}` : expected.startsWith('-') && expected !== '-' ? `▼ ${expected}` : expected;
   for (const assetType of ['domestic_stock', 'crypto']) {
     for (const [changeRate, expected] of [
       [null, '-'], [undefined, '-'], ['', '-'], ['NaN', '-'],
@@ -23,8 +27,9 @@ describe('Order screen information and trading controls', () => {
         h.asset.assetType = assetType;
         h.asset.price.changeRate = changeRate;
         const tree = h.render();
-        const label = elements(tree, 'Text').find((node: any) => textContent(node) === `전일대비 ${expected}`);
-        assert.equal(textContent(label), `전일대비 ${expected}`);
+        const text = `전일대비 ${withArrow(assetType, expected as string)}`;
+        const label = elements(tree, 'Text').find((node: any) => textContent(node) === text);
+        assert.equal(textContent(label), text);
       });
     }
   }
@@ -39,8 +44,9 @@ describe('Order screen information and trading controls', () => {
         priceCapturedAt: h.asset.price.priceCapturedAt, changeRate,
       };
       const tree = h.render();
-      const label = elements(tree, 'Text').find((node: any) => textContent(node) === `전일대비 ${expected}`);
-      assert.equal(textContent(label), `전일대비 ${expected}`);
+      const text = `전일대비 ${withArrow(h.asset.assetType, expected as string)}`;
+      const label = elements(tree, 'Text').find((node: any) => textContent(node) === text);
+      assert.equal(textContent(label), text);
       assert.doesNotMatch(textContent(tree), /등락률 -%|등락률 1\.23%/);
     });
   }

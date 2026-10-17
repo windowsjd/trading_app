@@ -60,3 +60,43 @@ QUEST 04 guides through this method (order-type → `order-method-protection`
 Browser checks: `test/browser/sellOrderBrowser.cjs` (224 screens at
 320–430px, light/dark, 1x/2x) and `beginnerBrowser.cjs` with
 `FULL_QUEST_BROWSER=1`.
+
+## 2026-10-17 — 주식 주문 카드 (A-2), Android 키보드
+
+**Stock order card.** Domestic and US stocks show one card with two columns
+at every width (no single-column fallback): the inputs on the left
+(매수/매도, 주문방식, 가격, 수량 with 주, 수량 비율 in the side color, 25–100%,
+주문 가능/최대 수량 or 매도 가능, 매수 주문/매도 주문) and 시세 (접기 folds the
+price only), 내 보유 and 예상 주문 on the right. Crypto keeps its form beside the
+live order book. 내 보유 and 예상 주문 belong to other components: AccountHoldings
+(its read, 손절가/익절가 sheet and guide target) and the keyed order form (its
+inputs and preview) draw them into named slots (`OrderAside`); the list under
+the card then holds only the account's other holdings, so nothing shows twice.
+A slot is emptied whenever its owner unmounts (side, method, asset, account).
+
+예상 주문 reuses the existing preview/quote amounts. Its badge is the expected
+handling under the known session, never a fill: 정규장 대기 (limit while
+closed), 주문 불가 (market/LOC while closed), 체결 대기 (limit), 종가 대기 (LOC),
+즉시 체결 (market); unknown market status shows none. A limit BUY total is 예상
+예약금액; 주문 후 사용 가능 is the available cash minus that total (매도: 주문 후
+매도 가능 in shares). Entered prices and quantities are shown exactly as sent.
+The price contract carries only the change rate, so the card shows 전일대비
+▲/▼ with the rate; no change amount or day low/high is derived.
+
+**Keyboard on Android.** The app is edge to edge (`edgeToEdgeEnabled=true`,
+`setDecorFitsSystemWindows(false)`), so `adjustResize` no longer shrinks the
+window: the keyboard covers the screen. Screens pad with KeyboardAvoidingView on
+both platforms (`behavior="padding"`, header height offset): order, FX, inquiry,
+futures and market search. Login and sign-up scroll inside one that runs on
+Android only while the keyboard is up (Android's hide event reports the visible
+area's height, which would leave status/navigation bar padding behind on a
+full-window screen). Bottom sheets and the order asset sheet rise by
+`useKeyboardCover`: the event's height plus, on Android, the navigation bar
+inset it leaves out. Nothing is measured against the keyboard's `screenY`:
+Fabric's `measureInWindow` is offset by the status bar on Android, `screenY` is
+not. Device checks (3-button/gesture navigation, iOS) remain to be done.
+
+**Beginner guide targets (stock quests).** 금액과 수수료 points at the card's fee
+and total rows (`order-summary-amounts`), 보유종목과 수익률 at the 내 보유
+figures (`order-holding-figures`): small enough for the guide card to sit beside
+them at 320px with 2x text.

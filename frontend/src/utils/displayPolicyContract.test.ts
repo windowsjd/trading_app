@@ -28,7 +28,7 @@ describe('numeric asset symbol display contract', () => {
     assert.match(marketSearch, /<MarketAssetRow item=\{item\}/u);
     assert.match(assetChart, /getTradingPair\(asset\)/u);
     assert.match(read('features/asset/tradingHeader.ts'), /getAssetNameDisplay\(asset\)/u);
-    assert.match(orderScreen, /label=\{side === 'buy' \? '매수' : '매도'\}/u);
+    assert.match(orderScreen, /label=\{stockLayout \? side === 'buy' \? '매수 주문' : '매도 주문' : side === 'buy' \? '매수' : '매도'\}/u);
     assert.match(orderMapper, /getAssetNameDisplay\(asset\)/u);
     assert.match(recordMapper, /getAssetSymbolDisplay\(/u);
     assert.match(recordOrderList, /display\.symbol \?/u);

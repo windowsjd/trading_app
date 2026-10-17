@@ -34,6 +34,7 @@ import {
 import { useMarketTickers } from '../../features/market/useMarketTickers';
 import { buildWsUrl } from '../../constants/env';
 import WhaleLoader from '../../components/states/WhaleLoader';
+import { useKeyboardCover } from '../../hooks/useKeyboardCover';
 
 const OPEN_DURATION = 280;
 const CLOSE_DURATION = 220;
@@ -123,7 +124,6 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
   const [scope, setScope] = useState<MarketSearchScope>('all');
   const [searchText, setSearchText] = useState('');
   const [sort, setSort] = useState<MarketSort>('turnover_desc');
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
   // Unlike the search screen, an empty search lists assets right away.
   const { searchQuery, items, hasPriceErrors, trimmedSearchText } = useMarketAssetSearch({
     scope,
@@ -138,19 +138,10 @@ function SheetBody({ visible, progress, drag, native, reduced, onClose, onSelect
     enabled: visible && !!wsUrl,
   });
 
-  // The list only gains bottom room for the keyboard; the header never moves,
-  // whether or not the platform also resizes the modal window.
-  useEffect(() => {
-    const ios = Platform.OS === 'ios';
-    const show = Keyboard.addListener(ios ? 'keyboardWillShow' : 'keyboardDidShow', (event) =>
-      setKeyboardHeight(event.endCoordinates.height));
-    const hide = Keyboard.addListener(ios ? 'keyboardWillHide' : 'keyboardDidHide', () =>
-      setKeyboardHeight(0));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
+  // The list only gains bottom room for the keyboard; the header never moves.
+  // The sheet fills the window, so the room is what the keyboard covers from
+  // the window's bottom: on Android (edge to edge) the navigation bar area too.
+  const keyboardHeight = useKeyboardCover(true, insets.bottom);
 
   const close = useCallback(() => {
     Keyboard.dismiss();

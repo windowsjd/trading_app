@@ -98,8 +98,9 @@ export default function InquiryScreen() {
 
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
-      <KeyboardAvoidingView style={styles.screen} keyboardVerticalOffset={Platform.OS === 'ios' ? headerHeight : 0}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {/* Android draws edge to edge, so the keyboard no longer resizes the
+          window (adjustResize): pad for it on both platforms. */}
+      <KeyboardAvoidingView style={styles.screen} keyboardVerticalOffset={headerHeight} behavior="padding">
         <ScrollView testID="inquiry-screen" ref={inputScroll.scrollRef} onLayout={inputScroll.revealFocusedInput}
           onContentSizeChange={inputScroll.revealFocusedInput} onScroll={inputScroll.onScroll} scrollEventThrottle={16}
           keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>

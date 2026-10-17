@@ -26,6 +26,7 @@ import {
   getErrorMessageFromCode,
   isAuthUserInactiveError,
 } from '../../services/api/errorMapper';
+import { APP_BRAND_NAME } from '../../constants/brand';
 
 type BootstrapError =
   | { kind: 'inactive'; message: string }
@@ -131,7 +132,7 @@ export default function SplashScreen({ navigation }: SplashScreenProps) {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.center}>
-        <Text style={styles.logo}>Trading League</Text>
+        <Text style={styles.logo}>{APP_BRAND_NAME}</Text>
         <WhaleLoader size={48} style={styles.loader} accessibilityLabel="앱을 준비하는 중" />
         <Text style={styles.caption}>앱을 준비하는 중입니다.</Text>
       </View>

@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from '../../theme/safeArea';
 import { semantic } from '../../theme/tokens';
 import { useReducedMotion } from '../../theme/useReducedMotion';
+import { useKeyboardCover } from '../../hooks/useKeyboardCover';
 import ActionPressable from './ActionPressable';
 
 /** Bottom sheets rise on a decelerate and fall on a short accelerate. */
@@ -82,7 +83,6 @@ type SheetProps = {
 function SheetFrame({ visible, onClose, dismissible = true, title, testID, floating = false, children, progress }: SheetProps & { progress: Animated.Value }) {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const [keyboard, setKeyboard] = useState(0);
 
   useEffect(() => {
     if (!visible) return;
@@ -93,13 +93,10 @@ function SheetFrame({ visible, onClose, dismissible = true, title, testID, float
     return () => subscription.remove();
   }, [dismissible, onClose, visible]);
 
-  // Android resizes the window (adjustResize); iOS needs the room added here.
-  useEffect(() => {
-    if (Platform.OS !== 'ios' || !visible) return;
-    const show = Keyboard.addListener('keyboardWillShow', event => setKeyboard(event.endCoordinates.height));
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKeyboard(0));
-    return () => { show.remove(); hide.remove(); setKeyboard(0); };
-  }, [visible]);
+  // The sheet rises above the keyboard on both platforms. Android draws edge
+  // to edge, so the keyboard covers the window instead of resizing it. The
+  // sheet layer spans the app window, so its bottom is the window's.
+  const keyboard = useKeyboardCover(visible, insets.bottom);
 
   const close = () => { if (dismissible) { Keyboard.dismiss(); onClose(); } };
   return (

@@ -23,12 +23,15 @@ const prices = {
   SUI: ['Sui', '0.8592', 4],
   币安人生: ['币安人生', '0.51', 4],
 };
-// `?krx=1` adds one open KRX stock (Conditional BUY / LOC screens).
+// `?krx=1` adds one open KRX stock (Conditional BUY / LOC screens);
+// `?krxClosed=1` closes its market, `?krxPrice=<n>` sets its price.
+const krxPrice = params.get('krxPrice') ?? '70000';
 const krxStock = params.get('krx') === '1' ? [{
   id: 'SAMSUNG', assetType: 'domestic_stock', symbol: '005930', market: 'KRX',
   name: params.get('longName') === '1' ? '아주 긴 이름을 가진 국내 상장 주식회사 우선주 Example Holdings' : '삼성전자',
-  priceCurrency: 'KRW', settlementCurrency: 'KRW', displayPriceDecimals: 0, isActive: true, marketStatus: 'open', tradable: true,
-  price: { state: 'available', currentPrice: '70000', priceCurrency: 'KRW', priceKrwState: 'available', priceKrw: '70000', changeRate: '0.43',
+  priceCurrency: 'KRW', settlementCurrency: 'KRW', displayPriceDecimals: 0, isActive: true,
+  marketStatus: params.get('krxClosed') === '1' ? 'closed' : 'open', tradable: params.get('krxClosed') !== '1',
+  price: { state: 'available', currentPrice: krxPrice, priceCurrency: 'KRW', priceKrwState: 'available', priceKrw: krxPrice, changeRate: '0.43',
     priceCapturedAt: new Date().toISOString(), priceEffectiveAt: new Date().toISOString() },
 }] : [];
 // `?us=1` adds one open US equity served by the Tiingo trial path. Synthetic
@@ -90,6 +93,29 @@ export const assets = Object.entries(prices).map(
     },
   }),
 ).concat(krxStock).concat(usStock);
+// `?stock=1` (A-2 stock order card): securities wallets and a stock holding
+// valued in its own currency. `?otherHolding=1` adds a second KRX holding.
+const stockAccount = params.get('stock') === '1';
+const heldStock = () => assets.find((a) => a.id === state.assetId && a.assetType !== 'crypto');
+function stockValuation(asset, quantity, averageCost) {
+  const qty = Number(quantity), price = Number(asset.price.currentPrice), cost = qty * Number(averageCost);
+  const value = qty * price, pnl = value - cost;
+  const money = (n) => asset.settlementCurrency === 'KRW' ? String(Math.round(n)) : n.toFixed(2);
+  return { state: 'available', currentPrice: asset.price.currentPrice, priceCurrency: asset.priceCurrency, assetPriceSnapshotId: 'snapshot',
+    priceEffectiveAt: new Date().toISOString(), priceCapturedAt: new Date().toISOString(), priceSource: null,
+    positionValue: money(value), positionValueKrw: String(Math.round(asset.settlementCurrency === 'KRW' ? value : value * 1400)),
+    unrealizedPnl: money(pnl), unrealizedPnlKrw: String(Math.round(asset.settlementCurrency === 'KRW' ? pnl : pnl * 1400)),
+    returnRate: cost ? (pnl / cost * 100).toFixed(2) : '0' };
+}
+function stockHolding(asset, quantity) {
+  const averageCost = asset.assetType === 'us_stock' ? '201.3' : String(Math.round(Number(asset.price.currentPrice) * 0.94));
+  return { averageCost, currencyCode: asset.settlementCurrency, valuation: stockValuation(asset, quantity, averageCost) };
+}
+function otherStockHolding() {
+  const asset = { settlementCurrency: 'KRW', priceCurrency: 'KRW', price: { currentPrice: '201000' } };
+  return { assetId: 'HYNIX', positionId: 'other-position', symbol: '000660', name: 'SK하이닉스', market: 'KRX', assetType: 'domestic_stock',
+    currencyCode: 'KRW', quantity: '3', averageCost: '180000', realizedPnl: '0', realizedPnlKrw: '0', valuation: stockValuation(asset, '3', '180000') };
+}
 const conditionalEnabled = params.get('conditional') === 'enabled';
 const locEnabled = params.get('loc') === 'enabled';
 const conditionalRow = (id, state, extra = {}) => ({
@@ -389,12 +415,15 @@ export const apiClient = {
             balanceAmount: String(state.balance),
             reservedAmount: '0',
           },
+          // `?stock=1`: the securities wallets stock orders read (A-2 card).
+          ...(stockAccount ? [
+            { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: params.get('krwBalance') ?? '7300074', reservedAmount: '0' },
+            { walletScope: 'securities', currencyCode: 'USD', balanceAmount: params.get('usdBalance') ?? '9876.54', reservedAmount: '0' },
+          ] : []),
         ],
       });
-    if (path.endsWith('/positions'))
-      return response({
-        ...scoped,
-        positions: state.position
+    if (path.endsWith('/positions')) {
+      const positions = (state.position
           ? [
               {
                 ...assets.find((a) => a.id === state.assetId),
@@ -407,24 +436,31 @@ export const apiClient = {
                 } : {}),
                 averageCost: '0.5',
                 currencyCode: 'USD',
+                // `?stock=1`: a stock holding in its own currency with a live
+                // valuation (fixture figures, computed here, for the 내 보유 card).
+                ...(stockAccount && heldStock() ? stockHolding(heldStock(), params.get('holding') ?? String(state.position)) : {}),
                 // `?valuation=1`: a live valuation (the sheet's 매도 가능 금액).
-                valuation: params.get('valuation') === '1' ? (() => {
+                ...(stockAccount && heldStock() ? {} : { valuation: params.get('valuation') === '1' ? (() => {
                   const held = assets.find((a) => a.id === state.assetId);
                   return { state: 'available', currentPrice: held.price.currentPrice, priceCurrency: held.priceCurrency ?? 'USD',
                     assetPriceSnapshotId: 'snapshot', priceEffectiveAt: new Date().toISOString(), priceCapturedAt: new Date().toISOString(),
                     priceSource: null, positionValue: '1', positionValueKrw: '1400', unrealizedPnl: '0', unrealizedPnlKrw: '0', returnRate: '0' };
-                })() : { state: 'unavailable', reason: 'fixture', message: 'fixture' },
+                })() : { state: 'unavailable', reason: 'fixture', message: 'fixture' } }),
               },
             ]
-          : [],
+          : []).concat(params.get('otherHolding') === '1' ? [otherStockHolding()] : []);
+      return response({
+        ...scoped,
+        positions,
         pagination: {
           offset: 0,
           limit: 20,
-          returned: 1,
-          total: 1,
+          returned: positions.length,
+          total: positions.length,
           nextOffset: null,
         },
       });
+    }
     if (parts[1] === 'trading-accounts')
       return response({ ...account, feePolicy: { tradeFeeRate: '0.001' } });
     throw Error('Unexpected fixture read ' + path);

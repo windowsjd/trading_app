@@ -11,9 +11,11 @@ const error = (code: string) => ({ response: { status: 500, data: { error: { cod
 describe('public authentication and general account errors', () => {
   for (const kind of ['Login', 'Signup']) it(`${kind} renders safe failure text before authentication`, () => {
     const h = interactionHarness();
-    Object.assign(h.native, { SafeAreaView: 'SafeAreaView', TextInput: 'TextInput' });
+    Object.assign(h.native, { SafeAreaView: 'SafeAreaView', TextInput: 'TextInput', KeyboardAvoidingView: 'KeyboardAvoidingView',
+      Keyboard: { addListener: () => ({ remove() {} }) } });
     let mutation: any;
     const Screen = h.load(`src/screens/auth/${kind}Screen.tsx`, {
+      'react-native-safe-area-context': { useSafeAreaInsets: () => ({ ...h.insets, left: 0, right: 0 }) },
       '@tanstack/react-query': { useQueryClient: () => ({}), useMutation: (options: any) => { mutation = options; return { isPending: false }; } },
       '../../features/auth/api': {},
       '../../features/auth/session': {},

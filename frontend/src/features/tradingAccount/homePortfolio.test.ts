@@ -32,7 +32,6 @@ describe('Home 평가 손익 = spot + futures Mark unrealized PnL', () => {
   });
 });
 
-const now = Date.now();
 const rate = (overrides: Partial<FxRateDto> = {}): FxRateDto => ({ state: 'available', baseCurrency: 'USD', quoteCurrency: 'KRW',
   rate: '1350', validUntil: new Date(now + 60_000).toISOString(), ...overrides });
 const spot = (id: string, valueKrw: string | null, state: 'available' | 'stale_cache' | 'unavailable' = 'available') => ({
@@ -40,6 +39,10 @@ const spot = (id: string, valueKrw: string | null, state: 'available' | 'stale_c
     : { state, positionValueKrw: valueKrw },
 }) as unknown as PositionItemDto;
 const book = futuresFixture('A', { position: true }).positions;
+// Ordered at the futures evaluation instant itself: a separate earlier
+// Date.now() made `now >= evaluatedAt` depend on both reads landing in the same
+// millisecond (2/30 isolated runs, every run under a 1 ms clock step).
+const now = Date.parse(book.evaluatedAt);
 const futures = (id: string, markNotional: string | null, stale = false) => {
   const base = (stale ? futuresFixture('A', { position: true, stale: true }) : futuresFixture('A', { position: true })).positions.positions[0];
   return { ...base, id, markNotional: stale ? null : markNotional } as FuturesPosition;
