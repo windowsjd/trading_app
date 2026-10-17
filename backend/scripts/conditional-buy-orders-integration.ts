@@ -471,15 +471,15 @@ async function evidenceAndSession() {
       (await conditionalBuy.evaluate(id)).state,
       'price_unavailable',
     );
-    await rejects(
-      register(s, {
-        triggerCondition: 'at_or_above',
-        triggerPrice: '200',
-        executionType: 'market',
-        quantity: '1',
-      }),
-      'CONDITIONAL_PRICE_UNAVAILABLE',
-    );
+    // Confirmed closure accepts a pending watch without an execution snapshot.
+    const queued = await register(s, {
+      triggerCondition: 'at_or_above',
+      triggerPrice: '200',
+      executionType: 'market',
+      quantity: '1',
+    });
+    assert.equal((await watch(queued)).registrationSnapshotId, null);
+    assert.equal((await conditionalBuy.evaluate(queued)).state, 'price_unavailable');
     assert.equal((await watch(id)).status, 'watching');
     tradingSessions.set(await now(), undefined, ['KRX']);
     await quote(s, 'KRX', '106');
