@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { it } from 'node:test';
+import { runInNewContext } from 'node:vm';
 import { assetMonogram, BUNDLED_CRYPTO_LOGOS, cryptoBaseAsset, krxCommonShareIsin, resolveAssetLogo } from './assetLogoSource.ts';
 
 const key = 'pk_test key';
@@ -54,6 +56,40 @@ it('stocks get a provider logo only with a key, by an identifier unique to their
     { assetType: 'etf', market: 'NAS', symbol: 'QQQ' }]) {
     assert.equal(resolveAssetLogo(asset, { logoDevKey: key }), null, JSON.stringify(asset));
   }
+});
+
+it('a release build carries the key it was built with, and a build without one requests no provider logos', () => {
+  // The Metro release transform itself (babel-preset-expo, isDev false), not a
+  // runtime read: on device process.env holds no EXPO_PUBLIC_ value, so the
+  // key reaches the app only if the build inlined it.
+  const require = createRequire(import.meta.url);
+  const babel = require('@babel/core');
+  const filename = path.join(process.cwd(), 'src', 'features', 'market', 'assetLogoSource.ts');
+  const source = readFileSync(filename, 'utf8');
+  const releaseBuild = (buildKey: string | undefined) => {
+    const saved = process.env.EXPO_PUBLIC_LOGO_DEV_KEY;
+    if (buildKey === undefined) delete process.env.EXPO_PUBLIC_LOGO_DEV_KEY;
+    else process.env.EXPO_PUBLIC_LOGO_DEV_KEY = buildKey;
+    try {
+      const { code } = babel.transformSync(source, {
+        filename, babelrc: false, configFile: false, comments: false, presets: ['babel-preset-expo'],
+        caller: { name: 'metro', bundler: 'metro', platform: 'android', isDev: false },
+      });
+      // A decoy runtime value: only a non-inlined read could pick it up.
+      const module = { exports: {} as { LOGO_DEV_KEY?: string | null } };
+      runInNewContext(code, { module, exports: module.exports, require, process: { env: { EXPO_PUBLIC_LOGO_DEV_KEY: 'pk_runtime' } } });
+      return { code: code as string, logoDevKey: module.exports.LOGO_DEV_KEY };
+    } finally {
+      if (saved === undefined) delete process.env.EXPO_PUBLIC_LOGO_DEV_KEY;
+      else process.env.EXPO_PUBLIC_LOGO_DEV_KEY = saved;
+    }
+  };
+  const withKey = releaseBuild(' pk_build ');
+  assert.equal(withKey.logoDevKey, 'pk_build');
+  assert.equal(/process\.env/.test(withKey.code), false);
+  const withoutKey = releaseBuild(undefined);
+  assert.equal(withoutKey.logoDevKey, null);
+  assert.equal(withoutKey.code.includes('pk_'), false);
 });
 
 it('computes KRX common-share ISINs (published examples)', () => {
