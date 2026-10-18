@@ -503,7 +503,7 @@ async function offSessionRegistration(kind: 'KRX' | 'US') {
   try {
     await scenario('season', async (s) => {
       tradingSessions.set(await now(), undefined, ['KRX', 'US']);
-      const currency = kind === 'KRX' ? 'KRW' : 'USD';
+      const currency: 'KRW' | 'USD' = kind === 'KRX' ? 'KRW' : 'USD';
       const asset = await db.asset.update({
         where: { id: s.instruments[0].asset.id },
         data:
