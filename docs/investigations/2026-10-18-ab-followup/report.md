@@ -69,12 +69,12 @@
 
 | 조합 | 결과 |
 | --- | --- |
-| 구앱 + 신서버 | 새 `learningPermissions`를 무시해도 동결된 `learningAccess`와 파싱 호환. Q6~9 버튼은 열릴 수 있지만 서버가 신규 거래를 차단. 구 오류 매퍼도 학습 안내 문구를 표시 |
+| 구앱 + 신서버 | 새 `learningPermissions`를 무시해도 동결된 `learningAccess`와 파싱 호환. Q6~9 버튼은 열릴 수 있지만 서버가 신규 거래를 차단. 공통/현물 오류 매퍼는 학습 안내. 구선물 전용 매퍼는 「주문이 접수되지 않았습니다. 입력값과 거래 가능 상태를 확인해주세요.」로 거절하며 학습 사유 상세 표시는 앱 업데이트 필요. 403을 체결 불명/5xx 서버 장애로 처리하지 않음 |
 | 신앱 + 구서버 | `learningPermissions` 부재 시 구서버 Q6 규칙을 따른다. 전체 10개 제한을 서버보다 먼저 강제하지 않음 |
 | 신앱 + 신서버 | 서버의 각 boolean을 사용. 완료한 실습/방향은 잠기고 전체 10개 후 열림 |
 | 신앱의 오래된 허용 상태 + 학습 403 | 현물 견적/실행·선물 3종 화면에서 일반 서버 오류나 불명 체결로 처리하지 않고 학습 안내, 권한 재조회, 버튼 상태 갱신 |
 
-별도 배포 시 **서버 → 신규 앱** 순서. 구앱의 버튼/다시하기 표시를 서버만으로 고칠 수 없으므로 업데이트 안내가 필요하다. 추가 버전 협상은 도입하지 않았다. EAS 클라우드 빌드/Update, 스토어/Render 배포는 수행하지 않는다. main 커밋은 기존 `[skip render]` 관행을 따른다.
+별도 배포 시 **서버 → 신규 앱** 순서. 구앱의 버튼/다시하기 및 선물 전용 안내를 서버만으로 고칠 수 없으므로 업데이트 안내가 필요하다. 추가 버전 협상은 도입하지 않았다. EAS 클라우드 빌드/Update, 스토어/Render 배포는 수행하지 않는다. main 커밋은 기존 `[skip render]` 관행을 따른다.
 
 ## 소규모 성능 측정
 
@@ -114,11 +114,27 @@ NODE_ENV=test FUTURES_DB_INTEGRATION=1 BEGINNER_PERMISSION_PROFILE=1 \
 - **검증 완료:** FE 관련 최초 26개 파일, 후속 선물/로고 7개 파일, 권한 UI 2개 파일, 이름/기록 4개 파일(중복 포함, 고유 34개). Node 기본 reporter의 file 단위 수치를 개별 assertion 개수로 부풀리지 않았다. 로고/색상 상세 실행은 13개 case 통과.
 - **검증 완료:** BE 단위 14스위트/535개. 실제 DB와 안전성 2스위트/17개(최종 skip 0), 별도 선물 조건부 진입 45검증, 현물 지정가 replay 7시나리오. 전체 퀘스트 러너의 추가 2경계 포함 통과.
 - **검증 완료:** 최종 3플랫폼 Expo export, 브라우저 호가 16·총자산 24·미국 이름 5. 홈의 24배치에는 작은 화면, Diamond/Whale, 긴 금액, 글꼴 2배, 안전한 아래쪽 엠블럼/두 줄 배치 및 갱신 검증이 포함된다. 과거 796/720배치 전체를 반복하지 않았다.
-- **검증 불가(로컬 완주):** 기존 긴 F1은 WSL 실제 시계 역전으로 중단. 실패 계정의 DB Close `2026-10-18 09:47:00.917`이 Open `09:47:02.698`보다 앞섰다. 초기에 별도로 발견한 테스트 클러스터의 KST/Prisma raw 시각 9시간 차이는 UTC 설정으로 해결했다. 긍정 fixture 시간 변경 실험은 원복했고 테스트/판정/가격 공식을 완화하지 않았다. 안정된 기존 CI F1 결과 확인이 남는다.
+- **검증 완료(CI로 보완):** 기존 긴 F1은 로컬 WSL 실제 시계 역전으로 중단됐으나 최종 코드의 CI에서는 통과했다. 실패한 로컬 계정의 DB Close `2026-10-18 09:47:00.917`이 Open `09:47:02.698`보다 앞섰다. 초기에 별도로 발견한 테스트 클러스터의 KST/Prisma raw 시각 9시간 차이는 UTC 설정으로 해결했다. 긍정 fixture 시간 변경 실험은 원복했고 테스트/판정/가격 공식을 완화하지 않았다.
 - **검증 불가(기존 종합 UI 러너):** `profileFinancialBrowser.cjs`는 navigation context 부재, 오래된 버튼 배경 기대값에서 실패. 해당 파일 변경은 원복했다. 새 집중 러너는 기존 trading/futures fixture와 실제 렌더러를 사용해 변경된 호가 영역만 검증한다. 종합 러너 전체 통과라고 보고하지 않는다.
 - **추가 조치 필요:** Logo.dev 계정 플랜/출처 승인과 외부 공개 링크, 전체 종목 로고 지원, 운영 데이터 규모 성능. 실기기/에뮬레이터는 요청상 제외.
 
 임시 로그/번들/스크린샷은 `/tmp/trading-ab-followup/`, 키 없는 증거 JSON은 이 폴더의 `evidence/`에 보존한다. 초기 실패와 보완 후 최종 결과를 구분한다.
+
+### push 후 기존 CI 확인
+
+검증 코드 SHA는 `e52730691816209d2d311686b9c2df628f260f6c`. 다음 문서/증거 정리 커밋은 제품·테스트 코드를 바꾸지 않으며 `[skip ci] [skip render]`로 중복 전체 실행/배포를 피한다. [최종 CI 요약](evidence/ci-review.json)은 실행별 상태와 기존 실패 원인을 구분한다.
+
+- [현재 CI](https://github.com/windowsjd/trading_app/actions/runs/39117473071): 프론트 전체 357스위트/3,100개 통과(fail/skip 0), 린트·타입·웹 번들·진단 게이트 통과. 금융 job의 30스위트 중 29개 통과. F1, risk, F3/F3.1, isolated boundary, 선물 limit/conditional entry, 현물 execution/market execution/idempotent replay, FX·이체 통과. 계정 job에서도 초보계정·보완한 전체 퀘스트 테스트 통과. E2E·캔들 fixture·PG17 retention job 통과.
+- **전체 CI는 미통과.** 아래 실패는 [시작 SHA의 CI](https://github.com/windowsjd/trading_app/actions/runs/39115538060)와 같은 원인임을 로그/무변경 diff로 확인했다. 새 코드의 통과 결과와 섞지 않는다.
+
+| 기존 실패 | 현재/시작 SHA 공통 증거 | 처리 |
+| --- | --- | --- |
+| Backend quality | `scripts/lib/auth-email-fixture.ts:22`의 `require-await` | 이메일 기능/fixture 변경은 이번 범위에서 하지 않음 |
+| 지갑 이전 PG | `spot-wallet-transfer-integration.ts:1251`의 migration 재생이 `CREATE INDEX CONCURRENTLY`를 트랜잭션 블록 안에서 실행(25001) | 기존 migration/과거 스키마 재생 테스트의 별도 보완 필요. F1 등 나머지 29스위트는 통과 |
+| 국내 종가 복구 PG | `krx-session-close-recovery-integration.ts:560`의 `created` 기대 4, 실제 2 | 기존 KOSCOM 복구/fixture의 별도 조사 필요. 관련 제품 정책 변경 안 함 |
+| 별도 Futures release fixture | 준비 중 `EMAIL_UNAVAILABLE` | [현재](https://github.com/windowsjd/trading_app/actions/runs/39117473143)·[시작 SHA](https://github.com/windowsjd/trading_app/actions/runs/39115538003) 모두 동일. 이번 소규모 초보 부하 검증과 별도이며 통과로 계산하지 않음 |
+
+이 선행 문제 때문에 저장소 전체 출시 검증 완료/전체 CI green으로 보고하지 않는다. 원인 대조를 위해 새로운 배포나 전체 테스트 재실행을 요청하지 않았다.
 
 ## 변경 파일 목적과 전체 자체 검토
 

@@ -1,0 +1,98 @@
+{
+  "testedCodeSha": "e52730691816209d2d311686b9c2df628f260f6c",
+  "baselineSha": "4b376d2a40036a61faf50870e39390b68104473a",
+  "ci": {
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071",
+    "status": "completed",
+    "conclusion": "failure",
+    "jobs": [
+      {
+        "name": "Core account PostgreSQL integration",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087179"
+      },
+      {
+        "name": "Backend quality",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087225"
+      },
+      {
+        "name": "Candle fixture integration",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087242"
+      },
+      {
+        "name": "Release-critical E2E",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087263"
+      },
+      {
+        "name": "Frontend quality",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087287"
+      },
+      {
+        "name": "Limit order PostgreSQL integration",
+        "status": "completed",
+        "conclusion": "failure",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087295"
+      },
+      {
+        "name": "Retention safety on PostgreSQL 17",
+        "status": "completed",
+        "conclusion": "success",
+        "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473071/job/117646087314"
+      }
+    ],
+    "frontend": {
+      "suites": 357,
+      "tests": 3100,
+      "passed": 3100,
+      "failed": 0,
+      "skipped": 0
+    },
+    "limitOrderPostgres": {
+      "passedSuites": 29,
+      "failedSuites": 1,
+      "futuresF1": "passed"
+    },
+    "coreAccountPostgres": {
+      "passedSuites": 26,
+      "failedSuites": 1,
+      "beginnerAccount": "passed",
+      "beginnerFullQuest": "passed"
+    }
+  },
+  "releaseFixture": {
+    "url": "https://github.com/windowsjd/trading_app/actions/runs/39117473143",
+    "status": "completed",
+    "conclusion": "failure"
+  },
+  "baselineCiUrl": "https://github.com/windowsjd/trading_app/actions/runs/39115538060",
+  "baselineReleaseFixtureUrl": "https://github.com/windowsjd/trading_app/actions/runs/39115538003",
+  "failuresAlsoPresentAtBaseline": [
+    {
+      "scope": "Backend quality",
+      "reason": "auth-email-fixture.ts:22 require-await"
+    },
+    {
+      "scope": "Limit order PostgreSQL integration",
+      "reason": "spot-wallet-transfer-integration.ts:1251 migration replay; CREATE INDEX CONCURRENTLY in a transaction block; SQLSTATE 25001"
+    },
+    {
+      "scope": "Core account PostgreSQL integration",
+      "reason": "krx-session-close-recovery-integration.ts:560 created expected 4, actual 2"
+    },
+    {
+      "scope": "Futures release fixture",
+      "reason": "EMAIL_UNAVAILABLE during ten-account preparation"
+    }
+  ],
+  "overallReleaseValidationComplete": false,
+  "documentationFollowupChangesProductOrTestCode": false
+}
