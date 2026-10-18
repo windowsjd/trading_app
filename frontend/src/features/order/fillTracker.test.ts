@@ -160,6 +160,12 @@ describe('unresolved detail reads', () => {
 });
 
 describe('fill notice is built from a server execution only', () => {
+  it('announces a US listing by its Korean name (market + symbol), never guessed without its market', () => {
+    const us = { name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS' };
+    assert.equal(buildFillNotice('a', executed({ asset: us }))?.title, '애플 매수 체결 완료');
+    assert.equal(buildFillNotice('a', executed({ asset: { name: 'Apple Inc.', symbol: 'AAPL' } }))?.title, 'Apple Inc. 매수 체결 완료');
+  });
+
   it('announces an executed order', () => {
     const notice = buildFillNotice('a', executed());
     assert.equal(notice?.title, '삼성전자 매수 체결 완료');

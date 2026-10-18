@@ -114,6 +114,25 @@ Reports and contact sheets default to `/tmp/trading-home-tiers`
 (`HOME_TIER_BROWSER_OUTPUT` overrides). Native rendering and device screen readers
 require separate device verification.
 
+The Home total assets beside the tier emblem (HomeAssetHero/heroTotalFit) use
+`homeHeroBrowser.cjs` on the same Home fixture (`?total=` sets the amount;
+`window.__heroTotal` changes it in place; `BROWSER_EXECUTABLE_PATH`,
+`HOME_HERO_QUICK=1`). It checks 320/360/390/430px × font scales 1/1.3/2 × six
+tiers × 7/8/9/10/16-digit totals × Light/Dark (720 layouts): every hero text
+inside the card and off the emblem, the total never below the 총 자산 label size,
+on one line unless even the whole row is too narrow at that minimum (then the
+emblem is below). It records where the emblem goes, bounds the frames a long
+total takes to settle when it first appears, and checks that an in-place amount
+update (same digits, a digit more, 16 digits and back) never moves the emblem or
+draws the total on two lines in any frame (2026-10-18).
+
+US stock names (2026-10-18) use `usStockNameBrowser.cjs` on the trading fixture
+(`usSymbol`/`usMarket`/`usName` swap the AAPL fixture's listing, e.g. BRK.B on
+NYS; `otherHolding=us` adds a Microsoft holding): the Korean name with
+`(English) · SYMBOL` under it on the asset detail header, the 애플 market search
+row and the holding row, at 320/360/390/430px × Light/Dark × font scales
+1/1.5/2 (120 screens), with no line outside its row or over another text.
+
 Reproduce the provided-source preparation with:
 
 ```sh

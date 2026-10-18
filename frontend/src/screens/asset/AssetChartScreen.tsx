@@ -39,6 +39,7 @@ import {
   formatAssetPrice,
   formatKrw,
   formatPercent,
+  getAssetEnglishNameLine,
   getAssetNameDisplay,
   getUnavailablePriceText,
 } from '../../utils/format';
@@ -196,6 +197,12 @@ export function AssetMarketChart({
               {asset.settlementCurrency}
             </Text> : null}
           </View>
+          {/* A US listing shown by its Korean name keeps its English name and symbol. */}
+          {asset && getAssetEnglishNameLine(getAssetNameDisplay(asset)) ? (
+            <Text testID="asset-detail-english-name" style={styles.englishName}>
+              {getAssetEnglishNameLine(getAssetNameDisplay(asset))}
+            </Text>
+          ) : null}
           <View ref={questGuideTarget('asset-price')} collapsable={false} style={styles.detailPriceRow}>
             <View style={styles.detailPriceStack}>
               <Text testID="asset-detail-primary-price" style={styles.detailPrice} selectable>
@@ -391,6 +398,7 @@ const styles = StyleSheet.create({
   assetNameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, rowGap: 4 },
   settlementBadge: { fontSize: 11, fontWeight: '700', color: semantic.secondary, backgroundColor: semantic.raised, overflow: 'hidden', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 4 },
   assetName: { minWidth: 0, fontSize: 28, fontWeight: '800', color: semantic.text, flexShrink: 1 },
+  englishName: { minWidth: 0, fontSize: 13, lineHeight: 19, color: semantic.secondary },
   nameSelector: { flexDirection: 'row', alignItems: 'center', gap: 6,
     minHeight: 44, minWidth: 0, maxWidth: '100%', flexShrink: 1 },
   detailPriceRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center',

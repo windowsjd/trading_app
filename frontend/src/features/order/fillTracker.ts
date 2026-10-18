@@ -257,7 +257,8 @@ export type FilledOrderFacts = {
   side?: string | null;
   executedAt?: string | null;
   quantity?: string | null;
-  asset?: { name?: string | null; symbol?: string | null } | null;
+  /** `market` lets a US listing read by its Korean name (getAssetNameDisplay). */
+  asset?: { name?: string | null; symbol?: string | null; market?: string | null } | null;
   marketExecution?: { status?: string | null; executedQuantity?: string | null } | null;
   limitOnClose?: unknown;
 };

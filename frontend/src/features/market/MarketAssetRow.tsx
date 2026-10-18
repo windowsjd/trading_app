@@ -5,6 +5,7 @@ import ActionPressable from '../../components/common/ActionPressable';
 
 import { TEST_IDS } from '../../constants/testIds';
 import {
+  getAssetEnglishNameLine,
   getAssetNameDisplay,
   getAssetPriceText,
   getAssetSymbolMarketDisplay,
@@ -55,9 +56,7 @@ function MarketAssetRowComponent({
   const nameDisplay = getAssetNameDisplay(displayItem);
   // A US stock shown by its Korean name keeps its English name under it:
   // `(Apple Inc.) · AAPL`. Every other row keeps `symbol · market`.
-  const secondLine = nameDisplay.english
-    ? [`(${nameDisplay.english})`, nameDisplay.secondary].filter(Boolean).join(' · ')
-    : getAssetSymbolMarketDisplay(displayItem);
+  const secondLine = getAssetEnglishNameLine(nameDisplay) ?? getAssetSymbolMarketDisplay(displayItem);
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
   // A closed US market's last confirmed close is named by its date, never "live".

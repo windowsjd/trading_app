@@ -138,3 +138,16 @@ it('opening a Futures position for the same BTC leaves the Spot count, quantity,
   assert.equal(h.node('home-futures-general:position') !== undefined, true);
   assert.equal(JSON.stringify(h.positions.general), original);
 });
+
+it('a US holding leads with its Korean name and keeps `(English) · SYMBOL` under it (2026-10-18)', async t => {
+  const h = setup('general', 1); t.after(h.close); await flush();
+  const id = 'home-position-item-general-a0';
+  const own = (node: any): string => node === undefined ? '' : [node.props.children].flat().join('');
+  // The fixture listing (market TEST) has no Korean name: one name line only.
+  assert.equal(h.node(`${id}-english-name`) === undefined, true);
+  Object.assign(h.positions.general[0], { name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS' });
+  await act(async () => h.client.refetchQueries()); await flush();
+  assert.equal(own(h.node(`${id}-name`)), '애플');
+  assert.equal(own(h.node(`${id}-english-name`)), '(Apple Inc.) · AAPL');
+  assert.match(own(h.node(`${id}-quantity`)), /^보유수량 1/);
+});

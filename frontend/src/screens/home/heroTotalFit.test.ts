@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { it } from 'node:test';
 import preparation from '../../assets/home-tiers/preparation.json' with { type: 'json' };
-import { fitHeroTotal, HERO_ASIDE_GAP, HERO_TOTAL_FONT_SIZE, HERO_TOTAL_MIN_FONT_SIZE, HERO_TOTAL_SHRINK_STEP } from './heroTotalFit.ts';
+import { fitHeroTotal, heroTotalWidth, HERO_ASIDE_GAP, HERO_TOTAL_FONT_SIZE, HERO_TOTAL_MIN_FONT_SIZE, HERO_TOTAL_SHRINK_STEP } from './heroTotalFit.ts';
 
 const require = createRequire(import.meta.url);
 const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
@@ -138,4 +138,41 @@ it('the hero keeps the emblem beside a long total and sizes the total from the m
   layout(measurer(), 900);
   assert.equal(host('home-hero-aside').parent === host('home-summary-card'), false);
   assert.equal(flatten(host('home-total-asset').props.style).fontSize >= HERO_TOTAL_MIN_FONT_SIZE, true);
+});
+
+it('an amount not measured yet takes the last measured width scaled by its advances', () => {
+  // The same text is the measurement itself; nothing measured stays unmeasured.
+  assert.equal(heroTotalWidth({ width: 203, text: '9,999,999원' }, '9,999,999원'), 203);
+  assert.equal(heroTotalWidth({ width: 0, text: '' }, '10,000,000원'), 0);
+  // One digit more is one digit's advance more; tabular digits keep the same width.
+  for (const [from, to] of [['9,999,999원', '10,000,000원'], ['99,999,999원', '100,000,000원'], ['123,456,789원', '1,234,567,890원'],
+    ['10,000,000원', '9,999,999원'], ['9,648,192원', '9,876,543원']]) {
+    const estimate = heroTotalWidth({ width: naturalAt36(from, 1), text: from }, to);
+    assert.equal(Math.abs(estimate - naturalAt36(to, 1)) < 0.02 * naturalAt36(to, 1), true, `${from} → ${to}`);
+  }
+});
+
+it('an updated amount is drawn at a fitting size at once, before its own width is measured', (t) => {
+  const h = interactionHarness();
+  const Hero = h.load('src/screens/home/HomeAssetHero.tsx').default;
+  const element = (totalAssetKrw: string) => React.createElement(Hero, {
+    summary: { totalAssetKrw, returnRate: '0.5', unrealizedPnlKrw: '0' }, aside: React.createElement('Emblem') });
+  const renderer = h.render(element('9999999'));
+  t.after(() => act(() => renderer.unmount()));
+  const host = (id: string) => renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID === id)[0];
+  const layout = (node: any, width: number, height = 46) => act(() => node.props.onLayout({ nativeEvent: { layout: { width, height, x: 0, y: 0 } } }));
+  const measurer = () => renderer.root.findAll((node: any) => node.type === 'Text' && node.props['aria-hidden'] && node.props.onLayout)[0];
+  const size = () => flatten(host('home-total-asset').props.style).fontSize;
+  layout(host('home-summary-card'), 358); layout(host('home-hero-aside'), 163); layout(measurer(), naturalAt36('9,999,999원', 1));
+  const before = size();
+  // 10,000,000원 arrives; the measurer has not reported its width yet.
+  act(() => renderer.update(element('10000000')));
+  const column = 358 - HERO_ASIDE_GAP - 163;
+  const drawn = naturalAt36('10,000,000원', 1) * size() / HERO_TOTAL_FONT_SIZE;
+  assert.equal(size() < before, true, 'already smaller for the extra digit');
+  assert.equal(drawn <= column, true, `fits its column at once (${drawn} ≤ ${column})`);
+  assert.equal(host('home-hero-aside').parent === host('home-summary-card'), true, 'the emblem stays beside');
+  // Its own measurement then confirms the size (the estimate was the measured advance here).
+  layout(measurer(), naturalAt36('10,000,000원', 1));
+  assert.equal(size(), fitHeroTotal({ row: 358, aside: 163, natural: naturalAt36('10,000,000원', 1), glyphs: 11 }).fontSize);
 });

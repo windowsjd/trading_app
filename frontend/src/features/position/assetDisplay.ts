@@ -1,5 +1,5 @@
 import type { PositionItemDto } from './api.ts';
-import { formatDisplayDecimal, formatMoneyDecimal, formatSignedPercent, getAssetNameDisplay, getFinancialDirection } from '../../utils/format.ts';
+import { formatDisplayDecimal, formatMoneyDecimal, formatSignedPercent, getAssetEnglishNameLine, getAssetNameDisplay, getFinancialDirection } from '../../utils/format.ts';
 import type { PositionValuationDto } from './api.ts';
 import { isHeldPosition } from '../tradingAccount/holdings.ts';
 
@@ -15,19 +15,22 @@ export type SpotHoldingDisplay = Pick<PositionItemDto, 'name' | 'symbol' | 'asse
  * Unit prices, quantity and KRW conversion do not determine these display values. */
 export function getPositionAssetDisplay(position: SpotHoldingDisplay) {
   isHeldPosition(position);
-  const name = getAssetNameDisplay(position).primary;
+  const nameDisplay = getAssetNameDisplay(position);
+  const name = nameDisplay.primary;
+  // A US listing shown by its Korean name keeps `(English) · SYMBOL` under it.
+  const englishName = getAssetEnglishNameLine(nameDisplay);
   const unit = position.assetType === 'crypto'
     ? position.market === 'BINANCE' ? position.symbol.replace(/USDT$/u, '') : position.symbol
     : '주';
   const quantity = `보유수량 ${formatDisplayDecimal(position.quantity)} ${unit}`;
   const valuation = position.valuation;
   if (valuation.state === 'unavailable') {
-    return { name, quantity, value: '-', pnl: '-', returnRate: '-', performance: '-', direction: 'neutral' as const, notice: '현재 시세 조회 불가' };
+    return { name, englishName, quantity, value: '-', pnl: '-', returnRate: '-', performance: '-', direction: 'neutral' as const, notice: '현재 시세 조회 불가' };
   }
   const pnl = formatMoneyDecimal(valuation.unrealizedPnl, valuation.priceCurrency, true);
   const returnRate = formatSignedPercent(valuation.returnRate);
   return {
-    name, quantity, pnl, returnRate,
+    name, englishName, quantity, pnl, returnRate,
     value: formatMoneyDecimal(valuation.positionValue, valuation.priceCurrency),
     performance: `${pnl} (${returnRate})`,
     direction: getFinancialDirection(valuation.unrealizedPnl),

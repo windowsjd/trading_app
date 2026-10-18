@@ -16,6 +16,9 @@ export default function PositionAssetRow({ position, onPress, testID, style, acc
     <View style={[styles.columns, stacked && styles.stacked]}>
       <View style={styles.identity}>
         <Text testID={testID ? `${testID}-name` : undefined} style={styles.name}>{display.name}</Text>
+        {display.englishName ? (
+          <Text testID={testID ? `${testID}-english-name` : undefined} style={styles.quantity}>{display.englishName}</Text>
+        ) : null}
         <Text testID={testID ? `${testID}-quantity` : undefined} style={styles.quantity}>{display.quantity}</Text>
       </View>
       <View testID={testID ? `${testID}-values` : undefined} style={[styles.values, stacked && styles.stackedValues]}>

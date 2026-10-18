@@ -41,8 +41,10 @@ const usLong = params.get('usLong') === '1';
 // `?usOfficial=1` (2026-10-17): the same asset priced by the official stored
 // Tiingo source, and every capability list naming US.
 const usOfficial = params.get('usOfficial') === '1';
+// `?usSymbol=&usMarket=&usName=` (2026-10-18): another listing under the same id, for its Korean name.
 const usStock = params.get('us') === '1' || usOfficial ? [{
-  id: 'AAPL', assetType: 'us_stock', symbol: 'AAPL', market: 'NAS', name: 'Apple Inc.',
+  id: 'AAPL', assetType: 'us_stock', symbol: params.get('usSymbol') ?? 'AAPL', market: params.get('usMarket') ?? 'NAS',
+  name: params.get('usName') ?? 'Apple Inc.',
   priceCurrency: 'USD', settlementCurrency: 'USD', displayPriceDecimals: null, isActive: true,
   marketStatus: params.get('usClosed') === '1' ? 'closed' : 'open', tradable: true,
   price: { state: 'available', currentPrice: usLong ? '12345.12345600' : '247.61000000', priceCurrency: 'USD',
@@ -112,6 +114,12 @@ function stockHolding(asset, quantity) {
   return { averageCost, currencyCode: asset.settlementCurrency, valuation: stockValuation(asset, quantity, averageCost) };
 }
 function otherStockHolding() {
+  // `?otherHolding=us`: a US listing with a Korean name (2026-10-18).
+  if (params.get('otherHolding') === 'us') {
+    const us = { settlementCurrency: 'USD', priceCurrency: 'USD', price: { currentPrice: '512.3' } };
+    return { assetId: 'MSFT', positionId: 'other-position', symbol: 'MSFT', name: 'Microsoft Corporation', market: 'NAS', assetType: 'us_stock',
+      currencyCode: 'USD', quantity: '2', averageCost: '480', realizedPnl: '0', realizedPnlKrw: '0', valuation: stockValuation(us, '2', '480') };
+  }
   const asset = { settlementCurrency: 'KRW', priceCurrency: 'KRW', price: { currentPrice: '201000' } };
   return { assetId: 'HYNIX', positionId: 'other-position', symbol: '000660', name: 'SK하이닉스', market: 'KRX', assetType: 'domestic_stock',
     currencyCode: 'KRW', quantity: '3', averageCost: '180000', realizedPnl: '0', realizedPnlKrw: '0', valuation: stockValuation(asset, '3', '180000') };
@@ -452,7 +460,7 @@ export const apiClient = {
                 })() : { state: 'unavailable', reason: 'fixture', message: 'fixture' } }),
               },
             ]
-          : []).concat(params.get('otherHolding') === '1' ? [otherStockHolding()] : []);
+          : []).concat(params.get('otherHolding') === '1' || params.get('otherHolding') === 'us' ? [otherStockHolding()] : []);
       return response({
         ...scoped,
         positions,

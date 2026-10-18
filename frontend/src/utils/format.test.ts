@@ -9,6 +9,7 @@ import {
   formatMoney,
   formatPercent,
   formatUsd,
+  getAssetEnglishNameLine,
   getAssetNameDisplay,
   getAssetSymbolDisplay,
   getAssetSymbolMarketDisplay,
@@ -287,6 +288,20 @@ test('getAssetNameDisplay', async (t) => {
     assert.deepEqual(getAssetNameDisplay({ name: 'Samsung Electronics', symbol: '005930', market: 'KRX' }), {
       primary: 'Samsung Electronics', secondary: null,
     });
+  });
+
+  await t.test('the line under a Korean name keeps the English name and symbol; other assets keep their own line', () => {
+    const line = (asset: { name?: string | null; symbol?: string | null; market?: string | null }) =>
+      getAssetEnglishNameLine(getAssetNameDisplay(asset));
+    assert.equal(line({ name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS' }), '(Apple Inc.) · AAPL');
+    assert.equal(line({ name: 'Berkshire Hathaway Inc. Class B', symbol: 'BRK.B', market: 'NYS' }),
+      `(Berkshire Hathaway Inc. Class B) · BRK.B`);
+    // No English name to repeat, no market (never guessed from the symbol), the
+    // same symbol on another market, a domestic stock or a coin: no such line.
+    for (const asset of [{ name: null, symbol: 'AAPL', market: 'NAS' }, { name: 'Apple Inc.', symbol: 'AAPL' },
+      { name: 'Apple Inc.', symbol: 'AAPL', market: 'NYS' }, { name: 'Samsung Electronics', symbol: '005930', market: 'KRX' },
+      { name: 'Bitcoin', symbol: 'BTCUSDT', market: 'BINANCE' }])
+      assert.equal(line(asset) === null, true, JSON.stringify(asset));
   });
 });
 

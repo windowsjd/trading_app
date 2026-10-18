@@ -14,6 +14,7 @@ import {
   formatCurrency,
   formatDisplayDecimal,
   formatKstDateTime,
+  getAssetEnglishNameLine,
   getAssetNameDisplay,
   getAssetSymbolDisplay,
 } from '../../utils/format';
@@ -271,9 +272,11 @@ export {
 export function getRecordOrderDisplay(item: RecordOrderItemDto) {
   const limitOnClose = item.limitOnClose ?? null;
   const currencyCode = item.currencyCode ?? item.fillCurrency ?? '';
+  // The order's own listing (`market` + `symbol`) decides a US Korean name.
   const nameDisplay = getAssetNameDisplay({
     name: item.name,
     symbol: item.symbol,
+    market: item.market,
   });
   // Submitted/canceled limit rows never filled, so their execution-result
   // amounts are suppressed here rather than trusted to arrive null — the
@@ -290,7 +293,8 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
       item.id ??
       `${item.assetId ?? item.symbol}-${item.executedAt}`,
     orderId: item.orderId ?? item.id ?? null,
-    symbol: symbol === nameDisplay.primary ? null : symbol,
+    // The line under the name: `(English) · SYMBOL` under a US Korean name.
+    symbol: getAssetEnglishNameLine(nameDisplay) ?? (symbol === nameDisplay.primary ? null : symbol),
     name: nameDisplay.primary,
     executedAt: formatKstDateTime(item.executedAt ?? item.submittedAt),
     side: item.side,

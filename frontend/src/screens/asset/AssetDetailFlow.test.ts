@@ -239,6 +239,21 @@ test('settlement badge shows USD for Binance and stays separate from the display
   assert.equal(h.node('asset-settlement-currency').children.join(''), 'USD');
 });
 
+test('a US listing reads by its Korean name with `(English) · SYMBOL` under it at 320px and fontScale 2', async (t) => {
+  const h = inlineTradingHarness();
+  h.assetId = 'samsung';
+  Object.assign(h.assets.samsung, { name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS', assetType: 'us_stock',
+    priceCurrency: 'USD', settlementCurrency: 'USD' });
+  h.dimensions = { width: 320, height: 700, fontScale: 2 };
+  await openDetail(h); t.after(h.close);
+  assert.equal(h.node('asset-detail-name').children.join(''), '애플');
+  assert.equal(h.node('asset-detail-english-name').children.join(''), '(Apple Inc.) · AAPL');
+  assert.equal(h.node('asset-detail-english-name').props.numberOfLines, undefined, 'a long English name wraps, never cut');
+  const screen = text(h);
+  assert.ok(screen.indexOf('asset-detail-name') < screen.indexOf('asset-detail-english-name'));
+  assert.ok(screen.indexOf('asset-detail-english-name') < screen.indexOf('asset-detail-primary-price'));
+});
+
 test('domestic asset shows KRW and a long name wraps beside the badge', async (t) => {
   const h = inlineTradingHarness();
   h.assetId = 'samsung';
@@ -246,6 +261,7 @@ test('domestic asset shows KRW and a long name wraps beside the badge', async (t
   await openDetail(h); t.after(h.close);
   assert.equal(h.node('asset-settlement-currency').children.join(''), 'KRW');
   assert.equal(h.node('asset-detail-name').children.join(''), h.assets.samsung.name);
+  assert.equal(h.node('asset-detail-english-name') === undefined, true, 'no Korean name, no extra line');
   const selector = h.node('asset-name-selector');
   assert.equal(selector.props.style.maxWidth, '100%');
   assert.equal(selector.props.style.flexDirection, 'row');

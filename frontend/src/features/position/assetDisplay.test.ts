@@ -7,7 +7,7 @@ import { HoldingsContractError } from '../tradingAccount/holdings.ts';
 describe('Home/Wallet holding value and unrealized return', () => {
   it('uses the complete local valuation and canonical return, regardless of quantity/cost/price', () => {
     assert.deepEqual(getPositionAssetDisplay(holding()), {
-      name: '삼성전자', quantity: '보유수량 0.12345678 주', value: '1,120,000원', pnl: '+1,000원', returnRate: '+4.82%', performance: '+1,000원 (+4.82%)', direction: 'rise', notice: null,
+      name: '삼성전자', englishName: null, quantity: '보유수량 0.12345678 주', value: '1,120,000원', pnl: '+1,000원', returnRate: '+4.82%', performance: '+1,000원 (+4.82%)', direction: 'rise', notice: null,
     });
   });
   for (const assetType of ['us_stock', 'crypto', 'domestic_stock']) {
@@ -21,6 +21,17 @@ describe('Home/Wallet holding value and unrealized return', () => {
       assert.equal(display.direction, 'fall');
     });
   }
+  it('a US holding leads with its Korean name and keeps `(English) · SYMBOL`; without its market it stays English', () => {
+    const position = holding('usd');
+    Object.assign(position, { assetType: 'us_stock', name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS' });
+    const display = getPositionAssetDisplay(position);
+    assert.deepEqual([display.name, display.englishName], ['애플', '(Apple Inc.) · AAPL']);
+    assert.equal(getPositionAssetDisplay({ ...position, market: null as unknown as string }).name, 'Apple Inc.');
+    assert.equal(getPositionAssetDisplay({ ...position, market: null as unknown as string }).englishName === null, true);
+    // The same symbol on another market is another listing: no Korean name.
+    assert.equal(getPositionAssetDisplay({ ...position, market: 'NYS' }).name, 'Apple Inc.');
+  });
+
   it('keeps genuine zero neutral and missing/invalid valuation values unknown', () => {
     const position = holding();
     Object.assign(position.valuation, { returnRate: '0', unrealizedPnl: '0' });

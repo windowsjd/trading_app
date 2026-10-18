@@ -12,6 +12,25 @@ const SAFETY_PER_GLYPH = 0.5;
 /** One correction step when a drawn line still breaks. */
 export const HERO_TOTAL_SHRINK_STEP = 0.5;
 
+/** A total's advance in ems — tabular digits share one advance, separators are
+ * narrow, 원 is a full glyph. Only ratios between two totals are used. */
+function totalEms(text: string) {
+  return Array.from(text).reduce((sum, glyph) => sum + (/[0-9]/u.test(glyph) ? 0.6 : /[,.\s]/u.test(glyph) ? 0.3 : 1), 0);
+}
+
+/**
+ * The base-size width to fit a total by before the measurer has reported it:
+ * the last measured total's width scaled by their advances. An updated amount
+ * is then drawn at a fitting size at once, instead of breaking onto a second
+ * line (and making the hero taller) until its own width arrives — a digit
+ * more, e.g. 9,999,999원 → 10,000,000원, did that for a frame or more.
+ * Unmeasured (width 0) stays 0: fitHeroTotal keeps the intended layout.
+ */
+export function heroTotalWidth(measured: { width: number; text: string }, text: string) {
+  if (measured.text === text || !(measured.width > 0) || !measured.text) return measured.width;
+  return measured.width * totalEms(text) / totalEms(measured.text);
+}
+
 /**
  * Where Home's tier emblem goes and how large the total assets are, from three
  * measured widths (dp): the hero row, the emblem column, and the total at the

@@ -379,7 +379,7 @@ describe('ActionPressable touch feedback', () => {
     const { MarketAssetRow } = h.load('src/features/market/MarketAssetRow.tsx', {
       '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
       '../../components/states/AdminDiagnosticPanel': { default: () => null, __esModule: true },
-      '../../utils/format': { getAssetNameDisplay: (item: any) => ({ primary: item.id }), getAssetSymbolMarketDisplay: () => '', getAssetPriceText: () => { prices++; return '100'; }, formatPercent: () => '0' },
+      '../../utils/format': { getAssetNameDisplay: (item: any) => ({ primary: item.id }), getAssetEnglishNameLine: () => null, getAssetSymbolMarketDisplay: () => '', getAssetPriceText: () => { prices++; return '100'; }, formatPercent: () => '0' },
     });
     function List() { parents++; return ['btc', 'eth'].map(id => React.createElement(MarketAssetRow, { key: id, item: { id, tradable: true, marketStatus: 'open' }, onPress() {} })); }
     const renderer = h.render(React.createElement(List));

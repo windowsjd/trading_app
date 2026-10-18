@@ -16,8 +16,11 @@ const DOMESTIC = [{ id: 'kr-005930', assetType: 'domestic_stock', symbol: '00593
 async function searchHarness(t: TestContext) {
   const h = interactionHarness('android');
   Object.assign(h.native, { SafeAreaView: 'SafeAreaView', TextInput: 'TextInput', KeyboardAvoidingView: 'KeyboardAvoidingView' });
-  h.native.FlatList = (props: { ListHeaderComponent?: unknown }) => React.createElement('FlatList', props, props.ListHeaderComponent);
+  h.native.FlatList = (props: { ListHeaderComponent?: unknown; ListEmptyComponent?: unknown; data?: unknown[] }) =>
+    React.createElement('FlatList', props, props.ListHeaderComponent, props.data?.length ? null : props.ListEmptyComponent);
   const requests: GetAssetsParams[] = [];
+  // Test controls: failed US list reads, held search answers, and the server's sort.
+  const control = { failUsList: 0, held: new Map<string, Promise<void>>() };
   const page = (assets: unknown[], params: GetAssetsParams) => ({
     assets, priceErrors: [], sortSnapshot: 'sort-1',
     pagination: { offset: params.offset ?? 0, limit: params.limit ?? 20, returned: assets.length, total: assets.length, nextOffset: null },
@@ -25,10 +28,18 @@ async function searchHarness(t: TestContext) {
   const marketApi = {
     getAssets: async (params: GetAssetsParams) => {
       requests.push(params);
+      if (params.assetType === 'us_stock' && params.limit === 100 && control.failUsList > 0) {
+        control.failUsList -= 1;
+        throw Object.assign(new Error('Network Error'), { isAxiosError: true });
+      }
+      const held = params.search ? control.held.get(params.search) : undefined;
+      if (held) await held;
       const pool = [...(params.assetType !== 'domestic_stock' && params.assetType !== 'crypto' ? US_LIST : []),
         ...(params.assetType === undefined || params.assetType === 'domestic_stock' ? DOMESTIC : [])];
+      // The server's own sort: ascending is the reverse order here.
+      const sorted = params.sortOrder === 'asc' ? [...pool].reverse() : pool;
       const needle = params.search?.toLowerCase();
-      return page(needle ? pool.filter((asset) => `${asset.symbol} ${asset.name}`.toLowerCase().includes(needle)) : pool, params);
+      return page(needle ? sorted.filter((asset) => `${asset.symbol} ${asset.name}`.toLowerCase().includes(needle)) : sorted, params);
     },
   };
   const Screen = h.load('src/screens/market/MarketSearchScreen.tsx', {
@@ -55,7 +66,7 @@ async function searchHarness(t: TestContext) {
   };
   const ids = () => renderer.root.findAll((node: any) => node.type === 'FlatList')[0]?.props.data.map((item: { id: string }) => item.id) ?? [];
   const usListReads = () => requests.filter((params) => params.assetType === 'us_stock' && params.limit === 100);
-  return { renderer, requests, type, ids, usListReads, flush };
+  return { renderer, requests, type, ids, usListReads, flush, control, client };
 }
 
 it('a Korean name finds its US listing, which the server alone (English names, symbols) cannot', async (t) => {
@@ -105,4 +116,59 @@ it('pull to refresh reloads the US list with the rows', async (t) => {
   assert.equal(s.usListReads().length, 2);
   assert.equal(s.usListReads()[1].sortRefresh, true);
   assert.deepEqual(s.ids(), ['us-NVDA']);
+});
+
+it('a failed US list read fails only the Korean search, never silently empty; a retry reads it again', async (t) => {
+  const s = await searchHarness(t);
+  s.control.failUsList = 1;
+  await s.type('애플');
+  // The error is shown (with a retry), never an empty "no results" for 애플.
+  assert.equal(s.renderer.root.findAll((node: any) => node.type === 'ErrorState').length, 1);
+  act(() => { s.renderer.root.findAll((node: any) => node.type === 'ErrorState')[0].props.onRetry(); });
+  await s.flush();
+  assert.deepEqual(s.ids(), ['us-AAPL']);
+  assert.equal(s.usListReads().length, 2, 'the retry read the list again');
+  // English names and symbols never need the list, so they never fail with it.
+  s.control.failUsList = 1;
+  await s.type('nvidia');
+  assert.deepEqual(s.ids(), ['us-NVDA']);
+});
+
+it('a slower answer for an earlier text never replaces the current results', async (t) => {
+  const s = await searchHarness(t);
+  let release!: () => void;
+  s.control.held.set('애플', new Promise<void>((resolve) => { release = resolve; }));
+  await s.type('애플');
+  // Still loading: the results area says so and the search field stays (typing continues).
+  const field = s.renderer.root.findAll((node: any) => node.props?.testID === 'market-search-input');
+  assert.equal(field.length, 1);
+  assert.equal(s.renderer.root.findAll((node: any) => node.props?.testID === 'market-search-loading').length, 1);
+  await s.type('엔비디아');
+  assert.deepEqual(s.ids(), ['us-NVDA']);
+  release();
+  await s.flush();
+  assert.deepEqual(s.ids(), ['us-NVDA'], 'the late 애플 answer stays in its own cache entry');
+  await s.type('애플');
+  assert.deepEqual(s.ids(), ['us-AAPL']);
+});
+
+it('the US list is read once per sort and again only after 30 s', async (t) => {
+  const s = await searchHarness(t);
+  t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
+  await s.type('알파벳');
+  assert.deepEqual(s.ids(), ['us-GOOGL', 'us-GOOG']);
+  t.mock.timers.tick(29_000);
+  await s.type('애플');
+  assert.equal(s.usListReads().length, 1, 'fresh for 30 s');
+  t.mock.timers.tick(2_000);
+  await s.type('엔비디아');
+  assert.equal(s.usListReads().length, 2, 'stale after 30 s: read again');
+  // Another sort is another order: its own list, and the matches follow it.
+  const control = s.renderer.root.findAll((node: any) => node.type === 'SortControl')[0];
+  act(() => control.props.onChange('turnover_asc'));
+  await s.flush();
+  await s.type('알파벳');
+  const reads = s.usListReads();
+  assert.deepEqual([reads.length, reads.at(-1)?.sortOrder], [3, 'asc']);
+  assert.deepEqual(s.ids(), ['us-GOOG', 'us-GOOGL'], 'the Korean matches follow the chosen sort');
 });

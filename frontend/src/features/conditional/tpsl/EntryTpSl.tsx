@@ -32,7 +32,7 @@ import { useLearningAccess } from '../../quest/useLearningAccess';
 import { isEntryTpSlMarketSupported } from '../../order/orderMethods';
 import { getApiErrorCode, getApiErrorInfo, getErrorMessageFromCode } from '../../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../../utils/idempotency';
-import { formatDisplayDecimal } from '../../../utils/format';
+import { formatDisplayDecimal, getAssetNameDisplay } from '../../../utils/format';
 import TpSlLegFields from './TpSlLegFields';
 import TpSlRow from './TpSlRow';
 
@@ -174,7 +174,7 @@ export default function EntryTpSl({ accountId, entryType, entryId, onBusyChange,
   return (
     <View style={styles.body} testID="tp-sl-entry">
       <View style={styles.header}>
-        <Text style={styles.name}>{entry ? `${entry.asset.name} · ${entry.asset.symbol}` : '대기 주문'}</Text>
+        <Text style={styles.name}>{entry ? `${getAssetNameDisplay(entry.asset).primary} · ${entry.asset.symbol}` : '대기 주문'}</Text>
         {entry ? <Text testID="tp-sl-entry-summary" style={styles.helper}>{describeEntry(entry)}</Text> : null}
         {entry ? (
           <Text testID="tp-sl-entry-quantity" style={styles.helper}>

@@ -27,7 +27,6 @@ import ActionPressable from '../../components/common/ActionPressable';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MarketStackParamList } from '../../app/navigation/types';
 import { TEST_IDS } from '../../constants/testIds';
-import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -79,10 +78,6 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
     searchQuery.data,
     items.length,
   ]);
-
-  if (viewState === 'market_search_loading') {
-    return <FullPageLoading message="검색 결과를 불러오는 중입니다." />;
-  }
 
   if (viewState === 'market_search_error') {
     return (
@@ -172,6 +167,14 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
               title="검색어를 입력해주세요."
               message="종목명 또는 심볼로 검색할 수 있습니다."
             />
+          ) : viewState === 'market_search_loading' ? (
+            // Drawn under the search field, never instead of it: replacing the
+            // screen unmounted the field (and closed the keyboard) on every
+            // keystroke that started a new search.
+            <View testID="market-search-loading" style={styles.loading}>
+              <WhaleLoader size={40} />
+              <Text style={styles.loadingText}>검색 결과를 불러오는 중입니다.</Text>
+            </View>
           ) : (
             <EmptyState
               title="검색 결과가 없습니다."
@@ -202,6 +205,8 @@ export default function MarketSearchScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
+  loading: { alignItems: 'center', paddingVertical: 32, gap: 12 },
+  loadingText: { fontSize: 14, color: semantic.secondary, textAlign: 'center' },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   header: {
     padding: 12, borderRadius: 14,

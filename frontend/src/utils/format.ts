@@ -443,6 +443,17 @@ export function getAssetNameDisplay(
 }
 
 /**
+ * The line under a US listing's Korean name wherever an asset's full name is
+ * shown: its English name in parentheses and its symbol,
+ * `(Apple Inc.) · AAPL`. Null for every other asset (Korean name not shown),
+ * so domestic stocks and coins keep their own second line.
+ */
+export function getAssetEnglishNameLine(display: AssetNameDisplay): string | null {
+  if (!display.english) return null;
+  return [`(${display.english})`, display.secondary].filter(Boolean).join(' · ');
+}
+
+/**
  * Market identifiers that stay internal: the crypto price provider is not a
  * market the user chooses, so a Spot row reads `BTCUSDT`, not
  * `BTCUSDT · BINANCE`. The asset's `market` value itself is unchanged.

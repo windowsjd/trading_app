@@ -7,7 +7,7 @@ import type { TradingAccountPortfolioSummaryDto, TradingAccountPortfolioDto } fr
 import { homeUnrealizedPnlKrw } from '../../features/tradingAccount/homePortfolio';
 import { formatKrw, formatPercent } from '../../utils/format';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
-import { fitHeroTotal, HERO_ASIDE_GAP, HERO_TOTAL_FONT_SIZE, HERO_TOTAL_MIN_FONT_SIZE } from './heroTotalFit';
+import { fitHeroTotal, heroTotalWidth, HERO_ASIDE_GAP, HERO_TOTAL_FONT_SIZE, HERO_TOTAL_MIN_FONT_SIZE } from './heroTotalFit';
 
 type Props = {
   summary: TradingAccountPortfolioSummaryDto | null;
@@ -36,15 +36,18 @@ export default function HomeAssetHero({ summary, finalResult, settled = false, c
   // smaller to fit (fitHeroTotal, from the measured widths), never cut. Only
   // large text on a narrow phone moves the emblem lower, beside the performance lines.
   const [row, setRow] = useState(0);
-  const [natural, setNatural] = useState({ width: 0, height: 0 });
+  // The measured one-line total, with the text it was measured for.
+  const [natural, setNatural] = useState({ width: 0, height: 0, text: '' });
+  // A new amount fits by its estimate until its own width is measured.
+  const naturalWidth = result ? heroTotalWidth(natural, total) : 0;
   const [asideWidth, setAsideWidth] = useState(0);
   // Backstop: a drawn total that still breaks onto a second line takes half a
   // point off, until it fits or reaches the minimum. Kept while the measured
   // widths stay the same (an update with as many digits keeps its size).
-  const fitInputs = `${row}|${aside ? asideWidth : '-'}|${natural.width}`;
+  const fitInputs = `${row}|${aside ? asideWidth : '-'}|${naturalWidth}`;
   const [overflow, setOverflow] = useState({ inputs: '', steps: 0 });
   const shrinkSteps = overflow.inputs === fitInputs ? overflow.steps : 0;
-  const fit = fitHeroTotal({ row, aside: aside ? asideWidth : null, natural: result ? natural.width : 0,
+  const fit = fitHeroTotal({ row, aside: aside ? asideWidth : null, natural: naturalWidth,
     glyphs: Array.from(total).length, shrinkSteps });
   const beside = !result || fit.beside;
   // One style object (not an array), sized only when the column needs it.
@@ -61,7 +64,7 @@ export default function HomeAssetHero({ summary, finalResult, settled = false, c
       <View style={styles.measureClip} pointerEvents="none" accessible={false} accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants" aria-hidden>
         <View style={styles.measureRow}>
-          <Text style={styles.total} onLayout={event => setNatural({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height })}
+          <Text style={styles.total} onLayout={event => setNatural({ width: event.nativeEvent.layout.width, height: event.nativeEvent.layout.height, text: total })}
             accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" aria-hidden>{total}</Text>
         </View>
       </View>

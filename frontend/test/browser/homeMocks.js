@@ -103,7 +103,8 @@ export const apiClient = {
           capturedAt: '2026-10-02T00:00:00Z',
         } : undefined,
         summary: variant === 'empty-summary' || settled ? null : {
-          totalAssetKrw: long ? '1234567890123456' : account.mode === 'season' ? '9648192' : '12530200',
+          // `?total=` (or `window.__heroTotal`, for an in-place update) sets the hero amount.
+          totalAssetKrw: globalThis.__heroTotal ?? params.get('total') ?? (long ? '1234567890123456' : account.mode === 'season' ? '9648192' : '12530200'),
           returnRate: account.mode === 'season' ? '-3.52' : '4.82', returnRateMethod,
           unrealizedPnlKrw: '-351885', realizedPnlKrw: '12000',
           krwCash: '1000000', usdCashKrw: '1000000', assetValueKrw: '7648192',
