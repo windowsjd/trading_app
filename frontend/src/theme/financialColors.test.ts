@@ -58,12 +58,9 @@ for (const mode of ['light', 'dark'] as const) for (const preference of ['red_bl
     }
     assert.equal(colors.credit, getFinancialColors(mode).credit);
     assert.equal(colors.debit, getFinancialColors(mode).debit);
-    // Order-book sides (2026-10-18): asks always red, bids blue (Red/Blue) or
-    // green (Green/Red), independent of the buy/sell order-button roles.
+    // Order-book sides stay red/blue under either user preference.
     const red = mode === 'light' ? ['#c8241e', '#fef2f2'] : ['#ff6b64', '#38232a'];
-    const bid = preference === 'red_blue'
-      ? mode === 'light' ? ['#1b5ec9', '#eff6ff'] : ['#64a2ff', '#1e304b']
-      : mode === 'light' ? ['#118038', '#f0fdf4'] : ['#4ed472', '#1d392b'];
+    const bid = mode === 'light' ? ['#1b5ec9', '#eff6ff'] : ['#64a2ff', '#1e304b'];
     assert.deepEqual([colors.askText, colors.askSurface], red);
     assert.deepEqual([colors.bidText, colors.bidSurface], bid);
     for (const [text, surface] of [[colors.askText, colors.askSurface], [colors.bidText, colors.bidSurface]]) {

@@ -293,6 +293,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       if (current(request)) {
         setFailure(error);
         const info = getApiErrorInfo(error);
+        if (info.serverCode === 'BEGINNER_FEATURE_LOCKED')
+          void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.quests(accountId) });
         // Only a lost or failed response may have executed: that one keeps its
         // key for the same-request check. A clear refusal (4xx) did not fill.
         request.uncertain = !info.hasResponse || (info.status ?? 0) >= 500;

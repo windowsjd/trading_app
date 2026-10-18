@@ -43,7 +43,7 @@ describe('compact trading depth presentation', () => {
 
 
 describe('order book side colors in the trading ladder', () => {
-  it('draws asks red and bids blue (green under Green/Red), number and row alike, without changing the best levels', (t) => {
+  it('draws asks red and bids blue under either preference, number and row alike, without changing the best levels', (t) => {
     const h = interactionHarness();
     const Ladder = h.load('src/features/asset/AssetOrderLadder.tsx').default;
     const book = createCryptoOrderBookFixture('btc', 'BTC', true);
@@ -57,17 +57,17 @@ describe('order book side colors in the trading ladder', () => {
     assert.equal(flatten(ask.children[0].props.style).color, financial.askText);
     assert.equal(flatten(bid.children[0].props.style).color, financial.bidText);
     for (const mode of ['light', 'dark'] as const) {
-      const redBlue = getFinancialColors(mode, 'red_blue'), greenRed = getFinancialColors(mode, 'green_red');
+      const redBlue = getFinancialColors(mode, 'red_blue');
       // Red/Blue: red asks over the current price, blue bids under it.
       assert.deepEqual([resolveFinancialColor(financial.askText, mode, 'red_blue'), resolveFinancialColor(financial.bidText, mode, 'red_blue')],
         [redBlue.rise, redBlue.fall]);
       assert.deepEqual([resolveFinancialColor(financial.askSurface, mode, 'red_blue'), resolveFinancialColor(financial.bidSurface, mode, 'red_blue')],
         [redBlue.riseSurface, redBlue.fallSurface]);
-      // Green/Red keeps its red asks and green bids.
+      // Green/Red uses the same book-side colors and surfaces.
       assert.deepEqual([resolveFinancialColor(financial.askText, mode, 'green_red'), resolveFinancialColor(financial.bidText, mode, 'green_red')],
-        [greenRed.fall, greenRed.rise]);
+        [redBlue.askText, redBlue.bidText]);
       assert.deepEqual([resolveFinancialColor(financial.askSurface, mode, 'green_red'), resolveFinancialColor(financial.bidSurface, mode, 'green_red')],
-        [greenRed.fallSurface, greenRed.riseSurface]);
+        [redBlue.askSurface, redBlue.bidSurface]);
     }
     assert.match(ask.props.accessibilityLabel, /매도 1호가/);
     assert.match(bid.props.accessibilityLabel, /매수 1호가/);

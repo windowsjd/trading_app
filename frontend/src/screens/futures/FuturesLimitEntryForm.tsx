@@ -88,6 +88,8 @@ export default function FuturesLimitEntryForm({ accountId, instrumentId, unit, d
     } catch (error) {
       if (!current()) return;
       const info = getApiErrorInfo(error); const retry = !info.hasResponse || (info.status ?? 0) >= 500;
+      if (info.serverCode === 'BEGINNER_FEATURE_LOCKED')
+        void client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.quests(accountId) });
       setUncertain(retry); if (!retry) request.current = null;
       setFailure(error); setMessage(retry ? '접수 여부를 확인해야 합니다. 동일 요청으로 다시 확인해주세요.'
         : info.serverCode?.startsWith('ENTRY_TP_SL') || info.serverCode === 'INVALID_ENTRY_TP_SL' || info.serverCode === 'FUTURES_TP_SL_DISABLED'

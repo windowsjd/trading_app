@@ -2,11 +2,17 @@ import { spawnSync } from 'node:child_process';
 
 const itDb = process.env.BEGINNER_ACCOUNT_DB_INTEGRATION === '1' ? it : it.skip;
 
-describe('Beginner full quest database safety', () => {
+describe.each([
+  'beginner-full-quest-integration.ts',
+  'beginner-permission-profile.ts',
+])('Beginner database safety: %s', (runner) => {
   it.each([
     {
       name: 'missing explicit opt-in',
-      env: { BEGINNER_ACCOUNT_DB_INTEGRATION: '' },
+      env: {
+        BEGINNER_ACCOUNT_DB_INTEGRATION: '',
+        BEGINNER_PERMISSION_PROFILE: '',
+      },
     },
     {
       name: 'production mode even in GitHub Actions',
@@ -47,13 +53,14 @@ describe('Beginner full quest database safety', () => {
   ])('rejects $name before running fixtures', ({ env, error }) => {
     const result = spawnSync(
       process.execPath,
-      ['--import', 'tsx', 'scripts/beginner-full-quest-integration.ts'],
+      ['--import', 'tsx', `scripts/${runner}`],
       {
         cwd: process.cwd(),
         env: {
           ...process.env,
           NODE_ENV: 'test',
           BEGINNER_ACCOUNT_DB_INTEGRATION: '1',
+          BEGINNER_PERMISSION_PROFILE: '1',
           FUTURES_DB_INTEGRATION: '1',
           GITHUB_ACTIONS: 'false',
           DATABASE_URL: 'postgresql://test@127.0.0.1:1/quest_safety_test',

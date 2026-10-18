@@ -1,5 +1,11 @@
 # Trading UI browser regression
 
+호가 고정 색상 회귀(2026-10-18)는 `orderBookColorsBrowser.cjs`를 사용한다.
+기존 trading/futures fixture로 실제 화면을 렌더링하고, 320px × 글꼴 1/2배 ×
+Light/Dark × 금융 색상 2설정의 16개 화면에서 Ask 빨강·Bid 파랑, 행 배경,
+설정 변경 후 호가 값 유지를 확인한다. 기존 외부 esbuild/Playwright 환경과
+`BROWSER_EXECUTABLE_PATH`를 재사용한다. `ORDER_BOOK_BROWSER_OUTPUT`으로 결과 위치를 지정한다.
+
 문의 답변·주문 실패 화면 (2026-10-17; 운영진 문의 관리 2026-10-18) use `NODE_PATH=/path/to/browser-tools/node_modules
 BROWSER_EXECUTABLE_PATH=… node test/browser/inquiryAnswerBrowser.cjs` (`INQUIRY_BROWSER_WIDTHS=320` for one width).
 The production InquiryScreen (long answered/pending rows, all pages, a filled long form;

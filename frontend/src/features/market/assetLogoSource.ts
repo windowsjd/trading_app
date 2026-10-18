@@ -37,9 +37,9 @@ const LOGO_DEV_IMAGE_ORIGIN = 'https://img.logo.dev';
 /** Share classes written with a dot (`BRK.B`) collide with Logo.dev's exchange-suffix syntax. */
 const US_LISTING_ISIN: Readonly<Record<string, string>> = { 'NYS:BRK.B': 'US0846707026' };
 
-declare const process: { env?: { EXPO_PUBLIC_LOGO_DEV_KEY?: string } } | undefined;
+declare const process: { env: { EXPO_PUBLIC_LOGO_DEV_KEY?: string } } | undefined;
 // Static dot notation, so babel-preset-expo inlines it (see constants/env.ts).
-const RAW_LOGO_DEV_KEY = typeof process === 'undefined' ? undefined : process.env?.EXPO_PUBLIC_LOGO_DEV_KEY;
+const RAW_LOGO_DEV_KEY = typeof process === 'undefined' ? undefined : process.env.EXPO_PUBLIC_LOGO_DEV_KEY;
 /** Logo.dev publishable key (`pk_…`, meant for client code); unset = no remote logos. */
 export const LOGO_DEV_KEY = RAW_LOGO_DEV_KEY?.trim() || null;
 

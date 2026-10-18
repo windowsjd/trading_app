@@ -66,6 +66,8 @@ it('a release build carries the key it was built with, and a build without one r
   const babel = require('@babel/core');
   const filename = path.join(process.cwd(), 'src', 'features', 'market', 'assetLogoSource.ts');
   const source = readFileSync(filename, 'utf8');
+  assert.match(source, /process\.env\.EXPO_PUBLIC_LOGO_DEV_KEY/);
+  assert.doesNotMatch(source, /process\.env\?\.EXPO_PUBLIC_LOGO_DEV_KEY/);
   const releaseBuild = (buildKey: string | undefined) => {
     const saved = process.env.EXPO_PUBLIC_LOGO_DEV_KEY;
     if (buildKey === undefined) delete process.env.EXPO_PUBLIC_LOGO_DEV_KEY;

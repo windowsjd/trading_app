@@ -1,0 +1,127 @@
+{
+  "samples": 20,
+  "maxConcurrency": 4,
+  "scope": "local service calls, not HTTP or production capacity",
+  "results": [
+    {
+      "name": "foundation:questProgress",
+      "samples": 20,
+      "concurrency": 1,
+      "p50Ms": 15.74,
+      "p95Ms": 18.64,
+      "maxMs": 23.35,
+      "sqlPerRequest": 36,
+      "evidenceSqlPerRequest": 20
+    },
+    {
+      "name": "foundation:questProgress",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 33.91,
+      "p95Ms": 40.23,
+      "maxMs": 40.36,
+      "sqlPerRequest": 36,
+      "evidenceSqlPerRequest": 20
+    },
+    {
+      "name": "foundation:policyAllowed",
+      "samples": 20,
+      "concurrency": 1,
+      "p50Ms": 7.54,
+      "p95Ms": 10.24,
+      "maxMs": 11.46,
+      "sqlPerRequest": 17,
+      "evidenceSqlPerRequest": 13
+    },
+    {
+      "name": "foundation:policyAllTrading",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 13.78,
+      "p95Ms": 15.99,
+      "maxMs": 17.68,
+      "sqlPerRequest": 17,
+      "evidenceSqlPerRequest": 13
+    },
+    {
+      "name": "foundation:refusedMarketBuy",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 23.36,
+      "p95Ms": 26.56,
+      "maxMs": 26.8,
+      "sqlPerRequest": 34,
+      "evidenceSqlPerRequest": 20
+    },
+    {
+      "name": "complete:questProgress",
+      "samples": 20,
+      "concurrency": 1,
+      "p50Ms": 16.93,
+      "p95Ms": 18.82,
+      "maxMs": 19.82,
+      "sqlPerRequest": 37,
+      "evidenceSqlPerRequest": 22
+    },
+    {
+      "name": "complete:questProgress",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 26.71,
+      "p95Ms": 30.68,
+      "maxMs": 31.24,
+      "sqlPerRequest": 37,
+      "evidenceSqlPerRequest": 22
+    },
+    {
+      "name": "complete:policyAllowed",
+      "samples": 20,
+      "concurrency": 1,
+      "p50Ms": 7.8,
+      "p95Ms": 9.16,
+      "maxMs": 11,
+      "sqlPerRequest": 18,
+      "evidenceSqlPerRequest": 15
+    },
+    {
+      "name": "complete:policyAllTrading",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 13.07,
+      "p95Ms": 14.81,
+      "maxMs": 15.57,
+      "sqlPerRequest": 18,
+      "evidenceSqlPerRequest": 15
+    },
+    {
+      "name": "general:policyAllTrading",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 0,
+      "p95Ms": 0.01,
+      "maxMs": 0.08,
+      "sqlPerRequest": 0,
+      "evidenceSqlPerRequest": 0
+    },
+    {
+      "name": "general:marketBuyQuoteAndExecute",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 88.89,
+      "p95Ms": 149.14,
+      "maxMs": 149.9,
+      "sqlPerRequest": 139.1,
+      "evidenceSqlPerRequest": 24
+    },
+    {
+      "name": "complete:marketBuyQuoteAndExecute",
+      "samples": 20,
+      "concurrency": 4,
+      "p50Ms": 160.76,
+      "p95Ms": 263.91,
+      "maxMs": 269.01,
+      "sqlPerRequest": 211,
+      "evidenceSqlPerRequest": 77
+    }
+  ]
+}

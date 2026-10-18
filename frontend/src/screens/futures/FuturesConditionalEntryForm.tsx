@@ -183,6 +183,8 @@ export default function FuturesConditionalEntryForm({ accountId, instrumentId, d
     } catch (error) {
       if (!current()) return;
       const info = getApiErrorInfo(error); const retry = !info.hasResponse || (info.status ?? 0) >= 500;
+      if (info.serverCode === 'BEGINNER_FEATURE_LOCKED')
+        void client.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.quests(accountId) });
       // The server's Last had already crossed: decide again from the latest Last.
       if (info.serverCode === 'FUTURES_CONDITIONAL_ENTRY_ALREADY_MET') {
         const triggerPrice = request.current?.triggerPrice;

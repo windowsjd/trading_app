@@ -1,0 +1,97 @@
+{
+  "environment": "preview",
+  "keyPresent": true,
+  "publishableFormat": true,
+  "requests": [
+    {
+      "assetType": "us_stock",
+      "market": "NAS",
+      "symbol": "AAPL",
+      "path": "/ticker/AAPL",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 2113,
+      "png": true,
+      "dimensions": [
+        128,
+        128
+      ],
+      "cacheControl": "max-age=86400, stale-while-revalidate=600"
+    },
+    {
+      "assetType": "us_stock",
+      "market": "NAS",
+      "symbol": "MSFT",
+      "path": "/ticker/MSFT",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 2238,
+      "png": true,
+      "dimensions": [
+        128,
+        128
+      ],
+      "cacheControl": "max-age=86400, stale-while-revalidate=600"
+    },
+    {
+      "assetType": "us_stock",
+      "market": "NYS",
+      "symbol": "BRK.B",
+      "path": "/isin/US0846707026",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 4288,
+      "png": true,
+      "dimensions": [
+        128,
+        128
+      ],
+      "cacheControl": "max-age=86400, stale-while-revalidate=600"
+    },
+    {
+      "assetType": "domestic_stock",
+      "market": "KRX",
+      "symbol": "005930",
+      "path": "/isin/KR7005930003",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 3069,
+      "png": true,
+      "dimensions": [
+        128,
+        128
+      ],
+      "cacheControl": "max-age=86400, stale-while-revalidate=600"
+    },
+    {
+      "assetType": "domestic_stock",
+      "market": "KRX",
+      "symbol": "000660",
+      "path": "/isin/KR7000660001",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 2735,
+      "png": true,
+      "dimensions": [
+        128,
+        128
+      ],
+      "cacheControl": "max-age=86400, stale-while-revalidate=600"
+    },
+    {
+      "assetType": "domestic_stock",
+      "market": "KRX",
+      "symbol": "035420",
+      "path": "/isin/KR7035420009",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 2940,
+      "png": true,
+      "dimensions": [
+        128,
+        128
+      ],
+      "cacheControl": "max-age=86400, stale-while-revalidate=600"
+    }
+  ]
+}

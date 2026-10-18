@@ -21,6 +21,7 @@ import {
 } from './lib/beginner-quest-practice';
 import { assertBeginnerLearningAccess } from '../src/trading-accounts/beginner-learning-policy';
 import { FuturesLimitService } from '../src/futures/futures-limit.service';
+import { FuturesConditionalEntryService } from '../src/futures/futures-conditional-entry.service';
 import { FuturesLiquidationService } from '../src/futures/futures-liquidation.service';
 
 const target = new URL(process.env.DATABASE_URL ?? 'http://invalid');
@@ -44,6 +45,7 @@ process.env.INDEPENDENT_TP_SL_ORDERS_ENABLED = 'true';
 process.env.CONDITIONAL_SELL_ORDERS_ENABLED = 'true';
 process.env.FUTURES_TRADING_MODE = 'ENABLED';
 process.env.FUTURES_RISK_ENGINE_ENABLED = 'true';
+process.env.FUTURES_CONDITIONAL_ENTRY_ENABLED = 'true';
 async function rejects(work: Promise<unknown>, code: string) {
   try {
     await work;
@@ -178,6 +180,54 @@ async function main() {
         effectiveAt: markAt,
       },
     });
+    await price(other, '100', 1, 0);
+    const secondMarkAt = await now();
+    await db.futuresMarkSnapshot.create({
+      data: {
+        instrumentId: other.instruments[1].instrument.id,
+        symbol: other.instruments[1].asset.symbol,
+        price: '100',
+        source: 'binance_usdm_mark_ws',
+        capturedAt: secondMarkAt,
+        effectiveAt: secondMarkAt,
+      },
+    });
+    const acceptedLimit = await entries.create(other.userId, other.accountId, {
+      instrumentId: other.instruments[1].instrument.id,
+      direction: 'long',
+      marginMode: 'isolated',
+      leverage: 2,
+      quantity: '1',
+      limitPrice: '90',
+      idempotencyKey: randomUUID(),
+    });
+    const watches = new FuturesConditionalEntryService(
+      db,
+      app.access,
+      app.futures,
+      entries,
+    );
+    const acceptedWatch = await watches.create(other.userId, other.accountId, {
+      instrumentId: other.instruments[0].instrument.id,
+      direction: 'long',
+      marginMode: 'isolated',
+      leverage: 2,
+      quantity: '1',
+      triggerCondition: 'at_or_above',
+      triggerPrice: '120',
+      executionType: 'market',
+      idempotencyKey: randomUUID(),
+    });
+    const reserved = (
+      await db.cashWallet.findUniqueOrThrow({
+        where: { id: other.futuresWalletId },
+      })
+    ).reservedAmount.toFixed(8);
+    assert.equal(
+      Number(reserved) > 0,
+      true,
+      'the accepted limit actually reserves collateral',
+    );
     const legacyPosition = await app.futures.execute(
       other.userId,
       other.accountId,
@@ -187,6 +237,14 @@ async function main() {
       where: { id: other.accountId },
       data: { mode: 'beginner' },
     });
+    assert.equal(
+      (
+        await db.cashWallet.findUniqueOrThrow({
+          where: { id: other.futuresWalletId },
+        })
+      ).reservedAmount.toFixed(8),
+      reserved,
+    );
     assert.equal(
       (
         await app.quests.getQuestProgress(other.userId, other.accountId)
@@ -220,6 +278,61 @@ async function main() {
       quantity: '1',
       idempotencyKey: randomUUID(),
     });
+    // Already accepted limits keep their reservation and fill policy under the new lock.
+    await price(other, '80', 1, 0);
+    assert.equal(
+      (await entries.evaluate(acceptedLimit.data.order.id)).state,
+      'executed',
+    );
+    assert.equal(
+      (
+        await db.cashWallet.findUniqueOrThrow({
+          where: { id: other.futuresWalletId },
+        })
+      ).reservedAmount.toFixed(8),
+      '0.00000000',
+    );
+    const filled = await db.futuresPosition.findFirstOrThrow({
+      where: {
+        tradingAccountId: other.accountId,
+        instrumentId: other.instruments[1].instrument.id,
+        status: 'open',
+      },
+    });
+    await app.futures.execute(other.userId, other.accountId, {
+      instrumentId: filled.instrumentId,
+      positionId: filled.id,
+      operation: 'close',
+      direction: 'long',
+      leverage: 2,
+      marginMode: 'isolated',
+      quantity: '1',
+      idempotencyKey: randomUUID(),
+    });
+    checks++;
+    // A reservation-free watch rechecks learning access when it actually triggers.
+    const beforeWatch = await db.futuresExecution.count({
+      where: { tradingAccountId: other.accountId },
+    });
+    await price(other, '120', 0, 0);
+    assert.equal(
+      (await watches.evaluate(acceptedWatch.data.entry.id)).state,
+      'BEGINNER_FEATURE_LOCKED',
+    );
+    const failedWatch = await db.futuresConditionalEntry.findUniqueOrThrow({
+      where: { id: acceptedWatch.data.entry.id },
+    });
+    assert.deepEqual(
+      [failedWatch.status, failedWatch.failureCode],
+      ['failed', 'BEGINNER_FEATURE_LOCKED'],
+    );
+    assert.equal(
+      await db.futuresExecution.count({
+        where: { tradingAccountId: other.accountId },
+      }),
+      beforeWatch,
+    );
+    checks++;
     assert.equal(
       (await app.quests.getQuestProgress(other.userId, other.accountId)).data
         .learningAccess.allTrading,
@@ -748,6 +861,7 @@ async function main() {
     await db.dailyPortfolioSnapshot.deleteMany({ where });
     await cleanup(s);
     const otherWhere = { tradingAccountId: other.accountId };
+    await db.futuresConditionalEntry.deleteMany({ where: otherWhere });
     await db.protectionLeg.deleteMany({ where: { group: otherWhere } });
     await db.protectionGroup.deleteMany({ where: otherWhere });
     await db.protectionCommand.deleteMany({ where: otherWhere });

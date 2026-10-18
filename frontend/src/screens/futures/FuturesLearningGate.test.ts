@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { test } from 'node:test';
 import { questProgress } from '../../../test/questFixtures.ts';
+import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 const { futuresHarness } = createRequire(import.meta.url)('../../../test/futuresHarness.cjs');
 
 const ALL = '모든 퀘스트를 완료하면 사용할 수 있어요.';
@@ -52,3 +53,26 @@ test('every quest complete: 1x and an increase are ordinary trades; before that 
   // With a position the order form increases it.
   assert.equal(hint(open), ALL);
 });
+
+for (const method of ['market', 'limit', 'conditional'] as const) {
+  test(`${method}: a server learning refusal explains the lock and refreshes stale permissions`, async t => {
+    const h = beginner(questProgress(10));
+    await h.start(); t.after(h.close);
+    if (method !== 'market') await h.selectMethod(method);
+    await h.amount('50');
+    if (method === 'limit') await h.change('futures-limit-price', '100');
+    if (method === 'conditional') await h.change('futures-conditional-trigger-price', '110');
+    // For example, cached permissions from the old server across a rollout.
+    h.questProgress = questProgress(9);
+    h.failure = { response: { status: 403, data: { success: false, error: { code: 'BEGINNER_FEATURE_LOCKED' } } } };
+    const submit = method === 'market' ? 'futures-submit' : `futures-${method}-submit`;
+    await h.press(submit);
+    await h.flush();
+    assert.equal(h.requests.length, 1);
+    assert.match(h.text(), /학습을 더 진행하면 이용할 수 있는 기능입니다/);
+    assert.equal(h.invalidations.some((key: string[]) => key.join('/') === QUERY_KEYS.tradingAccount.quests('A').join('/')), true);
+    assert.equal(h.node(submit).props.learningHint, ALL);
+    assert.equal(h.node('futures-retry') === undefined, true, 'a definite 403 is not an uncertain execution');
+    assert.equal(h.text().includes('체결 완료'), false);
+  });
+}

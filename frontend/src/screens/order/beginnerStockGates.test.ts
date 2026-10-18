@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
 import { questProgress } from '../../../test/questFixtures.ts';
+import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 const require = createRequire(import.meta.url);
 const { inlineTradingHarness } = require('../../../test/inlineTradingHarness.cjs');
 
@@ -28,6 +29,23 @@ const learningLocked = (h: any, method: string) =>
   String(h.node(`order-method-${method}`)?.props.accessibilityLabel ?? '').includes('학습 제한');
 
 describe('beginner staged access on a Korean stock (B차)', () => {
+  for (const phase of ['quote', 'execute'] as const) {
+    it(`${phase}: a stale allowed button gets learning guidance for a server 403 and refreshes permissions`, async t => {
+      const h = beginner(6);
+      await h.mount(); t.after(h.close);
+      await h.input(TEST_IDS.order.quantityInput, '1');
+      const error = { response: { status: 403, data: { success: false, error: { code: 'BEGINNER_FEATURE_LOCKED' } } } };
+      if (phase === 'quote') h.quoteFailure = error;
+      else h.failure = error;
+      await h.press(submit); await h.flush();
+      assert.equal(h.requests.length, phase === 'quote' ? 1 : 2);
+      assert.equal(h.success().visible, false);
+      const notices = h.renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.accessibilityLiveRegion === 'polite');
+      assert.equal(notices.some((node: any) => node.props.children === '학습을 더 진행하면 이용할 수 있는 기능입니다.'), true);
+      assert.equal(h.invalidations.some((key: string[]) => key.join('/') === QUERY_KEYS.tradingAccount.quests('beginner-1').join('/')), true);
+    });
+  }
+
   it('after QUEST 06 the market BUY is the QUEST 07 practice; limit and LOC wait for every quest', async (t) => {
     const h = beginner(6);
     await h.mount(); t.after(h.close);

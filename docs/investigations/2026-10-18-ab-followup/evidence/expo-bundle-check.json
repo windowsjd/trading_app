@@ -1,0 +1,23 @@
+[
+  {
+    "platform": "ios",
+    "testPublicValuePresent": true,
+    "unreplacedLogoEnv": false,
+    "logoCdnPresent": true,
+    "secretKeyMarkerPresent": false
+  },
+  {
+    "platform": "android",
+    "testPublicValuePresent": true,
+    "unreplacedLogoEnv": false,
+    "logoCdnPresent": true,
+    "secretKeyMarkerPresent": false
+  },
+  {
+    "platform": "web",
+    "testPublicValuePresent": true,
+    "unreplacedLogoEnv": false,
+    "logoCdnPresent": true,
+    "secretKeyMarkerPresent": false
+  }
+]

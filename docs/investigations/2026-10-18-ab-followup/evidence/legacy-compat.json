@@ -1,0 +1,48 @@
+{
+  "baseline": "81fae931",
+  "cases": [
+    {
+      "completed": 0,
+      "oldAppAcceptsNewPayload": true,
+      "oldAppAllTrading": false,
+      "newAppNewServerAllTrading": false,
+      "newAppOldServerAllTrading": false
+    },
+    {
+      "completed": 6,
+      "oldAppAcceptsNewPayload": true,
+      "oldAppAllTrading": true,
+      "newAppNewServerAllTrading": false,
+      "newAppOldServerAllTrading": true
+    },
+    {
+      "completed": 7,
+      "oldAppAcceptsNewPayload": true,
+      "oldAppAllTrading": true,
+      "newAppNewServerAllTrading": false,
+      "newAppOldServerAllTrading": true
+    },
+    {
+      "completed": 8,
+      "oldAppAcceptsNewPayload": true,
+      "oldAppAllTrading": true,
+      "newAppNewServerAllTrading": false,
+      "newAppOldServerAllTrading": true
+    },
+    {
+      "completed": 9,
+      "oldAppAcceptsNewPayload": true,
+      "oldAppAllTrading": true,
+      "newAppNewServerAllTrading": false,
+      "newAppOldServerAllTrading": true
+    },
+    {
+      "completed": 10,
+      "oldAppAcceptsNewPayload": true,
+      "oldAppAllTrading": true,
+      "newAppNewServerAllTrading": true,
+      "newAppOldServerAllTrading": true
+    }
+  ],
+  "oldAppLearning403Message": "학습을 더 진행하면 이용할 수 있는 기능입니다."
+}
