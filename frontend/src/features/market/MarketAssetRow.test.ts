@@ -90,7 +90,7 @@ it('a closed US market\'s last confirmed close is labeled 종가 without its ses
     // The KRX display close has its own reason and stays unlabeled (no date either).
     row({ id: 'krx', assetType: 'domestic_stock', symbol: '005930', name: 'Samsung Electronics', market: 'KRX', priceCurrency: 'KRW',
       marketStatus: 'closed', price: { state: 'available', currentPrice: '70000', priceCurrency: 'KRW', changeRate: '0',
-        priceSource: { ...close, sourceName: 'koscom_intraday', fallbackReason: 'market_closed_krx_last_close' } } }),
+        priceSource: { ...close, sourceName: 'koscom_history', fallbackReason: 'market_closed_krx_last_close' } } }),
   ]);
   assert.equal(r.text('market-last-close-closed'), '종가');
   assert.equal([r.node('market-last-close-live'), r.node('market-last-close-krx')].every((node) => node === undefined), true);

@@ -1,11 +1,15 @@
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
-/** Real PostgreSQL evidence for the shared closed-stock display/valuation policy. */
+/** Real PostgreSQL evidence for the closed-stock display/valuation split: the
+ * display shows the KOSCOM daily close when that session's daily is stored
+ * (2026-10-18), while valuation keeps the completed-session snapshots. */
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mock } from 'node:test';
 import { HttpException } from '@nestjs/common';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AssetsService } from '../src/assets/assets.service';
+import { DailyChangeRateService } from '../src/assets/daily-change-rate.service';
+import { MarketCandlesRepository } from '../src/assets/market-candles.repository';
 import { PositionsService } from '../src/positions/positions.service';
 import { HomeService } from '../src/home/home.service';
 import { PortfolioValuationService } from '../src/portfolio/portfolio-valuation.service';
@@ -41,7 +45,12 @@ const portfolio = new TradingAccountPortfolioService(
   valuation,
 );
 const positions = new PositionsService(prisma, access);
-const assets = new AssetsService(prisma);
+const candles = new MarketCandlesRepository(prisma);
+const assets = new AssetsService(
+  prisma,
+  undefined,
+  new DailyChangeRateService(candles),
+);
 const home = new HomeService(prisma, valuation);
 const orders = new OrdersService(
   prisma,
@@ -57,6 +66,22 @@ let userId: string | undefined;
 let seasonId: string | undefined;
 const sessionOpen = new Date('2026-07-10T00:00:00Z');
 const sessionClose = new Date('2026-07-10T06:30:00Z');
+/** KOSCOM's 07-10 daily bar (that KST day) for the first asset only. */
+const daily = (close: string, sourceUpdatedAt: Date) => ({
+  assetId: assetIds[0],
+  interval: '1d' as const,
+  openTime: new Date('2026-07-09T15:00:00Z'),
+  closeTime: new Date('2026-07-10T15:00:00Z'),
+  open: '247000',
+  high: '251000',
+  low: '246000',
+  close,
+  volume: '1000',
+  amount: '250000000',
+  isClosed: true,
+  sourceProvider: 'koscom_history',
+  sourceUpdatedAt,
+});
 
 async function main() {
   mock.timers.enable({
@@ -199,6 +224,10 @@ async function main() {
           },
         });
     }
+    // A daily differing from the session snapshot (248,500), with no 5m row.
+    await candles.upsertMany([
+      daily('250000', new Date('2026-07-10T06:50:00Z')),
+    ]);
     for (const at of [
       '2026-07-10T09:00:00Z',
       '2026-07-11T09:00:00Z',
@@ -221,16 +250,22 @@ async function main() {
           new Date(),
         );
       for (const assetId of assetIds) {
+        // Display: the KOSCOM daily close ahead of the session snapshot, or
+        // that snapshot when the session has no daily (second asset).
+        const shown =
+          assetId === assetIds[0]
+            ? { price: '250000.00000000', snapshotId: null }
+            : { price: '122200.00000000', snapshotId: snapshots.get(assetId) };
         const result = await assets.getAsset(user.id, assetId);
         assert.equal(result.data.asset.marketStatus, 'closed');
-        assert.equal(result.data.asset.price?.state, 'available');
         const ticker = await assets.getAssetPriceForTicker(assetId);
-        assert.equal(ticker?.price.state, 'available');
-        if (ticker?.price.state === 'available')
-          assert.equal(
-            ticker.price.assetPriceSnapshotId,
-            snapshots.get(assetId),
-          );
+        for (const price of [result.data.asset.price, ticker?.price]) {
+          assert.equal(price?.state, 'available');
+          if (price?.state === 'available') {
+            assert.equal(price.currentPrice, shown.price);
+            assert.equal(price.assetPriceSnapshotId, shown.snapshotId);
+          }
+        }
       }
       for (const accountId of accountIds) {
         const result = await positions.getPositionsForTradingAccount(
@@ -238,6 +273,7 @@ async function main() {
           accountId,
         );
         assert.equal(result.data.positions.length, 2);
+        // Valuation never uses the display-only daily close.
         for (const position of result.data.positions) {
           assert.equal(position.valuation.state, 'available');
           if (position.valuation.state === 'available')
@@ -277,12 +313,35 @@ async function main() {
       assert.equal(summary.totalAssetKrw, '10863600.00000000');
       console.log(`PASS Market/Position/Portfolio/Home GENERAL/SEASON ${at}`);
     }
+    // KOSCOM revises the bar (the final KRX close); the daily job's upsert
+    // stores it and later reads show it once the 30 s cached close expires.
+    const revisedAt = new Date(Date.now() - 60_000);
+    await candles.upsertMany([daily('249000', revisedAt)]);
+    const revised = await prisma.marketCandle.findFirstOrThrow({
+      where: { assetId: assetIds[0], interval: '1d' },
+    });
+    assert.equal(revised.close.toFixed(), '249000');
+    assert.equal(revised.sourceUpdatedAt.getTime(), revisedAt.getTime());
+    mock.timers.setTime(Date.now() + 31_000);
+    const revisedPrice = (await assets.getAsset(user.id, assetIds[0])).data
+      .asset.price;
+    assert.equal(revisedPrice?.state, 'available');
+    if (revisedPrice?.state === 'available') {
+      assert.equal(revisedPrice.currentPrice, '249000.00000000');
+      assert.equal(revisedPrice.priceCapturedAt, revisedAt.toISOString());
+    }
+    console.log('PASS revised KOSCOM daily close shown after the cache expiry');
     await prisma.assetPriceSnapshot.deleteMany({
       where: {
         assetId: assetIds[0],
         effectiveAt: { gte: sessionOpen, lte: sessionClose },
       },
     });
+    // Display still shows the daily close; valuation fails safe without it.
+    assert.equal(
+      (await assets.getAsset(user.id, assetIds[0])).data.asset.price?.state,
+      'available',
+    );
     for (const accountId of accountIds) {
       const result = await positions.getPositionsForTradingAccount(
         user.id,
@@ -302,7 +361,7 @@ async function main() {
       );
     }
     console.log('PASS missing completed-session evidence retains fail-safe');
-    console.log('krx closed price integration ok: 5 scenarios');
+    console.log('krx closed price integration ok: 6 scenarios');
   } finally {
     resetMarketSessionOverrideStoreForTest();
     mock.timers.reset();
@@ -310,6 +369,9 @@ async function main() {
       where: { tradingAccountId: { in: accountIds } },
     });
     await prisma.assetPriceSnapshot.deleteMany({
+      where: { assetId: { in: assetIds } },
+    });
+    await prisma.marketCandle.deleteMany({
       where: { assetId: { in: assetIds } },
     });
     await prisma.asset.deleteMany({ where: { id: { in: assetIds } } });

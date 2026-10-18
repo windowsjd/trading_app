@@ -11,12 +11,13 @@ export type AssetListTurnover = {
 };
 
 /**
- * US stocks on Tiingo: the latest completed regular session's RAW close ×
- * RAW volume from its confirmed end-of-day row
- * (`DailyChangeRateService.findLatestSessionTurnovers`). Market-list sorting
- * only; null when that session's row is absent or invalid.
+ * Turnover from the latest completed session's confirmed daily row
+ * (`DailyChangeRateService.findLatestSessionTurnovers`): US stocks on Tiingo
+ * (RAW close × RAW volume of the end-of-day row) and closed KRX stocks shown
+ * at that session's KOSCOM daily close (the row's accumulated trade value).
+ * Market-list sorting only; null when that session's row is absent or invalid.
  */
-export function usSessionTurnover(
+export function latestSessionTurnover(
   value: Prisma.Decimal | undefined,
 ): AssetListTurnover {
   return value?.isFinite() && value.gte(0)
@@ -26,8 +27,10 @@ export function usSessionTurnover(
 
 /** Only evidence attached to the price selected by the existing read policy.
  * Never synthesize notional from quantity/price or use manual/truncated evidence.
- * The single exception is US stocks on Tiingo, whose evidence has no notional:
- * `usSessionTurnover` (2026-10-17 product decision, assets-api-contract). */
+ * The exceptions are the daily rows of `latestSessionTurnover`: US stocks on
+ * Tiingo, whose evidence has no notional (2026-10-17 product decision), and a
+ * closed KRX stock whose shown price is its KOSCOM daily close (2026-10-18;
+ * assets-api-contract). */
 export function readAssetListTurnover(
   snapshot:
     | {

@@ -39,7 +39,7 @@ jest.mock('../generated/prisma/client', () => {
 import {
   compareAssetListMetric,
   readAssetListTurnover,
-  usSessionTurnover,
+  latestSessionTurnover,
 } from './asset-list-turnover';
 const read = (sourceName: string, payload: unknown, extra = {}) =>
   readAssetListTurnover({
@@ -229,18 +229,18 @@ describe('provider notional turnover evidence', () => {
   );
 });
 
-describe('usSessionTurnover', () => {
+describe('latestSessionTurnover', () => {
   const { Decimal } = jest.requireActual<
     typeof import('@prisma/client/runtime/client')
   >('@prisma/client/runtime/client');
 
   it('labels a valid end-of-day value with its session period and rejects invalid ones', () => {
-    expect(usSessionTurnover(new Decimal('183250000.5'))).toEqual({
+    expect(latestSessionTurnover(new Decimal('183250000.5'))).toEqual({
       turnover: '183250000.5',
       turnoverPeriod: 'last_completed_session',
     });
     for (const value of [undefined, new Decimal('-1'), new Decimal(NaN)]) {
-      expect(usSessionTurnover(value)).toEqual({
+      expect(latestSessionTurnover(value)).toEqual({
         turnover: null,
         turnoverPeriod: null,
       });

@@ -36,6 +36,7 @@ Historical holdings and financial reads retain their IDs and existing evidence.
 - Eligible asset providers are `kis_krx_realtime_trade` for KRX-family domestic stocks, `kis_us_delayed_trade` for NAS/NYS US stocks (`tiingo_us_reference_price` instead when `US_STOCK_PRICE_PROVIDER=tiingo`, 2026-10-17, with no `admin_manual` fallback for US stocks), and `binance_public_rest_24hr_ticker` for BINANCE USD crypto.
 - Eligible USD/KRW FX provider priority is `korea_exim_exchange_rate`, then `exchange_rate_api`.
 - While a stock market is open, provider asset freshness requires the configured `capturedAt` threshold and an `effectiveAt` inside the current asset session. While closed, read/display may use only a provider price from that asset market's latest completed session; it never skips back to an older session. Crypto remains continuously fresh by `capturedAt`. Provider FX freshness is unchanged.
+- A closed KRX market (2026-10-18, display only) shows the KOSCOM daily (`koscom_history`) close of its latest completed session whenever that session's confirmed daily row exists, ahead of the session's stored snapshots: `assetPriceSnapshotId=null`, `priceSource.sourceName=koscom_history`, `fallbackReason=market_closed_krx_last_close`, `priceEffectiveAt` = that session's regular close (the session the price belongs to), `priceCapturedAt` = the daily row's receipt. It is KOSCOM's value as stored (provisional — the NXT after-market last price — until KOSCOM finalizes the bar), not necessarily the 15:30 auction print. Without that row the selection above applies; it is never used while the market is open, and orders, valuation, settlement and ranking never read it. Policy: `policy-decisions.md` 「국내주식 휴장 시 표시 종가」.
 - Missing, stale, future, non-positive, wrong-source, or ineligible provider rows fall back to existing `admin_manual` selection.
 - The price payload may include optional public-safe `priceSource` and `fxRateSource` metadata for source/outage visibility. Raw provider payloads, `metadataJson`, and secrets are never exposed.
 - `displayPriceDecimals` (additive, nullable) is the number of decimal places a client should use for that asset's UNIT price. It comes from the provider's own tick size — for Binance assets, `PRICE_FILTER.tickSize` on the public `GET /api/v3/exchangeInfo` (BTC/ETH/BNB/SOL/ZEC = 2, LINK = 3, XRP/TRX/XLM = 4, DOGE = 5); every non-Binance asset is `null`, meaning "keep the currency's default formatting". It is present on the list item, the detail asset, `GET /api/v1/assets/:assetId/price`, and the `/api/v1/ws` `asset_ticker` payload, and all four report the same value for the same asset. Clients must not infer decimals from a price's magnitude. It applies to unit prices only — wallet balances, order totals and fees keep the currency's own formatting (USD 2 decimals). Existing clients that ignore the field are unaffected; there is no `/api/v2`.
@@ -489,10 +490,16 @@ instances can each build an immutable result without a distributed lock.
 Sorted list items expose nullable decimal-string `turnover` and `turnoverPeriod`
 (`session`, `rolling_24h` or `last_completed_session`). Turnover comes from the
 selected eligible provider price snapshot's stored, untruncated evidence — with
-the single US-on-Tiingo exception below:
+the daily-row exceptions below (US on Tiingo, closed KRX):
 
 - KRX: WebSocket ACML_TR_PBMN, REST current-price acml_tr_pbmn, or exact-date
   session-close acml_tr_pbmn; cumulative session notional in KRW.
+- KRX while the market is closed and the shown price is the KOSCOM daily close
+  (2026-10-18): that same daily row's accumulated trade value (`amount` =
+  KOSCOM `accTrdval`, KRW), `turnoverPeriod=last_completed_session`; a row
+  without `amount` yields null. Like the price it is KOSCOM's daily value
+  (provisional until finalized, NXT trades included). Read for all closed KRX
+  candidates in one query from stored rows; sorting and the home TOP 5 only.
 - US (KIS provider): WebSocket TAMT or REST current-price tamt; cumulative
   session notional in USD, with the existing delayed-feed semantics.
 - US (`US_STOCK_PRICE_PROVIDER=tiingo`, 2026-10-17 product decision): Tiingo
@@ -525,8 +532,8 @@ session under the existing price selector. The last observation is not guarantee
 to be the final full-session aggregate. Missing, truncated, invalid, unsupported
 or manual evidence yields null, never zero. Quantity/volume, price-times-volume
 and candle aggregations are not turnover fallbacks (the US-on-Tiingo
-end-of-day value above is a defined source for that provider, not a
-fallback for missing evidence). No FX conversion is introduced
+end-of-day value and the closed-KRX daily value above are defined sources,
+not fallbacks for missing evidence). No FX conversion is introduced
 for sorting. All-market search keeps the existing name/symbol filter and sorts its
 matches by the chosen native metric; it does not introduce relevance ranking or
 cross-currency conversion. The removed volume sort is rejected rather than aliased.

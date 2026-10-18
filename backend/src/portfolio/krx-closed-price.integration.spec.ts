@@ -4,7 +4,7 @@ const itDb = process.env.TRADING_ACCOUNT_DB_INTEGRATION === '1' ? it : it.skip;
 
 describe('Closed KRX price PostgreSQL integration', () => {
   itDb(
-    'shares completed-session prices across display and both account modes',
+    'shows the KOSCOM daily close while both account modes value completed-session snapshots',
     () => {
       const result = spawnSync(
         'pnpm',
@@ -19,7 +19,7 @@ describe('Closed KRX price PostgreSQL integration', () => {
       if (result.status !== 0)
         throw new Error(`${result.stdout}\n${result.stderr}`);
       expect(result.stdout).toContain(
-        'krx closed price integration ok: 5 scenarios',
+        'krx closed price integration ok: 6 scenarios',
       );
     },
     130000,

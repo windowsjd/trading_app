@@ -50,13 +50,13 @@ import { resolveStockMarketSessionState } from '../orders/market-calendar.policy
 import { findUsdKrwProviderSnapshotCandidates } from '../providers/fx-rate-snapshot-query';
 import { DailyChangeRateService } from './daily-change-rate.service';
 import { TIINGO_EOD_CANDLE_SOURCE } from '../providers/tiingo/tiingo.config';
-import { KOSCOM_MINUTE_SOURCE } from '../providers/koscom/koscom.config';
+import { KOSCOM_HISTORY_SOURCE } from '../providers/koscom/koscom.config';
 import { createHash, randomUUID } from 'node:crypto';
 import { RedisService } from '../redis/redis.service';
 import {
   compareAssetListMetric,
   readAssetListTurnover,
-  usSessionTurnover,
+  latestSessionTurnover,
   type AssetListTurnover,
 } from './asset-list-turnover';
 import {
@@ -339,10 +339,11 @@ const MAX_LIMIT = 100;
  */
 export const LAST_SESSION_CLOSE_FALLBACK_REASON = 'market_closed_last_close';
 /**
- * The same display-only fallback for a closed KRX market: the latest completed
- * session's KOSCOM close (`DailyChangeRateService.findLatestSessionClose`).
- * A reason of its own on purpose: the app labels only the US reason ("종가",
- * no date), and domestic prices show no close label (2026-10-18 product rule).
+ * The same display-only shape for a closed KRX market: the latest completed
+ * session's KOSCOM daily close (`koscom_history`), shown ahead of that
+ * session's snapshots (2026-10-18). A reason of its own on purpose: the app
+ * labels only the US reason ("종가", no date), and domestic prices show no
+ * close label (2026-10-18 product rule).
  */
 export const KRX_LAST_SESSION_CLOSE_FALLBACK_REASON =
   'market_closed_krx_last_close';
@@ -547,10 +548,11 @@ export class AssetsService {
         })
       : [];
     const byId = new Map(evidence.map((row) => [row.id, row]));
-    // US stocks on Tiingo carry no notional in their price evidence; their
-    // list turnover is the latest completed session's end-of-day value, read
-    // for every priced US row at once. A failed read leaves turnover null.
-    const usTurnovers =
+    // Rows without stored evidence take their latest completed session's
+    // daily value, read once per market: US stocks on Tiingo (no notional in
+    // their price evidence) and closed KRX stocks shown at that session's
+    // KOSCOM daily close (no stored snapshot). A failed read leaves it null.
+    const sessionTurnovers =
       (await this.dailyChangeRate
         ?.findLatestSessionTurnovers(
           priced.assets
@@ -573,7 +575,7 @@ export class AssetsService {
       return {
         ...asset,
         ...(turnover.turnover === null && available
-          ? usSessionTurnover(usTurnovers.get(asset.assetId))
+          ? latestSessionTurnover(sessionTurnovers.get(asset.assetId))
           : turnover),
       };
     });
@@ -1265,6 +1267,16 @@ export class AssetsService {
       now: valuationAt,
     };
     const closedScope = closedMarketPriceScope(priceRead);
+    // A closed KRX market shows its latest completed session's KOSCOM daily
+    // close ahead of that session's stored snapshots (2026-10-18 product
+    // rule: every domestic stock on one close basis). Without a valid daily
+    // the existing selection below applies unchanged.
+    const krxClosed =
+      closedScope !== null && asset.assetType === AssetType.domestic_stock;
+    const dailyClose = krxClosed
+      ? await this.findLatestSessionCloseSnapshot(asset, valuationAt, null)
+      : null;
+    if (dailyClose) return { snapshot: dailyClose };
     const providerCandidates = providerEligibility.eligible
       ? await findMarketAwareAssetPriceCandidates(this.prisma, {
           ...priceRead,
@@ -1348,13 +1360,15 @@ export class AssetsService {
     });
 
     if (!fallbackSnapshot) {
-      const lastClose = closedScope
-        ? await this.findLatestSessionCloseSnapshot(
-            asset,
-            valuationAt,
-            providerSelection.decision,
-          )
-        : null;
+      // A closed KRX market already tried its daily close above.
+      const lastClose =
+        closedScope && !krxClosed
+          ? await this.findLatestSessionCloseSnapshot(
+              asset,
+              valuationAt,
+              providerSelection.decision,
+            )
+          : null;
       if (lastClose) return { snapshot: lastClose };
       const latestCandidate = providerCandidates[0];
       const failureContext: DiagnosticContextUpdate = {
@@ -1403,20 +1417,20 @@ export class AssetsService {
   }
 
   /**
-   * A closed US market without an eligible stored price: the latest completed
-   * session's confirmed Tiingo end-of-day close (a closed KRX market: the
-   * KOSCOM closing-auction print, dated by the KOSCOM daily bar), DISPLAY
-   * only, for the asset read paths (list, search, detail, price, snapshot
-   * ticker). It has no stored row (`id: null`) and is never written: orders,
-   * valuation, ranking and settlement select `asset_price_snapshots` under
-   * their own freshness policies and never call this, so it cannot become an
-   * executable price.
+   * The latest completed session's daily close, DISPLAY only, for the asset
+   * read paths (list, search, detail, price, snapshot ticker): a closed US
+   * market without an eligible stored price shows the confirmed Tiingo
+   * end-of-day close; a closed KRX market shows KOSCOM's daily close first
+   * (`DailyChangeRateService.findLatestSessionClose`). It has no stored row
+   * (`id: null`) and is never written: orders, valuation, ranking and
+   * settlement select `asset_price_snapshots` under their own freshness
+   * policies and never call this, so it cannot become an executable price.
    * The market is closed, so the asset stays MARKET_CLOSED / not tradable.
    */
   private async findLatestSessionCloseSnapshot(
     asset: AssetRecord,
     valuationAt: Date,
-    providerDecision: SourceDecision,
+    providerDecision: SourceDecision | null,
   ): Promise<AssetPriceSnapshotRecord | null> {
     const currency = this.getAssetPriceCurrency(asset);
     const krx =
@@ -1428,7 +1442,7 @@ export class AssetsService {
       valuationAt,
     );
     if (!close) return null;
-    const sourceName = krx ? KOSCOM_MINUTE_SOURCE : TIINGO_EOD_CANDLE_SOURCE;
+    const sourceName = krx ? KOSCOM_HISTORY_SOURCE : TIINGO_EOD_CANDLE_SOURCE;
     return {
       id: null,
       price: close.close,
@@ -1448,7 +1462,8 @@ export class AssetsService {
         fallbackReason: krx
           ? KRX_LAST_SESSION_CLOSE_FALLBACK_REASON
           : LAST_SESSION_CLOSE_FALLBACK_REASON,
-        rejectedProviderReason: providerDecision.rejectedProviderReason,
+        rejectedProviderReason:
+          providerDecision?.rejectedProviderReason ?? null,
         freshnessAgeSeconds: null,
       },
     };
