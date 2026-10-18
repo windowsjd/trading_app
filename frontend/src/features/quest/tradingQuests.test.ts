@@ -6,16 +6,29 @@ import { startGuideSession, followGuideFocus, claimGuideCommand, settleGuideVeri
 import { TRADING_GUIDE_STEPS } from './tradingGuideSteps.ts';
 const account='beginner-1';
 const spot={kind:'spot' as const,accountId:account,assetId:'crypto-1',assetType:'crypto',side:'buy',orderType:'market',orderId:'new-fill',summary:'실제 체결'};
-for(let count=0;count<=6;count++)test(`foundation ${count}: next practice usable; later practice cannot start`,()=>{
-  const progress=questProgress(count);
-  BEGINNER_QUEST_KEYS.forEach((key,index)=>assert.equal(canStartQuest(key,progress),index<6?index<=count:count>=6));
+// A pending quest follows the order; a completed one (다시하기) starts only while
+// its practice is open: QUEST 01·02 (funding) always, QUEST 03 during QUEST
+// 04·05 (a practice holding may be bought again), everything after all ten.
+const startable:Record<number,string>={0:'TFFFFFFFFF',1:'TTFFFFFFFF',2:'TTTFFFFFFF',3:'TTTTFFFFFF',4:'TTTFTFFFFF',
+  5:'TTFFFTFFFF',6:'TTFFFFTTTT',7:'TTFFFFFTTT',10:'TTTTTTTTTT'};
+for(const [count,expected] of Object.entries(startable))test(`foundation ${count}: the current practice starts; a passed practice waits for all ten`,()=>{
+  const progress=questProgress(Number(count));
+  assert.equal(BEGINNER_QUEST_KEYS.map(key=>canStartQuest(key,progress)?'T':'F').join(''),expected);
 });
 test('advanced quests are independent, including Short before Long and US before KR',()=>{
   const payload=questPayload(6);const done=questPayload(10);
   payload.quests[7]=done.quests[7];payload.quests[9]=done.quests[9];
   const progress=parseBeginnerQuests(payload,account);
   for(const key of ['krStock','usStock','futuresLong','futuresShort'] as const)assert.equal(canStartQuest(key,progress),true);
+  // As the server reports it, the completed US and Short practices close
+  // (다시하기 waits for every quest) while the pending two still start.
+  const staged={...progress,learningPermissions:{...progress.learningPermissions,usStockMarketBuy:false,futuresShortOpen:false}};
+  for(const key of ['krStock','futuresLong'] as const)assert.equal(canStartQuest(key,staged),true);
+  for(const key of ['usStock','futuresShort'] as const)assert.equal(canStartQuest(key,staged),false);
+  // The legacy key keeps its QUEST 06 meaning for deployed apps; the staged
+  // permissions are what the server enforces.
   assert.equal(progress.learningAccess.allTrading,true);
+  assert.equal(progress.learningPermissions.allTrading,false);
 });
 test('a click/quote/old progress never replaces committed fill plus holdings review',()=>{
   const session=startGuideSession(1,account,'marketBuy',questProgress(2))!;
@@ -127,10 +140,12 @@ test('futures leverage step: the spotlight follows the leverage sheets, then 다
   }
 });
 test('replay preserves completion and returns without fireworks only after new practice',()=>{
-  const session=startGuideSession(4,account,'marketBuy',questProgress(6))!;
-  assert.equal(observeGuideProgress(session,questProgress(6),false).phase,'guiding');
+  // A passed practice cannot be replayed before every quest is complete.
+  assert.equal(startGuideSession(4,account,'marketBuy',questProgress(6)),null);
+  const session=startGuideSession(4,account,'marketBuy',questProgress(10))!;
+  assert.equal(observeGuideProgress(session,questProgress(10),false).phase,'guiding');
   const filled=claimGuideCommand(session,account,spot).session!;
-  assert.equal(settleGuideVerification({...filled,phase:'verifying'},questProgress(6)).phase,'replaySucceeded');
+  assert.equal(settleGuideVerification({...filled,phase:'verifying'},questProgress(10)).phase,'replaySucceeded');
 });
 test('the client rejects forged unlocks and out-of-order financial evidence',()=>{
   const forged=questPayload(2);forged.learningAccess.allTrading=true;
@@ -159,7 +174,7 @@ test('no guide copy offers a resume that no longer exists',()=>{
 });
 test('another practiced method: the guide opens the 주문방식 field and then points at the practiced row', () => {
   const views = (quest: 'marketBuy' | 'limitBuy' | 'marketSell', form: Record<string, unknown>) => {
-    const started = startGuideSession(1, account, quest, questProgress(6));
+    const started = startGuideSession(1, account, quest, questProgress(10));
     assert.ok(started, quest);
     // The order-type step of each practice (marketSell starts on the order screen).
     const session = { ...started, step: quest === 'marketSell' ? 2 : 3 };

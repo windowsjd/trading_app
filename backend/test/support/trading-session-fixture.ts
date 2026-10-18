@@ -35,6 +35,14 @@ export const tradingSessions = {
   reset() {
     sessions.clear();
   },
+  /** The current windows, for a helper that must put them back. */
+  save() {
+    return new Map(sessions);
+  },
+  restore(saved: Map<Market, calendar.MarketSessionWindow>) {
+    sessions.clear();
+    for (const [market, window] of saved) sessions.set(market, window);
+  },
 };
 
 const resolveState: typeof calendar.resolveStockMarketSessionState = (

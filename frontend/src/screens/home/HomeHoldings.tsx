@@ -80,12 +80,16 @@ export default function HomeHoldings({ holdings, onOpenAsset }: {
   return (
     <View testID="home-holdings" style={styles.card}>
       <Text accessibilityRole="header" style={styles.title}>보유종목 및 포지션</Text>
-      {empty ? <InlineEmptyState title="보유종목 및 포지션이 없습니다." message="아직 보유한 종목이나 선물 포지션이 없습니다." /> : <>
+      {/* Each area states its own empty result, never a combined repeat. */}
+      {empty ? <>
+        <InlineEmptyState title="보유 중인 종목이 없습니다." testID="home-holdings-spot-empty" />
+        <InlineEmptyState title="포지션이 없습니다." testID="home-holdings-futures-empty" />
+      </> : <>
       {positions && previewQuery.isError ? <ErrorState error={previewQuery.error}
         title="보유종목을 새로 불러오지 못했습니다." message="이전 조회 내역입니다. 잠시 후 다시 시도해주세요."
         onRetry={() => void previewQuery.refetch()} /> : null}
       {!positions && previewQuery.isError ? <ErrorState error={previewQuery.error} title="보유 종목을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void previewQuery.refetch()} />
-        : !positions && !previewQuery.isLoading ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." /> : null}
+        : !positions && !previewQuery.isLoading ? <InlineEmptyState title="보유 종목을 확인할 수 없습니다." /> : null}
       {futures.isError ? <ErrorState error={futures.error} title="포지션을 불러오지 못했습니다." onRetry={() => void futures.refetch()} /> : null}
       {settling ? <SectionSkeleton lines={2} /> : <>
         {order.futuresUncompared ? <Text testID="home-holdings-fx-notice" style={styles.notice}>

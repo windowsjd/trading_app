@@ -3,6 +3,13 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  // Beginner staged learning access (B차, 2026-10-18).
+  'Complete the exchange quest first.',
+  'Complete the six foundation quests first.',
+  'Available at its beginner quest step.',
+  'Available after every beginner quest is complete.',
+  'Close the open Futures position in this direction before opening another.',
+  'Beginner Futures quests open with leverage above 1x.',
   // Support inquiry answers by operators (2026-10-17).
   'Status must be pending or answered.',
   'An answer of 2-2000 characters and an idempotency key are required.',

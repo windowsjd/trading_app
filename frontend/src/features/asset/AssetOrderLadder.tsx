@@ -165,10 +165,12 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     flexShrink: 0,
   },
-  ask: { color: financial.sell },
-  bid: { color: financial.buy },
-  askRow: { backgroundColor: financial.sellSurface },
-  bidRow: { backgroundColor: financial.buySurface },
+  // Book sides, not order-button roles: asks red, bids blue (green under the
+  // Green/Red preference), each side's number and row in the same color.
+  ask: { color: financial.askText },
+  bid: { color: financial.bidText },
+  askRow: { backgroundColor: financial.askSurface },
+  bidRow: { backgroundColor: financial.bidSurface },
   status: { fontSize: 11, color: semantic.warning },
   hint: { fontSize: 10, color: semantic.muted },
 });

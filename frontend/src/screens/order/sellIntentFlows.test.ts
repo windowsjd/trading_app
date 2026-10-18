@@ -528,7 +528,7 @@ describe('SELL settings and the beginner learning guide', () => {
     await stopLossDraft(h);
     await h.press('tp-sl-submit'); await h.flush();
     assert.deepEqual(h.alerts.map((alert: any[]) => alert[1]), [
-      '암호화폐 지정가 매수 퀘스트를 완료하면 사용할 수 있어요.',
+      '모든 퀘스트를 완료하면 사용할 수 있어요.',
       'TP/SL 설정 퀘스트에서 사용할 수 있어요.',
     ]);
     assert.equal(h.requests.some((r: any) => r.url.includes('conditional-sell-orders')), false, 'nothing registered');
@@ -551,8 +551,16 @@ describe('SELL settings and the beginner learning guide', () => {
     assert.deepEqual(created[0].body.stopLoss, { triggerPrice: '700', executionType: 'market', quantity: '1' });
   });
 
-  it('after QUEST 06 the same stop-loss registers', async (t) => {
-    const h = beginner(6);
+  it('after QUEST 06 a new stop-loss waits for every quest; once all ten are complete it registers', async (t) => {
+    const locked = beginner(6);
+    await locked.mount(); t.after(locked.close);
+    await openTpSl(locked);
+    assert.equal(locked.node('tp-sl-submit').props.learningHint, '모든 퀘스트를 완료하면 사용할 수 있어요.');
+    await stopLossDraft(locked);
+    await locked.press('tp-sl-submit'); await locked.flush();
+    assert.deepEqual(locked.alerts.map((alert: any[]) => alert[1]), ['모든 퀘스트를 완료하면 사용할 수 있어요.']);
+    assert.equal(locked.requests.filter((r: any) => r.url === '/trading-accounts/beginner-1/conditional-sell-orders').length, 0, 'nothing registered');
+    const h = beginner(10);
     await h.mount(); t.after(h.close);
     await openTpSl(h);
     assert.equal(h.node('tp-sl-submit').props.learningHint ?? null, null);

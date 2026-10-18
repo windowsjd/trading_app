@@ -7,6 +7,11 @@
 
 export const QUEST_CATEGORY = '공통 기초 — 암호화폐 현물';
 
+/** The staged learning rule (B차, 2026-10-18), as the server enforces it. */
+export const QUEST_MARKET_NOTE = '네 심화 퀘스트까지 모두 완료하면 모든 거래 기능을 사용할 수 있어요. 그 전에는 진행 중인 퀘스트에 필요한 거래와 보유 자산을 줄이는 매도·종료·취소만 할 수 있어요.';
+/** A completed quest whose practice is not open again until every quest is done. */
+export const QUEST_REPLAY_LATER = '모든 퀘스트를 완료하면 다시 할 수 있어요.';
+
 export const QUEST_CARDS = {
   exchange: {
     number: 'QUEST 01',
@@ -41,7 +46,7 @@ export const QUEST_CARDS = {
   },
   limitBuy: {
     number: 'QUEST 06', title: '암호화폐 지정가 매수', summary: '원하는 가격으로 주문하고 예약금과 미체결 주문 관리를 배워요.',
-    topics: ['지정가격', '예약금', '미체결', '주문 취소'], condition: '등록한 주문을 취소하거나 체결 결과를 확인하면 모든 학습용 기능 제한이 해제돼요.', completed: '공통 기초 완료! 모든 거래 기능을 배울 준비가 됐어요.', result: '지정가 주문',
+    topics: ['지정가격', '예약금', '미체결', '주문 취소'], condition: '등록한 주문을 취소하거나 체결 결과를 확인하면 완료돼요.', completed: '공통 기초 완료! 이제 시장별 심화 퀘스트를 원하는 순서로 진행할 수 있어요.', result: '지정가 주문',
   },
   krStock: {
     number: 'QUEST 07', title: '한국주식 매수', summary: 'KRW로 국내 주식을 매수해요. 휴장 중에는 다른 심화 퀘스트를 선택할 수 있어요.',

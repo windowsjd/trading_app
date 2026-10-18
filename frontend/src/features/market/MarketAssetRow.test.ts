@@ -78,3 +78,20 @@ it('the logo keeps one 40 dp circle that nothing leaves, beside names that wrap 
   assert.equal(r.node('market-name-long').props.numberOfLines, undefined);
   assert.equal(r.text('market-subtitle-long'), '(Space Exploration Technologies Corp. Class A) · SPCX');
 });
+
+it('a closed US market\'s last confirmed close is labeled 종가 without its session date; other rows carry no label', (t) => {
+  const close = { sourceType: 'provider_api', sourceName: 'tiingo_eod', snapshotId: null, fallbackUsed: true,
+    fallbackReason: 'market_closed_last_close' };
+  const r = render(t, [
+    row({ id: 'closed', marketStatus: 'closed', tradable: false,
+      price: { state: 'available', currentPrice: '250.12', priceCurrency: 'USD', changeRate: '1.25',
+        priceSource: close, priceEffectiveAt: '2026-10-16T20:00:00.000Z' } }),
+    row({ id: 'live' }),
+    // The KRX display close has its own reason and stays unlabeled (no date either).
+    row({ id: 'krx', assetType: 'domestic_stock', symbol: '005930', name: 'Samsung Electronics', market: 'KRX', priceCurrency: 'KRW',
+      marketStatus: 'closed', price: { state: 'available', currentPrice: '70000', priceCurrency: 'KRW', changeRate: '0',
+        priceSource: { ...close, sourceName: 'koscom_intraday', fallbackReason: 'market_closed_krx_last_close' } } }),
+  ]);
+  assert.equal(r.text('market-last-close-closed'), '종가');
+  assert.equal([r.node('market-last-close-live'), r.node('market-last-close-krx')].every((node) => node === undefined), true);
+});

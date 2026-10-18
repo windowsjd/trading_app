@@ -1,7 +1,7 @@
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { questGuideTarget } from '../../features/quest/questGuideBridge';
-import FuturesMarketList from './FuturesMarketList';
+import { FuturesMarketControls, FuturesMarketRows, useFuturesMarket } from './FuturesMarketList';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import MarketSortControl from '../../features/market/MarketSortControl';
 import { marketSortParams, nextMarketPage, type MarketSort } from '../../features/market/marketSort';
@@ -136,6 +136,11 @@ export default function MarketScreen({ navigation, route }: Props) {
     (assetId: string) => navigation.navigate('AssetDetail', { assetId }),
     [navigation],
   );
+  const openFutures = useCallback(
+    (accountId: string, instrumentId: string) => navigation.navigate('Futures', { accountId, instrumentId }),
+    [navigation],
+  );
+  const futures = useFuturesMarket({ active: futuresMarket, sort, refreshVersion: futuresRefresh, onSelect: openFutures });
 
   const viewState = useMemo(() => {
     if (marketQuery.isLoading) return 'market_loading';
@@ -163,7 +168,10 @@ export default function MarketScreen({ navigation, route }: Props) {
         onEndReachedThreshold={0.4}
         refreshControl={refresh.refreshControl}
         ListHeaderComponent={
-          // The quest spotlight on the list starts below this header (spot rows only).
+          // One header card (segments and the list's own controls) on every
+          // list; the 선물 rows sit below it at the Spot rows' width.
+          <View>
+          {/* The quest spotlight on the list starts below this header (spot rows only). */}
           <View ref={futuresMarket ? undefined : questGuideTarget('market-list-header')} collapsable={false} style={styles.headerSection}>
             <View ref={questGuideTarget('market-tabs')} collapsable={false}>
               <SegmentedControl testID="market-tabs" accessibilityLabel="시장 선택" value={selectedTab} onChange={setSelectedTab}
@@ -178,8 +186,7 @@ export default function MarketScreen({ navigation, route }: Props) {
                   { key: 'futures', label: '선물', accessibilityLabel: '암호화폐 선물', testID: 'crypto-product-futures' },
                 ]} />
             ) : null}
-            {futuresMarket ? <FuturesMarketList sort={sort} onSortChange={setSort} refreshVersion={futuresRefresh}
-              onSelect={(accountId, instrumentId) => navigation.navigate('Futures', { accountId, instrumentId })} /> : <>
+            {futuresMarket ? <FuturesMarketControls market={futures} sort={sort} onSortChange={setSort} /> : <>
             <ActionPressable
               style={styles.searchEntry}
               onPress={() => navigation.navigate('MarketSearch', { sort })}
@@ -211,6 +218,8 @@ export default function MarketScreen({ navigation, route }: Props) {
               <AdminDiagnosticPanel runtime={tickerRuntime} />
             ) : null}
             </>}
+          </View>
+          {futuresMarket ? <FuturesMarketRows market={futures} /> : null}
           </View>
         }
         ListEmptyComponent={futuresMarket ? null : viewState === 'market_loading' ? (

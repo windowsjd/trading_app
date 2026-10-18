@@ -1,5 +1,6 @@
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import { FUTURES_PRACTICE_LEVERAGE_MESSAGE } from '../../features/quest/questProgress';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
 import QuestTarget from '../../features/quest/QuestTarget';
@@ -552,7 +553,15 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     setLimitPrice("");
     setConditionalDraft(emptyFuturesConditionalDraft);
   };
-  const entryGate = learning.gate(effectiveOperation === 'close' || effectiveOperation === 'reduce' ? 'riskReduction' : 'allTrading');
+  // As on the server (B차): close/reduce reduce risk; a new position opens in
+  // its quest's direction (above 1x before every quest is complete); an
+  // increase needs every quest complete.
+  const openGate = learning.gate(direction === 'short' ? 'futuresShortOpen' : 'futuresLongOpen');
+  const practiceLeverage = effectiveOperation === 'open' && openGate.allowed && !learning.gate('allTrading').allowed
+    && !(Number(selectedLeverage) > 1);
+  const entryGate = effectiveOperation === 'close' || effectiveOperation === 'reduce' ? learning.gate('riskReduction')
+    : effectiveOperation === 'increase' ? learning.gate('allTrading')
+      : practiceLeverage ? learning.lock(FUTURES_PRACTICE_LEVERAGE_MESSAGE) : openGate;
   const advancedGate = learning.gate('allTrading');
   const conditionalGate = getFuturesConditionalGate({
     isLoading: conditionalEntries.isPending,
@@ -1003,7 +1012,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             ]} />
           {listView === 'positions' ? (
             !data.positions.length ? (
-              <Text style={styles.muted}>보유 중인 선물 포지션이 없습니다.</Text>
+              <Text style={styles.muted} testID="futures-positions-empty">포지션이 없습니다.</Text>
             ) : (
               data.positions.map((p) => (
                 <FuturesPositionCard key={p.id} position={p} accountId={accountId} evaluatedAt={data.evaluatedAt} now={positionsNow}

@@ -60,7 +60,8 @@ describe('SELL limit (stocks)', () => {
       // 71,000 × 6 = 426,000; fee 0.1 % = 426; proceeds 425,574.
       assert.deepEqual([value(h, 'order-summary-fee'), label(h, 'order-summary-total'), value(h, 'order-summary-total')],
         ['426원', '예상 수령액', '425,574원']);
-      assert.deepEqual([label(h, 'order-summary-after'), value(h, 'order-summary-after')], ['주문 후 매도 가능', '0주']);
+      // A SELL card ends at 예상 수령액: no 주문 후 매도 가능 row (2026-10-18).
+      assert.equal(h.node('order-summary-after') === undefined, true);
       // Above the unreserved part: refused before any request.
       await h.input(qty, '7');
       assert.equal(has(h, /매도 가능 수량을 초과했습니다\. 다른 주문이 예약한 수량은 매도할 수 없습니다\./), true);

@@ -35,7 +35,11 @@ export function AssetDetailContent({
   const detail = useQuery({ queryKey: QUERY_KEYS.asset.detail(assetId), queryFn: () => getAssetDetail(assetId) });
   const learning = useLearningAccess(accountId);
   const insets = useSafeAreaInsets();
-  const buyGate = learning.gate(detail.data?.asset.assetType === 'crypto' ? 'cryptoMarketBuy' : 'allTrading');
+  // 구매하기 leads to every BUY of this market: open while any of them is (a
+  // crypto limit BUY at QUEST 06, a stock market BUY at its own quest).
+  const assetType = detail.data?.asset.assetType;
+  const buyGate = learning.gate(assetType === 'crypto' ? ['cryptoMarketBuy', 'cryptoLimitBuy']
+    : assetType === 'domestic_stock' ? 'krStockMarketBuy' : assetType === 'us_stock' ? 'usStockMarketBuy' : 'allTrading');
   useTradingGuideFacts({ screen: 'asset', accountId: accountId ?? '', assetId, assetType: detail.data?.asset.assetType }, focused);
   const openOrder = (side: 'buy' | 'sell') => {
     if (!accountId) return;

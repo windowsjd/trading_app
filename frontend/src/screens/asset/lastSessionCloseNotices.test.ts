@@ -48,22 +48,22 @@ const count = (h: any, id: string) =>
 const text = (h: any, id: string) =>
   [h.node(id).props.children].flat().join('');
 
-describe('closed US market: last confirmed close is labeled by its date', () => {
-  it('the detail chart says it is the 10/16 close, not a live price', async (t) => {
+describe('closed US market: last confirmed close is labeled 종가 without its date', () => {
+  it('the detail chart says it is the close, not a live price, without the 10/16 date', async (t) => {
     const h = closedUsStock('Chart', true);
     await h.mount();
     t.after(h.close);
     assert.equal(
       text(h, 'asset-last-close-notice'),
-      '미국 정규장 마감 · 10/16 종가 (실시간 시세 아님)',
+      '미국 정규장 마감 · 종가 (실시간 시세 아님)',
     );
   });
 
-  it('the order card labels the price 10/16 종가 instead of 현재가', async (t) => {
+  it('the order card labels the price 종가 (no date) instead of 현재가', async (t) => {
     const h = closedUsStock('OrderScreen', true);
     await h.mount();
     t.after(h.close);
-    assert.equal(text(h, 'order-price-label'), '10/16 종가 · USD');
+    assert.equal(text(h, 'order-price-label'), '종가 · USD');
   });
 
   it('a stored price keeps 현재가 and no close notice', async (t) => {

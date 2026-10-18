@@ -5,14 +5,17 @@ import { View, Text, StyleSheet } from '../../theme/native';
 export default function InlineEmptyState({
   title = '데이터가 없습니다.',
   message,
+  testID,
 }: {
   title?: string;
-  message: string;
+  /** Omitted for a self-explanatory title (e.g. 보유 중인 종목이 없습니다.). */
+  message?: string;
+  testID?: string;
 }) {
   return (
-    <View style={styles.box}>
+    <View style={styles.box} testID={testID}>
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+      {message !== undefined ? <Text style={styles.message}>{message}</Text> : null}
     </View>
   );
 }

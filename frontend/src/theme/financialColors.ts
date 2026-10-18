@@ -29,7 +29,7 @@ const green = {
   candle: { light: '#118038', dark: '#4ed472' },
 };
 
-function directionalPalette(positive: typeof red, negative: typeof red) {
+function directionalPalette(positive: typeof red, negative: typeof red, bid: typeof red) {
   return {
     buy: positive.text, sell: negative.text, rise: positive.text, fall: negative.text,
     buySurface: positive.surface, sellSurface: negative.surface,
@@ -37,6 +37,9 @@ function directionalPalette(positive: typeof red, negative: typeof red) {
     riseSurface: positive.surface, fallSurface: negative.surface,
     buyAction: positive.action, sellAction: negative.action,
     candleUp: positive.candle, candleDown: negative.candle,
+    // Order-book sides are not order buttons: asks (above the current price)
+    // are always red, bids the preference's other color (blue or green).
+    askText: red.text, askSurface: red.surface, bidText: bid.text, bidSurface: bid.surface,
     // Cashflow is independent of market/order direction and of this preference.
     credit: { light: '#16803a', dark: '#79d68b' },
     debit: { light: '#bd3030', dark: '#ff8585' },
@@ -44,8 +47,8 @@ function directionalPalette(positive: typeof red, negative: typeof red) {
 }
 
 export const FINANCIAL_PALETTES = {
-  red_blue: directionalPalette(red, blue),
-  green_red: directionalPalette(green, red),
+  red_blue: directionalPalette(red, blue, blue),
+  green_red: directionalPalette(green, red, green),
 };
 
 // Explicit role tokens for themed native styles; never infer roles from hex.
@@ -56,6 +59,7 @@ export const financial = {
   buyAction: '#0e0009', sellAction: '#0e000a',
   candleUp: '#0e000b', candleDown: '#0e000c',
   riseSurface: '#0e000d', fallSurface: '#0e000e',
+  askText: '#0e000f', askSurface: '#0e0010', bidText: '#0e0011', bidSurface: '#0e0012',
 } as const;
 type Role = keyof typeof financial;
 const roleByValue = Object.fromEntries(Object.entries(financial).map(([role, value]) => [value, role])) as Record<string, Role>;

@@ -616,7 +616,10 @@ export function defaultManifest(sha: string, smoke = false): Manifest {
       home: 0.15,
       historyFx: 0.05,
     },
-    accountWeights: { general: 0.6, season: 0.25, beginner: 0.15 },
+    // A beginner trades only its current quest step until all ten quests are
+    // complete (B차, 2026-10-18), and the stock quests need an open market, so
+    // the default load has no beginner actors (prepare stops at QUEST 06).
+    accountWeights: { general: 0.75, season: 0.25, beginner: 0 },
     dwellSeconds: {
       market: [30, 90],
       detail: [30, 60],

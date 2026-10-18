@@ -488,6 +488,9 @@ export function OrderForm({
         outcome: uncertain ? 'unknown' : executeAttempted ? undefined : 'not_submitted',
       }));
       const code = getApiErrorCode(error);
+      // The server's learning stage moved on (or the gate was stale): re-read it.
+      if (code === ERROR_CODE.BEGINNER_FEATURE_LOCKED)
+        void queryClient.invalidateQueries({ queryKey: QUERY_KEYS.tradingAccount.quests(action.request.accountId) });
       if (error instanceof OrderQuoteValidationError) {
         orderActionRef.current = null;
         setQuotedPreview(null);
@@ -905,16 +908,18 @@ export function OrderForm({
       ? '잔액이 부족합니다.'
       : null;
 
-  // Conditional, LOC and stop-loss/take-profit automation (either side) need
-  // full trading access on a beginner account; a plain sell stays risk reduction.
-  // A crypto stop-loss/take-profit is the TP/SL practice step (QUEST 04), so it
-  // opens with that step, as on the server.
+  // Beginner learning access mirrors the server (B차): conditional, LOC and a
+  // user's own limit SELL need every quest complete; a market SELL stays risk
+  // reduction; a BUY is open only at its quest's step (crypto market/limit,
+  // Korean/US stock market) until then.
   const advancedGate = learning.gate('allTrading');
   // A crypto 손절가/익절가 opens with the TP/SL practice step (QUEST 04).
   const protectionGate = learning.gate(asset?.assetType === 'crypto' ? 'spotProtection' : 'allTrading');
-  const tradeGate = automationForm || limitOnClose ? advancedGate
-    : learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? orderType === 'limit' ? 'cryptoLimitBuy' : 'cryptoMarketBuy' : 'allTrading');
-  const limitGate = learning.gate(side === 'sell' ? 'riskReduction' : asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
+  const marketBuyAction = asset?.assetType === 'crypto' ? 'cryptoMarketBuy'
+    : asset?.assetType === 'domestic_stock' ? 'krStockMarketBuy' : asset?.assetType === 'us_stock' ? 'usStockMarketBuy' : 'allTrading';
+  const limitGate = learning.gate(side === 'buy' && asset?.assetType === 'crypto' ? 'cryptoLimitBuy' : 'allTrading');
+  const tradeGate = automationForm || limitOnClose ? advancedGate : orderType === 'limit' ? limitGate
+    : learning.gate(side === 'sell' ? 'riskReduction' : marketBuyAction);
   const methodGate = (method: OrderMethod) =>
     method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : advancedGate;
   // The ordinary submit serves market/limit/LOC.
@@ -1117,21 +1122,17 @@ export function OrderForm({
   const summaryQuantityValue = quotedPreview?.quantity ?? (validateQuantity(orderInput) ? null : orderInput.trim());
   const summaryQuantity = summaryQuantityValue ? `${formatEnteredAmount(summaryQuantityValue, null)}주` : '-';
   const totalLabel = side === 'sell' ? '예상 수령액' : orderType === 'limit' ? '예상 예약금액' : '예상 결제금액';
-  // A LOC SELL above the unreserved part is accepted at that part (the form
-  // says so); within the holding it never leaves less than nothing.
-  const sellAccepted = summaryQuantityValue && limitOnClose && Number(summaryQuantityValue) <= Number(positionQuantity)
-    && Number(summaryQuantityValue) > Number(sellCapacity) ? sellCapacity : summaryQuantityValue;
-  const remaining = side === 'buy'
-    ? summaryPreview && buyAvailable !== null && !walletsQuery.isError ? decimalDifference(buyAvailable, summaryPreview.totalAmount) : null
-    : sellAccepted && summaryPreview !== null && !positionQuery.isLoading && !positionUnavailable ? decimalDifference(sellCapacity, sellAccepted) : null;
-  const summaryAfter = {
-    label: side === 'buy' ? '주문 후 사용 가능' : '주문 후 매도 가능',
+  // 주문 후 사용 가능 is a BUY row only (2026-10-18): a SELL card ends at 예상
+  // 수령액. The sellable quantity and its checks (sellCapacity) are unchanged.
+  const remaining = side === 'buy' && summaryPreview && buyAvailable !== null && !walletsQuery.isError
+    ? decimalDifference(buyAvailable, summaryPreview.totalAmount) : null;
+  const summaryAfter = side === 'buy' ? {
+    label: '주문 후 사용 가능',
     testID: 'order-summary-after',
     value: remaining === null ? '-'
-      : remaining.isNegative() ? '부족'
-        : side === 'buy' ? formatPreviewMoney(remaining.toFixed(), asset.settlementCurrency) : `${formatEnteredAmount(remaining.toFixed(), null)}주`,
+      : remaining.isNegative() ? '부족' : formatPreviewMoney(remaining.toFixed(), asset.settlementCurrency),
     short: !!remaining?.isNegative(),
-  };
+  } : null;
   // Why there is no expected amount yet, and the reads that would give one.
   const previewProblem = (
     <>

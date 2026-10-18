@@ -1,4 +1,4 @@
-import { financial } from '../../theme/financialColors.ts';
+import { financial, getFinancialColors, resolveFinancialColor } from '../../theme/financialColors.ts';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
@@ -42,8 +42,8 @@ describe('compact trading depth presentation', () => {
 });
 
 
-describe('order side colors in the trading ladder', () => {
-  it('uses red asks and green bids without changing the best levels', (t) => {
+describe('order book side colors in the trading ladder', () => {
+  it('draws asks red and bids blue (green under Green/Red), number and row alike, without changing the best levels', (t) => {
     const h = interactionHarness();
     const Ladder = h.load('src/features/asset/AssetOrderLadder.tsx').default;
     const book = createCryptoOrderBookFixture('btc', 'BTC', true);
@@ -51,13 +51,46 @@ describe('order side colors in the trading ladder', () => {
     t.after(() => act(() => renderer.unmount()));
     const ask = renderer.root.findByProps({ testID: 'asset-order-book-asks-1' });
     const bid = renderer.root.findByProps({ testID: 'asset-order-book-bids-1' });
-    assert.equal(flatten(ask.props.style).backgroundColor, financial.sellSurface);
-    assert.equal(flatten(bid.props.style).backgroundColor, financial.buySurface);
-    assert.equal(flatten(ask.children[0].props.style).color, financial.sell);
-    assert.equal(flatten(bid.children[0].props.style).color, financial.buy);
+    // Book-side roles, never the order buttons' buy/sell roles.
+    assert.equal(flatten(ask.props.style).backgroundColor, financial.askSurface);
+    assert.equal(flatten(bid.props.style).backgroundColor, financial.bidSurface);
+    assert.equal(flatten(ask.children[0].props.style).color, financial.askText);
+    assert.equal(flatten(bid.children[0].props.style).color, financial.bidText);
+    for (const mode of ['light', 'dark'] as const) {
+      const redBlue = getFinancialColors(mode, 'red_blue'), greenRed = getFinancialColors(mode, 'green_red');
+      // Red/Blue: red asks over the current price, blue bids under it.
+      assert.deepEqual([resolveFinancialColor(financial.askText, mode, 'red_blue'), resolveFinancialColor(financial.bidText, mode, 'red_blue')],
+        [redBlue.rise, redBlue.fall]);
+      assert.deepEqual([resolveFinancialColor(financial.askSurface, mode, 'red_blue'), resolveFinancialColor(financial.bidSurface, mode, 'red_blue')],
+        [redBlue.riseSurface, redBlue.fallSurface]);
+      // Green/Red keeps its red asks and green bids.
+      assert.deepEqual([resolveFinancialColor(financial.askText, mode, 'green_red'), resolveFinancialColor(financial.bidText, mode, 'green_red')],
+        [greenRed.fall, greenRed.rise]);
+      assert.deepEqual([resolveFinancialColor(financial.askSurface, mode, 'green_red'), resolveFinancialColor(financial.bidSurface, mode, 'green_red')],
+        [greenRed.fallSurface, greenRed.riseSurface]);
+    }
     assert.match(ask.props.accessibilityLabel, /매도 1호가/);
     assert.match(bid.props.accessibilityLabel, /매수 1호가/);
     assert.equal(ask.children[0].props.children, formatOrderBookDecimal(book.asks[0].price));
     assert.equal(bid.children[0].props.children, formatOrderBookDecimal(book.bids[0].price));
+  });
+
+  it('colors a level by its book side, never by where its price falls against the current price', (t) => {
+    const h = interactionHarness();
+    const Ladder = h.load('src/features/asset/AssetOrderLadder.tsx').default;
+    // A crossed (abnormal) snapshot: the best ask is below the best bid.
+    const book = { assetId: 'btc', priceUnit: 'USDT', quantityUnit: 'BTC', capturedAt: '2026-10-18T00:00:00.000Z',
+      asks: [{ price: '99', quantity: '1' }], bids: [{ price: '101', quantity: '2' }] };
+    const renderer = h.render(React.createElement(Ladder, { book, statusMessage: null,
+      currentPrice: React.createElement('Text', { testID: 'canonical-price' }, '$100') }));
+    t.after(() => act(() => renderer.unmount()));
+    const ids = renderer.root.findAll((node: any) => typeof node.type === 'string' && node.props.testID).map((node: any) => node.props.testID);
+    assert.ok(ids.indexOf('asset-order-book-asks-1') < ids.indexOf('canonical-price'));
+    assert.ok(ids.indexOf('canonical-price') < ids.indexOf('asset-order-book-bids-1'));
+    const ask = renderer.root.findByProps({ testID: 'asset-order-book-asks-1' });
+    const bid = renderer.root.findByProps({ testID: 'asset-order-book-bids-1' });
+    assert.deepEqual([ask.children[0].props.children, bid.children[0].props.children], ['99', '101']);
+    assert.deepEqual([flatten(ask.children[0].props.style).color, flatten(bid.children[0].props.style).color],
+      [financial.askText, financial.bidText]);
   });
 });

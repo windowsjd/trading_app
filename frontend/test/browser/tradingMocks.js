@@ -42,15 +42,20 @@ const usLong = params.get('usLong') === '1';
 // Tiingo source, and every capability list naming US.
 const usOfficial = params.get('usOfficial') === '1';
 // `?usSymbol=&usMarket=&usName=` (2026-10-18): another listing under the same id, for its Korean name.
-const usStock = params.get('us') === '1' || usOfficial ? [{
+// `?usLastClose=1` (B차): a closed market shown at its last confirmed close (label 종가, no date).
+const usLastClose = params.get('usLastClose') === '1';
+const usStock = params.get('us') === '1' || usOfficial || usLastClose ? [{
   id: 'AAPL', assetType: 'us_stock', symbol: params.get('usSymbol') ?? 'AAPL', market: params.get('usMarket') ?? 'NAS',
   name: params.get('usName') ?? 'Apple Inc.',
   priceCurrency: 'USD', settlementCurrency: 'USD', displayPriceDecimals: null, isActive: true,
-  marketStatus: params.get('usClosed') === '1' ? 'closed' : 'open', tradable: true,
+  marketStatus: params.get('usClosed') === '1' || usLastClose ? 'closed' : 'open', tradable: true,
   price: { state: 'available', currentPrice: usLong ? '12345.12345600' : '247.61000000', priceCurrency: 'USD',
     priceKrwState: 'available', priceKrw: '346654.00000000', changeRate: null,
     priceCapturedAt: new Date().toISOString(), priceEffectiveAt: new Date().toISOString(), assetPriceSnapshotId: null,
-    priceSource: { sourceType: 'provider_api', sourceName: usOfficial ? 'tiingo_us_reference_price' : 'tiingo_equity_reference_price', snapshotId: null,
+    priceSource: usLastClose ? { sourceType: 'provider_api', sourceName: 'tiingo_eod', snapshotId: null,
+      effectiveAt: '2026-10-16T20:00:00.000Z', capturedAt: '2026-10-16T22:00:00.000Z', fallbackUsed: true,
+      fallbackReason: 'market_closed_last_close', rejectedProviderReason: null, freshnessAgeSeconds: null }
+      : { sourceType: 'provider_api', sourceName: usOfficial ? 'tiingo_us_reference_price' : 'tiingo_equity_reference_price', snapshotId: null,
       effectiveAt: new Date().toISOString(), capturedAt: new Date().toISOString(), fallbackUsed: false,
       fallbackReason: null, rejectedProviderReason: null, freshnessAgeSeconds: 1 } },
 }] : [];

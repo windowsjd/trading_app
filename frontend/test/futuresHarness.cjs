@@ -8,7 +8,7 @@ const { deferred } = require('./walletTransferHarness.cjs');
 const { conditionalFixture } = require('./conditionalFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 function futuresHarness(options = {}) {
-  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], orderBookRequests: [], options, session: 1 };
+  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], orderBookRequests: [], alerts: [], options, session: 1 };
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = client.invalidateQueries.bind(client);
   client.invalidateQueries = config => { h.invalidations.push(config?.queryKey ?? []); return invalidate(config); };
@@ -90,7 +90,7 @@ function futuresHarness(options = {}) {
   const entryTpSlApi = load(resolve(__dirname, '../src/features/conditional/entryTpSlApi.ts'), { '../../services/api/client': transport });
   const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
   native.useWindowDimensions = () => options.dimensions ?? { width: 390, height: 844, fontScale: 1 };
-  Object.assign(native, { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
+  Object.assign(native, { Alert: { alert: (...args) => { h.alerts.push(args); } }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
     // Bottom sheets (주문방식, 선물 상품) mount these only while open.
     Pressable: 'Pressable', BackHandler: { addEventListener: () => ({ remove() {} }) } });
   const conditionalApi = load(resolve(__dirname, '../src/features/conditional/api.ts'), {
@@ -117,6 +117,8 @@ function futuresHarness(options = {}) {
       capabilities: { enabled: true, condition: { enabled: true, canCreate: true, canUseLimit: true }, protection: { enabled: true, canCreate: true, canUseLimit: true }, canCancel: true, markets: ['KRX', 'CRYPTO_SPOT'], maxLivePerAccount: 20 },
       conditionalOrders: [], pagination: { limit: 30, offset: 0, total: 0, returned: 0, nextOffset: null } }) },
     '../../features/tradingAccount/api': { getTradingAccountOrders: async id => ({ tradingAccountId: id, orders: [], pagination: { offset: 0, limit: 100, total: 0, returned: 0, nextOffset: null } }),
+      // A beginner selection (h.accountState) reads its learning permissions here.
+      getBeginnerQuestProgress: async () => h.questProgress,
       // The account's trade fee policy (the futures ratio slider keeps room for the fee).
       getTradingAccount: async id => {
         h.accountReads = (h.accountReads ?? 0) + 1;
@@ -148,7 +150,14 @@ function futuresHarness(options = {}) {
     mocks['../../features/me/api'] = { getMe: async () => me };
     client.setQueryData(['me'], me);
   }
-  const screen = load(resolve(__dirname, options.screen === 'market' ? '../src/screens/market/FuturesMarketList.tsx' : '../src/screens/futures/FuturesScreen.tsx'), mocks).default;
+  const loaded = load(resolve(__dirname, options.screen === 'market' ? '../src/screens/market/FuturesMarketList.tsx' : '../src/screens/futures/FuturesScreen.tsx'), mocks);
+  // MarketScreen's composition: the controls (header card), then the rows.
+  const screen = options.screen === 'market' ? (props) => {
+    const market = loaded.useFuturesMarket({ ...props, active: true });
+    return React.createElement(React.Fragment, null,
+      React.createElement(loaded.FuturesMarketControls, { market, sort: props.sort, onSortChange: props.onSortChange }),
+      React.createElement(loaded.FuturesMarketRows, { market }));
+  } : loaded.default;
   // The market list's sort/refresh are owned by MarketScreen; tests drive them.
   h.sort = 'turnover_desc'; h.refreshVersion = 0;
   const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: { accountId: h.routeAccountId, instrumentId: options.instrumentId } }, navigation: { navigate: (...args) => h.navigation.push(args) }, onSelect: (...args) => h.navigation.push(args),

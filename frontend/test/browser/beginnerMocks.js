@@ -1,6 +1,6 @@
 // Fixture transport only. Production providers, navigators and screens are used.
 import { apiClient as existing, transport } from './motionMocks';
-import { questPayload } from '../questFixtures';
+import { permissionsFromQuests, questPayload } from '../questFixtures';
 import { tradingQuestTransport } from './tradingQuestMocks';
 export { useMarketTickers, useAssetTicker, useAssetCandle, useAssetOrderBook, useFuturesOrderBook, getRequestGeneration } from './motionMocks';
 const params = new URLSearchParams(location.search);
@@ -39,11 +39,14 @@ function questProgress(accountId) {
     throw Object.assign(new Error('Request failed with status code 503'), { response: { status: 503, data: { success: false, error: { code: 'INTERNAL_SERVER_ERROR', message: 'Request could not be completed.' } } } });
   }
   const base = questPayload(Number(level) || 0, accountId);
-  return response({ ...base, learningAccess: { ...base.learningAccess, transfer: !!ledger.fxAt, cryptoMarketBuy: !!ledger.transferAt }, quests: [
+  const quests = [
     quest('common-01-exchange', 'fx_krw_to_usd', ledger.fxAt),
     quest('common-02-transfer', 'transfer_securities_usd_to_crypto_spot_usd', ledger.transferAt),
     ...base.quests.slice(2),
-  ] });
+  ];
+  // The server's staged permissions follow the live ledger, like learningAccess.
+  return response({ ...base, learningAccess: { ...base.learningAccess, transfer: !!ledger.fxAt, cryptoMarketBuy: !!ledger.transferAt },
+    learningPermissions: permissionsFromQuests(quests), quests });
 }
 const walletRows = accountId => [
   { id: `${accountId}:krw`, walletScope: 'securities', currencyCode: 'KRW', reservedAmount: '0', balanceAmount: String(ledger.wallets.krw) },

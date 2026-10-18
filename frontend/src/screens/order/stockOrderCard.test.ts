@@ -109,7 +109,7 @@ describe('stock order card (A-2)', () => {
     assert.equal(text(h.node('asset-market-status')), '장마감');
   });
 
-  it('a total above what can be used reads 부족; a sell shows what stays sellable', async (t) => {
+  it('a total above what can be used reads 부족; a sell card has no 주문 후 매도 가능 row', async (t) => {
     const h = inlineTradingHarness();
     stock(h);
     h.krwBalance = '100000';
@@ -121,9 +121,15 @@ describe('stock order card (A-2)', () => {
     assert.equal(h.node('order-balance-insufficient') !== undefined, true, 'the existing pre-check still blocks it');
     await h.press(sell);
     await h.input(qty, '1');
-    assert.deepEqual([label(h, 'order-summary-total'), label(h, 'order-summary-after'), value(h, 'order-summary-after')],
-      ['예상 수령액', '주문 후 매도 가능', '3주']);
+    assert.equal(label(h, 'order-summary-total'), '예상 수령액');
+    // The row (and its value) is gone; the card's last row is 예상 수령액.
+    assert.equal(h.node('order-summary-after') === undefined, true);
+    assert.deepEqual(idsWithin(h, 'order-indicative-preview').filter((id) => id.startsWith('order-summary-') && !id.endsWith('-value')),
+      ['order-summary-badge', 'order-summary-price', 'order-summary-quantity', 'order-summary-amounts', 'order-summary-fee', 'order-summary-total']);
+    // What stays sellable is still computed and shown where it was before.
     assert.deepEqual([value(h, 'order-sell-capacity'), h.node(TEST_IDS.order.executeSubmit).props.label], ['4주', '매도 주문']);
+    await h.input(qty, '5');
+    assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled', 'above the sellable quantity is still refused');
   });
 
   it('a LOC SELL above the unreserved part leaves nothing sellable, not a shortfall', async (t) => {
@@ -141,9 +147,10 @@ describe('stock order card (A-2)', () => {
     await h.input(limitPrice, '70000');
     await h.input(qty, '10');
     assert.equal(h.node('loc-sell-adjust-notice') !== undefined, true, 'the form says only the unreserved part is accepted');
-    assert.deepEqual([text(h.node('order-summary-badge')), label(h, 'order-summary-after'), value(h, 'order-summary-after')], ['종가 대기', '주문 후 매도 가능', '0주']);
+    assert.deepEqual([text(h.node('order-summary-badge')), value(h, 'order-summary-quantity')], ['종가 대기', '10주']);
+    assert.equal(h.node('order-summary-after') === undefined, true, 'no 주문 후 매도 가능 row on a SELL');
     await h.input(qty, '11');
-    assert.equal(value(h, 'order-summary-after'), '부족', 'above the holding itself');
+    assert.equal(h.node(TEST_IDS.order.executeSubmit).props.state, 'disabled', 'above the holding itself is still refused');
   });
 
   it('a side change or a moved account never leaves the previous form\'s 예상 주문', async (t) => {

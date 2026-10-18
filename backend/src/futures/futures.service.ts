@@ -1,4 +1,7 @@
-import { assertBeginnerLearningAccess } from '../trading-accounts/beginner-learning-policy';
+import {
+  assertBeginnerLearningAccess,
+  beginnerFuturesAction,
+} from '../trading-accounts/beginner-learning-policy';
 import { BINANCE_FUTURES_SYMBOLS } from '../providers/binance/binance-product-catalog';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { releaseFuturesEntryReservation } from './futures-limit-state';
@@ -270,13 +273,16 @@ export class FuturesService {
             HttpStatus.INTERNAL_SERVER_ERROR,
           );
         await this.assertTradable(lockedAccount, executeNow, tx);
-        await assertBeginnerLearningAccess(
-          tx,
-          lockedAccount,
-          ['open', 'increase'].includes(request.operation)
-            ? 'allTrading'
-            : 'riskReduction',
-        );
+        // A pending limit entry was gated when it was accepted: its fill is
+        // not a new command (like a Spot limit fill), and a refusal here would
+        // keep its reservation while the matcher retried every second.
+        if (!limitEntryId)
+          await assertBeginnerLearningAccess(
+            tx,
+            lockedAccount,
+            beginnerFuturesAction(request),
+            { leverage: request.leverage },
+          );
         const lockedInstrument = await this.instrument(
           tx,
           request.instrumentId,

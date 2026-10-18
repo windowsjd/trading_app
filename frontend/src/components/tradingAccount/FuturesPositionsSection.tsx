@@ -16,7 +16,7 @@ export default function FuturesPositionsSection({ holdings, onOpen, limit, testI
     <Text accessibilityRole="header" style={styles.title}>포지션</Text>
     {holdings.isError ? <ErrorState error={holdings.error} title="포지션을 불러오지 못했습니다." onRetry={() => void holdings.refetch()} />
       : !holdings.data ? <SectionSkeleton lines={2} />
-        : holdings.data.positions.length === 0 ? <InlineEmptyState message="보유 중인 선물 포지션이 없습니다." />
+        : holdings.data.positions.length === 0 ? <InlineEmptyState title="포지션이 없습니다." testID={`${testID}-empty`} />
           : holdings.data.positions.slice(0, limit).map(position => <FuturesPositionRow key={position.id}
             testID={`${testID}-${position.id}`} position={futuresHolding(position)} evaluatedAt={holdings.data.evaluatedAt}
             now={holdings.clock} onPress={() => onOpen(position)} />)}

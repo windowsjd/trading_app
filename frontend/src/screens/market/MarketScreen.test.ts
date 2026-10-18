@@ -82,7 +82,7 @@ describe('MarketScreen market switching', () => {
     const results: Record<string, any> = {};
     const keys: string[] = [], refetches: string[] = [], subscribed: string[][] = [];
     const Screen = h.load('src/screens/market/MarketScreen.tsx', {
-      './FuturesMarketList': { default: 'FuturesMarketList', __esModule: true },
+      './FuturesMarketList': { FuturesMarketControls: 'FuturesMarketControls', FuturesMarketRows: 'FuturesMarketRows', useFuturesMarket: () => ({}), __esModule: true },
       '@tanstack/react-query': { useInfiniteQuery: (options: any) => {
         const assetType = options.queryKey[2];
         keys.push(assetType);
@@ -141,6 +141,27 @@ describe('MarketScreen market switching', () => {
     assert.deepEqual(m.rows(), ['us_stock-1', 'us_stock-2']);
     assert.deepEqual(m.subscribed.at(-1), ['us_stock-1', 'us_stock-2']);
     assert.deepEqual(m.slides(), [1], 'data arrival does not move the pill again');
+  });
+
+  it('선물 rows sit below the header card, where Spot rows are; the card and its pills stay mounted', (t) => {
+    const m = marketHarness();
+    t.after(() => act(() => m.renderer.unmount()));
+    m.tab('market-tab-crypto');
+    m.tab('crypto-product-futures');
+    assert.deepEqual(m.slides(), [2, 1], 'the product pill slides: nothing above it was remounted');
+    const all = (type: string, root = m.renderer.root) => root.findAll((n: any) => n.type === type);
+    // The header card: the nearest view around the market tabs with the card's corner.
+    let card = m.renderer.root.findAll((n: any) => n.props.testID === 'market-tabs')[0];
+    while (card && card.props.style?.borderRadius !== 14) card = card.parent;
+    assert.equal(all('FuturesMarketControls', card).length, 1, 'search and sort stay in the card, like Spot');
+    assert.equal(all('FuturesMarketRows', card).length, 0, 'the rows are not inside the padded card');
+    assert.equal(all('FuturesMarketRows').length, 1);
+    const header = card.parent;
+    assert.deepEqual(header.children.map((n: any) => n === card ? 'card' : n.type), ['card', 'FuturesMarketRows'],
+      'rows follow the card at the list content width');
+    m.tab('crypto-product-spot');
+    assert.deepEqual(m.slides(), [2, 1, 0]);
+    assert.equal(all('FuturesMarketRows').length + all('FuturesMarketControls').length, 0);
   });
 
   it('rapid switches end on the last market; a late answer never replaces it and errors retry in place', (t) => {

@@ -143,6 +143,19 @@ describe('BeginnerQuestsService', () => {
       cryptoLimitBuy: false,
       allTrading: false,
     });
+    expect(result.data.learningPermissions).toEqual({
+      exchange: true,
+      transfer: false,
+      fxTransfer: false,
+      cryptoMarketBuy: false,
+      spotProtection: false,
+      cryptoLimitBuy: false,
+      krStockMarketBuy: false,
+      usStockMarketBuy: false,
+      futuresLongOpen: false,
+      futuresShortOpen: false,
+      allTrading: false,
+    });
     expect({
       ...result,
       data: {

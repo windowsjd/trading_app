@@ -111,8 +111,9 @@ tradable account/Season (`CONDITIONAL_ACCOUNT_NOT_TRADABLE`), an active Spot
 asset, KRX or crypto — or US with `US_STOCK_PRICE_PROVIDER=tiingo`
 (2026-10-17) — (`CONDITIONAL_SELL_MARKET_NOT_SUPPORTED` otherwise),
 the existing order input policy (whole shares for a stock limit execution),
-beginner learning access (`allTrading`; a **crypto stop-loss/take-profit**
-needs `spotProtection`, the QUEST 04 step, as the OCO protection did), at most
+beginner learning access (`allTrading` = all ten quests complete since
+2026-10-18, see beginner-mode.md; a **crypto stop-loss/take-profit** needs
+`spotProtection`, open during the QUEST 04 step, as the OCO protection did), at most
 30 live settings per account
 (`CONDITIONAL_SELL_LIMIT_EXCEEDED`; a pair counts two), no live whole-position
 OCO protection on the asset (`PROTECTION_CONFLICT`), an open holding

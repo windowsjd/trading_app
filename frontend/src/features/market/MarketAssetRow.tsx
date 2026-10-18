@@ -59,7 +59,7 @@ function MarketAssetRowComponent({
   const secondLine = getAssetEnglishNameLine(nameDisplay) ?? getAssetSymbolMarketDisplay(displayItem);
   const change = getMarketChangeDisplay(displayItem);
   const exception = getMarketException(displayItem);
-  // A closed US market's last confirmed close is named by its date, never "live".
+  // A closed US market's last confirmed close is named 종가 (no date), never "live".
   const lastClose =
     displayItem.price?.state === 'available'
       ? getLastSessionCloseLabel(displayItem.price)

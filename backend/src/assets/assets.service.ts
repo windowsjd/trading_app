@@ -334,14 +334,15 @@ const MAX_LIMIT = 100;
 /**
  * `priceSource.fallbackReason` of a closed US market's display price: the
  * latest completed session's confirmed end-of-day close (no stored snapshot,
- * never executable). The app labels it as that date's close.
+ * never executable). The app labels it "종가" (no session date since
+ * 2026-10-18; priceEffectiveAt still carries the session close).
  */
 export const LAST_SESSION_CLOSE_FALLBACK_REASON = 'market_closed_last_close';
 /**
  * The same display-only fallback for a closed KRX market: the latest completed
  * session's KOSCOM close (`DailyChangeRateService.findLatestSessionClose`).
- * A reason of its own on purpose: the app labels only the US reason with a
- * date, and domestic prices show no close date (2026-10-18 product rule).
+ * A reason of its own on purpose: the app labels only the US reason ("종가",
+ * no date), and domestic prices show no close label (2026-10-18 product rule).
  */
 export const KRX_LAST_SESSION_CLOSE_FALLBACK_REASON =
   'market_closed_krx_last_close';

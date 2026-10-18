@@ -1,4 +1,7 @@
 /** Test-only real financial practice. Never imported by application code. */
+// Calendar fixture before any service (see the fixture): the stock practice
+// opens its own KRX/US windows and puts the caller's back.
+import { tradingSessions } from '../../test/support/trading-session-fixture';
 import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { PrismaService } from '../../src/prisma/prisma.service';
@@ -19,6 +22,9 @@ import { ConditionalSellService } from '../../src/conditional/conditional-sell.s
 import { FuturesService } from '../../src/futures/futures.service';
 import { FxService } from '../../src/fx/fx.service';
 import { TradingAccountWalletTransferService } from '../../src/wallets/trading-account-wallet-transfer.service';
+import { BINANCE_FUTURES_SYMBOLS } from '../../src/providers/binance/binance-product-catalog';
+import { KOSCOM_PRICE_SOURCE } from '../../src/providers/koscom/koscom.config';
+import { usStockPriceSourceName } from '../../src/providers/source-eligibility.policy';
 
 export function practiceServices(db: PrismaService) {
   const access = new TradingAccountAccessService(db);
@@ -209,6 +215,211 @@ export async function practiceFoundation(
   };
 }
 
+/**
+ * QUEST 07–10 after QUEST 06, with real commands (B차, 2026-10-18: every
+ * quest opens the ordinary trading): one Korean and one US stock market BUY,
+ * then a 2x Long and a 2x Short each opened and fully closed by the user on a
+ * Futures catalog contract no other row in the database uses. Every asset it
+ * creates is named `learning-fixture:<account>` for the cleanup below. The
+ * caller's runner must import the session fixture before its services (this
+ * module does so first); its windows and Futures mode are put back after.
+ */
+export async function practiceMarkets(
+  db: PrismaService,
+  userId: string,
+  accountId: string,
+) {
+  const app = practiceServices(db);
+  const name = `learning-fixture:${accountId}`;
+  const clock = async () =>
+    (
+      await db.$queryRaw<
+        Array<{ now: Date }>
+      >`SELECT clock_timestamp() AS "now"`
+    )[0].now;
+  const sessions = tradingSessions.save();
+  const futuresMode = process.env.FUTURES_TRADING_MODE;
+  process.env.FUTURES_TRADING_MODE = 'ENABLED';
+  try {
+    // Prices two seconds old (fresh: quote 60 s, execution 10 s) are never
+    // "future" if a host clock steps back by a second or so meanwhile.
+    let at = new Date((await clock()).getTime() - 2000);
+    tradingSessions.set(at, new Date(at.getTime() + 86_400_000), ['KRX', 'US']);
+    // Securities USD for the US BUY and the Futures funding: a caller may have
+    // moved it all to Spot after QUEST 01·02. Exchange stays open (QUEST 01).
+    const securitiesUsd = await db.cashWallet.findUniqueOrThrow({
+      where: {
+        tradingAccountId_walletScope_currencyCode: {
+          tradingAccountId: accountId,
+          walletScope: 'securities',
+          currencyCode: 'USD',
+        },
+      },
+    });
+    if (securitiesUsd.balanceAmount.sub(securitiesUsd.reservedAmount).lt(400)) {
+      const body = {
+        fromCurrency: 'KRW',
+        toCurrency: 'USD',
+        sourceAmount: '700000',
+      };
+      const quote = await app.fx.quoteForTradingAccount(
+        userId,
+        accountId,
+        body,
+      );
+      await app.fx.executeForTradingAccount(userId, accountId, {
+        ...body,
+        quoteId: quote.data.quoteId,
+        idempotencyKey: randomUUID(),
+      });
+    }
+    for (const [assetType, market, currency, sourceName] of [
+      ['domestic_stock', 'KRX', 'KRW', KOSCOM_PRICE_SOURCE],
+      ['us_stock', 'NASDAQ', 'USD', usStockPriceSourceName()],
+    ] as const) {
+      const asset = await db.asset.create({
+        data: {
+          assetType,
+          market,
+          symbol: `L${randomUUID().slice(0, 7).toUpperCase()}`,
+          name,
+          currencyCode: currency,
+          priceCurrency: currency,
+          settlementCurrency: currency,
+        },
+      });
+      await db.assetPriceSnapshot.create({
+        data: {
+          assetId: asset.id,
+          price: '100',
+          currencyCode: currency,
+          sourceType: 'provider_api',
+          sourceName,
+          effectiveAt: at,
+          capturedAt: at,
+        },
+      });
+      const bought = await practiceOrder(app, userId, accountId, {
+        assetId: asset.id,
+        side: 'buy',
+        orderType: 'market',
+        quantity: '1',
+      });
+      assert.equal(bought.data.order.status, 'executed');
+      // The BUY fill is the evidence; like the foundation, no holding stays.
+      const sold = await practiceOrder(app, userId, accountId, {
+        assetId: asset.id,
+        side: 'sell',
+        orderType: 'market',
+        quantity: '1',
+      });
+      assert.equal(sold.data.order.status, 'executed');
+    }
+    // A catalog contract (the Futures product rule) that nothing else holds.
+    const used = new Set(
+      (
+        await db.asset.findMany({
+          where: {
+            market: 'BINANCE',
+            symbol: { in: [...BINANCE_FUTURES_SYMBOLS] },
+          },
+          select: { symbol: true },
+        })
+      ).map((row) => row.symbol),
+    );
+    const symbol = [...BINANCE_FUTURES_SYMBOLS]
+      .reverse()
+      .find((value) => !used.has(value));
+    assert.ok(symbol, 'No free Futures contract for the learning practice');
+    const underlying = await db.asset.create({
+      data: {
+        symbol,
+        name,
+        market: 'BINANCE',
+        assetType: 'crypto',
+        currencyCode: 'USD',
+        priceCurrency: 'USD',
+        settlementCurrency: 'USD',
+      },
+    });
+    const instrument = await db.futuresInstrument.create({
+      data: {
+        underlyingAssetId: underlying.id,
+        markVerifiedAt: await clock(),
+        markContractJson: {
+          symbol,
+          pair: symbol,
+          baseAsset: symbol.slice(0, -4),
+          contractType: 'PERPETUAL',
+          status: 'TRADING',
+          quoteAsset: 'USDT',
+          marginAsset: 'USDT',
+          underlyingType: 'COIN',
+        },
+      },
+    });
+    const wallets = await db.cashWallet.findMany({
+      where: { tradingAccountId: accountId, currencyCode: 'USD' },
+    });
+    await app.transfers.transfer(userId, accountId, {
+      sourceWalletId: wallets.find((w) => w.walletScope === 'securities')!.id,
+      destinationWalletId: wallets.find(
+        (w) => w.walletScope === 'crypto_futures',
+      )!.id,
+      amount: '200',
+      idempotencyKey: randomUUID(),
+    });
+    for (const direction of ['long', 'short'] as const) {
+      // Two seconds old as above: fresh for Last (10 s) and Mark (5 s).
+      at = new Date((await clock()).getTime() - 2000);
+      const evidence = {
+        instrumentId: instrument.id,
+        symbol,
+        price: '100',
+        effectiveAt: at,
+        capturedAt: at,
+      };
+      await db.futuresLastPriceSnapshot.create({
+        data: { ...evidence, source: 'binance_usdm_agg_trade_ws' },
+      });
+      await db.futuresMarkSnapshot.create({
+        data: { ...evidence, source: 'binance_usdm_mark_ws' },
+      });
+      const body = {
+        instrumentId: instrument.id,
+        direction,
+        marginMode: 'isolated' as const,
+        leverage: 2,
+        quantity: '1',
+      };
+      const opened = await app.futures.execute(userId, accountId, {
+        ...body,
+        operation: 'open',
+        idempotencyKey: randomUUID(),
+      });
+      await app.futures.execute(userId, accountId, {
+        ...body,
+        positionId: opened.data.position.id,
+        operation: 'close',
+        idempotencyKey: randomUUID(),
+      });
+    }
+  } finally {
+    tradingSessions.restore(sessions);
+    if (futuresMode === undefined) delete process.env.FUTURES_TRADING_MODE;
+    else process.env.FUTURES_TRADING_MODE = futuresMode;
+  }
+  const progress = (await app.quests.getQuestProgress(userId, accountId)).data;
+  assert.deepEqual(
+    progress.quests
+      .filter((quest) => quest.status !== 'completed')
+      .map((quest) => quest.questId),
+    [],
+    'every quest is complete',
+  );
+  assert.equal(progress.learningPermissions.allTrading, true);
+}
+
 /** Existing financial regression fixtures exercise a fully learned beginner.
  * Their explicit starting balances are restored after REAL foundation commands;
  * the immutable orders/acknowledgements remain available to the policy reader. */
@@ -286,6 +497,8 @@ async function prepareLearningFixture(
     await practiceFoundation(db, userId, accountId, asset.id, async () => {
       await new Promise((resolve) => setTimeout(resolve, 5));
     });
+    // Ordinary trading opens only with all ten quests (B차, 2026-10-18).
+    await practiceMarkets(db, userId, accountId);
     for (const wallet of saved)
       await db.cashWallet.update({
         where: { id: wallet.id },
@@ -323,6 +536,15 @@ export async function cleanupLearningPractice(
     select: { fxRateSnapshotId: true },
   });
   await db.beginnerQuestAcknowledgement.deleteMany({ where });
+  // The Futures practice: commands, then executions, then positions.
+  const contracts = {
+    instrument: { underlyingAssetId: { in: assets.map((a) => a.id) } },
+  };
+  await db.futuresExecuteRequest.deleteMany({
+    where: { ...where, execution: contracts },
+  });
+  await db.futuresExecution.deleteMany({ where: { ...where, ...contracts } });
+  await db.futuresPosition.deleteMany({ where: { ...where, ...contracts } });
   await db.conditionalSellOrder.deleteMany({ where });
   await db.protectionChild.deleteMany({ where: { group: where } });
   await db.protectionLeg.deleteMany({ where: { group: where } });
@@ -348,6 +570,14 @@ export async function releaseLearningAssets(
   learning: Awaited<ReturnType<typeof cleanupLearningPractice>>,
 ) {
   if (!learning) return;
+  const contracts = {
+    instrument: { underlyingAssetId: { in: learning.assetIds } },
+  };
+  await db.futuresLastPriceSnapshot.deleteMany({ where: contracts });
+  await db.futuresMarkSnapshot.deleteMany({ where: contracts });
+  await db.futuresInstrument.deleteMany({
+    where: { underlyingAssetId: { in: learning.assetIds } },
+  });
   await db.assetPriceSnapshot.deleteMany({
     where: { assetId: { in: learning.assetIds } },
   });

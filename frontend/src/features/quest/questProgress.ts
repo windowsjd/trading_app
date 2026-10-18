@@ -20,8 +20,15 @@ export type BeginnerQuestKey = keyof typeof QUEST_DEFINITIONS;
 export type BeginnerQuestStatus = 'not_started' | 'in_progress' | 'completed';
 export const BEGINNER_QUEST_KEYS = Object.keys(QUEST_DEFINITIONS) as BeginnerQuestKey[];
 export const FOUNDATION_KEYS = BEGINNER_QUEST_KEYS.slice(0, 6);
-export type LearningAction = 'exchange' | 'transfer' | 'cryptoMarketBuy' | 'spotProtection' | 'cryptoLimitBuy' | 'allTrading';
-export type LearningAccess = Record<LearningAction, boolean>;
+/** The legacy six-key contract (deployed apps compare it exactly; frozen). */
+export type LegacyLearningAction = 'exchange' | 'transfer' | 'cryptoMarketBuy' | 'spotProtection' | 'cryptoLimitBuy' | 'allTrading';
+export type LearningAccess = Record<LegacyLearningAction, boolean>;
+/** What the server lets a beginner START now (B차, 2026-10-18): a quest's own
+ * practice while it is the current step, everything once all ten are done. */
+export const LEARNING_ACTIONS = ['exchange', 'transfer', 'fxTransfer', 'cryptoMarketBuy', 'spotProtection', 'cryptoLimitBuy',
+  'krStockMarketBuy', 'usStockMarketBuy', 'futuresLongOpen', 'futuresShortOpen', 'allTrading'] as const;
+export type LearningAction = (typeof LEARNING_ACTIONS)[number];
+export type LearningPermissions = Record<LearningAction, boolean>;
 export interface BeginnerQuestStepDto { stepId: string; completed: boolean; completedAt: string | null; referenceId: string | null }
 export interface BeginnerQuestProgressDto {
   questId: string; status: BeginnerQuestStatus; completedStepCount: number; totalStepCount: number; steps: BeginnerQuestStepDto[];
@@ -30,6 +37,8 @@ export interface BeginnerQuestsDto {
   practice: { spotAssetId: string | null; limitAssetId: string | null; longPositionId: string | null; shortPositionId: string | null };
   tradingAccountId: string; quests: BeginnerQuestProgressDto[];
   learningAccess: LearningAccess;
+  /** Absent from a server before 2026-10-18 (its rule = the legacy keys). */
+  learningPermissions?: LearningPermissions;
   operations: { limitOrdersEnabled: boolean; conditionalOrdersEnabled: boolean; futuresTradingMode: 'ENABLED' | 'REDUCE_ONLY' | 'DISABLED' };
 }
 export interface BeginnerQuestProgress {
@@ -37,7 +46,7 @@ export interface BeginnerQuestProgress {
 }
 export type BeginnerQuests = Record<BeginnerQuestKey, BeginnerQuestProgress> & {
   practice: BeginnerQuestsDto['practice'];
-  learningAccess: LearningAccess; operations: BeginnerQuestsDto['operations'];
+  learningAccess: LearningAccess; learningPermissions: LearningPermissions; operations: BeginnerQuestsDto['operations'];
 };
 export class BeginnerQuestContractError extends Error {
   constructor() { super('퀘스트 진행 상황을 확인할 수 없습니다. 잠시 후 다시 시도해주세요.'); this.name = 'BeginnerQuestContractError'; }
@@ -70,10 +79,55 @@ function parseQuest(quests: unknown[], key: BeginnerQuestKey): BeginnerQuestProg
   return { status, completed: status === 'completed', completedAt: status === 'completed' ? previousAt : null, steps };
 }
 
+/** The command each quest practices, as a learning permission. */
+const QUEST_PRACTICE: Record<BeginnerQuestKey, LearningAction> = {
+  exchange: 'exchange', transfer: 'transfer', marketBuy: 'cryptoMarketBuy', protection: 'spotProtection',
+  // A practice sale needs a holding the guide may ask to buy again.
+  marketSell: 'cryptoMarketBuy', limitBuy: 'cryptoLimitBuy', krStock: 'krStockMarketBuy', usStock: 'usStockMarketBuy',
+  futuresLong: 'futuresLongOpen', futuresShort: 'futuresShortOpen',
+};
+
+/** A pending quest follows the quest order; a completed one (다시하기) only
+ * while its practice command is open — before every quest is complete that is
+ * QUEST 01·02 (funding) and QUEST 03 during QUEST 04·05. */
 export function canStartQuest(key: BeginnerQuestKey, progress: BeginnerQuests): boolean {
-  if (progress[key].completed || key === 'exchange') return true;
+  if (progress[key].completed) return progress.learningPermissions[QUEST_PRACTICE[key]];
+  if (key === 'exchange') return true;
   const index = FOUNDATION_KEYS.indexOf(key);
   return progress[index < 0 ? 'limitBuy' : FOUNDATION_KEYS[index - 1]].completed;
+}
+
+const ALL_QUESTS_FIRST = '모든 퀘스트를 완료하면 사용할 수 있어요.';
+const FOUNDATION_FIRST = '공통 기초 퀘스트를 모두 완료하면';
+export const FUTURES_PRACTICE_LEVERAGE_MESSAGE = '선물 퀘스트는 레버리지를 1배보다 높게 설정해 진입해야 해요.';
+
+/** Why a learning permission is closed, as the server decides it: the quest
+ * that opens it is still ahead, the open position of a pending Futures quest
+ * must be closed first, or only completing every quest opens it. */
+export function learningLockMessage(action: LearningAction, progress: BeginnerQuests): string {
+  const foundation = progress.limitBuy.completed;
+  const futures = (key: 'futuresLong' | 'futuresShort', label: string) => !foundation
+    ? `${FOUNDATION_FIRST} 선물 ${label} 퀘스트에서 사용할 수 있어요.`
+    : progress[key].completed ? ALL_QUESTS_FIRST : `진행 중인 ${label} 포지션을 전량 종료하면 새로 진입할 수 있어요.`;
+  switch (action) {
+    case 'exchange': return '환전하기 퀘스트에서 사용할 수 있어요.';
+    case 'transfer': return '환전하기 퀘스트를 완료하면 사용할 수 있어요.';
+    case 'fxTransfer': return `${FOUNDATION_FIRST} 사용할 수 있어요.`;
+    case 'cryptoMarketBuy': return progress.transfer.completed ? ALL_QUESTS_FIRST : '암호화폐 시장가 매수 퀘스트에서 사용할 수 있어요.';
+    case 'spotProtection': return progress.marketBuy.completed ? ALL_QUESTS_FIRST : 'TP/SL 설정 퀘스트에서 사용할 수 있어요.';
+    case 'cryptoLimitBuy': return progress.marketSell.completed ? ALL_QUESTS_FIRST : '암호화폐 지정가 매수 퀘스트에서 사용할 수 있어요.';
+    case 'krStockMarketBuy': return foundation ? ALL_QUESTS_FIRST : `${FOUNDATION_FIRST} 한국주식 매수 퀘스트에서 사용할 수 있어요.`;
+    case 'usStockMarketBuy': return foundation ? ALL_QUESTS_FIRST : `${FOUNDATION_FIRST} 미국주식 매수 퀘스트에서 사용할 수 있어요.`;
+    case 'futuresLongOpen': return futures('futuresLong', '롱');
+    case 'futuresShortOpen': return futures('futuresShort', '숏');
+    default: return ALL_QUESTS_FIRST;
+  }
+}
+
+/** A server before 2026-10-18 enforced the legacy keys: QUEST 06 opened all. */
+function legacyPermissions(access: LearningAccess): LearningPermissions {
+  return { ...access, fxTransfer: access.allTrading, krStockMarketBuy: access.allTrading, usStockMarketBuy: access.allTrading,
+    futuresLongOpen: access.allTrading, futuresShortOpen: access.allTrading };
 }
 
 export function parseBeginnerQuests(payload: unknown, accountId: string): BeginnerQuests {
@@ -94,7 +148,13 @@ export function parseBeginnerQuests(payload: unknown, accountId: string): Beginn
     || typeof operations.futuresTradingMode !== 'string' || !['ENABLED', 'REDUCE_ONLY', 'DISABLED'].includes(operations.futuresTradingMode)) throw new BeginnerQuestContractError();
   const practice = payload.practice;
   if (!isRecord(practice) || ['spotAssetId', 'limitAssetId', 'longPositionId', 'shortPositionId'].some(key => practice[key] !== null && (typeof practice[key] !== 'string' || !practice[key]))) throw new BeginnerQuestContractError();
-  return { ...parsed, learningAccess: expected, operations: operations as unknown as BeginnerQuestsDto['operations'], practice: practice as unknown as BeginnerQuestsDto['practice'] };
+  // The server enforces these (its own staged rule); the client follows them as sent.
+  const permissions = payload.learningPermissions;
+  if (permissions !== undefined && (!isRecord(permissions) || permissions.exchange !== true
+    || LEARNING_ACTIONS.some(action => typeof permissions[action] !== 'boolean'))) throw new BeginnerQuestContractError();
+  const learningPermissions = permissions === undefined ? legacyPermissions(expected)
+    : Object.fromEntries(LEARNING_ACTIONS.map(action => [action, permissions[action] === true])) as LearningPermissions;
+  return { ...parsed, learningAccess: expected, learningPermissions, operations: operations as unknown as BeginnerQuestsDto['operations'], practice: practice as unknown as BeginnerQuestsDto['practice'] };
 }
 
 export type QuestCardState = 'loading' | 'error' | 'waiting' | 'available' | 'inProgress' | 'completed';
@@ -123,7 +183,7 @@ export function describeQuestCard(
       : { state: 'loading', statusLabel: '확인 중', actionLabel: null, canStart: false };
   }
   const quest = progress[key];
-  if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시하기', canStart: true };
+  if (quest.completed) return { state: 'completed', statusLabel: '완료', actionLabel: '다시하기', canStart: canStartQuest(key, progress) };
   if (!canStartQuest(key, progress)) {
     return { state: 'waiting', statusLabel: '대기', actionLabel: '퀘스트 시작하기', canStart: false };
   }

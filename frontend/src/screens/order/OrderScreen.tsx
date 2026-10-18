@@ -194,7 +194,7 @@ export function OrderTradingScreen({
     displayPrice.priceKrwState === 'available' &&
     displayPrice.priceKrw !== null;
   const converted = showKrw && asset.priceCurrency !== 'KRW';
-  // A closed US market's last confirmed close is labeled by its date, not 현재가.
+  // A closed US market's last confirmed close is labeled 종가 (no date), not 현재가.
   const lastCloseLabel =
     displayPrice.priceLocal === null ? null : getLastSessionCloseLabel(displayPrice);
   const priceText = converted

@@ -19,20 +19,19 @@ const lastClose = {
 };
 
 describe('last session close (closed US market, display only)', () => {
-  it('names the New York trading date, not the Seoul date', () => {
-    assert.equal(getLastSessionCloseLabel(lastClose), '10/16 종가');
+  it('names the price a close without its session date', () => {
+    assert.equal(getLastSessionCloseLabel(lastClose), '종가');
     assert.equal(
       getLastSessionCloseNotice(lastClose),
-      '미국 정규장 마감 · 10/16 종가 (실시간 시세 아님)',
+      '미국 정규장 마감 · 종가 (실시간 시세 아님)',
     );
-    // An early (13:00 EST) close stays on its own date as well.
-    assert.equal(
-      getLastSessionCloseLabel({
-        ...lastClose,
-        priceEffectiveAt: '2026-11-27T18:00:00.000Z',
-      }),
-      '11/27 종가',
-    );
+    // No date in either line, whichever New York session it closed (e.g. an
+    // early 13:00 EST close), and the label never depends on that date.
+    for (const priceEffectiveAt of ['2026-11-27T18:00:00.000Z', null, 'invalid']) {
+      const price = { ...lastClose, priceEffectiveAt };
+      assert.equal(getLastSessionCloseLabel(price), '종가');
+      assert.equal(/\d/.test(getLastSessionCloseNotice(price) ?? ''), false);
+    }
   });
 
   it('leaves every other price unlabeled', () => {
@@ -48,12 +47,11 @@ describe('last session close (closed US market, display only)', () => {
         getLastSessionCloseLabel({ ...lastClose, priceSource }) === null,
         true,
       );
+      assert.equal(
+        getLastSessionCloseNotice({ ...lastClose, priceSource }) === null,
+        true,
+      );
     }
     assert.equal(getLastSessionCloseLabel(null) === null, true);
-    assert.equal(
-      getLastSessionCloseLabel({ ...lastClose, priceEffectiveAt: null }) ===
-        null,
-      true,
-    );
   });
 });

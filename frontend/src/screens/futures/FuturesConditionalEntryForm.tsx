@@ -19,7 +19,7 @@ import {
 } from '../../features/futures/api';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
-import { getApiErrorInfo } from '../../services/api/errorMapper';
+import { getApiErrorInfo, getErrorMessageFromCode } from '../../services/api/errorMapper';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatAssetPrice } from '../../utils/format';
 import {
@@ -230,6 +230,7 @@ function conditionalErrorMessage(code: string | null) {
   if (code === 'FUTURES_PRICE_UNAVAILABLE' || code === 'FUTURES_PRICE_STALE')
     return '현재 선물 Last를 확인할 수 없어 접수하지 않았습니다. 잠시 후 다시 시도해주세요.';
   if (code === 'FUTURES_REDUCE_ONLY' || code === 'FUTURES_TRADING_DISABLED') return '현재 선물 신규 진입이 제한되어 있습니다.';
+  if (code === 'BEGINNER_FEATURE_LOCKED') return getErrorMessageFromCode(code);
   return '조건주문을 접수하지 못했습니다. 입력값을 확인해주세요.';
 }
 

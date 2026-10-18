@@ -195,7 +195,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
                 </View>
               ))
             ) : (
-              <Text style={styles.helper}>보유 종목이 없습니다.</Text>
+              <Text style={styles.helper}>보유 중인 종목이 없습니다.</Text>
             )}
           </View>
           <View style={styles.card}>
@@ -203,7 +203,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
             {portfolio.futures.positions.length ? portfolio.futures.positions.map(position => (
               <FuturesPositionRow key={position.assetId} position={position} testID={`friend-futures-${position.assetId}`}
                 evaluatedAt={portfolio.futures.evaluatedAt} now={Date.now()} />
-            )) : <Text style={styles.helper}>보유 중인 선물 포지션이 없습니다.</Text>}
+            )) : <Text style={styles.helper}>포지션이 없습니다.</Text>}
           </View>
           <View style={styles.card}>
             <Text style={styles.label}>최근 30일 자산 / 수익률 추이</Text>

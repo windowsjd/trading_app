@@ -21,8 +21,11 @@ for (const mode of ['general', 'season', 'beginner']) for (const [spot, future] 
     await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.futures.positions(mode) })); await flush();
     const spotId = `home-position-item-${mode}-a0`, futuresId = `home-futures-${mode}:position`;
     assert.deepEqual(headers(h), ['보유종목 및 포지션'], 'no separate 보유종목/포지션 headings');
-    const titles = h.renderer.root.findAllByType('InlineEmptyState').map(node => node.props.title ?? '').join(' ');
-    assert.equal(titles.includes('보유종목 및 포지션이 없습니다.'), spot === 0 && future === 0);
+    // Both empty: each area says so on its own line, once, with no repeated
+    // explanation; otherwise the list itself shows what is held.
+    const empties = h.renderer.root.findAllByType('InlineEmptyState').map(node => [node.props.title, node.props.message ?? null]);
+    assert.deepEqual(empties, spot === 0 && future === 0
+      ? [['보유 중인 종목이 없습니다.', null], ['포지션이 없습니다.', null]] : []);
     // Collapsed: the single largest row of both domains.
     assert.deepEqual(listRows(h), future ? [futuresId] : spot ? [spotId] : []);
     // The rate is read only when KRW spot values and USD notionals must be compared.
@@ -103,7 +106,7 @@ for (const section of ['positions', 'futures']) it(`a failed ${section} read nev
     assert.equal(h.node('home-futures-general:position') !== undefined, true);
   } else assert.equal(h.rows().length, 1);
   assert.equal(h.renderer.root.findAllByType('ErrorState').length > 0, true);
-  assert.equal(h.renderer.root.findAllByType('InlineEmptyState').some(n => n.props.title === '보유종목 및 포지션이 없습니다.'), false);
+  assert.equal(h.renderer.root.findAllByType('InlineEmptyState').some(n => ['보유 중인 종목이 없습니다.', '포지션이 없습니다.'].includes(n.props.title)), false);
 });
 
 it('a late Futures response cannot paint an outgoing account after General→Season→Beginner', async t => {
@@ -151,3 +154,22 @@ it('a US holding leads with its Korean name and keeps `(English) · SYMBOL` unde
   assert.equal(own(h.node(`${id}-english-name`)), '(Apple Inc.) · AAPL');
   assert.match(own(h.node(`${id}-quantity`)), /^보유수량 1/);
 });
+
+// The Portfolio screen's own read (its allocation card needs one).
+const portfolio = { tradingAccountId: 'general', mode: 'general', status: 'active', state: 'available', summary: null,
+  finalResult: null, sectionErrors: [],
+  allocation: { state: 'available', cashKrwValue: '10000000', domesticStockValueKrw: '0', usStockValueKrw: '0', cryptoValueKrw: '0' } };
+for (const screen of ['wallet', 'portfolio']) for (const [spot, future] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+  it(`${screen}: Spot ${spot} / Futures ${future} — each empty area says only its own sentence`, async t => {
+    const h = setup('general', spot, screen, { portfolios: { general: portfolio } }); t.after(h.close); await flush();
+    h.futures = { general: futuresFixture('general', { position: !!future }).positions };
+    await act(async () => h.client.refetchQueries({ queryKey: QUERY_KEYS.tradingAccount.futures.positions('general') })); await flush();
+    const empties = h.renderer.root.findAllByType('InlineEmptyState').map(node => [node.props.title, node.props.message ?? null]);
+    const expected = [
+      ...(spot ? [] : [['보유 중인 종목이 없습니다.', null]]),
+      ...(future ? [] : [['포지션이 없습니다.', null]]),
+    ];
+    assert.deepEqual(empties.filter(([title]) => /보유|포지션/.test(String(title))), expected);
+    assert.equal(empties.some(([title, message]) => [title, message].includes('데이터가 없습니다.')), false);
+  });
+}

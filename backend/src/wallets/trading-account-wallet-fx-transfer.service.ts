@@ -192,7 +192,8 @@ export class TradingAccountWalletFxTransferService {
             'TRADING_ACCOUNT_SCOPE_MISMATCH',
             'Account mode changed.',
           );
-        await assertBeginnerLearningAccess(tx, lockedAccount, 'allTrading');
+        // FX and transfer stay open separately; the composite after QUEST 06.
+        await assertBeginnerLearningAccess(tx, lockedAccount, 'fxTransfer');
         const durable = await tx.quote.findFirst({
           where: {
             id: quoteId,

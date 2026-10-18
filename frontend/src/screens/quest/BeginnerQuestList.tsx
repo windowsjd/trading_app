@@ -4,7 +4,7 @@ import { semantic } from '../../theme/tokens';
 import CTAButton from '../../components/common/CTAButton';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
-import { QUEST_CARDS, QUEST_CATEGORY } from '../../features/quest/questContent';
+import { QUEST_CARDS, QUEST_CATEGORY, QUEST_MARKET_NOTE, QUEST_REPLAY_LATER } from '../../features/quest/questContent';
 import {
   BEGINNER_QUEST_KEYS,
   FOUNDATION_KEYS,
@@ -61,7 +61,10 @@ export default function BeginnerQuestList() {
           ) : null}
           {BEGINNER_QUEST_KEYS.map((key, index) => (
             <React.Fragment key={key}>
-            {index === 6 ? <Text accessibilityRole="header" style={styles.category}>시장별 심화 — 자유 진행</Text> : null}
+            {index === 6 ? <>
+              <Text accessibilityRole="header" style={styles.category}>시장별 심화 — 자유 진행</Text>
+              <Text style={styles.muted} testID="quest-market-note">{QUEST_MARKET_NOTE}</Text>
+            </> : null}
             <QuestCard key={key} questKey={key} progress={progress} isError={quest.isError}
               highlighted={guide?.justCompleted === key} starting={guide?.starting === key}
               onStart={guide && progress ? () => guide.start(key) : null} />
@@ -113,6 +116,9 @@ function QuestCard({ questKey, progress, isError, highlighted, starting, onStart
         || questKey === 'limitBuy' && !progress.operations.limitOrdersEnabled
         || (questKey === 'futuresLong' || questKey === 'futuresShort') && progress.operations.futuresTradingMode !== 'ENABLED') ? (
         <Text style={styles.muted} testID={`quest-card-${questKey}-operations`}>현재 서버 운영 정책으로 이 실습의 신규 거래가 제공되지 않습니다.</Text>
+      ) : null}
+      {display.state === 'completed' && !display.canStart ? (
+        <Text style={styles.muted} testID={`quest-card-${questKey}-replay-later`}>{QUEST_REPLAY_LATER}</Text>
       ) : null}
       <CTAButton
         label={display.actionLabel ?? '퀘스트 시작하기'}

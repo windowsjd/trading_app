@@ -1,4 +1,5 @@
 import Decimal from 'decimal.js';
+import { getErrorMessageFromCode } from '../../services/api/errorMapper.ts';
 import type { WalletBalanceDto } from './api';
 import type { TradingAccountFuturesCollateralDto } from '../tradingAccount/api';
 
@@ -55,6 +56,7 @@ export function transferErrorMessage(code: string | null): string {
   if (code === 'RATE_CHANGED_REQUOTE_REQUIRED') return '환율이 허용 범위보다 변경되었습니다. 다시 견적을 받아주세요.';
   if (code === 'FX_RATE_UNAVAILABLE' || code === 'FX_RATE_STALE' || code === 'FX_PROVIDER_RATE_STALE' || code === 'FX_PROVIDER_RATE_UNAVAILABLE' || code === 'PROVIDER_RATE_STALE' || code === 'PROVIDER_RATE_UNAVAILABLE') return '최신 환율을 확인할 수 없습니다. 잠시 후 다시 견적을 받아주세요.';
   if (code === 'WALLET_TRANSFER_ROUTE_UNSUPPORTED') return '증권 KRW와 USD 사이의 이동은 환전하기를 이용해주세요.';
+  if (code === 'BEGINNER_FEATURE_LOCKED') return getErrorMessageFromCode(code);
   return '이체를 처리하지 못했습니다. 같은 요청으로 다시 시도할 수 있습니다.';
 }
 

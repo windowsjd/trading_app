@@ -167,7 +167,6 @@ export default function AccountHoldings({
         <SectionSkeleton lines={4} />
       ) : visible.length === 0 ? (
         <InlineEmptyState
-          message=""
           title={
             currentInAside
               ? '다른 보유 종목이 없습니다.'

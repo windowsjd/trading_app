@@ -43,3 +43,29 @@ test('completed cards preserve status and description, expose a centered static 
   assert.deepEqual(starts, ['exchange', 'transfer']);
   assert.equal(progress.exchange.completedAt, at);
 });
+
+test('before every quest is complete a passed practice shows why 다시하기 waits; the market note states the rule', async t => {
+  const progress = questProgress(6);
+  const List = load(resolve('src/screens/quest/BeginnerQuestList.tsx'), {
+    'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', ActivityIndicator: 'ActivityIndicator', StyleSheet: { create: (x: unknown) => x } },
+    'react-native-svg': { default: 'Svg', Path: 'Path', __esModule: true },
+    '../../hooks/usePullToRefresh': { usePullToRefresh: () => ({}) },
+    '../../components/states/ErrorNotice': { default: 'ErrorNotice', __esModule: true },
+    '../../features/quest/useBeginnerQuestProgress': { useBeginnerQuestProgress: () => ({ progress, accountId: 'A' }) },
+    '../../features/quest/QuestGuideProvider': { useQuestGuide: () => ({ start: () => undefined }) },
+  }).default;
+  let renderer: any; await Renderer.act(async () => { renderer = Renderer.create(React.createElement(List)); });
+  t.after(async () => { await Renderer.act(async () => renderer.unmount()); });
+  const node = (id: string) => renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id)[0];
+  const text = (id: string) => [node(id)?.props.children].flat().join('');
+  for (const quest of ['marketBuy', 'protection', 'marketSell', 'limitBuy']) {
+    assert.equal(node(`quest-card-${quest}-start`).props.accessibilityState.disabled, true, quest);
+    assert.equal(text(`quest-card-${quest}-replay-later`), '모든 퀘스트를 완료하면 다시 할 수 있어요.');
+  }
+  // Funding practice stays open; pending market quests start normally.
+  for (const quest of ['exchange', 'transfer', 'krStock', 'futuresShort']) {
+    assert.equal(node(`quest-card-${quest}-start`).props.accessibilityState.disabled, false, quest);
+    assert.equal(node(`quest-card-${quest}-replay-later`) === undefined, true);
+  }
+  assert.match(text('quest-market-note'), /네 심화 퀘스트까지 모두 완료하면 모든 거래 기능을 사용할 수 있어요/);
+});

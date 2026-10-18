@@ -501,10 +501,7 @@ export default function PortfolioScreen({ navigation }: Props) {
               />
             </View>
           ) : viewState === 'portfolio_no_positions' ? (
-            <InlineEmptyState
-              title="보유종목이 없습니다."
-              message="해당 자산군의 보유종목이 없습니다."
-            />
+            <InlineEmptyState title="보유 중인 종목이 없습니다." testID="portfolio-holdings-empty" />
           ) : null
         }
         renderItem={({ item }) => (

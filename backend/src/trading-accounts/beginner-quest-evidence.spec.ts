@@ -1,5 +1,7 @@
 import {
   BeginnerQuestEvidence,
+  beginnerLearningPermissions,
+  type BeginnerQuestCompletion,
   type QuestClient,
 } from './beginner-quest-evidence';
 const at = (seconds: number) => new Date(Date.UTC(2026, 9, 11, 0, 0, seconds));
@@ -206,7 +208,7 @@ describe('QUEST 04 TP/SL registration evidence', () => {
     };
   }
   const step = async (reader: BeginnerQuestEvidence) => {
-    const progress = await reader.read('A', false);
+    const progress = await reader.read('A');
     const quest = progress.quests.find(
       (row) => row.questId === 'common-04-protection',
     )!;
@@ -261,5 +263,122 @@ describe('QUEST 04 TP/SL registration evidence', () => {
 
   it('stays open without a qualifying registration', async () => {
     expect((await step(proven(null, null).reader)).completed).toBe(false);
+  });
+});
+
+describe('staged learning permissions (B차, 2026-10-18)', () => {
+  const KEYS = [
+    'exchange',
+    'transfer',
+    'marketBuy',
+    'protection',
+    'marketSell',
+    'limitBuy',
+    'krStock',
+    'usStock',
+    'futuresLong',
+    'futuresShort',
+  ] as const;
+  /** The first `count` foundation quests complete, plus the named market quests. */
+  const progress = (
+    count: number,
+    market: Array<(typeof KEYS)[number]> = [],
+  ): BeginnerQuestCompletion =>
+    Object.fromEntries(
+      KEYS.map((key, index) => [
+        key,
+        index < 6 ? index < count : market.includes(key),
+      ]),
+    ) as BeginnerQuestCompletion;
+  const none = { long: false, short: false };
+  const open = (done: BeginnerQuestCompletion, positions = none) =>
+    Object.entries(beginnerLearningPermissions(done, positions))
+      .filter(([, allowed]) => allowed)
+      .map(([action]) => action)
+      .sort();
+
+  it.each([
+    [0, ['exchange']],
+    [1, ['exchange', 'transfer']],
+    [2, ['cryptoMarketBuy', 'exchange', 'transfer']],
+    // QUEST 04/05 keep the market BUY so a practice holding can be bought again.
+    [3, ['cryptoMarketBuy', 'exchange', 'spotProtection', 'transfer']],
+    [4, ['cryptoMarketBuy', 'exchange', 'transfer']],
+    [5, ['cryptoLimitBuy', 'exchange', 'transfer']],
+  ])(
+    'foundation %s complete opens only its current practice',
+    (count, actions) => {
+      expect(open(progress(count))).toEqual(actions);
+    },
+  );
+
+  it('QUEST 06 opens the four market practices, never everything', () => {
+    expect(open(progress(6))).toEqual([
+      'exchange',
+      'futuresLongOpen',
+      'futuresShortOpen',
+      'fxTransfer',
+      'krStockMarketBuy',
+      'transfer',
+      'usStockMarketBuy',
+    ]);
+  });
+
+  it('a completed market quest closes its own practice; the others stay independent', () => {
+    expect(open(progress(6, ['krStock']))).toEqual([
+      'exchange',
+      'futuresLongOpen',
+      'futuresShortOpen',
+      'fxTransfer',
+      'transfer',
+      'usStockMarketBuy',
+    ]);
+    expect(open(progress(6, ['futuresShort', 'usStock']))).toEqual([
+      'exchange',
+      'futuresLongOpen',
+      'fxTransfer',
+      'krStockMarketBuy',
+      'transfer',
+    ]);
+  });
+
+  it('an open position in a pending direction waits for its close; the other direction stays open', () => {
+    expect(open(progress(6), { long: true, short: false })).toEqual([
+      'exchange',
+      'futuresShortOpen',
+      'fxTransfer',
+      'krStockMarketBuy',
+      'transfer',
+      'usStockMarketBuy',
+    ]);
+  });
+
+  it('all ten quests open every action, open positions included', () => {
+    const all = beginnerLearningPermissions(
+      progress(6, ['krStock', 'usStock', 'futuresLong', 'futuresShort']),
+      { long: true, short: true },
+    );
+    expect(Object.values(all).every(Boolean)).toBe(true);
+  });
+
+  it('reads open positions only while a Futures quest is pending', async () => {
+    const db = {
+      exchangeTransaction: { findMany: jest.fn().mockResolvedValue([]) },
+      futuresPosition: { findMany: jest.fn() },
+    };
+    const result = await new BeginnerQuestEvidence(
+      db as unknown as QuestClient,
+    ).read('A');
+    expect(db.futuresPosition.findMany).not.toHaveBeenCalled();
+    expect(result.learningPermissions.allTrading).toBe(false);
+    // The legacy contract keeps its meaning for deployed apps.
+    expect(result.learningAccess).toEqual({
+      exchange: true,
+      transfer: false,
+      cryptoMarketBuy: false,
+      spotProtection: false,
+      cryptoLimitBuy: false,
+      allTrading: false,
+    });
   });
 });

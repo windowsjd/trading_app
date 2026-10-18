@@ -13,7 +13,7 @@ import {
   QUEST_TRANSFER_ID,
   QUEST_TRANSFER_STEP,
 } from './questProgress.ts';
-import { QUEST_CARDS, QUEST_CATEGORY, QUEST_GUIDE_COPY } from './questContent.ts';
+import { QUEST_CARDS, QUEST_CATEGORY, QUEST_GUIDE_COPY, QUEST_MARKET_NOTE, QUEST_REPLAY_LATER } from './questContent.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 
 const require = createRequire(import.meta.url);
@@ -150,9 +150,11 @@ describe('quest card display', () => {
     assert.equal(QUEST_CARDS.transfer.completed, '이체하기 퀘스트 완료!');
     assert.equal(QUEST_GUIDE_COPY.exchange.entry.body, '환전하기에서는 KRW와 USD 환전을 할 수 있어요.');
     const copy = JSON.stringify({
-      QUEST_CATEGORY, QUEST_GUIDE_COPY,
+      QUEST_CATEGORY, QUEST_GUIDE_COPY, QUEST_MARKET_NOTE, QUEST_REPLAY_LATER,
       cards: Object.values(QUEST_CARDS).map(card => ({ ...card, number: '' })),
     });
+    // QUEST 06 no longer claims to lift every learning restriction.
+    assert.doesNotMatch(`${QUEST_CARDS.limitBuy.condition} ${QUEST_CARDS.limitBuy.completed}`, /제한이 해제|모든 거래 기능/);
     // Unit definitions ("1달러") are fine; amounts, rates and percentages are not.
     assert.doesNotMatch(copy, /\d{2,}|\d[.,]\d|%|\$\d|보상|경험치|레벨|해금|잠금/);
   });
@@ -207,5 +209,46 @@ describe('quest API and query scope', () => {
     assert.equal(general.accountId, null);
     assert.equal(general.progress === null, true);
     assert.equal(calls.refetches.length, 1, 'a non-beginner focus never fetches quests');
+  });
+});
+
+describe('staged learning permissions (B차, 2026-10-18)', () => {
+  it('follows the server permissions as sent, next to the frozen legacy keys', () => {
+    const progress = parseBeginnerQuests(questPayload(6), 'beginner-1');
+    assert.equal(progress.learningAccess.allTrading, true, 'legacy key: QUEST 06');
+    assert.deepEqual(progress.learningPermissions, questPayload(6).learningPermissions);
+    assert.equal(progress.learningPermissions.allTrading, false);
+    for (const action of ['krStockMarketBuy', 'usStockMarketBuy', 'futuresLongOpen', 'futuresShortOpen'] as const)
+      assert.equal(progress.learningPermissions[action], true);
+  });
+
+  it('a server before the staged rule (no learningPermissions) keeps its own QUEST 06 rule', () => {
+    const value: Record<string, unknown> = { ...questPayload(6) };
+    delete value.learningPermissions;
+    const progress = parseBeginnerQuests(value, 'beginner-1');
+    assert.equal(progress.learningPermissions.allTrading, true);
+    assert.equal(progress.learningPermissions.cryptoMarketBuy, true);
+    const early: Record<string, unknown> = { ...questPayload(2) };
+    delete early.learningPermissions;
+    assert.equal(parseBeginnerQuests(early, 'beginner-1').learningPermissions.krStockMarketBuy, false);
+  });
+
+  it('rejects a malformed permission object instead of guessing', () => {
+    for (const learningPermissions of [null, 'all', { ...questPayload(6).learningPermissions, allTrading: 'yes' },
+      { ...questPayload(6).learningPermissions, exchange: false }]) {
+      rejects({ ...questPayload(6), learningPermissions });
+    }
+    const missing: Record<string, unknown> = { ...questPayload(6).learningPermissions };
+    delete missing.futuresShortOpen;
+    rejects({ ...questPayload(6), learningPermissions: missing });
+  });
+
+  it('a completed card offers 다시하기 only while its practice is open', () => {
+    const atSix = questProgress(6);
+    assert.deepEqual(describeQuestCard('limitBuy', { progress: atSix, isError: false }),
+      { state: 'completed', statusLabel: '완료', actionLabel: '다시하기', canStart: false });
+    assert.equal(describeQuestCard('exchange', { progress: atSix, isError: false }).canStart, true);
+    assert.equal(describeQuestCard('transfer', { progress: atSix, isError: false }).canStart, true);
+    assert.equal(describeQuestCard('limitBuy', { progress: questProgress(10), isError: false }).canStart, true);
   });
 });

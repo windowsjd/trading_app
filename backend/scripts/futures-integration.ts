@@ -614,6 +614,10 @@ async function lifecycle(
     const snapshots = await db.equitySnapshot.count({
       where: { tradingAccountId: s.accountId },
     });
+    // A learned beginner also keeps its closed Futures quest practice.
+    const priorExecutions = await db.futuresExecution.count({
+      where: { tradingAccountId: s.accountId },
+    });
     const body = openBody(s, { direction, idempotencyKey: 'lifetime-key' });
     const opened = await execute(s, body);
     assert.equal(opened.data.position.direction, direction);
@@ -684,8 +688,13 @@ async function lifecycle(
     assert.equal(closed.data.position.status, 'closed');
     assert.equal(closed.data.position.isolatedMargin, '0.00000000');
     assert.equal(closed.data.position.realizedPnl, '2.00000000');
+    // This scenario's contracts (a learned beginner also holds its closed
+    // Futures quest practice on a contract of its own).
     const executions = await db.futuresExecution.findMany({
-      where: { tradingAccountId: s.accountId },
+      where: {
+        tradingAccountId: s.accountId,
+        instrumentId: { in: s.instruments.map((r) => r.instrument.id) },
+      },
     });
     const fees = executions.reduce((sum, e) => sum.add(e.feeAmount), d('0'));
     assert.equal(
@@ -723,7 +732,7 @@ async function lifecycle(
       limit: '2',
       offset: '0',
     });
-    assert.equal(history.data.pagination.total, 5);
+    assert.equal(history.data.pagination.total, priorExecutions + 5);
     assert.equal(history.data.executions.length, 2);
     assert.equal(history.data.pagination.nextOffset, 2);
     assert.equal(
@@ -1012,7 +1021,10 @@ async function evidenceAndLifecycle(mode: TradingAccountMode) {
           where: {
             id: (
               await db.futuresExecuteRequest.findFirstOrThrow({
-                where: { tradingAccountId: s.accountId },
+                where: {
+                  tradingAccountId: s.accountId,
+                  execution: { instrumentId: s.instruments[0].instrument.id },
+                },
               })
             ).executionId,
           },
@@ -1376,7 +1388,10 @@ async function races(mode: TradingAccountMode) {
       if (kind === 'duplicate' || kind === 'same-open')
         assert.equal(
           await db.futuresExecution.count({
-            where: { tradingAccountId: s.accountId },
+            where: {
+              tradingAccountId: s.accountId,
+              instrumentId: { in: s.instruments.map((r) => r.instrument.id) },
+            },
           }),
           1,
         );

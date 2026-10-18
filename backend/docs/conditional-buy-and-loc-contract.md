@@ -65,7 +65,7 @@ Registration (2026-10-18) decides the session at its post-lock DB clock
   loaded): `409 MARKET_CALENDAR_UNAVAILABLE` — never taken for a closure.
 
 US stocks without the approved provider: `CONDITIONAL_BUY_MARKET_NOT_SUPPORTED`. Beginner accounts
-need `allTrading` learning access. At most 20 live watches per account
+need `allTrading` learning access (all ten quests complete since 2026-10-18; beginner-mode.md). At most 20 live watches per account
 (`CONDITIONAL_BUY_LIMIT_EXCEEDED`). Limit execution additionally requires
 `LIMIT_ORDER_ENABLED` and `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED`
 (`CONDITIONAL_LIMIT_UNAVAILABLE`).

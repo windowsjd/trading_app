@@ -84,7 +84,7 @@ async function main() {
     for (const screen of ['home', 'wallet', 'portfolio']) for (const kind of ['spot-error', 'futures-error', 'spot-delay', 'futures-delay']) {
       await visit({ screen, kind, fontScale: 2 });
       const future = page.getByTestId(new RegExp(`^${screen}-futures-.*:position$`));
-      if (kind.startsWith('spot-')) { await future.waitFor(); assert.equal(await page.getByText('보유종목 및 포지션이 없습니다.', { exact: true }).count(), 0); }
+      if (kind.startsWith('spot-')) { await future.waitFor(); assert.equal(await page.getByTestId('home-holdings-spot-empty').count(), 0); }
       else { await page.getByText('보유수량 12 주', { exact: true }).waitFor(); assert.equal(await future.count(), 0); }
       if (kind.endsWith('error')) await page.getByText(kind.startsWith('spot-') ? /보유.*불러오지 못했습니다/ : '포지션을 불러오지 못했습니다.').waitFor();
       assert.deepEqual(await overflow(page), [], `${screen}/${kind}`); flows.push(`${screen}/${kind}`);
@@ -94,7 +94,9 @@ async function main() {
       await page.getByTestId('home-holdings').waitFor(); await page.waitForTimeout(60);
       const future = page.getByTestId(/^home-futures-.*:position$/);
       assert.equal(await future.count(), kind === 'futures-only' ? 1 : 0);
-      assert.equal(await page.getByText('보유종목 및 포지션이 없습니다.', { exact: true }).count(), kind === 'empty' ? 1 : 0);
+      assert.equal(await page.getByTestId('home-holdings-spot-empty').count(), kind === 'empty' ? 1 : 0);
+      assert.equal(await page.getByTestId('home-holdings-futures-empty').count(), kind === 'empty' ? 1 : 0);
+      assert.equal(await page.getByText('데이터가 없습니다.', { exact: true }).count(), 0);
       flows.push(`${mode}/${kind}`);
     }
     for (const kind of ['mark-stale', 'spot-unavailable', 'spot-stale']) {

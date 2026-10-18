@@ -1,3 +1,5 @@
+import { getErrorMessageFromCode } from '../../services/api/errorMapper.ts';
+
 export const COLLATERAL_SHORT = "사용 가능한 담보가 부족합니다. 주문 금액이나 레버리지를 조정해주세요.";
 export const MAINTENANCE_SHORT = "현재 Mark 기준으로 유지 증거금을 충족하지 못합니다. 레버리지를 낮춰주세요.";
 
@@ -27,5 +29,7 @@ export function futuresErrorMessage(code: string | null, uncertain: boolean) {
     return "보유 수량을 초과할 수 없습니다. 최신 포지션을 확인해주세요.";
   if (code === "FUTURES_POSITION_NOT_FOUND")
     return "포지션이 이미 종료되었거나 변경되었습니다. 최신 상태를 확인해주세요.";
+  // A beginner learning lock, not a rejected input (the server's staged rule).
+  if (code === "BEGINNER_FEATURE_LOCKED") return getErrorMessageFromCode(code);
   return "주문이 접수되지 않았습니다. 입력값과 거래 가능 상태를 확인해주세요.";
 }

@@ -34,7 +34,7 @@ test('the futures list uses the Spot sort control and ranks by 24h statistics', 
   assert.deepEqual(rowIds(h), ['btc', 'eth', 'xrp', 'sol']);
   // The list no longer repeats the price/statistics basis under the toolbar;
   // the summary line and the rows are unchanged.
-  const listText = textOf(h.node('futures-market-list'));
+  const listText = textOf(h.node('futures-list-controls')) + textOf(h.node('futures-market-list'));
   assert.equal(listText.includes('현재가는 선물 Last 거래 기준'), false);
   assert.equal(listText.includes('24시간 통계'), false);
   assert.equal(textOf(h.node('futures-list-summary')), 'USDⓈ-M 무기한 · 24시간 기준');
@@ -67,8 +67,10 @@ test('the futures list uses the Spot sort control and ranks by 24h statistics', 
 test('the trading restriction notice stays while the removed price-basis line is gone', async t => {
   const h = futuresHarness({ screen: 'market', mode: 'REDUCE_ONLY' });
   await h.start(); t.after(h.close);
+  // The notice sits with the controls in the header card, above the rows.
+  assert.equal(textOf(h.node('futures-list-controls')).includes('현재 신규 선물 거래가 제한되어 있습니다.'), true);
   const listText = textOf(h.node('futures-market-list'));
-  assert.equal(listText.includes('현재 신규 선물 거래가 제한되어 있습니다.'), true);
+  assert.equal(listText.includes('현재 신규 선물 거래가 제한되어 있습니다.'), false);
   assert.equal(listText.includes('현재가는 선물 Last 거래 기준'), false);
   assert.deepEqual(rowIds(h), ['btc']);
 });

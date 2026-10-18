@@ -208,3 +208,10 @@ for (const method of ['market', 'limit'])
     assert.equal(h.requests.length, 2);
     assert.deepEqual(h.requests[1], h.requests[0], 'reconfirm the original request and key');
   });
+
+test('a beginner learning lock from the server reads as a learning step, not a rejected input', () => {
+  const { futuresErrorMessage } = require('../../features/futures/orderFeedback.ts');
+  assert.equal(futuresErrorMessage('BEGINNER_FEATURE_LOCKED', false), '학습을 더 진행하면 이용할 수 있는 기능입니다.');
+  // A lost response is still the same-request check, whatever its code.
+  assert.match(futuresErrorMessage('BEGINNER_FEATURE_LOCKED', true), /체결을 확인하지 못했습니다/);
+});

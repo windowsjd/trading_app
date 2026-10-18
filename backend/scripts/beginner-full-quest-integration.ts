@@ -12,6 +12,7 @@ import {
   fxEvidence,
   fxEvidenceIds,
   openBody,
+  positionBody,
 } from './futures-integration';
 import {
   practiceFoundation,
@@ -20,6 +21,7 @@ import {
 } from './lib/beginner-quest-practice';
 import { assertBeginnerLearningAccess } from '../src/trading-accounts/beginner-learning-policy';
 import { FuturesLimitService } from '../src/futures/futures-limit.service';
+import { FuturesLiquidationService } from '../src/futures/futures-liquidation.service';
 
 const target = new URL(process.env.DATABASE_URL ?? 'http://invalid');
 const disposableDatabase =
@@ -70,25 +72,33 @@ async function main() {
   const assetId = s.instruments[0].asset.id;
   const buy = { assetId, side: 'buy', orderType: 'market', amount: '100' };
   const limit = { ...buy, orderType: 'limit', limitPrice: '90' };
+  const mark = async (value = '100') => {
+    const at = await now();
+    await db.futuresMarkSnapshot.createMany({
+      data: s.instruments.map(({ instrument, asset }) => ({
+        instrumentId: instrument.id,
+        symbol: asset.symbol,
+        source: 'binance_usdm_mark_ws',
+        price: value,
+        effectiveAt: at,
+        capturedAt: at,
+      })),
+      skipDuplicates: true,
+    });
+  };
   const fresh = async () => {
     await fxEvidence();
     await spotPrice(s, '100', 0, 0);
     await price(s, '100', 0, 0);
-    const at = await now();
-    await db.futuresMarkSnapshot.createMany({
-      data: [
-        {
-          instrumentId: s.instruments[0].instrument.id,
-          symbol: s.instruments[0].asset.symbol,
-          source: 'binance_usdm_mark_ws',
-          price: '100',
-          effectiveAt: at,
-          capturedAt: at,
-        },
-      ],
-      skipDuplicates: true,
-    });
+    await price(s, '100', 1, 0);
+    await mark();
   };
+  /** The staged permissions that are open, sorted (B차, 2026-10-18). */
+  const opened = (permissions: Record<string, boolean>) =>
+    Object.entries(permissions)
+      .filter(([, allowed]) => allowed)
+      .map(([action]) => action)
+      .sort();
   try {
     await fresh();
     await rejects(
@@ -238,6 +248,8 @@ async function main() {
           count,
         );
         assert.equal(p.learningAccess.allTrading, stage === 6);
+        // Staged access: QUEST 06 is not every trade (B차, 2026-10-18).
+        assert.equal(p.learningPermissions.allTrading, false);
         if (stage < 6 || stage > 6) {
           await rejects(
             assertBeginnerLearningAccess(db, account, 'allTrading'),
@@ -326,19 +338,137 @@ async function main() {
       'FUTURES_TRADING_DISABLED',
     );
     process.env.FUTURES_TRADING_MODE = 'ENABLED';
+    // B차 (2026-10-18): QUEST 06 is the foundation, not every trade. Only the
+    // four market practices open; the legacy key keeps its QUEST 06 meaning.
+    await fresh();
+    const six = await read();
+    assert.equal(six.learningAccess.allTrading, true);
+    assert.deepEqual(opened(six.learningPermissions), [
+      'exchange',
+      'futuresLongOpen',
+      'futuresShortOpen',
+      'fxTransfer',
+      'krStockMarketBuy',
+      'transfer',
+      'usStockMarketBuy',
+    ]);
+    // Passed practice and later order types: refused by the real commands.
+    for (const body of [buy, limit])
+      await rejects(
+        app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, body),
+        'BEGINNER_FEATURE_LOCKED',
+      );
+    await rejects(
+      app.conditionalSell.create(s.userId, s.accountId, {
+        kind: 'protection',
+        assetId,
+        stopLoss: {
+          triggerPrice: '80',
+          executionType: 'market',
+          quantity: '0.1',
+        },
+        idempotencyKey: randomUUID(),
+      }),
+      'BEGINNER_FEATURE_LOCKED',
+    );
+    await rejects(
+      new FuturesLimitService(db, app.access, app.futures).create(
+        s.userId,
+        s.accountId,
+        {
+          instrumentId: s.instruments[0].instrument.id,
+          direction: 'long',
+          marginMode: 'isolated',
+          leverage: 2,
+          quantity: '1',
+          limitPrice: '90',
+          idempotencyKey: randomUUID(),
+        },
+      ),
+      'BEGINNER_FEATURE_LOCKED',
+    );
+    // Another user's account is never a way around the lock.
+    await rejects(
+      app.orders.quoteOrderForTradingAccount(s.userId, other.accountId, buy),
+      'TRADING_ACCOUNT_NOT_FOUND',
+    );
+    checks++;
     // Short first: no dependency on Long or either stock quest.
     for (const direction of ['short', 'long'] as const) {
       await fresh();
-      const opened = await app.futures.execute(
+      const index = direction === 'short' ? 9 : 8;
+      // A practice open counts only above 1x, so 1x is refused.
+      await rejects(
+        app.futures.execute(
+          s.userId,
+          s.accountId,
+          openBody(s, { direction, leverage: 1, marginMode: 'isolated' }),
+        ),
+        'BEGINNER_FEATURE_LOCKED',
+      );
+      if (direction === 'long') {
+        // A liquidated practice never counts and never blocks a retry.
+        const liquidated = await app.futures.execute(
+          s.userId,
+          s.accountId,
+          openBody(s, { direction, leverage: 2, marginMode: 'isolated' }),
+        );
+        await mark('0.01');
+        assert.equal(
+          (
+            await new FuturesLiquidationService(db).liquidate(
+              s.accountId,
+              liquidated.data.position.id,
+            )
+          ).state,
+          'liquidated',
+        );
+        const retry = await read();
+        assert.equal(retry.quests[index].status, 'not_started');
+        assert.equal(retry.learningPermissions.futuresLongOpen, true);
+        await fresh();
+      }
+      const position = await app.futures.execute(
         s.userId,
         s.accountId,
         openBody(s, { direction, leverage: 2, marginMode: 'isolated' }),
       );
-      const index = direction === 'short' ? 9 : 8;
-      assert.equal((await read()).quests[index].status, 'in_progress');
+      const inProgress = await read();
+      assert.equal(inProgress.quests[index].status, 'in_progress');
+      // While it is open: no second open in this direction, no increase; the
+      // other Futures quest and the stock quests stay independent.
+      await rejects(
+        app.futures.execute(
+          s.userId,
+          s.accountId,
+          openBody(s, {
+            direction,
+            leverage: 2,
+            marginMode: 'isolated',
+            instrumentId: s.instruments[1].instrument.id,
+          }),
+        ),
+        'BEGINNER_FEATURE_LOCKED',
+      );
+      await rejects(
+        app.futures.execute(
+          s.userId,
+          s.accountId,
+          await positionBody(s, 'increase', { quantity: '0.5' }),
+        ),
+        'BEGINNER_FEATURE_LOCKED',
+      );
+      assert.equal(
+        inProgress.learningPermissions[
+          direction === 'short' ? 'futuresLongOpen' : 'futuresShortOpen'
+        ],
+        direction === 'short',
+      );
+      assert.equal(inProgress.learningPermissions.krStockMarketBuy, true);
+      // Reduce and close stay risk reduction.
       const partial = await app.futures.execute(s.userId, s.accountId, {
         instrumentId: s.instruments[0].instrument.id,
-        positionId: opened.data.position.id,
+        positionId: position.data.position.id,
         direction,
         leverage: 2,
         marginMode: 'isolated',
@@ -350,7 +480,7 @@ async function main() {
       assert.equal((await read()).quests[index].status, 'in_progress');
       await app.futures.execute(s.userId, s.accountId, {
         instrumentId: s.instruments[0].instrument.id,
-        positionId: opened.data.position.id,
+        positionId: position.data.position.id,
         direction,
         leverage: 2,
         marginMode: 'isolated',
@@ -360,12 +490,26 @@ async function main() {
       });
       assert.equal((await read()).quests[index].status, 'completed');
       assert.equal((await read()).quests[6].status, 'not_started');
+      // A completed direction waits for every quest.
+      await fresh();
+      await rejects(
+        app.futures.execute(
+          s.userId,
+          s.accountId,
+          openBody(s, { direction, leverage: 2, marginMode: 'isolated' }),
+        ),
+        'BEGINNER_FEATURE_LOCKED',
+      );
       checks++;
     }
     // US first; use real trading validators with the existing deterministic calendar fixture.
-    for (const [type, market, currency, index, source] of [
-      ['us_stock', 'NASDAQ', 'USD', 7, 'kis_us_delayed_trade'],
-      ['domestic_stock', 'KRX', 'KRW', 6, 'koscom_krx_realtime_price'],
+    const stock: Record<'us_stock' | 'domestic_stock', string> = {
+      us_stock: '',
+      domestic_stock: '',
+    };
+    for (const [type, market, currency, source] of [
+      ['us_stock', 'NASDAQ', 'USD', 'kis_us_delayed_trade'],
+      ['domestic_stock', 'KRX', 'KRW', 'koscom_krx_realtime_price'],
     ] as const) {
       const asset = await db.asset.create({
         data: {
@@ -379,6 +523,7 @@ async function main() {
         },
       });
       stocks.push(asset.id);
+      stock[type] = asset.id;
       const at = await now();
       tradingSessions.set(at, new Date(at.getTime() + 86400000), ['KRX', 'US']);
       await db.assetPriceSnapshot.create({
@@ -392,21 +537,109 @@ async function main() {
           capturedAt: at,
         },
       });
-      await practiceOrder(app, s.userId, s.accountId, {
-        assetId: asset.id,
-        side: 'buy',
-        orderType: 'market',
-        quantity: '1',
-      });
-      assert.equal((await read()).quests[index].status, 'completed');
-      if (index === 7)
-        assert.equal((await read()).quests[6].status, 'not_started');
-      checks++;
     }
+    // QUEST 08 with a known key: its committed create replays after the lock.
+    await fxEvidence();
+    const usBody = {
+      assetId: stock.us_stock,
+      side: 'buy',
+      orderType: 'market',
+      quantity: '1',
+    };
+    const usQuote = await app.orders.quoteOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      usBody,
+    );
+    const usCreate = {
+      ...usBody,
+      quoteId: usQuote.data.quoteId,
+      idempotencyKey: randomUUID(),
+    };
+    const usOrder = await app.orders.createOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      usCreate,
+    );
+    const usDone = await read();
+    assert.equal(usDone.quests[7].status, 'completed');
+    assert.equal(usDone.quests[6].status, 'not_started');
+    assert.equal(usDone.learningPermissions.usStockMarketBuy, false);
+    // A second US BUY is refused; the committed command still replays as is.
+    await rejects(
+      app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, usBody),
+      'BEGINNER_FEATURE_LOCKED',
+    );
+    const ordersBefore = await db.order.count({
+      where: { tradingAccountId: s.accountId },
+    });
+    const replayed = await app.orders.createOrderForTradingAccount(
+      s.userId,
+      s.accountId,
+      usCreate,
+    );
+    assert.equal(replayed.data.order.orderId, usOrder.data.order.orderId);
     assert.equal(
-      (await read()).quests.every((q) => q.status === 'completed'),
+      await db.order.count({ where: { tradingAccountId: s.accountId } }),
+      ordersBefore,
+    );
+    // The holding: a user's own limit SELL waits for every quest, a market
+    // SELL stays risk reduction.
+    await rejects(
+      app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, {
+        ...usBody,
+        side: 'sell',
+        orderType: 'limit',
+        limitPrice: '120',
+      }),
+      'BEGINNER_FEATURE_LOCKED',
+    );
+    const sold = await practiceOrder(app, s.userId, s.accountId, {
+      ...usBody,
+      side: 'sell',
+    });
+    assert.equal(sold.data.order.status, 'executed');
+    checks++;
+    await practiceOrder(app, s.userId, s.accountId, {
+      assetId: stock.domestic_stock,
+      side: 'buy',
+      orderType: 'market',
+      quantity: '1',
+    });
+    const all = await read();
+    assert.equal(all.quests[6].status, 'completed');
+    assert.equal(
+      all.quests.every((q) => q.status === 'completed'),
       true,
     );
+    // Every quest complete: the ordinary trading opens, by the same commands.
+    assert.equal(Object.values(all.learningPermissions).every(Boolean), true);
+    await fresh();
+    await practiceOrder(app, s.userId, s.accountId, buy);
+    await app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, limit);
+    await app.orders.quoteOrderForTradingAccount(s.userId, s.accountId, {
+      assetId: stock.domestic_stock,
+      side: 'sell',
+      orderType: 'limit',
+      limitPrice: '120',
+      quantity: '1',
+    });
+    const unlocked = await app.futures.execute(
+      s.userId,
+      s.accountId,
+      openBody(s, { leverage: 1, marginMode: 'isolated' }),
+    );
+    await app.futures.execute(
+      s.userId,
+      s.accountId,
+      await positionBody(s, 'increase', { quantity: '0.5' }),
+    );
+    await app.futures.execute(s.userId, s.accountId, {
+      ...(await positionBody(s, 'close')),
+      positionId: unlocked.data.position.id,
+      quantity: '1.5',
+    });
+    checks++;
     // QUEST 04 via the order screen's stop-loss/take-profit setting: crypto
     // TP/SL opens at the TP/SL step (a user condition stays locked), one
     // stop-loss proves the quest, and its automatic sale is not QUEST 05.

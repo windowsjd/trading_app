@@ -304,8 +304,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
             {positionsQuery.isLoading ? <SectionSkeleton lines={3} />
               : positionsQuery.isError && !positions ? (
                 <ErrorState error={positionsQuery.error} title="보유 종목을 불러오지 못했습니다." message="요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요." onRetry={() => void positionsQuery.refetch()} />
-              ) : !positions ? <InlineEmptyState message="보유 종목을 확인할 수 없습니다." />
-                : positions.length === 0 ? <InlineEmptyState message="보유 종목이 없습니다." />
+              ) : !positions ? <InlineEmptyState title="보유 종목을 확인할 수 없습니다." />
+                : positions.length === 0 ? <InlineEmptyState title="보유 중인 종목이 없습니다." testID="wallet-holdings-empty" />
                   : positions.map((position) => (
                     <PositionAssetRow
                       key={position.positionId}

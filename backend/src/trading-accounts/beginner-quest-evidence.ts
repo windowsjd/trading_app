@@ -75,11 +75,83 @@ const TRANSFER_LEGS: LedgerLegRule[] = [
 
 const EVIDENCE_ORDER = [{ executedAt: 'asc' as const }, { id: 'asc' as const }];
 
+/** What a beginner account may START now (B차, 2026-10-18). The server's only
+ * learning authority; cancellation and risk reduction never need one. */
+export type BeginnerLearningPermissions = {
+  exchange: boolean;
+  transfer: boolean;
+  /** The composite FX + transfer command (the app does not use it). */
+  fxTransfer: boolean;
+  cryptoMarketBuy: boolean;
+  spotProtection: boolean;
+  cryptoLimitBuy: boolean;
+  krStockMarketBuy: boolean;
+  usStockMarketBuy: boolean;
+  /** Also requires leverage > 1 per command (the quest's own evidence). */
+  futuresLongOpen: boolean;
+  futuresShortOpen: boolean;
+  /** Every quest complete: the account's ordinary trading. */
+  allTrading: boolean;
+};
+
+export type BeginnerQuestCompletion = Record<
+  | 'exchange'
+  | 'transfer'
+  | 'marketBuy'
+  | 'protection'
+  | 'marketSell'
+  | 'limitBuy'
+  | 'krStock'
+  | 'usStock'
+  | 'futuresLong'
+  | 'futuresShort',
+  boolean
+>;
+
+/**
+ * Staged learning access: a quest's practice is open only while it is the
+ * current step, and everything opens once all ten quests are complete.
+ * - QUEST 01–06 run in order. A crypto market BUY stays open through QUEST 04
+ *   and 05 so a practice holding can be bought again (TP/SL needs one, and so
+ *   does the market SELL); the limit BUY opens at QUEST 06.
+ * - QUEST 07–10 are independent once QUEST 06 is complete; each opens only its
+ *   own market BUY or Futures open until it is complete. A second open in a
+ *   quest's direction waits until the open position is closed.
+ * - Exchange is always open and transfers after QUEST 01: they fund later
+ *   practice and create no market exposure.
+ */
+export function beginnerLearningPermissions(
+  done: BeginnerQuestCompletion,
+  open: { long: boolean; short: boolean },
+): BeginnerLearningPermissions {
+  // QUEST 06's evidence exists only after QUEST 01–05 (each reads the last).
+  const foundation = done.limitBuy;
+  const all =
+    foundation &&
+    done.krStock &&
+    done.usStock &&
+    done.futuresLong &&
+    done.futuresShort;
+  return {
+    exchange: true,
+    transfer: done.exchange,
+    fxTransfer: foundation,
+    cryptoMarketBuy: all || (done.transfer && !done.marketSell),
+    spotProtection: all || (done.marketBuy && !done.protection),
+    cryptoLimitBuy: all || (done.marketSell && !done.limitBuy),
+    krStockMarketBuy: all || (foundation && !done.krStock),
+    usStockMarketBuy: all || (foundation && !done.usStock),
+    futuresLongOpen: all || (foundation && !done.futuresLong && !open.long),
+    futuresShortOpen: all || (foundation && !done.futuresShort && !open.short),
+    allTrading: all,
+  };
+}
+
 /** Read-only evidence reader, also used inside the existing financial fences. */
 export class BeginnerQuestEvidence {
   constructor(private readonly prisma: QuestClient) {}
 
-  async read(accountId: string, includeAdvanced = true) {
+  async read(accountId: string) {
     const fx = await this.firstProvenFx(accountId);
     const transfer = fx ? await this.firstProvenTransfer(accountId, fx) : null;
     const acknowledgements = transfer
@@ -188,15 +260,36 @@ export class BeginnerQuestEvidence {
       limitReview.acknowledgedAt > this.limitResolvedAt(limit)!
         ? { id: limit.id, executedAt: limitReview.acknowledgedAt }
         : null;
-    const [kr, us, long, short] =
-      limitResult && includeAdvanced
-        ? await Promise.all([
-            this.filledOrder(accountId, limitResult, 'domestic_stock', 'buy'),
-            this.filledOrder(accountId, limitResult, 'us_stock', 'buy'),
-            this.futuresLifetime(accountId, limitResult, 'long'),
-            this.futuresLifetime(accountId, limitResult, 'short'),
-          ])
-        : [null, null, null, null];
+    const [kr, us, long, short] = limitResult
+      ? await Promise.all([
+          this.filledOrder(accountId, limitResult, 'domestic_stock', 'buy'),
+          this.filledOrder(accountId, limitResult, 'us_stock', 'buy'),
+          this.futuresLifetime(accountId, limitResult, 'long'),
+          this.futuresLifetime(accountId, limitResult, 'short'),
+        ])
+      : [null, null, null, null];
+    const done: BeginnerQuestCompletion = {
+      exchange: !!fx,
+      transfer: !!transfer,
+      marketBuy: !!holdings,
+      protection: !!protection,
+      marketSell: !!sell,
+      limitBuy: !!limitResult,
+      krStock: !!kr,
+      usStock: !!us,
+      futuresLong: !!long?.close,
+      futuresShort: !!short?.close,
+    };
+    // Open Futures directions matter only while a Futures quest is pending.
+    const pendingFutures =
+      done.limitBuy && (!done.futuresLong || !done.futuresShort);
+    const openDirections = pendingFutures
+      ? await this.prisma.futuresPosition.findMany({
+          where: { tradingAccountId: accountId, status: 'open' },
+          distinct: ['direction'],
+          select: { direction: true },
+        })
+      : [];
     return {
       tradingAccountId: accountId,
       practice: {
@@ -240,6 +333,9 @@ export class BeginnerQuestEvidence {
           this.step('short_closed', short?.close ?? null),
         ]),
       ],
+      // Legacy contract, frozen: deployed apps compare these six keys with
+      // their own derivation from `quests` and reject any other value. The
+      // server no longer enforces them (`allTrading` here = QUEST 06).
       learningAccess: {
         exchange: true,
         transfer: !!fx,
@@ -248,6 +344,10 @@ export class BeginnerQuestEvidence {
         cryptoLimitBuy: !!sell,
         allTrading: !!limitResult,
       },
+      learningPermissions: beginnerLearningPermissions(done, {
+        long: openDirections.some((row) => row.direction === 'long'),
+        short: openDirections.some((row) => row.direction === 'short'),
+      }),
     };
   }
 

@@ -1,5 +1,5 @@
 // Transport-only browser fixture. Real screens/commands/guide remain mounted.
-import { questPayload } from '../questFixtures';
+import { permissionsFromQuests, questPayload } from '../questFixtures';
 import { assets as cryptoAssets, apiClient as chartClient } from './tradingMocks';
 import { futuresFixture, futuresCandlesFixture } from '../futuresFixtures.cjs';
 import { conditionalFixture } from '../conditionalFixtures.cjs';
@@ -16,6 +16,9 @@ export function tradingQuestTransport(response, committedAt, accountId, level) {
   const snapshot=()=>{
     const done=i=>progress.quests[i].status==='completed';
     progress.learningAccess={exchange:true,transfer:done(0),cryptoMarketBuy:done(1),spotProtection:done(2),cryptoLimitBuy:done(4),allTrading:done(5)};
+    // Staged permissions (B차): an open practice position holds its direction.
+    const openDirection=position&&Number(position.quantity)>0?position.direction:null;
+    progress.learningPermissions=permissionsFromQuests(progress.quests,{long:openDirection==='long',short:openDirection==='short'});
     return response(structuredClone(progress));
   };
   const hold=asset=>({ ...asset,assetId:asset.id,positionId:`position-${asset.id}`,quantity:'1.00000000',availableQuantity:'1.00000000',reservedQuantity:'0',averageCost:'100',currencyCode:asset.settlementCurrency,

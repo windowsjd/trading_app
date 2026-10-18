@@ -214,7 +214,7 @@ async function run() {
       await theme.canvas(page, appearance);
       await theme.background(id('asset-detail-screen'), appearance, 'screen');
       await theme.background(id('asset-order-actions'), appearance, 'surface');
-      const up = expected[appearance][palette][0], down = expected[appearance][palette][1];
+      const up = expected[appearance][palette][0];
       assert.equal(await color(id('asset-change-rate')), up);
       const expectedAction = actions[palette];
       await strongButton(id('asset-detail-open-buy-order'), expectedAction[0]);
@@ -242,10 +242,12 @@ async function run() {
       await theme.background(id('asset-trading-columns'), appearance, 'surface');
       await selectedSide('buy', expectedAction[0]);
       await strongButton(id('order-execute-submit'), expectedAction[0]);
-      assert.equal(await color(id('asset-order-book-bids-1').locator('div').first()), up);
-      assert.equal(await color(id('asset-order-book-asks-1').locator('div').first()), down);
-      assert.equal(await color(id('asset-order-book-bids-1'), 'backgroundColor'), surfaces[appearance][palette][0]);
-      assert.equal(await color(id('asset-order-book-asks-1'), 'backgroundColor'), surfaces[appearance][palette][1]);
+      // Book sides (2026-10-18): asks always red, bids the preference's other color.
+      const [askIndex, bidIndex] = palette === 'red_blue' ? [0, 1] : [1, 0];
+      assert.equal(await color(id('asset-order-book-asks-1').locator('div').first()), expected[appearance][palette][askIndex]);
+      assert.equal(await color(id('asset-order-book-bids-1').locator('div').first()), expected[appearance][palette][bidIndex]);
+      assert.equal(await color(id('asset-order-book-asks-1'), 'backgroundColor'), surfaces[appearance][palette][askIndex]);
+      assert.equal(await color(id('asset-order-book-bids-1'), 'backgroundColor'), surfaces[appearance][palette][bidIndex]);
       await id('asset-detail-sell-button').click();
       await selectedSide('sell', expectedAction[1]);
       await strongButton(id('order-execute-submit'), expectedAction[1]);

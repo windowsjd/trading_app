@@ -90,3 +90,7 @@ test('all insufficient wallet responses use the same message', () => {
     assert.equal(transferErrorMessage(code), '잔액이 부족합니다.');
   }
 });
+
+test('a beginner learning lock reads as a learning step, never as a failed transfer to retry', () => {
+  assert.equal(transferErrorMessage('BEGINNER_FEATURE_LOCKED'), '학습을 더 진행하면 이용할 수 있는 기능입니다.');
+});

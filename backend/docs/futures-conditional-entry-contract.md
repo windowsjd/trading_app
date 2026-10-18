@@ -54,7 +54,8 @@ is `FUTURES_IDEMPOTENCY_CONFLICT`.
 Under the existing account/Season lifecycle fence, in order:
 `FUTURES_CONDITIONAL_ENTRY_DISABLED`, `FUTURES_TRADING_DISABLED`/
 `FUTURES_REDUCE_ONLY`, the account/Season/participant gates and beginner
-`allTrading` access (same codes as Futures execute),
+`allTrading` access (all ten quests complete since 2026-10-18; same codes as
+Futures execute),
 `FUTURES_INSTRUMENT_UNVERIFIED`, then conflicts with the current one-way
 position policy: an open position on the instrument
 (`FUTURES_POSITION_ALREADY_OPEN`), a submitted limit entry
