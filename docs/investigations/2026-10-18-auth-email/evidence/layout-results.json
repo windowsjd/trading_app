@@ -1,0 +1,674 @@
+[
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 375,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 1,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "light",
+    "textScale": 2,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 1,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "login",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "email",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "code-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "password-error",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "complete",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "signup",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  },
+  {
+    "width": 430,
+    "theme": "dark",
+    "textScale": 2,
+    "stage": "signup-code",
+    "issues": [],
+    "background": "rgba(0, 0, 0, 0)"
+  }
+]

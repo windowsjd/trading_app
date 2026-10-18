@@ -17,6 +17,7 @@ describe('public authentication and general account errors', () => {
     const Screen = h.load(`src/screens/auth/${kind}Screen.tsx`, {
       'react-native-safe-area-context': { useSafeAreaInsets: () => ({ ...h.insets, left: 0, right: 0 }) },
       '@tanstack/react-query': { useQueryClient: () => ({}), useMutation: (options: any) => { mutation = options; return { isPending: false }; } },
+      '../../features/auth/useEmailVerification': { useEmailVerification: () => ({ busy: false, challenge: null, verificationToken: null }) },
       '../../features/auth/api': {},
       '../../features/auth/session': {},
       '../../features/auth/useEnterApp': { useEnterApp: () => () => {} },

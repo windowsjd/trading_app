@@ -480,6 +480,13 @@ jobs:
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts
           src/ops/ops-job-lock.integration.spec.ts
+      - name: Auth email and recovery PostgreSQL integration (mocked delivery)
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/auth_email_test?schema=public
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE auth_email_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/auth/auth.integration.spec.ts src/auth/email-verification.integration.spec.ts
       - name: Active administrator concurrency PostgreSQL integration
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/active_admin_race_test?schema=public

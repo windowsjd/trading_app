@@ -301,6 +301,18 @@ export function getErrorMessageFromCode(
   options?: { fallbackToGeneric?: boolean },
 ) {
   switch (code as ErrorCode | undefined) {
+    case ERROR_CODE.EMAIL_CODE_INVALID:
+      return '인증번호가 올바르지 않습니다. 다시 확인해주세요.';
+    case ERROR_CODE.EMAIL_CODE_EXPIRED:
+      return '인증번호가 만료되었습니다. 새 인증번호를 요청해주세요.';
+    case ERROR_CODE.EMAIL_CODE_EXHAUSTED:
+      return '인증번호 입력 횟수를 초과했습니다. 새 인증번호를 요청해주세요.';
+    case ERROR_CODE.EMAIL_VERIFICATION_REQUIRED:
+      return '이메일 인증을 다시 진행해주세요.';
+    case ERROR_CODE.EMAIL_RATE_LIMITED:
+      return '요청 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.EMAIL_UNAVAILABLE:
+      return '인증메일을 요청할 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.INVALID_CREDENTIALS:
       return '이메일 또는 비밀번호를 확인해주세요.';
     case ERROR_CODE.EMAIL_ALREADY_EXISTS:

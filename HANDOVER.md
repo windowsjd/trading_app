@@ -10,6 +10,18 @@
 
 ---
 
+## 2026-10-18 Resend 이메일 인증 가입·비밀번호 재설정
+
+- **시작:** fetch한 `origin/main`과 HEAD `6f7459cff55dd9a63acb8af946b47c52870efb80`, main 작업 트리 clean. 기존 다른 worktree/stash는 보존했다. 커밋·push·PR·Render/EAS 배포·운영 DB 변경·실메일 발송 없음.
+- **가입:** 공통 `/api/v1/auth/email/request` → `/email/verify`의 이메일/목적 한정 일회용 증거 → 기존 `/signup`. 증거 소비·User·Refresh Session을 한 트랜잭션으로 처리한다. 기존 앱의 무인증 가입은 차단하며 투자 모드 선택은 기존 흐름을 유지한다.
+- **재설정:** 로그인 버튼 아래 찾기 링크 → 이메일/코드/새 비밀번호·확인 → `/api/v1/auth/password/reset` → 완료 문구와 로그인 복귀. 자동 로그인 없음. DB 변경·증거 소비·전체 Refresh 폐기·tokenVersion 증가가 원자적이다. Guard와 새 WebSocket 연결 인증은 JWT `tv`와 DB 버전을 비교한다. 기존 JWT의 누락 `tv`와 migration 기본값은 0이므로 배포만으로 기존 세션을 끊지 않는다.
+- **저장/보안:** 인증 목적 두 개를 한 challenge 테이블에서 처리하고 IP 예산만 별도 bucket에 둔다. 6자리 crypto 난수·서버 비밀값 HMAC·10분·5회 오입력·60초·이메일 합계 5회/시간. PostgreSQL 잠금으로 서버 간 발송/검증/소비를 직렬화한다. 알 수 없는/비활성 주소는 메일을 보내지 않고 동일한 응답/지연을 제공한다. DB 시간은 timezone 해석을 피한 epoch 기준이다.
+- **설정/migration:** `20261018120000_auth_email_verification`은 User의 nullable `emailVerifiedAt`, 기본 0 `tokenVersion`, 인증 두 테이블만 추가한다. 실제 인증을 하지 않은 기존 회원의 시각은 null이다. backend-only `RESEND_API_KEY`, `EMAIL_FROM="Trading Class <admin@nanghwa.com>"`, 별도 랜덤 `EMAIL_VERIFICATION_SECRET`(32자 이상)이 모두 필요하다. 실제 ingress 확인 후 `AUTH_TRUST_PROXY_HOPS`를 지정한다.
+- **검증:** backend 전체 346 suites/5,618 tests PASS(83 suites/116 tests 기존 opt-in skip), HTTP E2E 411 PASS, Auth PostgreSQL 2 suites PASS, 기존 MVP PostgreSQL PASS. frontend 전체 243 파일 항목 PASS, 최종 Auth 9 파일 PASS, typecheck/lint/빌드·Web export·진단 보안 게이트 PASS. 격리 PostgreSQL만 사용했고 실제 Resend는 모의 처리했다.
+- **레이아웃:** Web 320/375/430 × Light/Dark × 글자 1/2배 × 7 화면 = 84 사례 PASS. 네이티브 OS FontScale·Android/iOS 실제 키보드·실메일은 NOT_RUN.
+- **전환:** 운영 승인 후 migration → backend 전체 인스턴스 교체/설정 → 새 앱 제공 순서. 혼합 배포 중 이전 서버에서 무인증 가입이 통과하지 않게 가입 ingress를 제한한다. 구버전 기존 로그인은 유지되지만 회원가입은 업데이트가 필요하다. rollback도 증거/버전 Guard를 유지해야 한다. 인증 만료 행은 기존 DB 유지보수에서 24시간 경과 후 제한된 batch로 정리하도록 연결한다.
+- **상세:** [보고서·전체 변경 파일](docs/investigations/2026-10-18-auth-email/report.md), [Auth 계약](backend/docs/auth-api-contract.md), [QA·준비 순서](frontend/docs/auth-email-qa.md).
+
 ## 2026-10-18 국내주식 휴장 시 KOSCOM 일봉 종가 표시 통일
 
 - **결정:** 휴장 중 국내주식 표시 가격 = 마지막 완료 세션의 KOSCOM 일봉(`koscom_history`) 종가. 그 세션 스냅샷보다 먼저이며 70종목 같은 기준이다.

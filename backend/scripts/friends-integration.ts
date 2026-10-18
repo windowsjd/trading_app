@@ -1,3 +1,5 @@
+import { EmailVerificationService } from '../src/auth/email-verification.service';
+import { AuthEmailService } from '../src/auth/auth-email.service';
 import { zeroCryptoCashWalletData } from '../src/wallets/canonical-cash-wallets';
 /** Isolated PostgreSQL + real HTTP/guard integration; no provider or financial writes. */
 import 'reflect-metadata';
@@ -301,7 +303,11 @@ async function run() {
   const friends = new FriendsService(db);
   const records = new RecordsService(db, new PortfolioValuationService(db));
   const ranking = new RankingService(db);
-  const auth = new AuthService(db, jwt, config);
+  const emailVerification = new EmailVerificationService(
+    db,
+    new AuthEmailService(config),
+  );
+  const auth = new AuthService(db, jwt, config, emailVerification);
   // tsx omits emitDecoratorMetadata; supply the same constructor metadata tsc emits.
   for (const [controller, service] of [
     [FriendsController, FriendsService],
@@ -309,7 +315,13 @@ async function run() {
     [RankingController, RankingService],
     [AuthController, AuthService],
   ])
-    Reflect.defineMetadata('design:paramtypes', [service], controller);
+    Reflect.defineMetadata(
+      'design:paramtypes',
+      controller === AuthController
+        ? [AuthService, EmailVerificationService]
+        : [service],
+      controller,
+    );
   app = await Test.createTestingModule({
     controllers: [
       FriendsController,
@@ -322,6 +334,7 @@ async function run() {
       { provide: RecordsService, useValue: records },
       { provide: RankingService, useValue: ranking },
       { provide: AuthService, useValue: auth },
+      { provide: EmailVerificationService, useValue: emailVerification },
     ],
   }).compile();
   const http = app.createNestApplication();

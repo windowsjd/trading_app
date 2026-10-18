@@ -20,14 +20,26 @@ export type UserModel = runtime.Types.Result.DefaultSelection<Prisma.$UserPayloa
 
 export type AggregateUser = {
   _count: UserCountAggregateOutputType | null
+  _avg: UserAvgAggregateOutputType | null
+  _sum: UserSumAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
+}
+
+export type UserAvgAggregateOutputType = {
+  tokenVersion: number | null
+}
+
+export type UserSumAggregateOutputType = {
+  tokenVersion: number | null
 }
 
 export type UserMinAggregateOutputType = {
   id: string | null
   email: string | null
   passwordHash: string | null
+  emailVerifiedAt: Date | null
+  tokenVersion: number | null
   nickname: string | null
   profileImageUrl: string | null
   portfolioPublic: boolean | null
@@ -41,6 +53,8 @@ export type UserMaxAggregateOutputType = {
   id: string | null
   email: string | null
   passwordHash: string | null
+  emailVerifiedAt: Date | null
+  tokenVersion: number | null
   nickname: string | null
   profileImageUrl: string | null
   portfolioPublic: boolean | null
@@ -54,6 +68,8 @@ export type UserCountAggregateOutputType = {
   id: number
   email: number
   passwordHash: number
+  emailVerifiedAt: number
+  tokenVersion: number
   nickname: number
   profileImageUrl: number
   portfolioPublic: number
@@ -65,10 +81,20 @@ export type UserCountAggregateOutputType = {
 }
 
 
+export type UserAvgAggregateInputType = {
+  tokenVersion?: true
+}
+
+export type UserSumAggregateInputType = {
+  tokenVersion?: true
+}
+
 export type UserMinAggregateInputType = {
   id?: true
   email?: true
   passwordHash?: true
+  emailVerifiedAt?: true
+  tokenVersion?: true
   nickname?: true
   profileImageUrl?: true
   portfolioPublic?: true
@@ -82,6 +108,8 @@ export type UserMaxAggregateInputType = {
   id?: true
   email?: true
   passwordHash?: true
+  emailVerifiedAt?: true
+  tokenVersion?: true
   nickname?: true
   profileImageUrl?: true
   portfolioPublic?: true
@@ -95,6 +123,8 @@ export type UserCountAggregateInputType = {
   id?: true
   email?: true
   passwordHash?: true
+  emailVerifiedAt?: true
+  tokenVersion?: true
   nickname?: true
   profileImageUrl?: true
   portfolioPublic?: true
@@ -143,6 +173,18 @@ export type UserAggregateArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   /**
    * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
    * 
+   * Select which fields to average
+  **/
+  _avg?: UserAvgAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
+   * Select which fields to sum
+  **/
+  _sum?: UserSumAggregateInputType
+  /**
+   * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+   * 
    * Select which fields to find the minimum value
   **/
   _min?: UserMinAggregateInputType
@@ -173,6 +215,8 @@ export type UserGroupByArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   _count?: UserCountAggregateInputType | true
+  _avg?: UserAvgAggregateInputType
+  _sum?: UserSumAggregateInputType
   _min?: UserMinAggregateInputType
   _max?: UserMaxAggregateInputType
 }
@@ -181,6 +225,8 @@ export type UserGroupByOutputType = {
   id: string
   email: string
   passwordHash: string
+  emailVerifiedAt: Date | null
+  tokenVersion: number
   nickname: string
   profileImageUrl: string | null
   portfolioPublic: boolean
@@ -189,6 +235,8 @@ export type UserGroupByOutputType = {
   createdAt: Date
   updatedAt: Date
   _count: UserCountAggregateOutputType | null
+  _avg: UserAvgAggregateOutputType | null
+  _sum: UserSumAggregateOutputType | null
   _min: UserMinAggregateOutputType | null
   _max: UserMaxAggregateOutputType | null
 }
@@ -215,6 +263,8 @@ export type UserWhereInput = {
   id?: Prisma.StringFilter<"User"> | string
   email?: Prisma.StringFilter<"User"> | string
   passwordHash?: Prisma.StringFilter<"User"> | string
+  emailVerifiedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  tokenVersion?: Prisma.IntFilter<"User"> | number
   nickname?: Prisma.StringFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableFilter<"User"> | string | null
   portfolioPublic?: Prisma.BoolFilter<"User"> | boolean
@@ -248,6 +298,8 @@ export type UserOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   email?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  emailVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  tokenVersion?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   portfolioPublic?: Prisma.SortOrder
@@ -285,6 +337,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   passwordHash?: Prisma.StringFilter<"User"> | string
+  emailVerifiedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  tokenVersion?: Prisma.IntFilter<"User"> | number
   profileImageUrl?: Prisma.StringNullableFilter<"User"> | string | null
   portfolioPublic?: Prisma.BoolFilter<"User"> | boolean
   status?: Prisma.EnumUserStatusFilter<"User"> | $Enums.UserStatus
@@ -317,6 +371,8 @@ export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   email?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  emailVerifiedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  tokenVersion?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrderInput | Prisma.SortOrder
   portfolioPublic?: Prisma.SortOrder
@@ -325,8 +381,10 @@ export type UserOrderByWithAggregationInput = {
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
+  _avg?: Prisma.UserAvgOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
   _min?: Prisma.UserMinOrderByAggregateInput
+  _sum?: Prisma.UserSumOrderByAggregateInput
 }
 
 export type UserScalarWhereWithAggregatesInput = {
@@ -336,6 +394,8 @@ export type UserScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"User"> | string
   email?: Prisma.StringWithAggregatesFilter<"User"> | string
   passwordHash?: Prisma.StringWithAggregatesFilter<"User"> | string
+  emailVerifiedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  tokenVersion?: Prisma.IntWithAggregatesFilter<"User"> | number
   nickname?: Prisma.StringWithAggregatesFilter<"User"> | string
   profileImageUrl?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   portfolioPublic?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
@@ -349,6 +409,8 @@ export type UserCreateInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -382,6 +444,8 @@ export type UserUncheckedCreateInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -415,6 +479,8 @@ export type UserUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -448,6 +514,8 @@ export type UserUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -481,6 +549,8 @@ export type UserCreateManyInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -494,6 +564,8 @@ export type UserUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -507,6 +579,8 @@ export type UserUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -520,6 +594,8 @@ export type UserCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   email?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  emailVerifiedAt?: Prisma.SortOrder
+  tokenVersion?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
   portfolioPublic?: Prisma.SortOrder
@@ -529,10 +605,16 @@ export type UserCountOrderByAggregateInput = {
   updatedAt?: Prisma.SortOrder
 }
 
+export type UserAvgOrderByAggregateInput = {
+  tokenVersion?: Prisma.SortOrder
+}
+
 export type UserMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   email?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  emailVerifiedAt?: Prisma.SortOrder
+  tokenVersion?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
   portfolioPublic?: Prisma.SortOrder
@@ -546,6 +628,8 @@ export type UserMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   email?: Prisma.SortOrder
   passwordHash?: Prisma.SortOrder
+  emailVerifiedAt?: Prisma.SortOrder
+  tokenVersion?: Prisma.SortOrder
   nickname?: Prisma.SortOrder
   profileImageUrl?: Prisma.SortOrder
   portfolioPublic?: Prisma.SortOrder
@@ -553,6 +637,10 @@ export type UserMinOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+}
+
+export type UserSumOrderByAggregateInput = {
+  tokenVersion?: Prisma.SortOrder
 }
 
 export type UserScalarRelationFilter = {
@@ -567,6 +655,18 @@ export type UserNullableScalarRelationFilter = {
 
 export type StringFieldUpdateOperationsInput = {
   set?: string
+}
+
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
+export type IntFieldUpdateOperationsInput = {
+  set?: number
+  increment?: number
+  decrement?: number
+  multiply?: number
+  divide?: number
 }
 
 export type NullableStringFieldUpdateOperationsInput = {
@@ -877,6 +977,8 @@ export type UserCreateWithoutInquiriesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -909,6 +1011,8 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -957,6 +1061,8 @@ export type UserUpdateWithoutInquiriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -989,6 +1095,8 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1021,6 +1129,8 @@ export type UserCreateWithoutInquiryAnswersInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1053,6 +1163,8 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1101,6 +1213,8 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1133,6 +1247,8 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1165,6 +1281,8 @@ export type UserCreateWithoutFriendshipsLowInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1197,6 +1315,8 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1234,6 +1354,8 @@ export type UserCreateWithoutFriendshipsHighInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1266,6 +1388,8 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1314,6 +1438,8 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1346,6 +1472,8 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1389,6 +1517,8 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1421,6 +1551,8 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1453,6 +1585,8 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1485,6 +1619,8 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1533,6 +1669,8 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1565,6 +1703,8 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1597,6 +1737,8 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1629,6 +1771,8 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1677,6 +1821,8 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1709,6 +1855,8 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1741,6 +1889,8 @@ export type UserCreateWithoutTradingAccountsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1773,6 +1923,8 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1821,6 +1973,8 @@ export type UserUpdateWithoutTradingAccountsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1853,6 +2007,8 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1885,6 +2041,8 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1917,6 +2075,8 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -1965,6 +2125,8 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -1997,6 +2159,8 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2029,6 +2193,8 @@ export type UserCreateWithoutUserBadgesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2061,6 +2227,8 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2109,6 +2277,8 @@ export type UserUpdateWithoutUserBadgesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2141,6 +2311,8 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2173,6 +2345,8 @@ export type UserCreateWithoutSeasonRewardsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2205,6 +2379,8 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2253,6 +2429,8 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2285,6 +2463,8 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2317,6 +2497,8 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2349,6 +2531,8 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2386,6 +2570,8 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2418,6 +2604,8 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2455,6 +2643,8 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2487,6 +2677,8 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2524,6 +2716,8 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2556,6 +2750,8 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2604,6 +2800,8 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2636,6 +2834,8 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2679,6 +2879,8 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2711,6 +2913,8 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2754,6 +2958,8 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2786,6 +2992,8 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2829,6 +3037,8 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2861,6 +3071,8 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -2893,6 +3105,8 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2925,6 +3139,8 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -2973,6 +3189,8 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3005,6 +3223,8 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3037,6 +3257,8 @@ export type UserCreateWithoutQuotesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3069,6 +3291,8 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3117,6 +3341,8 @@ export type UserUpdateWithoutQuotesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3149,6 +3375,8 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3181,6 +3409,8 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3213,6 +3443,8 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3261,6 +3493,8 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3293,6 +3527,8 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3325,6 +3561,8 @@ export type UserCreateWithoutPushDevicesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3357,6 +3595,8 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3405,6 +3645,8 @@ export type UserUpdateWithoutPushDevicesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3437,6 +3679,8 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3469,6 +3713,8 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3501,6 +3747,8 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3549,6 +3797,8 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3581,6 +3831,8 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3613,6 +3865,8 @@ export type UserCreateWithoutPushNotificationsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3645,6 +3899,8 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   id?: string
   email: string
   passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
   nickname: string
   profileImageUrl?: string | null
   portfolioPublic?: boolean
@@ -3693,6 +3949,8 @@ export type UserUpdateWithoutPushNotificationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3725,6 +3983,8 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   email?: Prisma.StringFieldUpdateOperationsInput | string
   passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
   nickname?: Prisma.StringFieldUpdateOperationsInput | string
   profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -3950,6 +4210,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   id?: boolean
   email?: boolean
   passwordHash?: boolean
+  emailVerifiedAt?: boolean
+  tokenVersion?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
   portfolioPublic?: boolean
@@ -3984,6 +4246,8 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   id?: boolean
   email?: boolean
   passwordHash?: boolean
+  emailVerifiedAt?: boolean
+  tokenVersion?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
   portfolioPublic?: boolean
@@ -3997,6 +4261,8 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   id?: boolean
   email?: boolean
   passwordHash?: boolean
+  emailVerifiedAt?: boolean
+  tokenVersion?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
   portfolioPublic?: boolean
@@ -4010,6 +4276,8 @@ export type UserSelectScalar = {
   id?: boolean
   email?: boolean
   passwordHash?: boolean
+  emailVerifiedAt?: boolean
+  tokenVersion?: boolean
   nickname?: boolean
   profileImageUrl?: boolean
   portfolioPublic?: boolean
@@ -4019,7 +4287,7 @@ export type UserSelectScalar = {
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "emailVerifiedAt" | "tokenVersion" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
   friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
@@ -4074,6 +4342,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     id: string
     email: string
     passwordHash: string
+    emailVerifiedAt: Date | null
+    tokenVersion: number
     nickname: string
     profileImageUrl: string | null
     portfolioPublic: boolean
@@ -4527,6 +4797,8 @@ export interface UserFieldRefs {
   readonly id: Prisma.FieldRef<"User", 'String'>
   readonly email: Prisma.FieldRef<"User", 'String'>
   readonly passwordHash: Prisma.FieldRef<"User", 'String'>
+  readonly emailVerifiedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly tokenVersion: Prisma.FieldRef<"User", 'Int'>
   readonly nickname: Prisma.FieldRef<"User", 'String'>
   readonly profileImageUrl: Prisma.FieldRef<"User", 'String'>
   readonly portfolioPublic: Prisma.FieldRef<"User", 'Boolean'>

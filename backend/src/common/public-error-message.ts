@@ -3,6 +3,12 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  'Email verification is temporarily unavailable.',
+  'Email verification is invalid.',
+  'Email verification has expired.',
+  'Email verification attempts exceeded.',
+  'Verify your email again.',
+  'Try email verification again later.',
   // Beginner staged learning access (B차, 2026-10-18).
   'Complete the exchange quest first.',
   'Complete the six foundation quests first.',

@@ -1,4 +1,8 @@
 import {
+  EmailVerificationService,
+  authEmail,
+} from './email-verification.service';
+import {
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -23,6 +27,7 @@ import type {
   AuthUser,
   CurrentUserResponse,
   LoginRequestBody,
+  PasswordResetBody,
   LogoutResponse,
   RefreshTokenRequestBody,
   RequestAuthMetadata,
@@ -71,6 +76,7 @@ export class AuthService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    private readonly emailVerification: EmailVerificationService,
   ) {}
 
   onModuleInit() {
@@ -83,41 +89,39 @@ export class AuthService implements OnModuleInit {
   ): Promise<AuthTokenResponse> {
     const request = this.parseSignupRequest(body);
     this.validateAuthConfiguration();
-    const existingEmail = await this.prisma.user.findUnique({
-      where: {
-        email: request.email,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingEmail) {
-      this.throwConflict('EMAIL_ALREADY_EXISTS', 'Email already exists.');
-    }
-
-    const existingNickname = await this.prisma.user.findUnique({
-      where: {
-        nickname: request.nickname,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (existingNickname) {
-      this.throwConflict('NICKNAME_ALREADY_EXISTS', 'Nickname already exists.');
-    }
+    await this.emailVerification.limit('complete', metadata);
 
     const passwordHash = await argon2.hash(request.password);
     const refreshToken = this.createRefreshTokenArtifacts();
 
     try {
       const user = await this.prisma.$transaction(async (tx) => {
+        const evidence = await this.emailVerification.consume(
+          tx,
+          request.email,
+          'signup',
+          body.verificationToken,
+        );
+        const existingEmail = await tx.user.findUnique({
+          where: { email: request.email },
+          select: { id: true },
+        });
+        if (existingEmail)
+          this.throwConflict('EMAIL_ALREADY_EXISTS', 'Email already exists.');
+        const existingNickname = await tx.user.findUnique({
+          where: { nickname: request.nickname },
+          select: { id: true },
+        });
+        if (existingNickname)
+          this.throwConflict(
+            'NICKNAME_ALREADY_EXISTS',
+            'Nickname already exists.',
+          );
         const createdUser = await tx.user.create({
           data: {
             email: request.email,
             passwordHash,
+            emailVerifiedAt: evidence.verifiedAt,
             nickname: request.nickname,
             role: UserRole.user,
             status: UserStatus.active,
@@ -165,6 +169,7 @@ export class AuthService implements OnModuleInit {
         id: true,
         email: true,
         passwordHash: true,
+        tokenVersion: true,
         nickname: true,
         role: true,
         status: true,
@@ -187,7 +192,19 @@ export class AuthService implements OnModuleInit {
       this.throwUserNotActive();
     }
 
-    return this.createAuthTokenResponse(
+    const refreshToken = this.createRefreshTokenArtifacts();
+    await this.prisma.$transaction(async (tx) => {
+      const [current] = await this.lockUser(tx, user.id);
+      if (
+        !current ||
+        current.passwordHash !== user.passwordHash ||
+        current.tokenVersion !== (user.tokenVersion ?? 0)
+      )
+        this.throwInvalidCredentials();
+      if (current.status !== UserStatus.active) this.throwUserNotActive();
+      await this.createRefreshSession(tx, user.id, metadata, refreshToken);
+    });
+    return this.buildAuthTokenResponse(
       {
         id: user.id,
         email: user.email,
@@ -195,7 +212,8 @@ export class AuthService implements OnModuleInit {
         role: user.role,
         status: user.status,
       },
-      metadata,
+      refreshToken,
+      user.tokenVersion ?? 0,
     );
   }
 
@@ -226,6 +244,7 @@ export class AuthService implements OnModuleInit {
               nickname: true,
               role: true,
               status: true,
+              tokenVersion: true,
             },
           },
         },
@@ -247,6 +266,10 @@ export class AuthService implements OnModuleInit {
         this.throwUserNotActive();
       }
 
+      const [current] = await this.lockUser(tx, session.userId);
+      if (!current || current.tokenVersion !== (session.user.tokenVersion ?? 0))
+        this.throwInvalidRefreshToken();
+      if (current.status !== UserStatus.active) this.throwUserNotActive();
       const newSession = await this.createRefreshSession(
         tx,
         session.userId,
@@ -270,6 +293,7 @@ export class AuthService implements OnModuleInit {
       }
 
       return {
+        tokenVersion: session.user.tokenVersion ?? 0,
         id: session.user.id,
         email: session.user.email,
         nickname: session.user.nickname,
@@ -278,7 +302,69 @@ export class AuthService implements OnModuleInit {
       };
     });
 
-    return this.buildAuthTokenResponse(user, nextRefreshToken);
+    const { tokenVersion, ...publicUser } = user;
+    return this.buildAuthTokenResponse(
+      publicUser,
+      nextRefreshToken,
+      tokenVersion,
+    );
+  }
+
+  async resetPassword(
+    body: PasswordResetBody = {},
+    metadata: RequestAuthMetadata = {},
+  ) {
+    await this.emailVerification.limit('complete', metadata);
+    const email = authEmail(body.email);
+    const password = this.parsePassword(body.password);
+    const passwordHash = await argon2.hash(password);
+    await this.prisma.$transaction(async (tx) => {
+      const evidence = await this.emailVerification.consume(
+        tx,
+        email,
+        'password_reset',
+        body.verificationToken,
+      );
+      if (!evidence.targetUserId) this.emailVerification.proofError();
+      const [user] = await this.lockUser(tx, evidence.targetUserId);
+      if (
+        !user ||
+        user.email !== email ||
+        user.status !== UserStatus.active ||
+        user.tokenVersion !== evidence.targetVersion
+      )
+        this.emailVerification.proofError();
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          tokenVersion: { increment: 1 },
+          emailVerifiedAt: evidence.verifiedAt,
+        },
+      });
+      await tx.refreshTokenSession.updateMany({
+        where: { userId: user.id, status: RefreshTokenSessionStatus.active },
+        data: {
+          status: RefreshTokenSessionStatus.revoked,
+          revokedAt: evidence.now,
+        },
+      });
+    });
+    return { success: true, data: { changed: true } };
+  }
+
+  private lockUser(tx: Prisma.TransactionClient, userId: string) {
+    return tx.$queryRaw<
+      {
+        id: string;
+        email: string;
+        passwordHash: string;
+        tokenVersion: number;
+        status: UserStatus;
+      }[]
+    >`
+      SELECT id, email, password_hash AS "passwordHash", token_version AS "tokenVersion", status
+      FROM users WHERE id = ${userId} FOR UPDATE`;
   }
 
   async logout(body: RefreshTokenRequestBody = {}): Promise<LogoutResponse> {
@@ -508,16 +594,7 @@ export class AuthService implements OnModuleInit {
   }
 
   private parseEmail(value: unknown) {
-    if (typeof value !== 'string') {
-      this.throwBadRequest('INVALID_EMAIL', 'Email must be a valid email.');
-    }
-
-    const email = value.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      this.throwBadRequest('INVALID_EMAIL', 'Email must be a valid email.');
-    }
-
-    return email;
+    return authEmail(value);
   }
 
   private parsePassword(value: unknown) {
@@ -559,6 +636,7 @@ export class AuthService implements OnModuleInit {
   private async buildAuthTokenResponse(
     user: AuthUser,
     refreshToken: RefreshTokenArtifacts,
+    tokenVersion = 0,
   ): Promise<AuthTokenResponse> {
     const accessTokenExpiresIn = this.getAccessTtl();
 
@@ -570,6 +648,7 @@ export class AuthService implements OnModuleInit {
           accessToken: await this.signAccessToken(
             user.id,
             accessTokenExpiresIn,
+            tokenVersion,
           ),
           refreshToken: refreshToken.token,
           accessTokenExpiresIn,
@@ -577,22 +656,6 @@ export class AuthService implements OnModuleInit {
         },
       },
     };
-  }
-
-  private async createAuthTokenResponse(
-    user: AuthUser,
-    metadata: RequestAuthMetadata,
-  ) {
-    const refreshToken = this.createRefreshTokenArtifacts();
-
-    await this.createRefreshSession(
-      this.prisma,
-      user.id,
-      metadata,
-      refreshToken,
-    );
-
-    return this.buildAuthTokenResponse(user, refreshToken);
   }
 
   private async createRefreshSession(
@@ -656,10 +719,15 @@ export class AuthService implements OnModuleInit {
     return REFRESH_TOKEN_PATTERN.test(token);
   }
 
-  private signAccessToken(userId: string, expiresIn = this.getAccessTtl()) {
+  private signAccessToken(
+    userId: string,
+    expiresIn = this.getAccessTtl(),
+    tokenVersion = 0,
+  ) {
     return this.jwtService.signAsync(
       {
         sub: userId,
+        tv: tokenVersion,
       },
       {
         secret: this.getAccessSecret(),

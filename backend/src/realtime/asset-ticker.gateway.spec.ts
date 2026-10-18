@@ -95,8 +95,49 @@ describe('AssetTickerGateway', () => {
       binanceEventBus,
       gateway,
       prisma,
+      jwtService,
+      configService,
     };
   };
+
+  it.each([
+    { tv: undefined, version: 0, accepted: true },
+    { tv: undefined, version: 1, accepted: false },
+    { tv: 0, version: 1, accepted: false },
+    { tv: 1, version: 1, accepted: true },
+  ])(
+    'checks reset token version at WebSocket authentication: %j',
+    async ({ tv, version, accepted }) => {
+      const { gateway, prisma, jwtService, configService } =
+        createGateway(null);
+      configService.get.mockReturnValue('test-secret');
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-1',
+        ...(tv === undefined ? {} : { tv }),
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        status: 'active',
+        tokenVersion: version,
+      });
+      const socket = {
+        on: jest.fn(),
+        send: jest.fn(),
+        close: jest.fn(),
+        readyState: 1,
+      };
+      await gateway.handleConnection(
+        socket as never,
+        {
+          url: '/',
+          headers: { authorization: 'Bearer fixture-token' },
+        } as never,
+      );
+      expect(socket.close.mock.calls.length === 0).toBe(accepted);
+      if (!accepted)
+        expect(socket.close).toHaveBeenCalledWith(1008, 'Unauthorized');
+      gateway.handleDisconnect(socket as never);
+    },
+  );
 
   const buildTickerMessage = (gateway: AssetTickerGateway, assetId: string) =>
     (

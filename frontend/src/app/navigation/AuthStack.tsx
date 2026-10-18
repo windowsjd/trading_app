@@ -1,3 +1,4 @@
+import PasswordResetScreen from '../../screens/auth/PasswordResetScreen';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
@@ -17,6 +18,7 @@ export default function AuthStack() {
     <Stack.Navigator id="AuthStack" screenOptions={{ headerShown: false, ...stackTransition(reducedMotion, Platform.OS) }} screenLayout={stackScreenLayout}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="PasswordReset" component={PasswordResetScreen} />
     </Stack.Navigator>
   );
 }

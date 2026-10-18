@@ -529,10 +529,6 @@ export type EnumRefreshTokenSessionStatusFieldUpdateOperationsInput = {
   set?: $Enums.RefreshTokenSessionStatus
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type RefreshTokenSessionUpdateOneWithoutReplacementSourceSessionsNestedInput = {
   create?: Prisma.XOR<Prisma.RefreshTokenSessionCreateWithoutReplacementSourceSessionsInput, Prisma.RefreshTokenSessionUncheckedCreateWithoutReplacementSourceSessionsInput>
   connectOrCreate?: Prisma.RefreshTokenSessionCreateOrConnectWithoutReplacementSourceSessionsInput

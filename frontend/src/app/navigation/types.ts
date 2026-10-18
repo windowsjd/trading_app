@@ -15,6 +15,7 @@ import type {
 export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
+  PasswordReset: { email?: string } | undefined;
 };
 
 export type HomeStackParamList = {
@@ -150,6 +151,8 @@ export type LoginScreenProps = NativeStackScreenProps<
   AuthStackParamList,
   'Login'
 >;
+
+export type PasswordResetScreenProps = NativeStackScreenProps<AuthStackParamList, 'PasswordReset'>;
 
 export type SignupScreenProps = NativeStackScreenProps<
   AuthStackParamList,

@@ -1,3 +1,7 @@
+import {
+  readEmailAuthConfig,
+  readAuthTrustProxyHops,
+} from '../auth/email-auth.config';
 import { readAdRewardConfig } from '../ad-rewards/ad-reward.config';
 import { parseLimitOrderEnabled } from '../orders/limit-order.config';
 import { readLimitOrderMatchingConfig } from '../orders/limit-order-matching.config';
@@ -89,6 +93,8 @@ export function validateEnv(
   });
   collect(errors, () => readGeneralFxFeeRate(env));
   collect(errors, () => readProfileImageStorageConfig(config));
+  collect(errors, () => readEmailAuthConfig(config));
+  collect(errors, () => readAuthTrustProxyHops(config.AUTH_TRUST_PROXY_HOPS));
 
   // AD_REWARD_*: absent → disabled, which is a complete valid state. With
   // AD_REWARD_ENABLED=true every operational value (provider, amount, daily

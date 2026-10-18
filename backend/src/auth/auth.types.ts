@@ -12,9 +12,17 @@ export type AuthenticatedRequest = Request & {
 
 export type AccessTokenPayload = {
   sub?: unknown;
+  tv?: unknown;
+};
+
+export type PasswordResetBody = {
+  email?: unknown;
+  password?: unknown;
+  verificationToken?: unknown;
 };
 
 export type SignupRequestBody = {
+  verificationToken?: unknown;
   email?: unknown;
   password?: unknown;
   nickname?: unknown;

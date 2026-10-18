@@ -1,3 +1,5 @@
+import { EmailVerificationService } from '../src/auth/email-verification.service';
+import { createApiError } from '../src/common/api-error';
 import { SPOT_ASSET_WHERE } from '../src/providers/binance/binance-product-catalog';
 jest.mock('../src/generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
@@ -688,6 +690,34 @@ describe('AppController (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(prisma)
+      .overrideProvider(EmailVerificationService)
+      .useValue({
+        limit: jest.fn(),
+        request: jest
+          .fn()
+          .mockResolvedValue({
+            success: true,
+            data: {
+              challengeId: 'test-challenge',
+              message: '계정이 등록되어 있다면 인증번호가 발송됩니다.',
+            },
+          }),
+        verify: jest
+          .fn()
+          .mockResolvedValue({
+            success: true,
+            data: { verificationToken: 'verified-signup-proof' },
+          }),
+        consume: jest.fn(async (_tx, _email, _purpose, token) => {
+          if (token !== 'verified-signup-proof')
+            throw createApiError(
+              'EMAIL_VERIFICATION_REQUIRED',
+              'Verify your email again.',
+              400,
+            );
+          return { verifiedAt: new Date('2026-10-18T00:00:00Z') };
+        }),
+      })
       .overrideProvider(RedisService)
       .useValue({
         ping: (redisPing = jest.fn().mockResolvedValue('PONG')),
@@ -1288,6 +1318,54 @@ describe('AppController (e2e)', () => {
     });
   });
 
+  it('email request/verify are public, stay under /api/v1, and return the ownership proof contract', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/email/request')
+      .send({ email: 'user@example.com', purpose: 'signup' })
+      .expect(200)
+      .expect((response) =>
+        expect(response.body.data.challengeId).toBe('test-challenge'),
+      );
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/email/verify')
+      .send({
+        email: 'user@example.com',
+        purpose: 'signup',
+        challengeId: 'test-challenge',
+        code: '123456',
+      })
+      .expect(200)
+      .expect((response) =>
+        expect(response.body.data.verificationToken).toBe(
+          'verified-signup-proof',
+        ),
+      );
+  });
+
+  it('old apps cannot sign up or reset a password without server ownership evidence', async () => {
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/signup')
+      .send({
+        email: 'user@example.com',
+        password: 'Password123!',
+        nickname: 'traderKim',
+      })
+      .expect(400)
+      .expect((response) =>
+        expect(response.body.error.code).toBe('EMAIL_VERIFICATION_REQUIRED'),
+      );
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/password/reset')
+      .send({ email: 'user@example.com', password: 'Password123!' })
+      .expect(400)
+      .expect((response) =>
+        expect(response.body.error.code).toBe('EMAIL_VERIFICATION_REQUIRED'),
+      );
+    expect(prisma.user.create).not.toHaveBeenCalled();
+    expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
+  });
+
   it('/api/v1/auth/signup (POST) creates a user and returns access and refresh tokens', () => {
     prisma.user.findUnique
       .mockResolvedValueOnce(null)
@@ -1306,6 +1384,7 @@ describe('AppController (e2e)', () => {
         email: 'USER@example.com',
         password: 'Password123!',
         nickname: 'traderKim',
+        verificationToken: 'verified-signup-proof',
       })
       .expect(201)
       .expect((response) => {
@@ -1361,6 +1440,7 @@ describe('AppController (e2e)', () => {
   });
 
   it('/api/v1/auth/login (POST) authenticates a user and returns access and refresh tokens', () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ ...user, tokenVersion: 0 }]);
     prisma.user.findUnique.mockResolvedValueOnce(user);
 
     return request(app.getHttpServer())
@@ -1436,6 +1516,7 @@ describe('AppController (e2e)', () => {
   });
 
   it('/api/v1/auth/refresh (POST) rotates a valid refresh token', () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ ...user, tokenVersion: 0 }]);
     prisma.refreshTokenSession.findUnique.mockResolvedValueOnce({
       id: 'refresh-session-1',
       userId: user.id,
@@ -1497,6 +1578,7 @@ describe('AppController (e2e)', () => {
   });
 
   it('/api/v1/auth/refresh (POST) rejects old refresh token reuse after rotation', async () => {
+    prisma.$queryRaw.mockResolvedValueOnce([{ ...user, tokenVersion: 0 }]);
     prisma.refreshTokenSession.findUnique
       .mockResolvedValueOnce({
         id: 'refresh-session-1',
@@ -2996,23 +3078,45 @@ describe('AppController (e2e)', () => {
   it('/api/v1/trading-accounts/:accountId/quests/acknowledgements (POST) requires authentication', async () => {
     const spy = jest.spyOn(app.get(BeginnerQuestsService), 'acknowledge');
     try {
-      await request(app.getHttpServer()).post('/api/v1/trading-accounts/trading-account-3/quests/acknowledgements')
-        .send({ stepId: 'holdings_reviewed', orderId: 'order-1' }).expect(401);
+      await request(app.getHttpServer())
+        .post(
+          '/api/v1/trading-accounts/trading-account-3/quests/acknowledgements',
+        )
+        .send({ stepId: 'holdings_reviewed', orderId: 'order-1' })
+        .expect(401);
       expect(spy).not.toHaveBeenCalled();
-    } finally { spy.mockRestore(); }
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('quest acknowledgement rejects another owner and general mode before evidence reads', async () => {
-    resetPrismaMocks(); mockActiveUser();
+    resetPrismaMocks();
+    mockActiveUser();
     const token = await createValidAccessToken();
-    const path = '/api/v1/trading-accounts/trading-account-2/quests/acknowledgements';
+    const path =
+      '/api/v1/trading-accounts/trading-account-2/quests/acknowledgements';
     prisma.tradingAccount.findFirst.mockResolvedValueOnce(null);
-    await request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${token}`)
-      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' }).expect(404);
-    prisma.tradingAccount.findFirst.mockResolvedValueOnce({ id: 'trading-account-2', userId: user.id, mode: 'general', status: 'active', seasonParticipant: null });
-    await request(app.getHttpServer()).post(path).set('Authorization', `Bearer ${token}`)
-      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' }).expect(409)
-      .expect(response => expect(response.body.error.code).toBe('BEGINNER_QUEST_ACCOUNT_ONLY'));
+    await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' })
+      .expect(404);
+    prisma.tradingAccount.findFirst.mockResolvedValueOnce({
+      id: 'trading-account-2',
+      userId: user.id,
+      mode: 'general',
+      status: 'active',
+      seasonParticipant: null,
+    });
+    await request(app.getHttpServer())
+      .post(path)
+      .set('Authorization', `Bearer ${token}`)
+      .send({ stepId: 'holdings_reviewed', orderId: 'order-1' })
+      .expect(409)
+      .expect((response) =>
+        expect(response.body.error.code).toBe('BEGINNER_QUEST_ACCOUNT_ONLY'),
+      );
     expect(prisma.order.findFirst).not.toHaveBeenCalled();
   });
 

@@ -207,6 +207,16 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       </AuthSubmitBox>
 
       <ActionPressable
+        testID="auth-forgot-password"
+        style={styles.secondaryButton}
+        disabled={loginMutation.isPending}
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('PasswordReset', { email: email.trim() })}
+      >
+        <Text style={styles.secondaryButtonText}>비밀번호를 잊어버리셨나요?</Text>
+      </ActionPressable>
+
+      <ActionPressable
         style={styles.secondaryButton}
         onPress={() => navigation.navigate('Signup')}
       >

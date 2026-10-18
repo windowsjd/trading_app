@@ -1,4 +1,9 @@
 import {
+  EmailVerificationService,
+  type EmailRequestBody,
+  type EmailVerifyBody,
+} from './email-verification.service';
+import {
   Body,
   Controller,
   Get,
@@ -14,6 +19,7 @@ import { AuthService } from './auth.service';
 import type {
   AuthenticatedRequest,
   LoginRequestBody,
+  PasswordResetBody,
   RefreshTokenRequestBody,
   RequestAuthMetadata,
   SignupRequestBody,
@@ -22,7 +28,40 @@ import type {
 
 @Controller('api/v1')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly emailVerification: EmailVerificationService,
+  ) {}
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('auth/email/request')
+  requestEmail(@Body() body: EmailRequestBody, @Req() request: Request) {
+    return this.emailVerification.request(
+      body,
+      this.getRequestAuthMetadata(request),
+    );
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('auth/email/verify')
+  verifyEmail(@Body() body: EmailVerifyBody, @Req() request: Request) {
+    return this.emailVerification.verify(
+      body,
+      this.getRequestAuthMetadata(request),
+    );
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('auth/password/reset')
+  resetPassword(@Body() body: PasswordResetBody, @Req() request: Request) {
+    return this.authService.resetPassword(
+      body,
+      this.getRequestAuthMetadata(request),
+    );
+  }
 
   @Public()
   @HttpCode(HttpStatus.CREATED)

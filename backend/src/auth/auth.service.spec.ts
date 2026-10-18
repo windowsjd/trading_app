@@ -47,6 +47,7 @@ describe('AuthService', () => {
     id: 'user-1',
     email: 'user@example.com',
     passwordHash: 'hashed-password',
+    tokenVersion: 0,
     nickname: 'traderKim',
     profileImageUrl: null,
     role: UserRole.user,
@@ -57,6 +58,7 @@ describe('AuthService', () => {
   const createPrisma = () => {
     const prisma = {
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([activeUser]),
       refreshTokenSession: {
         create: jest.fn().mockResolvedValue({ id: 'refresh-session-1' }),
         findUnique: jest.fn(),
@@ -110,6 +112,10 @@ describe('AuthService', () => {
       prisma as never,
       jwtService as never,
       configService as never,
+      {
+        limit: jest.fn(),
+        consume: jest.fn().mockResolvedValue({ verifiedAt: createdAt }),
+      } as never,
     );
 
     return { configService, jwtService, prisma, service };
@@ -189,6 +195,7 @@ describe('AuthService', () => {
         data: {
           email: 'user@example.com',
           passwordHash: 'hashed-password',
+          emailVerifiedAt: createdAt,
           nickname: 'traderKim',
           role: UserRole.user,
           status: UserStatus.active,
@@ -196,7 +203,7 @@ describe('AuthService', () => {
       }),
     );
     expect(jwtService.signAsync).toHaveBeenCalledWith(
-      { sub: activeUser.id },
+      { sub: activeUser.id, tv: 0 },
       { secret: 'test-secret', expiresIn: '15m' },
     );
     expect(response).toEqual({
@@ -377,6 +384,20 @@ describe('AuthService', () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
+  it('does not create a session when password reset wins the login race', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValueOnce(activeUser);
+    prisma.$queryRaw.mockResolvedValueOnce([
+      { ...activeUser, passwordHash: 'new-hash', tokenVersion: 1 },
+    ]);
+    await expectHttpError(
+      service.login({ email: activeUser.email, password: 'Password123!' }),
+      HttpStatus.UNAUTHORIZED,
+      'INVALID_CREDENTIALS',
+    );
+    expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
+  });
+
   it('logs in and issues access and refresh tokens', async () => {
     const { jwtService, prisma, service } = createService();
     prisma.user.findUnique.mockResolvedValueOnce(activeUser);
@@ -391,7 +412,7 @@ describe('AuthService', () => {
       'Password123!',
     );
     expect(jwtService.signAsync).toHaveBeenCalledWith(
-      { sub: activeUser.id },
+      { sub: activeUser.id, tv: 0 },
       { secret: 'test-secret', expiresIn: '15m' },
     );
     expect(response.data.tokens.accessToken).toBe('access-token');
@@ -429,7 +450,7 @@ describe('AuthService', () => {
     });
 
     expect(jwtService.signAsync).toHaveBeenCalledWith(
-      { sub: activeUser.id },
+      { sub: activeUser.id, tv: 0 },
       { secret: 'test-secret', expiresIn: ttl },
     );
   });
@@ -602,7 +623,7 @@ describe('AuthService', () => {
       }),
     );
     expect(jwtService.signAsync).toHaveBeenCalledWith(
-      { sub: activeUser.id },
+      { sub: activeUser.id, tv: 0 },
       { secret: 'test-secret', expiresIn: '15m' },
     );
     expect(response.data.tokens.accessToken).toBe('access-token');

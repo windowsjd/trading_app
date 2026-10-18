@@ -1,0 +1,96 @@
+{
+  "date": "2026-10-18",
+  "baseline": {
+    "origin_main": "6f7459cff55dd9a63acb8af946b47c52870efb80",
+    "head": "6f7459cff55dd9a63acb8af946b47c52870efb80",
+    "working_tree_at_start": "clean"
+  },
+  "backend": {
+    "full_jest": {
+      "passed_suites": 346,
+      "skipped_suites": 83,
+      "passed_tests": 5618,
+      "skipped_tests": 116,
+      "failed_tests": 0
+    },
+    "http_e2e": {
+      "passed_suites": 2,
+      "passed_tests": 411
+    },
+    "postgres_auth": {
+      "passed_suites": 2,
+      "mocked_delivery": true,
+      "disposable_loopback_database": true,
+      "server_timezone": "Asia/Seoul",
+      "scope": "legacy Auth smoke plus ownership/rates/concurrency/reset/revocation/rollback/account and wallet preservation"
+    },
+    "postgres_mvp": {
+      "passed_suites": 1,
+      "disposable_loopback_database": true,
+      "database_timezone": "UTC"
+    },
+    "typecheck": "PASS",
+    "build": "PASS",
+    "changed_auth_source_lint": "PASS",
+    "diagnostic_gate": "PASS",
+    "prisma_validate": "PASS",
+    "websocket_authentication": "PASS: 4 version/legacy compatibility cases; existing streams are not forcibly terminated"
+  },
+  "frontend": {
+    "full_node_tests": {
+      "passed_file_entries": 243,
+      "failed": 0
+    },
+    "final_auth_node_tests": {
+      "passed_file_entries": 9,
+      "failed": 0
+    },
+    "typecheck": "PASS",
+    "gated_lint": "PASS",
+    "web_export": "PASS",
+    "diagnostic_gate": "PASS"
+  },
+  "layout": {
+    "browser": "Chromium",
+    "widths": [
+      320,
+      375,
+      430
+    ],
+    "themes": [
+      "light",
+      "dark"
+    ],
+    "css_text_scales": [
+      1,
+      2
+    ],
+    "stages": [
+      "login",
+      "email",
+      "code-error",
+      "password-error",
+      "complete",
+      "signup",
+      "signup-code"
+    ],
+    "cases": 84,
+    "overflow_or_clipping_findings": 0,
+    "os_font_scale": "NOT_RUN",
+    "native_keyboard": "NOT_RUN"
+  },
+  "not_run": [
+    "real_resend_delivery",
+    "native_android_device",
+    "native_ios_device",
+    "render_deployment",
+    "eas_build_or_update",
+    "production_migration"
+  ],
+  "execution_notes": [
+    "Initial full backend execution hit sandbox socket/child-process restrictions; all six affected suites passed after bounded recheck, followed by a fully passing unrestricted local test run.",
+    "PostgreSQL Auth tests use a dedicated loopback database and an in-memory mail boundary. No provider credentials are needed.",
+    "No test was removed or skipped to hide a failure. Existing opt-in integration skips remain; Auth and MVP PostgreSQL were explicitly enabled.",
+    "All modified UI assertions use primitives or small DTOs, never compare ReactTestInstance objects against null/undefined."
+  ]
+}

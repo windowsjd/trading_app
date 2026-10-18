@@ -1,3 +1,5 @@
+import { useEmailVerification } from '../../features/auth/useEmailVerification';
+import EmailVerificationPanel from './EmailVerificationPanel';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet } from '../../theme/native';
@@ -51,6 +53,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const scroll = useFocusedInputScroll();
 
   const [email, setEmail] = useState('');
+  const verification = useEmailVerification(email, 'signup');
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -104,6 +107,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     onError: (error: unknown) => {
       if (error instanceof SessionSupersededError) return;
       const code = getApiErrorCode(error);
+      if (code === 'EMAIL_VERIFICATION_REQUIRED') verification.clear();
       setBlockedAuthState(null);
       setSubmitError(
         isAuthUserInactiveError(code)
@@ -124,8 +128,10 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     return 'auth_idle';
   }, [signupMutation.isPending, fieldError, blockedAuthState, submitError]);
 
+  const submitDisabled = signupMutation.isPending || verification.busy || Boolean(verification.challenge && !verification.verificationToken && !verification.proofExpired);
+
   const onSubmit = () => {
-    if (inFlight.current || signupMutation.isPending) return;
+    if (inFlight.current || signupMutation.isPending || verification.busy) return;
     setFieldError(null);
     setSubmitError(null);
     setBlockedAuthState(null);
@@ -150,8 +156,13 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       return;
     }
 
+    if (!verification.verificationToken) {
+      void verification.request();
+      return;
+    }
     inFlight.current = true;
     signupMutation.mutate({
+      verificationToken: verification.verificationToken,
       email,
       nickname: nickname.trim(),
       password,
@@ -165,6 +176,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       <AuthField
         scroll={scroll}
         testID={TEST_IDS.auth.signupEmailInput}
+        editable={!signupMutation.isPending && !verification.busy}
         value={email}
         onChangeText={setEmail}
         placeholder="이메일"
@@ -217,23 +229,25 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         <Text style={styles.errorText}>{submitError}</Text>
       ) : null}
 
+      <EmailVerificationPanel verification={verification} scroll={scroll} disabled={signupMutation.isPending || verification.busy} />
+
       <AuthSubmitBox scroll={scroll}>
         <ActionPressable
           testID={TEST_IDS.auth.signupSubmit}
           primary
           style={styles.primaryButton}
           onPress={onSubmit}
-          disabled={signupMutation.isPending}
+          disabled={submitDisabled}
           // Busy keeps the brand background; the whale replaces the label.
           accessibilityRole="button"
-          accessibilityLabel={signupMutation.isPending ? '가입 중' : '회원가입'}
-          accessibilityState={{ disabled: signupMutation.isPending, busy: signupMutation.isPending }}
+          accessibilityLabel={signupMutation.isPending ? '가입 중' : verification.busy ? '처리 중' : verification.verificationToken ? '회원가입' : '인증번호 발송'}
+          accessibilityState={{ disabled: submitDisabled, busy: signupMutation.isPending || verification.busy }}
         >
           <View style={styles.primaryButtonLabel}>
             {signupMutation.isPending ? (
               <WhaleLoader size={22} tone="onAction" accessibilityLabel="가입 중" testID="signup-submit-loading" />
             ) : (
-              <Text style={styles.primaryButtonText}>회원가입</Text>
+              <Text style={styles.primaryButtonText}>{verification.busy ? '처리 중…' : verification.verificationToken ? '회원가입' : '인증번호 발송'}</Text>
             )}
           </View>
         </ActionPressable>
@@ -241,6 +255,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
       <ActionPressable
         style={styles.secondaryButton}
+        disabled={signupMutation.isPending || verification.busy}
         onPress={() => navigation.replace('Login')}
       >
         <Text style={styles.secondaryButtonText}>로그인으로 돌아가기</Text>
@@ -294,6 +309,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: semantic.error,
-    lineHeight: 20,
+    fontSize: 14,
   },
 });

@@ -626,3 +626,11 @@ export const ImportantNoticeStatus = {
 } as const
 
 export type ImportantNoticeStatus = (typeof ImportantNoticeStatus)[keyof typeof ImportantNoticeStatus]
+
+
+export const EmailAuthPurpose = {
+  signup: 'signup',
+  password_reset: 'password_reset'
+} as const
+
+export type EmailAuthPurpose = (typeof EmailAuthPurpose)[keyof typeof EmailAuthPurpose]

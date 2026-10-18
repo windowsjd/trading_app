@@ -54,6 +54,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RefreshTokenSessionStatus, UserRole, UserStatus } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { AuthService } from './src/auth/auth.service';
+import { authEmailFixture } from './scripts/lib/auth-email-fixture';
 import { AccessTokenGuard } from './src/auth/access-token.guard';
 import * as argon2 from 'argon2';
 
@@ -83,7 +84,8 @@ const configService = {
     return undefined;
   },
 };
-const authService = new AuthService(prisma, jwtService, configService);
+const emailFixture = authEmailFixture(prisma);
+const authService = new AuthService(prisma, jwtService, configService, emailFixture.verification);
 const reflector = {
   getAllAndOverride() {
     return false;
@@ -97,7 +99,9 @@ async function main() {
   try {
     await cleanup();
 
+    const verificationToken = await emailFixture.proof(activeEmail, 'signup');
     const signupResponse = await authService.signup({
+      verificationToken,
       email: activeEmail,
       password,
       nickname: activeNickname,
@@ -281,6 +285,8 @@ async function main() {
 }
 
 async function cleanup() {
+  await emailFixture.cleanup();
+  await prisma.emailAuthChallenge.deleteMany({ where: { email: { in: [activeEmail, suspendedEmail] } } });
   await prisma.user.deleteMany({
     where: {
       email: {

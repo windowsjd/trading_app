@@ -178,6 +178,48 @@ describe('AccessTokenGuard', () => {
     });
   });
 
+  it.each([undefined, 0, '1', 2, null, -1])(
+    'rejects outdated or malformed token version %j after reset',
+    async (tv) => {
+      const { guard, jwtService, prisma, reflector } = createGuard();
+      mockRouteMetadata(reflector);
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: 'user-1',
+        ...(tv === undefined ? {} : { tv }),
+      });
+      prisma.user.findUnique.mockResolvedValue({
+        id: 'user-1',
+        role: UserRole.user,
+        status: UserStatus.active,
+        tokenVersion: 1,
+      });
+      await expectHttpError(
+        guard.canActivate(
+          createContext(createRequest({ authorization: 'Bearer valid-token' })),
+        ),
+        HttpStatus.UNAUTHORIZED,
+        'UNAUTHORIZED',
+      );
+    },
+  );
+
+  it('accepts a current token version after reset', async () => {
+    const { guard, jwtService, prisma, reflector } = createGuard();
+    mockRouteMetadata(reflector);
+    jwtService.verifyAsync.mockResolvedValue({ sub: 'user-1', tv: 1 });
+    prisma.user.findUnique.mockResolvedValue({
+      id: 'user-1',
+      role: UserRole.user,
+      status: UserStatus.active,
+      tokenVersion: 1,
+    });
+    expect(
+      await guard.canActivate(
+        createContext(createRequest({ authorization: 'Bearer valid-token' })),
+      ),
+    ).toBe(true);
+  });
+
   it('rejects protected routes when the token is missing', async () => {
     const { guard, reflector } = createGuard();
     mockRouteMetadata(reflector);

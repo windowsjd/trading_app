@@ -121,7 +121,9 @@ export const ModelName = {
   PushNotification: 'PushNotification',
   PushDelivery: 'PushDelivery',
   PushScanCursor: 'PushScanCursor',
-  ImportantNotice: 'ImportantNotice'
+  ImportantNotice: 'ImportantNotice',
+  EmailAuthChallenge: 'EmailAuthChallenge',
+  EmailAuthRateBucket: 'EmailAuthRateBucket'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -144,6 +146,8 @@ export const UserScalarFieldEnum = {
   id: 'id',
   email: 'email',
   passwordHash: 'passwordHash',
+  emailVerifiedAt: 'emailVerifiedAt',
+  tokenVersion: 'tokenVersion',
   nickname: 'nickname',
   profileImageUrl: 'profileImageUrl',
   portfolioPublic: 'portfolioPublic',
@@ -1583,6 +1587,35 @@ export const ImportantNoticeScalarFieldEnum = {
 } as const
 
 export type ImportantNoticeScalarFieldEnum = (typeof ImportantNoticeScalarFieldEnum)[keyof typeof ImportantNoticeScalarFieldEnum]
+
+
+export const EmailAuthChallengeScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  purpose: 'purpose',
+  codeHash: 'codeHash',
+  targetUserId: 'targetUserId',
+  targetVersion: 'targetVersion',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt',
+  deliveredAt: 'deliveredAt',
+  attempts: 'attempts',
+  verifiedAt: 'verifiedAt',
+  proofHash: 'proofHash',
+  proofExpiresAt: 'proofExpiresAt',
+  consumedAt: 'consumedAt'
+} as const
+
+export type EmailAuthChallengeScalarFieldEnum = (typeof EmailAuthChallengeScalarFieldEnum)[keyof typeof EmailAuthChallengeScalarFieldEnum]
+
+
+export const EmailAuthRateBucketScalarFieldEnum = {
+  key: 'key',
+  hits: 'hits',
+  expiresAt: 'expiresAt'
+} as const
+
+export type EmailAuthRateBucketScalarFieldEnum = (typeof EmailAuthRateBucketScalarFieldEnum)[keyof typeof EmailAuthRateBucketScalarFieldEnum]
 
 
 export const SortOrder = {

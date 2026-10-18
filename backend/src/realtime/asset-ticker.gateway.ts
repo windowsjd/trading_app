@@ -1,3 +1,4 @@
+import type { AccessTokenPayload } from '../auth/auth.types';
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { resolveStockMarketSessionState } from '../orders/market-calendar.policy';
 import {
@@ -88,10 +89,6 @@ type FuturesOrderBookSubscription = {
 type FuturesOrderBookState = {
   subscriptions: Map<string, FuturesOrderBookSubscription>;
   pending: Map<string, FuturesOrderBookEvent>;
-};
-
-type AccessTokenPayload = {
-  sub?: unknown;
 };
 
 type ClientState = {
@@ -1620,10 +1617,16 @@ export class AssetTickerGateway
         },
         select: {
           status: true,
+          tokenVersion: true,
         },
       });
 
-      return user?.status === UserStatus.active ? userId : null;
+      const tokenVersion = payload.tv === undefined ? 0 : payload.tv;
+      return user?.status === UserStatus.active &&
+        Number.isSafeInteger(tokenVersion) &&
+        tokenVersion === (user.tokenVersion ?? 0)
+        ? userId
+        : null;
     } catch {
       return null;
     }

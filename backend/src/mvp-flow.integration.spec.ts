@@ -79,6 +79,7 @@ import { TradingAccountAccessService } from './src/trading-accounts/trading-acco
 import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
 import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
 import { AuthService } from './src/auth/auth.service';
+import { authEmailFixture } from './scripts/lib/auth-email-fixture';
 import { SeasonsService } from './src/seasons/seasons.service';
 import { WalletsService } from './src/wallets/wallets.service';
 import { AssetsService } from './src/assets/assets.service';
@@ -117,7 +118,8 @@ const configService = {
     return undefined;
   },
 };
-const authService = new AuthService(prisma, new JwtService(), configService);
+const emailFixture = authEmailFixture(prisma);
+const authService = new AuthService(prisma, new JwtService(), configService, emailFixture.verification);
 const seasonsService = new SeasonsService(prisma);
 const walletsService = new WalletsService(prisma);
 const assetsService = new AssetsService(prisma);
@@ -231,6 +233,7 @@ async function signupUser() {
   const response = await authService.signup(
     {
       email: scenario.email,
+      verificationToken: await emailFixture.proof(scenario.email, 'signup'),
       password,
       nickname: scenario.nickname,
     },
@@ -894,6 +897,7 @@ async function readMutationCounts() {
 }
 
 async function cleanup() {
+  await emailFixture.cleanup();
   const users = await prisma.user.findMany({
     where: {
       email: {

@@ -1,3 +1,4 @@
+import { EmailVerificationService } from '../src/auth/email-verification.service';
 jest.mock('../src/generated/prisma/client', () => ({
   PrismaClient: class {},
   UserRole: { user: 'user' },
@@ -96,6 +97,7 @@ describe('authenticated multipart profile image HTTP API (storage/DB fixtures)',
       controllers: [AuthController, ProfileImageController],
       providers: [
         AuthService,
+        { provide: EmailVerificationService, useValue: {} },
         ProfileImageService,
         AccessTokenGuard,
         { provide: APP_GUARD, useExisting: AccessTokenGuard },

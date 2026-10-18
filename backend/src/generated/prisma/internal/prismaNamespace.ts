@@ -454,7 +454,9 @@ export const ModelName = {
   PushNotification: 'PushNotification',
   PushDelivery: 'PushDelivery',
   PushScanCursor: 'PushScanCursor',
-  ImportantNotice: 'ImportantNotice'
+  ImportantNotice: 'ImportantNotice',
+  EmailAuthChallenge: 'EmailAuthChallenge',
+  EmailAuthRateBucket: 'EmailAuthRateBucket'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -470,7 +472,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -5728,6 +5730,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    EmailAuthChallenge: {
+      payload: Prisma.$EmailAuthChallengePayload<ExtArgs>
+      fields: Prisma.EmailAuthChallengeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.EmailAuthChallengeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.EmailAuthChallengeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>
+        }
+        findFirst: {
+          args: Prisma.EmailAuthChallengeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.EmailAuthChallengeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>
+        }
+        findMany: {
+          args: Prisma.EmailAuthChallengeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>[]
+        }
+        create: {
+          args: Prisma.EmailAuthChallengeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>
+        }
+        createMany: {
+          args: Prisma.EmailAuthChallengeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.EmailAuthChallengeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>[]
+        }
+        delete: {
+          args: Prisma.EmailAuthChallengeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>
+        }
+        update: {
+          args: Prisma.EmailAuthChallengeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>
+        }
+        deleteMany: {
+          args: Prisma.EmailAuthChallengeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.EmailAuthChallengeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.EmailAuthChallengeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>[]
+        }
+        upsert: {
+          args: Prisma.EmailAuthChallengeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthChallengePayload>
+        }
+        aggregate: {
+          args: Prisma.EmailAuthChallengeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateEmailAuthChallenge>
+        }
+        groupBy: {
+          args: Prisma.EmailAuthChallengeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EmailAuthChallengeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.EmailAuthChallengeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EmailAuthChallengeCountAggregateOutputType> | number
+        }
+      }
+    }
+    EmailAuthRateBucket: {
+      payload: Prisma.$EmailAuthRateBucketPayload<ExtArgs>
+      fields: Prisma.EmailAuthRateBucketFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.EmailAuthRateBucketFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.EmailAuthRateBucketFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>
+        }
+        findFirst: {
+          args: Prisma.EmailAuthRateBucketFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.EmailAuthRateBucketFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>
+        }
+        findMany: {
+          args: Prisma.EmailAuthRateBucketFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>[]
+        }
+        create: {
+          args: Prisma.EmailAuthRateBucketCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>
+        }
+        createMany: {
+          args: Prisma.EmailAuthRateBucketCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.EmailAuthRateBucketCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>[]
+        }
+        delete: {
+          args: Prisma.EmailAuthRateBucketDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>
+        }
+        update: {
+          args: Prisma.EmailAuthRateBucketUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>
+        }
+        deleteMany: {
+          args: Prisma.EmailAuthRateBucketDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.EmailAuthRateBucketUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.EmailAuthRateBucketUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>[]
+        }
+        upsert: {
+          args: Prisma.EmailAuthRateBucketUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$EmailAuthRateBucketPayload>
+        }
+        aggregate: {
+          args: Prisma.EmailAuthRateBucketAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateEmailAuthRateBucket>
+        }
+        groupBy: {
+          args: Prisma.EmailAuthRateBucketGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EmailAuthRateBucketGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.EmailAuthRateBucketCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.EmailAuthRateBucketCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -5771,6 +5921,8 @@ export const UserScalarFieldEnum = {
   id: 'id',
   email: 'email',
   passwordHash: 'passwordHash',
+  emailVerifiedAt: 'emailVerifiedAt',
+  tokenVersion: 'tokenVersion',
   nickname: 'nickname',
   profileImageUrl: 'profileImageUrl',
   portfolioPublic: 'portfolioPublic',
@@ -7212,6 +7364,35 @@ export const ImportantNoticeScalarFieldEnum = {
 export type ImportantNoticeScalarFieldEnum = (typeof ImportantNoticeScalarFieldEnum)[keyof typeof ImportantNoticeScalarFieldEnum]
 
 
+export const EmailAuthChallengeScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  purpose: 'purpose',
+  codeHash: 'codeHash',
+  targetUserId: 'targetUserId',
+  targetVersion: 'targetVersion',
+  createdAt: 'createdAt',
+  expiresAt: 'expiresAt',
+  deliveredAt: 'deliveredAt',
+  attempts: 'attempts',
+  verifiedAt: 'verifiedAt',
+  proofHash: 'proofHash',
+  proofExpiresAt: 'proofExpiresAt',
+  consumedAt: 'consumedAt'
+} as const
+
+export type EmailAuthChallengeScalarFieldEnum = (typeof EmailAuthChallengeScalarFieldEnum)[keyof typeof EmailAuthChallengeScalarFieldEnum]
+
+
+export const EmailAuthRateBucketScalarFieldEnum = {
+  key: 'key',
+  hits: 'hits',
+  expiresAt: 'expiresAt'
+} as const
+
+export type EmailAuthRateBucketScalarFieldEnum = (typeof EmailAuthRateBucketScalarFieldEnum)[keyof typeof EmailAuthRateBucketScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -7281,6 +7462,34 @@ export type ListStringFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMod
 
 
 /**
+ * Reference to a field of type 'DateTime'
+ */
+export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
+    
+
+
+/**
+ * Reference to a field of type 'DateTime[]'
+ */
+export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Int'
+ */
+export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
+    
+
+
+/**
+ * Reference to a field of type 'Int[]'
+ */
+export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
  * Reference to a field of type 'Boolean'
  */
 export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
@@ -7312,20 +7521,6 @@ export type EnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaM
  * Reference to a field of type 'UserRole[]'
  */
 export type ListEnumUserRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserRole[]'>
-    
-
-
-/**
- * Reference to a field of type 'DateTime'
- */
-export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime'>
-    
-
-
-/**
- * Reference to a field of type 'DateTime[]'
- */
-export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
     
 
 
@@ -7452,20 +7647,6 @@ export type EnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
  * Reference to a field of type 'SeasonStatus[]'
  */
 export type ListEnumSeasonStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'SeasonStatus[]'>
-    
-
-
-/**
- * Reference to a field of type 'Int'
- */
-export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
-    
-
-
-/**
- * Reference to a field of type 'Int[]'
- */
-export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
     
 
 
@@ -8226,6 +8407,20 @@ export type ListEnumImportantNoticeStatusFieldRefInput<$PrismaModel> = FieldRefI
 
 
 /**
+ * Reference to a field of type 'EmailAuthPurpose'
+ */
+export type EnumEmailAuthPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EmailAuthPurpose'>
+    
+
+
+/**
+ * Reference to a field of type 'EmailAuthPurpose[]'
+ */
+export type ListEnumEmailAuthPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'EmailAuthPurpose[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -8404,6 +8599,8 @@ export type GlobalOmitConfig = {
   pushDelivery?: Prisma.PushDeliveryOmit
   pushScanCursor?: Prisma.PushScanCursorOmit
   importantNotice?: Prisma.ImportantNoticeOmit
+  emailAuthChallenge?: Prisma.EmailAuthChallengeOmit
+  emailAuthRateBucket?: Prisma.EmailAuthRateBucketOmit
 }
 
 /* Types for Logging */

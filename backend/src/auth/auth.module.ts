@@ -1,3 +1,5 @@
+import { AuthEmailService } from './auth-email.service';
+import { EmailVerificationService } from './email-verification.service';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
@@ -14,6 +16,8 @@ import { ProfileImageStorageService } from './profile-image-storage.service';
   controllers: [AuthController, ProfileImageController],
   providers: [
     AuthService,
+    AuthEmailService,
+    EmailVerificationService,
     ProfileImageService,
     ProfileImageStorageService,
     AccessTokenGuard,

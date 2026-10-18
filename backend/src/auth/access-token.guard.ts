@@ -69,6 +69,7 @@ export class AccessTokenGuard implements CanActivate {
         id: true,
         role: true,
         status: true,
+        tokenVersion: true,
       },
     });
 
@@ -79,6 +80,13 @@ export class AccessTokenGuard implements CanActivate {
     if (user.status !== UserStatus.active) {
       this.throwUserNotActive();
     }
+
+    const tokenVersion = payload.tv === undefined ? 0 : payload.tv;
+    if (
+      !Number.isSafeInteger(tokenVersion) ||
+      tokenVersion !== (user.tokenVersion ?? 0)
+    )
+      this.throwUnauthorized();
 
     request.user = {
       userId: user.id,

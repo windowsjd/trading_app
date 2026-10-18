@@ -2,6 +2,82 @@
 
 Auth is an access token + opaque refresh token MVP.
 
+## Email verification and password recovery (2026-10-18)
+
+Signup now requires email ownership evidence. Existing users can log in without
+verification; their `emailVerifiedAt` remains null until they actually verify.
+All paths remain under `/api/v1`, all public POSTs below return `200` except
+final signup (`201`). Bodies and responses use the existing success/data envelope.
+
+| Path after `/auth` | Request | Success data |
+| --- | --- | --- |
+| `/email/request` | `{ email, purpose: "signup" or "password_reset" }` | `{ challengeId, expiresAt, resendAt, serverTime, message }` |
+| `/email/verify` | `{ email, purpose, challengeId, code }` | `{ verificationToken, expiresAt, serverTime }` |
+| `/signup` | `{ email, nickname, password, verificationToken }` | Existing user/tokens envelope |
+| `/password/reset` | `{ email, password, verificationToken }` | `{ changed: true }` (no login tokens) |
+
+One challenge table stores both purposes, delivery status, attempts and a
+single-use proof hash. A separate small PostgreSQL rate bucket table stores IP
+budgets. No pending User, financial account or Refresh Session is created.
+Codes use crypto.randomInt, six zero-padded digits, HMAC-SHA256 with a dedicated
+server secret and challenge/email/purpose context; raw codes never persist.
+Proofs use 32 random bytes, SHA-256 at rest, purpose/email/target account binding,
+and a ten-minute lifetime. Verification consumes the code; final completion
+consumes the proof in the same transaction as user/session/password writes.
+
+PostgreSQL transaction advisory locks serialize each email, including send,
+verify and completion across server instances. Resend invalidates all previous
+challenges/proofs for that email and purpose. The rolling email budget (shared
+across purposes) is five reservations per hour, at least 60 seconds apart.
+IP budgets: 30 sends/hour, 100 verifies/10 minutes, 30 completions/10 minutes.
+Failed deliveries and unknown accounts also consume send budgets. Five wrong
+codes exhaust a challenge. Expiry uses the database clock.
+
+Request responses never disclose account existence/status. Only active existing
+users receive reset mail; signup mail is sent only for unused emails. Unknown,
+inactive and delivery-failed reset requests have identical envelopes and a
+minimum response duration exceeding the bounded provider timeout, with jitter.
+There is no email/nickname conflict check before valid signup proof; the existing
+409 conflict codes remain available to the verified email owner at completion.
+
+Password reset locks the target user, checks active status and issuance-time
+token version, updates only passwordHash/emailVerifiedAt/tokenVersion, consumes
+proof and revokes all Refresh Sessions atomically. Login and rotation also lock
+that user so an overlapping reset cannot mint a surviving old-password session.
+JWTs contain `tv`; legacy missing `tv` means zero, matching migration defaults.
+The global guard compares current DB tokenVersion, rejecting old access tokens
+immediately after reset. WebSocket handshake authentication applies the same
+version check; ticker subscription/delivery behavior is unchanged. Existing
+price-stream sockets are not forcibly terminated. Deployment alone does not
+invalidate existing tokens.
+
+`RESEND_API_KEY`, `EMAIL_FROM="Trading Class <admin@nanghwa.com>"` and
+`EMAIL_VERIFICATION_SECRET` (at least 32 random characters, shared by replicas)
+enable email. All absent disables email endpoints (503), never permits unverified
+signup; partial/invalid config fails startup. No secret belongs in Expo env.
+Resend uses HTTPS POST /emails, text and HTML, four-second timeout, no automatic
+retry and a challenge-specific idempotency key. Provider bodies/errors are never
+logged. See [Resend send API](https://resend.com/docs/api-reference/emails/send-email).
+
+`AUTH_TRUST_PROXY_HOPS` defaults to 0. Configure a positive hop count only after
+verifying the ingress topology and that clients cannot inject the trusted
+forwarding suffix. The default uses the socket IP and fails conservatively
+behind a proxy. Never blindly trust all X-Forwarded-For values.
+
+Retention: attach deletion of challenges older than 24 hours (compare expires_at
+to `timezone('UTC', clock_timestamp()) - interval '24 hours'`) and rate buckets
+expired for more than 24 hours to existing DB maintenance. Delete in bounded
+batches, e.g. 5,000 IDs per transaction. Never delete rows in the current send
+budget window. No new maintenance worker is provisioned by this change. These
+rows contain emails/digests, so leaving retention unconfigured grows storage
+and extends personal-data retention. This maintenance was not run in production.
+
+Errors: `EMAIL_CODE_INVALID`, `EMAIL_CODE_EXPIRED`, `EMAIL_CODE_EXHAUSTED`,
+`EMAIL_VERIFICATION_REQUIRED` (missing/invalid/used/expired proof),
+`EMAIL_RATE_LIMITED` (429), `EMAIL_UNAVAILABLE` (503). Unknown and inactive
+accounts share the same invalid-code/proof behavior. Network or ambiguous send
+failure invalidates that challenge; user must resend after the cooldown.
+
 ## Scope
 
 - Implemented:
@@ -14,11 +90,11 @@ Auth is an access token + opaque refresh token MVP.
   - `PATCH /api/v1/me`
   - `POST /api/v1/me/profile-image`
   - `DELETE /api/v1/me/profile-image`
-- Access tokens remain stateless Bearer JWTs verified by the global access token guard.
+- Access tokens are signed Bearer JWTs; the global guard checks current DB status, role and tokenVersion.
 - Protected API identity remains `request.user.userId`; the guard also attaches current DB `role` for operator/admin authorization.
 - `x-user-id` fallback is not supported.
 - Cookie/session auth is not part of this MVP.
-- Access token blacklist/revocation is not part of this MVP.
+- Password reset revokes access through per-user tokenVersion; no JWT blacklist is used.
 - This contract is unrelated to provider/API key, trading, scheduler, settlement, or reward work.
 
 ## User Role And Status
@@ -60,7 +136,7 @@ TTL values must be a positive number plus one allowed unit with no spaces.
 
 `POST /api/v1/auth/login` remains `200 OK`.
 
-Both responses include the existing user payload and token envelope. The signup default role is `user`, but role is not added to this auth response envelope in this MVP:
+Both responses include the existing user payload (including role) and token envelope. The signup default role is `user`:
 
 ```json
 {
@@ -70,6 +146,7 @@ Both responses include the existing user payload and token envelope. The signup 
       "id": "user-id",
       "email": "user@example.com",
       "nickname": "traderKim",
+      "role": "user",
       "status": "active"
     },
     "tokens": {

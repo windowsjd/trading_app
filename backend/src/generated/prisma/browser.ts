@@ -418,3 +418,13 @@ export type PushScanCursor = Prisma.PushScanCursorModel
  * hides it and stops unsent pushes. Actors are also in operator_audit_logs.
  */
 export type ImportantNotice = Prisma.ImportantNoticeModel
+/**
+ * Model EmailAuthChallenge
+ * 
+ */
+export type EmailAuthChallenge = Prisma.EmailAuthChallengeModel
+/**
+ * Model EmailAuthRateBucket
+ * 
+ */
+export type EmailAuthRateBucket = Prisma.EmailAuthRateBucketModel
