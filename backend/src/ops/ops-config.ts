@@ -250,6 +250,7 @@ export function getOpsSchedulerConfig(
       [OpsJobName.futures_tp_sl_settings]: false, // Dedicated bounded Futures TP/SL worker.
       [OpsJobName.crypto_order_book_retention]: false, // Dedicated bounded retention worker.
       [OpsJobName.push_notifications]: false, // Dedicated push notification worker.
+      [OpsJobName.account_deletion_cleanup]: false, // Dedicated ProfileImageCleanupWorker.
       [OpsJobName.provider_fx_ingest]: providerFxEnabled,
       [OpsJobName.provider_binance_ingest]: providerBinanceEnabled,
       [OpsJobName.provider_kis_ingest]: providerKisEnabled,

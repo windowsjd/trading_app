@@ -550,6 +550,7 @@ Validation:
 - Target not found returns `TARGET_USER_NOT_FOUND`.
 - Admin cannot restore their own user id: `CANNOT_CHANGE_OWN_STATUS`.
 - Target must be deleted, otherwise `USER_RESTORE_NOT_ALLOWED`.
+- A member who deleted their own account has no user row: `TARGET_USER_NOT_FOUND` (nothing can be restored). An anonymous settled-result placeholder (`@deleted-member.invalid`, [account deletion contract](account-deletion-contract.md) §5.1) is never a member: `USER_RESTORE_NOT_ALLOWED`.
 - Restore always sets `status=active` and `role=user`.
 - Restore never performs role promotion. If `operator` or `admin` role is needed after restore, admin must submit a separate role-change request, producing a separate audit event.
 - Restore does not reactivate revoked refresh token sessions.

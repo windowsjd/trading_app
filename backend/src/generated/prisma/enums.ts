@@ -364,7 +364,8 @@ export const OpsJobName = {
   asset_price_snapshot_retention: 'asset_price_snapshot_retention',
   futures_tp_sl_settings: 'futures_tp_sl_settings',
   crypto_order_book_retention: 'crypto_order_book_retention',
-  push_notifications: 'push_notifications'
+  push_notifications: 'push_notifications',
+  account_deletion_cleanup: 'account_deletion_cleanup'
 } as const
 
 export type OpsJobName = (typeof OpsJobName)[keyof typeof OpsJobName]
@@ -630,7 +631,24 @@ export type ImportantNoticeStatus = (typeof ImportantNoticeStatus)[keyof typeof 
 
 export const EmailAuthPurpose = {
   signup: 'signup',
-  password_reset: 'password_reset'
+  password_reset: 'password_reset',
+  account_deletion: 'account_deletion'
 } as const
 
 export type EmailAuthPurpose = (typeof EmailAuthPurpose)[keyof typeof EmailAuthPurpose]
+
+
+export const AccountDeletionChannel = {
+  app: 'app',
+  web: 'web'
+} as const
+
+export type AccountDeletionChannel = (typeof AccountDeletionChannel)[keyof typeof AccountDeletionChannel]
+
+
+export const AccountDeletionStatus = {
+  cleanup_pending: 'cleanup_pending',
+  completed: 'completed'
+} as const
+
+export type AccountDeletionStatus = (typeof AccountDeletionStatus)[keyof typeof AccountDeletionStatus]

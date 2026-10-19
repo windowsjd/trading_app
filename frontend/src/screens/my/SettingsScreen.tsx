@@ -38,7 +38,7 @@ import { LOGO_DEV_KEY } from '../../features/market/assetLogoSource';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
-export default function SettingsScreen({ navigation: _navigation }: Props) {
+export default function SettingsScreen({ navigation }: Props) {
   const queryClient = useQueryClient();
   const { preference, setPreference, colors, financialPreference, setFinancialPreference } = useAppearance();
 
@@ -348,6 +348,13 @@ export default function SettingsScreen({ navigation: _navigation }: Props) {
         </View>
 
         <LogoutButton testID={TEST_IDS.settings.logout} onPress={onLogout} />
+
+        {/* 회원탈퇴: 안내 → 본인 확인 → 최종 확인; nothing changes before the last step. */}
+        <ActionPressable feedback="button" testID={TEST_IDS.settings.membershipDeletion} accessibilityRole="button"
+          accessibilityLabel="회원탈퇴" accessibilityHint="계정 삭제 안내와 본인 확인 화면으로 이동합니다"
+          onPress={() => navigation.navigate('MembershipDeletion')} style={styles.membershipDeletion}>
+          <Text style={styles.membershipDeletionText}>회원탈퇴</Text>
+        </ActionPressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -404,4 +411,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   photoDeleteText: { color: semantic.error, fontWeight: '700' },
+  membershipDeletion: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
+  membershipDeletionText: { fontSize: 14, color: semantic.secondary, textDecorationLine: 'underline', textAlign: 'center' },
 });

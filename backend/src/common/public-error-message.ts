@@ -3,6 +3,15 @@
  * approve arbitrary exception/Provider/DB prose for users or operators.
  */
 const PUBLIC_MESSAGES = new Set<string>([
+  // Self-service account deletion (2026-10-18, docs/account-deletion-contract.md).
+  'A valid account deletion request key is required.',
+  'Confirm the account deletion to continue.',
+  'The password does not match.',
+  'Operator and administrator accounts cannot be deleted here.',
+  'This account must be deleted with support.',
+  'Account deletion could not be completed. Try again.',
+  'Account deletion request not found.',
+  'A deleted member placeholder cannot be restored.',
   'Email verification is temporarily unavailable.',
   'Email verification is invalid.',
   'Email verification has expired.',

@@ -6,9 +6,14 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { createApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from './auth.service';
 import type { CurrentUserResponse } from './auth.types';
+import {
+  databaseNow,
+  ProfileImageCleanupService,
+} from './profile-image-cleanup.service';
 import { ProfileImageStorageService } from './profile-image-storage.service';
 import {
   type ProfileImageFile,
@@ -24,6 +29,7 @@ export class ProfileImageService {
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
     private readonly storage: ProfileImageStorageService,
+    private readonly cleanups: ProfileImageCleanupService,
   ) {}
 
   async upload(
@@ -36,6 +42,9 @@ export class ProfileImageService {
     this.storage.requireConfigured();
     const key = `profile-images/${owner}/${randomUUID()}.jpg`;
     const url = this.storage.publicUrl(key);
+    // Durable before any storage write: a crash, a failed cleanup or an
+    // overlapping account deletion still finds this key.
+    await this.cleanups.reserveUpload(owner, key);
     try {
       await this.storage.upload(key, bytes);
     } catch {
@@ -51,15 +60,12 @@ export class ProfileImageService {
 
     let changed: Awaited<ReturnType<ProfileImageService['changeUrl']>>;
     try {
-      changed = await this.changeUrl(owner, url);
+      changed = await this.changeUrl(owner, url, key);
     } catch (error) {
       await this.cleanup(owner, key);
       throw error;
     }
-    await this.cleanup(
-      owner,
-      this.storage.managedKey(changed.previousUrl, owner),
-    );
+    await this.cleanup(owner, changed.previousKey);
     return changed.response;
   }
 
@@ -68,14 +74,15 @@ export class ProfileImageService {
     this.storage.requireConfigured();
     const owner = current.data.id;
     const changed = await this.changeUrl(owner, null);
-    await this.cleanup(
-      owner,
-      this.storage.managedKey(changed.previousUrl, owner),
-    );
+    await this.cleanup(owner, changed.previousKey);
     return changed.response;
   }
 
-  private async changeUrl(userId: string, url: string | null) {
+  private async changeUrl(
+    userId: string,
+    url: string | null,
+    reservedKey?: string,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       // The id column is TEXT, matching the existing Prisma schema. Capture the
       // latest URL under this lock; multiple instances cannot orphan a winner.
@@ -105,6 +112,21 @@ export class ProfileImageService {
           profileImageError('USER_NOT_ACTIVE', 'User is not active.'),
         );
       }
+      // The URL is published together with consuming this upload's own
+      // reservation; a missing reservation means it was already processed.
+      if (reservedKey && !(await this.cleanups.claimUpload(tx, reservedKey)))
+        throw createApiError(
+          'PROFILE_IMAGE_UPLOAD_FAILED',
+          'Profile image upload failed.',
+          503,
+        );
+      // The replaced object is enqueued in the same commit as the new URL.
+      const previousKey =
+        before.profileImageUrl === url
+          ? null
+          : this.storage.managedKey(before.profileImageUrl, userId);
+      if (previousKey)
+        await this.cleanups.enqueue(tx, previousKey, await databaseNow(tx));
       const user =
         before.profileImageUrl === url
           ? before
@@ -114,7 +136,7 @@ export class ProfileImageService {
               select,
             });
       return {
-        previousUrl: before.profileImageUrl,
+        previousKey,
         response: {
           success: true as const,
           data: { ...user, createdAt: user.createdAt.toISOString() },
@@ -123,10 +145,11 @@ export class ProfileImageService {
     });
   }
 
+  /** Immediate attempt; a failure stays queued for the cleanup worker. */
   private async cleanup(userId: string, key: string | null) {
     if (!key) return;
     try {
-      await this.storage.delete(key);
+      await this.cleanups.process(key);
     } catch {
       this.logFailure(userId, 'cleanup');
     }

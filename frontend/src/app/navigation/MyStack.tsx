@@ -18,6 +18,7 @@ import MyScreen from '../../screens/my/MyScreen';
 import RewardScreen from '../../screens/reward/RewardScreen';
 import MyBadgesScreen from '../../screens/my/MyBadgesScreen';
 import SettingsScreen from '../../screens/my/SettingsScreen';
+import MembershipDeletionScreen from '../../screens/my/MembershipDeletionScreen';
 
 const Stack = createNativeStackNavigator<MyStackParamList>();
 
@@ -72,6 +73,11 @@ export default function MyStack() {
         name="Settings"
         component={SettingsScreen}
         options={{ title: '설정' }}
+      />
+      <Stack.Screen
+        name="MembershipDeletion"
+        component={MembershipDeletionScreen}
+        options={{ title: '회원탈퇴' }}
       />
     </Stack.Navigator>
   );

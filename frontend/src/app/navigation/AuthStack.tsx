@@ -1,4 +1,5 @@
 import PasswordResetScreen from '../../screens/auth/PasswordResetScreen';
+import MembershipDeletionResultScreen from '../../screens/auth/MembershipDeletionResultScreen';
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Platform } from '../../theme/native';
@@ -19,6 +20,7 @@ export default function AuthStack() {
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Signup" component={SignupScreen} />
       <Stack.Screen name="PasswordReset" component={PasswordResetScreen} />
+      <Stack.Screen name="MembershipDeletionResult" component={MembershipDeletionResultScreen} options={{ gestureEnabled: false }} />
     </Stack.Navigator>
   );
 }

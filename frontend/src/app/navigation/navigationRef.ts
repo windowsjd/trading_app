@@ -1,6 +1,6 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
 
-import type { RootStackParamList } from './types';
+import type { AuthStackParamList, RootStackParamList } from './types';
 
 /**
  * A navigator handle for the one caller that has no React context: the axios
@@ -21,4 +21,31 @@ export function resetToLoginFromRef() {
     index: 0,
     routes: [{ name: 'AuthStack', params: { screen: 'Login' } }],
   });
+}
+
+/**
+ * After a confirmed 회원탈퇴 the session is gone: the auth stack opens on the
+ * deletion result instead of Login. Uses the container ref because the
+ * deleting screen has usually unmounted by then.
+ */
+export function resetToMembershipDeletionResultFromRef(
+  params: AuthStackParamList['MembershipDeletionResult'],
+) {
+  if (!rootNavigationRef.isReady()) return;
+  rootNavigationRef.reset({
+    index: 0,
+    routes: [
+      {
+        name: 'AuthStack',
+        params: { screen: 'MembershipDeletionResult', params },
+      },
+    ],
+  });
+}
+
+export function isOnMembershipDeletionResult() {
+  return (
+    rootNavigationRef.isReady() &&
+    rootNavigationRef.getCurrentRoute()?.name === 'MembershipDeletionResult'
+  );
 }

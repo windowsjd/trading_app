@@ -37,7 +37,11 @@ export function authEmail(value: unknown): string {
 }
 
 function purposeOf(value: unknown): EmailPurpose {
-  if (value !== 'signup' && value !== 'password_reset')
+  if (
+    value !== 'signup' &&
+    value !== 'password_reset' &&
+    value !== 'account_deletion'
+  )
     throw createApiError(INVALID, 'Email verification is invalid.', 400);
   return value;
 }
@@ -67,13 +71,14 @@ export class EmailVerificationService {
     return new Date(Number(row.epochMs));
   }
 
-  private async lockEmail(tx: Prisma.TransactionClient, email: string) {
+  /** Also taken by account deletion before the user row (same order). */
+  async lockEmail(tx: Prisma.TransactionClient, email: string) {
     // One lock namespace for both purposes and every state transition.
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`email-auth:${email}`}, 0))::text AS locked`;
   }
 
   async limit(
-    action: 'send' | 'verify' | 'complete',
+    action: 'send' | 'verify' | 'complete' | 'status',
     metadata: RequestAuthMetadata,
   ) {
     const ip =
@@ -81,7 +86,7 @@ export class EmailVerificationService {
         ? metadata.ipAddress
         : 'unknown';
     const key = this.digest(['ip', action, ip]);
-    const max = action === 'verify' ? 100 : 30;
+    const max = action === 'verify' || action === 'status' ? 100 : 30;
     const duration = action === 'send' ? HOUR : TEN_MINUTES;
     // Separate committed operation: failed validation/transactions cannot refund abuse budgets.
     const [bucket] = await this.prisma.$queryRaw<{ hits: number }[]>`
@@ -127,6 +132,9 @@ export class EmailVerificationService {
       });
       const eligible =
         purpose === 'signup' ? !target : target?.status === 'active';
+      // Reset and deletion proofs are bound to the account and its token
+      // version at issue time, so a later reset/deletion invalidates them.
+      const bound = purpose !== 'signup' && eligible;
       await tx.emailAuthChallenge.updateMany({
         where: { email, purpose, consumedAt: null },
         data: { consumedAt: now },
@@ -139,12 +147,8 @@ export class EmailVerificationService {
           codeHash: this.digest(['code', id, email, purpose, code]),
           createdAt: now,
           expiresAt: new Date(now.getTime() + TEN_MINUTES),
-          targetUserId:
-            purpose === 'password_reset' && eligible ? target?.id : null,
-          targetVersion:
-            purpose === 'password_reset' && eligible
-              ? target?.tokenVersion
-              : null,
+          targetUserId: bound ? target?.id : null,
+          targetVersion: bound ? target?.tokenVersion : null,
         },
       });
       return { challenge, eligible };
@@ -177,9 +181,9 @@ export class EmailVerificationService {
         ).toISOString(),
         serverTime: serverTime.toISOString(),
         message:
-          purpose === 'password_reset'
-            ? '입력하신 이메일로 계정이 등록되어 있다면 인증번호가 발송됩니다.'
-            : '입력하신 이메일로 가입할 수 있다면 인증번호가 발송됩니다.',
+          purpose === 'signup'
+            ? '입력하신 이메일로 가입할 수 있다면 인증번호가 발송됩니다.'
+            : '입력하신 이메일로 계정이 등록되어 있다면 인증번호가 발송됩니다.',
       },
     };
   }

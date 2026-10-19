@@ -49,6 +49,10 @@ export class ProfileImageStorageService implements OnModuleDestroy {
       : null;
   }
 
+  isConfigured(): boolean {
+    return Boolean(this.config && this.client);
+  }
+
   requireConfigured() {
     if (!this.config || !this.client) {
       throw new ServiceUnavailableException(

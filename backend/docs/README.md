@@ -6,6 +6,7 @@ First compare current implementation, tests and migrations with explicit current
 
 1. API contracts — the request/response contract for each surface:
    - `docs/auth-api-contract.md`
+   - `docs/account-deletion-contract.md` — 2026-10-18: self-service account deletion (app password / web email proof), one-transaction purge, anonymous settled final results, receipts and status, durable profile image cleanup, web page requirements for nanghwa.com
    - `docs/friends-api-contract.md`
    - `docs/fx-api-contract.md`
    - `docs/orders-api-contract.md`

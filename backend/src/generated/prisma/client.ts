@@ -450,3 +450,24 @@ export type EmailAuthChallenge = Prisma.EmailAuthChallengeModel
  * 
  */
 export type EmailAuthRateBucket = Prisma.EmailAuthRateBucketModel
+/**
+ * Model AccountDeletion
+ * Server-side receipt of one confirmed account deletion. Deliberately NOT
+ * linked to users: it is written in the same transaction that deletes the
+ * user row and all of the user's data, and holds no personal data. The
+ * requester (app or web) reads its status with the client-generated request
+ * key, whose SHA-256 is the only lookup handle.
+ */
+export type AccountDeletion = Prisma.AccountDeletionModel
+/**
+ * Model ProfileImageCleanup
+ * Durable removal of one managed profile image object
+ * (profile-images/{userId}/{uuid}.jpg). An upload registers its key here
+ * before the storage write (a lease: nextAttemptAt is in the future) and
+ * the URL change deletes the row, so a crashed upload, a failed cleanup or
+ * an upload overlapping an account deletion never leaves an untracked
+ * object. Replaced/deleted photos and deleted accounts enqueue their key
+ * due at once; the cleanup worker retries until the storage delete
+ * succeeds. accountDeletionId links the objects an account deletion waits on.
+ */
+export type ProfileImageCleanup = Prisma.ProfileImageCleanupModel

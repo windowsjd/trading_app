@@ -16,6 +16,12 @@ export type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
   PasswordReset: { email?: string } | undefined;
+  /** After a confirmed 회원탈퇴: the server receipt (no key, no user data). */
+  MembershipDeletionResult: {
+    status: 'cleanup_pending' | 'completed';
+    deletedAt: string;
+    completedAt: string | null;
+  };
 };
 
 export type HomeStackParamList = {
@@ -89,6 +95,8 @@ export type MyStackParamList = {
   Badges: undefined;
   Reward: undefined;
   Settings: undefined;
+  /** 회원탈퇴 (안내 → 본인 확인 → 최종 확인). */
+  MembershipDeletion: undefined;
 };
 
 export type MainTabParamList = {
@@ -153,6 +161,7 @@ export type LoginScreenProps = NativeStackScreenProps<
 >;
 
 export type PasswordResetScreenProps = NativeStackScreenProps<AuthStackParamList, 'PasswordReset'>;
+export type MembershipDeletionResultScreenProps = NativeStackScreenProps<AuthStackParamList, 'MembershipDeletionResult'>;
 
 export type SignupScreenProps = NativeStackScreenProps<
   AuthStackParamList,

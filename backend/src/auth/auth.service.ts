@@ -625,7 +625,8 @@ export class AuthService implements OnModuleInit {
     return Object.hasOwn(value, key);
   }
 
-  private async verifyPassword(passwordHash: string, password: string) {
+  /** Also the re-authentication of account deletion (AccountDeletionService). */
+  async verifyPassword(passwordHash: string, password: string) {
     try {
       return await argon2.verify(passwordHash, password);
     } catch {

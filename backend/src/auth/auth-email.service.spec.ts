@@ -14,7 +14,7 @@ const env = {
 
 describe('Resend authentication delivery', () => {
   afterEach(() => jest.restoreAllMocks());
-  it.each(['signup', 'password_reset'] as const)(
+  it.each(['signup', 'password_reset', 'account_deletion'] as const)(
     'sends %s text and HTML with a bounded request and idempotency key',
     async (purpose) => {
       const cancel = jest.fn();
@@ -40,10 +40,18 @@ describe('Resend authentication delivery', () => {
       const body = JSON.parse(init?.body as string) as Record<string, string>;
       expect(body.from).toBe(env.EMAIL_FROM);
       expect(body.subject).toBe(
-        purpose === 'signup'
-          ? 'Trading Class 이메일 인증번호'
-          : 'Trading Class 비밀번호 재설정 인증번호',
+        {
+          signup: 'Trading Class 이메일 인증번호',
+          password_reset: 'Trading Class 비밀번호 재설정 인증번호',
+          account_deletion: 'Trading Class 회원탈퇴 인증번호',
+        }[purpose],
       );
+      // Only the irreversible purpose warns and asks to secure the account.
+      for (const part of [body.text, body.html])
+        expect(
+          part.includes('복구할 수 없습니다') &&
+            part.includes('비밀번호를 변경'),
+        ).toBe(purpose === 'account_deletion');
       expect(body.text).toContain('000123');
       expect(body.html).toContain('000123');
       expect(body.text).toContain('10분');

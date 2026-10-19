@@ -139,6 +139,29 @@ describe('AssetTickerGateway', () => {
     },
   );
 
+  it('refuses a new socket for a still-unexpired token of a deleted account', async () => {
+    const { gateway, prisma, jwtService, configService } = createGateway(null);
+    configService.get.mockReturnValue('test-secret');
+    jwtService.verifyAsync.mockResolvedValue({ sub: 'deleted-user', tv: 0 });
+    // Self-service deletion removes the user row itself.
+    prisma.user.findUnique.mockResolvedValue(null);
+    const socket = {
+      on: jest.fn(),
+      send: jest.fn(),
+      close: jest.fn(),
+      readyState: 1,
+    };
+    await gateway.handleConnection(
+      socket as never,
+      {
+        url: '/',
+        headers: { authorization: 'Bearer fixture-token' },
+      } as never,
+    );
+    expect(socket.close).toHaveBeenCalledWith(1008, 'Unauthorized');
+    gateway.handleDisconnect(socket as never);
+  });
+
   const buildTickerMessage = (gateway: AssetTickerGateway, assetId: string) =>
     (
       gateway as unknown as {

@@ -189,6 +189,7 @@ export const TEST_IDS = {
     appearance: (value: 'system' | 'light' | 'dark') => `settings-appearance-${value}`,
     saveNickname: 'settings-save-nickname',
     logout: 'settings-logout',
+    membershipDeletion: 'settings-membership-deletion',
   },
 
   tradingAccount: {

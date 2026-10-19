@@ -56,6 +56,7 @@ function settingsHarness(portfolioPublic = true) {
     photoGate: null as ReturnType<typeof deferred> | null,
     photoFailure: false,
     photoRequests: [] as string[],
+    navigations: [] as unknown[][],
   };
   const client: QueryClientType = new QueryClient({
     defaultOptions: {
@@ -135,7 +136,7 @@ function settingsHarness(portfolioPublic = true) {
     React.createElement(
       QueryClientProvider,
       { client },
-      React.createElement(Screen, { navigation: {} }),
+      React.createElement(Screen, { navigation: { navigate: (...args: unknown[]) => h.navigations.push(args) } }),
     );
   const mount = async () => {
     await act(async () => {
@@ -485,5 +486,19 @@ describe('Settings profile image management', () => {
     await act(async () => x.h.renderer.unmount()); x.client.removeQueries({ queryKey: QUERY_KEYS.me, exact: true });
     await act(async () => x.h.photoGate!.resolve()); await x.flush();
     assert.equal(x.client.getQueryData(QUERY_KEYS.me), undefined);
+  });
+});
+
+describe('Settings 회원탈퇴 entry', () => {
+  it('sits below 로그아웃 and only opens the deletion flow', async t => {
+    const x = settingsHarness(); t.after(x.close); await x.mount();
+    const entry = x.node(TEST_IDS.settings.membershipDeletion);
+    assert.equal(entry.props.accessibilityLabel, '회원탈퇴');
+    const tree = x.text();
+    assert.equal(tree.indexOf(TEST_IDS.settings.logout) < tree.indexOf(TEST_IDS.settings.membershipDeletion), true);
+    await act(async () => entry.props.onPress()); await x.flush();
+    assert.deepEqual(x.h.navigations, [['MembershipDeletion']]);
+    assert.deepEqual(x.h.patches, []);
+    assert.deepEqual(x.h.photoRequests, []);
   });
 });

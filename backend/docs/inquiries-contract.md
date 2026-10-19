@@ -9,7 +9,9 @@ wallet or ledger is read or written.
 
 - `inquiries` — one row per filed inquiry (`user_id`, `client_request_id`,
   `category`, `title` ≤100, `content` ≤2000, `created_at`). **Never updated or
-  deleted by the application**, including when it is answered.
+  deleted by the application**, including when it is answered — except by the
+  author's own account deletion, which deletes the author's inquiries and their
+  answers ([account deletion contract](account-deletion-contract.md)).
 - `inquiry_answers` — the operator's official answer, **at most one per
   inquiry** (`inquiry_id` UNIQUE, FK RESTRICT), inserted once and never
   updated: `answered_by_user_id`, `idempotency_key`, `content` ≤2000 (SQL

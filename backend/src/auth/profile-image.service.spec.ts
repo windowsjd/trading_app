@@ -10,6 +10,7 @@ import { ProfileImageService } from './profile-image.service';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { AuthService } from './auth.service';
 import type { ProfileImageStorageService } from './profile-image-storage.service';
+import type { ProfileImageCleanupService } from './profile-image-cleanup.service';
 
 const userId = 'cbdc80ec-8f69-44fd-8a76-32b1c136e06a';
 const jpeg = readFileSync(
@@ -32,7 +33,10 @@ function harness(url: string | null = oldUrl) {
   };
   const events: string[] = [];
   const tx = {
-    $queryRaw: jest.fn().mockImplementation(() => {
+    $queryRaw: jest.fn().mockImplementation((strings: TemplateStringsArray) => {
+      // The database clock read is not a lock.
+      if (strings.join('').includes('epoch'))
+        return Promise.resolve([{ epochMs: String(Date.now()) }]);
       events.push('lock');
       return Promise.resolve([]);
     }),
@@ -85,14 +89,44 @@ function harness(url: string | null = oldUrl) {
       return Promise.resolve();
     }),
   };
+  // Durable cleanup boundary: the immediate attempt is the storage delete;
+  // its failure surfaces so the service's own warning path stays observable.
+  const cleanups = {
+    reserveUpload: jest
+      .fn<Promise<void>, [string, string]>()
+      .mockImplementation(() => {
+        events.push('reserve');
+        return Promise.resolve();
+      }),
+    claimUpload: jest
+      .fn<Promise<boolean>, [unknown, string]>()
+      .mockImplementation(() => {
+        events.push('claim');
+        return Promise.resolve(true);
+      }),
+    enqueue: jest
+      .fn<Promise<void>, [unknown, string, Date]>()
+      .mockImplementation(() => {
+        events.push('enqueue');
+        return Promise.resolve();
+      }),
+    process: jest
+      .fn<Promise<boolean>, [string]>()
+      .mockImplementation(async (key: string) => {
+        await storage.delete(key);
+        return true;
+      }),
+  };
   const service = new ProfileImageService(
     prisma as unknown as PrismaService,
     auth as unknown as AuthService,
     storage as unknown as ProfileImageStorageService,
+    cleanups as unknown as ProfileImageCleanupService,
   );
   return {
     service,
     storage,
+    cleanups,
     prisma,
     tx,
     auth,
@@ -125,9 +159,48 @@ describe('profile image lifecycle', () => {
     expect(response.data.nickname).toBe('me');
     expect(response.data.createdAt).toBe('2026-10-06T00:00:00.000Z');
     expect(h.storage.delete).toHaveBeenCalledWith(oldKey);
-    expect(h.events).toEqual(['upload', 'lock', 'update', 'commit', 'delete']);
+    expect(h.events).toEqual([
+      'reserve',
+      'upload',
+      'lock',
+      'claim',
+      'enqueue',
+      'update',
+      'commit',
+      'delete',
+    ]);
+    expect(h.cleanups.reserveUpload).toHaveBeenCalledWith(userId, key);
+    expect(h.cleanups.claimUpload.mock.calls[0][1]).toBe(key);
+    expect(h.cleanups.enqueue.mock.calls[0][1]).toBe(oldKey);
     await h.service.upload(userId, file);
     expect(h.storage.upload.mock.calls[1][0]).not.toBe(key);
+  });
+
+  it('never publishes a URL whose reservation was already processed', async () => {
+    const h = harness();
+    h.cleanups.claimUpload.mockResolvedValue(false);
+    await expect(h.service.upload(userId, file)).rejects.toMatchObject({
+      status: 503,
+      response: { error: { code: 'PROFILE_IMAGE_UPLOAD_FAILED' } },
+    });
+    expect(h.tx.user.update).not.toHaveBeenCalled();
+    expect(h.cleanups.enqueue).not.toHaveBeenCalled();
+    expect(h.user.profileImageUrl).toBe(oldUrl);
+    expect(h.storage.delete).toHaveBeenCalledWith(
+      h.storage.upload.mock.calls[0][0],
+    );
+  });
+
+  it('reserves nothing and writes nothing for an inactive or missing member', async () => {
+    const h = harness();
+    h.cleanups.reserveUpload.mockRejectedValue(
+      Object.assign(new Error('USER_NOT_ACTIVE'), { status: 403 }),
+    );
+    await expect(h.service.upload(userId, file)).rejects.toMatchObject({
+      status: 403,
+    });
+    expect(h.storage.upload).not.toHaveBeenCalled();
+    expect(h.prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('uses the latest locked URL rather than the pre-upload snapshot', async () => {
@@ -162,6 +235,7 @@ describe('profile image lifecycle', () => {
       status: 401,
     });
     expect(h.storage.upload).not.toHaveBeenCalled();
+    expect(h.cleanups.reserveUpload).not.toHaveBeenCalled();
     expect(h.prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -175,6 +249,7 @@ describe('profile image lifecycle', () => {
     );
     await expect(disabled.service.delete(userId)).rejects.toThrow('disabled');
     expect(disabled.prisma.$transaction).not.toHaveBeenCalled();
+    expect(disabled.cleanups.reserveUpload).not.toHaveBeenCalled();
     const h = harness();
     h.storage.upload.mockRejectedValue(
       new Error('secret credentials binary payload'),
@@ -229,7 +304,7 @@ describe('profile image lifecycle', () => {
   it('deletes DB state before the managed object and remains idempotent', async () => {
     const h = harness();
     expect((await h.service.delete(userId)).data.profileImageUrl).toBeNull();
-    expect(h.events).toEqual(['lock', 'update', 'commit', 'delete']);
+    expect(h.events).toEqual(['lock', 'enqueue', 'update', 'commit', 'delete']);
     await h.service.delete(userId);
     expect(h.storage.delete).toHaveBeenCalledTimes(1);
     const empty = harness(null);
@@ -245,6 +320,7 @@ describe('profile image lifecycle', () => {
     await expect(h.service.delete(userId)).rejects.toThrow('DB failed');
     expect(h.user.profileImageUrl).toBe(oldUrl);
     expect(h.storage.delete).not.toHaveBeenCalled();
+    expect(h.cleanups.process).not.toHaveBeenCalled();
   });
 
   it('rechecks status inside the lock and compensates if user is no longer active', async () => {

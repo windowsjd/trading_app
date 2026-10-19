@@ -123,7 +123,9 @@ export const ModelName = {
   PushScanCursor: 'PushScanCursor',
   ImportantNotice: 'ImportantNotice',
   EmailAuthChallenge: 'EmailAuthChallenge',
-  EmailAuthRateBucket: 'EmailAuthRateBucket'
+  EmailAuthRateBucket: 'EmailAuthRateBucket',
+  AccountDeletion: 'AccountDeletion',
+  ProfileImageCleanup: 'ProfileImageCleanup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -1616,6 +1618,31 @@ export const EmailAuthRateBucketScalarFieldEnum = {
 } as const
 
 export type EmailAuthRateBucketScalarFieldEnum = (typeof EmailAuthRateBucketScalarFieldEnum)[keyof typeof EmailAuthRateBucketScalarFieldEnum]
+
+
+export const AccountDeletionScalarFieldEnum = {
+  id: 'id',
+  requestKeyHash: 'requestKeyHash',
+  channel: 'channel',
+  status: 'status',
+  deletedAt: 'deletedAt',
+  completedAt: 'completedAt'
+} as const
+
+export type AccountDeletionScalarFieldEnum = (typeof AccountDeletionScalarFieldEnum)[keyof typeof AccountDeletionScalarFieldEnum]
+
+
+export const ProfileImageCleanupScalarFieldEnum = {
+  objectKey: 'objectKey',
+  accountDeletionId: 'accountDeletionId',
+  attempts: 'attempts',
+  nextAttemptAt: 'nextAttemptAt',
+  lastErrorCode: 'lastErrorCode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProfileImageCleanupScalarFieldEnum = (typeof ProfileImageCleanupScalarFieldEnum)[keyof typeof ProfileImageCleanupScalarFieldEnum]
 
 
 export const SortOrder = {

@@ -24,6 +24,7 @@ import { AuthService } from '../src/auth/auth.service';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import { ProfileImageController } from '../src/auth/profile-image.controller';
 import { ProfileImageService } from '../src/auth/profile-image.service';
+import { ProfileImageCleanupService } from '../src/auth/profile-image-cleanup.service';
 import { ProfileImageStorageService } from '../src/auth/profile-image-storage.service';
 import {
   PROFILE_IMAGE_MAX_BYTES,
@@ -61,6 +62,7 @@ describe('authenticated multipart profile image HTTP API (storage/DB fixtures)',
   let user = { ...original };
   let databaseFailure = false;
   const storage = {
+    isConfigured: () => true,
     requireConfigured: jest.fn(),
     upload: jest.fn(),
     delete: jest.fn(),
@@ -74,8 +76,48 @@ describe('authenticated multipart profile image HTTP API (storage/DB fixtures)',
 
   beforeAll(async () => {
     warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => {});
+    // Durable cleanup rows (upload reservation, replaced object) of the run.
+    const cleanupRows = new Set<string>();
     const tx = {
-      $queryRaw: jest.fn().mockResolvedValue([]),
+      $queryRaw: jest
+        .fn()
+        .mockImplementation(
+          (strings: TemplateStringsArray, ...values: unknown[]) => {
+            const text = strings.join('?');
+            if (text.includes('epoch'))
+              return Promise.resolve([{ epochMs: String(Date.now()) }]);
+            if (text.includes('AS status FROM users'))
+              return Promise.resolve(
+                values[0] === owner ? [{ status: user.status }] : [],
+              );
+            if (text.includes('DELETE FROM profile_image_cleanups')) {
+              cleanupRows.delete(String(values[0]));
+              return Promise.resolve([{ accountDeletionId: null }]);
+            }
+            return Promise.resolve([]);
+          },
+        ),
+      profileImageCleanup: {
+        create: jest
+          .fn()
+          .mockImplementation(({ data }: { data: { objectKey: string } }) => {
+            cleanupRows.add(data.objectKey);
+            return Promise.resolve({});
+          }),
+        deleteMany: jest
+          .fn()
+          .mockImplementation(({ where }: { where: { objectKey: string } }) =>
+            Promise.resolve({
+              count: cleanupRows.delete(where.objectKey) ? 1 : 0,
+            }),
+          ),
+        upsert: jest
+          .fn()
+          .mockImplementation(({ where }: { where: { objectKey: string } }) => {
+            cleanupRows.add(where.objectKey);
+            return Promise.resolve({});
+          }),
+      },
       user: {
         findUnique: jest
           .fn()
@@ -99,6 +141,7 @@ describe('authenticated multipart profile image HTTP API (storage/DB fixtures)',
         AuthService,
         { provide: EmailVerificationService, useValue: {} },
         ProfileImageService,
+        ProfileImageCleanupService,
         AccessTokenGuard,
         { provide: APP_GUARD, useExisting: AccessTokenGuard },
         {

@@ -335,6 +335,20 @@ export function getErrorMessageFromCode(
       return '로그인 또는 회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.USER_NOT_ACTIVE:
       return '정지되었거나 삭제된 계정입니다. 고객센터에 문의해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_PASSWORD_MISMATCH:
+      return '비밀번호가 일치하지 않습니다. 다시 확인해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_CONFIRMATION_REQUIRED:
+      return '탈퇴 확인이 필요합니다. 최종 확인 단계를 다시 진행해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_REQUEST_KEY_INVALID:
+      return '탈퇴 요청을 준비하지 못했습니다. 화면을 닫고 다시 시도해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_ROLE_RESTRICTED:
+      return '운영자·관리자 계정은 앱에서 탈퇴할 수 없습니다. 관리자에게 문의해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_REQUIRES_SUPPORT:
+      return '이 계정은 고객센터를 통해 탈퇴를 진행해야 합니다. 문의하기로 요청해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_FAILED:
+      return '탈퇴를 완료하지 못했습니다. 계정은 그대로 유지됩니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.ACCOUNT_DELETION_NOT_FOUND:
+      return '탈퇴 요청을 찾을 수 없습니다.';
     case ERROR_CODE.UNAUTHORIZED:
       return '로그인이 필요합니다.';
     case ERROR_CODE.FORBIDDEN:

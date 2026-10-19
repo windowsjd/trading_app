@@ -11,7 +11,7 @@ final signup (`201`). Bodies and responses use the existing success/data envelop
 
 | Path after `/auth` | Request | Success data |
 | --- | --- | --- |
-| `/email/request` | `{ email, purpose: "signup" or "password_reset" }` | `{ challengeId, expiresAt, resendAt, serverTime, message }` |
+| `/email/request` | `{ email, purpose: "signup", "password_reset" or "account_deletion" }` | `{ challengeId, expiresAt, resendAt, serverTime, message }` |
 | `/email/verify` | `{ email, purpose, challengeId, code }` | `{ verificationToken, expiresAt, serverTime }` |
 | `/signup` | `{ email, nickname, password, verificationToken }` | Existing user/tokens envelope |
 | `/password/reset` | `{ email, password, verificationToken }` | `{ changed: true }` (no login tokens) |
@@ -34,7 +34,12 @@ Failed deliveries and unknown accounts also consume send budgets. Five wrong
 codes exhaust a challenge. Expiry uses the database clock.
 
 Request responses never disclose account existence/status. Only active existing
-users receive reset mail; signup mail is sent only for unused emails. Unknown,
+users receive reset mail; signup mail is sent only for unused emails.
+`account_deletion` (2026-10-18, web account deletion — see
+[account deletion contract](account-deletion-contract.md)) follows the reset
+rules: active members only, proof bound to the member and its token version, a
+dedicated subject and an irreversibility warning. A proof is accepted only by
+the flow of its own purpose. Unknown,
 inactive and delivery-failed reset requests have identical envelopes and a
 minimum response duration exceeding the bounded provider timeout, with jitter.
 There is no email/nickname conflict check before valid signup proof; the existing
@@ -109,6 +114,7 @@ failure invalidates that challenge; user must resend after the cooldown.
 - Role and status decisions use the current DB user read by the access-token guard. A role-like JWT claim is not trusted.
 - Admin suspend/delete status changes revoke active refresh token sessions for the target user.
 - Deleted user restore does not reactivate revoked refresh token sessions and always restores `role=user`.
+- Self-service account deletion (2026-10-18, [account deletion contract](account-deletion-contract.md)) is NOT `status=deleted`: it removes the user row and every personal/virtual-trading row in one transaction, so restore answers `404 TARGET_USER_NOT_FOUND`. Anonymous settled-result placeholders (`@deleted-member.invalid`) answer `409 USER_RESTORE_NOT_ALLOWED`.
 
 ## Environment
 
@@ -252,17 +258,21 @@ are ignored. URLs are generated from the configured public base, never a client
 URL. Objects use `Content-Type: image/jpeg` and `Cache-Control: public,
 max-age=31536000, immutable`.
 
-Replacement: read active user → upload new object → lock user row in a short DB
-transaction → update URL → commit → best-effort remove the previous managed
-object. The lock captures the latest URL across concurrent uploads/deletes and
+Replacement: read active user → reserve the new key in `profile_image_cleanups`
+under the user row lock (10-minute lease) → upload new object → lock user row in
+a short DB transaction → consume the reservation, update URL and enqueue the
+previous managed object (due now) → commit → immediately try to remove the
+previous object; a failure stays queued and `ProfileImageCleanupWorker` retries
+it (2026-10-18, [account deletion contract](account-deletion-contract.md) §6). The lock captures the latest URL across concurrent uploads/deletes and
 instances. No storage request runs inside a DB transaction. A failed DB write
 removes the new object best-effort and preserves the previous URL. A failed or
 ambiguous upload also attempts new-object cleanup. Cleanup failure never rolls
-back a successful DB change and logs only a bounded event/operation/userId.
+back a successful DB change; it stays queued for retry (logs carry no key).
 
-Deletion: lock user row → set null → commit → best-effort remove old managed
-object. DB failure leaves the object untouched. Storage deletion failure leaves
-the public profile cleared, with an orphan recorded in the server log. Only an
+Deletion: lock user row → set null and enqueue the old managed object → commit
+→ remove it (retried by the worker on failure). DB failure leaves the object
+untouched. Storage deletion failure leaves the public profile cleared and the
+object queued until it is removed. Only an
 exact configured public URL and the same user's strict generated-key pattern
 qualify for deletion. External/legacy URLs, other users' keys, URL aliases,
 query strings, fragments and encoded/traversal paths are never requested.

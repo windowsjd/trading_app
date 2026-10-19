@@ -11,6 +11,7 @@ import {
   UserRole,
   UserStatus,
 } from '../generated/prisma/client';
+import { isAccountDeletionPlaceholderEmail } from '../auth/account-deletion.purge';
 import type { AuthenticatedUser } from '../auth/auth.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { OperatorAuditService } from './operator-audit.service';
@@ -324,6 +325,16 @@ export class OperatorUserStatusService {
               HttpStatus.CONFLICT,
               'USER_RESTORE_NOT_ALLOWED',
               'Only deleted users can be restored.',
+            );
+          }
+
+          // A self-service deletion leaves no user row to restore; its
+          // anonymous settled-result placeholders are not members either.
+          if (isAccountDeletionPlaceholderEmail(target.email)) {
+            this.throwApiError(
+              HttpStatus.CONFLICT,
+              'USER_RESTORE_NOT_ALLOWED',
+              'A deleted member placeholder cannot be restored.',
             );
           }
 

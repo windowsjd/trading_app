@@ -1554,6 +1554,40 @@ export type EnumEmailAuthPurposeWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumEmailAuthPurposeFilter<$PrismaModel>
 }
 
+export type EnumAccountDeletionChannelFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionChannel | Prisma.EnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionChannelFilter<$PrismaModel> | $Enums.AccountDeletionChannel
+}
+
+export type EnumAccountDeletionStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionStatus | Prisma.EnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel> | $Enums.AccountDeletionStatus
+}
+
+export type EnumAccountDeletionChannelWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionChannel | Prisma.EnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionChannelWithAggregatesFilter<$PrismaModel> | $Enums.AccountDeletionChannel
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAccountDeletionChannelFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAccountDeletionChannelFilter<$PrismaModel>
+}
+
+export type EnumAccountDeletionStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionStatus | Prisma.EnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionStatusWithAggregatesFilter<$PrismaModel> | $Enums.AccountDeletionStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
+}
+
 export type NestedStringFilter<$PrismaModel = never> = {
   equals?: string | Prisma.StringFieldRefInput<$PrismaModel>
   in?: string[] | Prisma.ListStringFieldRefInput<$PrismaModel>
@@ -3051,6 +3085,40 @@ export type NestedEnumEmailAuthPurposeWithAggregatesFilter<$PrismaModel = never>
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumEmailAuthPurposeFilter<$PrismaModel>
   _max?: Prisma.NestedEnumEmailAuthPurposeFilter<$PrismaModel>
+}
+
+export type NestedEnumAccountDeletionChannelFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionChannel | Prisma.EnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionChannelFilter<$PrismaModel> | $Enums.AccountDeletionChannel
+}
+
+export type NestedEnumAccountDeletionStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionStatus | Prisma.EnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel> | $Enums.AccountDeletionStatus
+}
+
+export type NestedEnumAccountDeletionChannelWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionChannel | Prisma.EnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionChannel[] | Prisma.ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionChannelWithAggregatesFilter<$PrismaModel> | $Enums.AccountDeletionChannel
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAccountDeletionChannelFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAccountDeletionChannelFilter<$PrismaModel>
+}
+
+export type NestedEnumAccountDeletionStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.AccountDeletionStatus | Prisma.EnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.AccountDeletionStatus[] | Prisma.ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumAccountDeletionStatusWithAggregatesFilter<$PrismaModel> | $Enums.AccountDeletionStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumAccountDeletionStatusFilter<$PrismaModel>
 }
 
 

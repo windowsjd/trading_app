@@ -143,7 +143,9 @@ non-requester only, both users active. Key `friend:<requesterId>:<id>`.
 Accept/reject/re-read create no row. Another request from the same requester
 to the same recipient within 24 h (reject → re-request) is not announced
 again. Right before sending, the request must still be pending with the same
-requester, otherwise it is skipped (`source_invalid`).
+requester, otherwise it is skipped (`source_invalid`). The requester's account
+deletion deletes these rows from recipients' outboxes (they carry the
+requester's nickname and id), together with the deleted member's own rows.
 
 ### 2.5 Important notice (`important_notice`)
 

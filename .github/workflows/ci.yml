@@ -487,6 +487,17 @@ jobs:
           PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE auth_email_test'
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/auth/auth.integration.spec.ts src/auth/email-verification.integration.spec.ts
+      # Self-service account deletion: every member row in one commit, settled
+      # results kept anonymously, races with trades/settlement/refresh/uploads,
+      # rollback on failure. Object storage and email delivery are in memory.
+      - name: Account deletion PostgreSQL integration (mocked storage and delivery)
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/account_deletion_test?schema=public
+          ACCOUNT_DELETION_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE account_deletion_test'
+          pnpm exec prisma migrate deploy
+          pnpm exec jest --runInBand --runTestsByPath src/auth/account-deletion.integration.spec.ts
       - name: Active administrator concurrency PostgreSQL integration
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/active_admin_race_test?schema=public

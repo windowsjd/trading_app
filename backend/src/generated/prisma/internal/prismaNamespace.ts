@@ -456,7 +456,9 @@ export const ModelName = {
   PushScanCursor: 'PushScanCursor',
   ImportantNotice: 'ImportantNotice',
   EmailAuthChallenge: 'EmailAuthChallenge',
-  EmailAuthRateBucket: 'EmailAuthRateBucket'
+  EmailAuthRateBucket: 'EmailAuthRateBucket',
+  AccountDeletion: 'AccountDeletion',
+  ProfileImageCleanup: 'ProfileImageCleanup'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -472,7 +474,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -5878,6 +5880,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AccountDeletion: {
+      payload: Prisma.$AccountDeletionPayload<ExtArgs>
+      fields: Prisma.AccountDeletionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AccountDeletionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AccountDeletionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>
+        }
+        findFirst: {
+          args: Prisma.AccountDeletionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AccountDeletionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>
+        }
+        findMany: {
+          args: Prisma.AccountDeletionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>[]
+        }
+        create: {
+          args: Prisma.AccountDeletionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>
+        }
+        createMany: {
+          args: Prisma.AccountDeletionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AccountDeletionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>[]
+        }
+        delete: {
+          args: Prisma.AccountDeletionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>
+        }
+        update: {
+          args: Prisma.AccountDeletionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>
+        }
+        deleteMany: {
+          args: Prisma.AccountDeletionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AccountDeletionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AccountDeletionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>[]
+        }
+        upsert: {
+          args: Prisma.AccountDeletionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AccountDeletionPayload>
+        }
+        aggregate: {
+          args: Prisma.AccountDeletionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAccountDeletion>
+        }
+        groupBy: {
+          args: Prisma.AccountDeletionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AccountDeletionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AccountDeletionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AccountDeletionCountAggregateOutputType> | number
+        }
+      }
+    }
+    ProfileImageCleanup: {
+      payload: Prisma.$ProfileImageCleanupPayload<ExtArgs>
+      fields: Prisma.ProfileImageCleanupFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProfileImageCleanupFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProfileImageCleanupFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>
+        }
+        findFirst: {
+          args: Prisma.ProfileImageCleanupFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProfileImageCleanupFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>
+        }
+        findMany: {
+          args: Prisma.ProfileImageCleanupFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>[]
+        }
+        create: {
+          args: Prisma.ProfileImageCleanupCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>
+        }
+        createMany: {
+          args: Prisma.ProfileImageCleanupCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProfileImageCleanupCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>[]
+        }
+        delete: {
+          args: Prisma.ProfileImageCleanupDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>
+        }
+        update: {
+          args: Prisma.ProfileImageCleanupUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProfileImageCleanupDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProfileImageCleanupUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProfileImageCleanupUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProfileImageCleanupUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProfileImageCleanupPayload>
+        }
+        aggregate: {
+          args: Prisma.ProfileImageCleanupAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProfileImageCleanup>
+        }
+        groupBy: {
+          args: Prisma.ProfileImageCleanupGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProfileImageCleanupGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProfileImageCleanupCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProfileImageCleanupCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -7393,6 +7543,31 @@ export const EmailAuthRateBucketScalarFieldEnum = {
 export type EmailAuthRateBucketScalarFieldEnum = (typeof EmailAuthRateBucketScalarFieldEnum)[keyof typeof EmailAuthRateBucketScalarFieldEnum]
 
 
+export const AccountDeletionScalarFieldEnum = {
+  id: 'id',
+  requestKeyHash: 'requestKeyHash',
+  channel: 'channel',
+  status: 'status',
+  deletedAt: 'deletedAt',
+  completedAt: 'completedAt'
+} as const
+
+export type AccountDeletionScalarFieldEnum = (typeof AccountDeletionScalarFieldEnum)[keyof typeof AccountDeletionScalarFieldEnum]
+
+
+export const ProfileImageCleanupScalarFieldEnum = {
+  objectKey: 'objectKey',
+  accountDeletionId: 'accountDeletionId',
+  attempts: 'attempts',
+  nextAttemptAt: 'nextAttemptAt',
+  lastErrorCode: 'lastErrorCode',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type ProfileImageCleanupScalarFieldEnum = (typeof ProfileImageCleanupScalarFieldEnum)[keyof typeof ProfileImageCleanupScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -8421,6 +8596,34 @@ export type ListEnumEmailAuthPurposeFieldRefInput<$PrismaModel> = FieldRefInputT
 
 
 /**
+ * Reference to a field of type 'AccountDeletionChannel'
+ */
+export type EnumAccountDeletionChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountDeletionChannel'>
+    
+
+
+/**
+ * Reference to a field of type 'AccountDeletionChannel[]'
+ */
+export type ListEnumAccountDeletionChannelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountDeletionChannel[]'>
+    
+
+
+/**
+ * Reference to a field of type 'AccountDeletionStatus'
+ */
+export type EnumAccountDeletionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountDeletionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'AccountDeletionStatus[]'
+ */
+export type ListEnumAccountDeletionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AccountDeletionStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -8601,6 +8804,8 @@ export type GlobalOmitConfig = {
   importantNotice?: Prisma.ImportantNoticeOmit
   emailAuthChallenge?: Prisma.EmailAuthChallengeOmit
   emailAuthRateBucket?: Prisma.EmailAuthRateBucketOmit
+  accountDeletion?: Prisma.AccountDeletionOmit
+  profileImageCleanup?: Prisma.ProfileImageCleanupOmit
 }
 
 /* Types for Logging */

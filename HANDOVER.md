@@ -10,6 +10,20 @@
 
 ---
 
+## 2026-10-18 회원탈퇴·개인정보 삭제
+
+- **시작:** main HEAD `a40fe95d`, 작업 트리 clean. **커밋·push·운영 DB migration·Render/EAS 배포·실메일·실저장소 삭제 없음** — 전부 main 작업 트리에 미커밋.
+- **방식:** 탈퇴 확정 = 한 DB 트랜잭션 hard delete. 본인 확인 증거 검사, 회원·개인정보·모든 가상 투자 데이터(47개 테이블, 자식 → 부모 명시 순서), 영수증(`account_deletions`)을 함께 commit하거나 아무것도 바꾸지 않는다. `UserStatus.deleted`(운영자 제재·복구 가능)는 쓰지 않는다. FK/Cascade는 그대로이며 RESTRICT가 완전성 검사다(`account-deletion.purge.spec.ts`가 schema에서 누락 테이블을 잡는다). 미체결 주문·조건주문·선물 포지션은 체결·청산 없이 삭제.
+- **시즌:** 진행·정산 전 참가는 일별 순위까지 삭제(제외/제재 기록 아님). 정산 완료 시즌에서 최종 순위 행이 있는 참가만 원 회원과 연결 없는 익명 placeholder(`@deleted-member.invalid`, "탈퇴한 회원 XXXXXX", `status=deleted`)로 옮겨 다른 회원의 확정 순위·등급·보상을 지킨다. placeholder 복구는 409. 일별 순위 공백(audit 집계)은 결정 필요.
+- **상태:** 서버 영수증 `cleanup_pending`(데이터 삭제됨, 관리형 프로필 사진 객체 정리 중) / `completed`. 사진은 durable queue + 전용 워커(Ops lease, 지수 재시도·포기 없음, 7일 초과 경고)로 지운다. 업로드는 저장소 쓰기 전 lease 등록이라 탈퇴와 겹친 업로드도 추적된다.
+- **API(`/api/v1`):** `POST /me/account-deletion/password-check`, `POST /me/account-deletion`, 공개 `POST /auth/account-deletion`(웹, `account_deletion` 목적 이메일 인증 증거), `POST /auth/account-deletion/status`(요청 키). 운영자·관리자·운영 기록 행위자·비활성 회원은 스스로 탈퇴 불가.
+- **앱:** 설정 맨 아래 "회원탈퇴" → 안내 확인 → 비밀번호 본인 확인 → 최종 확인 → 영수증 판정 → 로그아웃과 같은 세션 종료 → 결과 화면. 응답 유실은 같은 요청 키로 상태 조회.
+- **웹:** nanghwa.com 코드는 이 저장소에 없다. 서버 API와 페이지 계약만 준비했다. **페이지가 공개되지 않았으므로 Google Play 계정 삭제 URL은 준비되지 않음.** 배포 시 `CORS_ORIGINS`에 페이지 Origin 추가 필요.
+- **Migration:** `20261018200000_add_account_deletion_enums`, `20261018200100_add_account_deletion` — 추가만(enum 값 2, 새 테이블 2). main push는 Render 자동 배포 + 운영 migration이므로 승인 전 push 금지(`[skip render]` 커밋 후 별도 승인 배포 권장). 서버 먼저, 앱 나중.
+- **검증:** 통합 PG 러너 26/26(최종 트리 2회), 백엔드 단위 349 suites/5,651 tests, e2e 변경 2 스위트 13/13(구현 중 전체 411), 인증 DB 3/3, core account 26/27(기존 main 실패 1), 거래 회귀 5 스위트 단독 새 DB 5/5, 프론트 check·Web export·진단 게이트, 브라우저 156 레이아웃. **Futures F1은 로컬 미통과:** 내 트리 4/4와 HEAD 사본 4/4가 같은 조건에서 WSL 시계 역전 순간에 같은 계열로 실패(F1 약 32초 > 역전 주기 약 30.5초) → CI 확인 필요. 실기기·실메일·실저장소·운영은 NOT_RUN.
+- **결정 필요(임의로 정하지 않음):** 백업·애플리케이션 로그·운영 감사/작업 기록·영수증·익명 결과의 보존기간, 재가입 남용 방지 식별자 보존, 운영자·정지 회원 삭제 절차, 일별 순위 공백 처리, 법정 보존 의무.
+- **상세:** [보고서](docs/investigations/2026-10-18-account-deletion/report.md), [계약](backend/docs/account-deletion-contract.md), [앱 QA](frontend/docs/membership-deletion-qa.md).
+
 ## 2026-10-18 A·B차 통합 후속 보완 및 회귀 검증
 
 - **기준:** 원격 main/HEAD `4b376d2a40036a61faf50870e39390b68104473a`, 시작 작업 트리 clean. 앞선 A·B 기록은 당시 정책/증거로 보존한다.
