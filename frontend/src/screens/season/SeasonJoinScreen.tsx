@@ -4,8 +4,10 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
 } from '../../theme/native';
+// Not React Native's SafeAreaView: it pads on iOS only, and Android draws this
+// headerless root screen edge to edge under the status and navigation bars.
+import { SafeAreaView } from '../../theme/safeArea';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -323,7 +325,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     viewState === 'season_join_already_joined'
   ) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.container}>
         <View style={styles.content}>
           <View style={styles.card}>
             <Text style={styles.title}>이미 이번 시즌에 참가한 상태입니다.</Text>
@@ -340,7 +342,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.container}>
       <View testID={TEST_IDS.season.joinScreen} style={styles.content}>
         <View style={styles.card}>
           <Text style={styles.title}>{season.name}</Text>

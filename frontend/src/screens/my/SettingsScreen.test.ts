@@ -39,7 +39,7 @@ const baseMe: MeDto = {
   portfolioPublic: true,
 };
 
-function settingsHarness(portfolioPublic = true) {
+function settingsHarness(portfolioPublic = true, constants?: unknown) {
   const h = {
     serverMe: { ...baseMe, portfolioPublic },
     nextResponse: null as MeDto | null,
@@ -130,6 +130,8 @@ function settingsHarness(portfolioPublic = true) {
       default: 'ErrorState',
       __esModule: true,
     },
+    // The embedded app config (EAS build stamp); the loader's empty config otherwise.
+    ...(constants ? { 'expo-constants': constants } : {}),
   }).default;
 
   const element = () =>
@@ -166,6 +168,20 @@ function settingsHarness(portfolioPublic = true) {
   };
   return { h, client, mount, flush, node, change, text, close };
 }
+
+describe('Settings 앱 정보', () => {
+  it('names the installed build by its EAS commit stamp, or 개발 빌드 without one', async (t) => {
+    const stamped = settingsHarness(true, { __esModule: true, default: { expoConfig: { extra: {
+      build: { commit: '367fbe5e7a9fa96aa7a7a46d44dc70cf1a4d8b1a', profile: 'preview', id: 'eas-build' } } } } });
+    t.after(stamped.close);
+    await stamped.mount();
+    assert.equal(stamped.node('settings-build').props.children, '빌드 367fbe5e · preview');
+    const local = settingsHarness(true);
+    t.after(local.close);
+    await local.mount();
+    assert.equal(local.node('settings-build').props.children, '개발 빌드');
+  });
+});
 
 describe('Settings portfolio privacy switch', () => {
   it('uses the compact Secondary switch and hands notifications to the server-backed section', async t => {

@@ -375,6 +375,8 @@ describe('ActionPressable touch feedback', () => {
 
   it('pressing one Market row leaves its parent and both price renderers untouched', (t) => {
     const h = interactionHarness();
+    // The rows just mounted: their ink layers answer measure, not onLayout yet.
+    h.inkLayer = { size: [358, 72] };
     let parents = 0, prices = 0;
     const { MarketAssetRow } = h.load('src/features/market/MarketAssetRow.tsx', {
       '../../components/common/ActionPressable': { default: h.ActionPressable, __esModule: true },
@@ -389,7 +391,151 @@ describe('ActionPressable touch feedback', () => {
     act(() => button.props.onPressOut(event));
     assert.equal(parents, 1);
     assert.equal(prices, 2);
-    assert.equal(h.animations.every((a: any) => [rippleMotion.spreadDuration, rippleMotion.fadeDuration].includes(a.options.duration)), true,
-      'only the pressed row\'s own ink moves');
+    assert.deepEqual(h.animations.map((a: any) => a.options.duration), [rippleMotion.spreadDuration, rippleMotion.fadeDuration],
+      'only the pressed row\'s own ink moves: it spread, then faded');
+    // The card's 1px border: its ink follows the border's inner curve (radius 12 - 1).
+    assert.equal(flatten(inkLayer(renderer).props.style).borderRadius, 11);
+  });
+});
+
+describe('ActionPressable: the first touch inks, and ink stays inside borders', () => {
+  for (const platform of ['android', 'ios'] as const) {
+    it(`${platform}: a press before the ink layer's first onLayout measures the layer and inks at once (buttons and rows)`, (t) => {
+      const h = interactionHarness(platform);
+      h.inkLayer = { size: [240, 50] };
+      const button = h.render(React.createElement(h.ActionPressable, {
+        feedback: 'button', onPress() {}, style: { backgroundColor: '#326FE5', borderRadius: 12, minHeight: 50 },
+      }));
+      t.after(() => act(() => button.unmount()));
+      // No onLayout yet (layoutInk is never called).
+      act(() => button.root.findByType('Pressable').props.onPressIn(event));
+      assert.equal(ink(button).opacity.value.value, 1, 'the first touch inks');
+      const spread = h.animations.find((a: any) => a.options.duration === rippleMotion.spreadDuration);
+      assert.equal(spread?.options.toValue, rippleScale({ width: 240, height: 50 }, { x: 30, y: 15 }));
+      act(() => button.root.findByType('Pressable').props.onPressOut(event));
+      h.finish();
+      assert.equal(ink(button).opacity.value.value, 0, 'and fades out');
+
+      const r = interactionHarness(platform);
+      r.inkLayer = { size: [358, 72] };
+      const row = r.render(React.createElement(r.ActionPressable, {
+        onPress() {}, style: { backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 1, borderColor: '#e5e8eb' },
+      }));
+      t.after(() => act(() => row.unmount()));
+      act(() => row.root.findByType('Pressable').props.onPressIn(event));
+      // The row's page offset gives the origin (130 - 100, 215 - 200); the layer gives the size.
+      assert.equal(ink(row).opacity.value.value, 1);
+      assert.equal(ink(row).transform[0].translateX.value, 30 - RIPPLE_BASE / 2);
+      assert.equal(ink(row).transform[1].translateY.value, 15 - RIPPLE_BASE / 2);
+      assert.equal(r.animations.find((a: any) => a.options.duration === rippleMotion.spreadDuration)?.options.toValue,
+        rippleScale({ width: 358, height: 72 }, { x: 30, y: 15 }));
+    });
+  }
+
+  it('web: an asynchronous layer measurement still inks a press released before it answers, then fades', (t) => {
+    const h = interactionHarness('web');
+    h.inkLayer = { size: [200, 60], delayed: true };
+    const renderer = h.render(React.createElement(h.ActionPressable, { onPress() {}, style: { backgroundColor: '#ffffff', borderRadius: 12 } }));
+    t.after(() => act(() => renderer.unmount()));
+    const target = renderer.root.findByType('Pressable');
+    act(() => target.props.onPressIn(event));
+    assert.deepEqual([h.inkMeasures.length, h.animations.length, ink(renderer).opacity.value.value], [1, 0, 0], 'waiting for the size');
+    act(() => target.props.onPressOut(event));
+    act(() => h.inkMeasures[0]());
+    assert.equal(h.animations.some((a: any) => a.options.duration === rippleMotion.spreadDuration), true, 'it showed');
+    assert.equal(h.animations.some((a: any) => a.options.duration === rippleMotion.fadeDuration && a.options.toValue === 0), true, 'then faded');
+    h.finish();
+    assert.equal(ink(renderer).opacity.value.value, 0, 'no ink is left behind');
+    // The size is known now: the next press inks without measuring again.
+    act(() => target.props.onPressIn(event));
+    assert.deepEqual([h.inkMeasures.length, ink(renderer).opacity.value.value], [1, 1]);
+  });
+
+  it('a newer press wins over a measurement still on its way, and a zero size inks nothing', (t) => {
+    const h = interactionHarness('web');
+    h.inkLayer = { size: [200, 60], delayed: true };
+    const renderer = h.render(React.createElement(h.ActionPressable, { onPress() {}, style: { backgroundColor: '#ffffff' } }));
+    t.after(() => act(() => renderer.unmount()));
+    const target = renderer.root.findByType('Pressable');
+    act(() => target.props.onPressIn(event));
+    act(() => target.props.onPressIn({ nativeEvent: { locationX: 150, locationY: 40 } }));
+    act(() => h.inkMeasures[0]());
+    assert.equal(h.animations.length, 0, 'the superseded answer starts nothing');
+    act(() => h.inkMeasures[1]());
+    assert.equal(h.animations.filter((a: any) => a.options.duration === rippleMotion.spreadDuration).length, 1);
+    assert.equal(ink(renderer).transform[0].translateX.value, 150 - RIPPLE_BASE / 2, 'from the newer touch');
+
+    const empty = interactionHarness('android');
+    empty.inkLayer = { size: [0, 0] };
+    const hidden = empty.render(React.createElement(empty.ActionPressable, { onPress() {}, style: { backgroundColor: '#ffffff' } }));
+    t.after(() => act(() => hidden.unmount()));
+    act(() => hidden.root.findByType('Pressable').props.onPressIn(event));
+    act(() => hidden.root.findByType('Pressable').props.onPressOut(event));
+    assert.deepEqual([empty.animations.length, ink(hidden).opacity.value.value], [0, 0]);
+  });
+
+  for (const fading of [false, true]) {
+    it(`a new press never paints the previous ${fading ? 'still-fading' : 'faded'} spread ink at the new point, whichever native update a frame lands after`, (t) => {
+      const h = interactionHarness('android');
+      const renderer = h.render(React.createElement(h.ActionPressable, { onPress() {}, style: { backgroundColor: '#ffffff', borderRadius: 12, borderWidth: 1 } }));
+      t.after(() => act(() => renderer.unmount()));
+      layoutInk(renderer, 358, 72);
+      const target = () => renderer.root.findByType('Pressable');
+      act(() => target().props.onPressIn(event));
+      act(() => target().props.onPressOut(event));
+      if (fading) h.animations.find((a: any) => a.options.duration === rippleMotion.spreadDuration).finish();
+      else h.finish();
+      const { transform, opacity } = ink(renderer);
+      const nodes: Record<string, any> = { spread: transform[2].scale, x: transform[0].translateX, y: transform[1].translateY, fade: opacity.value };
+      const state: Record<string, number> = Object.fromEntries(Object.entries(nodes).map(([key, node]) => [key, node.value]));
+      assert.deepEqual([state.fade > 0, state.spread > rippleMotion.startScale], [fading, true], 'the previous ink covers the row');
+      const from = h.sets.length;
+      act(() => target().props.onPressIn({ nativeEvent: { pageX: 400, pageY: 260, locationX: 300, locationY: 60 } }));
+      const updates: [string, number][] = h.sets.slice(from).flatMap(([node, value]: [unknown, number]) => {
+        const key = Object.keys(nodes).find((name) => nodes[name] === node);
+        return key ? [[key, value]] : [];
+      });
+      assert.deepEqual(updates, [['spread', rippleMotion.startScale], ['x', 300 - RIPPLE_BASE / 2], ['y', 60 - RIPPLE_BASE / 2], ['fade', 1]]);
+      // A frame between two updates paints what the earlier ones left.
+      updates.slice(0, -1).forEach(([key, value], index) => {
+        state[key] = value;
+        assert.equal(state.fade > 0 && state.spread > rippleMotion.startScale, false, `a frame after ${index + 1} update(s)`);
+      });
+    });
+  }
+
+  it('a layer inside a bordered surface follows the border\'s inner curve; a compact surface keeps its own corners', (t) => {
+    const h = interactionHarness('android');
+    const render = (props: Record<string, unknown>) => {
+      const renderer = h.render(React.createElement(h.ActionPressable, { onPress() {}, ...props }));
+      t.after(() => act(() => renderer.unmount()));
+      return renderer;
+    };
+    const radii = (style: any) => [style.borderRadius, style.borderTopLeftRadius, style.borderBottomRightRadius];
+    // Rows/cards: the ink fill starts inside the border.
+    assert.deepEqual(radii(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1 } })).props.style)),
+      [11, undefined, undefined]);
+    assert.deepEqual(radii(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderTopLeftRadius: 14, borderBottomRightRadius: 2, borderWidth: 3 } })).props.style)),
+      [undefined, 11, 0], 'per corner, never below zero');
+    // Uneven sides: a corner takes its own sides' width; one radius for all takes the thinnest
+    // side, so a corner without a border (the top-only separator's bottom) never leaves the outline.
+    assert.deepEqual(radii(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderRadius: 12, borderTopWidth: 1 } })).props.style)),
+      [12, undefined, undefined]);
+    assert.deepEqual(radii(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderTopLeftRadius: 12, borderBottomRightRadius: 12, borderTopWidth: 2, borderWidth: 1 } })).props.style)),
+      [undefined, 10, 11]);
+    assert.equal(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderTopStartRadius: 12, borderStartWidth: 2, borderLeftWidth: 5, borderWidth: 1 } })).props.style).borderTopStartRadius,
+      10, 'the start side wins over the left side');
+    assert.equal(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderRadius: 12 } })).props.style).borderRadius, 12, 'no border, no change');
+    assert.equal(flatten(inkLayer(render({ style: { backgroundColor: '#fff', borderRadius: '50%', borderWidth: 1 } })).props.style).borderRadius, '50%');
+    // The selection tint on a bordered control.
+    const selection = render({ feedback: 'selection', style: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1 } });
+    assert.equal(flatten(wash(selection).props.style).borderRadius, 11);
+    // A compact surface is its own (unbordered) box.
+    const compact = render({ style: { backgroundColor: '#fff', borderRadius: 12, borderWidth: 1 },
+      feedbackStyle: { top: 4, left: 4, width: 40, height: 40, borderRadius: 20, borderWidth: 1 } });
+    assert.equal(flatten(inkLayer(compact).props.style).borderRadius, 20);
+    // Buttons: a bordered surface (the learning-locked CTA) inks inside its border.
+    assert.equal(flatten(inkLayer(render({ feedback: 'button', style: { backgroundColor: '#f7f8fa', borderRadius: 12, borderWidth: 1 } })).props.style).borderRadius, 11);
+    assert.equal(flatten(inkLayer(render({ feedback: 'button', style: { backgroundColor: '#326FE5', borderRadius: 12 } })).props.style).borderRadius, 12);
   });
 });

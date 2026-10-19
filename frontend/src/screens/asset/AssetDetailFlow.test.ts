@@ -145,6 +145,16 @@ test('the order bar clears the system navigation area itself (tab bar hidden her
   assert.deepEqual(screen.props.edges, ['left', 'right'], 'the bottom inset is applied once, by the order bar');
 });
 
+test('the order bar follows the inset it is given, never a fixed gap (3-button 48dp, gesture 24dp, none)', async (t) => {
+  for (const bottom of [48, 24, 0]) {
+    const h = inlineTradingHarness();
+    h.safeAreaInsets = { top: 24, bottom, left: 0, right: 0 };
+    await openDetail(h);
+    t.after(h.close);
+    assert.equal(h.node('asset-order-actions').props.style.paddingBottom, 8 + bottom, `${bottom}dp inset`);
+  }
+});
+
 test('detail candle diagnostics stay admin only', async (t) => {
   const user = inlineTradingHarness();
   user.candleStale = true;

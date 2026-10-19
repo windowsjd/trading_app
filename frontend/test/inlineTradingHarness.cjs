@@ -353,7 +353,8 @@ function inlineTradingHarness() {
     './QuantityRatioSlider': load(resolve('src/screens/order/QuantityRatioSlider.web.tsx'), {}),
     react: React,
     'react-native': native,
-    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }) },
+    // The provider's insets (default: a 34dp gesture bar / home indicator); tests may replace them before mounting.
+    'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => h.safeAreaInsets ?? { top: 24, bottom: 34, left: 0, right: 0 } },
     '@react-navigation/elements': { useHeaderHeight: () => 48 },
     'react-native-svg': { default: 'Svg', Path: 'Path', Rect: 'Rect', __esModule: true },
     '../../features/auth/useAdminDiagnostics': adminHook,

@@ -12,7 +12,9 @@ const { createTradingUiHarness, elements } = require('../../../test/tradingUiHar
 
 function setup() {
   const h = interactionHarness();
-  const Backdrop = h.load('src/components/common/BottomSheetBackdrop.tsx').default;
+  const Backdrop = h.load('src/components/common/BottomSheetBackdrop.tsx', {
+    'react-native-safe-area-context': { useSafeAreaInsets: () => h.insets },
+  }).default;
   const Selector = h.load('src/components/charts/ChartTimeframeSelector.tsx', {
     '../common/ActionPressable': { default: h.ActionPressable, __esModule: true },
     '../common/BottomSheetBackdrop': { default: Backdrop, __esModule: true },
@@ -128,8 +130,13 @@ describe('chart timeframe selector', () => {
       act(() => h.renderer.update(React.createElement(h.Screen)));
       const content = h.renderer.root.findAllByType('View').find((node: any) => node.props.accessibilityViewIsModal);
       assert.ok(flatten(content.props.style).maxHeight + h.insets.top + 40 <= height);
+      // The bottom inset is applied once, by the backdrop's sheet (the Modal is edge to edge
+      // on Android); the list adds none, and the whole sheet still ends below the status bar.
+      const sheet = flatten(content.parent.props.style);
+      assert.equal(sheet.paddingBottom, Math.max(h.insets.bottom, 12) + 8);
       const list = h.renderer.root.findByType('ScrollView');
-      assert.equal(list.props.contentContainerStyle.paddingBottom, h.insets.bottom);
+      assert.equal(list.props.contentContainerStyle?.paddingBottom === undefined, true, 'no second inset in the list');
+      assert.ok(h.insets.top + sheet.padding + flatten(content.props.style).maxHeight + sheet.paddingBottom <= height);
       assert.ok(list.findAllByType('Text').some((text: any) => text.props.children === '시간봉'), 'the header can also scroll at extreme font sizes');
       for (const text of h.renderer.root.findAllByType('Text')) {
         assert.equal(text.props.numberOfLines, undefined);

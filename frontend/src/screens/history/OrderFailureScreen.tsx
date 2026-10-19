@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
+import { SafeAreaView } from '../../theme/safeArea';
 import { semantic } from '../../theme/tokens';
 import type { RootStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
@@ -75,6 +76,8 @@ export default function OrderFailureScreen({ route, navigation }: Props) {
   }
   const view = describeOrderFailure(failure);
   return (
+    // Below the native header; Android draws the screen under the navigation bar.
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
     <ScrollView testID="order-failure-screen" style={styles.screen} contentContainerStyle={styles.content}>
       <View style={styles.card} accessibilityLiveRegion="polite">
         <Text style={styles.badge}>{view.status}</Text>
@@ -107,6 +110,7 @@ export default function OrderFailureScreen({ route, navigation }: Props) {
         />
       ) : null}
     </ScrollView>
+    </SafeAreaView>
   );
 }
 

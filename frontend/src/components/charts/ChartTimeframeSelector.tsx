@@ -37,8 +37,9 @@ export default function ChartTimeframeSelector({ selectedTimeframe, onSelect }: 
         <Text style={styles.triggerText}>{label(selectedTimeframe)} ▾</Text>
       </ActionPressable>
       <BottomSheetBackdrop visible={open} onClose={close}>
-        <View style={[styles.sheetContent, { maxHeight: Math.max(0, height - insets.top - 64) }]} accessibilityViewIsModal>
-          <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: insets.bottom }}>
+        {/* The backdrop's sheet ends above the navigation bar; the list scrolls within the rest. */}
+        <View style={[styles.sheetContent, { maxHeight: Math.max(0, height - insets.top - insets.bottom - 64) }]} accessibilityViewIsModal>
+          <ScrollView style={styles.list}>
             <View style={styles.header}>
               <Text style={styles.title} accessibilityRole="header">시간봉</Text>
               <ActionPressable

@@ -100,7 +100,8 @@ function ButtonSurface({ children, pressed, enabled, reduced, ink, tone, style, 
     animation.start();
     return () => animation.stop();
   }, [enabled, pressed, progress, reduced]);
-  const shape = clipShape(style);
+  // Ink and gradient lie inside the surface's border.
+  const shape = clipShape(style, true);
   const color = processColor(gradient ? gradient.colors[0] : style.backgroundColor);
   const palette = getRipplePalette(typeof color === 'number' ? color : null, tone);
   return (
@@ -128,17 +129,36 @@ function useInkReleaseWhileBlocked(ink: InkRipple, enabled: boolean) {
   }, [enabled, release]);
 }
 
-function clipShape(base: ViewStyle): ViewStyle {
+/**
+ * The surface's corner shape for a layer laid over it. An absolute fill starts
+ * inside the surface's border, so a layer there takes the border's inner curve
+ * (each radius less the border width): with the outer radius a bordered card
+ * (Market and ranking rows) kept a hairline crescent of un-inked surface at
+ * every corner while its ink showed. A corner subtracts only its own sides'
+ * width; more would push the layer past the card's outline there.
+ */
+function clipShape(base: ViewStyle, insideBorder = false): ViewStyle {
+  const width = (...values: unknown[]) => {
+    const value = values.find((candidate) => typeof candidate === 'number');
+    return insideBorder && typeof value === 'number' ? value : 0;
+  };
+  // Logical sides win over physical ones (the app is left-to-right).
+  const top = width(base.borderTopWidth, base.borderWidth);
+  const bottom = width(base.borderBottomWidth, base.borderWidth);
+  const left = width(base.borderStartWidth, base.borderLeftWidth, base.borderWidth);
+  const right = width(base.borderEndWidth, base.borderRightWidth, base.borderWidth);
+  const inner = <T,>(radius: T, border: number): T => (typeof radius === 'number' ? Math.max(0, radius - border) as T : radius);
   return {
-    borderRadius: base.borderRadius,
-    borderTopLeftRadius: base.borderTopLeftRadius,
-    borderTopRightRadius: base.borderTopRightRadius,
-    borderBottomLeftRadius: base.borderBottomLeftRadius,
-    borderBottomRightRadius: base.borderBottomRightRadius,
-    borderTopStartRadius: base.borderTopStartRadius,
-    borderTopEndRadius: base.borderTopEndRadius,
-    borderBottomStartRadius: base.borderBottomStartRadius,
-    borderBottomEndRadius: base.borderBottomEndRadius,
+    // One radius for every corner: the thinnest side, so no corner leaves the outline.
+    borderRadius: inner(base.borderRadius, Math.min(top, bottom, left, right)),
+    borderTopLeftRadius: inner(base.borderTopLeftRadius, Math.max(top, left)),
+    borderTopRightRadius: inner(base.borderTopRightRadius, Math.max(top, right)),
+    borderBottomLeftRadius: inner(base.borderBottomLeftRadius, Math.max(bottom, left)),
+    borderBottomRightRadius: inner(base.borderBottomRightRadius, Math.max(bottom, right)),
+    borderTopStartRadius: inner(base.borderTopStartRadius, Math.max(top, left)),
+    borderTopEndRadius: inner(base.borderTopEndRadius, Math.max(top, right)),
+    borderBottomStartRadius: inner(base.borderBottomStartRadius, Math.max(bottom, left)),
+    borderBottomEndRadius: inner(base.borderBottomEndRadius, Math.max(bottom, right)),
     borderCurve: base.borderCurve,
   };
 }
@@ -202,7 +222,8 @@ function FeedbackActionPressable({ children, style, disabled, onPress, onPressIn
         const color = processColor(resolveSemanticColor(base.backgroundColor, colors, mode, financialPreference) ?? colors.screen);
         const surface = typeof color === 'number' ? color : null;
         // Copy only the clip shape; never clip the root's border/shadow/content.
-        const shape = clipShape(base);
+        // A fill lies inside the root's border; a compact surface is its own box.
+        const shape = clipShape(base, !feedbackStyle);
         // The ink takes only the compact surface's geometry; its paint stays below.
         const layer = feedbackStyle ? [styles.target, shape, feedbackStyle, styles.unpainted] : [styles.clip, shape];
         const palette = getFeedbackPalette(surface);

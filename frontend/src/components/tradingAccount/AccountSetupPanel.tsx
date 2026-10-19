@@ -1,6 +1,10 @@
 import { semantic } from '../../theme/tokens';
 import React from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, View } from '../../theme/native';
+import { ScrollView, StyleSheet, Text, View } from '../../theme/native';
+// The safe-area-context view, not React Native's (iOS only): it pads only where it
+// meets a system bar, so as the whole (headerless) season join screen its
+// scrolled-to end stays above Android's navigation bar; on Home (a tab) it adds nothing.
+import { SafeAreaView } from '../../theme/safeArea';
 
 import CTAButton from '../common/CTAButton';
 import { TEST_IDS } from '../../constants/testIds';

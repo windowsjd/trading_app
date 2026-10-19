@@ -100,3 +100,23 @@ not. Device checks (3-button/gesture navigation, iOS) remain to be done.
 and total rows (`order-summary-amounts`), 보유종목과 수익률 at the 내 보유
 figures (`order-holding-figures`): small enough for the guide card to sit beside
 them at 320px with 2x text.
+
+## 2026-10-20 — device check for the bottom bar
+
+The bar's code is unchanged: no defect was found in `8 + insets.bottom` (the
+root provider's `navigationBars()` inset under edge-to-edge), and `content`
+(`flex: 1`, `minHeight: 0`) cannot push the bar down. What was missing is a way
+to tell which build a device runs (every preview APK is 1.0 / 1) and to measure
+the bar against the system navigation bar on the device:
+
+- EAS builds are stamped (`app.config.js` → `extra.build`): MY › 설정 › 앱 정보
+  shows `빌드 <commit> · <profile>`; anything else shows `개발 빌드`.
+- With the screen open on a USB-debugging device:
+  `node scripts/android-layout-check.cjs --adb <adb or adb.exe> --screenshot out.png`
+  prints the navigation bar frame (`dumpsys window`), each action's clickable
+  bounds (`uiautomator`), the gap in px/dp, and — from the bar's padding under
+  the actions — the bottom inset the app applied, with a diagnosis (clear /
+  no inset / inset smaller than the bar / screen past the display). Exit 0
+  clear, 1 overlap, 2 nothing to compare. Run it in 3-button and gesture mode.
+
+Android native verification is still NOT_RUN (no device or emulator here).

@@ -8,10 +8,16 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const flatten = (style) => Array.isArray(style) ? Object.assign({}, ...style.map(flatten)) : style || {};
 
 function interactionHarness(platform = 'android') {
-  const h = { reduced: false, animations: [], loops: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200] };
+  const h = { reduced: false, animations: [], loops: [], measures: [], delayedMeasure: false, bounds: [0, 0, 200, 60, 100, 200],
+    // `{ size: [w, h], delayed? }`: the ink layer (the hidden View with onLayout) answers measure —
+    // at once like Fabric, or queued in `inkMeasures` like web. Null: no measurable layer.
+    inkLayer: null, inkMeasures: [],
+    // Every setValue in call order: on Android each one reaches the UI thread as its own batch.
+    sets: [] };
   class Value {
     constructor(value) { this.value = value; this.listeners = new Map(); this.listenerId = 0; }
     setValue(value) {
+      h.sets.push([this, value]);
       this.stopAnimation(); this.value = value;
       this.listeners.forEach((callback) => callback({ value }));
     }
@@ -63,6 +69,11 @@ function interactionHarness(platform = 'android') {
     let renderer;
     act(() => { renderer = create(element, { createNodeMock: (node) => node.type === 'Pressable' ? {
       measure: (callback) => { if (h.delayedMeasure) h.measures.push(callback); else callback(...h.bounds); },
+    } : h.inkLayer && node.type === 'View' && node.props.pointerEvents === 'none' && typeof node.props.onLayout === 'function' ? {
+      measure: (callback) => {
+        const answer = () => callback(0, 0, ...h.inkLayer.size, 100, 200);
+        if (h.inkLayer.delayed) h.inkMeasures.push(answer); else answer();
+      },
     } : null }); });
     return renderer;
   };

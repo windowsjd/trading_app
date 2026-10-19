@@ -5,7 +5,6 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   ScrollView,
   Pressable,
@@ -14,6 +13,9 @@ import {
   type AppStateStatus,
 } from '../../theme/native';
 import ActionPressable from '../../components/common/ActionPressable';
+// Not React Native's SafeAreaView (iOS only): on Android the list's end would
+// sit under the navigation bar. The native header keeps the top.
+import { SafeAreaView } from '../../theme/safeArea';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import FuturesHistory from '../futures/FuturesHistory';
 import {
@@ -336,7 +338,7 @@ export default function TradeHistoryScreen({ route }: Props) {
   // view survives a change of the pinned subject.
   if (market === 'futures') {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.container}>
         <ScrollView testID="trade-history-futures-screen" contentContainerStyle={styles.content}>
           {accountLine}
           {marketSwitch}
@@ -385,7 +387,7 @@ export default function TradeHistoryScreen({ route }: Props) {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.container}>
       <FlatList
         refreshControl={refresh.refreshControl}
         testID={TEST_IDS.record.orderListScreen}

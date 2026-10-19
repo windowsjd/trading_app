@@ -118,7 +118,7 @@ function load(file, mocks) {
     if (name.endsWith('/tierBackgrounds')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (name.endsWith('/ProfileAvatar')) return { default: 'ProfileAvatar', __esModule: true };
     if (name.endsWith('/theme/native')) return withNativeDefaults(mocks['react-native']);
-    if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView' };
+    if (name.endsWith('/theme/safeArea')) return mocks['react-native-safe-area-context'] ?? { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) };
     if (name.endsWith('/theme/useReducedMotion')) return { useReducedMotion: () => false, useReducedMotionSettled: () => true };
     if (name.endsWith('/theme/appearance')) return { AppearanceProvider: ({ children }) => children, useAppearance: () => ({ preference: 'system', financialPreference: 'red_blue', financialColors: require('../src/theme/financialColors.ts').getFinancialColors('light'), mode: 'light', colors: { screen: '#fff', text: '#111', border: '#ddd', ...LIGHT_TONES }, setPreference() {} }) };
     // Interaction animation is a native boundary here; its real component has
@@ -139,6 +139,8 @@ function load(file, mocks) {
     // The ranking tab's 순위 안내 hook shares the screen's ranking transport.
     if (name.endsWith('/useRankingInsights')) return load(resolve(dirname(file), name + '.ts'), mocks);
     if (file.includes('/features/ranking/') && name === './api') return mocks['../../features/ranking/api'] ?? load(resolve(dirname(file), 'api.ts'), mocks);
+    // Expo's native constants (the embedded app config): empty unless a test passes its own.
+    if (name === 'expo-constants') return { __esModule: true, default: { expoConfig: { extra: {} } } };
     if (name.startsWith('.')) {
       const tsx = resolve(dirname(file), name + '.tsx');
       if (existsSync(tsx)) return load(tsx, mocks);

@@ -35,6 +35,8 @@ import ErrorState from '../../components/states/ErrorState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import NotificationSettingsSection from '../../features/notifications/NotificationSettingsSection';
 import { LOGO_DEV_KEY } from '../../features/market/assetLogoSource';
+import Constants from 'expo-constants';
+import { describeBuild } from '../../utils/buildInfo';
 
 type Props = NativeStackScreenProps<MyStackParamList, 'Settings'>;
 
@@ -338,6 +340,8 @@ export default function SettingsScreen({ navigation }: Props) {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>앱 정보</Text>
           <Text style={styles.helper}>앱 버전 0.1.0</Text>
+          {/* Which build this is (EAS commit stamp, app.config.js): every preview APK reports the same version. */}
+          <Text testID="settings-build" style={styles.helper} selectable>{describeBuild(Constants.expoConfig?.extra?.build)}</Text>
           {/* The provider's attribution, required while stock logos come from it (free plan). */}
           {LOGO_DEV_KEY ? (
             <ActionPressable testID="settings-logo-attribution" accessibilityRole="link" style={styles.attribution}

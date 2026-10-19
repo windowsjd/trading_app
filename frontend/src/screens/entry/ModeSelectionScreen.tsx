@@ -2,12 +2,14 @@ import BeginnerAccountEntry from '../../components/tradingAccount/BeginnerAccoun
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from '../../theme/native';
+// Not React Native's SafeAreaView: it pads on iOS only, and Android draws this
+// headerless root screen edge to edge under the status and navigation bars.
+import { SafeAreaView } from '../../theme/safeArea';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useQuery } from '@tanstack/react-query';
 
@@ -129,7 +131,7 @@ export default function ModeSelectionScreen({
   const generalOption = model.general;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.content}
         testID={TEST_IDS.modeSelection.screen}
