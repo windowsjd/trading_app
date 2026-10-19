@@ -16,7 +16,7 @@ final signup (`201`). Bodies and responses use the existing success/data envelop
 | `/signup` | `{ email, nickname, password, verificationToken }` | Existing user/tokens envelope |
 | `/password/reset` | `{ email, password, verificationToken }` | `{ changed: true }` (no login tokens) |
 
-One challenge table stores both purposes, delivery status, attempts and a
+One challenge table stores all supported purposes, delivery status, attempts and a
 single-use proof hash. A separate small PostgreSQL rate bucket table stores IP
 budgets. No pending User, financial account or Refresh Session is created.
 Codes use crypto.randomInt, six zero-padded digits, HMAC-SHA256 with a dedicated
@@ -69,13 +69,37 @@ verifying the ingress topology and that clients cannot inject the trusted
 forwarding suffix. The default uses the socket IP and fails conservatively
 behind a proxy. Never blindly trust all X-Forwarded-For values.
 
-Retention: attach deletion of challenges older than 24 hours (compare expires_at
-to `timezone('UTC', clock_timestamp()) - interval '24 hours'`) and rate buckets
-expired for more than 24 hours to existing DB maintenance. Delete in bounded
-batches, e.g. 5,000 IDs per transaction. Never delete rows in the current send
-budget window. No new maintenance worker is provisioned by this change. These
-rows contain emails/digests, so leaving retention unconfigured grows storage
-and extends personal-data retention. This maintenance was not run in production.
+Retention (2026-10-19): the existing Auth maintenance timer invokes
+`EmailAuthCleanupService.runIfDue()` independently of profile storage config.
+Each instance attempts one batch per hour (first attempt at the existing 23-second
+startup phase). A PostgreSQL transaction advisory try-lock avoids concurrent
+passes; row locks use SKIP LOCKED. One transaction deletes at most 500 challenges
+and 500 IP buckets, with 100ms lock timeout, 2s statement timeout and 5s transaction
+limit. Both code expiry and any proof expiry must be more than 24 hours old;
+rate buckets must have expired more than 24 hours ago. Predicates are rechecked
+when deleting, so a renewed budget is preserved. Only these two tables are
+changed. Failure is caught and retried on the next minute tick, without stopping
+profile cleanup or authentication. Fixed events and counts use the existing Nest
+logger; no new table, enum, migration, worker service, queue or external cron.
+No cleanup was executed against production during implementation.
+
+Delivery diagnostics (2026-10-19): fixed `auth_email_delivery` events distinguish
+`accepted`, `rejected`, `timeout`, and `network_error`. Acceptance means Resend
+HTTP acceptance, never inbox receipt. Ineligible accounts skip send entirely and
+produce no acceptance event. Configuration emits `auth_email_configuration`
+with `disabled` or `invalid`; public configuration errors stay sanitized 503s
+and startup validation still rejects invalid configuration. No provider response
+body, exception message, email, code, proof, key, header, or IP enters these events.
+Logging exceptions are swallowed without changing delivery/verification outcomes.
+
+The provider timeout stays 4s, response padding stays 5–5.2s minimum (DB/network
+work can exceed this), and the common frontend timeout stays 10s. Requests are
+single-flight, without automatic retries. The UI keeps the initial-send action
+only until a successful generic request response, then uses verify/resend actions.
+A resend attempt immediately discards proof and blocks reuse of its previous code,
+including on response loss; a conservative local 60s cooldown complements the
+server's authoritative limits. Failed initial requests can be retried. Expired
+or server-rejected proofs return to resend, never permit final completion.
 
 Errors: `EMAIL_CODE_INVALID`, `EMAIL_CODE_EXPIRED`, `EMAIL_CODE_EXHAUSTED`,
 `EMAIL_VERIFICATION_REQUIRED` (missing/invalid/used/expired proof),

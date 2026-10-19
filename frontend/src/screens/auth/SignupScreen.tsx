@@ -107,7 +107,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     onError: (error: unknown) => {
       if (error instanceof SessionSupersededError) return;
       const code = getApiErrorCode(error);
-      if (code === 'EMAIL_VERIFICATION_REQUIRED') verification.clear();
+      if (code === 'EMAIL_VERIFICATION_REQUIRED') verification.invalidate();
       setBlockedAuthState(null);
       setSubmitError(
         isAuthUserInactiveError(code)
@@ -128,7 +128,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     return 'auth_idle';
   }, [signupMutation.isPending, fieldError, blockedAuthState, submitError]);
 
-  const submitDisabled = signupMutation.isPending || verification.busy || Boolean(verification.challenge && !verification.verificationToken && !verification.proofExpired);
+  const submitDisabled = signupMutation.isPending || verification.busy;
 
   const onSubmit = () => {
     if (inFlight.current || signupMutation.isPending || verification.busy) return;
@@ -157,6 +157,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
     }
 
     if (!verification.verificationToken) {
+      if (verification.hasRequested) return;
       void verification.request();
       return;
     }
@@ -231,7 +232,7 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
 
       <EmailVerificationPanel verification={verification} scroll={scroll} disabled={signupMutation.isPending || verification.busy} />
 
-      <AuthSubmitBox scroll={scroll}>
+      {!verification.hasRequested || verification.verificationToken ? <AuthSubmitBox scroll={scroll}>
         <ActionPressable
           testID={TEST_IDS.auth.signupSubmit}
           primary
@@ -244,14 +245,13 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
           accessibilityState={{ disabled: submitDisabled, busy: signupMutation.isPending || verification.busy }}
         >
           <View style={styles.primaryButtonLabel}>
-            {signupMutation.isPending ? (
-              <WhaleLoader size={22} tone="onAction" accessibilityLabel="가입 중" testID="signup-submit-loading" />
-            ) : (
-              <Text style={styles.primaryButtonText}>{verification.busy ? '처리 중…' : verification.verificationToken ? '회원가입' : '인증번호 발송'}</Text>
-            )}
+            <Text style={[styles.primaryButtonText, (signupMutation.isPending || verification.busy) && { opacity: 0 }]}>{verification.verificationToken ? '회원가입' : '인증번호 발송'}</Text>
+            {signupMutation.isPending || verification.busy ? <View style={{ position: 'absolute' }}>
+              <WhaleLoader size={22} tone="onAction" accessibilityLabel={signupMutation.isPending ? '가입 중' : '인증번호 발송 처리 중'} testID="signup-submit-loading" />
+            </View> : null}
           </View>
         </ActionPressable>
-      </AuthSubmitBox>
+      </AuthSubmitBox> : null}
 
       <ActionPressable
         style={styles.secondaryButton}
@@ -294,6 +294,8 @@ const styles = StyleSheet.create({
     color: semantic.onAccent,
     fontSize: 16,
     fontWeight: '700',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   secondaryButton: {
     borderWidth: 1,

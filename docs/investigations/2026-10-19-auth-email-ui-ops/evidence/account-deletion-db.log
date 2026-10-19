@@ -1,0 +1,29 @@
+(node:843203) DeprecationWarning: Calling client.query() when the client is already executing a query is deprecated and will be removed in pg@9.0. Use async/await or an external async flow control mechanism instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+PASS AccountDeletion full member fixture covers every account-scoped domain
+PASS AccountDeletion app deletion removes every personal and virtual-trading row in one commit
+PASS AccountDeletion other members, shared market data and seasons are unchanged
+PASS AccountDeletion settled final result is kept unchanged under an unlinkable anonymous placeholder
+PASS AccountDeletion settlement replay and final tier job keep every confirmed rank and tier
+PASS AccountDeletion old tokens, login and admin restore cannot bring the account back
+PASS AccountDeletion a late trading command for the deleted account fails without writes
+PASS AccountDeletion the same email and nickname re-register as a new member with nothing restored
+PASS AccountDeletion a member without trading accounts is deleted from the web flow
+PASS AccountDeletion a beginner account with quest acknowledgements is deleted
+PASS AccountDeletion wrong password, missing confirmation or key change nothing
+PASS AccountDeletion operators, former operators and inactive members are refused
+PASS AccountDeletion unknown emails get the same response and no mail
+PASS AccountDeletion signup/reset/other-email proofs cannot delete, deletion proofs cannot reset
+PASS AccountDeletion expired proofs and proofs issued before a password change are refused
+PASS AccountDeletion web deletion is single use, replayable by its request key and status is server-side
+PASS AccountDeletion concurrent deletion requests commit once
+PASS AccountDeletion a deletion waits for an in-flight trade and removes its committed rows
+PASS AccountDeletion token refresh racing the deletion leaves no usable session
+PASS AccountDeletion a deletion between valuation and final write fails that settlement; the rerun ranks the rest
+PASS AccountDeletion a deletion queued behind settlement keeps the new final result intact
+PASS AccountDeletion an upload overlapping the deletion never survives it and the receipt waits for it
+PASS AccountDeletion a storage outage leaves the receipt pending until the worker removes the object
+PASS AccountDeletion a database error mid-purge rolls back completely and a retry succeeds
+PASS AccountDeletion a connection lost mid-transaction leaves the account intact and retryable
+PASS AccountDeletion no password, token, proof, request key or member id was logged
+account deletion PostgreSQL integration ok (26 checks)

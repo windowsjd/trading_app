@@ -50,7 +50,10 @@ for (const kind of ['Login', 'Signup'] as const) it(`${kind}: one request per ta
   assert.equal(busy.props.disabled, true);
   assert.equal(busy.props.accessibilityState.busy, true);
   assert.equal(busy.findAll((n: any) => n.type === 'WhaleLoader').length, 1);
-  assert.equal(busy.findAll((n: any) => n.type === 'Text').length, 0, 'the label is replaced in the same-size box');
+  const flatten = (value: any): any => Array.isArray(value) ? Object.assign({}, ...value.map(flatten)) : value ?? {};
+  const visibleText = busy.findAll((n: any) => n.type === 'Text' && flatten(n.props.style).opacity !== 0);
+  assert.equal(visibleText.length, 0, 'the whale replaces the visible label while an invisible label can reserve its scaled height');
+  if (kind === 'Signup') assert.equal(busy.findAll((n: any) => n.type === 'Text' && flatten(n.props.style).opacity === 0).length, 1);
   h.pending = false;
   act(() => { h.options.onSettled(); renderer.update(render()); });
   act(() => submit().props.onPress());

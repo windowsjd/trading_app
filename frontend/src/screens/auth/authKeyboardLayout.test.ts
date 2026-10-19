@@ -12,7 +12,7 @@ const { load } = require('../../../test/ledgerTestHarness.cjs');
 type Rect = [number, number, number, number];
 
 /** Auth screens over minimal native hosts, with measurable fields and a scroll view. */
-function authHarness(kind: 'Login' | 'Signup', os: 'android' | 'ios') {
+function authHarness(kind: 'Login' | 'Signup' | 'PasswordReset', os: 'android' | 'ios', verifying = false) {
   const h: any = { listeners: new Map(), scrolls: [] as unknown[], frames: new Map(), next: 0, rects: {} as Record<string, Rect> };
   const previousRaf = globalThis.requestAnimationFrame, previousCancel = globalThis.cancelAnimationFrame;
   globalThis.requestAnimationFrame = ((cb: FrameRequestCallback) => { h.frames.set(++h.next, cb); return h.next; }) as typeof requestAnimationFrame;
@@ -34,7 +34,7 @@ function authHarness(kind: 'Login' | 'Signup', os: 'android' | 'ios') {
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 48, left: 0, right: 0 }) },
     '@tanstack/react-query': { useQueryClient: () => ({}), useMutation: () => ({ isPending: false, mutate: () => {} }) },
     '../../features/auth/useEnterApp': { useEnterApp: () => async () => {} },
-    '../../features/auth/useEmailVerification': { useEmailVerification: () => ({ busy: false, challenge: null, verificationToken: null }) },
+    '../../features/auth/useEmailVerification': { useEmailVerification: () => ({ busy: false, hasRequested: verifying, challenge: verifying ? { message: '발송 안내' } : null, verificationToken: null, code: '', secondsLeft: 600, resendSeconds: 0 }) },
       '../../features/auth/api': { login: async () => ({}), signup: async () => ({}) },
     '../../features/auth/session': { authenticateSession: async () => ({}), endSession: async () => {} },
     '../../services/api/sessionOwnership': { isCurrentSession: () => true, SessionSupersededError: class extends Error {} },
@@ -112,5 +112,20 @@ for (const os of ['android', 'ios'] as const) it(`${os}: sign-up pads for the ke
     // Closing the keyboard returns the layout: Android switches the padding off.
     h.emit(os === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', { endCoordinates: { screenY: 724, height: 0 } });
     assert.equal(h.host('KeyboardAvoidingView').props.enabled, os === 'ios');
+  } finally { act(() => h.renderer.unmount()); h.restore(); }
+});
+
+
+for (const os of ['android', 'ios'] as const) for (const kind of ['Signup', 'PasswordReset'] as const) it(`${os} ${kind}: the code field follows verify/resend controls above the keyboard without an initial-send button`, () => {
+  const h = authHarness(kind, os, true);
+  try {
+    h.rects = { 'email-verification-code': [24, 470, 272, 52], 'email-verification-actions': [24, 600, 272, 112] };
+    const sendId = kind === 'Signup' ? 'auth-signup-submit' : 'password-reset-submit';
+    assert.equal(h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === sendId).length, 0);
+    act(() => h.input('email-verification-code').props.onFocus?.({}));
+    h.emit('keyboardDidShow', { endCoordinates: { screenY: 430, height: 414 } });
+    if (os === 'ios') h.emit('keyboardWillShow', { endCoordinates: { screenY: 430, height: 414 } });
+    h.flushFrames();
+    assert.deepEqual(h.scrolls.at(-1), { y: 294, animated: false });
   } finally { act(() => h.renderer.unmount()); h.restore(); }
 });

@@ -8,6 +8,7 @@ import { OpsJobLockService } from '../ops/ops-job-lock.service';
 import { OpsJobRunService } from '../ops/ops-job-run.service';
 import { ProfileImageCleanupService } from './profile-image-cleanup.service';
 import { ProfileImageStorageService } from './profile-image-storage.service';
+import { EmailAuthCleanupService } from './email-auth-cleanup.service';
 
 const LOCK_KEY = 'account_deletion_cleanup:current';
 const LOCK_TTL_SECONDS = 120;
@@ -17,11 +18,12 @@ const INTERVAL_MS = 60_000;
  * Retries managed profile image removals (docs/account-deletion-contract.md
  * §6): photos of deleted accounts, replaced/deleted photos and abandoned
  * uploads. Every minute one instance (Ops lease) processes due rows with
- * backoff; an idle tick only reads. It runs only when profile image storage
+ * backoff; an idle profile tick only reads. Profile cleanup runs only when storage
  * is configured — without it no managed object can exist or be removed, and
  * queued rows wait. A run is recorded only when there was work: `failed` if
  * a storage delete failed or a deletion is past its 7-day target. No object
- * key, user id or provider message is logged.
+ * key, user id or provider message is logged. The same timer also invokes
+ * bounded email retention hourly, independently of storage configuration.
  */
 @Injectable()
 export class ProfileImageCleanupWorker
@@ -37,10 +39,10 @@ export class ProfileImageCleanupWorker
     private readonly cleanups: ProfileImageCleanupService,
     private readonly locks: OpsJobLockService,
     private readonly runs: OpsJobRunService,
+    private readonly emailCleanup: EmailAuthCleanupService,
   ) {}
 
   onModuleInit() {
-    if (!this.storage.isConfigured()) return;
     const tick = () =>
       void this.tick().catch(() =>
         this.logger.error('PROFILE_IMAGE_CLEANUP_TICK_FAILED'),
@@ -60,6 +62,8 @@ export class ProfileImageCleanupWorker
   }
 
   async tick() {
+    // Independent of storage configuration and failures in profile cleanup.
+    await this.emailCleanup.runIfDue();
     if (this.running || !this.storage.isConfigured()) return;
     this.running = true;
     let ownerId: string | undefined;

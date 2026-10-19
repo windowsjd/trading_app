@@ -1,9 +1,11 @@
+import type { StyleProp, TextStyle } from 'react-native';
 import React, { useRef } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
   TextInput,
+  Text,
   View,
   type TextInputProps,
 } from '../../theme/native';
@@ -78,6 +80,14 @@ export function AuthField({ scroll, onFocus, onBlur, ...props }: TextInputProps 
 /** The submit button's box, measured with the focused field. */
 export function AuthSubmitBox({ scroll, children }: { scroll: AuthFormScroll; children: React.ReactNode }) {
   return <View ref={scroll.submitRef} collapsable={false}>{children}</View>;
+}
+
+/** Keep the original wrapping/height while the request is pending. */
+export function AuthActionLabel({ busy, label, textStyle }: { busy: boolean; label: string; textStyle: StyleProp<TextStyle> }) {
+  return <View style={{ alignSelf: 'stretch', alignItems: 'center', justifyContent: 'center' }}>
+    <Text style={[textStyle, busy && { opacity: 0 }]} accessibilityElementsHidden={busy} importantForAccessibility={busy ? 'no-hide-descendants' : 'auto'}>{label}</Text>
+    {busy ? <Text style={[textStyle, { position: 'absolute' }]} accessibilityLiveRegion="polite">처리 중…</Text> : null}
+  </View>;
 }
 
 // Plain objects: the auth screen tests load this with minimal native mocks.

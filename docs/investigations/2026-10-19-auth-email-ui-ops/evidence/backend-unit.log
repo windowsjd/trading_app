@@ -1,0 +1,6 @@
+
+Test Suites: 6 passed, 6 total
+Tests:       84 passed, 84 total
+Snapshots:   0 total
+Time:        6.007 s
+Ran all test suites within paths "src/auth/auth-email.service.spec.ts", "src/auth/email-verification.service.spec.ts", "src/auth/auth.service.spec.ts", "src/auth/profile-image-cleanup.service.spec.ts", "src/auth/account-deletion.service.spec.ts", "src/auth/account-deletion.purge.spec.ts".

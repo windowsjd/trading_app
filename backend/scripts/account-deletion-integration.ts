@@ -47,6 +47,7 @@ import {
 import { AccountDeletionService } from '../src/auth/account-deletion.service';
 import { AuthService } from '../src/auth/auth.service';
 import { ProfileImageCleanupService } from '../src/auth/profile-image-cleanup.service';
+import { EmailAuthCleanupService } from '../src/auth/email-auth-cleanup.service';
 import { ProfileImageCleanupWorker } from '../src/auth/profile-image-cleanup.worker';
 import { ProfileImageService } from '../src/auth/profile-image.service';
 import { ProfileImageStorageService } from '../src/auth/profile-image-storage.service';
@@ -1983,6 +1984,7 @@ async function storageRaces() {
     cleanups,
     new OpsJobLockService(db),
     new OpsJobRunService(db),
+    new EmailAuthCleanupService(db),
   );
   await worker.tick();
   assert.equal(

@@ -7,6 +7,10 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { AuthService } from '../src/auth/auth.service';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
+import {
+  EmailAuthCleanupService,
+  EMAIL_AUTH_CLEANUP_BATCH,
+} from '../src/auth/email-auth-cleanup.service';
 import { EmailVerificationService } from '../src/auth/email-verification.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { authEmailFixture } from './lib/auth-email-fixture';
@@ -94,6 +98,178 @@ async function user(
       portfolioPublic: false,
     },
   });
+}
+
+async function retentionChecks() {
+  const cleanup = new EmailAuthCleanupService(db);
+  const address = email('retention');
+  const prefix = `retention-${suffix}-`;
+  const old = new Date('1900-01-01T00:00:00.000Z'),
+    now = Date.now();
+  const fresh = new Date(now + 600_000),
+    recent = new Date(now - 12 * 3_600_000);
+  const expired = Array.from(
+    { length: EMAIL_AUTH_CLEANUP_BATCH + 7 },
+    (_, i) => ({
+      id: `${prefix}old-${i}`,
+      email: address,
+      purpose: 'signup' as const,
+      codeHash: 'fixture-digest',
+      expiresAt: old,
+      proofExpiresAt: old,
+    }),
+  );
+  const keep = [
+    { id: `${prefix}code`, expiresAt: fresh, proofExpiresAt: null },
+    { id: `${prefix}proof`, expiresAt: old, proofExpiresAt: fresh },
+    { id: `${prefix}proof-grace`, expiresAt: old, proofExpiresAt: recent },
+    { id: `${prefix}code-grace`, expiresAt: recent, proofExpiresAt: null },
+  ];
+  await db.emailAuthChallenge.createMany({
+    data: [
+      ...expired,
+      ...keep.map((row) => ({
+        ...row,
+        email: address,
+        purpose: 'signup' as const,
+        codeHash: 'fixture-digest',
+      })),
+    ],
+  });
+  const bucketKeys = [
+    ...expired.map((_, i) => `${prefix}bucket-${i}`),
+    `${prefix}active`,
+    `${prefix}recent`,
+    `${prefix}renewed`,
+  ];
+  await db.emailAuthRateBucket.createMany({
+    data: bucketKeys.map((key) => ({
+      key,
+      hits: 30,
+      expiresAt: key.endsWith('active')
+        ? fresh
+        : key.endsWith('recent')
+          ? recent
+          : old,
+    })),
+  });
+  const usersBefore = await db.user.count(),
+    sessionsBefore = await db.refreshTokenSession.count(),
+    walletsBefore = await db.cashWallet.count();
+  try {
+    // A competing instance holding the advisory lock skips the whole pass.
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('email-auth-retention', 0))::text`;
+      assert.equal((await cleanup.deleteBatch()) === null, true);
+    });
+    // A rate-budget renewal in flight is skipped and its new expiry is retained.
+    await db.$transaction(async (tx) => {
+      await tx.emailAuthRateBucket.update({
+        where: { key: `${prefix}renewed` },
+        data: { expiresAt: fresh },
+      });
+      const batch = await cleanup.deleteBatch();
+      assert.equal(batch?.challenges, EMAIL_AUTH_CLEANUP_BATCH);
+      assert.equal(batch?.buckets, EMAIL_AUTH_CLEANUP_BATCH);
+    });
+    assert.equal(
+      await db.emailAuthChallenge.count({
+        where: { id: { in: expired.map((row) => row.id) } },
+      }),
+      7,
+    );
+    const passes = await Promise.all([
+      cleanup.deleteBatch(),
+      new EmailAuthCleanupService(db).deleteBatch(),
+    ]);
+    for (const pass of passes)
+      if (pass) {
+        assert.ok(pass.challenges <= EMAIL_AUTH_CLEANUP_BATCH);
+        assert.ok(pass.buckets <= EMAIL_AUTH_CLEANUP_BATCH);
+      }
+    assert.equal(
+      await db.emailAuthChallenge.count({
+        where: { id: { in: expired.map((row) => row.id) } },
+      }),
+      0,
+    );
+    assert.equal(
+      await db.emailAuthChallenge.count({
+        where: { id: { in: keep.map((row) => row.id) } },
+      }),
+      keep.length,
+    );
+    assert.equal(
+      await db.emailAuthRateBucket.count({
+        where: { key: { in: bucketKeys } },
+      }),
+      3,
+    );
+    assert.equal(
+      (
+        await db.emailAuthRateBucket.findUniqueOrThrow({
+          where: { key: `${prefix}renewed` },
+        })
+      ).hits,
+      30,
+    );
+    assert.equal(await db.user.count(), usersBefore);
+    assert.equal(await db.refreshTokenSession.count(), sessionsBefore);
+    assert.equal(await db.cashWallet.count(), walletsBefore);
+    // A locked old challenge must not hold up a batch or be deleted.
+    await db.emailAuthChallenge.create({
+      data: { ...expired[0], id: `${prefix}locked` },
+    });
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM email_auth_challenges WHERE id = ${`${prefix}locked`} FOR UPDATE`;
+      await cleanup.deleteBatch();
+      assert.equal(
+        await tx.emailAuthChallenge.count({ where: { id: `${prefix}locked` } }),
+        1,
+      );
+    });
+    // Failure after the first table rolls back both tables; the request path is unaffected.
+    const execute = db.$transaction.bind(db);
+    const broken = {
+      $transaction: (work: (tx: any) => Promise<unknown>, options: any) =>
+        execute(async (tx) => {
+          const wrapped = new Proxy(tx, {
+            get(target, property) {
+              if (property === '$executeRaw')
+                return async (
+                  strings: TemplateStringsArray,
+                  ...values: unknown[]
+                ) => {
+                  if (
+                    strings
+                      .join('')
+                      .includes('DELETE FROM email_auth_rate_buckets')
+                  )
+                    throw new Error('fixture DB failure');
+                  return tx.$executeRaw(strings, ...values);
+                };
+              return Reflect.get(target, property);
+            },
+          });
+          return work(wrapped);
+        }, options),
+    };
+    await assert.rejects(
+      new EmailAuthCleanupService(broken as never).deleteBatch(),
+      /fixture DB failure/,
+    );
+    assert.equal(
+      await db.emailAuthChallenge.count({ where: { id: `${prefix}locked` } }),
+      1,
+    );
+    await cleanup.deleteBatch();
+    checks += 10;
+  } finally {
+    await db.emailAuthChallenge.deleteMany({ where: { email: address } });
+    await db.emailAuthRateBucket.deleteMany({
+      where: { key: { in: bucketKeys } },
+    });
+  }
 }
 
 async function main() {
@@ -553,6 +729,7 @@ async function main() {
       await replica.limit(action, metadata);
       await db.emailAuthRateBucket.delete({ where: { key } });
     }
+    await retentionChecks();
     console.log(
       `auth email PostgreSQL integration ok (${checks} grouped checks)`,
     );

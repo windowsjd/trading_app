@@ -1,4 +1,5 @@
 import { AuthEmailService } from './auth-email.service';
+import { EmailAuthCleanupService } from './email-auth-cleanup.service';
 import { EmailVerificationService } from './email-verification.service';
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
@@ -27,6 +28,7 @@ import { ProfileImageStorageService } from './profile-image-storage.service';
   providers: [
     AuthService,
     AuthEmailService,
+    EmailAuthCleanupService,
     EmailVerificationService,
     ProfileImageService,
     ProfileImageStorageService,

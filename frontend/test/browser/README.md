@@ -546,3 +546,15 @@ Fixture switches: `krx=1`, `krxClosed=1`, `krxPrice=<n>`, `us=1`, `stock=1`
 `longName=1`. `BEGINNER_CHROMIUM` or `BROWSER_EXECUTABLE_PATH` selects Chromium,
 `STOCK_ORDER_BROWSER_OUTPUT` the screenshots/report.json (default
 `/tmp/trading-stock-order-browser`), `STOCK_ORDER_QUICK=1` two combinations only.
+
+
+이메일 인증 UI·운영 보완(2026-10-19)은 `authEmailBrowser.cjs`를 사용한다.
+기존 외부 esbuild/Playwright 도구를 `NODE_PATH`, Chromium을
+`BROWSER_EXECUTABLE_PATH`, 필요한 공유 라이브러리를 `LD_LIBRARY_PATH`로
+지정한다. `AUTH_EMAIL_FONT`는 로컬 한글 TTF 경로이며,
+`AUTH_EMAIL_BROWSER_OUTPUT`은 결과 디렉터리(기본 `/tmp/trading-auth-email-ui`)다.
+실제 Login/Signup/PasswordReset·이메일 Hook·버튼·테마와 모의 transport를
+사용한다. 320/375/430px × Light/Dark × 1/2배에서 228 사례를 확인한다.
+최초·코드·인증 완료·만료·발송/재발송 대기·응답 유실·긴 오류·420px 모의
+키보드 높이, 동일 보조 버튼 크기·정렬, 대기 중 높이 불변을 검증한다.
+모든 외부 요청은 차단한다. OS FontScale/실기기 IME는 별도 QA다.

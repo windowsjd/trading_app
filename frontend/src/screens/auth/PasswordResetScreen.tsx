@@ -8,7 +8,7 @@ import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import { Text, StyleSheet } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
 import ActionPressable from '../../components/common/ActionPressable';
-import AuthFormLayout, { AuthField, AuthSubmitBox } from './AuthFormLayout';
+import AuthFormLayout, { AuthActionLabel, AuthField, AuthSubmitBox } from './AuthFormLayout';
 import EmailVerificationPanel from './EmailVerificationPanel';
 
 export default function PasswordResetScreen({ route, navigation }: PasswordResetScreenProps) {
@@ -40,17 +40,17 @@ export default function PasswordResetScreen({ route, navigation }: PasswordReset
     onError: (cause: unknown) => {
       if (!mounted.current) return;
       setError(cause);
-      if (getApiErrorCode(cause) === 'EMAIL_VERIFICATION_REQUIRED') verification.clear();
+      if (getApiErrorCode(cause) === 'EMAIL_VERIFICATION_REQUIRED') verification.invalidate();
     },
     onSettled: () => { fence.current = false; },
   });
   const busy = mutation.isPending || verification.busy;
-  const submitDisabled = busy || Boolean(verification.challenge && !verification.verificationToken && !verification.proofExpired);
+  const submitDisabled = busy;
   const submit = () => {
     if (fence.current || busy) return;
     setError(null); setFieldError(null);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { setFieldError('이메일 형식을 확인해주세요.'); return; }
-    if (!verification.verificationToken) { void verification.request(); return; }
+    if (!verification.verificationToken) { if (!verification.hasRequested) void verification.request(); return; }
     if (password.length < 8) { setFieldError('비밀번호는 8자 이상이어야 합니다.'); return; }
     if (password !== confirmPassword) { setFieldError('비밀번호 확인이 일치하지 않습니다.'); return; }
     fence.current = true;
@@ -71,13 +71,13 @@ export default function PasswordResetScreen({ route, navigation }: PasswordReset
           onChangeText={setConfirmPassword} editable={!busy} secureTextEntry autoComplete="new-password" placeholder="새 비밀번호 확인" style={styles.input} />
       </> : null}
       {error || fieldError ? <Text accessibilityRole="alert" style={styles.error}>{fieldError ?? getApiErrorDisplayMessage(error)}</Text> : null}
-      <AuthSubmitBox scroll={scroll}>
+      {!verification.hasRequested || verification.verificationToken ? <AuthSubmitBox scroll={scroll}>
         <ActionPressable testID="password-reset-submit" primary onPress={submit}
           disabled={submitDisabled}
           style={styles.button} accessibilityRole="button" accessibilityState={{ busy, disabled: submitDisabled }}>
-          <Text style={styles.buttonText}>{busy ? '처리 중…' : verification.verificationToken ? '비밀번호 변경' : '인증번호 발송'}</Text>
+          <AuthActionLabel busy={busy} label={verification.verificationToken ? '비밀번호 변경' : '인증번호 발송'} textStyle={styles.buttonText} />
         </ActionPressable>
-      </AuthSubmitBox>
+      </AuthSubmitBox> : null}
     </>}
     <ActionPressable testID="password-reset-login" onPress={() => navigation.replace('Login')} disabled={busy}
       style={styles.back} accessibilityRole="button"><Text style={styles.backText}>로그인으로 돌아가기</Text></ActionPressable>

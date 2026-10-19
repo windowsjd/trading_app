@@ -1,0 +1,259 @@
+{
+  "checked": 228,
+  "problems": [],
+  "errors": [],
+  "measurements": [
+    {
+      "label": "320/light/1x",
+      "login": {
+        "x": 24,
+        "y": 443.5,
+        "width": 272,
+        "height": 50
+      },
+      "left": {
+        "x": 24,
+        "y": 505.5,
+        "width": 130,
+        "height": 49
+      },
+      "right": {
+        "x": 166,
+        "y": 505.5,
+        "width": 130,
+        "height": 49
+      }
+    },
+    {
+      "label": "320/light/2x",
+      "login": {
+        "x": 24,
+        "y": 475.5,
+        "width": 272,
+        "height": 65
+      },
+      "left": {
+        "x": 24,
+        "y": 552.5,
+        "width": 130,
+        "height": 104
+      },
+      "right": {
+        "x": 166,
+        "y": 552.5,
+        "width": 130,
+        "height": 104
+      }
+    },
+    {
+      "label": "320/dark/1x",
+      "login": {
+        "x": 24,
+        "y": 443.5,
+        "width": 272,
+        "height": 50
+      },
+      "left": {
+        "x": 24,
+        "y": 505.5,
+        "width": 130,
+        "height": 49
+      },
+      "right": {
+        "x": 166,
+        "y": 505.5,
+        "width": 130,
+        "height": 49
+      }
+    },
+    {
+      "label": "320/dark/2x",
+      "login": {
+        "x": 24,
+        "y": 475.5,
+        "width": 272,
+        "height": 65
+      },
+      "left": {
+        "x": 24,
+        "y": 552.5,
+        "width": 130,
+        "height": 104
+      },
+      "right": {
+        "x": 166,
+        "y": 552.5,
+        "width": 130,
+        "height": 104
+      }
+    },
+    {
+      "label": "375/light/1x",
+      "login": {
+        "x": 24,
+        "y": 443.5,
+        "width": 327,
+        "height": 50
+      },
+      "left": {
+        "x": 24,
+        "y": 505.5,
+        "width": 157.5,
+        "height": 49
+      },
+      "right": {
+        "x": 193.5,
+        "y": 505.5,
+        "width": 157.5,
+        "height": 49
+      }
+    },
+    {
+      "label": "375/light/2x",
+      "login": {
+        "x": 24,
+        "y": 475.5,
+        "width": 327,
+        "height": 65
+      },
+      "left": {
+        "x": 24,
+        "y": 552.5,
+        "width": 157.5,
+        "height": 104
+      },
+      "right": {
+        "x": 193.5,
+        "y": 552.5,
+        "width": 157.5,
+        "height": 104
+      }
+    },
+    {
+      "label": "375/dark/1x",
+      "login": {
+        "x": 24,
+        "y": 443.5,
+        "width": 327,
+        "height": 50
+      },
+      "left": {
+        "x": 24,
+        "y": 505.5,
+        "width": 157.5,
+        "height": 49
+      },
+      "right": {
+        "x": 193.5,
+        "y": 505.5,
+        "width": 157.5,
+        "height": 49
+      }
+    },
+    {
+      "label": "375/dark/2x",
+      "login": {
+        "x": 24,
+        "y": 475.5,
+        "width": 327,
+        "height": 65
+      },
+      "left": {
+        "x": 24,
+        "y": 552.5,
+        "width": 157.5,
+        "height": 104
+      },
+      "right": {
+        "x": 193.5,
+        "y": 552.5,
+        "width": 157.5,
+        "height": 104
+      }
+    },
+    {
+      "label": "430/light/1x",
+      "login": {
+        "x": 24,
+        "y": 443.5,
+        "width": 382,
+        "height": 50
+      },
+      "left": {
+        "x": 24,
+        "y": 505.5,
+        "width": 185,
+        "height": 49
+      },
+      "right": {
+        "x": 221,
+        "y": 505.5,
+        "width": 185,
+        "height": 49
+      }
+    },
+    {
+      "label": "430/light/2x",
+      "login": {
+        "x": 24,
+        "y": 475.5,
+        "width": 382,
+        "height": 65
+      },
+      "left": {
+        "x": 24,
+        "y": 552.5,
+        "width": 185,
+        "height": 104
+      },
+      "right": {
+        "x": 221,
+        "y": 552.5,
+        "width": 185,
+        "height": 104
+      }
+    },
+    {
+      "label": "430/dark/1x",
+      "login": {
+        "x": 24,
+        "y": 443.5,
+        "width": 382,
+        "height": 50
+      },
+      "left": {
+        "x": 24,
+        "y": 505.5,
+        "width": 185,
+        "height": 49
+      },
+      "right": {
+        "x": 221,
+        "y": 505.5,
+        "width": 185,
+        "height": 49
+      }
+    },
+    {
+      "label": "430/dark/2x",
+      "login": {
+        "x": 24,
+        "y": 475.5,
+        "width": 382,
+        "height": 65
+      },
+      "left": {
+        "x": 24,
+        "y": 552.5,
+        "width": 185,
+        "height": 104
+      },
+      "right": {
+        "x": 221,
+        "y": 552.5,
+        "width": 185,
+        "height": 104
+      }
+    }
+  ]
+}

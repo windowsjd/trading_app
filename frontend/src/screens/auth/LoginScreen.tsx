@@ -206,22 +206,18 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         </ActionPressable>
       </AuthSubmitBox>
 
-      <ActionPressable
-        testID="auth-forgot-password"
-        style={styles.secondaryButton}
-        disabled={loginMutation.isPending}
-        accessibilityRole="button"
-        onPress={() => navigation.navigate('PasswordReset', { email: email.trim() })}
-      >
-        <Text style={styles.secondaryButtonText}>비밀번호를 잊어버리셨나요?</Text>
-      </ActionPressable>
-
-      <ActionPressable
-        style={styles.secondaryButton}
-        onPress={() => navigation.navigate('Signup')}
-      >
-        <Text style={styles.secondaryButtonText}>회원가입</Text>
-      </ActionPressable>
+      <View testID="auth-login-secondary-actions" style={styles.secondaryActions}>
+        <ActionPressable testID="auth-signup-link" style={styles.secondaryButton}
+          accessibilityRole="button"
+          onPress={() => navigation.navigate('Signup')}>
+          <Text style={styles.secondaryButtonText}>회원가입</Text>
+        </ActionPressable>
+        <ActionPressable testID="auth-forgot-password" style={styles.secondaryButton}
+          disabled={loginMutation.isPending} accessibilityRole="button"
+          onPress={() => navigation.navigate('PasswordReset', { email: email.trim() })}>
+          <Text style={styles.secondaryButtonText}>비밀번호 찾기</Text>
+        </ActionPressable>
+      </View>
     </AuthFormLayout>
   );
 }
@@ -257,7 +253,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  secondaryActions: { flexDirection: 'row', gap: 12, alignItems: 'stretch' },
   secondaryButton: {
+    flex: 1,
+    minWidth: 0,
+    justifyContent: 'center',
+    paddingHorizontal: 10,
     borderWidth: 1,
     borderColor: semantic.selected,
     borderRadius: 12,
@@ -265,6 +266,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: {
+    textAlign: 'center',
+    flexShrink: 1,
     color: semantic.text,
     fontSize: 16,
     fontWeight: '700',
