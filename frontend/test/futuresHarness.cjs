@@ -8,7 +8,11 @@ const { deferred } = require('./walletTransferHarness.cjs');
 const { conditionalFixture } = require('./conditionalFixtures.cjs');
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 function futuresHarness(options = {}) {
-  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], orderBookRequests: [], alerts: [], options, session: 1 };
+  const h = { accountId: options.accountId ?? 'A', routeAccountId: options.accountId ?? 'A', requests: [], reads: [], invalidations: [], navigation: [], orderBookRequests: [], alerts: [], options, session: 1,
+    // Screen focus (another screen in front when false) and the signed-in role (admin diagnostics).
+    focused: true, role: options.role ?? (options.diagnostics ? 'admin' : 'user'),
+    // The full-screen chart route's params (`screen: 'chart'`).
+    chart: { instrumentId: options.instrumentId ?? 'btc', symbol: 'BTCUSDT', displayPriceDecimals: 2 } };
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = client.invalidateQueries.bind(client);
   client.invalidateQueries = config => { h.invalidations.push(config?.queryKey ?? []); return invalidate(config); };
@@ -104,7 +108,8 @@ function futuresHarness(options = {}) {
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView', useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }) },
     '../../components/states/AdminDiagnosticPanel': { default: () => null, __esModule: true },
     './AdminDiagnosticPanel': { default: () => null, __esModule: true },
-    '@react-navigation/native': { useIsFocused: () => true }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
+    '@react-navigation/native': { useIsFocused: () => h.focused }, '@react-navigation/elements': { useHeaderHeight: () => 64 },
+    '../../features/auth/useAdminDiagnostics': { useAdminDiagnostics: () => h.role === 'admin' },
     '../../features/futures/api': api,
     '../../features/futures/tpSlApi': tpSlApi,
     '../../features/conditional/entryTpSlApi': entryTpSlApi,
@@ -146,11 +151,12 @@ function futuresHarness(options = {}) {
     delete mocks['../../components/states/AdminDiagnosticPanel'];
     delete mocks['./AdminDiagnosticPanel'];
     delete mocks['../../components/states/ErrorState'];
-    const me = { id: 'user-1', role: options.role ?? 'admin' };
+    const me = { id: 'user-1', role: h.role };
     mocks['../../features/me/api'] = { getMe: async () => me };
     client.setQueryData(['me'], me);
   }
-  const loaded = load(resolve(__dirname, options.screen === 'market' ? '../src/screens/market/FuturesMarketList.tsx' : '../src/screens/futures/FuturesScreen.tsx'), mocks);
+  const screenFile = { market: '../src/screens/market/FuturesMarketList.tsx', chart: '../src/screens/futures/FuturesChartScreen.tsx' }[options.screen] ?? '../src/screens/futures/FuturesScreen.tsx';
+  const loaded = load(resolve(__dirname, screenFile), mocks);
   // MarketScreen's composition: the controls (header card), then the rows.
   const screen = options.screen === 'market' ? (props) => {
     const market = loaded.useFuturesMarket({ ...props, active: true });
@@ -160,7 +166,8 @@ function futuresHarness(options = {}) {
   } : loaded.default;
   // The market list's sort/refresh are owned by MarketScreen; tests drive them.
   h.sort = 'turnover_desc'; h.refreshVersion = 0;
-  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: { accountId: h.routeAccountId, instrumentId: options.instrumentId } }, navigation: { navigate: (...args) => h.navigation.push(args) }, onSelect: (...args) => h.navigation.push(args),
+  const params = () => options.screen === 'chart' ? { accountId: h.routeAccountId, ...h.chart } : { accountId: h.routeAccountId, instrumentId: options.instrumentId };
+  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: params() }, navigation: { navigate: (...args) => h.navigation.push(args), goBack: () => h.navigation.push(['goBack']) }, onSelect: (...args) => h.navigation.push(args),
     sort: h.sort, onSortChange: sort => { h.sort = sort; }, refreshVersion: h.refreshVersion }));
   h.flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); }); };
   h.start = async () => { await act(async () => { h.renderer = create(tree()); }); await h.flush(); };

@@ -54,7 +54,7 @@ describe('order screen estimated quote (US equities)', () => {
     assert.equal(h.estimatedQuoteOptions.assetId, 'samsung');
     const card = h.renderer.root.findByType('AssetEstimatedQuoteCard');
     assert.equal(card.props.estimate.assetId, 'samsung');
-    assert.equal(card.props.marketOpen, true);
+    assert.deepEqual(Object.keys(card.props).sort(), ['estimate', 'statusMessage']);
     // The estimate is never presented through the order-book ladder.
     assert.equal(h.renderer.root.findAll((node: any) => node.props?.testID === 'asset-order-book').length, 0);
     assert.equal(h.bookOptions.enabled, false);

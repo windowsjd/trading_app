@@ -24,6 +24,12 @@ export function tierEmblemWidth(tier: HomeTier, size: number) {
   return preparation[tier].displayAt160.width * (size / 160 * EMBLEM_OPTICAL_SCALE[tier]);
 }
 
+/** The `size` at which the emblem's slot fits whole inside a `box` square, proportions kept. */
+export function tierEmblemSizeToFit(tier: HomeTier, box: number) {
+  const { width, height } = preparation[tier].displayAt160;
+  return box * 160 / (Math.max(width, height) * EMBLEM_OPTICAL_SCALE[tier]);
+}
+
 /**
  * The visible silhouette at `size`: the prepared alpha bounds, placed as
  * TierEmblem places the canvas, as edges from the slot's top-left. The slot

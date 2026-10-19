@@ -48,9 +48,9 @@ import { TEST_IDS } from '../../constants/testIds';
 import { buildWsUrl } from '../../constants/env';
 import { CandlestickChart } from '../../components/charts';
 import ChartTimeframeSelector from '../../components/charts/ChartTimeframeSelector';
+import ChartLoading from '../../components/charts/ChartLoading';
 import ActionPressable from '../../components/common/ActionPressable';
 import DisclosureTriangle from '../../components/common/DisclosureTriangle';
-import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 
@@ -332,8 +332,11 @@ export function AssetMarketChart({
           setChartHeight(Math.floor(event.nativeEvent.layout.height))
         }
       >
-        {candlesQuery.isLoading || requestTimeframe === null ? (
-          <SectionSkeleton lines={8} />
+        {/* No candles yet for THIS request (first read, another 봉 시간 or a
+            retry): the whale, never another interval's candles. A cached
+            interval draws at once and refreshes behind the chart. */}
+        {candlesQuery.isPending || requestTimeframe === null ? (
+          <ChartLoading />
         ) : candlesQuery.isError && !candlesQuery.data ? (
           <ScrollView contentContainerStyle={styles.error}>
             <InlineEmptyState

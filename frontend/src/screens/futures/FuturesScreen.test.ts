@@ -375,7 +375,7 @@ test("the header keeps the contract, its Last and Mark and the chart; no subtitl
   assert.equal(/"Last"/.test(text) && /"Mark"/.test(text), true, "minimal Last / Mark names stay");
   assert.equal(words(h.node("futures-last-price")), "$102");
   assert.equal(words(h.node("futures-mark-price")), "$101");
-  assert.equal(h.node("futures-chart-toggle") !== undefined, true);
+  assert.equal(h.node("futures-open-chart") !== undefined, true);
   assert.equal(h.node("futures-wallet") === undefined, true, "the futures wallet card is gone");
   assert.match(words(h.node("futures-available-collateral")), /주문가능 9,995(\.00)? USD/);
   assert.equal(h.node("futures-cross") === undefined, true, "isolated: no Cross card");
@@ -416,34 +416,127 @@ for (const [label, offset] of [["2 s ahead of", -2000], ["1.5 s behind", 1500]] 
     assert.equal(h.node("futures-submit").props.state, "enabled");
   });
 
-test("a Mark that is really old, or reads that stop, still show the warning and block Open", async (t) => {
-  const stale = futuresHarness({ serverClockOffsetMs: -2000, stale: true });
-  await stale.start();
-  t.after(stale.close);
-  assert.equal(words(stale.node("futures-mark-price")), "Mark 확인 불가");
-  assert.equal(/Mark가 없거나 오래되었습니다/.test(stale.text()), true);
-  await stale.amount("51");
-  assert.equal(stale.node("futures-submit").props.state, "disabled");
+/** A device clock only the test moves (frozen otherwise, so a host clock step cannot shift it). */
+function deviceClock(t: any) {
+  const real = Date.now;
+  const base = real();
+  let offset = 0;
+  Date.now = () => base + offset;
+  t.after(() => { Date.now = real; });
+  return {
+    /** The screen in front for `ms`, re-rendering at least every 2 s (no read arrives). */
+    watch: async (h: any, ms: number) => {
+      for (let left = ms; left > 0; left -= 2000) { offset += Math.min(2000, left); await h.update(); }
+    },
+    /** Time passing in one step, as when the app was in the background. */
+    jump: async (h: any, ms: number) => { offset += ms; await h.update(); },
+    reset: () => { offset = 0; },
+  };
+}
+const MARK_DIAGNOSIS = "Mark가 없거나 오래되었습니다. Open/Increase는 제한되며, 현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.";
+const MEMBER_NOTICE = "가격 확인이 지연되어 신규 진입과 추가 주문이 잠시 제한될 수 있습니다.";
+const markSays = (h: any) => ({
+  price: words(h.node("futures-mark-price")),
+  diagnosis: h.node("futures-mark-diagnostic") ? words(h.node("futures-mark-diagnostic")).replace(/\s+/g, " ") : null,
+  notice: h.node("futures-mark-notice") ? words(h.node("futures-mark-notice")) : null,
+});
 
-  const h = futuresHarness({ serverClockOffsetMs: -2000, markPrice: "102" });
+test("a member is not told about a short Mark gap, gets a short notice once it lasts, and Open stays blocked throughout", async (t) => {
+  const h = futuresHarness({ serverClockOffsetMs: -2000, stale: true });
+  await h.start();
+  t.after(h.close);
+  const clock = deviceClock(t);
+  await h.amount("51");
+  // Just missing: being checked; no diagnosis or notice, but Open is blocked at once.
+  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  assert.equal(h.node("futures-submit").props.state, "disabled");
+  assert.equal(words(h.node("futures-ratio-reason")), "가격을 확인하는 중입니다.");
+  await clock.watch(h, 8000);
+  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null }, "8 s is still a short gap");
+  // 10 s watched without a Mark: a short, plain notice (no Mark/Open/Reduce jargon).
+  await clock.watch(h, 2000);
+  assert.deepEqual(markSays(h), { price: "Mark 확인 불가", diagnosis: null, notice: MEMBER_NOTICE });
+  assert.equal(h.node("futures-submit").props.state, "disabled", "the notice changes nothing about what may be ordered");
+  assert.equal(words(h.node("futures-ratio-reason")), "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다.");
+  // A fresh Mark ends it at once; a new gap starts quiet again (no flapping notice).
+  h.options.stale = false;
+  await h.client.refetchQueries();
+  await h.flush();
+  assert.deepEqual(markSays(h), { price: "$101", diagnosis: null, notice: null });
+  assert.equal(h.node("futures-submit").props.state, "enabled");
+  h.options.stale = true;
+  await h.client.refetchQueries();
+  await h.flush();
+  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  assert.equal(h.node("futures-submit").props.state, "disabled");
+});
+
+test("an admin sees the existing Mark diagnosis at once, with its diagnostic facts and the same restriction", async (t) => {
+  const h = futuresHarness({ serverClockOffsetMs: -2000, stale: true, diagnostics: true });
   await h.start();
   t.after(h.close);
   await h.amount("51");
-  assert.equal(h.node("futures-submit").props.state, "enabled");
-  // 4.5 s without a read: the Mark is 5.5 s old on the server clock.
-  const real = Date.now;
-  Date.now = () => real() + 4500;
-  t.after(() => { Date.now = real; });
-  await h.update();
-  assert.equal(words(h.node("futures-mark-price")), "Mark 확인 불가");
-  assert.equal(/Mark가 없거나 오래되었습니다/.test(h.text()), true);
+  assert.deepEqual(markSays(h), { price: "Mark 확인 불가", diagnosis: MARK_DIAGNOSIS, notice: null });
+  assert.equal(h.node("admin-diagnostic-panel") === undefined, false, "the admin-only diagnostic facts");
+  assert.equal(words(h.node("futures-ratio-reason")), "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다.");
   assert.equal(h.node("futures-submit").props.state, "disabled");
-  // The next read recovers it.
-  Date.now = real;
+  // A member with the same data sees neither the diagnosis nor its facts.
+  const member = futuresHarness({ serverClockOffsetMs: -2000, stale: true, diagnostics: true, role: "user" });
+  await member.start();
+  t.after(member.close);
+  assert.deepEqual(markSays(member), { price: "확인 중", diagnosis: null, notice: null });
+  assert.equal(member.node("admin-diagnostic-panel") === undefined, true);
+});
+
+test("reads that stop age the Mark out: Open is blocked at once, a member sees it being checked, an admin the diagnosis", async (t) => {
+  const clock = deviceClock(t);
+  for (const role of ["user", "admin"]) {
+    clock.reset();
+    const h = futuresHarness({ serverClockOffsetMs: -2000, markPrice: "102", role });
+    await h.start();
+    t.after(h.close);
+    await h.amount("51");
+    assert.equal(h.node("futures-submit").props.state, "enabled", role);
+    // 4.5 s without a read: the Mark is 5.5 s old on the server clock.
+    await clock.watch(h, 4500);
+    assert.equal(h.node("futures-submit").props.state, "disabled", role);
+    assert.deepEqual(markSays(h), role === "admin"
+      ? { price: "Mark 확인 불가", diagnosis: MARK_DIAGNOSIS, notice: null }
+      : { price: "확인 중", diagnosis: null, notice: null }, role);
+    // The next read recovers it.
+    await h.client.refetchQueries();
+    await h.flush();
+    assert.deepEqual(markSays(h), { price: "$102", diagnosis: null, notice: null }, role);
+    assert.equal(h.node("futures-submit").props.state, "enabled", role);
+  }
+});
+
+test("time the screen was not watching (the chart in front, the app in the background) never counts toward the notice", async (t) => {
+  const h = futuresHarness({ serverClockOffsetMs: -2000, markPrice: "102" });
+  await h.start();
+  t.after(h.close);
+  const clock = deviceClock(t);
+  // The full-screen chart in front for 30 s: no reads here, the Mark ages out meanwhile.
+  h.focused = false;
+  await clock.watch(h, 30_000);
+  // Back in front, before the first read answers: being checked, not a lasting gap.
+  h.readGate = deferred();
+  h.focused = true;
+  await h.update();
+  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  // The app in the background for 20 s (one silent jump): still not watched.
+  await clock.jump(h, 20_000);
+  assert.deepEqual(markSays(h), { price: "확인 중", diagnosis: null, notice: null });
+  // Watched for 10 s with still no Mark: now it is a lasting gap.
+  await clock.watch(h, 10_000);
+  assert.equal(markSays(h).notice, MEMBER_NOTICE);
+  await h.amount("51");
+  assert.equal(h.node("futures-submit").props.state, "disabled");
+  h.readGate.resolve();
+  h.readGate = null;
   await h.client.refetchQueries();
   await h.flush();
-  assert.equal(words(h.node("futures-mark-price")), "$102");
-  assert.equal(/Mark가 없거나 오래되었습니다/.test(h.text()), false);
+  assert.deepEqual(markSays(h), { price: "$102", diagnosis: null, notice: null });
 });
 
 test("the 선물 지갑 준비 guide step points at 주문가능 now that the wallet card is gone", async (t) => {

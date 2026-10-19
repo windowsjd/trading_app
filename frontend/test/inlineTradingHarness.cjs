@@ -372,6 +372,7 @@ function inlineTradingHarness() {
           isError: false,
           refetch,
         };
+        if (scope === 'asset' && resource === 'candles' && h.realCandles) return query.useQuery(options);
         if (scope === 'asset' && resource !== 'detail' && h.candleFailure)
           return { ...base, isError: true, error: h.candleFailure, data: undefined };
         if (scope === 'asset')
@@ -422,7 +423,6 @@ function inlineTradingHarness() {
         if (resource === 'wallets')
           return {
             ...base,
-            ...h.walletState,
             data: {
               wallets: [
                 {
@@ -436,6 +436,8 @@ function inlineTradingHarness() {
                 { walletScope: 'securities', currencyCode: 'KRW', balanceAmount: h.krwBalance ?? '1000000' },
               ],
             },
+            // Loading/failed reads; a test may also replace `data` (e.g. none yet).
+            ...h.walletState,
           };
         if (resource === 'positions')
           return {
@@ -485,7 +487,8 @@ function inlineTradingHarness() {
     '../../constants/env': {
       buildWsUrl: () => 'ws://test/api/v1/ws',
     },
-    '../../features/asset/api': timeframes,
+    // `h.realCandles`: candle reads go through the real query client to h.getAssetCandles.
+    '../../features/asset/api': { ...timeframes, getAssetCandles: (...args) => h.getAssetCandles(...args) },
     '../../features/asset/useAssetTicker': {
       useAssetTicker: () => ({ latestTicker: h.ticker, connectionState: h.connectionState, isStale: h.tickerStale, showReconnectBanner: h.reconnect, runtime: { assetId: h.assetId, socketStatus: h.connectionState, tickerStale: h.tickerStale } }),
     },
@@ -518,6 +521,7 @@ function inlineTradingHarness() {
     },
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
     '../../components/charts': { CandlestickChart: 'CandlestickChart' },
+    '../../components/charts/ChartLoading': { default: 'ChartLoading', __esModule: true },
     '../../components/charts/ChartTimeframeSelector': {
       default: 'ChartTimeframeSelector',
       __esModule: true,

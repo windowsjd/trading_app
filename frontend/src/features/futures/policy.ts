@@ -102,6 +102,30 @@ export function freshFuturesEvidence(
   );
 }
 
+/**
+ * How long a member may go without a confirmed Mark before the futures screen
+ * says so: two of the server's 5 s Mark windows. A shorter gap is the feed's
+ * own recovery (the 1 s Mark stream falls back to REST after 3 s of quiet) or
+ * a late 2 s read, and passes without a word.
+ */
+export const FUTURES_MARK_NOTICE_DELAY_MS = 10_000;
+
+/**
+ * What the futures screen says about a Mark that is not fresh: an admin gets
+ * the technical diagnosis at once; a member nothing until it has been missing
+ * for FUTURES_MARK_NOTICE_DELAY_MS, then a short notice. Display only — what
+ * may be ordered follows `markFresh` itself (futuresActionAllowed), never this.
+ */
+export function futuresMarkNotice(
+  markFresh: boolean,
+  missingForMs: number,
+  admin: boolean,
+): "diagnostic" | "member" | null {
+  if (markFresh) return null;
+  if (admin) return "diagnostic";
+  return missingForMs >= FUTURES_MARK_NOTICE_DELAY_MS ? "member" : null;
+}
+
 /** Futures Last mirrors the server: receipt within 10s and the reported trade
  * within 60s. A quiet market's older trade stays usable once re-confirmed. */
 export function freshFuturesReference(

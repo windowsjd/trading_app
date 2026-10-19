@@ -88,7 +88,7 @@ import {
   EMPTY_ORDER_SUCCESS_STATE,
 } from '../../features/order/successState';
 import { type WalletCurrency } from '../../features/wallet/api';
-import { getWalletAvailableAmount } from '../../features/wallet/mapper';
+import { getWalletAvailableAmount, getWalletByIdentity } from '../../features/wallet/mapper';
 import {
   isOrderIdempotencyConflictCode,
   isOrderRequoteRequiredCode,
@@ -239,6 +239,16 @@ function exceedsAvailable(total: string | null | undefined, available: string | 
   if (!total || available === null) return false;
   try {
     return new Decimal(total).gt(new Decimal(available));
+  } catch {
+    return false;
+  }
+}
+
+/** Exactly zero on a decimal string ('0', '0.00000000'); absent or unreadable is not zero. */
+function isZeroAmount(value: string | null | undefined) {
+  if (!value) return false;
+  try {
+    return new Decimal(value).isZero();
   } catch {
     return false;
   }
@@ -821,12 +831,21 @@ export function OrderForm({
   const settlementCurrency = isWalletCurrency(asset?.settlementCurrency)
     ? asset.settlementCurrency
     : null;
+  const buyWalletScope = asset?.assetType === 'crypto' ? 'crypto_spot' : 'securities';
   // Ratio buttons and spendable-cash checks use the AVAILABLE balance
   // (balance - reserved): cash locked by open limit orders is not spendable.
   const buyAvailable =
     side === 'buy' && settlementCurrency
-      ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency, asset?.assetType === 'crypto' ? 'crypto_spot' : 'securities')
+      ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency, buyWalletScope)
       : null;
+  // 지갑이 비어있습니다: this account's wallet for the buy holds nothing at all.
+  // Its TOTAL balance is exactly zero — cash only reserved by open orders is
+  // not an empty wallet — and a loading, failed or missing wallet is unknown.
+  const buyWallet =
+    side === 'buy' && settlementCurrency && !walletsQuery.isError
+      ? getWalletByIdentity(walletsQuery.data, buyWalletScope, settlementCurrency)
+      : null;
+  const buyWalletEmpty = isZeroAmount(buyWallet?.balanceAmount ?? buyWallet?.balance);
   const buyAvailableValue = parsePositiveDecimal(buyAvailable);
   const priceValue = parsePositiveDecimal(
     side === 'buy'
@@ -1295,12 +1314,12 @@ export function OrderForm({
           ) : null}
         </View>
       ) : null}
-      {isAmountBuy ? (
+      {isAmountBuy && estimatedQuantity ? (
         <Text style={styles.helper} testID="order-estimated-quantity">
-          {estimatedQuantity
-            ? `예상 수량 약 ${formatDisplayDecimal(estimatedQuantity)} ${asset.symbol?.replace(/USDT$/, '') ?? ''}`
-            : '예상 수량은 서버 견적에서 확인됩니다.'}
+          {`예상 수량 약 ${formatDisplayDecimal(estimatedQuantity)} ${asset.symbol?.replace(/USDT$/, '') ?? ''}`}
         </Text>
+      ) : isAmountBuy && buyWalletEmpty ? (
+        <Text style={styles.helper} testID="order-wallet-empty">지갑이 비어있습니다</Text>
       ) : null}
       <View style={styles.group}>
         <View style={styles.ratioLabel}>

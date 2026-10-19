@@ -26,7 +26,8 @@ const FULL_LABEL = '순위 안내. 바로 위 hana까지 3,389원. 1위 demiant�
 const SHOWN = {
   above: '↑|바로 위 hana까지|3,389|원',
   first: '1|1위 demiant까지|46,693|원',
-  tier: 'P|Platinum 티어까지|17,141|원',
+  // The tier's emblem stands where the other messages draw a glyph.
+  tier: 'Platinum 티어까지|17,141|원',
   goal: '0%|본전까지|44,731|원',
   change: '▲|어제보다 자산|+55,269|원|▲| 순위 4계단 상승',
 };
@@ -342,12 +343,13 @@ describe('순위 안내 슬롯: 높이와 접근성', () => {
       return { circle: text.parent, text };
     };
     const colors = getFinancialColors('light', 'red_blue');
-    const platinum = getHomeTier('platinum', 'light')!;
     assert.equal(hidden(glyph('change').circle), true);
     assert.equal(flatten(glyph('change').text.props.style).color, colors.fall);
     assert.equal(strings(h.node('ranking-slot-measure-change')).join('|'), '▼|어제보다 자산|-44,731|원|▼| 순위 2계단 하락');
-    assert.equal(flatten(glyph('tier').circle.props.style).backgroundColor, platinum.palette.backgroundColor);
-    assert.equal(flatten(glyph('tier').text.props.style).color, platinum.palette.color);
+    // 윗 티어 draws the tier's emblem instead (its own test below); it is decorative too.
+    const emblem = h.node('ranking-slot-measure-tier').findAll((node: any) => typeof node.type === 'string'
+      && node.props.testID === 'ranking-slot-emblem')[0];
+    assert.equal(hidden(emblem), true);
     assert.equal(flatten(glyph('goal').circle.props.style).backgroundColor, semantic.raised);
     h.update({ messages: FIVE });
     assert.equal(flatten(glyph('change').text.props.style).color, colors.rise);
@@ -388,6 +390,46 @@ describe('순위 안내 슬롯: 높이와 접근성', () => {
     assert.equal(/setInterval/.test(source), false);
     assert.equal(/Rolling|Roller|Odometer|AnimatedNumber/.test(source), false);
     assert.equal(/accessibilityLiveRegion|announceForAccessibility/.test(source), false);
+  });
+});
+
+describe('순위 안내 슬롯: 윗 티어 엠블럼', () => {
+  it("draws the upper tier's own emblem, whole and in proportion, in the glyph's 32 px square", (t) => {
+    const h = slotHarness(t);
+    const preparation = JSON.parse(readFileSync('src/assets/home-tiers/preparation.json', 'utf8'));
+    const host = (root: any, id: string) => root.findAll((node: any) => typeof node.type === 'string' && node.props.testID === id);
+    // API tiers (master is drawn as Whale); bronze is never the tier above, but maps like the rest.
+    for (const tier of ['silver', 'gold', 'platinum', 'diamond', 'master', 'bronze']) {
+      const home = getHomeTier(tier, 'light')!;
+      const message: RankingInsight = { ...FIVE[2], label: `${home.name} 티어까지`, glyph: home.name.charAt(0), tier };
+      if (h.mounted) h.update({ messages: [FIVE[0], message] });
+      else h.render([FIVE[0], message]);
+      const row = h.node('ranking-slot-measure-tier');
+      const [box] = host(row, 'ranking-slot-emblem');
+      // The circle's square and place: first in the row, nothing drawn behind the emblem.
+      const square = flatten(box.props.style);
+      assert.deepEqual([square.width, square.height, square.flexShrink, square.alignItems, square.justifyContent],
+        [32, 32, 0, 'center', 'center'], tier);
+      assert.equal(square.backgroundColor === undefined && square.borderRadius === undefined, true, `${tier}: no circle`);
+      assert.equal(box.parent.children[0].props.testID, 'ranking-slot-emblem', `${tier}: on the left, where the glyph was`);
+      // Exactly this tier's emblem and artwork.
+      const emblems = host(box, `ranking-slot-emblem-${home.id}`);
+      assert.equal(emblems.length, 1, tier);
+      assert.equal(host(box, 'ranking-slot-emblem-image')[0].props.source.uri.endsWith(`/${home.id}.png`), true, tier);
+      // Whole and in proportion: the longer side fills the square, the other keeps the artwork's ratio.
+      const slot = flatten(emblems[0].props.style);
+      const art = preparation[home.id].displayAt160;
+      assert.equal(Math.abs(Math.max(slot.width, slot.height) - 32) < 1e-9, true, `${tier} ${slot.width}x${slot.height}`);
+      assert.equal(Math.abs(slot.width / slot.height - art.width / art.height) < 1e-9, true, tier);
+      // The initial is gone; the words are unchanged.
+      assert.equal(strings(row).join('|'), `${home.name} 티어까지|17,141|원`, tier);
+    }
+    // Every other message keeps its glyph in the 32 px circle.
+    const above = h.node('ranking-slot-measure-above').findAllByType('Text')[0];
+    const circle = flatten(above.parent.props.style);
+    assert.deepEqual([circle.width, circle.height, circle.borderRadius, circle.backgroundColor, above.children.join('')],
+      [32, 32, 16, semantic.raised, '↑']);
+    assert.equal(host(h.node('ranking-slot-measure-above'), 'ranking-slot-emblem').length, 0);
   });
 });
 

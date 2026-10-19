@@ -32,9 +32,9 @@ export interface RankingInsight {
   value: string;
   /** `원`; empty when the figure is a phrase (`변동 없음`). */
   suffix: string;
-  /** Decorative mark in the 32px circle. */
+  /** Decorative mark in the 32px circle (the tier message draws its tier's emblem instead). */
   glyph: string;
-  /** API tier of the person ahead (tier message): the glyph's palette. */
+  /** API tier of the person ahead (tier message): the emblem the slot draws. */
   tier?: string;
   /** Direction of the figure (change message: my total asset since yesterday). */
   direction?: 'up' | 'down';

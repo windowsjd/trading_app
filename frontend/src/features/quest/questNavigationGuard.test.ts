@@ -12,7 +12,7 @@ const { CommonActions, StackActions, StackRouter, TabRouter } = require('@react-
 const TABS = ['HomeTab', 'MarketTab', 'QuestTab', 'WalletTab', 'MyTab'];
 const MARKET = ['Market', 'MarketSearch', 'AssetDetail', 'Order', 'Futures'];
 const WALLET = ['Wallet', 'WalletFx', 'WalletTransactions'];
-const ROOT = ['Splash', 'AuthStack', 'ModeSelection', 'MainTabs', 'TradeHistory', 'SeasonJoin', 'AssetChart'];
+const ROOT = ['Splash', 'AuthStack', 'ModeSelection', 'MainTabs', 'TradeHistory', 'SeasonJoin', 'AssetChart', 'FuturesChart'];
 
 function navigator(create: (options: object) => any, routeNames: string[], initialRouteName = routeNames[0]) {
   const original = create({ initialRouteName });
@@ -141,9 +141,14 @@ describe('quest navigation guard', () => {
     root.dispatch(CommonActions.navigate('AssetChart', { assetId: 'BTC' }));
     assert.equal(root.focused(), 'AssetChart', 'the chart is part of exploring an asset');
     root.dispatch(CommonActions.goBack());
+    holds(root, CommonActions.navigate('FuturesChart', { accountId: 'a', instrumentId: 'btc' }), 'no futures chart in a spot practice');
+    assert.equal(await heard(), 1);
     guide('futuresLong');
     holds(root, CommonActions.navigate('AssetChart', { assetId: 'BTC' }), 'no spot chart in a futures practice');
     assert.equal(await heard(), 1);
+    root.dispatch(CommonActions.navigate('FuturesChart', { accountId: 'a', instrumentId: 'btc' }));
+    assert.equal(root.focused(), 'FuturesChart', "the contract's chart is part of the futures practice");
+    root.dispatch(CommonActions.goBack());
     // Logout and session expiry reset to sign-in; account entry resets to mode selection.
     for (const reset of [{ name: 'AuthStack', params: { screen: 'Login' } }, { name: 'ModeSelection' }]) {
       root.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'MainTabs' }] }));

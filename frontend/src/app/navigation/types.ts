@@ -127,6 +127,15 @@ export type RootStackParamList = {
     pushAt?: number;
   };
   AssetChart: { assetId: string };
+  /** Full-screen 4h chart of one futures contract (the futures screen's chart
+   * button). `accountId` only reads that account's contract list for the
+   * current Futures Last line; the candles are account-free market data. */
+  FuturesChart: {
+    accountId: string;
+    instrumentId: string;
+    symbol: string;
+    displayPriceDecimals: number | null;
+  };
   Splash: undefined;
   AuthStack: NavigatorScreenParams<AuthStackParamList> | undefined;
   /**
@@ -255,4 +264,9 @@ export type MyBadgesScreenProps = CompositeScreenProps<
   CompositeScreenProps<TabScreenProps<'MyTab'>, RootScreenProps<'MainTabs'>>
 >;
 
-export type FuturesScreenProps = NativeStackScreenProps<MarketStackParamList, 'Futures'>;
+export type FuturesScreenProps = CompositeScreenProps<
+  StackScreenProps<MarketStackParamList, 'Futures'>,
+  CompositeScreenProps<TabScreenProps<'MarketTab'>, RootScreenProps<'MainTabs'>>
+>;
+
+export type FuturesChartScreenProps = RootScreenProps<'FuturesChart'>;

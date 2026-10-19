@@ -248,7 +248,8 @@ async function main() {
       for (const ratio of [25, 50, 75, 100]) assert.equal(await id(`futures-ratio-${ratio}`).getAttribute('aria-disabled') === 'true', disabled);
       assert.equal(await id('futures-submit').getAttribute('aria-disabled') === 'true', disabled);
       if (disabled) assert.equal(await id('futures-amount-ratio').textContent(), '0%');
-      if (mark !== 'fresh') assert.match(await id('futures-ratio-reason').textContent(), /Mark 정보를 확인할 수 없어/);
+      // A member's just-missing Mark is being checked; the technical wording waits for a lasting gap (FuturesScreen.test).
+      if (mark !== 'fresh') assert.match(await id('futures-ratio-reason').textContent(), /가격을 확인하는 중입니다/);
       await page.evaluate(async () => { window.futuresFixture.options = { freeCollateral: '70', crossBase: '70', liquidationBuffer: '70' }; await window.refreshFuturesFixture(); });
       await page.waitForFunction(() => !document.querySelector('[data-testid="futures-amount-slider"]').disabled);
       assert.equal(await id('futures-amount').inputValue(), '51');

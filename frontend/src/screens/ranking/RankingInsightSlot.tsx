@@ -19,6 +19,7 @@ import {
   type RankingInsightKey,
 } from '../../features/ranking/rankingInsights';
 import { getHomeTier } from '../home/tierPresentation';
+import TierEmblem, { tierEmblemSizeToFit } from '../home/TierEmblem';
 
 /** How long a message stays after it has entered. */
 export const RANKING_SLOT_DWELL_MS = 4000;
@@ -29,6 +30,8 @@ const easeOutCubic = (t: number) => 1 - (1 - t) ** 3;
 
 type Phase = 'rest' | 'exit' | 'gap' | 'enter';
 const HIDDEN = { accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants' } as const;
+/** The mark's square: a circle with a glyph, or the upper tier's emblem. */
+const MARK_SIZE = 32;
 // Each dot's hit rect is 24 tall: its 12 px box plus 12 below. A later sibling
 // takes touches in its own box first, so taps still land on the nearest dot;
 // the slop only reaches past the first and last dots.
@@ -210,12 +213,19 @@ function MessageRow({ message, mode, financialPreference }: {
   const detailInk = ink(detail?.direction);
   return (
     <View style={styles.row}>
-      <View style={[styles.glyph, tier && { backgroundColor: tier.palette.backgroundColor }]} {...HIDDEN}>
-        <Text maxFontSizeMultiplier={1.2}
-          style={[styles.glyphText, tier && { color: tier.palette.color }, direction && { color: direction }]}>
-          {message.glyph}
-        </Text>
-      </View>
+      {tier ? (
+        // The upper tier's own emblem, whole and in proportion, in the circle's square.
+        <View testID="ranking-slot-emblem" style={styles.emblem} {...HIDDEN}>
+          <TierEmblem tier={tier.id} size={tierEmblemSizeToFit(tier.id, MARK_SIZE)}
+            testID={`ranking-slot-emblem-${tier.id}`} imageTestID="ranking-slot-emblem-image" />
+        </View>
+      ) : (
+        <View style={styles.glyph} {...HIDDEN}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.glyphText, direction && { color: direction }]}>
+            {message.glyph}
+          </Text>
+        </View>
+      )}
       <View style={styles.copy}>
         <Text style={styles.label}>{message.label}</Text>
         <Text style={styles.value}>
@@ -247,14 +257,15 @@ const styles = StyleSheet.create({
   measureItem: { position: 'absolute', top: 0, left: 0, right: 0 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   glyph: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: MARK_SIZE,
+    height: MARK_SIZE,
+    borderRadius: MARK_SIZE / 2,
     flexShrink: 0,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: semantic.raised,
   },
+  emblem: { width: MARK_SIZE, height: MARK_SIZE, flexShrink: 0, alignItems: 'center', justifyContent: 'center' },
   glyphText: { fontSize: 13, lineHeight: 18, fontWeight: '800', color: semantic.text },
   copy: { flex: 1, minWidth: 0 },
   label: { fontSize: 13, lineHeight: 19, color: semantic.secondary },

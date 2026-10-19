@@ -96,9 +96,11 @@ async function run() {
       await card.waitFor();
       await theme.canvas(page, appearance);
       const cardText = await card.innerText();
-      assert.match(cardText, /추정 호가/);
-      assert.match(cardText, /Tiingo 통계 추정/);
-      assert.match(cardText, /실제 거래소 호가\(주문장\)가 아니며 주문 체결에 사용되지 않습니다\./);
+      // The title, badge and notices were removed (2026-10-19); rows and spread still say 추정.
+      assert.doesNotMatch(cardText, /Tiingo 통계 추정|실제 거래소 호가|정규장에만 표시/);
+      assert.doesNotMatch(cardText, /^추정 호가$/m);
+      assert.match(cardText, /매도 추정/);
+      assert.match(cardText, /추정 스프레드/);
       if (extra.includes('usAsk=none')) assert.match(await page.getByTestId('asset-estimated-quote-ask').innerText(), /미제공/);
       else assert.match(await page.getByTestId('asset-estimated-quote-ask').innerText(), /주/);
       assert.equal(await page.getByTestId('asset-order-book').count(), 0, 'no 10-level ladder for the estimate');

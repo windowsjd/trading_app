@@ -98,7 +98,9 @@ for (const method of ['market', 'limit'])
       assert.equal(slider(h).props.disabled, disabled);
       for (const ratio of [25, 50, 75, 100]) assert.equal(h.node(`futures-ratio-${ratio}`).props.disabled, disabled);
       assert.equal(h.node(method === 'market' ? 'futures-submit' : 'futures-limit-submit').props.state, disabled ? 'disabled' : 'enabled');
-      if (markMissing) assert.equal(text(h, 'futures-ratio-reason'), 'Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다.');
+      // A member's screen calls a just-missing Mark 확인 중; the technical wording waits for a lasting gap
+      // (FuturesScreen.test). The restriction itself is immediate either way.
+      if (markMissing) assert.equal(text(h, 'futures-ratio-reason'), '가격을 확인하는 중입니다.');
       assert.equal(h.node('futures-amount').props.value, '51', 'manual amount is preserved');
       if (disabled) {
         await h.press(method === 'market' ? 'futures-submit' : 'futures-limit-submit');

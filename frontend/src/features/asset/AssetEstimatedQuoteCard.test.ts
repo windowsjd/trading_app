@@ -33,14 +33,18 @@ function render(props: Record<string, unknown>, fontScale = 1) {
 
 describe('estimated quote card', () => {
   for (const fontScale of [1, 2]) {
-    it(`labels a one-level statistical estimate, not an order book (font ${fontScale})`, (t) => {
-      const view = render({ estimate: estimate(), statusMessage: null, marketOpen: true }, fontScale);
+    it(`shows a one-level statistical estimate without the title, badge or notices (font ${fontScale})`, (t) => {
+      const view = render({ estimate: estimate(), statusMessage: null }, fontScale);
       t.after(view.unmount);
       const text = view.text();
-      assert.ok(text.includes('추정 호가'));
-      assert.ok(text.includes('Tiingo'));
-      assert.ok(text.includes('통계 추정'));
-      assert.ok(text.includes('실제 거래소 호가(주문장)가 아니며 주문 체결에 사용되지 않습니다.'));
+      // Removed (2026-10-19): the 추정 호가 title, the Tiingo 통계 추정 badge and both notices.
+      for (const removed of ['추정 호가', 'Tiingo', '통계 추정', '실제 거래소 호가', '주문 체결에 사용되지 않습니다', '정규장에만']) {
+        assert.equal(text.includes(removed), false, removed);
+      }
+      assert.equal(view.renderer.root.findAll((node: any) => node.props?.testID === 'asset-estimated-quote-badge').length, 0);
+      // Still an estimate: each row and the spread say so.
+      assert.ok(text.includes('매도 추정'));
+      assert.ok(text.includes('매수 추정'));
       const rows = view.renderer.root.findAll(
         (node: any) => typeof node.type === 'string' && /^asset-estimated-quote-(?:ask|bid)$/.test(node.props.testID ?? ''),
       );
@@ -58,7 +62,6 @@ describe('estimated quote card', () => {
     const view = render({
       estimate: estimate({ ask: { price: null, size: null }, spread: null }),
       statusMessage: null,
-      marketOpen: true,
     });
     t.after(view.unmount);
     const ask = view.renderer.root.findByProps({ testID: 'asset-estimated-quote-ask' });
@@ -69,7 +72,7 @@ describe('estimated quote card', () => {
   });
 
   it('uses the shared buy/sell colors', (t) => {
-    const view = render({ estimate: estimate(), statusMessage: null, marketOpen: true });
+    const view = render({ estimate: estimate(), statusMessage: null });
     t.after(view.unmount);
     const ask = view.renderer.root.findByProps({ testID: 'asset-estimated-quote-ask' });
     const bid = view.renderer.root.findByProps({ testID: 'asset-estimated-quote-bid' });
@@ -79,14 +82,12 @@ describe('estimated quote card', () => {
     assert.equal(flatten(bid.children[1].props.style).color, financial.buy);
   });
 
-  it('explains the regular-session rule while the market is closed', (t) => {
-    const view = render({ estimate: null, statusMessage: '현재 표시할 추정 호가가 없습니다.', marketOpen: false });
-    t.after(view.unmount);
-    assert.ok(view.text().includes('추정 호가는 정규장에만 표시합니다.'));
-    assert.equal(
-      view.renderer.root.findAll((node: any) => node.props?.testID === 'asset-estimated-quote-ask').length,
-      0,
-    );
+  it('draws nothing without an estimate: no empty card, whatever the status', (t) => {
+    for (const statusMessage of [null, '현재 표시할 추정 호가가 없습니다.', '추정 호가를 불러오는 중입니다.', '추정 호가 연결을 복구하는 중입니다.']) {
+      const view = render({ estimate: null, statusMessage });
+      t.after(view.unmount);
+      assert.equal(view.renderer.toJSON() === null, true, String(statusMessage));
+    }
   });
 
   it('scrolls long exact values sideways in a narrow column instead of clipping them', (t) => {
@@ -97,7 +98,6 @@ describe('estimated quote card', () => {
           ask: { price: '12345.987654', size: '987654321' },
         }),
         statusMessage: null,
-        marketOpen: true,
       },
       2,
     );
@@ -113,8 +113,8 @@ describe('estimated quote card', () => {
     assert.ok(view.text().includes('987,654,321주'));
   });
 
-  it('passes loading/stale status through while the market is open', (t) => {
-    const view = render({ estimate: estimate(), statusMessage: '추정 호가가 지연되고 있습니다.', marketOpen: true });
+  it('states a delay of the estimate it shows', (t) => {
+    const view = render({ estimate: estimate(), statusMessage: '추정 호가가 지연되고 있습니다.' });
     t.after(view.unmount);
     assert.equal(
       view.renderer.root.findByProps({ testID: 'asset-estimated-quote-status' }).props.children,

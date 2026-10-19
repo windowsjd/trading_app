@@ -388,13 +388,14 @@ export function startGuideSession(id: number, accountId: string, quest: Beginner
  * and the 이체 sheet ('WalletTransfer', not a route). Everything else waits for
  * 안내 종료. Spot practice may explore any listed asset (the guide itself flags
  * a wrong market); futures funding may top up the futures USD wallet, by 이체 or,
- * with no USD left anywhere, 환전 first.
+ * with no USD left anywhere, 환전 first. Either practice may open its own chart
+ * screen (AssetChart, FuturesChart) over the tabs.
  */
 const GUIDE_ROUTES = {
   exchange: ['WalletTab', 'Wallet', 'WalletFx'],
   transfer: ['WalletTab', 'Wallet', 'WalletTransfer'],
   spot: ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'],
-  futures: ['MarketTab', 'Market', 'Futures', 'WalletTab', 'Wallet', 'WalletTransfer', 'WalletFx'],
+  futures: ['MarketTab', 'Market', 'Futures', 'FuturesChart', 'WalletTab', 'Wallet', 'WalletTransfer', 'WalletFx'],
 } as const;
 
 function guideRoutes(quest: BeginnerQuestKey): readonly string[] {

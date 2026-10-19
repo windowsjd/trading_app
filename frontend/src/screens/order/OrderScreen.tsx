@@ -483,7 +483,6 @@ export function OrderTradingScreen({
                               : null
                           }
                           statusMessage={estimateStatus}
-                          marketOpen={asset.marketStatus === 'open'}
                         />
                       ) : null}
                       {isAdmin && estimateSupported && estimateStatus ? (
@@ -530,7 +529,6 @@ export function OrderTradingScreen({
                               : null
                           }
                           statusMessage={estimateStatus}
-                          marketOpen={asset.marketStatus === 'open'}
                         />
                       ) : null}
                       {isAdmin && estimateSupported && estimateStatus ? (

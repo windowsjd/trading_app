@@ -106,8 +106,12 @@ describe('asset detail screen wiring', () => {
       'the chart error branch describes the actual error',
     );
     assert.ok(
-      !/candlesQuery\.isError[\s\S]{0,400}<SectionSkeleton/.test(screenSource),
-      'a failed candle request must not render as a loading skeleton',
+      !/candlesQuery\.isError[\s\S]{0,400}<ChartLoading/.test(screenSource),
+      'a failed candle request must not render as the chart loader',
+    );
+    assert.ok(
+      /candlesQuery\.isPending \|\| requestTimeframe === null \? \(\s*<ChartLoading \/>/.test(screenSource),
+      'only a request without candles yet shows the chart loader',
     );
     assert.ok(
       screenSource.includes('TEST_IDS.assetDetail.chartRetry'),

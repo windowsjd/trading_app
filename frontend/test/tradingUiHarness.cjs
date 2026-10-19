@@ -173,6 +173,7 @@ function createTradingUiHarness(screenName) {
     '../../features/asset/AssetOrderBookCard': { default: 'AssetOrderBookCard', __esModule: true },
     '../../features/asset/orderBookPreview': load(resolve(__dirname, '../src/features/asset/orderBookPreview.ts'), {}),
     '../../components/charts/ChartTimeframeSelector': { default: 'ChartTimeframeSelector', __esModule: true },
+    '../../components/charts/ChartLoading': { default: 'ChartLoading', __esModule: true },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState', 'InlineEmptyState', 'SectionSkeleton',
       'BlockedState', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
     ...Object.fromEntries(['AccountSwitcher', 'PreviewAmounts'].map(name => ['../../components/tradingAccount/' + name, { default: name, __esModule: true }])),

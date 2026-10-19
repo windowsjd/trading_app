@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  FUTURES_MARK_NOTICE_DELAY_MS,
   freshFuturesEvaluation,
   freshFuturesEvidence,
   freshFuturesReference,
+  futuresActionAllowed,
+  futuresMarkNotice,
   futuresPriceBasisLabel,
   futuresServerNow,
 } from "./policy.ts";
@@ -107,4 +110,27 @@ test("a really stale Mark or stopped reads still turn the Mark stale on the serv
   const stopped = markTimeline(0, { lastResponse: 2 });
   assert.equal(stopped.server.slice(0, 3).every(Boolean), true);
   assert.equal(stopped.server.at(-1), false);
+});
+
+test("Mark notice: an admin is told at once, a member only after two 5 s Mark windows; a fresh Mark says nothing", () => {
+  assert.equal(FUTURES_MARK_NOTICE_DELAY_MS, 2 * 5000);
+  for (const admin of [false, true]) {
+    for (const missingForMs of [0, 9_999, 10_000, 600_000]) assert.equal(futuresMarkNotice(true, missingForMs, admin), null);
+  }
+  assert.deepEqual([0, 4_000, 9_999].map((ms) => futuresMarkNotice(false, ms, true)), ["diagnostic", "diagnostic", "diagnostic"]);
+  assert.deepEqual([0, 4_000, 9_999].map((ms) => futuresMarkNotice(false, ms, false)), [null, null, null]);
+  assert.deepEqual([10_000, 60_000].map((ms) => futuresMarkNotice(false, ms, false)), ["member", "member"]);
+});
+
+test("the Mark notice never decides what may be ordered: Open/Increase need a fresh Mark whatever is shown", () => {
+  const capabilities = { tradingMode: "ENABLED" as const, canOpen: true, canIncrease: true, canReduce: true, canClose: true, reason: null };
+  for (const operation of ["open", "increase"] as const) {
+    assert.equal(futuresActionAllowed(capabilities, operation, false, true), false, `${operation} without a fresh Mark`);
+    assert.equal(futuresActionAllowed(capabilities, operation, true, true), true, operation);
+  }
+  // Reduce/Close keep their own rule: a fresh Last, no Mark needed.
+  for (const operation of ["reduce", "close"] as const) {
+    assert.equal(futuresActionAllowed(capabilities, operation, false, true), true, operation);
+    assert.equal(futuresActionAllowed(capabilities, operation, false, false), false, `${operation} without a fresh Last`);
+  }
 });

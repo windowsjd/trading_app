@@ -10,7 +10,6 @@ import FuturesConditionalEntryForm, {
   emptyFuturesConditionalDraft,
   type FuturesConditionalDraft,
 } from './FuturesConditionalEntryForm';
-import FuturesCandleChart from './FuturesCandleChart';
 import FuturesInstrumentSheet from './FuturesInstrumentSheet';
 import FuturesAmountField from './FuturesAmountField';
 import FuturesLeverageSelect, { type FuturesLeverageSheet } from './FuturesLeverageSelect';
@@ -38,6 +37,7 @@ import { useIsFocused } from "@react-navigation/native";
 import { useHeaderHeight } from "@react-navigation/elements";
 import type { FuturesScreenProps } from "../../app/navigation/types";
 import { useTradingAccount } from "../../features/tradingAccount/TradingAccountContext";
+import { useAdminDiagnostics } from "../../features/auth/useAdminDiagnostics";
 import { resolveAccountBinding } from "../../features/tradingAccount/accountBinding";
 import { getTradingAccount } from "../../features/tradingAccount/api";
 import { QUERY_KEYS } from "../../constants/queryKeys";
@@ -61,6 +61,7 @@ import {
   futuresServerNow,
   futuresActionAllowed,
   futuresInputError,
+  futuresMarkNotice,
   positionCommand,
 } from "../../features/futures/policy";
 import { COLLATERAL_SHORT, MAINTENANCE_SHORT, futuresErrorMessage } from "../../features/futures/orderFeedback";
@@ -99,6 +100,7 @@ import ActionPressable from "../../components/common/ActionPressable";
 import SegmentedControl from '../../components/common/SegmentedControl';
 import ErrorNotice from "../../components/states/ErrorNotice";
 import ErrorState from "../../components/states/ErrorState";
+import AdminDiagnosticPanel from "../../components/states/AdminDiagnosticPanel";
 import FullPageLoading from "../../components/states/FullPageLoading";
 import FuturesPositionCard from './FuturesPositionCard';
 import FuturesOrderBookCard from './FuturesOrderBookCard';
@@ -108,13 +110,15 @@ export default function FuturesScreen(props: FuturesScreenProps) {
 }
 
 type ListView = 'positions' | 'pending';
+/** Longer than the screen's 1 s re-render: it was not on screen meanwhile. */
+const MARK_WATCH_GAP_MS = 3000;
 /** RN and RN-web ScrollView: the content container (absent from RN's legacy typings). */
 type InnerViewScroll = { getInnerViewRef?: () => View | null };
 
 /**
  * The futures trading screen, laid out like the spot order screen: the
- * contract header (picker, 무기한, chart), its Last and Mark prices, then one
- * row with the trade form on the left (롱/숏, margin mode and leverage,
+ * contract header (picker, 무기한, the full-screen chart button), its Last and
+ * Mark prices, then one row with the trade form on the left (롱/숏, margin mode and leverage,
  * 주문방식, the USD order amount and its ratio, submit) and the contract's book
  * on the right — side by side on every phone width — then the positions and
  * pending views (records are in the central 거래 내역). The amount is the position's USD
@@ -129,6 +133,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const guide = useQuestGuide();
   const { colors } = useAppearance();
   const { width, fontScale } = useWindowDimensions();
+  const isAdmin = useAdminDiagnostics();
   const { accounts, selectedAccountId, isLoading, isError, error, refetchAccounts } = useTradingAccount();
   const binding = resolveAccountBinding({
     boundAccountId: accountId,
@@ -157,9 +162,12 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   }, [tradeReveal, scrollRef]);
   const [, setClock] = useState(Date.now());
   const clock = Date.now();
+  // When this contract's Mark was last seen fresh (or first watched): only how
+  // long a member has gone without one, for what the screen says. Written
+  // during render like `scope`; no order or limit reads it.
+  const markSeen = useRef({ instrumentId: "", at: clock, renderedAt: clock });
   const [selectedId, setSelectedId] = useState(route.params.instrumentId ?? "");
   const [instrumentSheetOpen, setInstrumentSheetOpen] = useState(false);
-  const [chartOpen, setChartOpen] = useState(false);
   const [direction, setDirection] = useState<Direction>("long");
   const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
   const [leverage, setLeverage] = useState("1");
@@ -380,6 +388,19 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       : freshFuturesEvaluation(instruments.data?.evaluatedAt, instrumentsNow) &&
         instrument?.markState === "fresh" &&
         freshFuturesEvidence(instrument.markEvidence, instrumentsNow));
+  // The screen re-renders every second while in front. Out of focus (the chart
+  // screen over it) or after a longer silence (the app in the background) it
+  // was not reading, so a Mark gone stale meanwhile is timed again from now.
+  const seen = markSeen.current;
+  const unwatched = !focused || clock - seen.renderedAt > MARK_WATCH_GAP_MS;
+  if (markFresh || unwatched || seen.instrumentId !== (instrument?.id ?? ""))
+    markSeen.current = { instrumentId: instrument?.id ?? "", at: clock, renderedAt: clock };
+  else seen.renderedAt = clock;
+  // A short gap is the Mark's own recovery: an admin sees it at once, a member
+  // only once it lasts (FUTURES_MARK_NOTICE_DELAY_MS); until then the Mark is
+  // being checked. Orders still follow markFresh below, never this.
+  const markMissingForMs = clock - markSeen.current.at;
+  const markNotice = futuresMarkNotice(markFresh, markMissingForMs, isAdmin);
   const reference = position
     ? position.referencePrice
     : instrument?.referencePrice;
@@ -478,7 +499,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
       ? capacity?.state === "unavailable"
         ? capacity.reason === "fee"
           ? tradingAccount.isError ? "수수료 정보를 확인할 수 없어 비율을 계산할 수 없습니다." : "수수료 정보를 확인하는 중입니다."
-          : capacity.reason === "mark" ? "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다."
+          : capacity.reason === "mark"
+            ? markNotice ? "Mark 정보를 확인할 수 없어 주문 가능 금액을 계산할 수 없습니다." : "가격을 확인하는 중입니다."
             : capacity.reason === "price" ? unpriced
             : capacity.reason === "maintenance" ? MAINTENANCE_SHORT
               : "사용 가능한 담보를 평가하는 중입니다."
@@ -700,18 +722,23 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
             <Text style={styles.badge}>무기한</Text>
           </View>
           {instrument ? (
+            // The spot order screen's chart button: the contract's chart on its
+            // own screen, over this one (the form stays as it is underneath).
             <ActionPressable
-              testID="futures-chart-toggle"
-              style={[styles.iconButton, chartOpen && styles.iconButtonActive]}
+              testID="futures-open-chart"
+              style={styles.iconButton}
               accessibilityRole="button"
-              accessibilityLabel={chartOpen ? '4시간봉 차트 접기' : '4시간봉 차트 보기'}
-              accessibilityState={{ selected: chartOpen }}
-              aria-pressed={chartOpen}
-              onPress={() => setChartOpen((open) => !open)}
+              accessibilityLabel="전체화면 차트 열기"
+              onPress={() => navigation.navigate('FuturesChart', {
+                accountId,
+                instrumentId: instrument.id,
+                symbol: instrument.underlying.symbol,
+                displayPriceDecimals: instrument.underlying.displayPriceDecimals,
+              })}
             >
               <Svg width={22} height={22} viewBox="0 0 24 24" aria-hidden>
                 <Path d="M5 3v18M2 8h6v7H2zM12 2v17M9 5h6v8H9zM19 6v16M16 11h6v7h-6z" fill="none"
-                  stroke={chartOpen ? colors.onAccent : colors.secondary} strokeWidth={1.5} />
+                  stroke={colors.secondary} strokeWidth={1.5} />
               </Svg>
             </ActionPressable>
           ) : null}
@@ -728,25 +755,32 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
               <View style={[styles.priceCell, stackedControls && styles.full]}>
                 <Text style={styles.priceLabel} accessibilityLabel="Mark 가격">Mark</Text>
                 <Text selectable style={styles.price} testID="futures-mark-price">
-                  {markFresh ? price(position?.markPrice ?? instrument.markPrice, instrument) : "Mark 확인 불가"}
+                  {markFresh ? price(position?.markPrice ?? instrument.markPrice, instrument)
+                    : markNotice ? "Mark 확인 불가" : "확인 중"}
                 </Text>
               </View>
             </View>
-            {!markFresh ? (
-              <Text style={styles.warning}>
-                Mark가 없거나 오래되었습니다. Open/Increase는 제한되며,
-                현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.
+            {markNotice === "diagnostic" ? (
+              <>
+                <Text testID="futures-mark-diagnostic" style={styles.warning}>
+                  Mark가 없거나 오래되었습니다. Open/Increase는 제한되며,
+                  현재가가 유효하면 Reduce/Close를 요청할 수 있습니다.
+                </Text>
+                <AdminDiagnosticPanel runtime={{
+                  instrumentId: instrument.id,
+                  markState: position ? position.markState : instrument.markState,
+                  markEffectiveAt: (position ? position.markEvidence : instrument.markEvidence)?.effectiveAt,
+                  positionsEvaluatedAt: data.evaluatedAt,
+                  instrumentsEvaluatedAt: instruments.data?.evaluatedAt,
+                  readTimely: timely,
+                  crossMarkFresh: crossFresh,
+                  markMissingForMs,
+                }} />
+              </>
+            ) : markNotice === "member" ? (
+              <Text testID="futures-mark-notice" style={styles.warning}>
+                가격 확인이 지연되어 신규 진입과 추가 주문이 잠시 제한될 수 있습니다.
               </Text>
-            ) : null}
-            {chartOpen ? (
-              <View style={styles.card}>
-                <FuturesCandleChart
-                  key={instrument.id}
-                  instrumentId={instrument.id}
-                  displayPriceDecimals={instrument.underlying.displayPriceDecimals}
-                  currentPrice={referenceFresh && reference ? reference : null}
-                />
-              </View>
             ) : null}
           </>
         ) : null}
@@ -1134,7 +1168,6 @@ const styles = StyleSheet.create({
   pair: { fontSize: 20, fontWeight: '700', color: semantic.text },
   badge: { fontSize: 11, color: semantic.muted, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: semantic.raised, borderRadius: 5 },
   iconButton: { minWidth: 44, minHeight: 44, padding: 8, borderRadius: 8, backgroundColor: semantic.raised, alignItems: 'center', justifyContent: 'center' },
-  iconButtonActive: { backgroundColor: semantic.selected },
   // Rows wrap; on narrow widths and large fonts each item takes a full line.
   full: { flexBasis: '100%', width: '100%' },
   prices: { flexDirection: 'row', flexWrap: 'wrap', columnGap: 12, rowGap: 8, minWidth: 0 },

@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
-import { describe, it } from 'node:test';
+import { describe, it, type TestContext } from 'node:test';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
+import { clearSessionCache } from '../auth/sessionCache.ts';
 import type { FriendUser } from './api.ts';
 const require = createRequire(import.meta.url);
 const React = require('react');
-const { QueryClient } = require('@tanstack/react-query');
+const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
+const { create, act } = require('react-test-renderer');
 const { elements, load } = require('../../../test/ledgerTestHarness.cjs');
 const user: FriendUser = { userId: 'target', nickname: '아주긴친구닉네임'.repeat(8), profileImageUrl: null, relationship: 'friend', requestId: 'relationship' };
 function screenHarness() {
@@ -139,13 +141,42 @@ describe('friend API and targeted cache updates', () => {
     client.clear();
   });
 });
+/** MY 전체 with the pending-request answer the hook would give. */
+function overallMenu(pending: boolean) {
+  const navigations: string[] = [];
+  const Screen = load(resolve('src/screens/my/OverallScreen.tsx'), {
+    'react-native': { ScrollView: 'ScrollView', Text: 'Text', View: 'View', Platform: { OS: 'android' }, StyleSheet: { create: (value: any) => value } },
+    '../../features/friends/usePendingFriendRequests': { usePendingFriendRequests: () => pending },
+  }).default;
+  const tree = Screen({ navigation: { navigate: (route: string) => navigations.push(route) } });
+  const rows = elements(tree, 'Pressable');
+  const dots = (row: any) => elements(row, 'View').filter((node: any) => node.props.testID === 'overall-Friends-request-dot');
+  return { navigations, rows, dots, row: (route: string) => rows.find((node: any) => node.props.testID === `overall-${route}`) };
+}
+
 describe('overall menu and server privacy setting', () => {
   it('routes to MY, friends, records, notices, inquiry and settings', () => {
-    const navigations: string[] = [];
-    const Screen = load(resolve('src/screens/my/OverallScreen.tsx'), { 'react-native': { ScrollView: 'ScrollView', Text: 'Text', Platform: { OS: 'android' }, StyleSheet: { create: (value: any) => value } } }).default;
-    const tree = Screen({ navigation: { navigate: (route: string) => navigations.push(route) } });
-    elements(tree, 'Pressable').forEach((node: any) => node.props.onPress());
-    assert.deepEqual(navigations, ['My', 'Friends', 'Record', 'Notices', 'Inquiry', 'Settings']);
+    const menu = overallMenu(false);
+    menu.rows.forEach((node: any) => node.props.onPress());
+    assert.deepEqual(menu.navigations, ['My', 'Friends', 'Record', 'Notices', 'Inquiry', 'Settings']);
+  });
+  it('marks 친구 with a small red dot (not a count) only while received requests wait, without moving the box', () => {
+    const none = overallMenu(false);
+    assert.equal(none.rows.some((row: any) => none.dots(row).length > 0), false, 'no dot without pending requests');
+    assert.equal(none.row('Friends').props.accessibilityLabel === undefined, true);
+    const pending = overallMenu(true);
+    const friends = pending.row('Friends');
+    const [dot] = pending.dots(friends);
+    assert.equal(dot === undefined, false);
+    assert.deepEqual(pending.rows.filter((row: any) => pending.dots(row).length > 0).map((row: any) => row.props.testID), ['overall-Friends']);
+    // Top-right corner, inside the box: absolutely placed, so the box keeps its size and the label its place.
+    const { position, top, right, width, height, borderRadius, backgroundColor } = dot.props.style;
+    assert.deepEqual([position, top, right, width, height, borderRadius, backgroundColor], ['absolute', 10, 10, 8, 8, 4, '#F04452']);
+    assert.deepEqual(friends.props.style, none.row('Friends').props.style);
+    assert.equal(elements(dot, 'Text').length, 0, 'a plain dot, no number');
+    assert.equal(dot.props.pointerEvents, 'none');
+    assert.equal(dot.props.importantForAccessibility, 'no-hide-descendants');
+    assert.equal(friends.props.accessibilityLabel, '친구, 받은 친구 요청 있음');
   });
   it('renders the persisted Boolean and updates /me cache before PATCH resolves', async () => {
     const mutations: any[] = [], options: any[] = [], saved: any[] = [];
@@ -184,5 +215,114 @@ describe('overall menu and server privacy setting', () => {
     await privacy.onSuccess({ ...data, portfolioPublic: true }, true, context);
     assert.deepEqual(cached, { ...data, portfolioPublic: true });
     assert.equal(saved.at(-1)[0], QUERY_KEYS.me);
+  });
+});
+
+/** usePendingFriendRequests over a real QueryClient and the real friends API module. */
+function pendingHarness(t: TestContext) {
+  const h: any = { reads: [] as string[], incoming: [] as FriendUser[], failure: null as unknown, values: [] as boolean[] };
+  h.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const api = load(resolve('src/features/friends/api.ts'), { '../../services/api/client': { apiClient: { get: async (path: string) => {
+    h.reads.push(path);
+    if (h.gate) await h.gate;
+    if (h.failure) throw h.failure;
+    const users = h.incoming;
+    return { data: { data: { users, pagination: { limit: 30, offset: 0, total: users.length, returned: users.length, nextOffset: null } } } };
+  } } } });
+  let focusEffect: () => void = () => {};
+  const { usePendingFriendRequests } = load(resolve('src/features/friends/usePendingFriendRequests.ts'), {
+    './api': api,
+    // Focus = mount; `h.focus()` is a return to the screen.
+    '@react-navigation/native': { useFocusEffect: (effect: () => void) => { focusEffect = effect; React.useEffect(() => effect(), [effect]); } },
+  });
+  function Probe() { h.values.push(usePendingFriendRequests()); return null; }
+  const settle = () => act(async () => { await new Promise((done) => setTimeout(done, 10)); });
+  h.value = () => h.values.at(-1);
+  h.mount = async () => { await act(async () => { h.renderer = create(React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Probe))); }); };
+  h.settle = settle;
+  h.focus = async () => { await act(async () => focusEffect()); await settle(); };
+  h.unmount = async () => { if (h.renderer) await act(async () => h.renderer.unmount()); h.renderer = null; };
+  t.after(async () => { await h.unmount(); h.client.clear(); });
+  return h;
+}
+const request = (id: string): FriendUser => ({ ...user, userId: id, nickname: id, relationship: 'received', requestId: `request-${id}` });
+
+describe('MY 전체 친구 dot: pending received requests', () => {
+  it("reads the server's 받은 요청 list and is true only once it holds a request", async (t) => {
+    const h = pendingHarness(t);
+    h.incoming = [request('a')];
+    let release = () => {};
+    h.gate = new Promise<void>((done) => { release = done; });
+    await h.mount();
+    await h.settle();
+    assert.equal(h.reads.length > 0, true, 'the read is out');
+    assert.equal(h.value(), false, 'unknown while the first read is out');
+    h.gate = null;
+    release();
+    await h.settle();
+    assert.equal(h.value(), true);
+    assert.equal(h.reads.every((path: string) => path.startsWith('/friends/requests?')), true, h.reads.join());
+    // The 친구 screen's 받은 요청 entry: one cache entry for both.
+    assert.equal(h.client.getQueryData(QUERY_KEYS.friends.requests).pages[0].users.length, 1);
+  });
+
+  it('stays off with no received request', async (t) => {
+    const h = pendingHarness(t);
+    await h.mount();
+    await h.settle();
+    assert.equal(h.value(), false);
+  });
+
+  it('clears after the last request is accepted or rejected, and comes back on return when a new one arrives', async (t) => {
+    const cache = load(resolve('src/features/friends/cache.ts'), {});
+    for (const action of ['accept', 'reject'] as const) {
+      const h = pendingHarness(t);
+      h.incoming = [request('a')];
+      await h.mount();
+      await h.settle();
+      assert.equal(h.value(), true, action);
+      // The 친구 screen's answer refreshes the shared entries (refreshFriendship).
+      h.incoming = [];
+      await act(async () => { await cache.refreshFriendship(h.client, { action, user: request('a') }); });
+      await h.settle();
+      assert.equal(h.value(), false, `${action}: no request left`);
+      // Someone sends a new one while the member is elsewhere: shown on return.
+      h.incoming = [request('b')];
+      await h.focus();
+      assert.equal(h.value(), true, `${action}: a new request on return`);
+      await h.unmount();
+    }
+  });
+
+  it('a failed read never shows a dot', async (t) => {
+    const h = pendingHarness(t);
+    h.failure = Object.assign(new Error('network'), { code: 'ERR_NETWORK' });
+    h.incoming = [request('a')];
+    await h.mount();
+    await h.settle();
+    assert.equal(h.value(), false, 'first read failed');
+    h.failure = null;
+    await h.focus();
+    assert.equal(h.value(), true);
+    h.failure = Object.assign(new Error('network'), { code: 'ERR_NETWORK' });
+    await h.focus();
+    assert.equal(h.value(), false, 'the latest read failed: not confirmed');
+  });
+
+  it("another member signing in never sees the previous member's requests", async (t) => {
+    const h = pendingHarness(t);
+    h.incoming = [request('a')];
+    await h.mount();
+    await h.settle();
+    assert.equal(h.value(), true);
+    // Sign-out leaves the tabs and clears every cached read; the next member starts over.
+    await h.unmount();
+    clearSessionCache(h.client);
+    h.incoming = [];
+    h.values.length = 0;
+    await h.mount();
+    assert.equal(h.value(), false, 'nothing carried over while the new read is out');
+    await h.settle();
+    assert.deepEqual([...new Set(h.values)], [false]);
   });
 });

@@ -26,7 +26,7 @@ for (const mode of ['light', 'dark'] as const) {
       '../../features/notifications/PushNotificationsHost': { default: 'PushNotificationsHost', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
-      '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
+      '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/futures/FuturesChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
       mocks[name] = { default: name, __esModule: true };
     }
     const Root = load(resolve('src/app/navigation/RootNavigator.tsx'), mocks).default;
@@ -48,8 +48,12 @@ for (const mode of ['light', 'dark'] as const) {
     // Push permission/registration/tap routing also lives inside navigation,
     // mounted once for every route (sign-in included).
     assert.equal(elements(tree, 'PushNotificationsHost').length, 1);
-    const chart = screens.find((s: any) => s.props.name === 'AssetChart');
-    assert.equal(chart.props.options.presentation, 'fullScreenModal');
-    assert.equal(chart.props.options.animation, 'fade');
+    // Both full-screen charts (spot AssetChart, the futures contract's FuturesChart) open the same way.
+    for (const name of ['AssetChart', 'FuturesChart']) {
+      const chart = screens.find((s: any) => s.props.name === name);
+      assert.equal(chart.props.component, `../../screens/${name === 'AssetChart' ? 'asset' : 'futures'}/${name}Screen`);
+      assert.equal(chart.props.options.presentation, 'fullScreenModal', name);
+      assert.equal(chart.props.options.animation, 'fade', name);
+    }
   });
 }
