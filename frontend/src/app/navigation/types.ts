@@ -30,14 +30,16 @@ export type HomeStackParamList = {
 };
 
 export type WalletStackParamList = {
-  // 이체 is a bottom sheet on Wallet (WalletTransferSheet), not a route.
+  // 이체 and 환전 are bottom sheets (WalletFundingSheet) over Wallet or an order
+  // screen, not routes; a quest guard names them WalletTransfer / WalletFx.
   Wallet: undefined;
-  WalletFx: undefined;
   WalletTransactions: { currencyCode?: 'KRW' | 'USD' } | undefined;
 };
 
 export type MarketStackParamList = {
-  Futures: { accountId: string; instrumentId?: string };
+  /** `direction`: the new entry the detail's 구매하기 (long) / 판매하기 (short) asked for. */
+  Futures: { accountId: string; instrumentId?: string; direction?: 'long' | 'short' };
+  FuturesDetail: { accountId: string; instrumentId: string };
   Market: { assetType?: import('../../features/market/api').AssetType } | undefined;
   MarketSearch: { returnToAsset?: boolean; sort?: import('../../features/market/marketSort').MarketSort } | undefined;
   AssetDetail: { assetId: string };
@@ -196,11 +198,6 @@ export type WalletScreenProps = CompositeScreenProps<
   CompositeScreenProps<TabScreenProps<'WalletTab'>, RootScreenProps<'MainTabs'>>
 >;
 
-export type WalletFxScreenProps = CompositeScreenProps<
-  StackScreenProps<WalletStackParamList, 'WalletFx'>,
-  CompositeScreenProps<TabScreenProps<'WalletTab'>, RootScreenProps<'MainTabs'>>
->;
-
 export type WalletTransactionsScreenProps = CompositeScreenProps<
   StackScreenProps<WalletStackParamList, 'WalletTransactions'>,
   CompositeScreenProps<TabScreenProps<'WalletTab'>, RootScreenProps<'MainTabs'>>
@@ -266,6 +263,11 @@ export type MyBadgesScreenProps = CompositeScreenProps<
 
 export type FuturesScreenProps = CompositeScreenProps<
   StackScreenProps<MarketStackParamList, 'Futures'>,
+  CompositeScreenProps<TabScreenProps<'MarketTab'>, RootScreenProps<'MainTabs'>>
+>;
+
+export type FuturesDetailScreenProps = CompositeScreenProps<
+  StackScreenProps<MarketStackParamList, 'FuturesDetail'>,
   CompositeScreenProps<TabScreenProps<'MarketTab'>, RootScreenProps<'MainTabs'>>
 >;
 

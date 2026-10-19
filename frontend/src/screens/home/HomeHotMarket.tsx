@@ -6,7 +6,7 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { getAssets, type AssetType } from '../../features/market/api';
 import { marketSortParams } from '../../features/market/marketSort';
 import { getMarketChangeDisplay, getMarketException } from '../../features/market/marketPresentation';
-import { getAssetNameDisplay, getAssetPriceText, getAssetSymbolMarketDisplay } from '../../utils/format';
+import { getAssetNameDisplay, getAssetNameSubline, getAssetPriceText, getAssetSymbolMarketDisplay } from '../../utils/format';
 import ActionPressable from '../../components/common/ActionPressable';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -63,7 +63,10 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
         onRetry={() => void hot.refreshQuery.refetch()} diagnosticError={query.error} /> : null}
       {!query.isLoading && !query.isError && !assets.length ? <InlineEmptyState message="거래대금을 확인할 수 있는 종목이 없습니다." /> : null}
       {assets.map((item, index) => {
-        const name = getAssetNameDisplay(item).primary;
+        const nameDisplay = getAssetNameDisplay(item);
+        const name = nameDisplay.primary;
+        // A KRX listing shows its code under its name, as in the market list.
+        const caption = nameDisplay.code ? getAssetNameSubline(nameDisplay) : getAssetSymbolMarketDisplay(item);
         const price = getAssetPriceText(item);
         const change = getMarketChangeDisplay(item);
         const exception = getMarketException(item);
@@ -76,7 +79,7 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
             <View style={styles.rowContent}>
               <View style={styles.identity}>
                 <Text style={styles.name}>{name}</Text>
-                <Text style={styles.caption}>{getAssetSymbolMarketDisplay(item)}</Text>
+                <Text style={styles.caption}>{caption}</Text>
               </View>
               <View style={styles.values}>
                 <Text style={styles.price}>{price}</Text>

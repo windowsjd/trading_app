@@ -91,7 +91,9 @@ for (const source of wallets) for (const destination of wallets.filter(value => 
   if (destination !== defaultDestination) await h.choose('destination', destination);
   await h.amount('20'); await h.press('wallet-transfer-submit'); assert.ok(h.node('wallet-transfer-success'));
   assert.equal(h.requests[0].body.sourceWalletId, 'A:' + source); assert.equal(h.requests[0].body.destinationWalletId, 'A:' + destination);
-  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.quests('A'), QUERY_KEYS.tradingAccount.walletsAll('A'), ...(source === 'crypto_futures' || destination === 'crypto_futures' ? [QUERY_KEYS.tradingAccount.futuresCollateral('A')] : [])]);
+  // A Futures side also refreshes the Futures screen's wallet balance and free collateral (its positions read).
+  assert.deepEqual(h.invalidations, [QUERY_KEYS.tradingAccount.quests('A'), QUERY_KEYS.tradingAccount.walletsAll('A'), ...(source === 'crypto_futures' || destination === 'crypto_futures'
+    ? [QUERY_KEYS.tradingAccount.futuresCollateral('A'), QUERY_KEYS.tradingAccount.futures.positions('A')] : [])]);
 });
 
 for (const switches of [['B'], ['B', 'A']]) for (const failure of [false, true]) test(`late A ${failure ? 'failure' : 'success'} after ${switches.join('→')} cannot affect current form`, async t => {
@@ -339,4 +341,76 @@ test('the receipt offers 확인 and 마켓으로 가기; busy is reported while 
   await h.press('wallet-transfer-done'); await h.press('wallet-transfer-go-market');
   assert.deepEqual(events.slice(-2), ['done', 'market']);
   assert.equal(h.requests.length, 1, 'closing or leaving never re-executes');
+});
+
+// An order screen opens this sheet on its own wallet (2026-10-20 작업 2 · 3).
+const selected = (h: any, kind: 'source' | 'destination') => h.node(`wallet-transfer-${kind}-selector`).props.accessibilityLabel as string;
+
+test('an order screen picks the receiving wallet; the sending one is never the same wallet', async t => {
+  for (const [initial, source, destination] of [
+    [{ destination: 'crypto_futures' }, '증권 USD', '암호화폐 · 선물 USD'],
+    [{ destination: 'securities' }, '암호화폐 · 현물 USD', '증권 USD'],
+    [{ destination: 'crypto_spot', source: 'crypto_spot' }, '증권 USD', '암호화폐 · 현물 USD'],
+    [{ source: 'crypto_futures', destination: 'securities', amount: '12.5' }, '암호화폐 · 선물 USD', '증권 USD'],
+  ] as const) {
+    const h = walletTransferHarness(); h.props = { initial }; await h.start(); t.after(h.close);
+    assert.match(selected(h, 'source'), new RegExp(`: ${source}$`), JSON.stringify(initial));
+    assert.match(selected(h, 'destination'), new RegExp(`: ${destination}$`), JSON.stringify(initial));
+    assert.equal(h.node('wallet-transfer-amount').props.value, 'amount' in initial ? initial.amount : '');
+    assert.equal(h.requests.length, 0, 'opening sends nothing');
+  }
+});
+
+test('a host that returns on success gets the call after the server confirms; no 마켓으로 가기 without a host for it', async t => {
+  let succeeded = 0;
+  const h = walletTransferHarness(); h.props = { initial: { destination: 'crypto_futures' }, onSucceeded: () => { succeeded++; } };
+  await h.start(); t.after(h.close);
+  await h.amount('20');
+  h.gate = deferred(); await h.press('wallet-transfer-submit');
+  assert.equal(succeeded, 0, 'not before the answer');
+  h.gate.resolve(); await h.flush();
+  assert.equal(succeeded, 1);
+  assert.equal(h.requests.length, 1);
+  assert.equal(h.requests[0].body.destinationWalletId, 'A:crypto_futures');
+  assert.equal(h.node('wallet-transfer-go-market') === undefined, true);
+  // The Futures side refreshes the screen's own reads (collateral and positions).
+  assert.ok(h.invalidations.some((key: unknown[]) => JSON.stringify(key) === JSON.stringify(QUERY_KEYS.tradingAccount.futures.positions('A'))));
+});
+
+test('환전하기 › appears while the sending 증권 USD wallet holds exactly nothing, and hands over the draft without sending', async t => {
+  const drafts: unknown[] = [];
+  const h = walletTransferHarness(); h.props = { onExchange: (draft: unknown) => drafts.push(draft) };
+  h.wallets.A.wallets.find((w: any) => w.id === 'A:securities').balanceAmount = '0.00000000';
+  h.wallets.A.wallets.find((w: any) => w.id === 'A:securities').reservedAmount = '0';
+  await h.start(); t.after(h.close);
+  assert.ok(h.node('wallet-transfer-exchange-row'));
+  await h.amount('30');
+  await h.press('wallet-transfer-exchange');
+  assert.deepEqual(drafts, [{ source: 'securities', destination: 'crypto_spot', amount: '30' }]);
+  assert.equal(h.requests.length, 0, 'the transfer is never sent by itself');
+  // Another sending wallet, or money in 증권 USD (even if reserved), shows no link.
+  await h.choose('source', 'crypto_futures');
+  assert.equal(h.node('wallet-transfer-exchange-row') === undefined, true);
+  const funded = walletTransferHarness(); funded.props = { onExchange: () => {} };
+  funded.wallets.A.wallets.find((w: any) => w.id === 'A:securities').reservedAmount = '1000';
+  await funded.start(); t.after(funded.close);
+  assert.equal(funded.node('wallet-transfer-exchange-row') === undefined, true, 'reserved money is not an empty wallet');
+});
+
+test('the link needs a host that can open 환전, and a known balance', async t => {
+  const plain = walletTransferHarness();
+  plain.wallets.A.wallets.find((w: any) => w.id === 'A:securities').balanceAmount = '0';
+  await plain.start(); t.after(plain.close);
+  assert.equal(plain.node('wallet-transfer-exchange-row') === undefined, true);
+  const failed = walletTransferHarness(); failed.props = { onExchange: () => {} };
+  failed.wallets.A.wallets.find((w: any) => w.id === 'A:securities').balanceAmount = '0';
+  failed.walletState = { isError: true, data: undefined, error: new Error('offline') };
+  await failed.start(); t.after(failed.close);
+  assert.equal(failed.node('wallet-transfer-exchange-row') === undefined, true);
+});
+
+test('back from 환전 the transfer says so above the form', async t => {
+  const h = walletTransferHarness(); h.props = { notice: '환전이 완료되었습니다. 받은 금액을 확인한 뒤 이체하기를 다시 눌러주세요.' };
+  await h.start(); t.after(h.close);
+  assert.match(String(h.node('wallet-transfer-notice').props.children), /환전이 완료되었습니다/);
 });

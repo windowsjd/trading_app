@@ -29,6 +29,16 @@ export function futuresErrorMessage(code: string | null, uncertain: boolean) {
     return "보유 수량을 초과할 수 없습니다. 최신 포지션을 확인해주세요.";
   if (code === "FUTURES_POSITION_NOT_FOUND")
     return "포지션이 이미 종료되었거나 변경되었습니다. 최신 상태를 확인해주세요.";
+  // One-way: one position per contract, its direction, leverage and margin
+  // mode fixed for its lifetime (a stale screen meets the server's answer).
+  if (code === "FUTURES_POSITION_ALREADY_OPEN")
+    return "이 상품의 포지션이 이미 열려 있습니다. 같은 방향으로 수량을 추가하거나 전량 종료한 뒤 새로 진입해주세요.";
+  if (code === "FUTURES_ONE_WAY_VIOLATION")
+    return "보유 포지션과 반대 방향으로는 진입할 수 없습니다. 포지션을 전량 종료한 뒤 진입해주세요.";
+  if (code === "FUTURES_LEVERAGE_MISMATCH")
+    return "보유 포지션의 레버리지로만 수량을 추가할 수 있습니다. 최신 포지션을 확인해주세요.";
+  if (code === "FUTURES_MARGIN_MODE_MISMATCH")
+    return "보유 포지션의 증거금 방식으로만 수량을 추가할 수 있습니다. 최신 포지션을 확인해주세요.";
   // A beginner learning lock, not a rejected input (the server's staged rule).
   if (code === "BEGINNER_FEATURE_LOCKED") return getErrorMessageFromCode(code);
   return "주문이 접수되지 않았습니다. 입력값과 거래 가능 상태를 확인해주세요.";

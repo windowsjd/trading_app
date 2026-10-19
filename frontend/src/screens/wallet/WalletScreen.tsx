@@ -1,5 +1,6 @@
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
 import LearningLock from '../../features/quest/LearningLock';
+import { QUEST_LOCK_CAPTION } from '../../features/quest/questProgress';
 import { portfolioReadPolicy } from '../../features/tradingAccount/portfolioReadPolicy';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { revealInScrollView } from '../../hooks/useFocusedInputScroll';
@@ -46,9 +47,7 @@ import { publishQuestGuideFacts, questGuideTarget, registerQuestGuideReveal, typ
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { questNavigationAllowed } from '../../features/quest/questNavigationGuard';
 import QuestTargetHighlight from '../../features/quest/QuestTargetHighlight';
-import InlineBottomSheet from '../../components/common/InlineBottomSheet';
-import { SheetPortal } from '../../components/common/ScreenSheetHost';
-import WalletTransferPanel from './WalletTransferSheet';
+import WalletFundingSheet, { type FundingRequest } from './WalletFundingSheet';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
@@ -75,14 +74,13 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
   const transferGate = useLearningAccess(accountId).gate('transfer');
   const rootNavigation = useRootNavigation();
   const [trendExpanded, setTrendExpanded] = useState(false);
-  // 이체 opens over the wallet instead of a new page; leaving the wallet closes it.
+  // 이체 and 환전 open over the wallet instead of a new page; leaving the wallet closes them.
   const focused = useIsFocused();
-  const [transferOpen, setTransferOpen] = useState(false);
-  const [transferBusy, setTransferBusy] = useState(false);
-  useEffect(() => { if (!focused) setTransferOpen(false); }, [focused]);
-  const closeTransfer = useCallback(() => setTransferOpen(false), []);
-  const transferToMarket = useCallback(() => {
-    setTransferOpen(false);
+  const [funding, setFunding] = useState<FundingRequest | null>(null);
+  useEffect(() => { if (!focused) setFunding(null); }, [focused]);
+  const closeFunding = useCallback(() => setFunding(null), []);
+  const fundingToMarket = useCallback(() => {
+    setFunding(null);
     rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } });
   }, [rootNavigation]);
   const [equityRange, setEquityRange] = useState<HomeEquityRange>('30d');
@@ -132,7 +130,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-transfer'),
       // The sheet is not a route: an active quest guide checks it here.
-      onPress: () => { if (questNavigationAllowed('WalletTransfer')) transferGate.guard(() => setTransferOpen(true)); },
+      onPress: () => { if (questNavigationAllowed('WalletTransfer')) transferGate.guard(() => setFunding({ kind: 'transfer' })); },
     },
     {
       testID: 'wallet-exchange',
@@ -142,7 +140,8 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
       disabled: !capabilities?.canExchange,
       hidden: !!integrityFailure,
       questTarget: questGuideTarget('wallet-exchange'),
-      onPress: () => navigation.navigate('WalletFx'),
+      // 환전 is a sheet too (KRW → USD first); a quest guide names it WalletFx.
+      onPress: () => { if (questNavigationAllowed('WalletFx')) setFunding({ kind: 'fx' }); },
     },
     {
       testID: 'wallet-ledger',
@@ -269,7 +268,10 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
                   aria-hidden
                   style={[styles.quickActionLabel, (action.disabled || action.testID === 'wallet-transfer' && transferGate.locked) && styles.quickActionDisabled]}
                 >
-                  {action.label}
+                  {/* Inside the label: the measured guide group keeps its icon surface and label. */}
+                  {action.testID === 'wallet-transfer' && transferGate.locked ? (
+                    <>{action.label}{'\n'}<Text testID="wallet-transfer-learning-caption" style={styles.quickActionCaption}>{QUEST_LOCK_CAPTION}</Text></>
+                  ) : action.label}
                 </Text>
               </View>
             </ActionPressable>
@@ -323,12 +325,7 @@ function AccountWallet({ account, capabilities, navigation }: AccountWalletProps
         </View>
       ) : null}
     </ScrollView>
-    <SheetPortal>
-      <InlineBottomSheet testID="wallet-transfer-sheet" title="이체하기" visible={transferOpen && focused}
-        dismissible={!transferBusy} onClose={closeTransfer}>
-        <WalletTransferPanel onDone={closeTransfer} onGoMarket={transferToMarket} onBusyChange={setTransferBusy} />
-      </InlineBottomSheet>
-    </SheetPortal>
+    <WalletFundingSheet testID="wallet" request={funding} visible={focused} onClose={closeFunding} onGoMarket={fundingToMarket} />
     </View>
   );
 }
@@ -388,4 +385,5 @@ const styles = StyleSheet.create({
   quickActionFeedback: { top: 0, alignSelf: 'center', zIndex: 1 },
   quickActionDisabled: { opacity: 0.45 },
   quickActionLabel: { alignSelf: 'stretch', fontSize: 13, fontWeight: '600', lineHeight: 20, color: semantic.secondary, textAlign: 'center' },
+  quickActionCaption: { alignSelf: 'stretch', fontSize: 11, lineHeight: 15, color: semantic.secondary, textAlign: 'center' },
 });

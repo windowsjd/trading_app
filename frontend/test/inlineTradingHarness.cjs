@@ -521,6 +521,10 @@ function inlineTradingHarness() {
       },
     },
     '../../features/asset/useStaleRecheck': { useStaleRecheck: () => {} },
+    // The wallet's 이체 / 환전 panels inside the order screen's sheet: their own
+    // tests render them; here the sheet shows which one opened, with what.
+    './WalletTransferSheet': { default: 'WalletTransferPanel', __esModule: true },
+    './WalletFxSheet': { default: 'WalletFxPanel', __esModule: true },
     '../../components/charts': { CandlestickChart: 'CandlestickChart' },
     '../../components/charts/ChartLoading': { default: 'ChartLoading', __esModule: true },
     '../../components/charts/ChartTimeframeSelector': {

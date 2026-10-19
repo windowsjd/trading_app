@@ -56,6 +56,22 @@ export interface RankingsResponseDto {
   message?: string;
 }
 
+/**
+ * One fully closed trade of a friend, as the server aggregates it: a Spot
+ * holding closed now (매수 금액 = every buy, fee included) or one closed
+ * Futures lifetime (진입 증거금 by the margin policy). 실현 손익 is confirmed
+ * and includes fees; 수익률 is null when its basis is not above zero.
+ */
+export type FriendCompletedTrade =
+  | {
+      kind: 'spot'; assetId: string; symbol: string; name: string; market: string; assetType: string;
+      currencyCode: 'KRW' | 'USD'; buyAmount: MoneyString; realizedPnl: MoneyString; returnRate: PercentString | null;
+    }
+  | {
+      kind: 'futures'; assetId: string; symbol: string; name: string; market: string; direction: 'long' | 'short';
+      currencyCode: 'USD'; entryMargin: MoneyString; realizedPnl: MoneyString; returnRate: PercentString | null;
+    };
+
 export interface UserSeasonSummaryDto {
   state: 'available' | 'not_joined' | 'unavailable';
   user: { id: string; nickname: string; profileImageUrl: string | null };
@@ -95,6 +111,8 @@ export interface UserSeasonSummaryDto {
       totalAssetKrw: MoneyString;
       returnRate: PercentString;
     }>;
+    /** 거래 완료 종목 (backend docs/friends-api-contract.md); absent from a server before 2026-10-20. */
+    completedTrades?: { items: FriendCompletedTrade[]; hasMore: boolean };
   } | null;
   reason?: string;
   message?: string;

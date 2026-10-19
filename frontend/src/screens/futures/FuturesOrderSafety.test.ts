@@ -217,3 +217,19 @@ test('a beginner learning lock from the server reads as a learning step, not a r
   // A lost response is still the same-request check, whatever its code.
   assert.match(futuresErrorMessage('BEGINNER_FEATURE_LOCKED', true), /체결을 확인하지 못했습니다/);
 });
+
+test('a one-way conflict from the server says what to do, never the generic refusal', () => {
+  const { futuresErrorMessage } = require('../../features/futures/orderFeedback.ts');
+  const generic = futuresErrorMessage('SOMETHING_ELSE', false);
+  for (const [code, pattern] of [
+    ['FUTURES_POSITION_ALREADY_OPEN', /이미 열려 있습니다.*전량 종료한 뒤 새로 진입/],
+    ['FUTURES_ONE_WAY_VIOLATION', /반대 방향으로는 진입할 수 없습니다/],
+    ['FUTURES_LEVERAGE_MISMATCH', /레버리지로만 수량을 추가/],
+    ['FUTURES_MARGIN_MODE_MISMATCH', /증거금 방식으로만 수량을 추가/],
+  ] as const) {
+    assert.match(futuresErrorMessage(code, false), pattern, code);
+    assert.notEqual(futuresErrorMessage(code, false), generic, code);
+    // A lost response stays the same-request check, whatever its code.
+    assert.match(futuresErrorMessage(code, true), /체결을 확인하지 못했습니다/, code);
+  }
+});

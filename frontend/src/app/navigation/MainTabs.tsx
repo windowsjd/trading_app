@@ -79,8 +79,8 @@ export default function MainTabs() {
         component={MarketStack}
         options={({ route }) => ({
           title: '마켓',
-          // Detail owns the bottom safe area and its persistent order actions.
-          ...(getFocusedRouteNameFromRoute(route) === 'AssetDetail'
+          // A detail (spot or futures) owns the bottom safe area and its persistent order actions.
+          ...(['AssetDetail', 'FuturesDetail'].includes(getFocusedRouteNameFromRoute(route) ?? '')
             ? { tabBarStyle: { display: 'none' } }
             : {}),
           tabBarIcon: ({ color, size, focused }) => (

@@ -137,7 +137,8 @@ export default function MarketScreen({ navigation, route }: Props) {
     [navigation],
   );
   const openFutures = useCallback(
-    (accountId: string, instrumentId: string) => navigation.navigate('Futures', { accountId, instrumentId }),
+    // Like a spot row: the contract's detail (chart, 구매하기/판매하기) before its order screen.
+    (accountId: string, instrumentId: string) => navigation.navigate('FuturesDetail', { accountId, instrumentId }),
     [navigation],
   );
   const futures = useFuturesMarket({ active: futuresMarket, sort, refreshVersion: futuresRefresh, onSelect: openFutures });

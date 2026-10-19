@@ -264,7 +264,7 @@ describe('the styles long text depends on are present', () => {
   });
 
   it('capability and integrity notices wrap in the FX screen', () => {
-    const source = read('screens/wallet/WalletFxScreen.tsx');
+    const source = read('screens/wallet/WalletFxSheet.tsx');
 
     assert.match(source, /blockedMessage:\s*\{[^}]*lineHeight/s);
     assert.ok(!/numberOfLines=\{/.test(source));
@@ -373,8 +373,8 @@ describe('fail-closed copy is complete, plain, and never claims absence', () => 
 });
 
 describe('an account switch cannot leave the previous account on screen', () => {
-  it('WalletFxScreen gates every FX callback on the request scope', () => {
-    const source = read('screens/wallet/WalletFxScreen.tsx');
+  it('the FX panel gates every FX callback on the request scope', () => {
+    const source = read('screens/wallet/WalletFxSheet.tsx');
 
     // Success/error handlers compare the RESPONSE's scope, not a render
     // closure, before touching quote/success/error state.
@@ -391,7 +391,7 @@ describe('an account switch cannot leave the previous account on screen', () => 
       !/invalidateAfterFx\(queryClient, accountId/.test(source),
       'invalidating the CURRENT selection would refresh the wrong account',
     );
-    // The success sheet is bound to successData, which the scope gate owns.
-    assert.match(source, /visible=\{!!successData\}/);
+    // The receipt is bound to successData, which the scope gate owns.
+    assert.match(source, /\{successData \? \(\s*<FxReceipt payload=\{successData\}/);
   });
 });

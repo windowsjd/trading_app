@@ -39,19 +39,19 @@ it('a US stock leads with its Korean name and keeps the English name and symbol 
   assert.deepEqual([r.text('market-name-us-elsewhere'), r.text('market-subtitle-us-elsewhere')], ['Apple Inc.', 'AAPL · NYS']);
 });
 
-it('domestic and crypto rows keep their names; verified coins show their icon, others a monogram', (t) => {
+it('a domestic row shows its KRX listing name over its code; coins keep their names; verified coins show their icon, others a monogram', (t) => {
   const r = render(t, [
     row({ id: 'kr', assetType: 'domestic_stock', symbol: '005930', name: 'Samsung Electronics', market: 'KRX', priceCurrency: 'KRW' }),
     row({ id: 'btc', assetType: 'crypto', symbol: 'BTCUSDT', name: 'Bitcoin', market: 'BINANCE' }),
     row({ id: 'pepe', assetType: 'crypto', symbol: 'PEPEUSDT', name: 'Pepe', market: 'BINANCE' }),
     row({ id: 'perp', assetType: 'crypto', symbol: 'ETHUSDT', name: 'Ethereum', market: 'USDⓈ-M 무기한' }),
   ]);
-  assert.deepEqual([r.text('market-name-kr'), r.text('market-subtitle-kr')], ['Samsung Electronics', 'KRX']);
+  assert.deepEqual([r.text('market-name-kr'), r.text('market-subtitle-kr')], ['삼성전자', '(005930)']);
   assert.deepEqual([r.text('market-name-btc'), r.text('market-subtitle-btc')], ['Bitcoin', 'BTCUSDT']);
   assert.equal(r.node('market-logo-btc-image').props.source.uri.endsWith('/crypto-logos/btc.png'), true);
   assert.equal(r.node('market-logo-perp-image').props.source.uri.endsWith('/crypto-logos/eth.png'), true, 'futures rows share the coin');
   // Without a verified icon (and with no stock logo key here) the shown name's first letter marks the row.
-  assert.deepEqual([r.text('market-logo-pepe-monogram'), r.text('market-logo-kr-monogram')], ['P', 'S']);
+  assert.deepEqual([r.text('market-logo-pepe-monogram'), r.text('market-logo-kr-monogram')], ['P', '삼']);
   assert.equal(r.node('market-logo-pepe-image') === undefined, true);
 });
 

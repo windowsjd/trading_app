@@ -14,7 +14,7 @@ import {
   formatCurrency,
   formatDisplayDecimal,
   formatKstDateTime,
-  getAssetEnglishNameLine,
+  getAssetNameSubline,
   getAssetNameDisplay,
   getAssetSymbolDisplay,
 } from '../../utils/format';
@@ -294,7 +294,7 @@ export function getRecordOrderDisplay(item: RecordOrderItemDto) {
       `${item.assetId ?? item.symbol}-${item.executedAt}`,
     orderId: item.orderId ?? item.id ?? null,
     // The line under the name: `(English) · SYMBOL` under a US Korean name.
-    symbol: getAssetEnglishNameLine(nameDisplay) ?? (symbol === nameDisplay.primary ? null : symbol),
+    symbol: getAssetNameSubline(nameDisplay) ?? (symbol === nameDisplay.primary ? null : symbol),
     name: nameDisplay.primary,
     executedAt: formatKstDateTime(item.executedAt ?? item.submittedAt),
     side: item.side,

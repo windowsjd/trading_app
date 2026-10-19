@@ -263,7 +263,11 @@ export class PushNotificationScanner {
             pushDevices: { some: {} },
             OR: [
               { notificationPreference: { is: null } },
-              { notificationPreference: { is: { importantNotice: true } } },
+              {
+                notificationPreference: {
+                  is: { importantNotice: true, allEnabled: true },
+                },
+              },
             ],
           },
           orderBy: { id: 'asc' },

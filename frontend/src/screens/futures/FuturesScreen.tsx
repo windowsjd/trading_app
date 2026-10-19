@@ -1,5 +1,9 @@
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import { questNavigationAllowed } from '../../features/quest/questNavigationGuard';
+import { walletFundingMessage, walletFundingState, type FundingAction } from '../../features/wallet/walletFunding';
+import WalletFundingNotice from '../../components/tradingAccount/WalletFundingNotice';
+import WalletFundingSheet, { type FundingRequest } from '../wallet/WalletFundingSheet';
 import { FUTURES_PRACTICE_LEVERAGE_MESSAGE } from '../../features/quest/questProgress';
 import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { captureQuestGuideCommand, questGuideTarget, registerQuestGuideReveal } from '../../features/quest/questGuideBridge';
@@ -106,7 +110,8 @@ import FuturesPositionCard from './FuturesPositionCard';
 import FuturesOrderBookCard from './FuturesOrderBookCard';
 
 export default function FuturesScreen(props: FuturesScreenProps) {
-  return <BoundFuturesScreen key={`${props.route.params.accountId}:${props.route.params.instrumentId ?? ""}:${getSessionGeneration()}`} {...props} />;
+  const { accountId, instrumentId, direction } = props.route.params;
+  return <BoundFuturesScreen key={`${accountId}:${instrumentId ?? ""}:${direction ?? ""}:${getSessionGeneration()}`} {...props} />;
 }
 
 type ListView = 'positions' | 'pending';
@@ -168,7 +173,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const markSeen = useRef({ instrumentId: "", at: clock, renderedAt: clock });
   const [selectedId, setSelectedId] = useState(route.params.instrumentId ?? "");
   const [instrumentSheetOpen, setInstrumentSheetOpen] = useState(false);
-  const [direction, setDirection] = useState<Direction>("long");
+  // The detail's 구매하기 / 판매하기 open a new long / short entry; long otherwise.
+  const [direction, setDirection] = useState<Direction>(route.params.direction ?? "long");
   const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
   const [leverage, setLeverage] = useState("1");
   const [leverageSheet, setLeverageSheet] = useState<FuturesLeverageSheet>(null);
@@ -191,6 +197,10 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const [collateralAttempted, setCollateralAttempted] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [listView, setListView] = useState<ListView>('positions');
+  // 이체 into the Futures wallet, opened over this screen (the selected account,
+  // which a bound screen is); leaving the screen or the account closes it.
+  const [funding, setFunding] = useState<FundingRequest | null>(null);
+  useEffect(() => { if (!bound || !focused) setFunding(null); }, [bound, focused]);
   const scope = useRef({ key: "", epoch: 0, mounted: true });
   const session = getSessionGeneration();
   const scopeKey = `${accountId}:${selectedAccountId}:${bound}:${session}`;
@@ -674,6 +684,17 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
     if (wholePosition) estimateLines.push("보유 수량 전체 · 전량 종료로 처리됩니다.");
   }
   const freeCollateral = collateralKnown ? data.collateral.freeCollateral : null;
+  // The Futures wallet for a new entry or an increase only (a reduce or close
+  // needs no money): empty when this read's balance is exactly zero; all held
+  // as margin or by orders when a known free collateral is none; else silent.
+  const fundingState = entering && timely
+    ? walletFundingState(data.collateral.balanceAmount, freeCollateral === null ? null : hasNoFreeCollateral(freeCollateral) ? '0' : freeCollateral)
+    : null;
+  const transferGate = learning.gate('transfer');
+  const openFunding = (action: FundingAction) => {
+    if (action.kind === 'transfer' && questNavigationAllowed('WalletTransfer'))
+      transferGate.guard(() => setFunding({ kind: 'transfer', destination: action.destination }));
+  };
   const availableText = selectedOperation === "reduce" && position
     ? `보유 ${formatDisplayDecimal(position.quantity)} ${baseSymbol}${positionNotional ? ` · 약 ${formatUsd(positionNotional)} USD` : ""}`
     : freeCollateral === null ? "주문가능 평가 대기" : `주문가능 ${formatUsd(freeCollateral)} USD`;
@@ -824,6 +845,14 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       방향·레버리지·증거금 모드는 전량 종료 후 새 포지션에서
                       선택할 수 있습니다.
                     </Text>
+                    {/* Asked for the other side (detail's 구매하기/판매하기): one-way, so say why
+                        instead of turning the request into a reduce or close. */}
+                    {route.params.direction && route.params.direction !== position.direction ? (
+                      <Text testID="futures-direction-held" style={styles.helper}>
+                        {directionLabel[position.direction]} 포지션이 열려 있어 {directionLabel[route.params.direction]}으로
+                        새로 진입할 수 없습니다. 이 포지션을 전량 종료한 뒤 진입할 수 있어요.
+                      </Text>
+                    ) : null}
                   </View>
                 ) : (
                   <>
@@ -945,6 +974,13 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                     {amount.trim() && inputError ? (
                       <Text testID="futures-amount-error" accessibilityLiveRegion="polite" style={styles.error}>{inputError}</Text>
                     ) : null}
+                    {fundingState ? (
+                      <WalletFundingNotice testID="futures-wallet-funding" product="crypto_futures"
+                        message={walletFundingMessage('crypto_futures', fundingState)} onAction={openFunding} disabled={locked} />
+                    ) : entering && (collateralShort || orderNotice === COLLATERAL_SHORT) ? (
+                      <WalletFundingNotice testID="futures-funding-actions" product="crypto_futures" message={null}
+                        onAction={openFunding} disabled={locked} />
+                    ) : null}
                     {ratioMessage ? (
                       <Text testID="futures-ratio-message" accessibilityLiveRegion="polite" style={styles.error}>{ratioMessage}</Text>
                     ) : null}
@@ -972,6 +1008,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       <View ref={inputScroll.submitRef}>
                         <QuestTarget id="futures-submit"><CTAButton
                           learningHint={entryGate.locked ? entryGate.message : null}
+                          learningCaption={entryGate.locked ? entryGate.caption : null}
                           label={`${directionLabel[orderDirection]} ${operationVerb[effectiveOperation]}`}
                           testID="futures-submit"
                           style={entering ? { backgroundColor: orderDirection === 'long' ? BUY_COLOR : SELL_COLOR } : undefined}
@@ -1095,6 +1132,8 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
         ) : null}
       </ScrollView>
       <TpSlSheet target={focused && tpSlTarget?.accountId === accountId ? tpSlTarget : null} onClose={() => setTpSlTarget(null)} />
+      {/* 이체 over this screen: closes on success; the next reads carry the new balance and margin. */}
+      <WalletFundingSheet testID="futures" request={funding} visible={focused && bound} closeOnSuccess onClose={() => setFunding(null)} />
       <FuturesInstrumentSheet
         visible={instrumentSheetOpen && !locked}
         instruments={allInstruments}

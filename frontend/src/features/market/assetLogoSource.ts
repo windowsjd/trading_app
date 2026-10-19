@@ -72,13 +72,20 @@ function isinCheckDigit(body: string) {
   return String((10 - (sum % 10)) % 10);
 }
 
-function logoDevUri(path: string, key: string) {
-  // 64 px at 2x covers the row's 28 dp logo box at every density; PNG keeps
-  // transparency; 404 instead of the provider's monogram, so ours is shown.
-  return `${LOGO_DEV_IMAGE_ORIGIN}/${path}?token=${encodeURIComponent(key)}&size=64&retina=true&format=png&fallback=404`;
+function logoDevUri(path: string, key: string, theme: 'light' | 'dark') {
+  // 64 px at 2x (128 px) covers the row's 36 dp logo box up to 3.5x density;
+  // PNG keeps transparency; 404 instead of the provider's monogram, so ours is
+  // shown. On a dark screen the provider's own dark variant: a transparent logo
+  // drawn dark (Apple's) comes back light, a logo on its own ground unchanged.
+  const variant = theme === 'dark' ? '&theme=dark' : '';
+  return `${LOGO_DEV_IMAGE_ORIGIN}/${path}?token=${encodeURIComponent(key)}&size=64&retina=true&format=png&fallback=404${variant}`;
 }
 
-export function resolveAssetLogo(asset: LogoAsset, { logoDevKey = LOGO_DEV_KEY }: { logoDevKey?: string | null } = {}): AssetLogoSource | null {
+export function resolveAssetLogo(asset: LogoAsset, { logoDevKey = LOGO_DEV_KEY, theme = 'light' }: {
+  logoDevKey?: string | null;
+  /** The screen's appearance; a remote logo asks for the matching variant. */
+  theme?: 'light' | 'dark';
+} = {}): AssetLogoSource | null {
   const base = cryptoBaseAsset(asset);
   if (base) {
     return (BUNDLED_CRYPTO_LOGOS as readonly string[]).includes(base) ? { kind: 'bundled', key: base as BundledCryptoLogo } : null;
@@ -88,12 +95,12 @@ export function resolveAssetLogo(asset: LogoAsset, { logoDevKey = LOGO_DEV_KEY }
   const market = asset.market?.trim().toUpperCase() ?? '';
   if (asset.assetType === 'us_stock' && US_MARKETS.has(market)) {
     const isin = US_LISTING_ISIN[`${market}:${symbol}`];
-    if (isin) return { kind: 'remote', uri: logoDevUri(`isin/${isin}`, logoDevKey) };
-    return /^[A-Z]{1,5}$/.test(symbol) ? { kind: 'remote', uri: logoDevUri(`ticker/${symbol}`, logoDevKey) } : null;
+    if (isin) return { kind: 'remote', uri: logoDevUri(`isin/${isin}`, logoDevKey, theme) };
+    return /^[A-Z]{1,5}$/.test(symbol) ? { kind: 'remote', uri: logoDevUri(`ticker/${symbol}`, logoDevKey, theme) } : null;
   }
   if (asset.assetType === 'domestic_stock' && market === 'KRX') {
     const isin = krxCommonShareIsin(symbol);
-    return isin ? { kind: 'remote', uri: logoDevUri(`isin/${isin}`, logoDevKey) } : null;
+    return isin ? { kind: 'remote', uri: logoDevUri(`isin/${isin}`, logoDevKey, theme) } : null;
   }
   return null;
 }

@@ -854,6 +854,78 @@ async function run() {
     'no row was sent twice by concurrent workers',
   );
 
+  // 전체 알림 off: a type that is itself on waits at send time, and a notice
+  // published meanwhile is not fanned out to that user; the seven switches
+  // are never rewritten, so turning it back on restores them as they were.
+  const masterOff = await preferences.update(bob.id, { allEnabled: false });
+  check(
+    masterOff.data.allEnabled === false &&
+      masterOff.data.preferences.tradeFill === false &&
+      masterOff.data.preferences.futuresLiquidation === true,
+    '전체 알림 off keeps the per-type switches',
+  );
+  const heldAt = new Date(claimAt.getTime() + 10);
+  const heldRow = await db.pushNotification.create({
+    data: {
+      userId: bob.id,
+      type: 'futures_liquidation',
+      sourceKey: `manual:${tag}:all-off`,
+      title: 't',
+      body: 'b',
+      data: { v: 1, type: 'futures_liquidation', uid: bob.id },
+      eventAt: heldAt,
+      expiresAt: new Date(heldAt.getTime() + HOUR),
+      nextAttemptAt: heldAt,
+    },
+  });
+  sent.length = 0;
+  await dispatcher.dispatch(new Date(heldAt.getTime() + 1), config);
+  const held = await db.pushNotification.findUniqueOrThrow({
+    where: { id: heldRow.id },
+  });
+  check(
+    held.skipReason === 'preference_disabled' &&
+      !sent.some((m) => m.data.uid === bob.id),
+    '전체 알림 off holds a type that is itself on',
+  );
+  const offNotice = await notices.create(
+    { userId: operator.id, role: 'operator' },
+    {
+      title: '전체 알림 확인',
+      summary: '전체 알림이 꺼진 사용자에게는 보내지 않음',
+      sections: [{ heading: 'h', paragraphs: ['p'] }],
+      idempotencyKey: `notice-all-off-${tag}`,
+    },
+    {},
+  );
+  created.notices.push(offNotice.data.notice.id);
+  await notices.publish(
+    { userId: operator.id, role: 'operator' },
+    offNotice.data.notice.id,
+    { confirm: true },
+    {},
+  );
+  await scanner.scan(new Date(heldAt.getTime() + 2_000), config);
+  const offKey = `notice:${offNotice.data.notice.id}`;
+  const afterOff = await notificationsOf([alice.id, bob.id]);
+  check(
+    afterOff.some((row) => row.userId === alice.id && row.sourceKey === offKey),
+    'the notice still reaches a user with 전체 알림 on',
+  );
+  check(
+    !afterOff.some((row) => row.userId === bob.id && row.sourceKey === offKey),
+    'a notice is not fanned out to a user with 전체 알림 off',
+  );
+  const restored = await preferences.update(bob.id, { allEnabled: true });
+  check(
+    restored.data.allEnabled === true &&
+      restored.data.preferences.tradeFill === false &&
+      Object.entries(restored.data.preferences).every(
+        ([key, value]) => key === 'tradeFill' || value === true,
+      ),
+    '전체 알림 on restores the seven exactly as chosen',
+  );
+
   // A device released (logout) while its push is in flight: the outcome is
   // still recorded, so nothing is resent after the lease.
   await devices.register(bob.id, {

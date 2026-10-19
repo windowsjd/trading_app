@@ -285,10 +285,21 @@ is in `push_notifications.status/skip_reason/last_error_code` and
 ## 6. Preferences
 
 `GET /api/v1/notifications/preferences` and `PATCH` with any subset of
-`tradeFill, futuresLiquidation, orderFailure, friendRequest, importantNotice,
-seasonFinalResult, seasonEndingSoon` (booleans only; unknown keys or an empty
-body → 400 `INVALID_NOTIFICATION_PREFERENCES`). Both answer with the stored
-seven values. No row = all on. The OS permission is separate device state.
+`allEnabled, tradeFill, futuresLiquidation, orderFailure, friendRequest,
+importantNotice, seasonFinalResult, seasonEndingSoon` (booleans only; unknown
+keys or an empty body → 400 `INVALID_NOTIFICATION_PREFERENCES`). Both answer
+`{ allEnabled, preferences }` with the stored values (`preferences` = the
+seven, unchanged in shape for apps from before 2026-10-20). No row = all on.
+The OS permission is separate device state.
+
+**전체 알림 (`allEnabled`, 2026-10-20, column `notification_preferences.all_enabled`,
+default `true`):** off holds every type — the dispatcher checks it with the
+type's own switch at send time (`preference_disabled`), and an important notice
+is not fanned out to that user at all — while the seven columns are never
+rewritten, so turning it back on restores exactly what the user chose. One
+value per user (every device). An app from before 2026-10-20 ignores the field
+and cannot turn it back on; only a newer app can turn it off. The app shows no
+전체 알림 switch when a server answers without the field.
 
 ## 7. App behaviour (frontend `src/features/notifications`)
 
@@ -327,9 +338,11 @@ seven values. No row = all on. The OS permission is separate device state.
   (opened), final result / ending soon → 시즌 전적 상세
   (`RecordSeasonDetail`). A beginner's active quest holds the move like any
   other navigation.
-- **Settings:** seven server switches (saving state shown, failed saves
-  revert with an error) and the OS permission state with 알림 허용하기 /
-  기기 설정 열기.
+- **Settings:** 전체 알림 and the seven server switches under 알림 종류별 설정
+  (folded by default; folding is screen state, never stored). While 전체 알림 is
+  off the seven show their kept values and wait. Saving state is shown, a failed
+  save reverts with an error and 다시 시도 (the same change again), and the OS
+  permission state stays separate with 알림 허용하기 / 기기 설정 열기.
 
 ## 8. Configuration and external setup
 
@@ -389,6 +402,11 @@ Required outside the code before any real delivery (none done yet; checked
    in `frontend/docs/push-notifications-qa.md`), then production.
 5. Rollback: `PUSH_NOTIFICATIONS_ENABLED=false` stops all sends immediately;
    the tables can stay. Nothing financial depends on them.
+6. 전체 알림 (`20261020090000_add_notification_all_enabled`): additive column
+   with a default, so the server deploys first and older apps keep working;
+   then the app. Rolling the server back leaves the column unused (a user
+   who had turned 전체 알림 off would receive pushes again until it is
+   redeployed); dropping it is never required.
 
 ## 10. Invariants
 

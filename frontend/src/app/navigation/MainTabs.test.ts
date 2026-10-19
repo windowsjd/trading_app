@@ -125,18 +125,18 @@ describe('mode-aware bottom tabs', () => {
   });
 
   for (const mode of ['general', 'season'] as const) {
-    it(`${mode}: hides the tab bar only for AssetDetail and restores it on Market routes`, () => {
+    it(`${mode}: hides the tab bar only for the detail screens (AssetDetail, FuturesDetail) and restores it on Market routes`, () => {
       const tree = renderTabs(mode);
       const screens = elements(tree, 'Screen');
       const market = screens.find((screen: any) => screen.props.name === 'MarketTab');
       const defaultStyle = tree.props.screenOptions.tabBarStyle;
 
       // Nested screen params are available before the child navigator mounts.
-      for (const name of [undefined, 'Market', 'MarketSearch', 'AssetDetail', 'MarketSearch', 'Market']) {
+      for (const name of [undefined, 'Market', 'MarketSearch', 'AssetDetail', 'MarketSearch', 'FuturesDetail', 'Futures', 'Order', 'Market']) {
         const route = { name: 'MarketTab', params: name ? { screen: name } : undefined };
         const options = screenOptions(market, route);
         assert.equal(options.title, '마켓');
-        if (name === 'AssetDetail') {
+        if (name === 'AssetDetail' || name === 'FuturesDetail') {
           assert.deepEqual(options.tabBarStyle, { display: 'none' });
         } else {
           assert.equal(options.tabBarStyle, undefined, 'inherits the navigator tab bar style');

@@ -260,6 +260,11 @@ describe('PushDispatcher.dispatch', () => {
         { preferences: [{ userId: 'u1', tradeFill: false }] },
         'preference_disabled',
       ],
+      // 전체 알림 off holds the type even though its own switch is on.
+      [
+        { preferences: [{ userId: 'u1', allEnabled: false, tradeFill: true }] },
+        'preference_disabled',
+      ],
       [{ devices: [] }, 'no_device'],
     ];
     for (const [options, reason] of cases) {

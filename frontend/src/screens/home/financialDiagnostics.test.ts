@@ -318,7 +318,7 @@ for (const role of ['user', 'operator', 'admin']) it(`Home season header: existi
 });
 
 for (const walletFailed of [false, true]) it(`FX: ${walletFailed ? 'wallet rejection selects only its own failure' : 'HTTP 200 unavailable wallets do not borrow a rate failure'}`, () => {
-  const h = createTradingUiHarness('wallet/WalletFxScreen.tsx'); const walletError = failure('fx-wallet-request');
+  const h = createTradingUiHarness('wallet/WalletFxSheet.tsx'); const walletError = failure('fx-wallet-request');
   h.walletQuery = { data: { state: 'unavailable', wallets: [] }, isError: walletFailed, error: walletFailed ? walletError : undefined };
   h.rateQuery = { data: undefined, isError: true, error: failure('unrelated-rate-request') };
   const state = elements(h.render(), 'ErrorState')[0];

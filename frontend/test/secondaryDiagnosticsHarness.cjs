@@ -35,6 +35,8 @@ function secondaryDiagnosticsHarness(screen, role = 'admin') {
   const account = { id: 'A', mode: 'season', status: 'active', season: { seasonId: h.season.id, seasonStatus: 'active' } };
   Object.assign(h.native, { SafeAreaView: 'SafeAreaView', TextInput: 'TextInput', Switch: 'Switch',
     Alert: { alert: (...args) => h.alerts.push(args) },
+    // Screens that re-read on a return from the background (the friend summary).
+    AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) },
     FlatList: ({ data, renderItem, ListHeaderComponent, ListEmptyComponent, ListFooterComponent, ...props }) => React.createElement('FlatList', props, ListHeaderComponent, data.length ? data.map((item, index) => React.createElement(React.Fragment, { key: index }, renderItem({ item, index }))) : ListEmptyComponent, ListFooterComponent),
   });
   const mocks = {

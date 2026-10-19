@@ -256,7 +256,7 @@ describe('session movement', () => {
 
   it('keeps each practice to its own screens; the guard holds the rest and a move it missed ends the guide', () => {
     const allowed = (quest: GuideSession['quest']) => ['HomeTab', 'MarketTab', 'QuestTab', 'WalletTab', 'MyTab', 'Market', 'MarketSearch',
-      'AssetDetail', 'Order', 'Futures', 'AssetChart', 'FuturesChart', 'Wallet', 'WalletFx', 'WalletTransfer', 'WalletTransactions', 'TradeHistory', 'Guide', 'Home']
+      'AssetDetail', 'Order', 'FuturesDetail', 'Futures', 'AssetChart', 'FuturesChart', 'Wallet', 'WalletFx', 'WalletTransfer', 'WalletTransactions', 'TradeHistory', 'Guide', 'Home']
       .filter(name => guideAllowsRoute(quest, name));
     assert.deepEqual(allowed('exchange'), ['WalletTab', 'Wallet', 'WalletFx']);
     assert.deepEqual(allowed('transfer'), ['WalletTab', 'Wallet', 'WalletTransfer']);
@@ -264,7 +264,8 @@ describe('session movement', () => {
       assert.deepEqual(allowed(quest), ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'], quest);
     }
     for (const quest of ['futuresLong', 'futuresShort'] as const) {
-      assert.deepEqual(allowed(quest), ['MarketTab', 'WalletTab', 'Market', 'Futures', 'FuturesChart', 'Wallet', 'WalletFx', 'WalletTransfer'], quest);
+      // The contract's detail (from the 선물 list) leads to the same order screen.
+      assert.deepEqual(allowed(quest), ['MarketTab', 'WalletTab', 'Market', 'FuturesDetail', 'Futures', 'FuturesChart', 'Wallet', 'WalletFx', 'WalletTransfer'], quest);
     }
     const buying: GuideSession = { ...session(), quest: 'marketBuy', step: 3 };
     assert.equal(leaveGuideTab(buying, 'MarketTab', 'Order') === buying, true);

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
 import { describe, it, type TestContext } from 'node:test';
@@ -68,7 +69,7 @@ function harness(t: TestContext, options: {
     navigate: (name: string, params: unknown) => { h.navigations.push({ name, params }); },
   };
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const Host = load(resolve('src/features/notifications/PushNotificationsHost.tsx'), {
+  const hostModule = load(resolve('src/features/notifications/PushNotificationsHost.tsx'), {
     'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) } },
     './nativePush': { nativePush },
     './api': {
@@ -79,7 +80,8 @@ function harness(t: TestContext, options: {
     '../quest/questNavigationGuard': { questNavigationAllowed: () => true },
     '../order/fillEvents': { emitOrderFillEvent: (event: Record<string, unknown>) => { h.events.push(event); } },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => h.account },
-  }).default;
+  });
+  const Host = hostModule.default;
   const flush = () => act(async () => { await new Promise((done) => setTimeout(done, 0)); });
   const settle = async () => { for (let i = 0; i < 4; i++) await flush(); };
   const mount = async () => {
@@ -105,7 +107,7 @@ function harness(t: TestContext, options: {
     if (h.renderer) await act(async () => h.renderer.unmount());
     client.clear();
   });
-  return { h, client, mount, go, signIn, signOut, settle };
+  return { h, client, mount, go, signIn, signOut, settle, mainRoutes: hostModule.MAIN_ROUTES as ReadonlySet<string> };
 }
 
 const fillPush = (uid: string, accountId = 'acct-a'): Push => ({
@@ -159,6 +161,30 @@ describe('push notifications host', () => {
     assert.equal(params.market, 'spot');
     // A per-tap stamp lets an already open history select the view again.
     assert.equal(typeof params.pushAt, 'number');
+  });
+
+  it('opens a tap at once over the full-screen charts opened from the tabs (AssetChart, FuturesChart)', async (t) => {
+    for (const chart of ['AssetChart', 'FuturesChart']) {
+      const x = harness(t);
+      await x.mount();
+      await x.go('AuthStack');
+      await x.signIn('user-a');
+      await x.go('MainTabs');
+      await x.go(chart);
+      await act(async () => { x.h.tapped(fillPush('user-a')); });
+      await x.settle();
+      assert.deepEqual(x.h.navigations.map((entry: { name: string }) => entry.name), ['TradeHistory'], chart);
+    }
+  });
+
+  it('counts every root screen opened from the tabs as ready, and none of the entry routes', (t) => {
+    // A root route added to RootNavigator without this decision makes taps wait while it is in front.
+    const routes = harness(t).mainRoutes;
+    const roots = [...readFileSync(resolve('src/app/navigation/RootNavigator.tsx'), 'utf8').matchAll(/<Stack\.Screen name="([A-Za-z]+)"/g)].map((match) => match[1]);
+    const entry = ['Splash', 'AuthStack', 'ModeSelection', 'SeasonJoin'];
+    assert.equal(roots.length > entry.length, true);
+    assert.deepEqual(roots.filter((name) => !entry.includes(name) && !routes.has(name)), [], 'root screens a tap would wait behind');
+    assert.deepEqual(entry.filter((name) => routes.has(name)), [], 'entry routes must keep a tap waiting');
   });
 
   it('drops a tap meant for another user or for an account the user does not own', async (t) => {

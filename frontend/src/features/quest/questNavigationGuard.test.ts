@@ -10,7 +10,7 @@ const require = createRequire(import.meta.url);
 const { CommonActions, StackActions, StackRouter, TabRouter } = require('@react-navigation/routers');
 
 const TABS = ['HomeTab', 'MarketTab', 'QuestTab', 'WalletTab', 'MyTab'];
-const MARKET = ['Market', 'MarketSearch', 'AssetDetail', 'Order', 'Futures'];
+const MARKET = ['Market', 'MarketSearch', 'AssetDetail', 'Order', 'FuturesDetail', 'Futures'];
 const WALLET = ['Wallet', 'WalletFx', 'WalletTransactions'];
 const ROOT = ['Splash', 'AuthStack', 'ModeSelection', 'MainTabs', 'TradeHistory', 'SeasonJoin', 'AssetChart', 'FuturesChart'];
 
@@ -104,7 +104,8 @@ describe('quest navigation guard', () => {
     }
     holds(market, CommonActions.navigate('Futures', { accountId: 'a' }), 'futures is another practice');
     holds(market, StackActions.push('Futures', { accountId: 'a' }), 'pushed the same');
-    assert.equal(await heard(), 2);
+    holds(market, CommonActions.navigate('FuturesDetail', { accountId: 'a', instrumentId: 'btc' }), "a futures contract's detail too");
+    assert.equal(await heard(), 3);
     market.dispatch(StackActions.popToTop());
     assert.equal(market.focused(), 'Market', 'a tab re-press returns to the list');
     // A screen that is already open is never refused: native gestures pop before JS hears of them.
@@ -127,6 +128,17 @@ describe('quest navigation guard', () => {
     wallet.dispatch(CommonActions.navigate('WalletFx'));
     assert.equal(wallet.focused(), 'WalletFx');
     assert.equal(await heard(), 2);
+  });
+
+  it('a futures practice goes from the 선물 list through the contract detail to its order screen', async () => {
+    const market = stack(MARKET);
+    guide('futuresShort');
+    market.dispatch(CommonActions.navigate('FuturesDetail', { accountId: 'a', instrumentId: 'btc' }));
+    assert.equal(market.focused(), 'FuturesDetail');
+    market.dispatch(CommonActions.navigate('Futures', { accountId: 'a', instrumentId: 'btc', direction: 'short' }));
+    assert.equal(market.focused(), 'Futures');
+    holds(market, CommonActions.navigate('AssetDetail', { assetId: 'ETH' }), 'a spot detail is another practice');
+    assert.equal(await heard(), 1);
   });
 
   it('holds pushes over the tabs, never sign-in or account entry', async () => {

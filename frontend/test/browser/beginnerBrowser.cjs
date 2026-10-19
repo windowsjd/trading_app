@@ -269,8 +269,8 @@ async function run() {
     function assertSmoothReturn(frames, practice) {
       assert.equal(frames.some(frame => frame.sheet), false, 'no FX success sheet next to the celebration');
       const routes = frames.map(frame => frame.route).filter((route, index, all) => route && route !== all[index - 1]);
-      // 이체 is a sheet over the Wallet route (2026-10-12), 환전 is its own screen.
-      assert.deepEqual(routes, [practice === 'fx' ? 'WalletFx' : 'Wallet', 'Guide'], `one direct return, no Wallet flash: ${routes}`);
+      // 이체 (2026-10-12) and 환전 (2026-10-20) are sheets over the Wallet route.
+      assert.deepEqual(routes, ['Wallet', 'Guide'], `one direct return, no Wallet flash: ${routes}`);
       const firstList = frames.findIndex(frame => frame.route === 'Guide');
       assert.ok(firstList > 0);
       assert.equal(frames[firstList - 1].celebration, true, 'the celebration covers the tab switch');
@@ -488,7 +488,8 @@ async function run() {
         assert.equal(await page.getByText('잔액이 부족합니다.', { exact: true }).count(), 0);
         assert.equal(await id('wallet-fx-execute-submit').getAttribute('aria-disabled'), 'true');
       }
-      await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
+      // 환전 is a sheet over Wallet (2026-10-20): 닫기, not a header Back.
+      await id('wallet-fx-sheet-close').click(); await page.getByTestId('wallet-fx-screen').waitFor({ state: 'detached' });
       await id('wallet-transfer').click(); await id('wallet-transfer-screen').waitFor();
       const cash = await available('USD');
       await id('wallet-transfer-amount').fill((cash + 1).toFixed(8));
@@ -565,7 +566,8 @@ async function run() {
     await id('quest-card-exchange-start').click();
     await id('wallet-exchange').click();
     await page.getByTestId('quest-guide-ring').waitFor();
-    await page.getByLabel(/back|뒤로/i).filter({ visible: true }).first().click();
+    // Closing the 환전 sheet (Android Back does the same) returns to the Wallet step.
+    await id('wallet-fx-sheet-close').click();
     await id('wallet-screen').waitFor();
     await page.waitForFunction(() => document.querySelector('[data-testid="quest-guide-step"]')?.textContent === '1/6');
     const stillOnWallet = async (label) => {

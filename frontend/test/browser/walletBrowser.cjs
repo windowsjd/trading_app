@@ -409,11 +409,13 @@ async function run() {
       await id('wallet-composition').waitFor();
       assert.equal(await id('wallet-exchange-label').textContent(), '환전하기');
       assert.notEqual(await id('wallet-exchange').getAttribute('aria-disabled'), 'true');
-      for (const [action, destination, marker] of [
-        ['wallet-transfer', 'WalletTransfer', 'wallet-transfer-screen'],
-        ['wallet-exchange', 'WalletFx', 'wallet-fx-screen'],
-        ['wallet-ledger', 'WalletTransactions', 'wallet-transactions-screen'],
-        ['wallet-orders', 'TradeHistory', 'record-order-list-screen'],
+      // 이체 (2026-10-12) and 환전 (2026-10-20) open sheets over the Wallet route;
+      // 원장 and 주문 내역 are screens.
+      for (const [action, destination, marker, sheet] of [
+        ['wallet-transfer', 'Wallet', 'wallet-transfer-screen', 'wallet-transfer-sheet'],
+        ['wallet-exchange', 'Wallet', 'wallet-fx-screen', 'wallet-fx-sheet'],
+        ['wallet-ledger', 'WalletTransactions', 'wallet-transactions-screen', null],
+        ['wallet-orders', 'TradeHistory', 'record-order-list-screen', null],
       ]) for (const area of ['surface', 'label', 'gap']) {
         await id(action).scrollIntoViewIfNeeded();
         const surface = await id(`${action}-surface`).boundingBox(), label = await id(`${action}-label`).boundingBox();
@@ -426,7 +428,10 @@ async function run() {
         const route = await page.evaluate(() => window.fixture.navigationRef.getCurrentRoute());
         assert.equal(route.name, destination, `${account}: ${action} ${area}`);
         if (action === 'wallet-orders') assert.equal(route.params.accountId, `${account}-account`);
-        await page.evaluate(() => window.fixture.navigationRef.goBack());
+        if (sheet) {
+          await id(`${sheet}-close`).click();
+          await id(marker).waitFor({ state: 'detached' });
+        } else await page.evaluate(() => window.fixture.navigationRef.goBack());
         await id('wallet-composition').waitFor();
         assert.equal(await page.getByRole('tab', { name: '지갑' }).getAttribute('aria-selected'), 'true');
       }

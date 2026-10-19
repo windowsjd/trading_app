@@ -1,6 +1,7 @@
 import { logoutGradient, primaryGradient, semantic } from '../../theme/tokens';
 import React from 'react';
 import {
+  Alert,
   Text,
   StyleSheet,
   View,
@@ -10,6 +11,7 @@ import ActionPressable from './ActionPressable';
 import WhaleLoader from '../states/WhaleLoader';
 import type { RippleTone } from './pressFeedback';
 import LearningLock from '../../features/quest/LearningLock';
+import { QUEST_LOCK_CAPTION } from '../../features/quest/questProgress';
 
 type CTAState = 'enabled' | 'disabled' | 'loading' | 'blocked';
 
@@ -17,6 +19,8 @@ interface CTAButtonProps {
   label: string;
   /** Only server-confirmed learning restrictions; operational disabled remains separate. */
   learningHint?: string | null;
+  /** The line shown under a learning-locked button; the quest lock's copy by default. */
+  learningCaption?: string | null;
   leadingIcon?: React.ReactNode;
   state?: CTAState;
   onPress?: () => void;
@@ -33,6 +37,7 @@ interface CTAButtonProps {
 export default function CTAButton({
   label,
   learningHint,
+  learningCaption,
   leadingIcon,
   state = 'enabled',
   onPress,
@@ -43,8 +48,11 @@ export default function CTAButton({
   accessibilityHint,
 }: CTAButtonProps) {
   const disabled = state === 'disabled' || state === 'loading' || state === 'blocked';
+  // A locked button carries its reason underneath: the pair takes the button's
+  // place in its parent, and the button keeps its own size and look.
+  const locked = learningHint ? splitPlacement(style) : null;
 
-  return (
+  const button = (
     <ActionPressable
       feedback="button"
       primary={!learningHint && variant === 'primary' && style?.backgroundColor === undefined}
@@ -61,7 +69,7 @@ export default function CTAButton({
         variant === 'secondary' && styles.secondary,
         state === 'blocked' && styles.blocked,
         state === 'disabled' && styles.disabled,
-        style,
+        locked ? locked.own : style,
         learningHint && styles.learning,
       ]}
       onPress={onPress}
@@ -83,11 +91,38 @@ export default function CTAButton({
       )}
     </ActionPressable>
   );
+  if (!locked) return button;
+  const caption = learningCaption ?? QUEST_LOCK_CAPTION;
+  return (
+    <View style={[styles.lockedGroup, locked.placement]}>
+      {button}
+      {/* The locked button takes no press, so its quest's own guidance opens from here. */}
+      <ActionPressable testID={testID && `${testID}-learning-caption`} accessibilityRole="button" style={styles.learningCaptionPress}
+        accessibilityLabel={`${caption} 자세히 보기`} onPress={() => Alert.alert('기능 안내', learningHint ?? caption)}>
+        <Text style={styles.learningCaption}>{caption}</Text>
+      </ActionPressable>
+    </View>
+  );
+}
+
+// Where the button sits in its parent (moved to the button + caption pair), as opposed to its own box.
+const PLACEMENT_KEYS = new Set(['flex', 'flexGrow', 'flexShrink', 'flexBasis', 'alignSelf', 'width', 'minWidth', 'maxWidth',
+  'margin', 'marginTop', 'marginBottom', 'marginLeft', 'marginRight', 'marginHorizontal', 'marginVertical', 'marginStart',
+  'marginEnd', 'position', 'top', 'right', 'bottom', 'left', 'start', 'end', 'zIndex']);
+
+function splitPlacement(style?: ViewStyle) {
+  const placement: Record<string, unknown> = {};
+  const own: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(StyleSheet.flatten(style) ?? {})) (PLACEMENT_KEYS.has(key) ? placement : own)[key] = value;
+  return { placement: placement as ViewStyle, own: own as ViewStyle };
 }
 
 const styles = StyleSheet.create({
   learning: { backgroundColor: semantic.raised, borderWidth: 1, borderColor: semantic.border },
   learningText: { color: semantic.secondary },
+  lockedGroup: { gap: 6 },
+  learningCaption: { fontSize: 12, lineHeight: 17, color: semantic.secondary, textAlign: 'center' },
+  learningCaptionPress: { minHeight: 24, justifyContent: 'center', borderRadius: 6 },
   labelGroup: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, maxWidth: '100%' },
   icon: { flexShrink: 0 },
   loading: { minHeight: 21, alignItems: 'center', justifyContent: 'center' },

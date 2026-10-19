@@ -16,6 +16,12 @@ export const PREFERENCE_KEYS = [
 
 export type PreferenceKey = (typeof PREFERENCE_KEYS)[number];
 export type NotificationPreferences = Record<PreferenceKey, boolean>;
+/** 전체 알림: off holds every type without rewriting the switches above, so
+ * turning it back on restores them; stored in the same row for every device. */
+export const ALL_ENABLED_KEY = 'allEnabled';
+type StoredPreferences = Partial<NotificationPreferences> & {
+  allEnabled?: boolean;
+};
 
 export const PREFERENCE_KEY_BY_TYPE: Record<
   PushNotificationType,
@@ -42,17 +48,21 @@ export const DEFAULT_PREFERENCES: NotificationPreferences = Object.freeze({
 });
 
 export function preferenceEnabled(
-  row: Partial<NotificationPreferences> | null | undefined,
+  row: StoredPreferences | null | undefined,
   type: PushNotificationType,
 ): boolean {
-  return row?.[PREFERENCE_KEY_BY_TYPE[type]] ?? true;
+  return (
+    (row?.allEnabled ?? true) && (row?.[PREFERENCE_KEY_BY_TYPE[type]] ?? true)
+  );
 }
 
-function pick(row: NotificationPreferences | null): NotificationPreferences {
-  if (!row) return { ...DEFAULT_PREFERENCES };
-  return Object.fromEntries(
-    PREFERENCE_KEYS.map((key) => [key, row[key]]),
-  ) as NotificationPreferences;
+function pick(row: (NotificationPreferences & { allEnabled: boolean }) | null) {
+  const preferences = row
+    ? (Object.fromEntries(
+        PREFERENCE_KEYS.map((key) => [key, row[key]]),
+      ) as NotificationPreferences)
+    : { ...DEFAULT_PREFERENCES };
+  return { allEnabled: row?.allEnabled ?? true, preferences };
 }
 
 /** In-app notification switches. Stored per user in PostgreSQL; a response
@@ -77,7 +87,7 @@ export class NotificationPreferencesService {
     const row = await this.prisma.notificationPreference.findUnique({
       where: { userId: viewer },
     });
-    return { success: true, data: { preferences: pick(row) } };
+    return { success: true, data: pick(row) };
   }
 
   async update(userId: string | undefined, body: unknown) {
@@ -93,8 +103,10 @@ export class NotificationPreferencesService {
       !entries.length ||
       entries.some(
         ([key, value]) =>
-          !(PREFERENCE_KEYS as readonly string[]).includes(key) ||
-          typeof value !== 'boolean',
+          !(
+            (PREFERENCE_KEYS as readonly string[]).includes(key) ||
+            key === ALL_ENABLED_KEY
+          ) || typeof value !== 'boolean',
       )
     )
       this.fail(
@@ -102,14 +114,17 @@ export class NotificationPreferencesService {
         'INVALID_NOTIFICATION_PREFERENCES',
         'Only known notification types with true/false values are accepted.',
       );
-    const patch = Object.fromEntries(
-      entries,
-    ) as Partial<NotificationPreferences>;
+    const patch = Object.fromEntries(entries) as StoredPreferences;
     const row = await this.prisma.notificationPreference.upsert({
       where: { userId: viewer },
-      create: { userId: viewer, ...DEFAULT_PREFERENCES, ...patch },
+      create: {
+        userId: viewer,
+        allEnabled: true,
+        ...DEFAULT_PREFERENCES,
+        ...patch,
+      },
       update: patch,
     });
-    return { success: true, data: { preferences: pick(row) } };
+    return { success: true, data: pick(row) };
   }
 }

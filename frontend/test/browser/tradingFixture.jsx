@@ -13,6 +13,7 @@ import Search from '../../src/screens/market/MarketSearchScreen';
 import Home from '../../src/screens/home/HomeScreen';
 import Settings from '../../src/screens/my/SettingsScreen';
 import Futures from '../../src/screens/futures/FuturesScreen';
+import FuturesDetail from '../../src/screens/futures/FuturesDetailScreen';
 import { state, navigation } from './tradingMocks';
 import { ScreenSheetHost } from '../../src/components/common/ScreenSheetHost';
 import OrderFillBanner from '../../src/features/order/OrderFillBanner';
@@ -46,8 +47,10 @@ function App() {
     if (params.assetId) state.assetId = params.assetId;
     if (params.side) state.side = params.side;
     if (params.instrumentId) state.instrumentId = params.instrumentId;
+    // 구매하기 / 판매하기 on the futures detail open the order on that side.
+    state.direction = params.direction;
     setScreen(
-      next === 'Futures' ? 'futures' : next === 'Order'
+      next === 'Futures' ? 'futures' : next === 'FuturesDetail' ? 'futuresDetail' : next === 'Order'
         ? 'order'
         : next === 'AssetChart'
           ? 'chart'
@@ -85,6 +88,7 @@ function App() {
     home: Home,
     settings: Settings,
     futures: Futures,
+    futuresDetail: FuturesDetail,
   }[screen];
   return (
     <QueryClientProvider client={client}>
@@ -103,7 +107,8 @@ function App() {
           <ScreenSheetHost>
             <Component
               key={state.assetId + ':' + screen}
-              route={{ params: { assetId: state.assetId, accountId: state.accountId, instrumentId: state.instrumentId, side: state.side ?? 'buy', returnToAsset: true } }}
+              route={{ params: { assetId: state.assetId, accountId: state.accountId, instrumentId: state.instrumentId, side: state.side ?? 'buy', returnToAsset: true,
+                ...(state.direction ? { direction: state.direction } : {}) } }}
               navigation={navigation}
             />
           </ScreenSheetHost>

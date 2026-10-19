@@ -19,7 +19,7 @@ const seasonAccount = {
 };
 
 function fxHarness(mode: 'general' | 'beginner' | 'season' = 'beginner') {
-  const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+  const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
   h.account = mode === 'season' ? { ...seasonAccount } : { ...h.account, mode };
   return h;
 }
@@ -69,7 +69,7 @@ describe('FX screen and the quest guide', () => {
       assert.deepEqual(h.requests[1].body, { quoteId: 'quote-1', fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '100000',
         idempotencyKey: h.requests[1].body.idempotencyKey });
       assert.deepEqual(adopted, [{ kind: 'fx', accountId: 'account-1', fromCurrency: 'KRW', toCurrency: 'USD', summary: '받은 금액 USD 73.82' }]);
-      assert.equal(elements(tree, 'FxSuccessBottomSheet')[0].props.visible, false, 'the guide presents the server-checked outcome');
+      assert.equal(elements(tree, 'FxReceipt').length, 0, 'the guide presents the server-checked outcome');
       assert.equal(h.control(tree, TEST_IDS.walletFx.amountInput).props.value, '');
       assert.equal(h.renderCta(h.control(tree, TEST_IDS.walletFx.executeSubmit)).props.disabled, true, 'no second execute');
     } finally { dispose(); }
@@ -80,10 +80,10 @@ describe('FX screen and the quest guide', () => {
     try {
       const h = fxHarness();
       const tree = await executeFx(h);
-      assert.equal(elements(tree, 'FxSuccessBottomSheet')[0].props.visible, true);
+      assert.equal(elements(tree, 'FxReceipt').length, 1);
     } finally { dispose(); }
     const h = fxHarness('general');
-    assert.equal(elements(await executeFx(h), 'FxSuccessBottomSheet')[0].props.visible, true);
+    assert.equal(elements(await executeFx(h), 'FxReceipt').length, 1);
   });
 
   for (const mode of ['beginner', 'general', 'season'] as const) {
@@ -100,7 +100,7 @@ describe('FX screen and the quest guide', () => {
   }
 
   it('never imports the switcher, keeps the scoped bindings and a no-account notice', () => {
-    const source = readFileSync(resolve('src/screens/wallet/WalletFxScreen.tsx'), 'utf8');
+    const source = readFileSync(resolve('src/screens/wallet/WalletFxSheet.tsx'), 'utf8');
     assert.doesNotMatch(source, /AccountSwitcher/);
     assert.match(source, /testID="wallet-fx-no-account"/);
     assert.match(source, /환전할 투자 계정이 없습니다\./);

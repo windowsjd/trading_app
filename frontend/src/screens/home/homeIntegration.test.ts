@@ -130,7 +130,7 @@ describe('Home asset hierarchy and real portfolio/ranking/me sources', () => {
 
 describe('Home keeps exchange entry in Wallet', () => {
   for (const mode of ['general', 'season']) {
-    it(`${mode} has no Home exchange and Wallet opens WalletFx for the selected account`, async (t) => {
+    it(`${mode} has no Home exchange and Wallet opens the 환전 sheet for the selected account`, async (t) => {
       const h = createHomeHarness(mode);
       t.after(h.close);
       h.seed(h.account, fixture[mode].data);
@@ -144,7 +144,8 @@ describe('Home keeps exchange entry in Wallet', () => {
       assert.equal(button.props.accessibilityLabel, '환전하기');
       assert.equal(button.props.disabled, false);
       button.props.onPress();
-      assert.deepEqual(h.navigation, [['WalletFx']]);
+      assert.deepEqual(h.navigation, [], 'a sheet over Wallet, not a page');
+      assert.equal(elements(h.renderWallet().tree, 'WalletFxPanel').length, 1);
 
       h.renderFx();
       const queries = h.fxQueries.filter(
@@ -293,7 +294,7 @@ describe('Home keeps exchange entry in Wallet', () => {
       assert.equal(exchange.props.disabled, account.status !== 'active');
       if (!exchange.props.disabled) {
         exchange.props.onPress();
-        assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
+        assert.equal(elements(h.renderWallet().tree, 'WalletFxPanel').length, 1, 'the 환전 sheet over Wallet');
         h.renderFx();
         const wallets = h.fxQueries.find(
           (query) => query.queryKey.includes('wallets'),

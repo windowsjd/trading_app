@@ -131,12 +131,17 @@ export function invalidateAfterFx(
   return invalidateAll(client, keys);
 }
 
-/** Internal cash relocation changes cash/ledger and affected Futures collateral. */
+/**
+ * Internal cash relocation changes cash/ledger and affected Futures collateral:
+ * the Futures screen reads its wallet balance and free collateral with its positions.
+ */
 export function invalidateAfterWalletTransfer(client: InvalidatorClient, accountId: string, options: { futuresCollateral?: boolean } = {}) {
   return invalidateAll(client, [
     QUERY_KEYS.tradingAccount.quests(accountId),
     ...walletKeys(accountId),
-    ...(options.futuresCollateral ? [QUERY_KEYS.tradingAccount.futuresCollateral(accountId)] : []),
+    ...(options.futuresCollateral
+      ? [QUERY_KEYS.tradingAccount.futuresCollateral(accountId), QUERY_KEYS.tradingAccount.futures.positions(accountId)]
+      : []),
   ]);
 }
 

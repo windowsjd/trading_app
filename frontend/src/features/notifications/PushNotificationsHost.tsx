@@ -14,8 +14,14 @@ import { intentGuardName, parsePushData, resolvePushIntent, type PushIntent } fr
 import { refreshForPush } from './pushRefresh';
 import { emitOrderFillEvent } from '../order/fillEvents';
 
-/** Root routes that are only reachable after sign-in and the mode choice. */
-const MAIN_ROUTES = new Set(['MainTabs', 'TradeHistory', 'OrderFailure', 'AssetChart']);
+/**
+ * Root routes that are only reachable after sign-in and the mode choice: a tap
+ * received while one of them is in front opens at once. Every root screen
+ * opened from the main tabs belongs here (otherwise a tap waits until the user
+ * leaves it); the entry routes and SeasonJoin (also opened before the mode
+ * choice) do not.
+ */
+export const MAIN_ROUTES: ReadonlySet<string> = new Set(['MainTabs', 'TradeHistory', 'OrderFailure', 'AssetChart', 'FuturesChart']);
 
 /**
  * Push notifications (backend docs/push-notifications-contract.md), mounted

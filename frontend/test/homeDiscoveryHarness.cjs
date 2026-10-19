@@ -73,6 +73,8 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
     '../../components/tradingAccount/AccountSwitcher': { __esModule: true, default: ({ children }) => React.createElement('AccountSwitcher', {}, children) },
     '../../components/tradingAccount/AccountSetupPanel': { __esModule: true, default: 'AccountSetupPanel' },
     '../../components/states/FullPageLoading': { __esModule: true, default: 'FullPageLoading' },
+    // The Wallet's 환전 panel (its own harness covers it); refresh tests never open it.
+    './WalletFxSheet': { __esModule: true, default: 'WalletFxPanel' },
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];

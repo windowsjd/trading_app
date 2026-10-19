@@ -220,7 +220,8 @@ describe('overall menu and server privacy setting', () => {
 
 /** usePendingFriendRequests over a real QueryClient and the real friends API module. */
 function pendingHarness(t: TestContext) {
-  const h: any = { reads: [] as string[], incoming: [] as FriendUser[], failure: null as unknown, values: [] as boolean[] };
+  const h: any = { reads: [] as string[], incoming: [] as FriendUser[], failure: null as unknown, values: [] as boolean[],
+    focused: true, appListeners: [] as Array<(state: string) => void> };
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const api = load(resolve('src/features/friends/api.ts'), { '../../services/api/client': { apiClient: { get: async (path: string) => {
     h.reads.push(path);
@@ -233,7 +234,11 @@ function pendingHarness(t: TestContext) {
   const { usePendingFriendRequests } = load(resolve('src/features/friends/usePendingFriendRequests.ts'), {
     './api': api,
     // Focus = mount; `h.focus()` is a return to the screen.
-    '@react-navigation/native': { useFocusEffect: (effect: () => void) => { focusEffect = effect; React.useEffect(() => effect(), [effect]); } },
+    '@react-navigation/native': { useFocusEffect: (effect: () => void) => { focusEffect = effect; React.useEffect(() => effect(), [effect]); },
+      useIsFocused: () => h.focused },
+    'react-native': { AppState: { currentState: 'active', addEventListener: (_: string, listener: (state: string) => void) => {
+      h.appListeners.push(listener); return { remove: () => { h.appListeners = h.appListeners.filter((item: unknown) => item !== listener); } };
+    } } },
   });
   function Probe() { h.values.push(usePendingFriendRequests()); return null; }
   const settle = () => act(async () => { await new Promise((done) => setTimeout(done, 10)); });
@@ -242,6 +247,9 @@ function pendingHarness(t: TestContext) {
   h.settle = settle;
   h.focus = async () => { await act(async () => focusEffect()); await settle(); };
   h.unmount = async () => { if (h.renderer) await act(async () => h.renderer.unmount()); h.renderer = null; };
+  h.app = async (state: string) => { await act(async () => { h.appListeners.forEach((listener: (value: string) => void) => listener(state)); }); await settle(); };
+  h.rerender = async () => { await act(async () => { h.renderer.update(React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Probe))); }); };
+  h.interval = () => h.client.getQueryCache().find({ queryKey: QUERY_KEYS.friends.requests })?.observers[0]?.options.refetchInterval;
   t.after(async () => { await h.unmount(); h.client.clear(); });
   return h;
 }
@@ -307,6 +315,28 @@ describe('MY 전체 친구 dot: pending received requests', () => {
     h.failure = Object.assign(new Error('network'), { code: 'ERR_NETWORK' });
     await h.focus();
     assert.equal(h.value(), false, 'the latest read failed: not confirmed');
+  });
+
+  it('re-reads every 30 s only while MY 전체 is in front with the app active; back from the background it reads at once', async (t) => {
+    const h = pendingHarness(t);
+    await h.mount();
+    await h.settle();
+    assert.equal(h.interval(), 30_000);
+    // The app in the background: no interval, nothing read.
+    const before = h.reads.length;
+    await h.app('background');
+    assert.deepEqual([h.interval(), h.reads.length], [false, before]);
+    // A request arrived meanwhile and no push came: shown as soon as the app is back.
+    h.incoming = [request('late')];
+    await h.app('active');
+    assert.deepEqual([h.interval(), h.reads.length, h.value()], [30_000, before + 1, true]);
+    // Another screen in front: no interval (its return reads again, as before).
+    h.focused = false;
+    await h.rerender();
+    assert.equal(h.interval(), false);
+    await h.app('background');
+    await h.app('active');
+    assert.equal(h.reads.length, before + 1, 'no read for a screen that is not in front');
   });
 
   it("another member signing in never sees the previous member's requests", async (t) => {

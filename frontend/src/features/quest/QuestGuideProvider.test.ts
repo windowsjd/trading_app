@@ -18,7 +18,7 @@ const fxFacts = { screen: 'fx', accountId: ACCOUNT, blocked: false, fromCurrency
   previewReady: true, canExecute: true, pending: false, failed: false } as const;
 const fxCommand = { kind: 'fx', accountId: ACCOUNT, fromCurrency: 'KRW', toCurrency: 'USD', summary: '받은 금액 USD 73.82' } as const;
 
-const TAB_OF: Record<string, string> = { Guide: 'QuestTab', Wallet: 'WalletTab', WalletFx: 'WalletTab', WalletTransactions: 'WalletTab',
+const TAB_OF: Record<string, string> = { Guide: 'QuestTab', Wallet: 'WalletTab', WalletTransactions: 'WalletTab',
   Market: 'MarketTab', MarketSearch: 'MarketTab', AssetDetail: 'MarketTab', Order: 'MarketTab', Futures: 'MarketTab', Home: 'HomeTab' };
 const TABS = ['HomeTab', 'MarketTab', 'QuestTab', 'WalletTab', 'MyTab'];
 
@@ -160,7 +160,7 @@ describe('QuestGuideProvider', () => {
     assert.equal(h.view().kind, 'spotlight');
     assert.deepEqual(h.view().targets, ['wallet-exchange']);
 
-    await h.focus('WalletFx');
+    // 환전 opens as a sheet over Wallet (no route): its published facts move the guide.
     await h.act(() => bridge.publishQuestGuideFacts('fx', fxFacts));
     assert.deepEqual(h.view().targets, ['fx-direction']);
     await h.act(() => h.overlay.onAction('next', 1));
@@ -202,7 +202,8 @@ describe('QuestGuideProvider', () => {
     await h.render();
     t.after(h.close);
     await h.start('exchange', progress(false));
-    await h.focus('WalletFx');
+    await h.focus('Wallet');
+    await h.act(() => bridge.publishQuestGuideFacts('fx', fxFacts));
     await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
     await h.settle(1, new Error('network'));
     assert.equal(h.guide.active.phase, 'unconfirmed');
@@ -358,8 +359,9 @@ describe('QuestGuideProvider: no resume — leaving ends the guide, a start is a
     await h.focus('Guide');
     await h.start('exchange', progress(false));
     await h.focus('Wallet');
-    await h.focus('WalletFx');
-    assert.equal(h.guide.active?.quest, 'exchange');
+    await h.act(() => bridge.publishQuestGuideFacts('fx', fxFacts));
+    assert.equal(h.guide.active?.quest, 'exchange', 'kept with the 환전 sheet open');
+    await h.act(() => bridge.publishQuestGuideFacts('fx', null));
     await h.focus('Guide');
     assert.equal(h.guide.active === null, true, 'the quest list ends it');
   });
@@ -486,7 +488,8 @@ describe('QuestGuideProvider: the practice path is held, 안내 종료 lifts it'
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('exchange', progress(false));
-    await h.focus('WalletFx');
+    await h.focus('Wallet');
+    await h.act(() => bridge.publishQuestGuideFacts('fx', fxFacts));
     await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
     assert.equal(await held(h, 'QuestTab'), true, 'held while the server confirms');
     await h.settle(1, progress(true));
@@ -508,7 +511,8 @@ describe('QuestGuideProvider: the practice path is held, 안내 종료 lifts it'
     t.mock.timers.enable({ apis: ['setTimeout'] });
     const h = harness(); await h.render(); t.after(h.close);
     await h.start('exchange', progress(true));
-    await h.focus('WalletFx');
+    await h.focus('Wallet');
+    await h.act(() => bridge.publishQuestGuideFacts('fx', fxFacts));
     await h.act(() => bridge.claimQuestGuideCommand(fxCommand));
     assert.equal(h.view().replay, true);
     await h.act(() => t.mock.timers.tick(1100));

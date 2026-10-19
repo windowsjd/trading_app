@@ -20,7 +20,7 @@ const orderMapper = read('features/order/mapper.ts');
 const recordMapper = read('features/record/api.ts');
 const recordOrderList = read('screens/history/TradeHistoryScreen.tsx');
 const seasonAccountHome = read('screens/home/SeasonAccountHome.tsx');
-const walletFxScreen = read('screens/wallet/WalletFxScreen.tsx');
+const walletFxScreen = read('screens/wallet/WalletFxSheet.tsx');
 
 describe('numeric asset symbol display contract', () => {
   it('uses shared helpers across market, detail, order and record surfaces', () => {

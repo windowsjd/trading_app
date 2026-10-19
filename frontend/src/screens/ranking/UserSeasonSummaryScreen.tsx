@@ -1,8 +1,9 @@
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import {
+  AppState,
   View,
   Text,
   StyleSheet,
@@ -17,8 +18,11 @@ import {
   getRankingTier,
   getUserSeasonSummary,
 } from '../../features/ranking/api';
-import { formatKrw, formatPercent } from '../../utils/format';
+import { formatKrw, formatKstDateTime, formatPercent } from '../../utils/format';
 import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
+import { getCompletedTradeDisplay } from '../../features/friends/completedTradeDisplay';
+import { financial } from '../../theme/financialColors';
+import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import { useAppearance } from '../../theme/appearance';
 import { getHomeTier } from '../home/tierPresentation';
 import TierEmblem from '../home/TierEmblem';
@@ -36,12 +40,9 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   const focused = useIsFocused();
   const client = useQueryClient();
   const { mode } = useAppearance();
-  const [, setClock] = useState(Date.now());
-  useEffect(() => {
-    if (!focused) return;
-    const timer = setInterval(() => setClock(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, [focused]);
+  // No polling: a friend's portfolio is read on entry, on return (screen or
+  // app), on pull to refresh and on an invalidation. Each read re-checks the
+  // server's friendship/privacy/season gates; the shown values are that read's.
   const query = useQuery({
     queryKey: QUERY_KEYS.ranking.userSeasonSummary(userId),
     queryFn: ({ signal }) => getUserSeasonSummary(userId, signal),
@@ -49,7 +50,6 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
     refetchOnMount: 'always',
     enabled: focused,
     gcTime: 0,
-    refetchInterval: 4000,
   });
   const refresh = usePullToRefresh([query]);
   useEffect(() => {
@@ -60,17 +60,31 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
   }, [client, focused, query.data, query.isError, userId]);
 
   const { refetch } = query;
+  const clearFinancialCache = useCallback(() => client.setQueryData<UserSeasonSummaryDto>(
+    QUERY_KEYS.ranking.userSeasonSummary(userId),
+    data => data ? { ...data, portfolio: null } : data,
+  ), [client, userId]);
   useFocusEffect(
     useCallback(() => {
-      const clearFinancialCache = () => client.setQueryData<UserSeasonSummaryDto>(
-        QUERY_KEYS.ranking.userSeasonSummary(userId),
-        data => data ? { ...data, portfolio: null } : data,
-      );
       clearFinancialCache();
       void refetch();
       return () => { clearFinancialCache(); };
-    }, [client, userId, refetch]),
+    }, [clearFinancialCache, refetch]),
   );
+  // Back from the background is a return too: the old answer is not shown
+  // again before the server has re-checked the friend's permission.
+  useEffect(() => {
+    if (!focused) return;
+    let previous = AppState.currentState;
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (previous !== 'active' && next === 'active') {
+        clearFinancialCache();
+        void refetch();
+      }
+      previous = next;
+    });
+    return () => subscription.remove();
+  }, [clearFinancialCache, focused, refetch]);
   if (query.isLoading)
     return <FullPageLoading message="유저 정보를 불러오는 중입니다." />;
   const code = getApiErrorCode(query.error);
@@ -146,12 +160,6 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
           <Text style={styles.helper}>
             총 자산 {formatKrw(season.totalAssetKrw)}원
           </Text>
-          <Text style={styles.helper}>
-            최대 낙폭{' '}
-            {season.maxDrawdown === null
-              ? '-'
-              : `${formatPercent(season.maxDrawdown)}%`}
-          </Text>
         </View>
       ) : null}
       {portfolio ? (
@@ -200,29 +208,57 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
           </View>
           <View style={styles.card}>
             <Text style={styles.label}>포지션</Text>
+            {/* A snapshot of this read, judged and labelled at the server's own
+                evaluation time (no device clock): never a live value. */}
+            {portfolio.futures.positions.length ? (
+              <Text testID="friend-futures-read-at" style={styles.helper}>
+                {formatKstDateTime(portfolio.futures.evaluatedAt)} 조회 시점 기준 평가입니다.
+              </Text>
+            ) : null}
             {portfolio.futures.positions.length ? portfolio.futures.positions.map(position => (
               <FuturesPositionRow key={position.assetId} position={position} testID={`friend-futures-${position.assetId}`}
-                evaluatedAt={portfolio.futures.evaluatedAt} now={Date.now()} />
+                evaluatedAt={portfolio.futures.evaluatedAt} now={Date.parse(portfolio.futures.evaluatedAt)} />
             )) : <Text style={styles.helper}>포지션이 없습니다.</Text>}
           </View>
-          <View style={styles.card}>
-            <Text style={styles.label}>최근 30일 자산 / 수익률 추이</Text>
-            {portfolio.history.length ? (
-              portfolio.history.map((point) => (
-                <View key={point.date} style={styles.historyRow}>
-                  <Text style={styles.helper}>{point.date}</Text>
-                  <Text style={styles.helper}>
-                    {formatKrw(point.totalAssetKrw)}원 ·{' '}
-                    {formatPercent(point.returnRate)}%
-                  </Text>
-                </View>
-              ))
-            ) : (
+          {/* 거래 완료 종목: the server's aggregates of fully closed trades (a
+              server before 2026-10-20 sends none, and nothing is shown). */}
+          {portfolio.completedTrades ? (
+            <View style={styles.card} testID="friend-completed-trades">
+              <Text style={styles.label}>거래 완료 종목</Text>
               <Text style={styles.helper}>
-                아직 일별 포트폴리오 기록이 없습니다.
+                모두 정리한 종목과 종료된 선물 포지션의 확정 결과예요. 실현 손익과 수익률에는 수수료가 반영돼요.
               </Text>
-            )}
-          </View>
+              {portfolio.completedTrades.items.length ? (
+                portfolio.completedTrades.items.map((item, index) => {
+                  const display = getCompletedTradeDisplay(item);
+                  return (
+                    <View key={`${item.kind}-${item.assetId}-${index}`} testID={`friend-completed-${index}`} style={styles.completedRow}>
+                      <View style={styles.completedHeading}>
+                        <Text testID={`friend-completed-${index}-kind`} style={[styles.completedKind,
+                          display.direction ? { color: display.direction === 'long' ? BUY_COLOR : SELL_COLOR } : null]}>
+                          {display.kind}
+                        </Text>
+                        <Text testID={`friend-completed-${index}-name`} style={styles.completedName}>{display.name}</Text>
+                      </View>
+                      {display.subline ? <Text style={styles.helper}>{display.subline}</Text> : null}
+                      <Text testID={`friend-completed-${index}-basis`} style={styles.helper}>{`${display.basisLabel} ${display.basis}`}</Text>
+                      <Text testID={`friend-completed-${index}-result`}
+                        style={[styles.completedResult, { color: display.pnlDirection === 'neutral' ? semantic.text : financial[display.pnlDirection] }]}>
+                        {`실현 손익 ${display.pnl} · 수익률 ${display.returnRate}`}
+                      </Text>
+                    </View>
+                  );
+                })
+              ) : (
+                <Text style={styles.helper}>아직 모두 정리한 종목이 없어요.</Text>
+              )}
+              {portfolio.completedTrades.hasMore ? (
+                <Text testID="friend-completed-more" style={styles.helper}>
+                  최근 {portfolio.completedTrades.items.length}개만 보여드려요.
+                </Text>
+              ) : null}
+            </View>
+          ) : null}
         </>
       ) : (
         <InlineEmptyState
@@ -260,5 +296,9 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingVertical: 10,
   },
-  historyRow: { gap: 6, paddingVertical: 8 },
+  completedRow: { gap: 3, paddingVertical: 10, borderTopWidth: 1, borderTopColor: semantic.border },
+  completedHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: 6, rowGap: 2 },
+  completedKind: { fontSize: 12, lineHeight: 18, fontWeight: '700', color: semantic.secondary },
+  completedName: { minWidth: 0, flexShrink: 1, fontSize: 16, lineHeight: 24, fontWeight: '700' },
+  completedResult: { fontSize: 14, lineHeight: 21, fontWeight: '600', fontVariant: ['tabular-nums'] },
 });

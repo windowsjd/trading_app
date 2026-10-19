@@ -21,6 +21,9 @@ for(const mode of ['general','season'])test(`${mode}: no learning query or lock 
 test('fresh server progress keeps locked functions visible and explains why on press',()=>{
  const h=harness('beginner',questProgress(2));const gate=h.access.gate('cryptoLimitBuy');
  assert.equal(gate.allowed,false);assert.equal(gate.locked,true);gate.guard(()=>{h.state.runs++;});
+ // The visible line under the control: the quest lock's own copy; open or exempt actions have none.
+ assert.equal(gate.caption,'퀘스트 완료 후 이용 가능합니다.');
+ assert.equal(h.access.gate('cryptoMarketBuy').caption,null);assert.equal(h.access.gate('riskReduction').caption,null);
  assert.equal(h.state.runs,0);assert.equal(h.alerts.length,1);assert.match(h.alerts[0][1] as string,/지정가 매수/);
  assert.equal(h.access.gate('cryptoMarketBuy').allowed,true);assert.equal(h.access.gate('riskReduction').allowed,true);
 });
@@ -28,6 +31,7 @@ test('unknown/error progress is a refresh failure, never a fabricated learning l
  for(const [data,isError] of [[undefined,false],[questProgress(2),true]] as const){
   const h=harness('beginner',data,isError);const gate=h.access.gate('allTrading');
   assert.equal(gate.allowed,false);assert.equal(gate.locked,false);gate.guard(()=>{h.state.runs++;});
+  assert.equal(gate.caption,null,'an unknown state is never shown as a quest lock');
   assert.equal(h.state.runs,0);assert.equal(h.state.refresh,1);
  }
 });
@@ -65,4 +69,9 @@ test('a screen-derived lock (1x Futures practice) explains itself and never runs
  const h=harness('beginner',questProgress(6));const gate=h.access.lock('선물 퀘스트는 레버리지를 1배보다 높게 설정해 진입해야 해요.');
  assert.deepEqual([gate.allowed,gate.locked],[false,true]);gate.guard();
  assert.equal(h.alerts.length,1);assert.match(h.alerts[0][1] as string,/레버리지/);
+});
+
+test('a screen-derived lock (1x Futures practice) carries its own reason as the visible line',()=>{
+ const lock=harness('beginner',questProgress(7)).access.lock('선물 퀘스트는 레버리지를 1배보다 높게 설정해 진입해야 해요.');
+ assert.deepEqual([lock.locked,lock.caption],[true,'선물 퀘스트는 레버리지를 1배보다 높게 설정해 진입해야 해요.']);
 });

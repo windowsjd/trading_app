@@ -407,6 +407,10 @@ describe('ranking API and query contract', () => {
   });
 });
 
+const completedSpot = { kind: 'spot' as const, assetId: 'asset-samsung', symbol: '005930', name: 'Samsung Electronics', market: 'KRX',
+  assetType: 'domestic_stock', currencyCode: 'KRW' as const, buyAmount: '1061060.00000000', realizedPnl: '62815.00000005', returnRate: '5.92002337' };
+const completedFutures = { kind: 'futures' as const, assetId: 'asset-btc', symbol: 'BTCUSDT', name: 'Bitcoin', market: 'BINANCE', direction: 'short' as const,
+  currencyCode: 'USD' as const, entryMargin: '63.33333334', realizedPnl: '24.64500000', returnRate: '38.91315789' };
 const summaryFixture: UserSeasonSummaryDto = {
   state: 'available',
   user: { id: 'user-2', nickname: 'trader-2', profileImageUrl: null },
@@ -528,6 +532,40 @@ describe('other ranking consumers', () => {
 });
 
 
+describe('friend portfolio reads (no polling)', () => {
+  it('reads on entry/return only: no interval, focused-only, never kept, and no MDD line', () => {
+    const h = createHarness();
+    h.queries.set('ranking', h.ready(summaryFixture));
+    const html = h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
+    const options = h.queryOptions.find((q) => q.queryKey[0] === 'ranking');
+    assert.deepEqual([options.refetchInterval, options.enabled, options.gcTime, options.staleTime, options.refetchOnMount],
+      [undefined, true, 0, 0, 'always']);
+    assert.doesNotMatch(html, /최대 낙폭/);
+    assert.match(html, /수익률/);
+    assert.match(html, /총 자산 999,998원/);
+  });
+
+  it('shows futures values as of the server\'s evaluation, labelled, however long ago that read was', () => {
+    const h = createHarness();
+    const data = structuredClone(summaryFixture);
+    // Evaluated long before the device's now: still that read's values, never a flip to 평가 대기.
+    const evaluatedAt = '2026-10-20T03:04:05.000Z';
+    data.portfolio!.futures = { evaluatedAt, positions: [{ assetId: 'f-btc', symbol: 'BTCUSDT', name: 'Bitcoin', market: 'USDⓈ-M 무기한',
+      direction: 'long', marginMode: 'isolated', leverage: '5', markNotional: '1234.5', roi: '12.5', markUnrealizedPnl: '25',
+      markState: 'fresh', markEvidence: { effectiveAt: '2026-10-20T03:04:04.000Z', capturedAt: '2026-10-20T03:04:04.500Z' } }] } as any;
+    h.queries.set('ranking', h.ready(data));
+    const html = h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
+    assert.match(html, /2026-10-20 12:04 조회 시점 기준 평가입니다/);
+    assert.match(html, /포지션 규모 \$1,234\.5"/);
+    assert.match(html, /\+\$25 \(\+12\.5%\)/);
+    assert.doesNotMatch(html, /평가 대기/);
+    // Evidence that was already stale at that evaluation stays unavailable.
+    data.portfolio!.futures.positions[0].markEvidence = { effectiveAt: '2026-10-20T03:03:00.000Z', capturedAt: '2026-10-20T03:03:00.000Z' } as any;
+    h.queries.set('ranking', h.ready(data));
+    assert.match(h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } }), /평가 대기/);
+  });
+});
+
 describe('friend portfolio access rendering', () => {
   it('keeps competition info but never renders cached private holdings', () => {
     for (const [access, message] of [['private', '비공개'], ['not_friend', '친구 요청을 수락한']] as const) {
@@ -535,27 +573,63 @@ describe('friend portfolio access rendering', () => {
       const data = structuredClone(summaryFixture);
       data.portfolioAccess = access;
       data.portfolio!.holdings = [{ assetId: 'private-asset', name: 'PRIVATE_HOLDING', symbol: 'SECRET', assetType: 'crypto', market: 'BINANCE', quantity: '0.00000001', valuation: { state: 'unavailable' }, weight: '30' }];
+      data.portfolio!.completedTrades = { items: [{ ...completedSpot, name: 'PRIVATE_DONE', symbol: 'DONE1', market: 'NASDAQ' }], hasMore: false };
       h.queries.set('ranking', h.ready(data));
       const html = h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
       assert.ok(html.includes(message));
       assert.match(html, /trader-2|999,998/);
-      assert.doesNotMatch(html, /PRIVATE_HOLDING|SECRET|자산 배분/);
+      assert.doesNotMatch(html, /PRIVATE_HOLDING|SECRET|자산 배분|PRIVATE_DONE|거래 완료 종목/);
     }
   });
-  it('shows persisted history and holdings, and suppresses them during permission refresh', () => {
+  it('shows completed trades and holdings (no 30-day history), and suppresses them during permission refresh', () => {
     const h = createHarness();
     const data = structuredClone(summaryFixture);
     data.portfolio!.holdings = [{ assetId: 'a', name: '보유종목', symbol: 'BTCUSDT', assetType: 'crypto', market: 'BINANCE', quantity: '0.00000001', valuation: { state: 'unavailable' }, weight: null }];
+    // An older field the server still sends: no longer drawn.
     data.portfolio!.history = [{ date: '2026-09-29', totalAssetKrw: '1000000', returnRate: '1' }];
+    data.portfolio!.completedTrades = { items: [completedFutures, completedSpot], hasMore: false };
     h.queries.set('ranking', h.ready(data));
     const render = () => h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
-    assert.match(render(), /0.00000001 BTC/);
-    assert.match(render(), /비중 확인 불가/);
-    assert.match(render(), /2026-09-29/);
+    const html = render();
+    assert.match(html, /0.00000001 BTC/);
+    assert.match(html, /비중 확인 불가/);
+    assert.doesNotMatch(html, /최근 30일|2026-09-29/);
+    assert.match(html, /거래 완료 종목/);
+    // Newest first, as the server orders them: the Short lifetime, then the Korean stock.
+    assert.ok(html.indexOf('선물 SHORT') < html.indexOf('삼성전자'));
+    assert.match(html, /진입 증거금 \$63\.33/);
+    assert.match(html, /실현 손익 \+\$24\.65 · 수익률 \+38\.91%/);
+    assert.match(html, /현물/);
+    assert.match(html, /\(005930\)/);
+    assert.match(html, /매수 금액 1,061,060원/);
+    assert.match(html, /실현 손익 \+62,815원 · 수익률 \+5\.92%/);
+    assert.match(html, /수수료가 반영돼요/);
+    assert.doesNotMatch(html, /최근 \d+개만/);
     h.queries.set('ranking', { ...h.ready(data), isFetching: true });
-    assert.doesNotMatch(render(), /0.00000001 BTC|2026-09-29/);
+    assert.doesNotMatch(render(), /0.00000001 BTC|거래 완료 종목|삼성전자/);
     h.queries.set('ranking', { ...h.ready(data), isError: true });
-    assert.doesNotMatch(render(), /0.00000001 BTC|2026-09-29/);
+    assert.doesNotMatch(render(), /0.00000001 BTC|거래 완료 종목|삼성전자/);
+  });
+
+  it('completed trades: a loss, no basis, none yet, more than listed, and a server without them', () => {
+    const h = createHarness();
+    const render = (completedTrades?: unknown) => {
+      const data = structuredClone(summaryFixture);
+      if (completedTrades) (data.portfolio as any).completedTrades = completedTrades;
+      h.queries.set('ranking', h.ready(data));
+      return h.render('ranking/UserSeasonSummaryScreen', { route: { params: { userId: 'user-2' } } });
+    };
+    const loss = render({ items: [{ ...completedSpot, symbol: 'AAPL', name: 'Apple', market: 'NAS', assetType: 'us_stock', currencyCode: 'USD',
+      buyAmount: '200.5', realizedPnl: '-12.345', returnRate: '-6.15710723' }, { ...completedFutures, entryMargin: '0', returnRate: null }], hasMore: true });
+    assert.match(loss, /애플/, 'the same Korean name as a held US stock');
+    assert.match(loss, /매수 금액 \$200\.5</);
+    assert.match(loss, /실현 손익 -\$12\.35 · 수익률 -6\.16%/);
+    assert.match(loss, /진입 증거금 \$0</);
+    assert.match(loss, /수익률 -(?!\d)/, 'no basis: no rate, never a fake 0%');
+    assert.match(loss, /최근 2개만 보여드려요/);
+    assert.match(render({ items: [], hasMore: false }), /아직 모두 정리한 종목이 없어요/);
+    const legacy = render();
+    assert.doesNotMatch(legacy, /거래 완료 종목|최근 30일/);
   });
 });
 

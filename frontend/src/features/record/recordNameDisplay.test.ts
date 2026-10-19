@@ -29,9 +29,9 @@ describe('trade history / pending order names (2026-10-18)', () => {
     assert.equal(other.name, 'Apple Inc.', 'the same symbol on another market is another listing');
   });
 
-  it('domestic stocks and coins keep their existing name and symbol lines', () => {
+  it('a domestic stock shows its KRX listing name over its code; coins keep their name and symbol lines', () => {
     const krx = records.getRecordOrderDisplay(row({ id: 'a2', name: 'Samsung Electronics', symbol: '005930', market: 'KRX', currencyCode: 'KRW' }));
-    assert.deepEqual([krx.name, krx.symbol], ['Samsung Electronics', null]);
+    assert.deepEqual([krx.name, krx.symbol], ['삼성전자', '(005930)']);
     const coin = records.getRecordOrderDisplay(row({ id: 'a3', name: 'Bitcoin', symbol: 'BTCUSDT', market: 'BINANCE', currencyCode: 'USD' }));
     assert.deepEqual([coin.name, coin.symbol], ['Bitcoin', 'BTCUSDT']);
   });

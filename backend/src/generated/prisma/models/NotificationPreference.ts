@@ -27,6 +27,7 @@ export type AggregateNotificationPreference = {
 
 export type NotificationPreferenceMinAggregateOutputType = {
   userId: string | null
+  allEnabled: boolean | null
   tradeFill: boolean | null
   futuresLiquidation: boolean | null
   orderFailure: boolean | null
@@ -39,6 +40,7 @@ export type NotificationPreferenceMinAggregateOutputType = {
 
 export type NotificationPreferenceMaxAggregateOutputType = {
   userId: string | null
+  allEnabled: boolean | null
   tradeFill: boolean | null
   futuresLiquidation: boolean | null
   orderFailure: boolean | null
@@ -51,6 +53,7 @@ export type NotificationPreferenceMaxAggregateOutputType = {
 
 export type NotificationPreferenceCountAggregateOutputType = {
   userId: number
+  allEnabled: number
   tradeFill: number
   futuresLiquidation: number
   orderFailure: number
@@ -65,6 +68,7 @@ export type NotificationPreferenceCountAggregateOutputType = {
 
 export type NotificationPreferenceMinAggregateInputType = {
   userId?: true
+  allEnabled?: true
   tradeFill?: true
   futuresLiquidation?: true
   orderFailure?: true
@@ -77,6 +81,7 @@ export type NotificationPreferenceMinAggregateInputType = {
 
 export type NotificationPreferenceMaxAggregateInputType = {
   userId?: true
+  allEnabled?: true
   tradeFill?: true
   futuresLiquidation?: true
   orderFailure?: true
@@ -89,6 +94,7 @@ export type NotificationPreferenceMaxAggregateInputType = {
 
 export type NotificationPreferenceCountAggregateInputType = {
   userId?: true
+  allEnabled?: true
   tradeFill?: true
   futuresLiquidation?: true
   orderFailure?: true
@@ -174,6 +180,7 @@ export type NotificationPreferenceGroupByArgs<ExtArgs extends runtime.Types.Exte
 
 export type NotificationPreferenceGroupByOutputType = {
   userId: string
+  allEnabled: boolean
   tradeFill: boolean
   futuresLiquidation: boolean
   orderFailure: boolean
@@ -207,6 +214,7 @@ export type NotificationPreferenceWhereInput = {
   OR?: Prisma.NotificationPreferenceWhereInput[]
   NOT?: Prisma.NotificationPreferenceWhereInput | Prisma.NotificationPreferenceWhereInput[]
   userId?: Prisma.StringFilter<"NotificationPreference"> | string
+  allEnabled?: Prisma.BoolFilter<"NotificationPreference"> | boolean
   tradeFill?: Prisma.BoolFilter<"NotificationPreference"> | boolean
   futuresLiquidation?: Prisma.BoolFilter<"NotificationPreference"> | boolean
   orderFailure?: Prisma.BoolFilter<"NotificationPreference"> | boolean
@@ -220,6 +228,7 @@ export type NotificationPreferenceWhereInput = {
 
 export type NotificationPreferenceOrderByWithRelationInput = {
   userId?: Prisma.SortOrder
+  allEnabled?: Prisma.SortOrder
   tradeFill?: Prisma.SortOrder
   futuresLiquidation?: Prisma.SortOrder
   orderFailure?: Prisma.SortOrder
@@ -236,6 +245,7 @@ export type NotificationPreferenceWhereUniqueInput = Prisma.AtLeast<{
   AND?: Prisma.NotificationPreferenceWhereInput | Prisma.NotificationPreferenceWhereInput[]
   OR?: Prisma.NotificationPreferenceWhereInput[]
   NOT?: Prisma.NotificationPreferenceWhereInput | Prisma.NotificationPreferenceWhereInput[]
+  allEnabled?: Prisma.BoolFilter<"NotificationPreference"> | boolean
   tradeFill?: Prisma.BoolFilter<"NotificationPreference"> | boolean
   futuresLiquidation?: Prisma.BoolFilter<"NotificationPreference"> | boolean
   orderFailure?: Prisma.BoolFilter<"NotificationPreference"> | boolean
@@ -249,6 +259,7 @@ export type NotificationPreferenceWhereUniqueInput = Prisma.AtLeast<{
 
 export type NotificationPreferenceOrderByWithAggregationInput = {
   userId?: Prisma.SortOrder
+  allEnabled?: Prisma.SortOrder
   tradeFill?: Prisma.SortOrder
   futuresLiquidation?: Prisma.SortOrder
   orderFailure?: Prisma.SortOrder
@@ -267,6 +278,7 @@ export type NotificationPreferenceScalarWhereWithAggregatesInput = {
   OR?: Prisma.NotificationPreferenceScalarWhereWithAggregatesInput[]
   NOT?: Prisma.NotificationPreferenceScalarWhereWithAggregatesInput | Prisma.NotificationPreferenceScalarWhereWithAggregatesInput[]
   userId?: Prisma.StringWithAggregatesFilter<"NotificationPreference"> | string
+  allEnabled?: Prisma.BoolWithAggregatesFilter<"NotificationPreference"> | boolean
   tradeFill?: Prisma.BoolWithAggregatesFilter<"NotificationPreference"> | boolean
   futuresLiquidation?: Prisma.BoolWithAggregatesFilter<"NotificationPreference"> | boolean
   orderFailure?: Prisma.BoolWithAggregatesFilter<"NotificationPreference"> | boolean
@@ -278,6 +290,7 @@ export type NotificationPreferenceScalarWhereWithAggregatesInput = {
 }
 
 export type NotificationPreferenceCreateInput = {
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -291,6 +304,7 @@ export type NotificationPreferenceCreateInput = {
 
 export type NotificationPreferenceUncheckedCreateInput = {
   userId: string
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -302,6 +316,7 @@ export type NotificationPreferenceUncheckedCreateInput = {
 }
 
 export type NotificationPreferenceUpdateInput = {
+  allEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   tradeFill?: Prisma.BoolFieldUpdateOperationsInput | boolean
   futuresLiquidation?: Prisma.BoolFieldUpdateOperationsInput | boolean
   orderFailure?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -315,6 +330,7 @@ export type NotificationPreferenceUpdateInput = {
 
 export type NotificationPreferenceUncheckedUpdateInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  allEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   tradeFill?: Prisma.BoolFieldUpdateOperationsInput | boolean
   futuresLiquidation?: Prisma.BoolFieldUpdateOperationsInput | boolean
   orderFailure?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -327,6 +343,7 @@ export type NotificationPreferenceUncheckedUpdateInput = {
 
 export type NotificationPreferenceCreateManyInput = {
   userId: string
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -338,6 +355,7 @@ export type NotificationPreferenceCreateManyInput = {
 }
 
 export type NotificationPreferenceUpdateManyMutationInput = {
+  allEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   tradeFill?: Prisma.BoolFieldUpdateOperationsInput | boolean
   futuresLiquidation?: Prisma.BoolFieldUpdateOperationsInput | boolean
   orderFailure?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -350,6 +368,7 @@ export type NotificationPreferenceUpdateManyMutationInput = {
 
 export type NotificationPreferenceUncheckedUpdateManyInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
+  allEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   tradeFill?: Prisma.BoolFieldUpdateOperationsInput | boolean
   futuresLiquidation?: Prisma.BoolFieldUpdateOperationsInput | boolean
   orderFailure?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -367,6 +386,7 @@ export type NotificationPreferenceNullableScalarRelationFilter = {
 
 export type NotificationPreferenceCountOrderByAggregateInput = {
   userId?: Prisma.SortOrder
+  allEnabled?: Prisma.SortOrder
   tradeFill?: Prisma.SortOrder
   futuresLiquidation?: Prisma.SortOrder
   orderFailure?: Prisma.SortOrder
@@ -379,6 +399,7 @@ export type NotificationPreferenceCountOrderByAggregateInput = {
 
 export type NotificationPreferenceMaxOrderByAggregateInput = {
   userId?: Prisma.SortOrder
+  allEnabled?: Prisma.SortOrder
   tradeFill?: Prisma.SortOrder
   futuresLiquidation?: Prisma.SortOrder
   orderFailure?: Prisma.SortOrder
@@ -391,6 +412,7 @@ export type NotificationPreferenceMaxOrderByAggregateInput = {
 
 export type NotificationPreferenceMinOrderByAggregateInput = {
   userId?: Prisma.SortOrder
+  allEnabled?: Prisma.SortOrder
   tradeFill?: Prisma.SortOrder
   futuresLiquidation?: Prisma.SortOrder
   orderFailure?: Prisma.SortOrder
@@ -434,6 +456,7 @@ export type NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput = {
 }
 
 export type NotificationPreferenceCreateWithoutUserInput = {
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -445,6 +468,7 @@ export type NotificationPreferenceCreateWithoutUserInput = {
 }
 
 export type NotificationPreferenceUncheckedCreateWithoutUserInput = {
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -472,6 +496,7 @@ export type NotificationPreferenceUpdateToOneWithWhereWithoutUserInput = {
 }
 
 export type NotificationPreferenceUpdateWithoutUserInput = {
+  allEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   tradeFill?: Prisma.BoolFieldUpdateOperationsInput | boolean
   futuresLiquidation?: Prisma.BoolFieldUpdateOperationsInput | boolean
   orderFailure?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -483,6 +508,7 @@ export type NotificationPreferenceUpdateWithoutUserInput = {
 }
 
 export type NotificationPreferenceUncheckedUpdateWithoutUserInput = {
+  allEnabled?: Prisma.BoolFieldUpdateOperationsInput | boolean
   tradeFill?: Prisma.BoolFieldUpdateOperationsInput | boolean
   futuresLiquidation?: Prisma.BoolFieldUpdateOperationsInput | boolean
   orderFailure?: Prisma.BoolFieldUpdateOperationsInput | boolean
@@ -497,6 +523,7 @@ export type NotificationPreferenceUncheckedUpdateWithoutUserInput = {
 
 export type NotificationPreferenceSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   userId?: boolean
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -510,6 +537,7 @@ export type NotificationPreferenceSelect<ExtArgs extends runtime.Types.Extension
 
 export type NotificationPreferenceSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   userId?: boolean
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -523,6 +551,7 @@ export type NotificationPreferenceSelectCreateManyAndReturn<ExtArgs extends runt
 
 export type NotificationPreferenceSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   userId?: boolean
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -536,6 +565,7 @@ export type NotificationPreferenceSelectUpdateManyAndReturn<ExtArgs extends runt
 
 export type NotificationPreferenceSelectScalar = {
   userId?: boolean
+  allEnabled?: boolean
   tradeFill?: boolean
   futuresLiquidation?: boolean
   orderFailure?: boolean
@@ -546,7 +576,7 @@ export type NotificationPreferenceSelectScalar = {
   updatedAt?: boolean
 }
 
-export type NotificationPreferenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"userId" | "tradeFill" | "futuresLiquidation" | "orderFailure" | "friendRequest" | "importantNotice" | "seasonFinalResult" | "seasonEndingSoon" | "updatedAt", ExtArgs["result"]["notificationPreference"]>
+export type NotificationPreferenceOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"userId" | "allEnabled" | "tradeFill" | "futuresLiquidation" | "orderFailure" | "friendRequest" | "importantNotice" | "seasonFinalResult" | "seasonEndingSoon" | "updatedAt", ExtArgs["result"]["notificationPreference"]>
 export type NotificationPreferenceInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
 }
@@ -564,6 +594,10 @@ export type $NotificationPreferencePayload<ExtArgs extends runtime.Types.Extensi
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     userId: string
+    /**
+     * 전체 알림: off holds every type; the per-type switches keep their values.
+     */
+    allEnabled: boolean
     tradeFill: boolean
     futuresLiquidation: boolean
     orderFailure: boolean
@@ -997,6 +1031,7 @@ export interface Prisma__NotificationPreferenceClient<T, Null = never, ExtArgs e
  */
 export interface NotificationPreferenceFieldRefs {
   readonly userId: Prisma.FieldRef<"NotificationPreference", 'String'>
+  readonly allEnabled: Prisma.FieldRef<"NotificationPreference", 'Boolean'>
   readonly tradeFill: Prisma.FieldRef<"NotificationPreference", 'Boolean'>
   readonly futuresLiquidation: Prisma.FieldRef<"NotificationPreference", 'Boolean'>
   readonly orderFailure: Prisma.FieldRef<"NotificationPreference", 'Boolean'>

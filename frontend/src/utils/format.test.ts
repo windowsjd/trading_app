@@ -9,7 +9,7 @@ import {
   formatMoney,
   formatPercent,
   formatUsd,
-  getAssetEnglishNameLine,
+  getAssetNameSubline,
   getAssetNameDisplay,
   getAssetSymbolDisplay,
   getAssetSymbolMarketDisplay,
@@ -285,21 +285,39 @@ test('getAssetNameDisplay', async (t) => {
       { name: 'AT&T Inc.', symbol: 'T', market: 'NYS' }, { name: 'KLA Corp.', symbol: 'KLAC', market: 'NAS' }]) {
       assert.deepEqual(getAssetNameDisplay(asset), { primary: asset.name, secondary: asset.symbol }, JSON.stringify(asset));
     }
+  });
+
+  await t.test('a KRX listing shows its KRX listing name with its code, leading zeros kept', () => {
     assert.deepEqual(getAssetNameDisplay({ name: 'Samsung Electronics', symbol: '005930', market: 'KRX' }), {
+      primary: '삼성전자', secondary: '005930', code: '005930',
+    });
+    // The listing short name, not the company name; Latin-letter names stay as listed.
+    assert.equal(getAssetNameDisplay({ name: 'Hyundai Motor', symbol: '005380', market: 'KRX' }).primary, '현대차');
+    assert.equal(getAssetNameDisplay({ name: 'LS ELECTRIC', symbol: '010120', market: 'KRX' }).primary, 'LS ELECTRIC');
+    assert.equal(getAssetNameDisplay({ name: 'KEPCO', symbol: '015760', market: 'KRX' }).primary, '한국전력');
+    // A code outside the map keeps its own name (never translated), still with its code.
+    assert.deepEqual(getAssetNameDisplay({ name: 'New Listing', symbol: '900010', market: 'KRX' }), {
+      primary: 'New Listing', secondary: '900010', code: '900010',
+    });
+    // Without market KRX nothing is guessed from a numeric symbol.
+    assert.deepEqual(getAssetNameDisplay({ name: 'Samsung Electronics', symbol: '005930' }), {
       primary: 'Samsung Electronics', secondary: null,
     });
   });
 
   await t.test('the line under a Korean name keeps the English name and symbol; other assets keep their own line', () => {
     const line = (asset: { name?: string | null; symbol?: string | null; market?: string | null }) =>
-      getAssetEnglishNameLine(getAssetNameDisplay(asset));
+      getAssetNameSubline(getAssetNameDisplay(asset));
     assert.equal(line({ name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS' }), '(Apple Inc.) · AAPL');
     assert.equal(line({ name: 'Berkshire Hathaway Inc. Class B', symbol: 'BRK.B', market: 'NYS' }),
       `(Berkshire Hathaway Inc. Class B) · BRK.B`);
+    // A KRX listing: its code in parentheses, leading zeros kept.
+    assert.equal(line({ name: 'Samsung Electronics', symbol: '005930', market: 'KRX' }), '(005930)');
+    assert.equal(line({ name: 'New Listing', symbol: '900010', market: 'KRX' }), '(900010)');
     // No English name to repeat, no market (never guessed from the symbol), the
-    // same symbol on another market, a domestic stock or a coin: no such line.
+    // same symbol on another market, or a coin: no such line.
     for (const asset of [{ name: null, symbol: 'AAPL', market: 'NAS' }, { name: 'Apple Inc.', symbol: 'AAPL' },
-      { name: 'Apple Inc.', symbol: 'AAPL', market: 'NYS' }, { name: 'Samsung Electronics', symbol: '005930', market: 'KRX' },
+      { name: 'Apple Inc.', symbol: 'AAPL', market: 'NYS' }, { name: 'Samsung Electronics', symbol: '005930' },
       { name: 'Bitcoin', symbol: 'BTCUSDT', market: 'BINANCE' }])
       assert.equal(line(asset) === null, true, JSON.stringify(asset));
   });

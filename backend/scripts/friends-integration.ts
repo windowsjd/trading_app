@@ -42,6 +42,7 @@ let assetId: string | undefined;
 let displayAssetId: string | undefined;
 let displayInstrumentId: string | undefined;
 let displayFxId: string | undefined;
+let completedAssetId: string | undefined;
 let app: import('@nestjs/testing').TestingModule | undefined;
 let closeHttp: (() => Promise<void>) | undefined;
 const now = new Date();
@@ -292,6 +293,139 @@ async function run() {
       isolatedMargin: '0',
     },
   });
+  // 거래 완료 종목 fixtures on the friend's season account: one fully closed
+  // Spot holding (two buys, one sell; the engine's own average-cost result)
+  // and one closed Long lifetime with its open/close executions.
+  const hoursAgo = (hours: number) =>
+    new Date(now.getTime() - hours * 3_600_000);
+  const closedAsset = await db.asset.create({
+    data: {
+      symbol: `DONE${tag}`,
+      name: 'Completed fixture holding',
+      market: 'KRX',
+      assetType: 'domestic_stock',
+      currencyCode: 'KRW',
+      priceCurrency: 'KRW',
+      settlementCurrency: 'KRW',
+    },
+  });
+  completedAssetId = closedAsset.id;
+  const krwSnapshot = async (price: string, at: Date) =>
+    db.assetPriceSnapshot.create({
+      data: {
+        assetId: closedAsset.id,
+        price,
+        currencyCode: 'KRW',
+        sourceType: 'admin_manual',
+        sourceName: 'isolated-completed-fixture',
+        effectiveAt: at,
+        capturedAt: at,
+      },
+    });
+  for (const [side, price, quantity, gross, fee, net, at] of [
+    ['buy', '70000', '10', '700000', '700', '700700', hoursAgo(3)],
+    ['buy', '72000', '5', '360000', '360', '360360', hoursAgo(2)],
+    ['sell', '75000', '15', '1125000', '1125', '1123875', hoursAgo(1)],
+  ] as const)
+    await db.order.create({
+      data: {
+        tradingAccountId: accountIds[7],
+        assetId: closedAsset.id,
+        side,
+        orderType: 'market',
+        status: 'executed',
+        quantity,
+        currencyCode: 'KRW',
+        cashWalletScope: 'securities',
+        executedPrice: price,
+        grossAmount: gross,
+        feeAmount: fee,
+        netAmount: net,
+        assetPriceSnapshotId: (await krwSnapshot(price, at)).id,
+        submittedAt: at,
+        executedAt: at,
+      },
+    });
+  // The valuation still prices a closed position (at zero quantity).
+  await krwSnapshot('75000', fixtureAt);
+  await db.position.create({
+    data: {
+      tradingAccountId: accountIds[7],
+      assetId: closedAsset.id,
+      quantity: '0',
+      averageCost: '70737.33333333',
+      currencyCode: 'KRW',
+      realizedPnl: '62815.00000005',
+      realizedPnlKrw: '62815.00000005',
+    },
+  });
+  const closedLong = await db.futuresPosition.create({
+    data: {
+      tradingAccountId: accountIds[7],
+      instrumentId: instrument.id,
+      direction: 'long',
+      marginMode: 'isolated',
+      status: 'closed',
+      quantity: '0',
+      averageEntryPrice: '60000',
+      entryNotional: '0',
+      leverage: 10,
+      isolatedMargin: '0',
+      realizedPnl: '1500',
+      closedAt: new Date(now.getTime() - 1_800_000),
+    },
+  });
+  for (const [operation, price, notional, fee, realized, after, margin, at] of [
+    ['open', '60000', '30000', '30', '0', '0.5', '3000', hoursAgo(2)],
+    [
+      'close',
+      '63000',
+      '31500',
+      '31.5',
+      '1500',
+      '0',
+      '0',
+      new Date(now.getTime() - 1_800_000),
+    ],
+  ] as const) {
+    const evidence = await db.assetPriceSnapshot.create({
+      data: {
+        assetId: displayAssetId,
+        price,
+        currencyCode: 'USD',
+        sourceType: 'provider_api',
+        sourceName: 'binance_spot_ws_ticker',
+        effectiveAt: new Date(at.getTime() - 1_000),
+        capturedAt: new Date(at.getTime() - 1_000),
+      },
+    });
+    await db.futuresExecution.create({
+      data: {
+        tradingAccountId: accountIds[7],
+        instrumentId: instrument.id,
+        positionId: closedLong.id,
+        operation,
+        direction: 'long',
+        marginMode: 'isolated',
+        quantity: '0.5',
+        leverage: 10,
+        executionPrice: price,
+        assetPriceSnapshotId: evidence.id,
+        priceSourceType: 'provider_api',
+        priceSourceName: 'binance_spot_ws_ticker',
+        priceEffectiveAt: evidence.effectiveAt,
+        priceCapturedAt: evidence.capturedAt,
+        notional,
+        feeRate: '0.001',
+        feeAmount: fee,
+        realizedPnl: realized,
+        positionQuantityAfter: after,
+        averageEntryPriceAfter: '60000',
+        isolatedMarginAfter: margin,
+        executedAt: at,
+      },
+    });
+  }
   const baseline = await financialState();
   const jwt = new JwtService();
   const config = new ConfigService({
@@ -428,6 +562,43 @@ async function run() {
   check(
     r.body.data.portfolio.holdings[0].weight !== null,
     'existing asset weight retained',
+  );
+  // 거래 완료 종목: aggregates only, newest completion first.
+  check(
+    JSON.stringify(
+      (r.body as { data: { portfolio: { completedTrades: unknown } } }).data
+        .portfolio.completedTrades,
+    ) ===
+      JSON.stringify({
+        items: [
+          {
+            kind: 'futures',
+            assetId: displayAssetId,
+            symbol: 'BTCUSDT',
+            name: 'Bitcoin',
+            market: 'BINANCE',
+            direction: 'long',
+            currencyCode: 'USD',
+            entryMargin: '3000.00000000',
+            realizedPnl: '1438.50000000',
+            returnRate: '47.95000000',
+          },
+          {
+            kind: 'spot',
+            assetId: completedAssetId,
+            symbol: `DONE${tag}`,
+            name: 'Completed fixture holding',
+            market: 'KRX',
+            assetType: 'domestic_stock',
+            currencyCode: 'KRW',
+            buyAmount: '1061060.00000000',
+            realizedPnl: '62815.00000005',
+            returnRate: '5.92002337',
+          },
+        ],
+        hasMore: false,
+      }),
+    'completed trades: closed holding and closed lifetime, fees included, no order or price detail',
   );
   check(
     r.body.data.portfolio.futures.positions.length === 1 &&
@@ -695,6 +866,13 @@ run()
     await db.dailyPortfolioSnapshot.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
+    // Completed-trade fixtures reference positions, assets and price evidence.
+    await db.futuresExecution.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
+    await db.order.deleteMany({
+      where: { tradingAccountId: { in: accountIds } },
+    });
     await db.position.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });
@@ -716,6 +894,12 @@ run()
     if (displayFxId)
       await db.fxRateSnapshot.delete({ where: { id: displayFxId } });
     if (assetId) await db.asset.delete({ where: { id: assetId } });
+    if (completedAssetId) {
+      await db.assetPriceSnapshot.deleteMany({
+        where: { assetId: completedAssetId },
+      });
+      await db.asset.delete({ where: { id: completedAssetId } });
+    }
     await db.cashWallet.deleteMany({
       where: { tradingAccountId: { in: accountIds } },
     });

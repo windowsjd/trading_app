@@ -63,8 +63,12 @@ function createHomeHarness(mode = 'general') {
   let states = [];
   let homeStates = [];
   let walletStates = [];
+  // The Wallet's 이체 / 환전 sheet keeps its own slots: it renders after
+  // content that comes and goes, which would shift shared positional slots.
+  let fundingStates = [];
+  let fundingIndex = 0;
   const beginRender = (screen) => {
-    if (stateAccount !== h.account.id) { homeStates = []; walletStates = []; stateAccount = h.account.id; }
+    if (stateAccount !== h.account.id) { homeStates = []; walletStates = []; fundingStates = []; stateAccount = h.account.id; }
     states = screen === "wallet" ? walletStates : homeStates;
     stateIndex = 0; h.queries = [];
   };
@@ -161,7 +165,9 @@ function createHomeHarness(mode = 'general') {
   const expandDisplay = (node) => {
     if (Array.isArray(node)) return node.map(expandDisplay);
     if (!React.isValidElement(node)) return node;
-    if (node.type === hero || node.type === positionRow || futuresComponents.includes(node.type) || node.type === charts || homeComponents.includes(node.type)) return expandDisplay(node.type(node.props));
+    if (node.type === fundingSheet) fundingIndex = 0;
+    if (node.type === hero || node.type === positionRow || futuresComponents.includes(node.type) || node.type === charts || homeComponents.includes(node.type)
+      || node.type === fundingSheet) return expandDisplay(node.type(node.props));
     return React.cloneElement(node, {}, expandDisplay(node.type === 'AccountSwitcher'
       ? [node.props.children, node.props.homeVisual, node.props.homeVisualCaption] : node.props.children));
   };
@@ -185,6 +191,19 @@ function createHomeHarness(mode = 'general') {
   ).default;
   mocks['./HomeAssetTrend'] = { default: charts, __esModule: true };
   mocks['../home/HomeAssetTrend'] = { default: charts, __esModule: true };
+  // The Wallet's 이체 / 환전 sheet renders here (which one, open or not); the
+  // panels inside are stand-ins, rendered by their own harnesses.
+  const fundingSheet = load(resolve(__dirname, '../src/screens/wallet/WalletFundingSheet.tsx'), {
+    ...mocks,
+    react: { ...mocks.react, useState: (initial) => {
+      const index = fundingIndex++;
+      if (!(index in fundingStates)) fundingStates[index] = typeof initial === 'function' ? initial() : initial;
+      return [fundingStates[index], (value) => { fundingStates[index] = typeof value === 'function' ? value(fundingStates[index]) : value; }];
+    } },
+    './WalletTransferSheet': { default: 'WalletTransferPanel', __esModule: true },
+    './WalletFxSheet': { default: 'WalletFxPanel', __esModule: true },
+  }).default;
+  mocks['./WalletFundingSheet'] = { default: fundingSheet, __esModule: true };
   const wallet = load(resolve(__dirname, '../src/screens/wallet/WalletScreen.tsx'), mocks).default;
   const home = load(
     resolve(__dirname, '../src/screens/home/HomeScreen.tsx'),
@@ -205,7 +224,7 @@ function createHomeHarness(mode = 'general') {
   h.renderCta = (node) => cta(node.props);
   h.renderFx = () => {
     h.fxQueries = [];
-    const screen = load(resolve(__dirname, '../src/screens/wallet/WalletFxScreen.tsx'), {
+    const screen = load(resolve(__dirname, '../src/screens/wallet/WalletFxSheet.tsx'), {
       ...mocks,
       react: {
         ...React,
@@ -230,9 +249,9 @@ function createHomeHarness(mode = 'general') {
       '../../components/states/BlockedState': { default: 'BlockedState', __esModule: true },
       '../../components/states/AdminDiagnosticPanel': { default: 'AdminDiagnosticPanel', __esModule: true },
       '../../components/tradingAccount/PreviewAmounts': { default: 'PreviewAmounts', __esModule: true },
-      './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
+      './FxReceipt': { default: 'FxReceipt', __esModule: true },
     }).default;
-    return screen({ navigation: root });
+    return screen({});
   };
   h.home = () => home({ navigation: root });
   h.render = () => {

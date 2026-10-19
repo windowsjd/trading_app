@@ -2,6 +2,7 @@
 // them back to the API — they are lossy (rounded) by design. Formatters are for
 // rendering to the screen only, never for order/price/settlement calculations.
 
+import { getKrStockKoreanName, getKrxListingCode } from './krStockKoreanNames.ts';
 import { getUsStockKoreanName } from './usStockKoreanNames.ts';
 
 export type FormatCurrencyCode = 'KRW' | 'USD' | (string & {});
@@ -409,6 +410,8 @@ export type AssetNameDisplay = {
   secondary: string | null;
   /** The English `Asset.name`, present when `primary` is a US listing's Korean name. */
   english?: string;
+  /** A KRX listing's 6-digit code (leading zeros kept), shown as `(005930)` under its name. */
+  code?: string;
 };
 
 /**
@@ -418,7 +421,9 @@ export type AssetNameDisplay = {
  * A US stock whose listing (`market` + `symbol`, the asset's identity) has a
  * Korean name (usStockKoreanNames) shows that name as primary; its English
  * name is kept as `english` for screens that show it beside the Korean one.
- * Without `market` the English name stays primary.
+ * A KRX stock (`market` KRX, 6-digit code) shows its official KRX listing name
+ * (krStockKoreanNames; the English `Asset.name` if unknown) with the code kept
+ * as `secondary` and `code`. Without `market` the English name stays primary.
  */
 export function getAssetNameDisplay(
   asset?: { name?: string | null; symbol?: string | null; market?: string | null } | null,
@@ -429,6 +434,10 @@ export function getAssetNameDisplay(
   // Some fallback payloads may repeat the symbol in `name`. Do not let a
   // hidden numeric symbol re-enter the UI through that duplicate field.
   const name = rawName === rawSymbol && rawSymbol && !symbol ? null : rawName;
+  const krxCode = getKrxListingCode(asset);
+  if (krxCode) {
+    return { primary: getKrStockKoreanName(asset) ?? name ?? krxCode, secondary: krxCode, code: krxCode };
+  }
   const korean = getUsStockKoreanName(asset);
   if (korean) {
     return name && name !== korean && name !== symbol
@@ -443,14 +452,15 @@ export function getAssetNameDisplay(
 }
 
 /**
- * The line under a US listing's Korean name wherever an asset's full name is
- * shown: its English name in parentheses and its symbol,
- * `(Apple Inc.) · AAPL`. Null for every other asset (Korean name not shown),
- * so domestic stocks and coins keep their own second line.
+ * The line under a stock's name wherever its full name is shown: for a US
+ * listing with a Korean name, its English name in parentheses and its symbol,
+ * `(Apple Inc.) · AAPL`; for a KRX listing, its code, `(005930)`. Null for
+ * every other asset, so coins keep their own second line.
  */
-export function getAssetEnglishNameLine(display: AssetNameDisplay): string | null {
-  if (!display.english) return null;
-  return [`(${display.english})`, display.secondary].filter(Boolean).join(' · ');
+export function getAssetNameSubline(display: AssetNameDisplay): string | null {
+  if (display.english) return [`(${display.english})`, display.secondary].filter(Boolean).join(' · ');
+  if (display.code) return `(${display.code})`;
+  return null;
 }
 
 /**

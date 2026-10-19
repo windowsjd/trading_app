@@ -7,7 +7,7 @@ import { HoldingsContractError } from '../tradingAccount/holdings.ts';
 describe('Home/Wallet holding value and unrealized return', () => {
   it('uses the complete local valuation and canonical return, regardless of quantity/cost/price', () => {
     assert.deepEqual(getPositionAssetDisplay(holding()), {
-      name: '삼성전자', englishName: null, quantity: '보유수량 0.12345678 주', value: '1,120,000원', pnl: '+1,000원', returnRate: '+4.82%', performance: '+1,000원 (+4.82%)', direction: 'rise', notice: null,
+      name: '삼성전자', englishName: '(005930)', quantity: '보유수량 0.12345678 주', value: '1,120,000원', pnl: '+1,000원', returnRate: '+4.82%', performance: '+1,000원 (+4.82%)', direction: 'rise', notice: null,
     });
   });
   for (const assetType of ['us_stock', 'crypto', 'domestic_stock']) {

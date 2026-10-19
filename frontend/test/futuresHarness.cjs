@@ -146,6 +146,10 @@ function futuresHarness(options = {}) {
       return h.orderBookState ?? { latestOrderBook: null, statusMessage: '호가 정보를 불러오는 중입니다.' };
     } },
     ...Object.fromEntries(['FullPageLoading', 'ErrorState'].map(name => ['../../components/states/' + name, { default: name, __esModule: true }])),
+    // The wallet's 이체 / 환전 panels inside the futures screen's sheet: their own
+    // tests render them; here the sheet shows which one opened, with what.
+    './WalletTransferSheet': { default: 'WalletTransferPanel', __esModule: true },
+    './WalletFxSheet': { default: 'WalletFxPanel', __esModule: true },
   };
   if (options.diagnostics) {
     delete mocks['../../components/states/AdminDiagnosticPanel'];
@@ -155,7 +159,8 @@ function futuresHarness(options = {}) {
     mocks['../../features/me/api'] = { getMe: async () => me };
     client.setQueryData(['me'], me);
   }
-  const screenFile = { market: '../src/screens/market/FuturesMarketList.tsx', chart: '../src/screens/futures/FuturesChartScreen.tsx' }[options.screen] ?? '../src/screens/futures/FuturesScreen.tsx';
+  const screenFile = { market: '../src/screens/market/FuturesMarketList.tsx', chart: '../src/screens/futures/FuturesChartScreen.tsx',
+    detail: '../src/screens/futures/FuturesDetailScreen.tsx' }[options.screen] ?? '../src/screens/futures/FuturesScreen.tsx';
   const loaded = load(resolve(__dirname, screenFile), mocks);
   // MarketScreen's composition: the controls (header card), then the rows.
   const screen = options.screen === 'market' ? (props) => {
@@ -166,7 +171,11 @@ function futuresHarness(options = {}) {
   } : loaded.default;
   // The market list's sort/refresh are owned by MarketScreen; tests drive them.
   h.sort = 'turnover_desc'; h.refreshVersion = 0;
-  const params = () => options.screen === 'chart' ? { accountId: h.routeAccountId, ...h.chart } : { accountId: h.routeAccountId, instrumentId: options.instrumentId };
+  // `options.routeDirection`: the detail's 구매하기 (long) / 판매하기 (short) request on the futures
+  // screen (`options.direction` is the fixture position's own side).
+  const params = () => options.screen === 'chart' ? { accountId: h.routeAccountId, ...h.chart }
+    : options.screen === 'detail' ? { accountId: h.routeAccountId, instrumentId: options.instrumentId ?? 'btc' }
+      : { accountId: h.routeAccountId, instrumentId: options.instrumentId, ...(options.routeDirection ? { direction: options.routeDirection } : {}) };
   const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: params() }, navigation: { navigate: (...args) => h.navigation.push(args), goBack: () => h.navigation.push(['goBack']) }, onSelect: (...args) => h.navigation.push(args),
     sort: h.sort, onSortChange: sort => { h.sort = sort; }, refreshVersion: h.refreshVersion }));
   h.flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); }); };

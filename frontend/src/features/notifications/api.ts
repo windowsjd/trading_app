@@ -2,7 +2,7 @@ import axios from 'axios';
 import { apiClient } from '../../services/api/client';
 import { API_BASE_URL } from '../../constants/env';
 import type { ApiSuccessResponse } from '../../models/dto/common';
-import type { NotificationPreferences } from './types';
+import type { NotificationPreferences, NotificationSettings, NotificationSettingsPatch } from './types';
 import { parseOrderFailure, type OrderFailureKind } from './orderFailure';
 
 export class OrderFailureResponseError extends Error {
@@ -30,19 +30,22 @@ export async function getOrderFailure(
   return failure;
 }
 
-export async function getNotificationPreferences(signal?: AbortSignal) {
-  const response = await apiClient.get<
-    ApiSuccessResponse<{ preferences: NotificationPreferences }>
-  >('/notifications/preferences', { signal });
-  return response.data.data.preferences;
+type StoredSettings = { allEnabled?: unknown; preferences: NotificationPreferences };
+
+/** A server without 전체 알림 sends no `allEnabled` (null here). */
+function readSettings(data: StoredSettings): NotificationSettings {
+  return { allEnabled: typeof data.allEnabled === 'boolean' ? data.allEnabled : null, preferences: data.preferences };
 }
 
-/** Answers with the committed switches, never an optimistic copy. */
-export async function updateNotificationPreferences(patch: Partial<NotificationPreferences>) {
-  const response = await apiClient.patch<
-    ApiSuccessResponse<{ preferences: NotificationPreferences }>
-  >('/notifications/preferences', patch);
-  return response.data.data.preferences;
+export async function getNotificationPreferences(signal?: AbortSignal) {
+  const response = await apiClient.get<ApiSuccessResponse<StoredSettings>>('/notifications/preferences', { signal });
+  return readSettings(response.data.data);
+}
+
+/** Answers with the committed settings, never an optimistic copy. */
+export async function updateNotificationPreferences(patch: NotificationSettingsPatch) {
+  const response = await apiClient.patch<ApiSuccessResponse<StoredSettings>>('/notifications/preferences', patch);
+  return readSettings(response.data.data);
 }
 
 /** Ties this device's push token to the signed-in user. */

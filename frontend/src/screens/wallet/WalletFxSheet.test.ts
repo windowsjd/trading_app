@@ -21,7 +21,7 @@ const press = (h: any) => h.control(h.render(), TEST_IDS.walletFx.executeSubmit)
 
 for (const mode of ['general', 'season', 'beginner']) for (const currency of ['KRW', 'USD']) {
   test(`${mode} ${currency}: spendable cash excludes reservations; exact balance is allowed`, () => {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     h.account.mode = mode;
     if (mode === 'season') h.account.season = { seasonId: 's', seasonStatus: 'active', participantStatus: 'active',
       startAt: new Date(Date.now() - 60000).toISOString(), endAt: new Date(Date.now() + 60000).toISOString() };
@@ -40,7 +40,7 @@ for (const mode of ['general', 'season', 'beginner']) for (const currency of ['K
 
 test('FX never reports insufficient funds for malformed input or unknown/fetching/error balances', () => {
   for (const value of ['-1', '1e3', 'NaN', '0', '1,000', '1.000000001']) {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     const tree = input(h, value); assert.equal(disabled(h, tree), true);
     assert.doesNotMatch(textContent(tree), /잔액이 부족/);
   }
@@ -49,7 +49,7 @@ test('FX never reports insufficient funds for malformed input or unknown/fetchin
     { data: wallets('KRW', 'NaN') }, { data: wallets('KRW', '10', '11') },
     { data: { tradingAccountId: 'account-1', wallets: [] } },
   ]) {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     input(h, '1'); h.walletQuery = state;
     const tree = h.render(); assert.doesNotMatch(textContent(tree), /잔액이 부족/);
     const button = elements(tree).find((node: any) => node.props.testID === TEST_IDS.walletFx.executeSubmit);
@@ -63,7 +63,7 @@ test('FX rechecks before a new quote, and a fresh rejection sends no financial c
     { data: wallets('KRW', '40', '0'), isError: false },
     { data: wallets('KRW'), isError: true },
   ]) {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     input(h, '50'); h.walletRefetch = async () => state;
     const submit = h.control(h.render(), TEST_IDS.walletFx.executeSubmit).props.onPress;
     submit(); submit(); await h.flush();
@@ -74,7 +74,7 @@ test('FX rechecks before a new quote, and a fresh rejection sends no financial c
 
 for (const code of ['INSUFFICIENT_BALANCE', 'INSUFFICIENT_AVAILABLE_BALANCE']) {
   test(`FX maps server ${code} to the requested message`, async () => {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     h.post = async () => { throw { response: { status: 409, data: { error: { code, message: 'private server detail' } } } }; };
     input(h, '50'); press(h); await h.flush();
     const tree = h.render(); assert.match(textContent(tree), /잔액이 부족합니다\./);
@@ -83,7 +83,7 @@ for (const code of ['INSUFFICIENT_BALANCE', 'INSUFFICIENT_AVAILABLE_BALANCE']) {
 }
 
 test('FX unknown execution retries its original quote and key despite a refreshed debit', async () => {
-  const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+  const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
   const quote = { tradingAccountId: 'account-1', quoteId: 'quote', fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '50' };
   let fail = true;
   h.post = async (path: string) => {
@@ -97,11 +97,11 @@ test('FX unknown execution retries its original quote and key despite a refreshe
   assert.doesNotMatch(textContent(h.render()), /잔액이 부족/);
   fail = false; press(h); await h.flush();
   assert.equal(h.requests.length, 3); assert.deepEqual(h.requests[2], h.requests[1]);
-  assert.equal(elements(h.render(), 'FxSuccessBottomSheet')[0].props.visible, true);
+  assert.equal(elements(h.render(), 'FxReceipt').length, 1);
 });
 
 test('FX pins a pending command to its submitting guide session', async () => {
-  const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+  const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
   let session = 1; let claimed = 0;
   const dispose = bridge.setQuestGuideCommandSink(() => { claimed++; return true; }, () => session);
   let release: () => void = () => {};
@@ -112,13 +112,13 @@ test('FX pins a pending command to its submitting guide session', async () => {
   try {
     input(h, '50'); press(h); session = 2; release(); await h.flush();
     assert.equal(claimed, 0);
-    assert.equal(elements(h.render(), 'FxSuccessBottomSheet')[0].props.visible, true);
+    assert.equal(elements(h.render(), 'FxReceipt').length, 1);
   } finally { dispose(); }
 });
 
 test('FX cannot complete a guide from an unidentifiable or different command receipt', async () => {
   for (const corrupt of [{ exchangeId: '' }, { quoteId: 'another-quote' }, { sourceAmount: '51' }, { fromCurrency: 'USD', toCurrency: 'KRW' }]) {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     h.quote = { tradingAccountId: 'account-1', quoteId: 'q', fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '50' };
     h.result = { ...h.quote, exchangeId: 'fx', netTargetAmount: '0.037', wallets: { KRW: '20', USD: '100' }, ...corrupt };
     let claims = 0;
@@ -129,7 +129,7 @@ test('FX cannot complete a guide from an unidentifiable or different command rec
 });
 
 test('FX clears an insufficient rejection after a newer wallet read proves enough funds', async () => {
-  const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+  const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
   h.walletQuery = { data: wallets('KRW'), dataUpdatedAt: 1 };
   h.post = async () => { throw { response: { status: 409, data: { error: { code: 'INSUFFICIENT_BALANCE' } } } }; };
   input(h, '50'); press(h); await h.flush();

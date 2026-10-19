@@ -207,9 +207,14 @@ describe('RecordsService', () => {
       delete: jest.fn(),
     },
     futuresPosition: { findMany: jest.fn().mockResolvedValue([]) },
+    // 거래 완료 종목 reads (friend detail): nothing closed unless a test says so.
+    futuresExecution: { groupBy: jest.fn().mockResolvedValue([]) },
+    futuresLiquidationClose: { findMany: jest.fn().mockResolvedValue([]) },
+    futuresSeasonClose: { findMany: jest.fn().mockResolvedValue([]) },
+    $queryRaw: jest.fn().mockResolvedValue([]),
     position: {
       count: jest.fn(),
-      findMany: jest.fn(),
+      findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -1736,6 +1741,24 @@ describe('RecordsService', () => {
       participantAccount.id,
       expect.any(Date),
     );
+    // 거래 완료 종목: the season account's own closed positions only.
+    expect(response.data.portfolio!.completedTrades).toEqual({
+      items: [],
+      hasMore: false,
+    });
+    expect(prisma.position.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tradingAccountId: participantAccount.id,
+          quantity: { equals: '0' },
+        },
+      }),
+    );
+    expect(prisma.futuresPosition.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tradingAccountId: participantAccount.id, status: 'closed' },
+      }),
+    );
     expectNoRecordWrites(prisma);
   });
 
@@ -1786,6 +1809,7 @@ describe('RecordsService', () => {
       positionsProjection.readOpenHoldingProjection,
     ).not.toHaveBeenCalled();
     expect(prisma.futuresPosition.findMany).not.toHaveBeenCalled();
+    expect(prisma.$queryRaw).not.toHaveBeenCalled();
     expectNoRecordWrites(prisma);
   });
 

@@ -1,5 +1,5 @@
 import type { PositionItemDto } from './api.ts';
-import { formatDisplayDecimal, formatMoneyDecimal, formatSignedPercent, getAssetEnglishNameLine, getAssetNameDisplay, getFinancialDirection } from '../../utils/format.ts';
+import { formatDisplayDecimal, formatMoneyDecimal, formatSignedPercent, getAssetNameSubline, getAssetNameDisplay, getFinancialDirection } from '../../utils/format.ts';
 import type { PositionValuationDto } from './api.ts';
 import { isHeldPosition } from '../tradingAccount/holdings.ts';
 
@@ -18,7 +18,7 @@ export function getPositionAssetDisplay(position: SpotHoldingDisplay) {
   const nameDisplay = getAssetNameDisplay(position);
   const name = nameDisplay.primary;
   // A US listing shown by its Korean name keeps `(English) · SYMBOL` under it.
-  const englishName = getAssetEnglishNameLine(nameDisplay);
+  const englishName = getAssetNameSubline(nameDisplay);
   const unit = position.assetType === 'crypto'
     ? position.market === 'BINANCE' ? position.symbol.replace(/USDT$/u, '') : position.symbol
     : '주';

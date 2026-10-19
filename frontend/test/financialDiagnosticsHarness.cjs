@@ -109,6 +109,8 @@ function financialDiagnosticsHarness(screen = 'home', { role = 'admin', mode = '
     '../../components/tradingAccount/AccountSetupPanel': { default: 'AccountSetupPanel', __esModule: true },
     './HomeHotMarket': { useHomeHotMarket: () => ({ refreshQuery: { refetch() {} } }), default: () => null, __esModule: true },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+    // The Wallet's 환전 panel has its own diagnostics test (tradingUiHarness); these screens never open it.
+    './WalletFxSheet': { default: 'WalletFxPanel', __esModule: true },
   };
   const files = { home: 'home/HomeScreen', wallet: 'wallet/WalletScreen', portfolio: 'home/PortfolioScreen', ledger: 'home/WalletTransactionsScreen', history: 'history/TradeHistoryScreen' };
   const Screen = h.load(`src/screens/${files[screen]}.tsx`, mocks).default;

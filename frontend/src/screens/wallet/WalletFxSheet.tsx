@@ -6,15 +6,11 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  KeyboardAvoidingView,
 } from '../../theme/native';
-import { SafeAreaView } from '../../theme/safeArea';
-import { useHeaderHeight } from '@react-navigation/elements';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import ActionPressable from '../../components/common/ActionPressable';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import type { WalletFxScreenProps } from '../../app/navigation/types';
 import { useRootNavigation } from '../../app/navigation/navigationHooks';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
@@ -77,7 +73,7 @@ import { runQuotedAction, type QuotedAction } from '../../features/tradingAccoun
 import { useStaleRecheck } from '../../features/asset/useStaleRecheck';
 import PreviewAmounts from '../../components/tradingAccount/PreviewAmounts';
 import CTAButton from '../../components/common/CTAButton';
-import FxSuccessBottomSheet from './FxSuccessBottomSheet';
+import FxReceipt from './FxReceipt';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
 import { useFxRateUpdates } from '../../features/wallet/useFxRateUpdates';
 import { FX_RATE_FALLBACK_INTERVAL_MS } from '../../features/wallet/fxRateUpdates';
@@ -88,8 +84,19 @@ import {
   registerQuestGuideReveal,
 } from '../../features/quest/questGuideBridge';
 
-type Props = WalletFxScreenProps;
 type Currency = 'KRW' | 'USD';
+type Props = {
+  /** The direction the sheet opens on: KRW → USD unless the opener asks for USD → KRW. */
+  initialFromCurrency?: Currency;
+  /** 확인 on the receipt: close the sheet. */
+  onDone?: () => void;
+  /** 마켓으로 가기 on the receipt (no such button without it). */
+  onGoMarket?: () => void;
+  /** A committed exchange the host continues from (back to its transfer); no receipt then. */
+  onExchanged?: (result: FxExecuteDto) => void;
+  /** A command in flight: the sheet must not look closable/cancellable. */
+  onBusyChange?: (busy: boolean) => void;
+};
 type FxDomainState = Extract<
   WalletFxViewState,
   | 'fx_quote_rejected'
@@ -125,8 +132,15 @@ function getFxDomainErrorMessage(
     : getErrorMessageFromCode(code);
 }
 
-export default function WalletFxScreen({ navigation }: Props) {
-  const headerHeight = useHeaderHeight();
+/**
+ * 환전 (Securities KRW ↔ USD) in a bottom sheet over the screen that opened it
+ * (the Wallet, or an order screen whose wallet needs money), like 이체. Its
+ * financial flow — fresh balance preflight, one quote → execute with a pinned
+ * idempotency key, re-quote on expiry/rate change, uncertain-result retry,
+ * account scope fences — is the former full screen's, unchanged. The receipt
+ * replaces the form inside the same sheet.
+ */
+export default function WalletFxPanel({ initialFromCurrency = 'KRW', onDone, onGoMarket, onExchanged, onBusyChange }: Props) {
   const inputScroll = useFocusedInputScroll();
   const { onInputBlur: clearInputFocus } = inputScroll;
   const amountRef = useRef<View>(null);
@@ -181,7 +195,7 @@ export default function WalletFxScreen({ navigation }: Props) {
     scopeEpoch: scopeRef.current.epoch,
   });
 
-  const [fromCurrency, setFromCurrency] = useState<Currency>('KRW');
+  const [fromCurrency, setFromCurrency] = useState<Currency>(initialFromCurrency);
   const [amount, setAmount] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [domainError, setDomainError] = useState<string | null>(null);
@@ -281,7 +295,9 @@ export default function WalletFxScreen({ navigation }: Props) {
           toCurrency: data.result.toCurrency,
           summary: `받은 금액 ${getFxExecuteSuccessDisplay(data.result).netTargetAmount}`,
         });
-        if (!adopted) setSuccessData(data.result);
+        // A host continuing elsewhere (back to its transfer) takes the result; else the receipt.
+        if (committed && onExchanged) onExchanged(data.result);
+        else if (!adopted) setSuccessData(data.result);
         setAmount('');
         setFxDomainState(null);
         setFieldError(null);
@@ -357,6 +373,8 @@ export default function WalletFxScreen({ navigation }: Props) {
   }, [accountId, clearInputFocus]);
 
   const pending = executeMutation.isPending;
+  useEffect(() => { onBusyChange?.(pending); }, [onBusyChange, pending]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   const balanceReady = !walletsQuery.isError && !walletsQuery.isLoading && !walletsQuery.isFetching;
   const sourceAvailable = balanceReady && walletsQuery.data?.tradingAccountId === accountId
     ? transferAvailableAmount(getWalletByCurrency(walletsQuery.data, fromCurrency)) : null;
@@ -445,16 +463,14 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   if (noAccounts || !hasAccount) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.content}>
-          <View style={styles.card} testID="wallet-fx-no-account">
-            <Text style={styles.blockedTitle}>환전할 투자 계정이 없습니다.</Text>
-            <Text style={styles.blockedMessage}>
-              홈에서 투자 계정을 시작하거나 선택한 뒤 환전할 수 있습니다.
-            </Text>
-          </View>
+      <View style={styles.content}>
+        <View style={styles.card} testID="wallet-fx-no-account">
+          <Text style={styles.blockedTitle}>환전할 투자 계정이 없습니다.</Text>
+          <Text style={styles.blockedMessage}>
+            홈에서 투자 계정을 시작하거나 선택한 뒤 환전할 수 있습니다.
+          </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -471,18 +487,16 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   if (exchangeBlockMessage) {
     return (
-      <SafeAreaView style={styles.container}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <View
-            testID={TEST_IDS.tradingAccount.capabilityNotice}
-            style={styles.card}
-          >
-            <Text style={styles.label}>환전</Text>
-            <Text style={styles.blockedTitle}>환전이 제한된 계정입니다.</Text>
-            <Text style={styles.blockedMessage}>{exchangeBlockMessage}</Text>
-          </View>
-        </ScrollView>
-      </SafeAreaView>
+      <View style={styles.content}>
+        <View
+          testID={TEST_IDS.tradingAccount.capabilityNotice}
+          style={styles.card}
+        >
+          <Text style={styles.label}>환전</Text>
+          <Text style={styles.blockedTitle}>환전이 제한된 계정입니다.</Text>
+          <Text style={styles.blockedMessage}>{exchangeBlockMessage}</Text>
+        </View>
+      </View>
     );
   }
 
@@ -500,16 +514,15 @@ export default function WalletFxScreen({ navigation }: Props) {
 
   if (integrityFailure) {
     return (
-      <SafeAreaView style={styles.container} testID={TEST_IDS.tradingAccount.integrityError}>
-        <View style={styles.content}>
-          <ErrorState
-            title={ACCOUNT_INTEGRITY_TITLE}
-            message={integrityFailure.message}
-            onRetry={integrityFailure.retry}
-            diagnosticError={walletsQuery.error}
-          />
-        </View>
-      </SafeAreaView>
+      <View style={styles.content} testID={TEST_IDS.tradingAccount.integrityError}>
+        <ErrorState
+          error={integrityFailure.error}
+          title={ACCOUNT_INTEGRITY_TITLE}
+          message={integrityFailure.message}
+          onRetry={integrityFailure.retry}
+          diagnosticError={walletsQuery.error}
+        />
+      </View>
     );
   }
 
@@ -549,15 +562,12 @@ export default function WalletFxScreen({ navigation }: Props) {
   const krwWallet = getWalletBalanceAmount(walletsQuery.data, 'KRW');
   const usdWallet = getWalletBalanceAmount(walletsQuery.data, 'USD');
 
+  // The sheet supplies keyboard room; the scroll keeps the input and CTA visible.
   return (
-    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
-      {/* Android draws edge to edge, so the keyboard no longer resizes the
-          window (adjustResize): pad for it on both platforms. */}
-      <KeyboardAvoidingView style={styles.flex} keyboardVerticalOffset={headerHeight} behavior="padding">
-      <View ref={questGuideTarget('fx-viewport')} collapsable={false} style={styles.flex}>
+      <View ref={questGuideTarget('fx-viewport')} collapsable={false} style={styles.viewport}>
       <ScrollView
         ref={inputScroll.scrollRef}
-        style={styles.flex}
+        style={styles.scroll}
         onLayout={inputScroll.revealFocusedInput}
         onContentSizeChange={inputScroll.revealFocusedInput}
         onScroll={inputScroll.onScroll}
@@ -567,6 +577,10 @@ export default function WalletFxScreen({ navigation }: Props) {
         testID={TEST_IDS.walletFx.screen}
         contentContainerStyle={styles.content}
       >
+        {successData ? (
+          <FxReceipt payload={successData} onGoMarket={onGoMarket}
+            onDone={() => { if (onDone) onDone(); else setSuccessData(null); }} />
+        ) : <>
         {/* Three equal rows only. An unavailable rate is never replaced by a
             number; its explanation, retry and diagnostics sit below. */}
         <View style={styles.card} testID="fx-wallet-summary">
@@ -728,24 +742,9 @@ export default function WalletFxScreen({ navigation }: Props) {
               onPress={executeQuote} />
           </View>
         </View>
+        </>}
       </ScrollView>
       </View>
-      </KeyboardAvoidingView>
-
-      <FxSuccessBottomSheet
-        visible={!!successData}
-        payload={successData}
-        onClose={() => setSuccessData(null)}
-        onGoWallet={() => {
-          setSuccessData(null);
-          navigation.goBack();
-        }}
-        onGoMarket={() => {
-          setSuccessData(null);
-          rootNavigation.navigate('MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } });
-        }}
-      />
-    </SafeAreaView>
   );
 }
 
@@ -759,10 +758,10 @@ function SummaryRow({ label, value, testID }: { label: string; value: string; te
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: semantic.screen },
-  content: { padding: 16, gap: 12, paddingBottom: 24 },
+  viewport: { flexShrink: 1, minHeight: 0 },
+  scroll: { flexGrow: 0 },
+  content: { gap: 12, paddingTop: 4, paddingBottom: 4 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  flex: { flex: 1 },
   card: {
     borderWidth: 1,
     borderColor: semantic.border,

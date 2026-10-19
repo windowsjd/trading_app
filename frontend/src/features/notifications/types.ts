@@ -16,6 +16,15 @@ export const NOTIFICATION_PREFERENCE_KEYS = [
 export type NotificationPreferenceKey = (typeof NOTIFICATION_PREFERENCE_KEYS)[number];
 export type NotificationPreferences = Record<NotificationPreferenceKey, boolean>;
 
+/**
+ * The stored settings: 전체 알림 (`allEnabled`) and the seven switches. Off,
+ * 전체 알림 holds every push while the seven keep their values, so turning it
+ * back on restores them. null: a server from before 2026-10-20 that has no
+ * 전체 알림 (the seven alone decide; the app shows no master switch).
+ */
+export type NotificationSettings = { allEnabled: boolean | null; preferences: NotificationPreferences };
+export type NotificationSettingsPatch = Partial<NotificationPreferences> & { allEnabled?: boolean };
+
 /** Settings order and copy. */
 export const NOTIFICATION_PREFERENCE_ITEMS: ReadonlyArray<{
   key: NotificationPreferenceKey;

@@ -12,12 +12,20 @@ const require = createRequire(import.meta.url);
 const { createTradingUiHarness, textContent, elements } = require('../../../test/tradingUiHarness.cjs');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 
-const sheet = load(resolve('src/screens/wallet/FxSuccessBottomSheet.tsx'), {
-  'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView',
-    StyleSheet: { create: (styles: unknown) => styles }, useWindowDimensions: () => ({ height: 480 }) },
-  '../../components/common/BottomSheetBackdrop': { default: 'BottomSheetBackdrop', __esModule: true },
+const receipt = load(resolve('src/screens/wallet/FxReceipt.tsx'), {
+  'react-native': { View: 'View', Text: 'Text', StyleSheet: { create: (styles: unknown) => styles } },
   '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
 }).default;
+
+/** One KRW → USD exchange through the panel, to its receipt. */
+async function exchange(h: any) {
+  h.quote = { tradingAccountId: 'account-1', quoteId: 'quote-1', fromCurrency: 'KRW', toCurrency: 'USD', sourceAmount: '100000' };
+  h.result = { ...h.quote, exchangeId: 'exchange-1', wallets: { KRW: '900000', USD: '173.82' } };
+  h.control(h.render(), TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
+  h.control(h.render(), TEST_IDS.walletFx.executeSubmit).props.onPress();
+  await h.flush();
+  return h.render();
+}
 
 // The wallet summary is exactly KRW Wallet / USD Wallet / 환율 in one row
 // structure, at one size and weight. No title, account name, USD→KRW
@@ -45,7 +53,7 @@ function assertCleanRateDisplay(h: any, tree: any) {
 
 it('retains the measured loading rate space after arrival without limiting larger text', () => {
   for (const height of [96, 218]) {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     const rate = h.rateQuery.data;
     h.rateQuery = { data: undefined, isLoading: true, isError: false };
     const status = () => elements(h.render(), 'View').find((node: any) => node.props.testID === 'fx-rate-status');
@@ -60,20 +68,39 @@ it('retains the measured loading rate space after arrival without limiting large
 });
 
 describe('FX screen information display', () => {
-  it('the success Market action reaches MarketTab / Market', () => {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
-    const success = elements(h.render(), 'FxSuccessBottomSheet')[0];
-    assert.ok(success);
-    success.props.onGoMarket();
-    assert.deepEqual(h.navigation, [['MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } }]]);
-    assert.equal(success.props.onGoHome, undefined);
-    const tree = sheet({ visible: true, onClose() {}, onGoWallet() {}, onGoMarket() {}, payload: null });
-    // FX and transfer receipts share the pair 확인 / 마켓으로 가기.
-    assert.deepEqual(elements(tree, 'CTAButton').map(node => node.props.label), ['확인', '마켓으로 가기']);
+  it('the receipt offers 마켓으로 가기 only where its host has one (the Wallet, not an order screen)', async () => {
+    for (const onGoMarket of [() => {}, undefined]) {
+      const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
+      h.screenProps = { onGoMarket };
+      const success = elements(await exchange(h), 'FxReceipt');
+      assert.equal(success.length, 1);
+      assert.equal(success[0].props.onGoMarket, onGoMarket);
+      assert.equal(success[0].props.onGoHome, undefined);
+      assert.equal(h.navigation.length, 0, 'the panel itself navigates nowhere');
+      const tree = receipt({ onDone() {}, onGoMarket, payload: h.result });
+      // FX and transfer receipts share the pair 확인 / 마켓으로 가기.
+      assert.deepEqual(elements(tree, 'CTAButton').map((node: any) => node.props.label), onGoMarket ? ['확인', '마켓으로 가기'] : ['확인']);
+    }
+  });
+
+  it('a host continuing elsewhere takes the committed result; 확인 closes through the host', async () => {
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
+    const taken: unknown[] = [];
+    h.screenProps = { onExchanged: (result: unknown) => taken.push(result) };
+    const tree = await exchange(h);
+    assert.equal(taken.length, 1);
+    assert.equal(taken[0] === h.result, true);
+    assert.equal(elements(tree, 'FxReceipt').length, 0, 'the host shows what comes next, not this receipt');
+    // Without one, 확인 on the receipt goes through onDone (the sheet closes).
+    let done = 0;
+    const host = createTradingUiHarness('wallet/WalletFxSheet.tsx');
+    host.screenProps = { onDone: () => { done++; } };
+    elements(await exchange(host), 'FxReceipt')[0].props.onDone();
+    assert.equal(done, 1);
   });
 
   it('keeps the current rate and captured timestamp with empty and filled inputs', () => {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     let tree = h.render();
     assertCleanRateDisplay(h, tree);
     h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
@@ -88,7 +115,7 @@ describe('FX screen information display', () => {
 
   for (const status of ['suspended', 'closed']) {
     it(`removes the ledger CTA from the ${status} exchange branch and keeps the restriction`, () => {
-      const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+      const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
       h.account.status = status;
       const tree = h.render();
       assert.match(textContent(tree), /환전이 제한된 계정입니다/);
@@ -98,7 +125,7 @@ describe('FX screen information display', () => {
   }
 
   it('retains unavailable-rate handling and disables execution without a ledger CTA', () => {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     h.rateQuery.isError = true;
     const tree = h.render();
     assert.match(textContent(tree), /현재 환율을 사용할 수 없어/);
@@ -109,7 +136,7 @@ describe('FX screen information display', () => {
 
   for (const fromCurrency of ['KRW', 'USD']) {
     it(`keeps ${fromCurrency} quote → execute data and shows the successful response`, async () => {
-      const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+      const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
       const toCurrency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
       const sourceAmount = fromCurrency === 'KRW' ? '100000' : '10.5';
       h.quote = { tradingAccountId: 'account-1', quoteId: 'quote-1', fromCurrency, toCurrency, sourceAmount };
@@ -133,20 +160,29 @@ describe('FX screen information display', () => {
         idempotencyKey: h.requests[1].body.idempotencyKey });
       assert.ok(h.requests[1].body.idempotencyKey);
       tree = h.render();
-      const success = elements(tree, 'FxSuccessBottomSheet')[0];
-      assert.equal(success.props.visible, true);
-      assert.strictEqual(success.props.payload, h.result);
+      const success = elements(tree, 'FxReceipt');
+      assert.equal(success.length, 1);
+      assert.strictEqual(success[0].props.payload, h.result);
+      // The receipt stands in for the form inside the sheet's scroll (a short
+      // screen scrolls to every row): no second execute while it is shown.
+      const scroll = elements(tree, 'ScrollView').find((node: any) => node.props.testID === TEST_IDS.walletFx.screen);
+      assert.equal(elements(scroll, 'FxReceipt').length, 1);
+      assert.equal(elements(tree).some((node: any) => node.props.testID === TEST_IDS.walletFx.executeSubmit), false);
+      // 확인 (no host) returns to an empty form that cannot execute again.
+      success[0].props.onDone();
+      tree = h.render();
+      assert.equal(elements(tree, 'FxReceipt').length, 0);
       assert.equal(h.control(tree, TEST_IDS.walletFx.amountInput).props.value, '');
       assert.equal(h.renderCta(h.control(tree, TEST_IDS.walletFx.executeSubmit)).props.disabled, true);
     });
   }
 });
 
-describe('FX completion sheet rows', () => {
+describe('FX receipt rows', () => {
   for (const fromCurrency of ['KRW', 'USD']) {
-    it(`renders exactly the eight requested rows for ${fromCurrency} on a short viewport`, () => {
+    it(`renders exactly the eight requested rows for ${fromCurrency}`, () => {
       const toCurrency = fromCurrency === 'KRW' ? 'USD' : 'KRW';
-      const tree = sheet({ visible: true, onClose: () => {}, onGoWallet: () => {}, onGoMarket: () => {},
+      const tree = receipt({ onDone: () => {}, onGoMarket: () => {},
         payload: { fromCurrency, toCurrency,
           sourceAmount: fromCurrency === 'KRW' ? '100000' : '10.5',
           netTargetAmount: toCurrency === 'USD' ? '73.82' : '14029.70625',
@@ -167,8 +203,9 @@ describe('FX completion sheet rows', () => {
       assert.equal(values['KRW 지갑 잔액'], '900,000');
       assert.equal(values['USD 지갑 잔액'], '173.82');
       assert.equal(values['수수료'], toCurrency === 'USD' ? '$14.04' : '14원');
-      const scroll = elements(tree, 'ScrollView')[0];
-      assert.equal(scroll.props.style.maxHeight, 384);
+      // Inside the 환전 sheet: no scroll or modal of its own (the sheet's scroll holds it).
+      assert.equal(elements(tree, 'ScrollView').length, 0);
+      assert.equal(tree.props.testID, 'fx-success');
       const renderedRow = rows[6].type(rows[6].props);
       assert.equal(elements(renderedRow, 'Text')[0].props.numberOfLines, undefined);
       assert.equal(elements(renderedRow, 'Text')[1].props.numberOfLines, undefined);

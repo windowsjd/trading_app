@@ -43,7 +43,7 @@ function transport() {
 describe('FX rate notifications', () => {
   for (const direction of ['KRW', 'USD']) {
     it(`resyncs canonical REST and updates ${direction} preview without clearing input`, async () => {
-      const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+      const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
       let tree = h.render();
       if (direction === 'USD') {
         h.control(tree, TEST_IDS.walletFx.directionUsdKrw).props.onPress();
@@ -127,7 +127,7 @@ describe('FX rate notifications', () => {
   });
 
   it('keeps the existing account-switch reset while rates remain account-independent', async () => {
-    const h = createTradingUiHarness('wallet/WalletFxScreen.tsx');
+    const h = createTradingUiHarness('wallet/WalletFxSheet.tsx');
     let tree = h.render();
     h.control(tree, TEST_IDS.walletFx.amountInput).props.onChangeText('100000');
     tree = h.render();

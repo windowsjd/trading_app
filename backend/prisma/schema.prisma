@@ -2702,6 +2702,8 @@ model PushDevice {
 /// Independent of the device's OS notification permission.
 model NotificationPreference {
   userId             String   @id @map("user_id")
+  /// 전체 알림: off holds every type; the per-type switches keep their values.
+  allEnabled         Boolean  @default(true) @map("all_enabled")
   tradeFill          Boolean  @default(true) @map("trade_fill")
   futuresLiquidation Boolean  @default(true) @map("futures_liquidation")
   orderFailure       Boolean  @default(true) @map("order_failure")

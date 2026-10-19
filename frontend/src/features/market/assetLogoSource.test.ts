@@ -48,6 +48,10 @@ it('stocks get a provider logo only with a key, by an identifier unique to their
     'https://img.logo.dev/ticker/AAPL?token=pk_test%20key&size=64&retina=true&format=png&fallback=404');
   assert.match(uri({ assetType: 'us_stock', market: 'NYS', symbol: 'BRK.B' }) ?? '', /^https:\/\/img\.logo\.dev\/isin\/US0846707026\?/);
   assert.match(uri({ assetType: 'domestic_stock', market: 'KRX', symbol: '005930' }) ?? '', /^https:\/\/img\.logo\.dev\/isin\/KR7005930003\?/);
+  // A dark screen asks for the provider's dark variant; the resolution stays the same.
+  const dark = resolveAssetLogo({ assetType: 'us_stock', market: 'NAS', symbol: 'AAPL' }, { logoDevKey: key, theme: 'dark' });
+  assert.equal(dark?.kind === 'remote' ? dark.uri : null,
+    'https://img.logo.dev/ticker/AAPL?token=pk_test%20key&size=64&retina=true&format=png&fallback=404&theme=dark');
   // No key: no request at all.
   assert.equal(resolveAssetLogo({ assetType: 'us_stock', market: 'NAS', symbol: 'AAPL' }, { logoDevKey: null }), null);
   // A listing that is not what its fields claim gets no logo rather than someone else's.

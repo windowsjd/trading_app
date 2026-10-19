@@ -199,7 +199,9 @@ async function run() {
       await page.evaluate(() => window.fixture.client.setQueryData(['season','current'], current => ({ ...current, joined: false })));
       await visual(page.getByRole('button', { name: '시즌 참가하기', exact: true }).filter({ visible: true }).first(), `${mode}-season-join`, true, true);
       await page.screenshot({ path: path.join(out, `${mode}-season-screen.png`) });
-      await page.evaluate(() => window.fixture.navigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'WalletFx' } }));
+      // 환전 is a sheet over Wallet (2026-10-20).
+      await page.evaluate(() => window.fixture.navigationRef.navigate('MainTabs', { screen: 'WalletTab', params: { screen: 'Wallet' } }));
+      await id('wallet-exchange').click();
       await id('wallet-fx-amount-input').fill('10000');
       await page.waitForFunction(() => document.querySelector('[data-testid="wallet-fx-execute-submit"]')?.getAttribute('aria-disabled') !== 'true');
       await visual(id('wallet-fx-execute-submit'), `${mode}-fx`, true, true); await visual(id('wallet-fx-direction-krw-usd'), `${mode}-fx-selected`, false);

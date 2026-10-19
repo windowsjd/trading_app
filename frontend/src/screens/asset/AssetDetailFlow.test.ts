@@ -223,8 +223,9 @@ test('unavailable ticker KRW never borrows REST conversion', async (t) => {
 test('domestic KRW stock has no invented USD conversion', async (t) => {
   const h = inlineTradingHarness(); h.assetId = 'samsung';
   await openDetail(h); t.after(h.close);
-  assert.equal(h.node('asset-detail-name').props.children, 'Samsung Electronics');
-  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 Samsung Electronics/);
+  assert.equal(h.node('asset-detail-name').props.children, '삼성전자');
+  assert.equal(h.node('asset-detail-english-name').props.children, '(005930)', 'the code under the KRX listing name');
+  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 삼성전자/);
   assert.match(h.node('asset-detail-primary-price').props.children, /70,000/);
   assert.equal(h.node('asset-currency-usd') === undefined, true);
   assert.equal(h.node('asset-currency-krw') === undefined, true);
@@ -267,11 +268,13 @@ test('a US listing reads by its Korean name with `(English) · SYMBOL` under it 
 test('domestic asset shows KRW and a long name wraps beside the badge', async (t) => {
   const h = inlineTradingHarness();
   h.assetId = 'samsung';
+  // A code outside the listing-name map shows the asset's own (long) name.
+  h.assets.samsung.symbol = '900010';
   h.assets.samsung.name = '아주 긴 이름을 가진 국내 상장 종목 삼성전자 보통주';
   await openDetail(h); t.after(h.close);
   assert.equal(h.node('asset-settlement-currency').children.join(''), 'KRW');
   assert.equal(h.node('asset-detail-name').children.join(''), h.assets.samsung.name);
-  assert.equal(h.node('asset-detail-english-name') === undefined, true, 'no Korean name, no extra line');
+  assert.equal(h.node('asset-detail-english-name').props.children, '(900010)', 'its code below, never an English line');
   const selector = h.node('asset-name-selector');
   assert.equal(selector.props.style.maxWidth, '100%');
   assert.equal(selector.props.style.flexDirection, 'row');

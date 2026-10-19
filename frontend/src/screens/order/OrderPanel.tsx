@@ -1,6 +1,10 @@
 import { captureQuestGuideCommand, questGuideTarget } from '../../features/quest/questGuideBridge';
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
+import { questNavigationAllowed } from '../../features/quest/questNavigationGuard';
+import { walletFundingMessage, walletFundingState, type FundingAction, type FundingProduct } from '../../features/wallet/walletFunding';
+import WalletFundingNotice from '../../components/tradingAccount/WalletFundingNotice';
+import WalletFundingSheet, { type FundingRequest } from '../wallet/WalletFundingSheet';
 import QuestTarget from '../../features/quest/QuestTarget';
 import { semantic } from '../../theme/tokens';
 import Decimal from 'decimal.js';
@@ -244,16 +248,6 @@ function exceedsAvailable(total: string | null | undefined, available: string | 
   }
 }
 
-/** Exactly zero on a decimal string ('0', '0.00000000'); absent or unreadable is not zero. */
-function isZeroAmount(value: string | null | undefined) {
-  if (!value) return false;
-  try {
-    return new Decimal(value).isZero();
-  } catch {
-    return false;
-  }
-}
-
 /** a − b on decimal strings; null when either is not a number. */
 function decimalDifference(a: string, b: string) {
   try {
@@ -333,6 +327,11 @@ export function OrderForm({
   // Every new form (asset, side, account, session or a return) starts at 시장가.
   const [orderMethod, setOrderMethod] = useState<OrderMethod>(DEFAULT_ORDER_METHOD);
   const [methodSheetOpen, setMethodSheetOpen] = useState(false);
+  // 이체 / 환전 opened from this form's wallet notice, over the order screen;
+  // the sheet acts on the selected account, which a bound form is. Leaving the
+  // screen or the account closes it (as on the Wallet).
+  const [funding, setFunding] = useState<FundingRequest | null>(null);
+  useEffect(() => { if (!accountKnown || !enabled) setFunding(null); }, [accountKnown, enabled]);
   // The ordinary order type behind market/limit/LOC; LOC is a limit order.
   const orderType = getOrderTypeForMethod(orderMethod) ?? 'market';
   const limitOnClose = orderMethod === 'loc';
@@ -838,14 +837,18 @@ export function OrderForm({
     side === 'buy' && settlementCurrency
       ? getWalletAvailableAmount(walletsQuery.data, settlementCurrency, buyWalletScope)
       : null;
-  // 지갑이 비어있습니다: this account's wallet for the buy holds nothing at all.
-  // Its TOTAL balance is exactly zero — cash only reserved by open orders is
-  // not an empty wallet — and a loading, failed or missing wallet is unknown.
+  // The wallet the buy pays from, named for its product: empty when its TOTAL
+  // balance is exactly zero; money there that open orders reserve is said
+  // apart (nothing usable now); a loading, failed or missing wallet is unknown.
   const buyWallet =
     side === 'buy' && settlementCurrency && !walletsQuery.isError
       ? getWalletByIdentity(walletsQuery.data, buyWalletScope, settlementCurrency)
       : null;
-  const buyWalletEmpty = isZeroAmount(buyWallet?.balanceAmount ?? buyWallet?.balance);
+  const fundingProduct: FundingProduct | null = asset?.assetType === 'crypto' ? 'crypto_spot'
+    : asset?.assetType === 'domestic_stock' ? 'domestic_stock' : asset?.assetType === 'us_stock' ? 'us_stock' : null;
+  const fundingState = fundingProduct && buyWallet
+    ? walletFundingState(buyWallet.balanceAmount ?? buyWallet.balance, buyAvailable)
+    : null;
   const buyAvailableValue = parsePositiveDecimal(buyAvailable);
   const priceValue = parsePositiveDecimal(
     side === 'buy'
@@ -941,6 +944,16 @@ export function OrderForm({
     : learning.gate(side === 'sell' ? 'riskReduction' : marketBuyAction);
   const methodGate = (method: OrderMethod) =>
     method === 'market' ? learning.gate('riskReduction') : method === 'limit' ? limitGate : advancedGate;
+  // The wallet's own sheets, with the Wallet tab's guards: a quest that holds
+  // 이체 / 환전 says why, and a beginner's transfer opens at its quest step.
+  const transferGate = learning.gate('transfer');
+  const openFunding = (action: FundingAction) => {
+    if (action.kind === 'fx') {
+      if (questNavigationAllowed('WalletFx')) setFunding({ kind: 'fx', fromCurrency: action.fromCurrency });
+      return;
+    }
+    if (questNavigationAllowed('WalletTransfer')) transferGate.guard(() => setFunding({ kind: 'transfer', destination: action.destination }));
+  };
   // The ordinary submit serves market/limit/LOC.
   const canExecute =
     methodReady &&
@@ -1318,8 +1331,11 @@ export function OrderForm({
         <Text style={styles.helper} testID="order-estimated-quantity">
           {`예상 수량 약 ${formatDisplayDecimal(estimatedQuantity)} ${asset.symbol?.replace(/USDT$/, '') ?? ''}`}
         </Text>
-      ) : isAmountBuy && buyWalletEmpty ? (
-        <Text style={styles.helper} testID="order-wallet-empty">지갑이 비어있습니다</Text>
+      ) : null}
+      {/* The paying wallet's state stands on its own: an estimate beside it does not hide it. */}
+      {fundingProduct && fundingState ? (
+        <WalletFundingNotice testID="order-wallet-funding" product={fundingProduct}
+          message={walletFundingMessage(fundingProduct, fundingState)} onAction={openFunding} disabled={pending} />
       ) : null}
       <View style={styles.group}>
         <View style={styles.ratioLabel}>
@@ -1511,18 +1527,12 @@ export function OrderForm({
           <AdminDiagnosticPanel error={diagnosticError} runtime={diagnosticRuntime} includeRuntimeWithDiagnostic />
         </>
       ) : null}
-      {asset.settlementCurrency === 'USD' &&
-      domainError ===
-        getOrderDomainErrorMessage(ERROR_CODE.INSUFFICIENT_BALANCE) ? (
-        <CTAButton
-          label="USD 환전하러 가기"
-          onPress={() =>
-            rootNavigation.navigate('MainTabs', {
-              screen: 'WalletTab',
-              params: { screen: 'WalletFx', initial: false },
-            })
-          }
-        />
+      {/* Short of cash (the live check or the server's answer): the routes into
+          this product's wallet, unless its notice above already offers them. */}
+      {fundingProduct && side === 'buy' && !fundingState && (buyInsufficientReason
+        || domainError === getOrderDomainErrorMessage(ERROR_CODE.INSUFFICIENT_BALANCE)) ? (
+        <WalletFundingNotice testID="order-funding-actions" product={fundingProduct} message={null}
+          onAction={openFunding} disabled={pending} />
       ) : null}
       {ordinaryForm && stockLayout ? (
         <OrderAsidePortal name="preview">
@@ -1619,6 +1629,9 @@ export function OrderForm({
           });
         }}
       />
+      {/* 이체 / 환전 over this order: closes on success, back to a refreshed form. */}
+      <WalletFundingSheet testID="order" request={funding} visible={enabled && accountKnown} closeOnSuccess
+        onClose={() => setFunding(null)} />
     </View>
   );
 }

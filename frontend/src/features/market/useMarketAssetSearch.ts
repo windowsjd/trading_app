@@ -2,9 +2,10 @@ import { useMemo, useRef } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 
 import { QUERY_KEYS } from '../../constants/queryKeys';
+import { findKrStocksByKoreanName } from '../../utils/krStockKoreanNames';
 import { findUsStocksByKoreanName } from '../../utils/usStockKoreanNames';
 import { getAssets, type AssetType, type MarketAssetItemDto } from './api';
-import { prependKoreanNameMatches, type ListedUsStocks } from './koreanNameSearch';
+import { prependKoreanNameMatches, type ListedStocks } from './koreanNameSearch';
 import { marketSortParams, nextMarketPage, type MarketPageParam, type MarketSort } from './marketSort';
 
 export type MarketSearchScope = AssetType | 'all';
@@ -16,18 +17,21 @@ export const MARKET_SEARCH_SCOPES: Array<{ key: MarketSearchScope; label: string
   { key: 'crypto', label: '암호화폐' },
 ];
 
-/** Kept under 30 s: one US list serves every keystroke of a Korean search. */
+/** Kept under 30 s: one list per stock type serves every keystroke of a Korean search. */
 const KOREAN_NAME_INDEX_STALE_MS = 30_000;
 
-/** Every listed US stock in the search's sort (the universe is 100; pages of 100). */
-async function fetchListedUsStocks(sort: ReturnType<typeof marketSortParams>, sortRefresh: boolean): Promise<ListedUsStocks> {
-  const listed: ListedUsStocks = { assets: [], priceErrors: [] };
+type NamedStockType = 'us_stock' | 'domestic_stock';
+
+/** Every listed stock of one type in the search's sort (universes of 100 and 70; pages of 100). */
+async function fetchListedStocks(assetType: NamedStockType, sort: ReturnType<typeof marketSortParams>,
+  sortRefresh: boolean): Promise<ListedStocks> {
+  const listed: ListedStocks = { assets: [], priceErrors: [] };
   let page: MarketPageParam | undefined = { offset: 0 };
   // Bounded: a runaway pagination can never loop the search.
   for (let index = 0; page && index < 5; index++) {
     const response = await getAssets({
       ...sort, sortSnapshot: page.sortSnapshot, sortRefresh: sortRefresh && index === 0,
-      assetType: 'us_stock', withPrice: true, limit: 100, offset: page.offset,
+      assetType, withPrice: true, limit: 100, offset: page.offset,
     });
     listed.assets.push(...response.assets);
     listed.priceErrors.push(...(response.priceErrors ?? []));
@@ -42,9 +46,10 @@ async function fetchListedUsStocks(sort: ReturnType<typeof marketSortParams>, so
  * each search text/scope/sort has its own cache key, so a slower earlier
  * response can never replace the rows of the current search.
  *
- * A text matching US stocks' Korean names (애플, 엔비디아…) also lists those
- * stocks first: the server knows only English names and symbols, so they are
- * taken from the whole US list by market and symbol (koreanNameSearch).
+ * A text matching the Korean names of US stocks (애플, 엔비디아…) or KRX
+ * stocks (삼성전자, 현대차…) also lists those stocks first: the server knows
+ * only English names and symbols, so they are taken from the whole US/KRX list
+ * by market and symbol (koreanNameSearch).
  */
 export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
   scope: MarketSearchScope;
@@ -58,7 +63,10 @@ export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
   const trimmedSearchText = searchText.trim();
   const assetType = scope === 'all' ? undefined : scope;
   const koreanMatches = useMemo(
-    () => (scope === 'all' || scope === 'us_stock' ? findUsStocksByKoreanName(trimmedSearchText) : []),
+    () => [
+      ...(scope === 'all' || scope === 'us_stock' ? findUsStocksByKoreanName(trimmedSearchText) : []),
+      ...(scope === 'all' || scope === 'domestic_stock' ? findKrStocksByKoreanName(trimmedSearchText) : []),
+    ],
     [scope, trimmedSearchText],
   );
 
@@ -84,12 +92,14 @@ export function useMarketAssetSearch({ scope, searchText, sort, enabled }: {
         limit: 20,
       });
       if (pageParam.offset !== 0 || !koreanMatches.length) return page;
-      const listed = await queryClient.fetchQuery({
-        queryKey: QUERY_KEYS.market.koreanNameIndex(sortParams),
-        queryFn: () => fetchListedUsStocks(sortParams, sortRefresh),
+      const types = [...new Set(koreanMatches.map((match): NamedStockType => (match.market === 'KRX' ? 'domestic_stock' : 'us_stock')))];
+      const lists = await Promise.all(types.map((type) => queryClient.fetchQuery({
+        queryKey: QUERY_KEYS.market.koreanNameIndex({ ...sortParams, assetType: type }),
+        queryFn: () => fetchListedStocks(type, sortParams, sortRefresh),
         // A pull to refresh reloads it with the rows.
         staleTime: sortRefresh ? 0 : KOREAN_NAME_INDEX_STALE_MS,
-      });
+      })));
+      const listed: ListedStocks = { assets: lists.flatMap((list) => list.assets), priceErrors: lists.flatMap((list) => list.priceErrors) };
       return prependKoreanNameMatches(page, listed, koreanMatches);
     },
     getNextPageParam: nextMarketPage,

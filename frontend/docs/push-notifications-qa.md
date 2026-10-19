@@ -66,7 +66,7 @@ Negative cases (no push; row absent or `skipped`):
 - Ended-but-not-settled Season; not-qualified participant.
 - A Season the user did not join.
 - A static notice change / app update; an unpublished draft.
-- The type switched off in Settings (`preference_disabled`).
+- The type switched off in Settings, or 전체 알림 off (`preference_disabled`).
 
 ## D. Foreground and taps
 
@@ -85,10 +85,13 @@ Negative cases (no push; row absent or `skipped`):
 
 | # | Steps | Expected |
 |---|---|---|
-| E1 | Open 설정 > 알림 설정 | Seven switches, all on for a new user |
+| E1 | Open 설정 > 알림 설정 | 전체 알림 on; 알림 종류별 설정 folded (`7/7 켜짐 · 펼치기`); seven switches, all on for a new user, after 펼치기 |
 | E2 | Toggle one off | "저장 중…", then off; persists after app restart and on another device |
-| E3 | Toggle with the network off | Switch returns to the saved value with an error |
+| E3 | Toggle with the network off | Switch returns to the saved value with an error and 다시 시도 |
 | E4 | Log out, log in as another user | The other user's switches, never the previous ones |
+| E5 | 전체 알림 off, then trigger a fill / friend request / important notice | No push of any type (`preference_disabled`; the notice is not fanned out); the seven keep their values, greyed |
+| E6 | 전체 알림 on again | The seven exactly as before (e.g. a type turned off earlier stays off); pushes resume |
+| E7 | Leave and reopen 알림 설정 | Folded again (a screen state, never saved) |
 
 ## F. Native readiness (before any row above can run)
 

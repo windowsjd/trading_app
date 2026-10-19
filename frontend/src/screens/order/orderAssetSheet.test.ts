@@ -32,7 +32,7 @@ describe('order screen asset sheet', () => {
       .map((n: any) => [n.props.children].flat().join(''));
     assert.equal(rowTexts('btc').includes('BTCUSDT'), true);
     assert.equal(rowTexts('btc').some((text: string) => text.includes('BINANCE')), false);
-    assert.equal(rowTexts('samsung').includes('KRX'), true, 'stock market labels stay');
+    assert.deepEqual(['삼성전자', '(005930)'].map((text) => rowTexts('samsung').includes(text)), [true, true], 'a domestic row: listing name over its code');
     assert.equal(h.marketTickerOptions.enabled, true);
     assert.deepEqual(h.marketTickerOptions.assetIds, ['bnb', 'btc', 'samsung']);
   });

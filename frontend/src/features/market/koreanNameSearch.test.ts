@@ -28,6 +28,13 @@ it('matches the exact listing: the same symbol on another market or a coin never
   assert.deepEqual(merged.assets.map((item) => item.id), ['a-aapl']);
 });
 
+it('joins a KRX listing by its code the same way, beside US matches', () => {
+  const krx = { assets: [...listed.assets, asset('k-sec', '005930', 'KRX', 'domestic_stock'), asset('k-other', '005930', 'NAS')], priceErrors: [] };
+  const merged = prependKoreanNameMatches(page([asset('kr-2', '000660', 'KRX', 'domestic_stock')]), krx,
+    [{ market: 'NAS', symbol: 'AAPL' }, { market: 'KRX', symbol: '005930' }]);
+  assert.deepEqual(merged.assets.map((item) => item.id), ['a-aapl', 'k-sec', 'kr-2']);
+});
+
 it('an asset already on the server page appears once; no match leaves the page untouched', () => {
   const server = page([asset('a-aapl', 'AAPL', 'NAS')], [{ assetId: 'a-aapl', code: 'PRICE_STALE' }]);
   const merged = prependKoreanNameMatches(server, listed, [{ market: 'NAS', symbol: 'AAPL' }]);

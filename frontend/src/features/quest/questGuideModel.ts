@@ -395,7 +395,7 @@ const GUIDE_ROUTES = {
   exchange: ['WalletTab', 'Wallet', 'WalletFx'],
   transfer: ['WalletTab', 'Wallet', 'WalletTransfer'],
   spot: ['MarketTab', 'Market', 'MarketSearch', 'AssetDetail', 'Order', 'AssetChart'],
-  futures: ['MarketTab', 'Market', 'Futures', 'FuturesChart', 'WalletTab', 'Wallet', 'WalletTransfer', 'WalletFx'],
+  futures: ['MarketTab', 'Market', 'FuturesDetail', 'Futures', 'FuturesChart', 'WalletTab', 'Wallet', 'WalletTransfer', 'WalletFx'],
 } as const;
 
 function guideRoutes(quest: BeginnerQuestKey): readonly string[] {

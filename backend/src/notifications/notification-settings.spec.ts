@@ -47,21 +47,25 @@ describe('NotificationPreferencesService', () => {
 
   it('starts with every type on', async () => {
     const result = await service().preferences.get('u1');
+    expect(result.data.allEnabled).toBe(true);
     expect(result.data.preferences).toEqual(DEFAULT_PREFERENCES);
     expect(
       Object.values(result.data.preferences).every((value) => value === true),
     ).toBe(true);
   });
 
-  it('returns only the seven switches of a stored row', async () => {
+  it('returns only the seven switches of a stored row, with 전체 알림 beside them', async () => {
     const result = await service({
       userId: 'u1',
+      allEnabled: false,
       ...DEFAULT_PREFERENCES,
       tradeFill: false,
       updatedAt: new Date(),
     }).preferences.get('u1');
     expect(Object.keys(result.data.preferences)).toHaveLength(7);
     expect(result.data.preferences.tradeFill).toBe(false);
+    expect(Object.keys(result.data)).toEqual(['allEnabled', 'preferences']);
+    expect(result.data.allEnabled).toBe(false);
   });
 
   it('stores a partial update on top of the defaults', async () => {
@@ -69,11 +73,32 @@ describe('NotificationPreferencesService', () => {
     const result = await preferences.update('u1', { orderFailure: false });
     expect(upserts[0]).toEqual({
       where: { userId: 'u1' },
-      create: { userId: 'u1', ...DEFAULT_PREFERENCES, orderFailure: false },
+      create: {
+        userId: 'u1',
+        allEnabled: true,
+        ...DEFAULT_PREFERENCES,
+        orderFailure: false,
+      },
       update: { orderFailure: false },
     });
     expect(result.data.preferences.orderFailure).toBe(false);
     expect(result.data.preferences.tradeFill).toBe(true);
+  });
+
+  it('turns 전체 알림 off and on without rewriting any per-type switch', async () => {
+    const { preferences, upserts } = service();
+    const off = await preferences.update('u1', { allEnabled: false });
+    expect(upserts[0].update).toEqual({ allEnabled: false });
+    expect(upserts[0].create).toEqual({
+      userId: 'u1',
+      allEnabled: false,
+      ...DEFAULT_PREFERENCES,
+    });
+    expect(off.data.allEnabled).toBe(false);
+    expect(off.data.preferences).toEqual(DEFAULT_PREFERENCES);
+    const on = await preferences.update('u1', { allEnabled: true });
+    expect(upserts[1].update).toEqual({ allEnabled: true });
+    expect(on.data.allEnabled).toBe(true);
   });
 
   it('rejects unknown keys, non-booleans, empty bodies and anonymous calls', async () => {
@@ -82,6 +107,8 @@ describe('NotificationPreferencesService', () => {
       {},
       { marketing: true },
       { tradeFill: 'false' },
+      { allEnabled: 'off' },
+      { all: false },
       null,
       [],
     ])
@@ -99,6 +126,30 @@ describe('NotificationPreferencesService', () => {
     const row = { ...DEFAULT_PREFERENCES, friendRequest: false };
     expect(preferenceEnabled(row, 'friend_request')).toBe(false);
     expect(preferenceEnabled(row, 'important_notice')).toBe(true);
+  });
+
+  it('holds every type while 전체 알림 is off, whatever the per-type switch says', () => {
+    const off = { allEnabled: false, ...DEFAULT_PREFERENCES };
+    for (const type of [
+      'trade_fill',
+      'futures_liquidation',
+      'order_failure',
+      'friend_request',
+      'important_notice',
+      'season_final_result',
+      'season_ending_soon',
+    ] as const)
+      expect(preferenceEnabled(off, type)).toBe(false);
+    // Back on: the per-type switches decide again (a row from before the column reads as on).
+    expect(
+      preferenceEnabled(
+        { allEnabled: true, ...DEFAULT_PREFERENCES, tradeFill: false },
+        'trade_fill',
+      ),
+    ).toBe(false);
+    expect(
+      preferenceEnabled({ ...DEFAULT_PREFERENCES }, 'season_ending_soon'),
+    ).toBe(true);
   });
 });
 

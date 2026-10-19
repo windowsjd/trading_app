@@ -47,7 +47,10 @@ async function main(){
    assert.equal(await page.getByTestId('crypto-product-spot').getAttribute('aria-selected'),'true');
    await page.getByTestId('crypto-product-futures').click();await page.getByTestId('futures-market-btc').waitFor();
    assert.deepEqual(await overflow(page),[],`${width}/${theme}/${fontScale}/market-selector`);
-   await page.getByTestId('futures-market-btc').click();await page.getByTestId('futures-screen').waitFor();
+   // A row opens the contract's detail first (chart, 판매하기/구매하기), as a spot row does.
+   await page.getByTestId('futures-market-btc').click();await page.getByTestId('futures-detail-screen').waitFor();
+   assert.deepEqual(await overflow(page),[],`${width}/${theme}/${fontScale}/futures-detail`);
+   await page.getByTestId('futures-detail-long').click();await page.getByTestId('futures-screen').waitFor();
    assert.equal(await page.evaluate(()=>window.fixture.state.instrumentId),'btc');
   }else if(scenario.endsWith('-error')){
    const long=scenario.startsWith('limit-long'),sl=scenario.includes('-sl-');

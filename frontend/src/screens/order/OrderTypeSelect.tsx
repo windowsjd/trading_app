@@ -1,4 +1,5 @@
 import LearningLock from '../../features/quest/LearningLock';
+import { QUEST_LOCK_CAPTION } from '../../features/quest/questProgress';
 import QuestTarget from '../../features/quest/QuestTarget';
 import React from 'react';
 import Svg, { Path } from 'react-native-svg';
@@ -133,7 +134,8 @@ function MethodRow({ option, selected, learningHint, onSelect }: {
           {badge ? <Text testID={`order-method-${option.method}-badge`} style={styles.badge}>{badge}</Text> : null}
           {learningHint ? <LearningLock /> : null}
         </View>
-        {reason ? <Text style={styles.reason}>{reason}</Text> : null}
+        {reason ? <Text style={styles.reason}>{reason}</Text>
+          : learningHint ? <Text testID={`order-method-${option.method}-learning-caption`} style={styles.reason}>{QUEST_LOCK_CAPTION}</Text> : null}
       </View>
       {selected ? <Text style={styles.check} accessible={false} importantForAccessibility="no">✓</Text> : null}
     </ActionPressable>

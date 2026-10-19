@@ -6,6 +6,7 @@ import { holding } from '../../../test/positionFixture.ts';
 import { HoldingsContractError } from '../../features/tradingAccount/holdings.ts';
 import type { TradingAccountPortfolioDto } from '../../features/tradingAccount/api';
 import { primaryGradient, semantic } from '../../theme/tokens.ts';
+import { questProgress } from '../../../test/questFixtures.ts';
 
 const text = (tree) => elements(tree, 'Text').flatMap((node) => node.props.children).join(' ');
 const find = (tree, testID) => elements(tree).find((node) => node.props.testID === testID);
@@ -143,8 +144,26 @@ describe('selected account Wallet and shared Home holdings', () => {
       const navigations = h.navigation.length;
       find(wallet, 'wallet-transfer').props.onPress();
       assert.equal(h.navigation.length, navigations);
+      let opened = h.renderWallet().tree;
+      assert.equal(find(opened, 'wallet-transfer-sheet').props.visible, true);
+      assert.equal(elements(opened, 'WalletTransferPanel').length, 1);
+      find(opened, 'wallet-transfer-sheet').props.onClose();
+      assert.equal(find(h.renderWallet().tree, 'wallet-transfer-sheet').props.visible, false);
+      // 환전 is a bottom sheet over Wallet too (KRW → USD first), never a page.
       find(wallet, 'wallet-exchange').props.onPress();
-      assert.deepEqual(h.navigation.at(-1), ['WalletFx']);
+      assert.equal(h.navigation.length, navigations);
+      opened = h.renderWallet().tree;
+      const fxSheet = find(opened, 'wallet-fx-sheet');
+      assert.equal(fxSheet.props.visible, true);
+      assert.equal(fxSheet.props.title, '환전하기');
+      const fxPanel = elements(opened, 'WalletFxPanel');
+      assert.equal(fxPanel.length, 1);
+      assert.equal(fxPanel[0].props.initialFromCurrency, 'KRW');
+      assert.equal(elements(opened, 'WalletTransferPanel').length, 0, 'one sheet at a time, never stacked');
+      // Its receipt's 마켓으로 가기 closes the sheet on the way to the market.
+      fxPanel[0].props.onGoMarket();
+      assert.deepEqual(h.navigation.at(-1), ['MainTabs', { screen: 'MarketTab', params: { screen: 'Market' } }]);
+      assert.equal(elements(h.renderWallet().tree, 'WalletFxPanel').length, 0);
       find(wallet, 'wallet-ledger').props.onPress();
       assert.deepEqual(h.navigation.at(-1), ['WalletTransactions']);
       find(wallet, 'wallet-orders').props.onPress();
@@ -228,6 +247,17 @@ describe('selected account Wallet and shared Home holdings', () => {
     wallet = h.renderWallet().tree;
     assert.equal(find(wallet, 'wallet-principal-summary') === undefined, true);
     assert.doesNotMatch(text(wallet), /누적 투자원금|투자 손익/);
+  });
+  it('a learning-locked 이체하기 says why under its label, from the server quest progress', (t) => {
+    const h = createHomeHarness(); t.after(h.close);
+    h.account = { ...h.account, id: 'beginner-1', mode: 'beginner' };
+    h.seed(h.account, { points: [] });
+    const caption = () => find(h.renderWallet().tree, 'wallet-transfer-learning-caption');
+    h.client.setQueryData(QUERY_KEYS.tradingAccount.quests('beginner-1'), questProgress(0));
+    assert.deepEqual(elements(caption(), 'Text').map((node) => node.props.children), ['퀘스트 완료 후 이용 가능합니다.']);
+    // QUEST 01 done: 이체 opens and the line goes.
+    h.client.setQueryData(QUERY_KEYS.tradingAccount.quests('beginner-1'), questProgress(1));
+    assert.equal(caption() === undefined, true);
   });
   it('an unavailable total preserves independently known cash and stale/unavailable holdings', (t) => {
     const h = createHomeHarness(); t.after(h.close); h.seed(h.account, { points: [] });

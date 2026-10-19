@@ -80,14 +80,13 @@ export function useQuestGuide() {
   return useContext(QuestGuideContext);
 }
 
-/** 이체 is a bottom sheet over Wallet: its mounted form is the practice screen. */
-const walletOrTransfer = (): FocusedGuideScreen => (getQuestGuideFacts('transfer') ? 'transfer' : 'wallet');
+/** 환전 and 이체 are bottom sheets over Wallet: the mounted form is the practice screen. */
+const walletOrSheet = (): FocusedGuideScreen => (getQuestGuideFacts('fx') ? 'fx' : getQuestGuideFacts('transfer') ? 'transfer' : 'wallet');
 
 function readFocusedScreen(): FocusedGuideScreen {
   if (!rootNavigationRef.isReady()) return 'other';
   switch (rootNavigationRef.getCurrentRoute()?.name) {
-    case 'Wallet': return walletOrTransfer();
-    case 'WalletFx': return 'fx';
+    case 'Wallet': return walletOrSheet();
     case 'Guide': return 'quests';
     case 'Market': return 'market';
     case 'AssetDetail': return 'asset';
@@ -311,9 +310,9 @@ export function QuestGuideProvider({ accountId, children }: { accountId: string;
     void fetchProgress().then(begin, () => begin(null));
   }, [accountId, fetchProgress, setSession]);
 
-  // Opening/closing the transfer sheet changes no route; follow it like one
+  // Opening/closing the 환전 or 이체 sheet changes no route; follow it like one
   // (closing it returns to the Wallet entry step, as leaving the page did).
-  const effectiveFocus: FocusedGuideScreen = focused === 'wallet' || focused === 'transfer' ? walletOrTransfer() : focused;
+  const effectiveFocus: FocusedGuideScreen = focused === 'wallet' || focused === 'transfer' || focused === 'fx' ? walletOrSheet() : focused;
   useEffect(() => {
     setSession(current => current ? followGuideFocus(current, effectiveFocus) : current);
   }, [effectiveFocus, setSession]);

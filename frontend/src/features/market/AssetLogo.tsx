@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Image, StyleSheet, Text, View, type ImageSourcePropType } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
+import { useAppearance } from '../../theme/appearance';
 import { assetMonogram, resolveAssetLogo, type BundledCryptoLogo } from './assetLogoSource';
 import aave from '../../assets/crypto-logos/aave.png';
 import ada from '../../assets/crypto-logos/ada.png';
@@ -32,22 +33,23 @@ const BUNDLED: Record<BundledCryptoLogo, ImageSourcePropType> = {
   ETH: eth, FIL: fil, ICP: icp, LINK: link, LTC: ltc, QNT: qnt, SOL: sol, TRX: trx, UNI: uni, XLM: xlm, XRP: xrp, ZEC: zec, ZEN: zen,
 };
 
-/** The circle every row reserves, whatever the logo (dp). */
+/** The square every row reserves, whatever the logo (dp). */
 export const ASSET_LOGO_SIZE = 40;
-// A square logo of this side fits inside the circle corner to corner
-// (√2 × 28 < 40), so no logo, wide or tall, can cross or be cut by it.
-const REMOTE_LOGO_BOX = 28;
+/** A company logo's largest side inside that square (dp): its own shape, never cut. */
+const REMOTE_LOGO_BOX = 36;
 
 const HIDDEN = {
   accessible: false, accessibilityElementsHidden: true, importantForAccessibility: 'no-hide-descendants', 'aria-hidden': true,
 } as const;
 
 /**
- * The asset's logo in a fixed circle beside its name (decorative: the name is
- * the label). A bundled coin icon is itself a circle and fills it; a remote
- * company logo keeps its proportions inside the inscribed box on white, the
- * background logos are drawn for; without a logo, or when one fails to load,
- * the first letter of the shown name marks the row instead.
+ * The asset's logo in a fixed 40 dp square beside its name (decorative: the
+ * name is the label). A bundled coin icon is itself a circle and fills it. A
+ * remote company logo is shown as the provider draws it: up to 36 dp, its own
+ * proportions (contain), centred, with no mask or ground of ours; on a dark
+ * screen the provider's dark variant keeps a transparent dark logo visible.
+ * Without a logo, or when one fails to load, the first letter of the shown
+ * name marks the row instead, in a circle.
  */
 function AssetLogo({ assetType, market, symbol, name, testID }: {
   assetType?: string | null;
@@ -57,7 +59,8 @@ function AssetLogo({ assetType, market, symbol, name, testID }: {
   name: string;
   testID?: string;
 }) {
-  const source = resolveAssetLogo({ assetType, market, symbol });
+  const { mode } = useAppearance();
+  const source = resolveAssetLogo({ assetType, market, symbol }, { theme: mode === 'dark' ? 'dark' : 'light' });
   // Remembered per address: a recycled row with another asset tries its own logo.
   const [failedUri, setFailedUri] = useState<string | null>(null);
   if (source?.kind === 'bundled') {
@@ -69,7 +72,7 @@ function AssetLogo({ assetType, market, symbol, name, testID }: {
   }
   if (source?.kind === 'remote' && failedUri !== source.uri) {
     return (
-      <View testID={testID} style={[styles.circle, styles.remoteCircle]} {...HIDDEN}>
+      <View testID={testID} style={styles.box} {...HIDDEN}>
         <Image testID={testID && `${testID}-image`} source={{ uri: source.uri }} resizeMode="contain" style={styles.remote}
           onError={() => setFailedUri(source.uri)} />
       </View>
@@ -90,8 +93,7 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   bundled: { width: ASSET_LOGO_SIZE, height: ASSET_LOGO_SIZE },
-  // White in both appearances: company logos are drawn for a light ground.
-  remoteCircle: { backgroundColor: '#FFFFFF', borderWidth: StyleSheet.hairlineWidth, borderColor: semantic.border },
+  box: { width: ASSET_LOGO_SIZE, height: ASSET_LOGO_SIZE, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   remote: { width: REMOTE_LOGO_BOX, height: REMOTE_LOGO_BOX },
   monogramCircle: { backgroundColor: semantic.raised, borderWidth: StyleSheet.hairlineWidth, borderColor: semantic.border },
   monogram: { fontSize: 16, lineHeight: 20, fontWeight: '700', color: semantic.secondary },

@@ -428,6 +428,15 @@ describe('PushNotificationScanner', () => {
       status: 'active',
       pushDevices: { some: {} },
     });
+    // Only users with no row, or with both 전체 알림 and 주요 공지사항 on.
+    expect(where.OR).toEqual([
+      { notificationPreference: { is: null } },
+      {
+        notificationPreference: {
+          is: { importantNotice: true, allEnabled: true },
+        },
+      },
+    ]);
   });
 
   it('closes a stale notice without sending', async () => {

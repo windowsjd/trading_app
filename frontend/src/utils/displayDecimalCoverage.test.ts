@@ -13,7 +13,7 @@ describe('app-wide decimal display coverage', () => {
     const walletMapper = read('features/wallet/mapper.ts');
     const recordApi = read('features/record/api.ts');
     const seasonJoin = read('screens/season/SeasonJoinScreen.tsx');
-    const walletScreen = read('screens/wallet/WalletFxScreen.tsx');
+    const walletScreen = read('screens/wallet/WalletFxSheet.tsx');
 
     for (const source of [orderMapper, walletMapper, recordApi]) {
       assert.match(source, /formatDisplayDecimal/u);

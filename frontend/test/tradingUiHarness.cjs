@@ -191,7 +191,7 @@ function createTradingUiHarness(screenName) {
     } },
     // Only OrderTradingScreen renders here; the asset sheet belongs to its route wrapper.
     './OrderAssetSheet': { default: 'OrderAssetSheet', __esModule: true },
-    './FxSuccessBottomSheet': { default: 'FxSuccessBottomSheet', __esModule: true },
+    './FxReceipt': { default: 'FxReceipt', __esModule: true },
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   mocks['../states/AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
@@ -213,7 +213,7 @@ function createTradingUiHarness(screenName) {
   }
   const renderOnce = (side) => {
     index = 0; effects = []; h.queries = [];
-    const tree = expand(screen({ assetId: h.asset.id, accountId: h.account.id, side, onReturnToAsset: () => {}, route: { params: { assetId: h.asset.id, accountId: h.account.id, side } }, navigation }));
+    const tree = expand(screen({ assetId: h.asset.id, accountId: h.account.id, side, onReturnToAsset: () => {}, route: { params: { assetId: h.asset.id, accountId: h.account.id, side } }, navigation, ...h.screenProps }));
     effects.forEach(fn => fn());
     return tree;
   };

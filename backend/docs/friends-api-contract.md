@@ -45,7 +45,24 @@ notional/PnL/ROI and Mark timestamps. It exposes no shared collateral, risk or
 transaction controls or margin balances. The ROI basis is calculated on the
 server and is not returned. See the Futures position display projection for the basis.
 The existing friend holding asset-id ordering is retained.
-Both projections are read only and exist solely inside this guarded detail.
+`completedTrades` (거래 완료 종목, 2026-10-20) lists fully closed trades of the
+same season account as aggregates only, newest completion first, at most 30
+(`hasMore` when older ones exist). A Spot item is an asset whose position is
+closed now (quantity 0): `buyAmount` = the net amounts (fee included) of every
+executed BUY on the account, `realizedPnl` = the position's own confirmed
+realized PnL (fees included); rounds and re-entries add up once, and a holding
+open again is left out until it closes. A Futures item is one closed position
+lifetime with its `direction`: `entryMargin` = ceil(Σ open/increase notional
+/ leverage, 8 dp) as in the margin policy, `realizedPnl` = the position's
+confirmed realized PnL less every fee of that lifetime (executions and a
+liquidation or season-final close). `returnRate` = realizedPnl / basis × 100
+(8 dp, half up), null when the basis is not above zero. Amounts stay in the
+trade's currency (no FX). An item whose stored rows do not reconcile
+(quantities in vs out, a missing amount, realized PnL vs its parts) is left
+out rather than guessed. No order, execution, quantity, price, average cost,
+fee line, timestamp, leverage, position id or ledger row is returned. The
+existing `history` (30 days) stays for older apps.
+All three projections are read only and exist solely inside this guarded detail.
 Friendship/privacy and current season/participant/account eligibility are
 revalidated after all financial reads; a revoked permission discards the entire
 portfolio. Ranking, friend search and historical public records are unchanged.

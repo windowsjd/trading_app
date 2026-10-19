@@ -39,7 +39,7 @@ import {
   formatAssetPrice,
   formatKrw,
   formatPercent,
-  getAssetEnglishNameLine,
+  getAssetNameSubline,
   getAssetNameDisplay,
   getUnavailablePriceText,
 } from '../../utils/format';
@@ -198,9 +198,9 @@ export function AssetMarketChart({
             </Text> : null}
           </View>
           {/* A US listing shown by its Korean name keeps its English name and symbol. */}
-          {asset && getAssetEnglishNameLine(getAssetNameDisplay(asset)) ? (
+          {asset && getAssetNameSubline(getAssetNameDisplay(asset)) ? (
             <Text testID="asset-detail-english-name" style={styles.englishName}>
-              {getAssetEnglishNameLine(getAssetNameDisplay(asset))}
+              {getAssetNameSubline(getAssetNameDisplay(asset))}
             </Text>
           ) : null}
           <View ref={questGuideTarget('asset-price')} collapsable={false} style={styles.detailPriceRow}>

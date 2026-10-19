@@ -19,6 +19,7 @@ import {
   type PortfolioAccess,
 } from '../friends/friendship.policy';
 import type { FriendPortfolio } from '../friends/friend-portfolio.types';
+import { readFriendCompletedTrades } from '../friends/friend-completed-trades';
 import { PositionsService } from '../positions/positions.service';
 import { readFuturesHoldingSummaries } from '../futures/futures-position-display';
 import {
@@ -2014,7 +2015,7 @@ export class RecordsService {
     const since = new Date(valuationAt);
     since.setUTCHours(0, 0, 0, 0);
     since.setUTCDate(since.getUTCDate() - 29);
-    const [positions, futures, snapshots] = await Promise.all([
+    const [positions, futures, snapshots, completedTrades] = await Promise.all([
       this.positionsService.readOpenHoldingProjection(
         tradingAccountId,
         valuationAt,
@@ -2032,6 +2033,11 @@ export class RecordsService {
         orderBy: { snapshotDate: 'asc' },
         take: 30,
       }),
+      // Closed positions and their own totals, read in one snapshot.
+      this.prisma.$transaction(
+        (tx) => readFriendCompletedTrades(tx, tradingAccountId),
+        { isolationLevel: 'RepeatableRead' },
+      ),
     ]);
     const values = new Map(
       valuation?.positionValues.map((position) => [
@@ -2070,6 +2076,7 @@ export class RecordsService {
         totalAssetKrw: this.formatDecimal(point.totalAssetKrw, 8),
         returnRate: this.formatDecimal(point.returnRate, 8),
       })),
+      completedTrades,
     };
   }
 

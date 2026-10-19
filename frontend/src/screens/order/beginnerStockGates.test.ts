@@ -52,6 +52,9 @@ describe('beginner staged access on a Korean stock (B차)', () => {
     assert.equal(h.node(submit).props.learningHint ?? null, null);
     await h.press('order-type-select');
     assert.deepEqual([learningLocked(h, 'market'), learningLocked(h, 'limit'), learningLocked(h, 'loc')], [false, true, true]);
+    // A locked method says so under its name; an open one has no such line.
+    assert.equal(h.node('order-method-limit-learning-caption').props.children, '퀘스트 완료 후 이용 가능합니다.');
+    assert.equal(h.node('order-method-market-learning-caption') === undefined, true);
     await h.press('order-method-limit');
     assert.equal(h.orderType(), '시장가', 'a locked method is not selected');
     assert.deepEqual(h.alerts.map((alert: unknown[]) => alert[1]), [ALL]);

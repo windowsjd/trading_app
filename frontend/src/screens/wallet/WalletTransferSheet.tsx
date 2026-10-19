@@ -15,6 +15,7 @@ import { getWalletByIdentity } from '../../features/wallet/mapper';
 import { TRANSFER_WALLETS, WALLET_SCOPE_LABELS, type TransferWalletIdentity } from '../../features/wallet/walletIdentity';
 import { parseTransferAmount, transferAmountFits, transferAvailableAmount, futuresTransferAvailableAmount, transferErrorMessage, WalletTransferContractError, WalletBalanceCheckError, walletBalanceCheckMessage } from '../../features/wallet/walletTransfer';
 import { isFxResponseInScope as isTransferResponseInScope, type FxRequestScope as TransferScope } from '../../features/wallet/fxAccountScope';
+import { isZeroAmount, type UsdWalletScope } from '../../features/wallet/walletFunding';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { createIdempotencyKey } from '../../utils/idempotency';
 import { formatDisplayDecimal } from '../../utils/format';
@@ -36,14 +37,33 @@ type UsdWalletIdentity = Extract<TransferWalletIdentity, { currency: 'USD' }>;
 const USD_TRANSFER_WALLETS = TRANSFER_WALLETS.filter((wallet): wallet is UsdWalletIdentity => wallet.currency === 'USD');
 const walletLabel = (wallet: UsdWalletIdentity) => WALLET_SCOPE_LABELS[wallet.scope] + ' USD';
 
+/** The form's choices, kept while the sheet steps to 환전 and back. */
+export type TransferDraft = { source: UsdWalletScope; destination: UsdWalletScope; amount: string };
+
 type SheetActions = {
   /** 확인: close the receipt and stay on the wallet. */
   onDone?: () => void;
-  /** 마켓으로 가기: close the receipt and open the market. */
+  /** 마켓으로 가기: close the receipt and open the market (no such button without it). */
   onGoMarket?: () => void;
   /** A command in flight: the sheet must not look closable/cancellable. */
   onBusyChange?: (busy: boolean) => void;
+  /** Where the form starts: an order screen picks its own wallet as the receiving one. */
+  initial?: Partial<TransferDraft>;
+  /** A line above the form (e.g. back from 환전). */
+  notice?: string | null;
+  /** 환전하기 › under the wallets while the sending 증권 USD wallet holds nothing at all. */
+  onExchange?: (draft: TransferDraft) => void;
+  /** A completed transfer: the host returns to its own screen (no receipt). */
+  onSucceeded?: () => void;
 };
+
+/** The starting pair: the asked-for wallets, never the same wallet on both sides. */
+function startingWallets(initial?: Partial<TransferDraft>): Pick<TransferDraft, 'source' | 'destination'> {
+  const destination = initial?.destination ?? 'crypto_spot';
+  const source = initial?.source && initial.source !== destination ? initial.source
+    : destination === 'securities' ? 'crypto_spot' : 'securities';
+  return { source, destination };
+}
 
 /**
  * The USD wallet transfer, presented in the Wallet's bottom sheet. Its
@@ -68,7 +88,7 @@ type TransferCommand = TransferScope & {
   uncertain?: boolean;
   reportQuestCommand: ReturnType<typeof captureQuestGuideCommand>;
 };
-function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMarket, onBusyChange }: SheetActions & {
+function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMarket, onBusyChange, initial, notice, onExchange, onSucceeded }: SheetActions & {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
   scope: TransferScope;
@@ -82,12 +102,12 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
   const wallets = useQuery({ queryKey: QUERY_KEYS.tradingAccount.wallets(account.id), queryFn: () => getTradingAccountWallets(account.id), refetchOnMount: 'always' });
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const [sourceKey, setSourceKey] = useState<UsdWalletIdentity['key']>('securities');
-  const [destinationKey, setDestinationKey] = useState<UsdWalletIdentity['key']>('crypto_spot');
+  const [sourceKey, setSourceKey] = useState<UsdWalletIdentity['key']>(() => startingWallets(initial).source);
+  const [destinationKey, setDestinationKey] = useState<UsdWalletIdentity['key']>(() => startingWallets(initial).destination);
   const [openDropdown, setOpenDropdown] = useState<'source' | 'destination' | null>(null);
   const sourceIdentity = USD_TRANSFER_WALLETS.find(wallet => wallet.key === sourceKey);
   const destinationIdentity = USD_TRANSFER_WALLETS.find(wallet => wallet.key === destinationKey);
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState(initial?.amount ?? '');
   const [result, setResult] = useState<WalletTransferDto | null>(null);
   const [failure, setFailure] = useState<unknown>(null);
   const attempt = useRef<TransferCommand | null>(null);
@@ -129,6 +149,7 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
       void invalidateAfterWalletTransfer(queryClient, command.accountId, { futuresCollateral: command.futuresCollateral });
       if (!mounted.current || !isTransferResponseInScope(command, readScope())) return;
       setResult(data); setFailure(null);
+      onSucceeded?.();
       // QUEST 02 re-reads server progress itself; the receipt stays on screen.
       command.reportQuestCommand({
         kind: 'transfer',
@@ -268,7 +289,7 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
           <View style={styles.receiptActions}>
             <CTAButton testID="wallet-transfer-done" variant="neutral" label="확인" style={styles.flex}
               onPress={() => { if (onDone) onDone(); else { setResult(null); setAmount(''); attempt.current = null; } }} />
-            <CTAButton testID="wallet-transfer-go-market" label="마켓으로 가기" style={styles.flex} onPress={() => onGoMarket?.()} />
+            {onGoMarket ? <CTAButton testID="wallet-transfer-go-market" label="마켓으로 가기" style={styles.flex} onPress={onGoMarket} /> : null}
           </View>
         </View>
       ) : integrity ? <ErrorState error={integrity.error} diagnosticRuntime={integrity.error === failure ? failureRuntime : undefined} title={ACCOUNT_INTEGRITY_TITLE} message={integrity.message} onRetry={integrity.retry} />
@@ -276,9 +297,22 @@ function TransferForm({ account, capabilities, scope, readScope, onDone, onGoMar
           : wallets.isError || !wallets.data ? <ErrorState error={wallets.error} title="지갑 잔액을 불러오지 못했습니다." onRetry={() => void wallets.refetch()} />
             : !hasAllWallets || (!sourceIsFutures && available === null) ? <ErrorState title={ACCOUNT_INTEGRITY_TITLE} message="지갑 정보를 확인할 수 없어 이체를 중단했습니다." onRetry={() => void wallets.refetch()} />
               : <>
+                {notice ? <Text testID="wallet-transfer-notice" style={styles.body} accessibilityLiveRegion="polite">{notice}</Text> : null}
                 {block ? <Text testID="wallet-transfer-blocked" style={styles.error}>{block}</Text> : null}
                 <WalletSelector kind="source" selected={sourceIdentity} excludedKey={destinationKey} expanded={openDropdown === 'source'} disabled={locked} onToggle={() => toggleDropdown('source')} onSelect={wallet => chooseWallet('source', wallet)} />
                 <WalletSelector kind="destination" selected={destinationIdentity} excludedKey={sourceKey} expanded={openDropdown === 'destination'} disabled={locked} onToggle={() => toggleDropdown('destination')} onSelect={wallet => chooseWallet('destination', wallet)} />
+                {/* 증권 USD comes from 환전 (KRW → USD): while it holds nothing at all,
+                    step there and come back to this same transfer. */}
+                {onExchange && sourceIdentity.scope === 'securities' && !block && isZeroAmount(source?.balanceAmount ?? source?.balance) ? (
+                  <View style={styles.exchangeRow} testID="wallet-transfer-exchange-row">
+                    <Text style={styles.body}>증권 USD 지갑이 비어 있습니다.</Text>
+                    <ActionPressable testID="wallet-transfer-exchange" accessibilityRole="button" accessibilityLabel="환전하기, 원화를 달러로"
+                      disabled={locked} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={styles.linkPress}
+                      onPress={() => { dismissAmount(); setOpenDropdown(null); onExchange({ source: sourceIdentity.scope, destination: destinationIdentity.scope, amount }); }}>
+                      <Text style={styles.link}>환전하기 ›</Text>
+                    </ActionPressable>
+                  </View>
+                ) : null}
                 <View style={styles.card}>
                   <Text style={styles.heading}>이체 금액 (USD)</Text>
                   <View ref={questGuideTarget('transfer-amount')} collapsable={false} testID="wallet-transfer-amount-field">
@@ -382,5 +416,8 @@ const styles = StyleSheet.create({
   option: { minHeight: 48, padding: 12, borderWidth: 1, borderColor: semantic.border, borderRadius: 10, justifyContent: 'center' },
   selected: { borderColor: semantic.selected, backgroundColor: semantic.raised },
   disabled: { opacity: 0.5 },
+  exchangeRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 12, rowGap: 4 },
+  link: { fontSize: 14, lineHeight: 22, fontWeight: '700', color: semantic.secondaryActionForeground },
+  linkPress: { minHeight: 24, justifyContent: 'center', borderRadius: 6 },
   input: { borderWidth: 1, borderColor: semantic.border, borderRadius: 10, padding: 12, fontSize: 18, minHeight: 52 },
 });

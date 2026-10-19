@@ -6,7 +6,7 @@ import { AppearanceProvider } from '../../src/theme/appearance';
 import Market from '../../src/screens/market/MarketScreen';
 import Chart from '../../src/screens/asset/AssetChartScreen';
 import Order from '../../src/screens/order/OrderScreen';
-import Fx from '../../src/screens/wallet/WalletFxScreen';
+import Fx from '../../src/screens/wallet/WalletFxSheet';
 import { state, navigation } from './realtimeMocks';
 
 const sockets = [];

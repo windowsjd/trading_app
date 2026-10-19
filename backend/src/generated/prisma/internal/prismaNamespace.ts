@@ -7430,6 +7430,7 @@ export type PushDeviceScalarFieldEnum = (typeof PushDeviceScalarFieldEnum)[keyof
 
 export const NotificationPreferenceScalarFieldEnum = {
   userId: 'userId',
+  allEnabled: 'allEnabled',
   tradeFill: 'tradeFill',
   futuresLiquidation: 'futuresLiquidation',
   orderFailure: 'orderFailure',

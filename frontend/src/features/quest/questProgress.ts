@@ -100,6 +100,8 @@ export function canStartQuest(key: BeginnerQuestKey, progress: BeginnerQuests): 
 const ALL_QUESTS_FIRST = '모든 퀘스트를 완료하면 사용할 수 있어요.';
 const FOUNDATION_FIRST = '공통 기초 퀘스트를 모두 완료하면';
 export const FUTURES_PRACTICE_LEVERAGE_MESSAGE = '선물 퀘스트는 레버리지를 1배보다 높게 설정해 진입해야 해요.';
+/** The line shown under a control the server keeps locked until a quest is done. */
+export const QUEST_LOCK_CAPTION = '퀘스트 완료 후 이용 가능합니다.';
 
 /** Why a learning permission is closed, as the server decides it: the quest
  * that opens it is still ahead, the open position of a pending Futures quest
