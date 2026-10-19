@@ -74,7 +74,7 @@ function createHomeHarness(mode = 'general') {
   };
   const mocks = {
     '@react-navigation/native': { NavigationContext: React.createContext(undefined), useIsFocused: () => true },
-    react: { ...React, useContext: () => undefined, useCallback: (fn) => fn, useRef: (value) => ({ current: value }), useEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
+    react: { ...React, useContext: () => undefined, useCallback: (fn) => fn, useRef: (value) => ({ current: value }), useEffect() {}, useLayoutEffect() {}, useMemo: (fn) => fn(), useState: (initial) => {
       const index = stateIndex++;
       if (!(index in states)) states[index] = typeof initial === 'function' ? initial() : initial;
       return [states[index], (value) => { states[index] = typeof value === 'function' ? value(states[index]) : value; }];
@@ -148,6 +148,8 @@ function createHomeHarness(mode = 'general') {
       __esModule: true,
     },
     './GeneralAccountHome': { default: 'GeneralAccountHome', __esModule: true },
+    // The 보상 sheet and header button have their own harness (GeneralRewardSheet.test.ts).
+    './GeneralRewardSheet': { default: 'GeneralRewardSheet', HomeRewardButton: 'HomeRewardButton', __esModule: true },
     './SeasonAccountHome': { default: 'SeasonAccountHome', __esModule: true },
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];

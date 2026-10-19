@@ -19,6 +19,7 @@ import {
   assertGeneralEquityHistoryRows,
   assertGeneralHistoryBoundaryPairs,
 } from './general-history-integrity';
+import type { GeneralExternalFundingSummary } from './general-external-funding.service';
 import {
   compareGeneralSnapshotOrder,
   CUMULATIVE_PRINCIPAL_RETURN_RATE_METHOD,
@@ -188,20 +189,40 @@ export class TradingAccountPortfolioService {
         // never initialized". The continuity check comes with it (작업 7 보완 2)
         // — a history whose latest state already disagrees with the ledger is
         // not a chart to render, it is damage to report.
-        await this.performanceService.requireContinuousPerformanceState({
-          account: locked,
-          client: tx,
-        });
+        const { funding } =
+          await this.performanceService.requireContinuousPerformanceState({
+            account: locked,
+            client: tx,
+          });
 
-        const since = this.resolveSince(range, locked.openedAt, now.getTime());
+        // The chart is the CURRENT performance epoch (2026-10-20): after a
+        // reset, rows of an ended epoch are kept but never drawn next to the
+        // new one, whose principal and PnL started over at the reset.
+        const epochStart = funding.epoch.startedAt;
+        const rangeStart = this.resolveSince(
+          range,
+          locked.openedAt,
+          now.getTime(),
+        );
+        const since =
+          epochStart && epochStart.getTime() > rangeStart.getTime()
+            ? epochStart
+            : rangeStart;
         const points = daily
-          ? await this.findDailyPoints(tx, locked, range, now)
+          ? await this.findDailyPoints(tx, locked, range, now, epochStart)
           : range === '1d'
             ? await this.findGeneralEquityPoints(tx, locked.id, since)
             : ((await this.findGeneralDailyPoints(tx, locked.id, since)) ??
               (await this.findGeneralEquityPoints(tx, locked.id, since)));
 
-        return this.buildEquityResponse(locked, range, points, daily);
+        const response = this.buildEquityResponse(locked, range, points, daily);
+        return {
+          ...response,
+          data: {
+            ...response.data,
+            performanceEpoch: this.presentEpoch(funding.epoch, locked.openedAt),
+          },
+        };
       },
     );
   }
@@ -335,6 +356,11 @@ export class TradingAccountPortfolioService {
             futuresUnrealizedPnlKrw:
               live.valuation.futuresUnrealizedPnlKrw ?? '0.00000000',
             valuedAt: live.valuation.valuationAt.toISOString(),
+            // Which epoch the principal, PnL and rate above describe.
+            performanceEpoch: this.presentEpoch(
+              live.funding.epoch,
+              account.openedAt,
+            ),
           },
           allocation: this.buildAllocation(live.valuation),
           sectionErrors: [],
@@ -832,12 +858,15 @@ export class TradingAccountPortfolioService {
   }
 
   /** Explicit daily read: job date is authoritative, even for late captures.
-   * Never substitute intraday/funding-boundary rows for missing daily history. */
+   * Never substitute intraday/funding-boundary rows for missing daily history.
+   * `epochStart` (standalone accounts after a reset) drops rows captured in an
+   * ended performance epoch. */
   private async findDailyPoints(
     client: Prisma.TransactionClient,
     account: OwnedTradingAccount,
     range: EquityRange,
     now: Date,
+    epochStart: Date | null = null,
   ): Promise<EquityHistoryPoint[]> {
     const dateKey = (date: Date) =>
       new Intl.DateTimeFormat('en-CA', {
@@ -861,6 +890,7 @@ export class TradingAccountPortfolioService {
               capturedAt: { lte: account.seasonParticipant.season.endAt },
             }
           : {}),
+        ...(epochStart ? { capturedAt: { gte: epochStart } } : {}),
       },
       orderBy: { snapshotDate: 'asc' },
       select: {
@@ -1125,6 +1155,20 @@ export class TradingAccountPortfolioService {
       externalFundingAmountKrw:
         row.externalFundingAmountKrw?.toFixed(MONEY_SCALE) ?? null,
     }));
+  }
+
+  /**
+   * The performance epoch of a standalone read: 0 + openedAt for an account
+   * never reset, otherwise the latest reset's sequence and instant.
+   */
+  private presentEpoch(
+    epoch: GeneralExternalFundingSummary['epoch'],
+    openedAt: Date,
+  ) {
+    return {
+      sequence: epoch.sequence,
+      startedAt: (epoch.startedAt ?? openedAt).toISOString(),
+    };
   }
 
   private returnRateMethod(mode: TradingAccountMode): ReturnRateMethod {

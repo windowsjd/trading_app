@@ -114,6 +114,13 @@ export interface TradingAccountPortfolioSummaryDto {
   cumulativeExternalFundingKrw: MoneyString | null;
   cumulativeAdRewardKrw: MoneyString | null;
   investmentPnlKrw: MoneyString | null;
+  /**
+   * General/beginner only (2026-10-20): the performance epoch the principal,
+   * PnL and rate describe. sequence 0 = since the account opened; n = since
+   * the n-th general-account reset (principal restarted at the reset target).
+   * Absent from older servers.
+   */
+  performanceEpoch?: { sequence: number; startedAt: string };
 }
 
 export interface TradingAccountAllocationDto {
@@ -275,13 +282,44 @@ export interface TradingAccountOrdersDto {
   orders: Array<Record<string, unknown>>;
 }
 
+/** GET .../ad-rewards/eligibility — advisory; the claim re-checks everything. */
 export interface AdRewardEligibilityDto {
+  tradingAccountId: string;
+  /** AD_REWARD_ENABLED on the server (false = the default). */
+  enabled: boolean;
+  provider: string | null;
   eligible: boolean;
+  /** AD_REWARD_DISABLED, AD_REWARD_PROVIDER_UNAVAILABLE, TRADING_ACCOUNT_NOT_ACTIVE, a daily limit or cooldown. */
   reason: string | null;
-  message?: string | null;
-  rewardAmountKrw?: MoneyString | null;
-  dailyClaimCount?: number;
-  dailyClaimLimit?: number;
+  rewardAmountKrw: MoneyString | null;
+  grantedCountToday: number;
+  grantedAmountTodayKrw: MoneyString;
+  remainingCountToday: number;
+  remainingAmountTodayKrw: MoneyString;
+  nextEligibleAt: string | null;
+}
+
+/** What still holds a general account (2026-10-20, account-reset blockers). */
+export type GeneralAccountResetBlocker =
+  | 'SPOT_HOLDINGS'
+  | 'FUTURES_POSITIONS'
+  | 'OPEN_ORDERS'
+  | 'ACTIVE_CONDITIONAL_ORDERS'
+  | 'RESERVED_FUNDS';
+
+/** GET .../account-reset/eligibility — advisory; the reset re-checks under the account lock. */
+export interface AccountResetEligibilityDto {
+  tradingAccountId: string;
+  enabled: boolean;
+  provider: string | null;
+  eligible: boolean;
+  /** As above, plus GENERAL_ACCOUNT_RESET_BLOCKED while something is held. */
+  reason: string | null;
+  blockers: GeneralAccountResetBlocker[];
+  /** Securities KRW after a reset (every USD wallet goes to 0). */
+  targetKrwBalance: MoneyString;
+  resetCount: number;
+  lastResetAt: string | null;
 }
 
 function accountPath(accountId: string, suffix = '') {
@@ -600,6 +638,18 @@ export async function getAdRewardEligibility(accountId: string) {
   );
 }
 
+export async function getAccountResetEligibility(accountId: string) {
+  const response = await apiClient.get<
+    ApiSuccessResponse<AccountResetEligibilityDto>
+  >(accountPath(accountId, '/account-reset/eligibility'));
+
+  return assertAccountScope(
+    'GET /trading-accounts/:accountId/account-reset/eligibility',
+    accountId,
+    response.data.data,
+  );
+}
+
 export async function getAdRewardClaims(
   accountId: string,
   params: { limit?: number; offset?: number } = {},
@@ -720,10 +770,24 @@ export async function executeTradingAccountFx(
   );
 }
 
+/**
+ * Both ad-redeeming commands take this body: the provider key, the opaque proof
+ * the ad SDK handed over, and the client's idempotency key. The amount, the
+ * event id and what a reset does are all decided by the server.
+ */
 export interface AdRewardClaimRequestDto {
   idempotencyKey: string;
-  provider?: string;
-  proof?: string;
+  provider: string;
+  proof: string;
+}
+
+export interface AdRewardClaimResultDto {
+  /** false when this call replayed an already-granted claim. */
+  granted: boolean;
+  duplicate: boolean;
+  claimId: string;
+  grantedAt: string | null;
+  walletBalanceAfter: MoneyString | null;
 }
 
 export async function claimAdReward(
@@ -731,11 +795,43 @@ export async function claimAdReward(
   payload: AdRewardClaimRequestDto,
 ) {
   const response = await apiClient.post<
-    ApiSuccessResponse<Record<string, unknown>>
+    ApiSuccessResponse<AdRewardClaimResultDto>
   >(accountPath(accountId, '/ad-rewards/claim'), payload);
 
   return assertAccountScope(
     'POST /trading-accounts/:accountId/ad-rewards/claim',
+    accountId,
+    response.data.data,
+  );
+}
+
+export interface AccountResetResultDto {
+  /** true on the call that reset the account; false on a replay. */
+  reset: boolean;
+  duplicate: boolean;
+  resetId: string;
+  claimId: string;
+  sequence: number;
+  resetAt: string;
+  totalAssetKrw: MoneyString;
+  wallets: Array<{
+    walletScope: 'securities' | 'crypto_spot' | 'crypto_futures';
+    currencyCode: 'KRW' | 'USD';
+    balanceAmount: MoneyString;
+  }>;
+}
+
+/** POST .../account-reset (2026-10-20): one verified ad completion resets a general account. */
+export async function resetGeneralAccount(
+  accountId: string,
+  payload: AdRewardClaimRequestDto,
+) {
+  const response = await apiClient.post<
+    ApiSuccessResponse<AccountResetResultDto>
+  >(accountPath(accountId, '/account-reset'), payload);
+
+  return assertAccountScope(
+    'POST /trading-accounts/:accountId/account-reset',
     accountId,
     response.data.data,
   );

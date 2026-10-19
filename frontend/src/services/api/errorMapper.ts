@@ -555,6 +555,28 @@ export function getErrorMessageFromCode(
       // Temporary and retryable — deliberately worded unlike an integrity
       // failure, which asks the user to contact support.
       return '광고 제공자와 연결할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.AD_REWARD_DISABLED:
+      return '광고 기능을 준비하고 있습니다.';
+    case ERROR_CODE.AD_REWARD_GENERAL_ACCOUNT_ONLY:
+      return '일반 투자 계정에서만 이용할 수 있습니다.';
+    case ERROR_CODE.AD_REWARD_VERIFICATION_FAILED:
+      return '광고 시청을 확인하지 못했습니다. 광고를 다시 시청해주세요.';
+    case ERROR_CODE.AD_REWARD_EVENT_ALREADY_USED:
+      return '이미 사용한 광고 보상입니다. 광고를 다시 시청해주세요.';
+    case ERROR_CODE.AD_REWARD_IDEMPOTENCY_CONFLICT:
+    case ERROR_CODE.AD_REWARD_INVALID_REQUEST:
+      return '요청을 처리하지 못했습니다. 다시 시도해주세요.';
+    case ERROR_CODE.AD_REWARD_DAILY_COUNT_LIMIT:
+    case ERROR_CODE.AD_REWARD_DAILY_AMOUNT_LIMIT:
+      return '오늘 받을 수 있는 가상자금을 모두 받았습니다.';
+    case ERROR_CODE.AD_REWARD_COOLDOWN_ACTIVE:
+      return '잠시 후 다시 가상자금을 받을 수 있습니다.';
+    case ERROR_CODE.GENERAL_ACCOUNT_RESET_BLOCKED:
+      return '보유 종목, 선물 포지션, 미체결·조건 주문을 모두 정리한 뒤 초기화할 수 있습니다.';
+    case ERROR_CODE.GENERAL_ACCOUNT_RESET_UNAVAILABLE:
+      return '지금은 계정을 초기화할 수 없습니다. 잠시 후 다시 시도해주세요.';
+    case ERROR_CODE.FUTURES_CANDLES_UNAVAILABLE:
+      return '선물 차트를 지금 불러올 수 없습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.RATE_CHANGED_REQUOTE_REQUIRED:
       return '가격 또는 환율이 변경되었습니다. 다시 견적을 받아주세요.';
     case ERROR_CODE.IDEMPOTENCY_REQUIRED:

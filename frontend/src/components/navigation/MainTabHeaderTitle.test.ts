@@ -39,8 +39,9 @@ for (const [stack, root, label, icon] of [
     assert.equal(title.props.icon, icon);
     assert.equal(title.props.children, label);
     assert.equal(title.props.tintColor, '#f2f5f7');
-    // 종목 상세 and 주문 alone take the heavy theme font (bolder, same size).
-    const bold = stack === 'Market' ? ['AssetDetail', 'Order'] : [];
+    // 종목 상세 (stocks/crypto and futures contracts) and 주문 alone take the
+    // heavy theme font (bolder, same size).
+    const bold = stack === 'Market' ? ['AssetDetail', 'FuturesDetail', 'Order'] : [];
     for (const screen of screens) {
       const resolved = typeof screen.props.options === 'function'
         ? screen.props.options({ theme: navigationTheme.useTheme() }) : screen.props.options;
@@ -54,7 +55,7 @@ for (const [stack, root, label, icon] of [
       }
     }
     if (stack === 'Market') {
-      for (const [name, title] of [['AssetDetail', '종목 상세'], ['Order', '주문']]) {
+      for (const [name, title] of [['AssetDetail', '종목 상세'], ['FuturesDetail', '종목 상세'], ['Order', '주문']]) {
         const screen = screens.find(item => item.props.name === name);
         assert.equal(screen.props.options({ theme: navigationTheme.useTheme() }).title, title);
       }

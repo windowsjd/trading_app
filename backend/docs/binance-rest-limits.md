@@ -78,18 +78,24 @@ one ingesting process, live candles/ticker on WebSocket:
 | Crypto reconciliation (300 s, 1/asset; first run of a UTC day 2, of a week 9) | 200 (400 daily, 1800 weekly) | 40 | 200; weekly ≈ 400–600 for a few minutes |
 | Spot 4h upkeep (after each 4h close, 1/asset × 2) | 200 | ≈ 1 | 200 |
 | USDⓈ-M 4h upkeep (≈ 60–120 s, 1/contract, limit < 100 = 1) | 100 | 50–100 | 100 |
+| Futures chart 5m/15m/30m/1h/1d on demand (2026-10-20; only viewed series, one call at a time ≥ 150 ms apart, ≤ `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` = 60 calls/min/process) | 1 (tail) – 5 (cold window) | 0 when nobody views; ≈ 1 per viewed series per 15–120 s | ≤ 60–300 (all cold windows; tails ≤ 60) |
 | Futures Last re-confirmation (`/fapi/v2/ticker/price`, ≤ every 3 s) | 2 | 35–40 | 40 |
 | Futures Mark recovery (`premiumIndex`, only when Mark WS degrades) | 10 | 0 | 200 |
 | exchangeInfo (Spot 6 h, Futures 5 min) | 21 | < 1 | 21 |
 
-Average ≈ 240/min. A typical busy minute is ≈ 440–940; everything in one
-minute (daily reconciliation + Spot sync + Mark degraded) ≈ 1340–1540, which
-still exceeds 1200: the excess is refused (`PROVIDER_RATE_LIMITED`) and the
-existing sync runs defer it, without retries or extra concurrency.
+Average ≈ 240/min without chart viewers (+ ≈ 4/min per continuously viewed
+5m series, less for longer intervals, ≤ 60 tail calls/min). A typical busy
+minute is ≈ 440–940 (≈ 500–1000 with the on-demand chart at its call cap of
+tail reads); everything in one minute (daily reconciliation + Spot sync + Mark
+degraded) ≈ 1340–1540, which still exceeds 1200: the excess is refused
+(`PROVIDER_RATE_LIMITED`) and the existing sync runs defer it, without retries
+or extra concurrency. The on-demand chart reads hold at most one of the two
+slots (one call at a time), and a refusal only marks the chart stale.
 
 - At 600, one Spot sync run for 100 assets (600) can exhaust a whole minute,
   and Futures Last/Mark REST recovery is then refused until the minute rolls
-  over. 1200 leaves ≈ 260–760 for that recovery in typical busy minutes.
+  over. 1200 leaves ≈ 260–760 for that recovery in typical busy minutes
+  (≈ 200–700 while the on-demand chart runs at its tail-read cap).
 - Completion: a 100-asset Spot sync run (300 requests on two slots) finishes
   in one run at 1200; at 600 the remainder waits for the next 600 s run.
 - 96-day 4h backfill: Spot 100 × 1 call (200) + USDⓈ-M 100 × 2 calls (300),

@@ -240,7 +240,9 @@ export class BinanceCandleIngestionService {
     const intervalMs = BINANCE_CANDLE_INTERVAL_MS[interval];
     if (!intervalMs) {
       // @diagnosticSurface internal: Programmer-guard on a typed interval; sync callers record a fixed series code.
-      throw new BinanceCandleInputError('interval must be 5m, 4h, 1d, or 1w.');
+      throw new BinanceCandleInputError(
+        'interval must be 5m, 15m, 30m, 1h, 4h, 1d, or 1w.',
+      );
     }
     return intervalMs;
   }

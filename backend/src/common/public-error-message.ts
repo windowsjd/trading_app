@@ -173,7 +173,12 @@ const PUBLIC_MESSAGES = new Set<string>([
   'Futures collateral information could not be verified.',
   'Futures wallet information could not be verified.',
   'Futures instrument was not found.',
-  'Futures chart supports interval 4h, range 96d and a limit from 1 to 1000.',
+  // Futures chart timeframes (2026-10-20, docs/futures-chart-timeframes.md).
+  'Futures chart supports 5m/2d, 15m/3d, 30m/14d, 1h/14d, 4h/96d and 1d/1y with a limit within the window.',
+  'Futures chart data is temporarily unavailable. Try again shortly.',
+  // General-account reset (2026-10-20, docs/general-account-and-ad-rewards-api-contract.md).
+  'Close holdings, positions and open orders before resetting the account.',
+  'The account reset is temporarily unavailable. Try again shortly.',
   'Futures trading is disabled.',
   'This Futures instrument is not yet available for new trades.',
   'Leverage is fixed for the open position lifetime.',

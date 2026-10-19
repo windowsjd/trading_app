@@ -427,6 +427,7 @@ export const ModelName = {
   CashWallet: 'CashWallet',
   WalletTransaction: 'WalletTransaction',
   AdRewardClaim: 'AdRewardClaim',
+  GeneralAccountReset: 'GeneralAccountReset',
   ExchangeTransaction: 'ExchangeTransaction',
   FxRateSnapshot: 'FxRateSnapshot',
   Quote: 'Quote',
@@ -474,7 +475,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
+    modelProps: "user" | "inquiry" | "inquiryAnswer" | "friendship" | "operatorAuditLog" | "refreshTokenSession" | "tradingAccount" | "season" | "seasonParticipant" | "badge" | "userBadge" | "seasonReward" | "rewardFulfillmentRequest" | "asset" | "assetPriceSnapshot" | "assetOrderbookSnapshot" | "cryptoSpotOrderBookSnapshot" | "marketCandle" | "marketCandleSyncState" | "marketSessionOverride" | "futuresInstrument" | "futuresMarketCandle" | "futuresPosition" | "futuresExecution" | "futuresExecuteRequest" | "futuresLimitOrder" | "protectionGroup" | "protectionLeg" | "protectionChild" | "protectionCommand" | "position" | "order" | "conditionalBuyOrder" | "futuresConditionalEntry" | "conditionalSellOrder" | "futuresTpSlSetting" | "entryTpSlPlan" | "limitOnCloseOrder" | "sessionClosePriceEvidence" | "beginnerQuestAcknowledgement" | "cashWallet" | "walletTransaction" | "adRewardClaim" | "generalAccountReset" | "exchangeTransaction" | "fxRateSnapshot" | "quote" | "walletTransfer" | "walletTransferQuote" | "walletTransferExecuteRequest" | "fxExecuteRequest" | "equitySnapshot" | "dailyPortfolioSnapshot" | "seasonRanking" | "batchJobRun" | "opsJobRun" | "opsJobLock" | "limitOrderCandleEvidence" | "futuresLastPriceSnapshot" | "futuresMarkSnapshot" | "futuresOrderBookSnapshot" | "futuresLiquidation" | "futuresLiquidationClose" | "futuresSeasonPrice" | "futuresSeasonSettlement" | "futuresSeasonClose" | "pushDevice" | "notificationPreference" | "pushNotification" | "pushDelivery" | "pushScanCursor" | "importantNotice" | "emailAuthChallenge" | "emailAuthRateBucket" | "accountDeletion" | "profileImageCleanup"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -3657,6 +3658,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.AdRewardClaimCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.AdRewardClaimCountAggregateOutputType> | number
+        }
+      }
+    }
+    GeneralAccountReset: {
+      payload: Prisma.$GeneralAccountResetPayload<ExtArgs>
+      fields: Prisma.GeneralAccountResetFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.GeneralAccountResetFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.GeneralAccountResetFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>
+        }
+        findFirst: {
+          args: Prisma.GeneralAccountResetFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.GeneralAccountResetFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>
+        }
+        findMany: {
+          args: Prisma.GeneralAccountResetFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>[]
+        }
+        create: {
+          args: Prisma.GeneralAccountResetCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>
+        }
+        createMany: {
+          args: Prisma.GeneralAccountResetCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.GeneralAccountResetCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>[]
+        }
+        delete: {
+          args: Prisma.GeneralAccountResetDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>
+        }
+        update: {
+          args: Prisma.GeneralAccountResetUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>
+        }
+        deleteMany: {
+          args: Prisma.GeneralAccountResetDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.GeneralAccountResetUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.GeneralAccountResetUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>[]
+        }
+        upsert: {
+          args: Prisma.GeneralAccountResetUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$GeneralAccountResetPayload>
+        }
+        aggregate: {
+          args: Prisma.GeneralAccountResetAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateGeneralAccountReset>
+        }
+        groupBy: {
+          args: Prisma.GeneralAccountResetGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GeneralAccountResetGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.GeneralAccountResetCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.GeneralAccountResetCountAggregateOutputType> | number
         }
       }
     }
@@ -6974,11 +7049,32 @@ export const AdRewardClaimScalarFieldEnum = {
   idempotencyKey: 'idempotencyKey',
   requestHash: 'requestHash',
   responsePayloadJson: 'responsePayloadJson',
+  purpose: 'purpose',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type AdRewardClaimScalarFieldEnum = (typeof AdRewardClaimScalarFieldEnum)[keyof typeof AdRewardClaimScalarFieldEnum]
+
+
+export const GeneralAccountResetScalarFieldEnum = {
+  id: 'id',
+  tradingAccountId: 'tradingAccountId',
+  userId: 'userId',
+  adRewardClaimId: 'adRewardClaimId',
+  sequence: 'sequence',
+  resetAt: 'resetAt',
+  targetKrwBalance: 'targetKrwBalance',
+  lifetimeExternalFundingKrw: 'lifetimeExternalFundingKrw',
+  closingTotalAssetKrw: 'closingTotalAssetKrw',
+  closingExternalFundingKrw: 'closingExternalFundingKrw',
+  closingInvestmentPnlKrw: 'closingInvestmentPnlKrw',
+  walletsBeforeJson: 'walletsBeforeJson',
+  positionsRebasedJson: 'positionsRebasedJson',
+  createdAt: 'createdAt'
+} as const
+
+export type GeneralAccountResetScalarFieldEnum = (typeof GeneralAccountResetScalarFieldEnum)[keyof typeof GeneralAccountResetScalarFieldEnum]
 
 
 export const ExchangeTransactionScalarFieldEnum = {
@@ -8345,6 +8441,20 @@ export type ListEnumAdRewardClaimStatusFieldRefInput<$PrismaModel> = FieldRefInp
 
 
 /**
+ * Reference to a field of type 'AdRewardPurpose'
+ */
+export type EnumAdRewardPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardPurpose'>
+    
+
+
+/**
+ * Reference to a field of type 'AdRewardPurpose[]'
+ */
+export type ListEnumAdRewardPurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AdRewardPurpose[]'>
+    
+
+
+/**
  * Reference to a field of type 'FxRateSourceType'
  */
 export type EnumFxRateSourceTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'FxRateSourceType'>
@@ -8775,6 +8885,7 @@ export type GlobalOmitConfig = {
   cashWallet?: Prisma.CashWalletOmit
   walletTransaction?: Prisma.WalletTransactionOmit
   adRewardClaim?: Prisma.AdRewardClaimOmit
+  generalAccountReset?: Prisma.GeneralAccountResetOmit
   exchangeTransaction?: Prisma.ExchangeTransactionOmit
   fxRateSnapshot?: Prisma.FxRateSnapshotOmit
   quote?: Prisma.QuoteOmit

@@ -185,7 +185,7 @@ export type FuturesHistory = {
   executions?: FuturesExecution[];
   liquidations?: FuturesLiquidation[];
 };
-/** One Binance USDⓈ-M contract 4h candle (contract trade price, not Mark). */
+/** One Binance USDⓈ-M contract candle (contract trade price, not Mark). */
 export type FuturesCandle = {
   time: string;
   open: string;
@@ -196,6 +196,13 @@ export type FuturesCandle = {
   amount: string;
   /** True only for the bucket containing "now" (not final yet). */
   provisional: boolean;
+};
+export type FuturesChartInterval = "5m" | "15m" | "30m" | "1h" | "4h" | "1d";
+export type FuturesChartRange = "2d" | "3d" | "14d" | "96d" | "1y";
+export type FuturesChartWindow = {
+  interval: FuturesChartInterval;
+  range: FuturesChartRange;
+  limit: number;
 };
 export type FuturesCandles = {
   state: "available" | "empty";
@@ -209,8 +216,8 @@ export type FuturesCandles = {
     displayPriceDecimals: number;
   };
   priceBasis: "contract_last_trade";
-  range: "96d";
-  interval: "4h";
+  range: FuturesChartRange;
+  interval: FuturesChartInterval;
   candles: FuturesCandle[];
   source: {
     provider: "binance_usdm";
@@ -220,35 +227,66 @@ export type FuturesCandles = {
     requestedCount: number;
     returnedCount: number;
     provisionalUpdatedAt: string | null;
+    /** stored = the collected 4h history; provider = native klines read on demand. */
+    delivery?: "stored" | "provider";
+    fetchedAt?: string | null;
+    /** The server could not refresh this copy (served from its cache). */
+    stale?: boolean;
   };
 };
+/**
+ * Each 봉 시간's window, the server's own (market-candle-futures-windows.ts):
+ * the general crypto chart's windows — about 2 days of 5m, 3 days of 15m, 14
+ * days of 30m and 1h, 96 days of 4h, a year of 1d — each under the 1000 cap.
+ */
+export const FUTURES_CHART_WINDOWS: Record<FuturesChartInterval, FuturesChartWindow> = {
+  "5m": { interval: "5m", range: "2d", limit: 600 },
+  "15m": { interval: "15m", range: "3d", limit: 300 },
+  "30m": { interval: "30m", range: "14d", limit: 700 },
+  "1h": { interval: "1h", range: "14d", limit: 350 },
+  "4h": { interval: "4h", range: "96d", limit: 600 },
+  "1d": { interval: "1d", range: "1y", limit: 400 },
+};
 /** 96 days × 6 closed contract buckets + the current one, under the 1000 cap. */
-export const FUTURES_CHART_WINDOW = {
-  interval: "4h",
-  range: "96d",
-  limit: 600,
-} as const;
+export const FUTURES_CHART_WINDOW = FUTURES_CHART_WINDOWS["4h"];
+/** The window of a selected 봉 시간 (the shared selector's interval). */
+export function futuresChartWindow(interval: string): FuturesChartWindow {
+  return FUTURES_CHART_WINDOWS[interval as FuturesChartInterval] ?? FUTURES_CHART_WINDOW;
+}
+/**
+ * How often an open chart re-reads its window: the server's own freshness for
+ * that interval (a shorter poll would only hit its cache).
+ */
+export const FUTURES_CHART_REFRESH_MS: Record<FuturesChartInterval, number> = {
+  "5m": 15_000,
+  "15m": 30_000,
+  "30m": 30_000,
+  "1h": 60_000,
+  "4h": 60_000,
+  "1d": 120_000,
+};
 /**
  * Contract chart of one FuturesInstrument. Market data, not account data: the
  * route is not account-scoped and the response carries no account fields, so
- * every trading account shares one cache entry per instrument.
+ * every trading account shares one cache entry per instrument and window.
  */
 export async function getFuturesInstrumentCandles(
   instrumentId: string,
+  window: FuturesChartWindow = FUTURES_CHART_WINDOW,
   signal?: AbortSignal,
 ): Promise<FuturesCandles> {
   const query = new URLSearchParams({
-    interval: FUTURES_CHART_WINDOW.interval,
-    range: FUTURES_CHART_WINDOW.range,
-    limit: String(FUTURES_CHART_WINDOW.limit),
+    interval: window.interval,
+    range: window.range,
+    limit: String(window.limit),
   });
   const response = await apiClient.get<{ success: true; data: FuturesCandles }>(
     `/futures/instruments/${encodeURIComponent(instrumentId)}/candles?${query.toString()}`,
     { signal },
   );
   const data = response.data.data;
-  // Never show another contract's candles under this instrument.
-  if (data.instrument.id !== instrumentId) {
+  // Never show another contract's, or another interval's, candles here.
+  if (data.instrument.id !== instrumentId || data.interval !== window.interval) {
     throw new Error("FUTURES_CHART_INSTRUMENT_MISMATCH");
   }
   return data;

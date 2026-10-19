@@ -62,6 +62,7 @@ import {
   formatPercent,
 } from '../../utils/format';
 import WhaleLoader from '../../components/states/WhaleLoader';
+import { openingFundingLabel, resetEpochNote } from '../../features/tradingAccount/performanceEpoch';
 
 type Props = PortfolioScreenProps;
 
@@ -620,7 +621,7 @@ function AccountSummaryCard({
             누적 투자원금 {formatKrw(summary.cumulativeExternalFundingKrw)}
           </Text>
           <Text style={styles.helper}>
-            최초 지급금 {formatKrw(summary.initialFundingKrw)}
+            {openingFundingLabel(summary)} {formatKrw(summary.initialFundingKrw)}
           </Text>
           <Text style={styles.helper}>
             누적 광고 보상금 {formatKrw(summary.cumulativeAdRewardKrw)}
@@ -632,6 +633,9 @@ function AccountSummaryCard({
           <Text style={styles.footnote}>
             수익률은 투자 손익을 누적 투자원금으로 나눈 값입니다. 광고 보상금은 투자 수익이 아니라 누적 투자원금에 더해집니다.
           </Text>
+          {resetEpochNote(summary) ? (
+            <Text testID="portfolio-reset-epoch" style={styles.footnote}>{resetEpochNote(summary)}</Text>
+          ) : null}
         </>
       ) : null}
 

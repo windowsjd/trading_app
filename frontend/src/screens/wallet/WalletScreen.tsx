@@ -48,6 +48,7 @@ import { useQuestGuide } from '../../features/quest/QuestGuideProvider';
 import { questNavigationAllowed } from '../../features/quest/questNavigationGuard';
 import QuestTargetHighlight from '../../features/quest/QuestTargetHighlight';
 import WalletFundingSheet, { type FundingRequest } from './WalletFundingSheet';
+import { openingFundingLabel } from '../../features/tradingAccount/performanceEpoch';
 
 export default function WalletScreen({ navigation }: WalletScreenProps) {
   const { selectedAccount, capabilities, isLoading, isError, error, refetchAccounts } = useTradingAccount();
@@ -348,7 +349,7 @@ function principalSummary(summary: TradingAccountPortfolioSummaryDto, showAdRewa
       </Text>
       {showAdReward && summary.initialFundingKrw !== null && summary.cumulativeAdRewardKrw !== null ? (
         <Text testID="wallet-principal-breakdown" style={styles.principalCaption}>
-          최초 지급금 {formatKrw(summary.initialFundingKrw)}원 · 광고 보상금 {formatKrw(summary.cumulativeAdRewardKrw)}원
+          {openingFundingLabel(summary)} {formatKrw(summary.initialFundingKrw)}원 · 광고 보상금 {formatKrw(summary.cumulativeAdRewardKrw)}원
         </Text>
       ) : null}
       <Text testID="wallet-investment-pnl" style={styles.principalText}>

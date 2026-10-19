@@ -388,7 +388,9 @@ function setup(mode: 'general' | 'season') {
     getOwnedAccountOrThrow: jest.fn().mockResolvedValue(account),
   };
   const performance = {
-    requireContinuousPerformanceState: jest.fn().mockResolvedValue({}),
+    requireContinuousPerformanceState: jest
+      .fn()
+      .mockResolvedValue({ funding: { epoch: { sequence: 0, resetId: null, startedAt: null } } }),
   };
   const service = new TradingAccountPortfolioService(
     client as never,
@@ -423,6 +425,15 @@ describe('account equity daily read contract and legacy ranges', () => {
             futuresUnrealizedPnlUsd: null,
             futuresUnrealizedPnlKrw: null,
           })),
+          // Standalone reads name the performance epoch they draw (2026-10-20).
+          ...(mode === 'general'
+            ? {
+                performanceEpoch: {
+                  sequence: 0,
+                  startedAt: '2026-01-01T16:00:00.000Z',
+                },
+              }
+            : {}),
         },
       });
       expect(JSON.stringify(h.rows)).toBe(before);
@@ -454,6 +465,45 @@ describe('account equity daily read contract and legacy ranges', () => {
       }
     },
   );
+  it('draws only the current performance epoch after a general-account reset', async () => {
+    const h = setup('general');
+    const resetAt = new Date('2026-09-05T03:00:00.000Z');
+    h.performance.requireContinuousPerformanceState.mockResolvedValue({
+      funding: {
+        epoch: { sequence: 2, resetId: 'reset-2', startedAt: resetAt },
+      },
+    });
+    const daily = await h.service.getEquity('user', h.account.id, {
+      range: '30d',
+      granularity: 'daily',
+    });
+    expect(daily.data).toMatchObject({
+      performanceEpoch: { sequence: 2, startedAt: resetAt.toISOString() },
+    });
+    expect(h.client.dailyPortfolioSnapshot.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ capturedAt: { gte: resetAt } }),
+      }),
+    );
+    // A range that starts before the reset starts at the reset instead.
+    await h.service.getEquity('user', h.account.id, { range: 'all' });
+    expect(h.client.dailyPortfolioSnapshot.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: { tradingAccountId: h.account.id, capturedAt: { gte: resetAt } },
+      }),
+    );
+    // A range that starts after it keeps its own start.
+    await h.service.getEquity('user', h.account.id, { range: '1d' });
+    expect(h.client.equitySnapshot.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: {
+          tradingAccountId: h.account.id,
+          capturedAt: { gte: new Date('2026-09-07T15:00:01.000Z') },
+        },
+      }),
+    );
+  });
+
   it.each(['general', 'season'] as const)(
     'does not fill missing dates or replace empty %s history with intraday/current assets',
     async (mode) => {
@@ -681,7 +731,9 @@ describe('standalone cumulative-principal return rate', () => {
       $transaction: jest.fn().mockImplementation((handler) => handler(client)),
     };
     const performance = {
-      requireContinuousPerformanceState: jest.fn().mockResolvedValue({}),
+      requireContinuousPerformanceState: jest
+        .fn()
+        .mockResolvedValue({ funding: { epoch: { sequence: 0, resetId: null, startedAt: null } } }),
       resolveLivePerformance: jest.fn(),
     };
     const service = new TradingAccountPortfolioService(
@@ -719,6 +771,8 @@ describe('standalone cumulative-principal return rate', () => {
         initialFundingKrw: d('10000000'),
         cumulativeAdRewardKrw: d(input.adRewards),
         cumulativeExternalFundingKrw: d(input.principal),
+        lifetimeExternalFundingKrw: d(input.principal),
+        epoch: { sequence: 0, resetId: null, startedAt: null },
       },
       latestSnapshot: {},
       advance: {

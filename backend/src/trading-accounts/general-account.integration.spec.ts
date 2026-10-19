@@ -154,6 +154,8 @@ function fakeVerifier(provider) {
       return {
         ok: true,
         provider,
+        // The purpose the event was issued for, as the app requested it.
+        purpose: request.expectedPurpose,
         // The EVENT ID comes from the verifier, never the client body.
         providerEventId: request.proof,
         occurredAt: new Date(),

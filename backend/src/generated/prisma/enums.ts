@@ -110,7 +110,8 @@ export const WalletTransactionType = {
   settlement: 'settlement',
   ad_reward: 'ad_reward',
   wallet_transfer: 'wallet_transfer',
-  futures_pnl: 'futures_pnl'
+  futures_pnl: 'futures_pnl',
+  account_reset: 'account_reset'
 } as const
 
 export type WalletTransactionType = (typeof WalletTransactionType)[keyof typeof WalletTransactionType]
@@ -127,7 +128,8 @@ export const WalletTransactionReferenceType = {
   wallet_transfer: 'wallet_transfer',
   futures_execution: 'futures_execution',
   futures_liquidation: 'futures_liquidation',
-  futures_season_settlement: 'futures_season_settlement'
+  futures_season_settlement: 'futures_season_settlement',
+  general_account_reset: 'general_account_reset'
 } as const
 
 export type WalletTransactionReferenceType = (typeof WalletTransactionReferenceType)[keyof typeof WalletTransactionReferenceType]
@@ -185,6 +187,14 @@ export const AdRewardClaimStatus = {
 export type AdRewardClaimStatus = (typeof AdRewardClaimStatus)[keyof typeof AdRewardClaimStatus]
 
 
+export const AdRewardPurpose = {
+  funding: 'funding',
+  account_reset: 'account_reset'
+} as const
+
+export type AdRewardPurpose = (typeof AdRewardPurpose)[keyof typeof AdRewardPurpose]
+
+
 export const SnapshotReason = {
   season_join: 'season_join',
   exchange_executed: 'exchange_executed',
@@ -194,7 +204,8 @@ export const SnapshotReason = {
   general_account_open: 'general_account_open',
   performance_baseline: 'performance_baseline',
   external_funding_before: 'external_funding_before',
-  external_funding_after: 'external_funding_after'
+  external_funding_after: 'external_funding_after',
+  general_account_reset: 'general_account_reset'
 } as const
 
 export type SnapshotReason = (typeof SnapshotReason)[keyof typeof SnapshotReason]

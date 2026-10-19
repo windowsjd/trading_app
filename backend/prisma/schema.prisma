@@ -84,6 +84,11 @@ enum WalletTransactionType {
   // Internal, same-currency cash relocation; never external funding.
   wallet_transfer
   futures_pnl
+  // General-account reset (2026-10-20): moves one wallet to its reset target
+  // (Securities KRW 10,000,000; every USD wallet 0). Neither external funding
+  // nor investment PnL: the reset starts a new performance epoch whose
+  // principal is the reset target (see GeneralAccountReset).
+  account_reset
 }
 
 enum WalletTransactionReferenceType {
@@ -103,6 +108,9 @@ enum WalletTransactionReferenceType {
   futures_execution
   futures_liquidation
   futures_season_settlement
+  // referenceId = GeneralAccountReset.id; at most one row per wallet per
+  // reset (partial unique index, add_general_account_resets migration).
+  general_account_reset
 }
 
 enum FuturesProductType {
@@ -139,6 +147,14 @@ enum AdRewardClaimStatus {
   failed
 }
 
+/// What one verified ad completion was redeemed for (2026-10-20).
+enum AdRewardPurpose {
+  /// The KRW top-up: ad_reward ledger row + external-funding boundary pair.
+  funding
+  /// A general-account reset: a GeneralAccountReset row, no ad_reward row.
+  account_reset
+}
+
 enum SnapshotReason {
   season_join
   exchange_executed
@@ -158,6 +174,13 @@ enum SnapshotReason {
   performance_baseline
   external_funding_before
   external_funding_after
+  // general_account_reset    — the origin of a NEW performance epoch, written
+  //                            in the same transaction as a general-account
+  //                            reset: total = principal = the reset target,
+  //                            PnL 0, factor 1. The account's one opening
+  //                            origin above stays; history and the funding
+  //                            ledger are read from the latest epoch on.
+  general_account_reset
 }
 
 enum FxRateSourceType {
@@ -349,6 +372,7 @@ model User {
   operatorAuditLogs           OperatorAuditLog[]
   quotes                      Quote[]
   adRewardClaims              AdRewardClaim[]
+  generalAccountResets        GeneralAccountReset[]
   rewardFulfillmentTargets    RewardFulfillmentRequest[] @relation("RewardFulfillmentTargetUser")
   rewardFulfillmentsRequested RewardFulfillmentRequest[] @relation("RewardFulfillmentRequestedBy")
   rewardFulfillmentsProcessed RewardFulfillmentRequest[] @relation("RewardFulfillmentProcessedBy")
@@ -527,6 +551,7 @@ model TradingAccount {
   limitOnCloseOrders            LimitOnCloseOrder[]
   quotes                        Quote[]
   adRewardClaims                AdRewardClaim[]
+  generalAccountResets          GeneralAccountReset[]
   equitySnapshots               EquitySnapshot[]
   dailyPortfolioSnapshots       DailyPortfolioSnapshot[]
   // Season accounts only — a general account attached here is an integrity
@@ -1966,12 +1991,19 @@ model AdRewardClaim {
   requestHash              String?             @map("request_hash")
   /// The first committed success/refusal payload, replayed verbatim on retry.
   responsePayloadJson      Json?               @map("response_payload_json")
+  /// What this verified completion was redeemed for (2026-10-20). The
+  /// (provider, providerEventId) unique below spans BOTH purposes, so one ad
+  /// completion is redeemed once, for exactly one command. An account_reset
+  /// claim carries rewardAmountKrw 0 and never a walletTransactionId (SQL
+  /// CHECK); its money movement is the GeneralAccountReset it links to.
+  purpose                  AdRewardPurpose     @default(funding)
   createdAt                DateTime            @default(now()) @map("created_at")
   updatedAt                DateTime            @updatedAt @map("updated_at")
 
-  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
-  tradingAccount    TradingAccount     @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
-  walletTransaction WalletTransaction? @relation(fields: [walletTransactionId], references: [id], onDelete: Restrict)
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tradingAccount      TradingAccount       @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  walletTransaction   WalletTransaction?   @relation(fields: [walletTransactionId], references: [id], onDelete: Restrict)
+  generalAccountReset GeneralAccountReset?
 
   /// The duplicate-payout guard: one provider event can be granted once.
   @@unique([provider, providerEventId])
@@ -1983,6 +2015,54 @@ model AdRewardClaim {
   @@index([userId, grantedAt])
   @@index([status, createdAt])
   @@map("ad_reward_claims")
+}
+
+/// A general-account reset (2026-10-20): the account, its id, its opening
+/// grant and every past ledger/order/fill row stay; the four wallets are
+/// moved to the reset target by `account_reset` ledger rows that reference
+/// this row, and a `general_account_reset` EquitySnapshot opens a new
+/// performance epoch (principal = target, PnL 0, factor 1).
+///
+/// Epoch principal = targetKrwBalance + (verified lifetime external funding
+/// now − lifetimeExternalFundingKrw recorded here). Ad rewards only ever add
+/// to the lifetime total, so the difference is exactly the rewards granted
+/// after this reset; the continuity check against the latest snapshot proves
+/// it on every read.
+///
+/// Every reset consumes one verified ad completion (adRewardClaimId, purpose
+/// account_reset) and is serialized with every other money movement of the
+/// account by the trading_accounts row lock.
+model GeneralAccountReset {
+  id                         String   @id @default(uuid())
+  tradingAccountId           String   @map("trading_account_id")
+  userId                     String   @map("user_id")
+  adRewardClaimId            String   @unique @map("ad_reward_claim_id")
+  /// 1, 2, 3 … per account; the latest reset is the current epoch.
+  sequence                   Int
+  resetAt                    DateTime @map("reset_at")
+  /// Securities KRW after the reset (10,000,000); every USD wallet goes to 0.
+  targetKrwBalance           Decimal  @map("target_krw_balance") @db.Decimal(24, 8)
+  /// Verified initial grant + granted ad rewards at the reset instant.
+  lifetimeExternalFundingKrw Decimal  @map("lifetime_external_funding_krw") @db.Decimal(24, 8)
+  /// The ended epoch, valued at resetAt (cash only: nothing may be held).
+  closingTotalAssetKrw       Decimal  @map("closing_total_asset_krw") @db.Decimal(24, 8)
+  closingExternalFundingKrw  Decimal  @map("closing_external_funding_krw") @db.Decimal(24, 8)
+  closingInvestmentPnlKrw    Decimal  @map("closing_investment_pnl_krw") @db.Decimal(24, 8)
+  /// The four wallets as they were (scope, currency, balance) before the reset.
+  walletsBeforeJson          Json     @map("wallets_before_json")
+  /// Spot Position aggregates whose realized PnL was re-based to 0, with the
+  /// values they held (empty array when none).
+  positionsRebasedJson       Json     @map("positions_rebased_json")
+  createdAt                  DateTime @default(now()) @map("created_at")
+
+  tradingAccount TradingAccount @relation(fields: [tradingAccountId], references: [id], onDelete: Restrict)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  adRewardClaim  AdRewardClaim  @relation(fields: [adRewardClaimId], references: [id], onDelete: Restrict)
+
+  @@unique([tradingAccountId, sequence])
+  @@index([tradingAccountId, resetAt])
+  @@index([userId])
+  @@map("general_account_resets")
 }
 
 model ExchangeTransaction {

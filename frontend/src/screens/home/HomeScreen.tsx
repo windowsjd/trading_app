@@ -1,5 +1,6 @@
 import { semantic } from '../../theme/tokens';
-import React from 'react';
+import React, { useEffect, useLayoutEffect, useState } from 'react';
+import { useIsFocused } from '@react-navigation/native';
 import { StyleSheet, SafeAreaView, View } from '../../theme/native';
 import { useAppearance } from '../../theme/appearance';
 
@@ -13,6 +14,7 @@ import type { AssetType } from '../../features/market/api';
 import AccountSetupPanel from '../../components/tradingAccount/AccountSetupPanel';
 import GeneralAccountHome from './GeneralAccountHome';
 import SeasonAccountHome from './SeasonAccountHome';
+import GeneralRewardSheet, { HomeRewardButton } from './GeneralRewardSheet';
 
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
@@ -55,6 +57,35 @@ export default function HomeScreen({ navigation }: Props) {
   const accountContext = useHomeAccountContext(selectedAccount);
   const hot = useHomeHotMarket(!!selectedAccount);
   const { mode } = useAppearance();
+  const focused = useIsFocused();
+  // 보상 (2026-10-20): general accounts only — never season or beginner.
+  const rewardAccount = selectedAccount?.mode === 'general' ? selectedAccount : null;
+  const rewardAccountId = rewardAccount?.id ?? null;
+  const [rewardOpen, setRewardOpen] = useState(false);
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: rewardAccountId
+        ? () => <HomeRewardButton onPress={() => setRewardOpen(true)} />
+        : undefined,
+    });
+  }, [navigation, rewardAccountId]);
+  // The sheet never stays over another tab, and belongs to one account.
+  useEffect(() => {
+    if (!focused) setRewardOpen(false);
+  }, [focused]);
+  useEffect(() => {
+    setRewardOpen(false);
+  }, [rewardAccountId]);
+  // Mounted whatever Home shows below (a failed accounts re-read keeps the
+  // selection), so an attempt in flight or awaiting its re-check survives.
+  const rewardSheet = rewardAccount ? (
+    <GeneralRewardSheet
+      key={rewardAccount.id}
+      visible={rewardOpen && focused}
+      account={rewardAccount}
+      onClose={() => setRewardOpen(false)}
+    />
+  ) : null;
 
   if (accountsLoading) {
     return <FullPageLoading message="홈 정보를 불러오는 중입니다." />;
@@ -64,12 +95,15 @@ export default function HomeScreen({ navigation }: Props) {
     // "We could not read your accounts" is not "you have none": offering the
     // setup panel here would invite a second account on a network blip.
     return (
-      <ErrorState
-        error={accountsFailure}
-        title="계정 정보를 불러오지 못했습니다."
-        message="네트워크 상태를 확인한 뒤 다시 시도해주세요."
-        onRetry={() => void refetchAccounts()}
-      />
+      <>
+        <ErrorState
+          error={accountsFailure}
+          title="계정 정보를 불러오지 못했습니다."
+          message="네트워크 상태를 확인한 뒤 다시 시도해주세요."
+          onRetry={() => void refetchAccounts()}
+        />
+        {rewardSheet}
+      </>
     );
   }
 
@@ -127,6 +161,7 @@ export default function HomeScreen({ navigation }: Props) {
           />
         )}
       </View>
+      {rewardSheet}
     </SafeAreaView>
   );
 }

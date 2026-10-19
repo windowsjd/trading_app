@@ -23,12 +23,14 @@ jest.mock('../generated/prisma/client', () => {
       performance_baseline: 'performance_baseline',
       external_funding_before: 'external_funding_before',
       external_funding_after: 'external_funding_after',
+      general_account_reset: 'general_account_reset',
     },
     WalletTransactionReferenceType: {
       order: 'order',
       exchange_transaction: 'exchange_transaction',
       general_account_open: 'general_account_open',
       ad_reward_claim: 'ad_reward_claim',
+      general_account_reset: 'general_account_reset',
     },
   };
 });
@@ -90,6 +92,68 @@ function expectIntegrityFailure(run: () => unknown) {
 }
 
 describe('general equity history rows', () => {
+  describe('epoch origin of a general-account reset (2026-10-20)', () => {
+    const epochOrigin = (overrides: Partial<GeneralHistoryEquityRow> = {}) =>
+      equityRow({
+        id: 'epoch-origin',
+        snapshotReason: 'general_account_reset',
+        externalFundingAmountKrw: d('10000000'),
+        externalFundingReferenceType: 'general_account_reset',
+        externalFundingReferenceId: 'reset-1',
+        ...overrides,
+      });
+
+    it('accepts the zero point of a new epoch that names its reset', () => {
+      expect(() =>
+        assertGeneralEquityHistoryRows(ACCOUNT_ID, [
+          epochOrigin(),
+          equityRow({ id: 'after-reset', capturedAt: new Date('2026-08-02') }),
+        ]),
+      ).not.toThrow();
+    });
+
+    it.each([
+      [
+        'a factor other than 1',
+        { timeWeightedReturnFactor: d('1.1'), returnRate: d('10') },
+      ],
+      ['no reset reference', { externalFundingReferenceId: null }],
+      [
+        'another reference type',
+        { externalFundingReferenceType: 'ad_reward_claim' as const },
+      ],
+      [
+        'an amount other than its principal',
+        { externalFundingAmountKrw: d('5000000') },
+      ],
+      [
+        'PnL that is not 0',
+        { totalAssetKrw: d('10000001'), investmentPnlKrw: d('1') },
+      ],
+    ])('rejects an epoch origin with %s', (_label, overrides) => {
+      expectIntegrityFailure(() =>
+        assertGeneralEquityHistoryRows(ACCOUNT_ID, [
+          epochOrigin(overrides as Partial<GeneralHistoryEquityRow>),
+        ]),
+      );
+    });
+
+    it('never draws two epochs in one page', () => {
+      expectIntegrityFailure(() =>
+        assertGeneralEquityHistoryRows(ACCOUNT_ID, [
+          equityRow({
+            id: 'opening-origin',
+            snapshotReason: 'general_account_open',
+            externalFundingAmountKrw: d('10000000'),
+            externalFundingReferenceType: 'general_account_open',
+            externalFundingReferenceId: ACCOUNT_ID,
+          }),
+          epochOrigin(),
+        ]),
+      );
+    });
+  });
+
   it('accepts a healthy ordinary capture', () => {
     expect(() =>
       assertGeneralEquityHistoryRows(ACCOUNT_ID, [equityRow()]),

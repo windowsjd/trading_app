@@ -484,7 +484,11 @@ const SAFE_MESSAGES = new Set<string>([
   'interval 1d is the only interval supported for range prev576_open.',
   'range 96d is available for KRX stocks and crypto only.',
   'interval 4h is the only interval supported for range 96d.',
-  'Futures chart supports interval 4h, range 96d and a limit from 1 to 1000.',
+  'Futures chart supports 5m/2d, 15m/3d, 30m/14d, 1h/14d, 4h/96d and 1d/1y with a limit within the window.',
+  'Futures chart data is temporarily unavailable. Try again shortly.',
+  // General-account reset (2026-10-20, docs/general-account-and-ad-rewards-api-contract.md).
+  'Close holdings, positions and open orders before resetting the account.',
+  'The account reset is temporarily unavailable. Try again shortly.',
   'range must be one of 1d, 7d, 30d, 90d, 180d, 360d, all.',
   'range must be one of 1d, 7d, season.',
   'rankingDate must be YYYY-MM-DD.',

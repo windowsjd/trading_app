@@ -191,7 +191,10 @@ describe('FuturesCandlesService', () => {
       ),
     ).toBe('404:FUTURES_INSTRUMENT_NOT_FOUND');
     for (const query of [
-      { interval: '1h' },
+      { interval: '2h' },
+      { interval: '1h', range: '96d' },
+      { interval: '5m', limit: '601' },
+      { interval: '1d', range: '30d' },
       { range: '30d' },
       { limit: '0' },
       { limit: '1001' },
@@ -213,6 +216,127 @@ describe('FuturesCandlesService', () => {
         create([]).service.getInstrumentCandles(undefined, 'fut-btc', {}, now),
       ),
     ).toBe('401:UNAUTHORIZED');
+  });
+
+  describe('on-demand timeframes (5m/15m/30m/1h/1d)', () => {
+    const M15 = 15 * 60_000;
+    const current15 = Math.floor(now.getTime() / M15) * M15;
+    const providerCandle = (openMs: number, isClosed: boolean) => ({
+      openMs,
+      closeMs: openMs + M15,
+      open: '100.00000000',
+      high: '102.00000000',
+      low: '99.00000000',
+      close: '101.00000000',
+      volume: '3.00000000',
+      amount: '300.00000000',
+      isClosed,
+    });
+    const createWithProvider = (
+      read: jest.Mock,
+      instrument: unknown = instrumentRow(),
+    ) => {
+      const prisma = {
+        futuresInstrument: {
+          findUnique: jest.fn().mockResolvedValue(instrument),
+        },
+      };
+      const repository = { findRange: jest.fn() };
+      return {
+        repository,
+        service: new FuturesCandlesService(
+          prisma as never,
+          repository as never,
+          { read } as never,
+        ),
+      };
+    };
+
+    it('serves the contract klines of the requested interval, never the stored 4h rows', async () => {
+      const read = jest.fn().mockResolvedValue({
+        candles: [
+          providerCandle(current15 - 2 * M15, true),
+          // Open when received, but its bucket has ended since: withheld.
+          providerCandle(current15 - M15, false),
+          providerCandle(current15, false),
+        ],
+        fetchedAt: new Date(now.getTime() - 5_000),
+        stale: false,
+      });
+      const { service, repository } = createWithProvider(read);
+      const response = await service.getInstrumentCandles(
+        'user-1',
+        'fut-btc',
+        { interval: '15m', range: '3d', limit: '288' },
+        now,
+      );
+      expect(read).toHaveBeenCalledWith({
+        instrumentId: 'fut-btc',
+        symbol: 'BTCUSDT',
+        interval: '15m',
+        now,
+      });
+      expect(repository.findRange).not.toHaveBeenCalled();
+      const data = response.data;
+      expect(data.interval).toBe('15m');
+      expect(data.range).toBe('3d');
+      expect(data.priceBasis).toBe('contract_last_trade');
+      expect(data.source.delivery).toBe('provider');
+      expect(data.source.stale).toBe(false);
+      expect(
+        data.candles.map((c) => [Date.parse(c.time), c.provisional]),
+      ).toEqual([
+        [current15 - 2 * M15, false],
+        [current15, true],
+      ]);
+      expect(data.source.provisionalUpdatedAt).toBe(data.source.fetchedAt);
+    });
+
+    it('defaults the range to the interval window and reports a stale copy as such', async () => {
+      const read = jest.fn().mockResolvedValue({
+        candles: [providerCandle(current15 - M15, true)],
+        fetchedAt: new Date(now.getTime() - 600_000),
+        stale: true,
+      });
+      const { service } = createWithProvider(read);
+      const response = await service.getInstrumentCandles(
+        'user-1',
+        'fut-btc',
+        { interval: '15m' },
+        now,
+      );
+      expect(response.data.range).toBe('3d');
+      expect(response.data.source.requestedCount).toBe(300);
+      expect(response.data.source.stale).toBe(true);
+      expect(response.data.source.provisionalUpdatedAt).toBeNull();
+    });
+
+    it('keeps 4h on the stored path and answers 503 when no on-demand reader exists', async () => {
+      const read = jest.fn();
+      const { service, repository } = createWithProvider(read);
+      repository.findRange.mockResolvedValue([stored(currentStart - H4, true)]);
+      const response = await service.getInstrumentCandles(
+        'user-1',
+        'fut-btc',
+        {},
+        now,
+      );
+      expect(read).not.toHaveBeenCalled();
+      expect(response.data.source.delivery).toBe('stored');
+      expect(response.data.interval).toBe('4h');
+
+      const { service: withoutProvider } = create([]);
+      expect(
+        await errorCode(
+          withoutProvider.getInstrumentCandles(
+            'user-1',
+            'fut-btc',
+            { interval: '1d' },
+            now,
+          ),
+        ),
+      ).toBe('503:FUTURES_CANDLES_UNAVAILABLE');
+    });
   });
 
   it('shares one database read between concurrent viewers of the same contract', async () => {

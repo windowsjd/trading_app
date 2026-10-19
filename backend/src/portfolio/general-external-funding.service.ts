@@ -32,21 +32,52 @@ import { throwGeneralAccountIntegrity } from '../trading-accounts/general-accoun
  * its claim is not partially counted and not skipped — it fails closed, so a
  * corrupted account can never produce a plausible-looking return.
  *
+ * PERFORMANCE EPOCHS (general-account reset, 2026-10-20)
+ * ------------------------------------------------------
+ * The allow-list above is the LIFETIME external funding and is validated
+ * exactly as before. A reset starts a new epoch whose principal is the reset
+ * target; it records the lifetime total at that instant. Ad rewards only add
+ * to the lifetime total and the reset and every payout are serialized by the
+ * account row lock, so
+ *
+ *     epoch ad rewards = lifetime now − lifetime at the latest reset
+ *     epoch principal  = reset target + epoch ad rewards
+ *
+ * with no timestamp comparison. `account_reset` ledger rows are neither
+ * funding nor PnL and are not on the allow-list. Without a reset the epoch is
+ * the opening one and every value is the lifetime value, unchanged.
+ *
  * All arithmetic is Prisma.Decimal; no value passes through a JS number.
  */
 
 type ExternalFundingClient = Pick<
   Prisma.TransactionClient,
-  'walletTransaction' | 'adRewardClaim' | 'cashWallet'
+  'walletTransaction' | 'adRewardClaim' | 'cashWallet' | 'generalAccountReset'
 >;
 
+/** The performance epoch a summary describes. */
+export type GeneralPerformanceEpoch = {
+  /** 0 = the opening epoch; n = the epoch opened by the n-th reset. */
+  sequence: number;
+  /** The reset that opened the epoch; null for the opening epoch. */
+  resetId: string | null;
+  /** The reset instant; null for the opening epoch (it starts at openedAt). */
+  startedAt: Date | null;
+};
+
 export type GeneralExternalFundingSummary = {
-  /** The one-time account-open grant (0 only if the account is corrupt). */
+  /**
+   * The epoch's opening funding: the one-time account-open grant, or the
+   * target of the reset that opened the epoch.
+   */
   initialFundingKrw: Prisma.Decimal;
-  /** Sum of granted ad rewards. */
+  /** Granted ad rewards within the current epoch. */
   cumulativeAdRewardKrw: Prisma.Decimal;
-  /** initialFundingKrw + cumulativeAdRewardKrw. */
+  /** initialFundingKrw + cumulativeAdRewardKrw: the epoch principal. */
   cumulativeExternalFundingKrw: Prisma.Decimal;
+  /** Opening grant + every granted ad reward, across all epochs. */
+  lifetimeExternalFundingKrw: Prisma.Decimal;
+  epoch: GeneralPerformanceEpoch;
 };
 
 @Injectable()
@@ -182,12 +213,57 @@ export class GeneralExternalFundingService {
       }
     }
 
-    return {
-      initialFundingKrw,
+    const lifetimeExternalFundingKrw = initialFundingKrw.add(
       cumulativeAdRewardKrw,
-      cumulativeExternalFundingKrw: initialFundingKrw.add(
+    );
+    const reset = await client.generalAccountReset.findFirst({
+      where: { tradingAccountId: accountId },
+      orderBy: { sequence: 'desc' },
+      select: {
+        id: true,
+        sequence: true,
+        resetAt: true,
+        targetKrwBalance: true,
+        lifetimeExternalFundingKrw: true,
+      },
+    });
+    if (!reset) {
+      return {
+        initialFundingKrw,
         cumulativeAdRewardKrw,
-      ),
+        cumulativeExternalFundingKrw: lifetimeExternalFundingKrw,
+        lifetimeExternalFundingKrw,
+        epoch: { sequence: 0, resetId: null, startedAt: null },
+      };
+    }
+
+    // The recorded lifetime total can only lie between the opening grant and
+    // today's total: funding is never removed from the allow-list.
+    if (
+      !reset.targetKrwBalance.gt(0) ||
+      reset.lifetimeExternalFundingKrw.lt(initialFundingKrw) ||
+      reset.lifetimeExternalFundingKrw.gt(lifetimeExternalFundingKrw)
+    ) {
+      throwGeneralAccountIntegrity(
+        accountId,
+        `general account reset ${reset.id} records a lifetime external funding that the verified ledger cannot have held`,
+      );
+    }
+    const epochAdRewardKrw = lifetimeExternalFundingKrw.sub(
+      reset.lifetimeExternalFundingKrw,
+    );
+
+    return {
+      initialFundingKrw: reset.targetKrwBalance,
+      cumulativeAdRewardKrw: epochAdRewardKrw,
+      cumulativeExternalFundingKrw:
+        reset.targetKrwBalance.add(epochAdRewardKrw),
+      lifetimeExternalFundingKrw,
+      epoch: {
+        sequence: reset.sequence,
+        resetId: reset.id,
+        startedAt: reset.resetAt,
+      },
     };
   }
 }

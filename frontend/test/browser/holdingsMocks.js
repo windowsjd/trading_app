@@ -11,6 +11,7 @@ let focused = true;
 export const navigation = {
   calls: [], isFocused: () => focused,
   navigate(...args) { this.calls.push(args); },
+  setOptions() {},
   addListener(event, listener) { listeners[event]?.add(listener); return () => listeners[event]?.delete(listener); },
   setFocused(value) { focused = value; listeners[value ? 'focus' : 'blur'].forEach(listener => listener()); },
 };
@@ -55,8 +56,8 @@ async function before(domain, path) {
 }
 export const apiClient = {
   async get(path, config) {
-    // Contract 4h chart (market data, not account-scoped).
-    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
+    // Contract chart at the requested 봉 시간 (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3]), Date.now(), new URLSearchParams(path.split('?')[1] ?? '').get('interval') ?? '4h') } };
     if (path.includes('/season-summary')) {
       await before('friend', path);
       const own = futures('season-account').positions;

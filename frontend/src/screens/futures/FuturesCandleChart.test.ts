@@ -41,7 +41,8 @@ test('draws the contract chart from the account-free market-data route with the 
   const node = chart(h);
   assert.equal(node === undefined, false);
   assert.equal(node.props.candles.length, 4);
-  assert.equal(node.props.viewportResetKey, 'btc:4h');
+  // AssetChart's default 봉 시간 (5분), the contract's own window.
+  assert.equal(node.props.viewportResetKey, 'btc:5m');
   assert.equal(node.props.currencyCode, 'USD');
   assert.equal(node.props.displayPriceDecimals, 2);
   // Fresh Futures Last is the current-price line; the chart never uses Mark (101).
@@ -51,14 +52,14 @@ test('draws the contract chart from the account-free market-data route with the 
     .getQueryCache()
     .findAll({ queryKey: ['futuresMarket'] })
     .map((query: any) => JSON.stringify(query.queryKey));
-  assert.deepEqual(keys, [JSON.stringify(['futuresMarket', 'candles', 'btc', '96d', '4h', 600])]);
+  assert.deepEqual(keys, [JSON.stringify(['futuresMarket', 'candles', 'btc', '2d', '5m', 600])]);
   // The Last comes from the route account's contract list only.
   assert.equal(h.reads.some((path: string) => path.startsWith('/trading-accounts/A/') && path.includes('instruments')), true);
-  // Contract basis, the fixed 4h window and the separate Mark role are stated.
-  assert.match(h.text(), /4시간봉/);
-  assert.match(h.text(), /선물 계약 거래가격\(Last\) 기준 · 최근 96일/);
-  assert.match(h.text(), /Mark Price는 차트와 별개로 평가·청산에만 쓰입니다/);
-  assert.match(h.text(), /마지막 봉은 진행 중인 잠정 봉입니다/);
+  // The shared 봉 시간 selector above the chart, as on AssetChart; the old
+  // basis / provisional / Mark notes are not repeated on the chart.
+  assert.equal(words(h.node('asset-timeframe-selector')), '5분 ▾');
+  for (const removed of ['선물 계약 거래가격(Last) 기준', 'Mark Price는 차트와 별개로', '마지막 봉은 진행 중인 잠정 봉입니다'])
+    assert.equal(h.text().includes(removed), false, removed);
   assert.equal(h.node('chart-loading') === undefined, true);
 });
 
@@ -92,9 +93,9 @@ test('shows the whale while the candles load, then the chart', async (t) => {
   assert.equal(loader.findAll((n: any) => n.props?.accessibilityRole === 'progressbar').length > 0, true, 'the WhaleLoader');
   assert.match(h.text(), /차트를 불러오는 중입니다/);
   assert.equal(chart(h) === undefined, true);
-  // The header and basis stay while only the chart box waits.
+  // The header and the 봉 시간 selector stay while only the chart box waits.
   assert.equal(h.node('futures-chart-back') === undefined, false);
-  assert.match(h.text(), /선물 계약 거래가격\(Last\) 기준/);
+  assert.equal(h.node('asset-timeframe-selector') === undefined, false);
   h.readGate.resolve();
   await h.flush();
   assert.equal(h.node('chart-loading') === undefined, true);
@@ -111,9 +112,9 @@ test('a stale Futures Last draws no price line and says so; Mark is never used i
 
 test('a response for another contract is never drawn under the selected one', async (t) => {
   const h = chartScreen();
-  h.futuresCandles = (id: string) => ({
-    ...futuresCandlesFixture(id),
-    instrument: { ...futuresCandlesFixture(id).instrument, id: 'other' },
+  h.futuresCandles = (id: string, interval: string) => ({
+    ...futuresCandlesFixture(id, Date.now(), interval),
+    instrument: { ...futuresCandlesFixture(id, Date.now(), interval).instrument, id: 'other' },
   });
   await h.start();
   t.after(h.close);
@@ -127,7 +128,7 @@ test('a response for another contract is never drawn under the selected one', as
 
 test('an empty contract shows its empty state; a failure shows the error with a retry that loads again', async (t) => {
   const empty = chartScreen();
-  empty.futuresCandles = (id: string) => ({ ...futuresCandlesFixture(id), state: 'empty', candles: [] });
+  empty.futuresCandles = (id: string, interval: string) => ({ ...futuresCandlesFixture(id, Date.now(), interval), state: 'empty', candles: [] });
   await empty.start();
   t.after(empty.close);
   assert.equal(chart(empty) === undefined, true);
@@ -155,8 +156,8 @@ test('an empty contract shows its empty state; a failure shows the error with a 
 
 test('another contract remounts the chart with that contract only (futures-only HYPEUSDT included)', async (t) => {
   const h = chartScreen({ futuresOnly: true });
-  h.futuresCandles = (id: string) => {
-    const fixture = futuresCandlesFixture(id);
+  h.futuresCandles = (id: string, interval: string) => {
+    const fixture = futuresCandlesFixture(id, Date.now(), interval);
     const price = id === 'hype' ? '30.00000000' : '60000.00000000';
     return {
       ...fixture,
@@ -170,10 +171,40 @@ test('another contract remounts the chart with that contract only (futures-only 
   h.chart = { instrumentId: 'hype', symbol: 'HYPEUSDT', displayPriceDecimals: 3 };
   await h.update();
   const node = chart(h);
-  assert.equal(node.props.viewportResetKey, 'hype:4h');
+  assert.equal(node.props.viewportResetKey, 'hype:5m');
   assert.equal(node.props.displayPriceDecimals, 3);
   assert.ok(node.props.candles.every((c: any) => c.open === '30.00000000'));
   assert.deepEqual(h.candleReads, ['btc', 'hype']);
+});
+
+test('every 봉 시간 reads its own contract window; a stale server copy says so', async (t) => {
+  const h = chartScreen();
+  await h.start();
+  t.after(h.close);
+  for (const [interval, window] of [
+    ['15m', 'btc:15m:3d:300'], ['30m', 'btc:30m:14d:700'], ['1h', 'btc:1h:14d:350'],
+    ['4h', 'btc:4h:96d:600'], ['1d', 'btc:1d:1y:400'], ['5m', 'btc:5m:2d:600'],
+  ] as const) {
+    await h.press('asset-timeframe-selector');
+    await h.press(`asset-timeframe-option-${interval}`);
+    assert.equal(chart(h).props.viewportResetKey, `btc:${interval}`);
+    assert.equal(h.candleWindows.at(-1), window);
+  }
+  // 5m chosen again draws from its cache at once (no whale) and refreshes
+  // behind the chart, as the asset chart does.
+  assert.equal(h.node('chart-loading') === undefined, true);
+  assert.deepEqual(h.candleWindows, ['btc:5m:2d:600', 'btc:15m:3d:300', 'btc:30m:14d:700', 'btc:1h:14d:350', 'btc:4h:96d:600', 'btc:1d:1y:400', 'btc:5m:2d:600']);
+  assert.equal(h.node('futures-chart-stale') === undefined, true);
+
+  const stale = chartScreen();
+  stale.futuresCandles = (id: string, interval: string) => {
+    const fixture = futuresCandlesFixture(id, Date.now(), interval);
+    return { ...fixture, source: { ...fixture.source, delivery: 'provider', stale: true } };
+  };
+  await stale.start();
+  t.after(stale.close);
+  assert.match(words(stale.node('futures-chart-stale')), /차트 갱신이 지연되고 있습니다/);
+  assert.equal(chart(stale).props.candles.length, 4, 'the last good copy is still drawn');
 });
 
 test('뒤로 returns to the futures screen', async (t) => {

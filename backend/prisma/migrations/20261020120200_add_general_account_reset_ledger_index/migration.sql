@@ -1,0 +1,12 @@
+-- One account_reset ledger row per wallet per reset (2026-10-20). Built
+-- CONCURRENTLY, outside any transaction, so ledger writes are never blocked
+-- while it builds; no existing row matches the predicate.
+--
+-- If a build is interrupted, PostgreSQL leaves an INVALID index and this
+-- migration is marked failed: run `DROP INDEX CONCURRENTLY
+-- "wallet_transactions_general_account_reset_wallet_unique";`, then `prisma
+-- migrate resolve --rolled-back 20261020120200_add_general_account_reset_ledger_index`
+-- and deploy again. Deliberately no IF NOT EXISTS: a rerun that skipped the
+-- DROP fails loudly instead of "succeeding" over an INVALID index that
+-- enforces nothing.
+CREATE UNIQUE INDEX CONCURRENTLY "wallet_transactions_general_account_reset_wallet_unique" ON "wallet_transactions"("reference_id", "wallet_id") WHERE "reference_type" = 'general_account_reset';

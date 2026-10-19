@@ -6,11 +6,23 @@ export const BINANCE_KLINES_MAX_LIMIT = 1000;
 
 // '4h' is the long-range completed-history interval (Spot native klines and
 // USDⓈ-M contract klines); 5m/1d/1w are the checkpointed Spot feeds.
-export type BinanceCandleInterval = '5m' | '4h' | '1d' | '1w';
+// 15m/30m/1h are read only by the USDⓈ-M contract chart, which takes the
+// contract's native klines on demand (never stored, never a Spot feed).
+export type BinanceCandleInterval =
+  | '5m'
+  | '15m'
+  | '30m'
+  | '1h'
+  | '4h'
+  | '1d'
+  | '1w';
 
 export const BINANCE_CANDLE_INTERVAL_MS: Record<BinanceCandleInterval, number> =
   {
     '5m': 5 * 60_000,
+    '15m': 15 * 60_000,
+    '30m': 30 * 60_000,
+    '1h': 60 * 60_000,
     '4h': 4 * 60 * 60_000,
     '1d': 24 * 60 * 60_000,
     '1w': 7 * 24 * 60 * 60_000,

@@ -68,6 +68,8 @@ function App() {
     if (params.assetId) state.assetId = params.assetId;
     if (params.side) state.side = params.side;
     if (params.accountId) state.accountId = params.accountId;
+    // The futures detail's contract picker switches the contract in place.
+    if (params.instrumentId) state.instrumentId = params.instrumentId;
     refresh();
   };
   window.fixture = {

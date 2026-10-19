@@ -43,8 +43,13 @@ export default function MarketStack() {
         component={OrderScreen}
         options={({ theme }) => ({ title: '주문', headerTitleStyle: theme.fonts.heavy })}
       />
-      {/* The futures flow keeps native headers (as the futures order screen). */}
-      <Stack.Screen name="FuturesDetail" component={FuturesDetailScreen} options={{ title: '선물 상세' }} />
+      {/* A futures contract's detail is the asset detail's screen (2026-10-20):
+          the same title and heavy font. The order screen keeps its own. */}
+      <Stack.Screen
+        name="FuturesDetail"
+        component={FuturesDetailScreen}
+        options={({ theme }) => ({ title: '종목 상세', headerTitleStyle: theme.fonts.heavy })}
+      />
       <Stack.Screen name="Futures" component={FuturesScreen} options={{ title: '암호화폐 선물' }} />
     </Stack.Navigator>
   );

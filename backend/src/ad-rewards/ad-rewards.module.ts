@@ -3,6 +3,8 @@ import { GeneralPerformanceModule } from '../portfolio/general-performance.modul
 import { TradingAccountsModule } from '../trading-accounts/trading-accounts.module';
 import { AdRewardController } from './ad-reward.controller';
 import { AdRewardService } from './ad-reward.service';
+import { GeneralAccountResetController } from './general-account-reset.controller';
+import { GeneralAccountResetService } from './general-account-reset.service';
 import {
   AD_REWARD_VERIFICATION_REGISTRY,
   AdRewardVerificationRegistry,
@@ -27,9 +29,12 @@ import {
   // GeneralPerformanceModule supplies the external-funding boundary snapshots
   // written inside the payout transaction (작업 7).
   imports: [GeneralPerformanceModule, TradingAccountsModule],
-  controllers: [AdRewardController],
+  // The general-account reset (2026-10-20) redeems a verified ad completion
+  // through the SAME registry, so it lives here and shares its emptiness.
+  controllers: [AdRewardController, GeneralAccountResetController],
   providers: [
     AdRewardService,
+    GeneralAccountResetService,
     {
       provide: AD_REWARD_VERIFICATION_REGISTRY,
       useFactory: () => new AdRewardVerificationRegistry([]),

@@ -269,6 +269,7 @@ export default function WalletTransactionsScreen({ route }: Props) {
             display.quantity,
             detail === summary ? null : summary,
             item.txType === 'ad_reward' ? '외부 가상자금 유입' : null,
+            item.txType === 'account_reset' ? '일반계정 초기화로 잔액 조정' : null,
           ].filter((line): line is string => !!line);
           return (
             <View testID={TEST_IDS.walletTransactions.item(item.id)} style={styles.rowCard}>

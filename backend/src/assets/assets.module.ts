@@ -57,6 +57,12 @@ import {
 import { MarketCandleReconciliationService } from './market-candle-reconciliation.service';
 import { FuturesMarketCandlesRepository } from './market-candle-futures.repository';
 import { FuturesCandlesService } from './market-candle-futures.service';
+import {
+  FuturesCandleProviderService,
+  readFuturesCandleProviderConfig,
+} from './market-candle-futures-provider.service';
+import { BINANCE_USDM_CANDLE_INGESTION } from '../providers/binance/binance-kline-usdm.client';
+import type { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 import { FuturesCandlesController } from './market-candle-futures.controller';
 import { MarketCandleLongSyncService } from './market-candle-long-sync.service';
 import { readMarketCandleRetentionConfig } from './market-candle-retention.config';
@@ -83,6 +89,16 @@ import { KrxCheckpointCompactionService } from './krx-checkpoint-compaction.serv
     AssetCandlesService,
     MarketCandlesRepository,
     FuturesMarketCandlesRepository,
+    {
+      // Factory: the env-derived call cap is read (and validated) at boot.
+      provide: FuturesCandleProviderService,
+      inject: [BINANCE_USDM_CANDLE_INGESTION],
+      useFactory: (ingestion: BinanceCandleIngestionService) =>
+        new FuturesCandleProviderService(
+          ingestion,
+          readFuturesCandleProviderConfig(),
+        ),
+    },
     FuturesCandlesService,
     {
       provide: MarketCandleRetentionService,

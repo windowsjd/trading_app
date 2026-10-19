@@ -58,6 +58,7 @@ function grantedClaim(
     id: CLAIM_ID,
     userId: 'user-1',
     tradingAccountId: ACCOUNT_ID,
+    purpose: 'funding',
     status: 'granted',
     rewardAmountKrw: d(REWARD),
     grantedAt: new Date('2026-08-04T02:00:00.000Z'),

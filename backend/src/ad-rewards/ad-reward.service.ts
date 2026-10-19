@@ -1,6 +1,7 @@
 import { HttpException, Inject, Injectable, Logger } from '@nestjs/common';
 import {
   AdRewardClaimStatus,
+  AdRewardPurpose,
   CurrencyCode,
   Prisma,
   TradingAccountMode,
@@ -9,6 +10,10 @@ import {
   WalletTransactionReferenceType,
   WalletTransactionType,
 } from '../generated/prisma/client';
+import {
+  parseAdRewardCommand,
+  type AdRewardCommandBody,
+} from './ad-reward-command';
 import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertGeneralAccountFinancialIntegrity } from '../trading-accounts/general-account-integrity';
@@ -76,6 +81,7 @@ const STORED_CLAIM_SELECT = {
   id: true,
   userId: true,
   tradingAccountId: true,
+  purpose: true,
   status: true,
   rewardAmountKrw: true,
   grantedAt: true,
@@ -112,12 +118,7 @@ const STORED_CLAIM_SELECT = {
 const CLAIM_LIST_DEFAULT_LIMIT = 50;
 const CLAIM_LIST_MAX_LIMIT = 100;
 
-export type AdRewardClaimRequestBody = {
-  provider?: unknown;
-  proof?: unknown;
-  verificationToken?: unknown;
-  idempotencyKey?: unknown;
-};
+export type AdRewardClaimRequestBody = AdRewardCommandBody;
 
 export type AdRewardClaimsQuery = {
   limit?: string;
@@ -127,6 +128,8 @@ export type AdRewardClaimsQuery = {
 type ClaimView = {
   id: string;
   provider: string;
+  /** funding = the KRW top-up; account_reset = a general-account reset. */
+  purpose: AdRewardPurpose;
   status: AdRewardClaimStatus;
   rewardAmountKrw: string;
   requestedAt: string;
@@ -351,16 +354,20 @@ export class AdRewardService {
       proof: request.proof,
       expectedUserId: account.userId,
       expectedTradingAccountId: account.id,
+      expectedPurpose: AdRewardPurpose.funding,
     });
 
-    if (!verification.ok) {
-      // Nothing is written: no claim row, no wallet change, no ledger row.
+    if (!verification.ok || verification.purpose !== AdRewardPurpose.funding) {
+      // Nothing is written: no claim row, no wallet change, no ledger row. An
+      // event issued for a reset is never paid out as a top-up (2026-10-20).
       this.logger.warn(
         JSON.stringify({
           event: 'ad_reward_verification_failed',
           tradingAccountId: account.id,
           provider: request.provider,
-          reasonCode: verification.reasonCode,
+          reasonCode: verification.ok
+            ? 'PURPOSE_MISMATCH'
+            : verification.reasonCode,
         }),
       );
       throwAdRewardError(
@@ -481,13 +488,23 @@ export class AdRewardService {
 
     if (
       input.matchedBy === 'command_key' &&
-      claim.requestHash !== input.requestHash
+      (claim.requestHash !== input.requestHash ||
+        claim.purpose !== AdRewardPurpose.funding)
     ) {
-      // The key already means a different request. Never re-verify or
-      // re-grant under it.
+      // The key already means a different request (possibly an account
+      // reset). Never re-verify or re-grant under it.
       throwAdRewardError(
         adRewardErrorCodes.AD_REWARD_IDEMPOTENCY_CONFLICT,
         'Same idempotencyKey was used with a different ad reward claim request.',
+      );
+    }
+
+    if (claim.purpose !== AdRewardPurpose.funding) {
+      // The same completion already redeemed an account reset on this
+      // account (2026-10-20): one event, one command — never also a top-up.
+      throwAdRewardError(
+        adRewardErrorCodes.AD_REWARD_EVENT_ALREADY_USED,
+        'This ad completion event has already been used.',
       );
     }
 
@@ -627,7 +644,17 @@ export class AdRewardService {
           });
         }
 
-        const now = new Date();
+        // The boundary pair must sort after the latest snapshot even when this
+        // server's clock lags the database clock that stamped it (fills) or
+        // a reset that already moved past it — the reset's own rule.
+        const latest = await tx.equitySnapshot.findFirst({
+          where: { tradingAccountId: account.id },
+          orderBy: { capturedAt: 'desc' },
+          select: { capturedAt: true },
+        });
+        const now = new Date(
+          Math.max(Date.now(), (latest?.capturedAt.getTime() ?? 0) + 1),
+        );
         const usage = await this.readDailyUsage(tx, account.id, config, now);
         const limitViolation = this.evaluateLimits(usage, config, now);
 
@@ -641,6 +668,7 @@ export class AdRewardService {
               tradingAccountId: account.id,
               provider: verification.provider,
               providerEventId: verification.providerEventId,
+              purpose: AdRewardPurpose.funding,
               status: AdRewardClaimStatus.rejected,
               rewardAmountKrw: config.rewardAmountKrw,
               verificationFingerprint: proofFingerprint,
@@ -675,6 +703,7 @@ export class AdRewardService {
             tradingAccountId: account.id,
             provider: verification.provider,
             providerEventId: verification.providerEventId,
+            purpose: AdRewardPurpose.funding,
             status: AdRewardClaimStatus.verified,
             rewardAmountKrw: config.rewardAmountKrw,
             verificationFingerprint: proofFingerprint,
@@ -870,11 +899,13 @@ export class AdRewardService {
     const dayStart = resolveAdRewardDayStart(now, config.dayTimeZone);
 
     // Only GRANTED claims count toward the caps; rejected/failed ones never
-    // consume a user's daily allowance.
+    // consume a user's daily allowance. The caps limit the KRW top-up: an
+    // account reset (2026-10-20) adds no money and is not counted.
     const [aggregate, lastGranted] = await Promise.all([
       client.adRewardClaim.aggregate({
         where: {
           tradingAccountId,
+          purpose: AdRewardPurpose.funding,
           status: AdRewardClaimStatus.granted,
           grantedAt: { gte: dayStart },
         },
@@ -884,6 +915,7 @@ export class AdRewardService {
       client.adRewardClaim.findFirst({
         where: {
           tradingAccountId,
+          purpose: AdRewardPurpose.funding,
           status: AdRewardClaimStatus.granted,
           grantedAt: { not: null },
         },
@@ -999,86 +1031,9 @@ export class AdRewardService {
     return readAdRewardConfig();
   }
 
-  /**
-   * The request may carry ONLY a provider key and an opaque proof. There is
-   * deliberately no reward amount, event id, user id, account id, or granted
-   * timestamp field — a client cannot influence what it is paid.
-   */
-  /**
-   * The request may carry ONLY a provider key, an opaque proof, and a client
-   * idempotency key. There is deliberately no reward amount, provider event
-   * id, user id, account id, granted timestamp, request hash, or response
-   * payload field — a client cannot influence what it is paid.
-   *
-   * `provider` is REQUIRED (작업 6 보완 1): a replay must not depend on what
-   * AD_REWARD_PROVIDER happens to say at retry time. No real provider exists
-   * yet, so there is no frontend compatibility reason to keep a fallback.
-   */
-  private parseClaimRequest(body: AdRewardClaimRequestBody): {
-    provider: string;
-    proof: string;
-    idempotencyKey: string;
-  } {
-    const provider = this.parseText(body.provider);
-    if (!provider) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'provider is required.',
-      );
-    }
-    if (provider.length > 64) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'provider is too long.',
-      );
-    }
-
-    const proof =
-      this.parseText(body.proof) ?? this.parseText(body.verificationToken);
-    if (!proof) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'proof (or verificationToken) is required.',
-      );
-    }
-    if (proof.length > 4096) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'proof is too long.',
-      );
-    }
-
-    const idempotencyKey = this.parseText(body.idempotencyKey);
-    if (!idempotencyKey) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'idempotencyKey is required.',
-      );
-    }
-    if (idempotencyKey.length > 255) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'idempotencyKey is too long.',
-      );
-    }
-    // Control characters would make the key unloggable and unsafe to echo.
-    // Matching control characters IS the check here; the rule exists to catch
-    // them being typed into a pattern by accident.
-    // eslint-disable-next-line no-control-regex
-    if (/[\u0000-\u001f\u007f]/u.test(idempotencyKey)) {
-      throwAdRewardError(
-        adRewardErrorCodes.AD_REWARD_INVALID_REQUEST,
-        'idempotencyKey must not contain control characters.',
-      );
-    }
-
-    return { provider, proof, idempotencyKey };
-  }
-
-  private parseText(value: unknown): string | undefined {
-    if (typeof value !== 'string') return undefined;
-    const trimmed = value.trim();
-    return trimmed === '' ? undefined : trimmed;
+  /** The shared ad-command body (ad-reward-command.ts). */
+  private parseClaimRequest(body: AdRewardClaimRequestBody) {
+    return parseAdRewardCommand(body);
   }
 
   /**
@@ -1162,6 +1117,7 @@ export class AdRewardService {
   private toClaimView(claim: {
     id: string;
     provider: string;
+    purpose: AdRewardPurpose;
     status: AdRewardClaimStatus;
     rewardAmountKrw: Prisma.Decimal;
     requestedAt: Date;
@@ -1176,6 +1132,7 @@ export class AdRewardService {
     return {
       id: claim.id,
       provider: claim.provider,
+      purpose: claim.purpose,
       status: claim.status,
       rewardAmountKrw: claim.rewardAmountKrw.toFixed(8),
       requestedAt: claim.requestedAt.toISOString(),
@@ -1232,6 +1189,7 @@ export class AdRewardService {
 const CLAIM_VIEW_SELECT = {
   id: true,
   provider: true,
+  purpose: true,
   status: true,
   rewardAmountKrw: true,
   requestedAt: true,

@@ -170,3 +170,30 @@ export function invalidateAfterAdRewardClaim(
 
   return invalidateAll(client, keys);
 }
+
+/**
+ * After a general-account reset (2026-10-20): every wallet moved, emptied
+ * holdings' realized PnL restarted, and the portfolio, history chart and ad
+ * answers start a new epoch. Orders, conditional orders and Futures views
+ * are re-read too, so nothing on screen keeps a pre-reset balance or limit.
+ * General-only, so no season UI is refreshed.
+ */
+export function invalidateAfterAccountReset(
+  client: InvalidatorClient,
+  accountId: string,
+) {
+  const keys: QueryKey[] = [
+    QUERY_KEYS.tradingAccount.adRewardsAll(accountId),
+    ...walletKeys(accountId),
+    ...portfolioKeys(accountId),
+    QUERY_KEYS.tradingAccount.positionsAll(accountId),
+    QUERY_KEYS.tradingAccount.ordersAll(accountId),
+    QUERY_KEYS.tradingAccount.conditionalBuy.all(accountId),
+    QUERY_KEYS.tradingAccount.conditionalSell.all(accountId),
+    QUERY_KEYS.tradingAccount.protections.all(accountId),
+    QUERY_KEYS.tradingAccount.futures.all(accountId),
+    QUERY_KEYS.tradingAccount.futuresCollateral(accountId),
+  ];
+
+  return invalidateAll(client, keys);
+}

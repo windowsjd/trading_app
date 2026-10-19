@@ -28,8 +28,8 @@ export function tradingQuestTransport(response, committedAt, accountId, level) {
   return {
     progress:snapshot,
     async get(path,config){
-    // Contract 4h chart (market data, not account-scoped).
-    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
+    // Contract chart at the requested 봉 시간 (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3]), Date.now(), new URLSearchParams(path.split('?')[1] ?? '').get('interval') ?? '4h') } };
       const url=new URL(path,'https://fixture.invalid'),parts=url.pathname.split('/');
       if(parts[1]==='assets'){
         if(!parts[2]){const rows=assets.filter(a=>a.assetType===(config?.params?.assetType??url.searchParams.get('assetType')??'crypto'));return response({assets:rows,pagination:page(rows),sortSnapshot:'quests'});}

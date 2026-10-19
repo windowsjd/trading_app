@@ -56,6 +56,13 @@ export const GENERAL_PERFORMANCE_ORIGIN_REASONS = [
   SnapshotReason.performance_baseline,
 ] as const;
 
+/**
+ * The origin of a performance EPOCH opened by a general-account reset
+ * (2026-10-20): one per reset, never counted with the account origins above.
+ */
+export const GENERAL_PERFORMANCE_EPOCH_ORIGIN_REASON =
+  SnapshotReason.general_account_reset;
+
 const PERFORMANCE_SNAPSHOT_SELECT = {
   id: true,
   tradingAccountId: true,
@@ -151,6 +158,44 @@ export class GeneralAccountPerformanceService {
         WalletTransactionReferenceType.general_account_open,
       externalFundingReferenceId: input.tradingAccountId,
       capturedAt: input.openedAt,
+    };
+  }
+
+  /**
+   * The origin of the epoch a general-account reset opens, written in the
+   * reset transaction: total = principal = the reset target, PnL 0, factor 1
+   * (stored return 0). It carries the reset as its external-funding
+   * reference, so the boundary unique admits exactly one per reset.
+   */
+  buildResetOriginSnapshotData(input: {
+    tradingAccountId: string;
+    resetId: string;
+    targetKrwBalance: Prisma.Decimal | string;
+    resetAt: Date;
+  }): Prisma.EquitySnapshotUncheckedCreateInput {
+    const origin = buildGeneralPerformanceOrigin(input.targetKrwBalance);
+
+    return {
+      tradingAccountId: input.tradingAccountId,
+      totalAssetKrw: origin.totalAssetKrw.toFixed(MONEY_SCALE),
+      returnRate: origin.returnRate.toFixed(RETURN_RATE_SCALE),
+      krwCash: origin.totalAssetKrw.toFixed(MONEY_SCALE),
+      usdCashKrw: '0',
+      domesticStockValueKrw: '0',
+      usStockValueKrw: '0',
+      cryptoValueKrw: '0',
+      ...futuresSnapshotValues({}),
+      snapshotReason: GENERAL_PERFORMANCE_EPOCH_ORIGIN_REASON,
+      cumulativeExternalFundingKrw:
+        origin.cumulativeExternalFundingKrw.toFixed(MONEY_SCALE),
+      investmentPnlKrw: origin.investmentPnlKrw.toFixed(MONEY_SCALE),
+      timeWeightedReturnFactor:
+        origin.timeWeightedReturnFactor.toFixed(TWR_FACTOR_SCALE),
+      externalFundingAmountKrw: origin.totalAssetKrw.toFixed(MONEY_SCALE),
+      externalFundingReferenceType:
+        WalletTransactionReferenceType.general_account_reset,
+      externalFundingReferenceId: input.resetId,
+      capturedAt: input.resetAt,
     };
   }
 
@@ -299,6 +344,7 @@ export class GeneralAccountPerformanceService {
       client,
     );
 
+    this.assertSnapshotInCurrentEpoch(snapshot, funding);
     this.assertExternalFundingContinuity(
       snapshot.cumulativeExternalFundingKrw,
       funding.cumulativeExternalFundingKrw,
@@ -306,6 +352,25 @@ export class GeneralAccountPerformanceService {
     );
 
     return { wallets, snapshot, state, funding };
+  }
+
+  /**
+   * After a reset, the stored state every advance continues from must belong
+   * to the new epoch: its origin is written in the reset transaction, so a
+   * latest snapshot older than the reset means that origin is missing — the
+   * pre-reset state must never be advanced into the new epoch (2026-10-20).
+   */
+  private assertSnapshotInCurrentEpoch(
+    snapshot: PerformanceSnapshotRow,
+    funding: GeneralExternalFundingSummary,
+  ): void {
+    const startedAt = funding.epoch.startedAt;
+    if (startedAt && snapshot.capturedAt.getTime() < startedAt.getTime()) {
+      this.throwPerformance(
+        generalPerformanceErrorCodes.GENERAL_PERFORMANCE_INTEGRITY,
+        `Latest general performance snapshot ${snapshot.id} predates the performance epoch opened by reset ${funding.epoch.resetId}; the epoch origin is missing.`,
+      );
+    }
   }
 
   /**
@@ -457,6 +522,7 @@ export class GeneralAccountPerformanceService {
       input.wallets.krwWalletId,
       input.client,
     );
+    this.assertSnapshotInCurrentEpoch(snapshot, fundingBefore);
 
     // Inside the payout transaction the NEW ledger row does not exist yet, so
     // the stored state must still match the pre-payout ledger exactly. If it

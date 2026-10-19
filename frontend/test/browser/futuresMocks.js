@@ -14,8 +14,8 @@ export const useFuturesOrderBook = ({ instrumentId }) => futuresOrderBookFixture
 export const useTradingAccount = () => ({ accounts, selectedAccountId: state.accountId, isLoading: false });
 export const apiClient = {
   async get(path) {
-    // Contract 4h chart (market data, not account-scoped).
-    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
+    // Contract chart at the requested 봉 시간 (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3]), Date.now(), new URLSearchParams(path.split('?')[1] ?? '').get('interval') ?? '4h') } };
     if(path.endsWith('/protections')) {
       const protection = params.get('protection');
       if(protection==='error') throw new Error('protection fixture unavailable');

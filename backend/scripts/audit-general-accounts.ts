@@ -173,6 +173,29 @@ async function main() {
       `  daily rows written to closed accounts: ${summary.dailySnapshotsOnClosedAccounts}`,
     );
 
+    console.log('\ngeneral-account resets (2026-10-20):');
+    console.log(
+      `  resets with an invalid ad claim: ${summary.resetsWithInvalidClaim}`,
+    );
+    console.log(
+      `  account_reset claims without a reset: ${summary.resetClaimsWithoutReset}`,
+    );
+    console.log(
+      `  resets on non-general accounts: ${summary.resetsOnNonGeneralAccounts}`,
+    );
+    console.log(
+      `  resets without a valid epoch origin: ${summary.resetsWithInvalidEpochOrigin}`,
+    );
+    console.log(
+      `  reset wallet/ledger mismatches: ${summary.resetWalletLedgerMismatches}`,
+    );
+    console.log(
+      `  account_reset ledger rows without a reset: ${summary.resetLedgerRowsWithoutReset}`,
+    );
+    console.log(
+      `  accounts with a reset sequence gap: ${summary.accountsWithResetSequenceGap}`,
+    );
+
     if (summary.findings.length > 0) {
       console.error(`\nFindings: ${summary.findings.length}`);
       for (const finding of summary.findings.slice(0, 50)) {

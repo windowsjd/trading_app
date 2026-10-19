@@ -37,7 +37,7 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   const mocks = {
     '../../features/quest/QuestGuideProvider': { useQuestGuide: () => null },
     '../../features/quest/QuestTargetHighlight': { default: () => null, __esModule: true },
-    '@react-navigation/native': { NavigationContext, useIsFocused: () => true },
+    '@react-navigation/native': { NavigationContext, useIsFocused: () => h.focused !== false },
     '../../features/futures/api': { getFuturesPositions: async id => {
       await read('futures', { account: id });
       return h.futures?.[id] ?? require('./futuresFixtures.cjs').futuresFixture(id).positions;
@@ -75,13 +75,18 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
     '../../components/states/FullPageLoading': { __esModule: true, default: 'FullPageLoading' },
     // The Wallet's 환전 panel (its own harness covers it); refresh tests never open it.
     './WalletFxSheet': { __esModule: true, default: 'WalletFxPanel' },
+    // Home's 보상 sheet and header button have their own harness.
+    './GeneralRewardSheet': { __esModule: true, default: 'GeneralRewardSheet', HomeRewardButton: 'HomeRewardButton' },
     ...Object.fromEntries(['ErrorState', 'InlineEmptyState', 'SectionSkeleton', 'AdminDiagnosticPanel'].map(name => ['../../components/states/' + name, { __esModule: true, default: name }])),
   };
   mocks['./AdminDiagnosticPanel'] = mocks['../../components/states/AdminDiagnosticPanel'];
   for (const name of ['ErrorState', 'InlineEmptyState', 'SectionSkeleton']) mocks['../states/' + name] = mocks['../../components/states/' + name];
   const Screen = h.load(screen === 'wallet' ? 'src/screens/wallet/WalletScreen.tsx' : screen === 'portfolio' ? 'src/screens/home/PortfolioScreen.tsx' : 'src/screens/home/HomeScreen.tsx', mocks).default;
   h.client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity, gcTime: Infinity, ...options.queryDefaults } } });
-  const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation: { navigate() {} } }));
+  // setOptions: Home's header (the general account's 보상 button), recorded.
+  h.headerOptions = [];
+  const navigation = { navigate() {}, setOptions(options) { h.headerOptions.push(options); } };
+  const tree = () => React.createElement(QueryClientProvider, { client: h.client }, React.createElement(Screen, { navigation }));
   h.renderer = h.render(tree());
   h.node = id => h.renderer.root.findAll(node => typeof node.type === 'string' && node.props.testID === id)[0];
   h.rows = () => h.renderer.root.findAll(node => node.type === 'Pressable' && /^home-position-item-/.test(node.props.testID ?? ''));
@@ -89,6 +94,7 @@ function setup(mode = 'season', count = 7, screen = 'home', options = {}) {
   h.press = async id => { act(() => h.node(id).props.onPress()); await flush(); };
   h.refresh = async () => { act(() => h.renderer.root.findByType('ScrollView').props.refreshControl.props.onRefresh()); await flush(); };
   h.switch = async next => { h.account = next; act(() => h.renderer.update(tree())); await flush(); };
+  h.setFocused = async focused => { h.focused = focused; act(() => h.renderer.update(tree())); await flush(); };
   h.close = () => { act(() => h.renderer.unmount()); h.client.clear(); };
   return h;
 }

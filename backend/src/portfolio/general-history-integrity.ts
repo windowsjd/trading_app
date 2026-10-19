@@ -45,6 +45,14 @@ const BOUNDARY_REASONS: readonly SnapshotReason[] = [
   SnapshotReason.external_funding_after,
 ];
 
+/**
+ * The origin of an epoch opened by a general-account reset (2026-10-20). The
+ * history read starts at the latest epoch, so a page holds either the
+ * account's opening origin or this one — never both.
+ */
+const EPOCH_ORIGIN_REASON: SnapshotReason =
+  SnapshotReason.general_account_reset;
+
 export type GeneralHistoryEquityRow = {
   id: string;
   tradingAccountId: string;
@@ -127,6 +135,31 @@ export function assertGeneralEquityHistoryRows(
       }
       if (!row.returnRate.isZero()) {
         fail(label, 'is a performance origin whose return rate is not 0.');
+      }
+      continue;
+    }
+
+    if (row.snapshotReason === EPOCH_ORIGIN_REASON) {
+      originCount += 1;
+      // The zero point of a new epoch: nothing earned yet, the whole total
+      // is the reset target, and the reset is named as its reference.
+      if (!row.timeWeightedReturnFactor!.equals(1)) {
+        fail(label, 'is an epoch origin whose factor is not exactly 1.');
+      }
+      if (!row.returnRate.isZero() || !row.investmentPnlKrw!.isZero()) {
+        fail(label, 'is an epoch origin whose return or PnL is not 0.');
+      }
+      if (
+        row.externalFundingReferenceType !==
+          WalletTransactionReferenceType.general_account_reset ||
+        row.externalFundingReferenceId === null ||
+        row.externalFundingAmountKrw === null ||
+        !row.externalFundingAmountKrw.equals(row.cumulativeExternalFundingKrw!)
+      ) {
+        fail(
+          label,
+          'is an epoch origin that does not reference its reset with the reset target.',
+        );
       }
       continue;
     }

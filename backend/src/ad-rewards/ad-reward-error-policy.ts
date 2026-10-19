@@ -33,6 +33,13 @@ export const adRewardErrorCodes = {
    * exist, so it fails closed instead.
    */
   AD_REWARD_CLAIM_INTEGRITY: 'AD_REWARD_CLAIM_INTEGRITY',
+  /**
+   * A general-account reset was refused because something is still held or
+   * pending (holdings, Futures positions, open or conditional orders,
+   * reserved cash). Nothing is written and the ad completion is not consumed;
+   * GET .../account-reset/eligibility lists what blocks it (2026-10-20).
+   */
+  GENERAL_ACCOUNT_RESET_BLOCKED: 'GENERAL_ACCOUNT_RESET_BLOCKED',
 } as const;
 
 export type AdRewardErrorCode =
@@ -51,6 +58,7 @@ export const adRewardErrorHttpStatus: Record<AdRewardErrorCode, HttpStatus> = {
   AD_REWARD_INVALID_REQUEST: HttpStatus.BAD_REQUEST,
   AD_REWARD_IDEMPOTENCY_CONFLICT: HttpStatus.CONFLICT,
   AD_REWARD_CLAIM_INTEGRITY: HttpStatus.INTERNAL_SERVER_ERROR,
+  GENERAL_ACCOUNT_RESET_BLOCKED: HttpStatus.CONFLICT,
 };
 
 /** The three codes a claim can be permanently REJECTED with. */

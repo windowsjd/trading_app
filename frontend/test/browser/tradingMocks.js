@@ -196,6 +196,7 @@ export const navigation = {
   goBack: () => state.navigate('AssetDetail'),
   reset: () => {},
   setParams: (params) => state.setParams(params),
+  setOptions: () => {},
 };
 export const useRootNavigation = () => navigation;
 // Quest provider / root ref imports; inert in the isolated trading fixture.
@@ -293,8 +294,8 @@ export const apiClient = {
     }
     if (path === '/fx/rates/current')
       return response({ state: 'available', baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1400', validUntil: new Date(Date.now() + 60000).toISOString() });
-    // Contract 4h chart (market data, not account-scoped).
-    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
+    // Contract chart at the requested 봉 시간 (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3]), Date.now(), new URLSearchParams(path.split('?')[1] ?? '').get('interval') ?? '4h') } };
     if(path.endsWith('/protections')) {
       const protection = params.get('protection');
       if(protection==='error') throw new Error('protection fixture unavailable');

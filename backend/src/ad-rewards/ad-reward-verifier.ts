@@ -13,6 +13,8 @@ import { createHash } from 'node:crypto';
  *  - the event is in a COMPLETED state,
  *  - it is bound to the user the server expected,
  *  - it is bound to the general trading account the server expected,
+ *  - it was issued for the command (purpose) the server expected —
+ *    the KRW top-up or a general-account reset (2026-10-20),
  *  - its event id is a stable, unique identifier for that single completion.
  *
  * WHAT A CLIENT MAY NEVER DECIDE — none of these are read from the request:
@@ -27,6 +29,15 @@ import { createHash } from 'node:crypto';
  * registers nothing).
  */
 
+/**
+ * What the completion is redeemed for (2026-10-20). The app chooses it BEFORE
+ * the ad is shown (a reset is confirmed first), so an adapter can bind it to
+ * the provider event (e.g. server-side verification custom data) and must
+ * report the purpose the event was issued for. The server refuses an event
+ * whose reported purpose differs from the command it arrived on.
+ */
+export type AdRewardVerificationPurpose = 'funding' | 'account_reset';
+
 export type AdRewardVerificationRequest = {
   /** Provider key exactly as configured in AD_REWARD_PROVIDER. */
   provider: string;
@@ -36,11 +47,15 @@ export type AdRewardVerificationRequest = {
   expectedUserId: string;
   /** The owned general account the completion must be bound to. */
   expectedTradingAccountId: string;
+  /** The command the completion must have been issued for. */
+  expectedPurpose: AdRewardVerificationPurpose;
 };
 
 export type AdRewardVerificationSuccess = {
   ok: true;
   provider: string;
+  /** The purpose the provider event was issued for (see above). */
+  purpose: AdRewardVerificationPurpose;
   /**
    * The provider's stable unique id for this ad completion. It is the
    * duplicate-payout key ((provider, providerEventId) is UNIQUE) and MUST
@@ -138,6 +153,31 @@ export function buildAdRewardClaimRequestHash(input: {
     .update(
       JSON.stringify({
         version: AD_REWARD_CLAIM_REQUEST_HASH_VERSION,
+        provider: input.provider,
+        proofFingerprint: input.proofFingerprint,
+      }),
+      'utf8',
+    )
+    .digest('hex');
+}
+
+/**
+ * Request hash of a general-account RESET command (2026-10-20). Its own
+ * version prefix keeps a reset and a funding claim apart even when a client
+ * reuses one idempotency key for both: the second is an idempotency conflict,
+ * never a replay of the other command.
+ */
+export const GENERAL_ACCOUNT_RESET_REQUEST_HASH_VERSION =
+  'general-account-reset:v1';
+
+export function buildGeneralAccountResetRequestHash(input: {
+  provider: string;
+  proofFingerprint: string;
+}): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        version: GENERAL_ACCOUNT_RESET_REQUEST_HASH_VERSION,
         provider: input.provider,
         proofFingerprint: input.proofFingerprint,
       }),

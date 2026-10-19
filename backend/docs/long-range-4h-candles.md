@@ -85,10 +85,13 @@ updating the current bucket.
 
 - 404 `FUTURES_INSTRUMENT_NOT_FOUND` unless the instrument is a catalog
   USDⓈ-M `synthetic_perpetual` (inactive instruments stay readable for their
-  history); 400 `FUTURES_CANDLES_INVALID_QUERY` for anything but `4h`/`96d`/
-  limit 1–1000.
-- DB only (no provider call in the request path); per-instance 5 s cache with
-  in-flight sharing.
+  history); 400 `FUTURES_CANDLES_INVALID_QUERY` for a query outside the
+  supported windows (4h: `96d`, limit 1–1000).
+- The 4h read is DB only (no provider call in the request path); per-instance
+  5 s cache with in-flight sharing. Since 2026-10-20 the same route also
+  serves 5m/15m/30m/1h/1d from the contract's native klines on demand, never
+  stored — [futures-chart-timeframes.md](futures-chart-timeframes.md); the 4h
+  path below is unchanged.
 - Closed rows whose window ended, plus the open row of the current bucket
   marked `provisional: true`; an open row from an ended window (collection
   stopped) is withheld. `priceBasis: "contract_last_trade"`,

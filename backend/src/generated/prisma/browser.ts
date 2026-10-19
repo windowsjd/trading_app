@@ -253,6 +253,25 @@ export type WalletTransaction = Prisma.WalletTransactionModel
  */
 export type AdRewardClaim = Prisma.AdRewardClaimModel
 /**
+ * Model GeneralAccountReset
+ * A general-account reset (2026-10-20): the account, its id, its opening
+ * grant and every past ledger/order/fill row stay; the four wallets are
+ * moved to the reset target by `account_reset` ledger rows that reference
+ * this row, and a `general_account_reset` EquitySnapshot opens a new
+ * performance epoch (principal = target, PnL 0, factor 1).
+ * 
+ * Epoch principal = targetKrwBalance + (verified lifetime external funding
+ * now − lifetimeExternalFundingKrw recorded here). Ad rewards only ever add
+ * to the lifetime total, so the difference is exactly the rewards granted
+ * after this reset; the continuity check against the latest snapshot proves
+ * it on every read.
+ * 
+ * Every reset consumes one verified ad completion (adRewardClaimId, purpose
+ * account_reset) and is serialized with every other money movement of the
+ * account by the trading_accounts row lock.
+ */
+export type GeneralAccountReset = Prisma.GeneralAccountResetModel
+/**
  * Model ExchangeTransaction
  * 
  */

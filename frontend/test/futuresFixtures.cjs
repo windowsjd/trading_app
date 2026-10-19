@@ -28,10 +28,12 @@ const accounts = [
   { id: 'A', mode: 'general', status: 'active', season: null },
   { id: 'B', mode: 'season', status: 'active', season: { seasonId: 'season', seasonName: '테스트 시즌', seasonStatus: 'active', participantStatus: 'active', startAt: new Date(Date.now() - 86400000).toISOString(), endAt: new Date(Date.now() + 86400000).toISOString() } },
 ];
-// Contract 4h chart (GET /futures/instruments/:id/candles): three closed buckets
-// and the provisional current one.
-function futuresCandlesFixture(instrumentId, now = Date.now()) {
-  const H4 = 4 * 3600_000;
+// Contract chart (GET /futures/instruments/:id/candles) at one 봉 시간: three
+// closed buckets and the provisional current one.
+const INTERVAL_MS = { '5m': 300_000, '15m': 900_000, '30m': 1_800_000, '1h': 3_600_000, '4h': 14_400_000, '1d': 86_400_000 };
+const INTERVAL_RANGE = { '5m': '2d', '15m': '3d', '30m': '14d', '1h': '14d', '4h': '96d', '1d': '1y' };
+function futuresCandlesFixture(instrumentId, now = Date.now(), interval = '4h') {
+  const H4 = INTERVAL_MS[interval];
   const current = Math.floor(now / H4) * H4;
   const candles = [3, 2, 1, 0].map(back => ({
     time: new Date(current - back * H4).toISOString(),
@@ -41,7 +43,7 @@ function futuresCandlesFixture(instrumentId, now = Date.now()) {
   return {
     state: 'available',
     instrument: { id: instrumentId, symbol: 'BTCUSDT', name: 'Bitcoin', productType: 'synthetic_perpetual', settlementCurrency: 'USD', isActive: true, displayPriceDecimals: 1 },
-    priceBasis: 'contract_last_trade', range: '96d', interval: '4h', candles,
+    priceBasis: 'contract_last_trade', range: INTERVAL_RANGE[interval], interval, candles,
     source: { provider: 'binance_usdm', endpoint: '/fapi/v1/klines', symbol: 'BTCUSDT', contractType: 'PERPETUAL', requestedCount: 600, returnedCount: candles.length, provisionalUpdatedAt: new Date(now).toISOString() },
   };
 }

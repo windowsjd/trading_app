@@ -54,6 +54,8 @@ export function compatibleLedgerType(
 const TYPE_LABELS: Record<string, string> = {
   order_buy: '매수', order_sell: '매도', wallet_transfer: '이체',
   exchange_source: '환전', exchange_target: '환전', ad_reward: '광고 보상',
+  // A general-account reset's per-wallet adjustment (2026-10-20), under 전체.
+  account_reset: '계정 초기화',
   // No current standalone writers/chips, but historical rows must stay visible.
   fee: '수수료', adjustment: '조정', settlement: '정산',
 };

@@ -9,13 +9,18 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import type { FuturesChartScreenProps } from '../../app/navigation/types';
 import { getFuturesInstruments } from '../../features/futures/api';
 import { freshFuturesReference, futuresServerNow } from '../../features/futures/policy';
+import {
+  DEFAULT_ASSET_CHART_TIMEFRAME,
+  type AssetChartTimeframe,
+} from '../../features/asset/chartTimeframes';
 import { formatAssetPrice } from '../../utils/format';
 import FuturesCandleChart from './FuturesCandleChart';
 
 /**
  * The futures contract's chart on a whole screen, opened by the futures
  * screen's chart button as the spot order screen opens AssetChart: back
- * button, contract and its current Futures Last on top, then the 4h chart in
+ * button, contract and its current Futures Last on top, the 봉 시간 selector,
+ * then the chart in
  * the rest of the screen (never below the old 280 px strip: with little room,
  * e.g. large text on a small phone, the screen scrolls instead, as the asset
  * detail chart does). The futures screen stays mounted underneath, so 뒤로
@@ -27,6 +32,8 @@ import FuturesCandleChart from './FuturesCandleChart';
 export default function FuturesChartScreen({ route, navigation }: FuturesChartScreenProps) {
   const { accountId, instrumentId, symbol, displayPriceDecimals } = route.params;
   const focused = useIsFocused();
+  // AssetChart's own default; each 봉 시간 is its own contract query.
+  const [timeframe, setTimeframe] = useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setClock(Date.now()), 1000);
@@ -71,6 +78,9 @@ export default function FuturesChartScreen({ route, navigation }: FuturesChartSc
           instrumentId={instrumentId}
           displayPriceDecimals={displayPriceDecimals}
           currentPrice={lastFresh ? last : null}
+          timeframe={timeframe}
+          onTimeframeChange={setTimeframe}
+          variant="fullscreen"
         />
       </ScrollView>
     </SafeAreaView>

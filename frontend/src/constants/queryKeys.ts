@@ -487,6 +487,9 @@ export const QUERY_KEYS = {
       ['tradingAccount', 'adRewards', accountId] as const,
     adRewardEligibility: (accountId: string) =>
       ['tradingAccount', 'adRewards', accountId, 'eligibility'] as const,
+    // Under adRewardsAll: a claim or a reset refreshes both answers.
+    accountResetEligibility: (accountId: string) =>
+      ['tradingAccount', 'adRewards', accountId, 'accountReset'] as const,
     adRewardClaims: (accountId: string, filters?: Record<string, unknown>) =>
       [
         'tradingAccount',

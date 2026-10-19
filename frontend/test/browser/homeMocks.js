@@ -24,7 +24,7 @@ export const transport = {
     { ...base, id: 'general-account', mode: 'general', season: null },
   ],
 };
-export const navigation = { calls: [], isFocused: () => true, addListener: () => () => {}, navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
+export const navigation = { calls: [], isFocused: () => true, addListener: () => () => {}, setOptions() {}, navigate(...args) { this.calls.push(args); if (window.fixture?.navigationRef?.isReady()) window.fixture.navigationRef.navigate(...args); } };
 if (params.has('past')) transport.accounts.push({ ...base, id: 'past-account', mode: 'season', status: 'closed',
   season: { ...season, seasonId: 'past-season', seasonName: '지난 시즌', seasonStatus: 'settled', participantStatus: 'finished' } });
 // Entry scenarios are explicit fixture inputs; production selection stays real.
@@ -38,8 +38,8 @@ export const useRootNavigation = () => navigation;
 const response = (data) => ({ data: { success: true, data } });
 export const apiClient = {
   async get(path, config) {
-    // Contract 4h chart (market data, not account-scoped).
-    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3])) } };
+    // Contract chart at the requested 봉 시간 (market data, not account-scoped).
+    if (path.startsWith('/futures/instruments/') && path.includes('/candles')) return { data: { success: true, data: futuresCandlesFixture(decodeURIComponent(path.split('/')[3]), Date.now(), new URLSearchParams(path.split('?')[1] ?? '').get('interval') ?? '4h') } };
     transport.requests.push(path);
     if (path.startsWith('/assets?')) {
       const query = new URL(path, location.origin).searchParams;

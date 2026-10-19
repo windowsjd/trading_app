@@ -34,6 +34,12 @@ import type { PrismaClient } from '../../src/generated/prisma/client';
  *  - general Order/Position/Quote account-scope consistency,
  *    missing durable quotes, invalid sell-side reservation evidence, invalid
  *    Position reservation bounds, and account+asset reservation mismatches
+ *  - (2026-10-20 general-account reset) the external-funding continuity check
+ *    reads the CURRENT epoch's principal; funding-only checks skip reset
+ *    claims; every reset must be a granted account_reset claim of its own
+ *    general account with one epoch origin at the reset instant, wallet ledger
+ *    rows that move exactly what it recorded to the targets, and contiguous
+ *    sequence numbers
  */
 
 export const GENERAL_ACCOUNT_INITIAL_CAPITAL_KRW = '10000000.00000000';
@@ -94,6 +100,14 @@ export type GeneralAccountAuditSummary = {
   boundaryPairsWithTotalAssetMismatch: number;
   generalDailySnapshotsMissingPerformanceValues: number;
   dailySnapshotsOnClosedAccounts: number;
+  // ---- general-account reset checks (2026-10-20) ----
+  resetsWithInvalidClaim: number;
+  resetClaimsWithoutReset: number;
+  resetsOnNonGeneralAccounts: number;
+  resetsWithInvalidEpochOrigin: number;
+  resetWalletLedgerMismatches: number;
+  resetLedgerRowsWithoutReset: number;
+  accountsWithResetSequenceGap: number;
   findings: GeneralAccountAuditFinding[];
 };
 
@@ -244,9 +258,15 @@ export async function auditGeneralAccounts(
     }
   }
 
+  // A granted RESET claim has no ad_reward row by design; its money moves
+  // through the reset's own ledger rows (audited below).
   const grantedClaimsWithoutWalletTransaction =
     await prisma.adRewardClaim.count({
-      where: { status: 'granted', walletTransactionId: null },
+      where: {
+        status: 'granted',
+        walletTransactionId: null,
+        purpose: 'funding',
+      },
     });
   if (grantedClaimsWithoutWalletTransaction > 0) {
     add(
@@ -317,6 +337,7 @@ export async function auditGeneralAccounts(
 
   // ------------------------------------------------------------ 작업 7
   const performance = await auditGeneralPerformance(prisma, add);
+  const resets = await auditGeneralAccountResets(prisma, add);
 
   return {
     generalAccountCount: generalAccounts.length,
@@ -335,6 +356,7 @@ export async function auditGeneralAccounts(
     ...trading,
     ...fx,
     ...performance,
+    ...resets,
     findings,
   };
 }
@@ -772,6 +794,7 @@ async function auditGeneralPerformance(
       SELECT count(*)::int AS n
       FROM "ad_reward_claims" c
       WHERE c."status" = 'granted'
+        AND c."purpose" = 'funding'
         AND c."idempotency_key" IS NOT NULL
         AND (
           NOT EXISTS (
@@ -857,11 +880,27 @@ async function auditGeneralPerformance(
             OR ("tx_type" = 'ad_reward' AND "reference_type" = 'ad_reward_claim')
           )
         GROUP BY "trading_account_id"
+      ),
+      -- After a reset the principal is the reset target plus the rewards
+      -- granted since (lifetime now − lifetime at the reset), as at runtime.
+      last_reset AS (
+        SELECT DISTINCT ON ("trading_account_id")
+          "trading_account_id" AS account_id,
+          "target_krw_balance" AS target,
+          "lifetime_external_funding_krw" AS lifetime_at_reset
+        FROM "general_account_resets"
+        ORDER BY "trading_account_id", "sequence" DESC
       )
       SELECT count(*)::int AS n
       FROM latest l
       LEFT JOIN funding f ON f.account_id = l.account_id
-      WHERE l.cumulative_funding IS DISTINCT FROM coalesce(f.total, 0)
+      LEFT JOIN last_reset r ON r.account_id = l.account_id
+      WHERE l.cumulative_funding IS DISTINCT FROM (
+        CASE
+          WHEN r.account_id IS NULL THEN coalesce(f.total, 0)
+          ELSE r.target + coalesce(f.total, 0) - r.lifetime_at_reset
+        END
+      )
     `),
     ),
     'GENERAL_PERFORMANCE_EXTERNAL_FUNDING_MISMATCH',
@@ -873,6 +912,7 @@ async function auditGeneralPerformance(
       SELECT count(*)::int AS n
       FROM "ad_reward_claims" c
       WHERE c."status" = 'granted'
+        AND c."purpose" = 'funding'
         AND c."idempotency_key" IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM "equity_snapshots" s
@@ -889,6 +929,7 @@ async function auditGeneralPerformance(
       SELECT count(*)::int AS n
       FROM "ad_reward_claims" c
       WHERE c."status" = 'granted'
+        AND c."purpose" = 'funding'
         AND c."idempotency_key" IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM "equity_snapshots" s
@@ -1022,6 +1063,192 @@ async function auditGeneralPerformance(
     boundaryPairsWithTotalAssetMismatch,
     generalDailySnapshotsMissingPerformanceValues,
     dailySnapshotsOnClosedAccounts,
+  };
+}
+
+/**
+ * General-account resets (2026-10-20). SELECT-only, like the rest: a reset
+ * that disagrees with its claim, origin or ledger is reported, never redone.
+ */
+async function auditGeneralAccountResets(
+  prisma: PrismaClient,
+  add: (code: string, tradingAccountId: string | null, detail: string) => void,
+) {
+  const q = async (sql: Promise<Array<{ n: number | bigint }>>) =>
+    Number((await sql)[0]?.n ?? 0);
+  const report = (count: number, code: string, detail: string) => {
+    if (count > 0) add(code, null, detail);
+    return count;
+  };
+
+  const resetsWithInvalidClaim = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "general_account_resets" r
+      LEFT JOIN "ad_reward_claims" c ON c."id" = r."ad_reward_claim_id"
+      WHERE c."id" IS NULL
+         OR c."purpose" <> 'account_reset'
+         OR c."status" <> 'granted'
+         OR c."trading_account_id" <> r."trading_account_id"
+         OR c."user_id" <> r."user_id"
+         OR c."wallet_transaction_id" IS NOT NULL
+         OR c."granted_at" IS DISTINCT FROM r."reset_at"
+    `),
+    'GENERAL_ACCOUNT_RESET_CLAIM_INVALID',
+    'reset(s) whose ad claim is not a granted account_reset claim of the same account and instant',
+  );
+
+  const resetClaimsWithoutReset = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "ad_reward_claims" c
+      WHERE c."purpose" = 'account_reset'
+        AND NOT EXISTS (
+          SELECT 1 FROM "general_account_resets" r
+          WHERE r."ad_reward_claim_id" = c."id"
+        )
+    `),
+    'GENERAL_ACCOUNT_RESET_CLAIM_WITHOUT_RESET',
+    'account_reset claim(s) with no reset record',
+  );
+
+  const resetsOnNonGeneralAccounts = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "general_account_resets" r
+      JOIN "trading_accounts" a ON a."id" = r."trading_account_id"
+      WHERE a."mode" <> 'general' OR a."user_id" <> r."user_id"
+    `),
+    'GENERAL_ACCOUNT_RESET_ON_NON_GENERAL_ACCOUNT',
+    'reset(s) recorded on a non-general account or for another user',
+  );
+
+  const resetsWithInvalidEpochOrigin = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "general_account_resets" r
+      WHERE (
+        SELECT count(*)
+        FROM "equity_snapshots" s
+        WHERE s."trading_account_id" = r."trading_account_id"
+          AND s."snapshot_reason" = 'general_account_reset'
+          AND s."external_funding_reference_type" = 'general_account_reset'
+          AND s."external_funding_reference_id" = r."id"
+          AND s."captured_at" = r."reset_at"
+          AND s."total_asset_krw" = r."target_krw_balance"
+          AND s."cumulative_external_funding_krw" = r."target_krw_balance"
+          AND s."external_funding_amount_krw" = r."target_krw_balance"
+          AND s."investment_pnl_krw" = 0
+          AND s."time_weighted_return_factor" = 1
+          AND s."return_rate" = 0
+      ) <> 1
+      OR EXISTS (
+        SELECT 1 FROM "equity_snapshots" s
+        WHERE s."snapshot_reason" = 'general_account_reset'
+          AND s."external_funding_reference_id" = r."id"
+          AND s."trading_account_id" <> r."trading_account_id"
+      )
+    `),
+    'GENERAL_ACCOUNT_RESET_EPOCH_ORIGIN_INVALID',
+    'reset(s) without exactly one epoch-origin snapshot at the reset target and instant',
+  );
+
+  // Every wallet recorded on the reset: moved to its target by exactly one
+  // account_reset row of the recorded size, or left alone when already there.
+  const resetWalletLedgerMismatches = report(
+    await q(prisma.$queryRaw`
+      WITH recorded AS (
+        SELECT
+          r."id" AS reset_id,
+          r."trading_account_id" AS account_id,
+          w->>'walletId' AS wallet_id,
+          (w->>'balanceAmount')::numeric AS before_amount,
+          (w->>'targetAmount')::numeric AS target_amount
+        FROM "general_account_resets" r
+        CROSS JOIN LATERAL jsonb_array_elements(r."wallets_before_json") w
+      ),
+      ledger AS (
+        SELECT
+          wt."reference_id" AS reset_id,
+          wt."wallet_id",
+          count(*) AS rows,
+          sum(wt."amount") AS amount,
+          max(wt."balance_after") AS balance_after,
+          bool_and(wt."tx_type" = 'account_reset') AS reset_rows,
+          bool_and(wt."direction" = 'credit') AS credits,
+          bool_and(wt."direction" = 'debit') AS debits,
+          bool_and(wt."trading_account_id" = cw."trading_account_id") AS scoped
+        FROM "wallet_transactions" wt
+        JOIN "cash_wallets" cw ON cw."id" = wt."wallet_id"
+        WHERE wt."reference_type" = 'general_account_reset'
+        GROUP BY wt."reference_id", wt."wallet_id"
+      )
+      SELECT count(*)::int AS n
+      FROM recorded rc
+      LEFT JOIN ledger l
+        ON l.reset_id = rc.reset_id AND l.wallet_id = rc.wallet_id
+      LEFT JOIN "cash_wallets" cw ON cw."id" = rc.wallet_id
+      WHERE cw."id" IS NULL
+         OR cw."trading_account_id" <> rc.account_id
+         OR (rc.before_amount = rc.target_amount AND l.rows IS NOT NULL)
+         OR (
+           rc.before_amount <> rc.target_amount
+           AND (
+             l.rows IS DISTINCT FROM 1
+             OR l.amount <> abs(rc.target_amount - rc.before_amount)
+             OR l.balance_after <> rc.target_amount
+             OR NOT l.reset_rows
+             OR NOT l.scoped
+             OR (rc.target_amount > rc.before_amount AND NOT l.credits)
+             OR (rc.target_amount < rc.before_amount AND NOT l.debits)
+           )
+         )
+    `),
+    'GENERAL_ACCOUNT_RESET_WALLET_LEDGER_MISMATCH',
+    'reset wallet movement(s) that disagree with the reset record',
+  );
+
+  const resetLedgerRowsWithoutReset = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n
+      FROM "wallet_transactions" wt
+      LEFT JOIN "general_account_resets" r ON r."id" = wt."reference_id"
+      WHERE (wt."tx_type" = 'account_reset' OR wt."reference_type" = 'general_account_reset')
+        AND (
+          r."id" IS NULL
+          OR r."trading_account_id" <> wt."trading_account_id"
+          OR wt."occurred_at" <> r."reset_at"
+          OR NOT EXISTS (
+            SELECT 1 FROM jsonb_array_elements(r."wallets_before_json") w
+            WHERE w->>'walletId' = wt."wallet_id"
+          )
+        )
+    `),
+    'GENERAL_ACCOUNT_RESET_LEDGER_WITHOUT_RESET',
+    'account_reset ledger row(s) that no reset of the same account records',
+  );
+
+  const accountsWithResetSequenceGap = report(
+    await q(prisma.$queryRaw`
+      SELECT count(*)::int AS n FROM (
+        SELECT "trading_account_id"
+        FROM "general_account_resets"
+        GROUP BY "trading_account_id"
+        HAVING max("sequence") <> count(*) OR min("sequence") <> 1
+      ) gaps
+    `),
+    'GENERAL_ACCOUNT_RESET_SEQUENCE_GAP',
+    'account(s) whose reset sequence is not 1..n',
+  );
+
+  return {
+    resetsWithInvalidClaim,
+    resetClaimsWithoutReset,
+    resetsOnNonGeneralAccounts,
+    resetsWithInvalidEpochOrigin,
+    resetWalletLedgerMismatches,
+    resetLedgerRowsWithoutReset,
+    accountsWithResetSequenceGap,
   };
 }
 

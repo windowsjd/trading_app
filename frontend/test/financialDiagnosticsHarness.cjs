@@ -111,13 +111,15 @@ function financialDiagnosticsHarness(screen = 'home', { role = 'admin', mode = '
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     // The Wallet's 환전 panel has its own diagnostics test (tradingUiHarness); these screens never open it.
     './WalletFxSheet': { default: 'WalletFxPanel', __esModule: true },
+    // Home's 보상 sheet and header button have their own harness.
+    './GeneralRewardSheet': { default: 'GeneralRewardSheet', HomeRewardButton: 'HomeRewardButton', __esModule: true },
   };
   const files = { home: 'home/HomeScreen', wallet: 'wallet/WalletScreen', portfolio: 'home/PortfolioScreen', ledger: 'home/WalletTransactionsScreen', history: 'history/TradeHistoryScreen' };
   const Screen = h.load(`src/screens/${files[screen]}.tsx`, mocks).default;
   const Probe = () => { h.accountContext = context.useTradingAccount(); return null; };
   const tree = () => React.createElement(QueryClientProvider, { client: h.client },
     React.createElement(context.TradingAccountProvider, {}, React.createElement(Probe),
-      React.createElement(Screen, { route: { params: h.route }, navigation: { navigate() {} } })));
+      React.createElement(Screen, { route: { params: h.route }, navigation: { navigate() {}, setOptions() {} } })));
   h.flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 30)); }); };
   h.start = async () => { h.renderer = h.render(tree()); await h.flush(); await h.flush(); };
   h.update = async () => { act(() => h.renderer.update(tree())); await h.flush(); };

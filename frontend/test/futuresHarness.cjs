@@ -25,9 +25,14 @@ function futuresHarness(options = {}) {
         // Contract chart (market data, not account-scoped): /futures/instruments/:id/candles
         if (path.startsWith('/futures/instruments/') && path.includes('/candles')) {
           const instrumentId = decodeURIComponent(path.split('/')[3]);
+          const params = new URLSearchParams(path.split('?')[1] ?? '');
+          const interval = params.get('interval') ?? '4h';
           h.candleReads ??= []; h.candleReads.push(instrumentId);
+          // Which 봉 시간 each read asked for (instrument:interval:range:limit).
+          h.candleWindows ??= []; h.candleWindows.push(`${instrumentId}:${interval}:${params.get('range')}:${params.get('limit')}`);
+          if (h.candleGates?.[interval]) await h.candleGates[interval].promise;
           if (h.candleFailure) throw h.candleFailure;
-          return { data: { success: true, data: h.futuresCandles?.(instrumentId) ?? futuresCandlesFixture(instrumentId) } };
+          return { data: { success: true, data: h.futuresCandles?.(instrumentId, interval) ?? futuresCandlesFixture(instrumentId, Date.now(), interval) } };
         }
         const f = futuresFixture(h.wrongScope ?? id, h.options);
         // 손절가/익절가 plans on pending entries: closed unless a test opens them.
@@ -92,7 +97,8 @@ function futuresHarness(options = {}) {
   const api = load(resolve(__dirname, '../src/features/futures/api.ts'), { '../../services/api/client': transport });
   const tpSlApi = load(resolve(__dirname, '../src/features/futures/tpSlApi.ts'), { '../../services/api/client': transport });
   const entryTpSlApi = load(resolve(__dirname, '../src/features/conditional/entryTpSlApi.ts'), { '../../services/api/client': transport });
-  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView'].map(name => [name, name]));
+  // Modal: the chart's 봉 시간 sheet (BottomSheetBackdrop) mounts one.
+  const native = Object.fromEntries(['View', 'Text', 'SafeAreaView', 'ScrollView', 'TextInput', 'KeyboardAvoidingView', 'Modal'].map(name => [name, name]));
   native.useWindowDimensions = () => options.dimensions ?? { width: 390, height: 844, fontScale: 1 };
   Object.assign(native, { Alert: { alert: (...args) => { h.alerts.push(args); } }, AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'web' }, StyleSheet: { create: value => value }, Keyboard: { addListener: () => ({ remove() {} }), dismiss() {} },
     // Bottom sheets (주문방식, 선물 상품) mount these only while open.
@@ -137,6 +143,13 @@ function futuresHarness(options = {}) {
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts, selectedAccountId: h.accountId, isLoading: false, ...h.accountState }) },
     '../../services/api/sessionOwnership': { getSessionGeneration: () => h.session, isCurrentSession: owner => owner === h.session },
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+    // The detail's won figure: the wallet's USD/KRW read (h.fxRate overrides).
+    '../../features/wallet/api': { getCurrentFxRate: async () => {
+      h.fxReads = (h.fxReads ?? 0) + 1;
+      if (h.fxFailure) throw h.fxFailure;
+      return h.fxRate ?? { state: 'available', baseCurrency: 'USD', quoteCurrency: 'KRW', rate: '1400.00000000',
+        validUntil: new Date(Date.now() + 600_000).toISOString(), effectiveAt: new Date().toISOString() };
+    } },
     '../../components/charts/CandlestickChart': { default: 'CandlestickChart', __esModule: true },
     // Contract ladder: screens observe the subscription request and render
     // whatever book state a test sets (no socket in unit tests).
@@ -176,7 +189,9 @@ function futuresHarness(options = {}) {
   const params = () => options.screen === 'chart' ? { accountId: h.routeAccountId, ...h.chart }
     : options.screen === 'detail' ? { accountId: h.routeAccountId, instrumentId: options.instrumentId ?? 'btc' }
       : { accountId: h.routeAccountId, instrumentId: options.instrumentId, ...(options.routeDirection ? { direction: options.routeDirection } : {}) };
-  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: params() }, navigation: { navigate: (...args) => h.navigation.push(args), goBack: () => h.navigation.push(['goBack']) }, onSelect: (...args) => h.navigation.push(args),
+  // The detail's contract picker changes the route's instrument (setParams).
+  const tree = () => React.createElement(query.QueryClientProvider, { client }, React.createElement(screen, { route: { params: params() }, navigation: { navigate: (...args) => h.navigation.push(args), goBack: () => h.navigation.push(['goBack']),
+    setParams: (next) => { h.navigation.push(['setParams', next]); if (next.instrumentId) options.instrumentId = next.instrumentId; } }, onSelect: (...args) => h.navigation.push(args),
     sort: h.sort, onSortChange: sort => { h.sort = sort; }, refreshVersion: h.refreshVersion }));
   h.flush = async () => { await act(async () => { await new Promise(resolve => setTimeout(resolve, 25)); }); };
   h.start = async () => { await act(async () => { h.renderer = create(tree()); }); await h.flush(); };

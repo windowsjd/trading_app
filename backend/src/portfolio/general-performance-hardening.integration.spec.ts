@@ -173,6 +173,7 @@ function fakeVerifier(provider) {
       return {
         ok: true,
         provider,
+        purpose: request.expectedPurpose,
         providerEventId: request.proof,
         occurredAt: new Date(),
         metadata: { source: 'fake' },

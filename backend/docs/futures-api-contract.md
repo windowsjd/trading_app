@@ -72,11 +72,16 @@ is NOT under `/trading-accounts/:accountId`: it returns market data of one
 `priceBasis: "contract_last_trade"`), carries no account, position or
 permission field, and is shared by every trading account. It never reads Spot
 candles of the underlying asset and never serves Mark/Index series; Futures
-Last (fills, TP/SL) and Mark (UPNL, risk, liquidation) are unchanged. Only
-`4h`/`96d`/limit 1–1000 are accepted (400 `FUTURES_CANDLES_INVALID_QUERY`);
-unknown or non-catalog instruments are 404 `FUTURES_INSTRUMENT_NOT_FOUND`. The
-bucket containing "now" is returned with `provisional: true`. Contract,
-storage and collection: [long-range-4h-candles.md](long-range-4h-candles.md).
+Last (fills, TP/SL) and Mark (UPNL, risk, liquidation) are unchanged. Since
+2026-10-20 the windows are 5m/`2d`, 15m/`3d`, 30m/`14d`, 1h/`14d`, 4h/`96d`
+and 1d/`1y` (anything else is 400 `FUTURES_CANDLES_INVALID_QUERY`); unknown or
+non-catalog instruments are 404 `FUTURES_INSTRUMENT_NOT_FOUND`. The bucket
+containing "now" is returned with `provisional: true`. 4h is the stored
+history ([long-range-4h-candles.md](long-range-4h-candles.md)); the other
+intervals are the contract's native klines read on demand through one shared
+cache, with `source.delivery`, `source.fetchedAt` and `source.stale`, and 503
+`FUTURES_CANDLES_UNAVAILABLE` only when nothing can be served
+([futures-chart-timeframes.md](futures-chart-timeframes.md)).
 
 ## Arithmetic and collateral
 

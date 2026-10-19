@@ -770,6 +770,7 @@ async function generalFundingAndHistory() {
             return {
               ok: true,
               provider: 'f3-test',
+              purpose: request.expectedPurpose,
               providerEventId: request.proof,
               occurredAt: new Date(),
               metadata: { source: 'fake' },

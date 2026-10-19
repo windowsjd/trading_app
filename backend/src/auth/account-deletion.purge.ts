@@ -386,6 +386,11 @@ export async function purgeDeletionScope(
       Prisma.sql`DELETE FROM fx_execute_requests WHERE user_id = ${user} OR trading_account_id = ANY(${accounts})`,
     ],
     [
+      // A reset references the ad claim it consumed (2026-10-20).
+      'general_account_resets',
+      Prisma.sql`DELETE FROM general_account_resets WHERE user_id = ${user} OR trading_account_id = ANY(${accounts})`,
+    ],
+    [
       'ad_reward_claims',
       Prisma.sql`DELETE FROM ad_reward_claims WHERE user_id = ${user} OR trading_account_id = ANY(${accounts})`,
     ],

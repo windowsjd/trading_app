@@ -141,7 +141,8 @@ export type WalletTransactionDirection = 'credit' | 'debit';
 
 export type WalletTransactionType =
   | 'initial_grant' | 'exchange_source' | 'exchange_target'
-  | 'wallet_transfer' | 'order_buy' | 'order_sell' | 'fee' | 'adjustment' | 'settlement' | 'ad_reward';
+  | 'wallet_transfer' | 'order_buy' | 'order_sell' | 'fee' | 'adjustment' | 'settlement' | 'ad_reward'
+  | 'account_reset';
 /** `exchange` groups two canonical wallet legs; it is never a stored txType. */
 export type WalletTransactionFilter = WalletTransactionType | 'exchange';
 

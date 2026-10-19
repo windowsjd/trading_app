@@ -11,6 +11,12 @@ Implemented:
 - `GET /api/v1/trading-accounts/:accountId/ad-rewards/eligibility`
 - `POST /api/v1/trading-accounts/:accountId/ad-rewards/claim`
 - `GET /api/v1/trading-accounts/:accountId/ad-rewards/claims`
+- `GET /api/v1/trading-accounts/:accountId/account-reset/eligibility` (2026-10-20)
+- `POST /api/v1/trading-accounts/:accountId/account-reset` (2026-10-20)
+
+One verified ad completion redeems ONE of two commands — the KRW top-up or a
+general-account reset — see "Ad reward purpose and the general-account reset"
+at the end of this document.
 
 The existing account-scoped finance reads
 (`GET /api/v1/trading-accounts/:accountId/wallets`, `wallet-transactions`)
@@ -154,6 +160,11 @@ Enforced by the existing partial unique index
   `monthlyGrantCount` / `catchUpGrant` / `recurringGrant` are forbidden.
 - Further funding comes only from verified rewarded-ad claims.
 - No transfer of funds between accounts, in either direction.
+- (2026-10-20) A user may RESET the general account with one verified ad
+  completion and an explicit confirmation. It is not a re-grant: the opening
+  grant row stays the only `initial_grant`, and the reset is its own ledger
+  shape (`account_reset`) and performance epoch. There is still no automatic
+  or bankruptcy reset.
 
 ### Damaged accounts fail closed
 
@@ -968,8 +979,241 @@ in `excludedClosed` / `skippedClosedDuringRun`.
 - `POST /api/v1/trading-accounts/general` now has a UI (`AccountSetupPanel`),
   reached when a user owns no trading account. Creation stays an explicit press;
   no GET, mount, or navigation creates an account, a wallet, or a grant.
-- Ad reward **eligibility/claim screens still do not exist**. The client
-  wrappers (`getAdRewardEligibility`, `getAdRewardClaims`, `claimAdReward`) and
-  their cache invalidation are in place; no screen calls them.
+- ~~Ad reward eligibility/claim screens still do not exist.~~ (2026-10-20)
+  The general home's 보상 button opens 자금 관리 (top-up and reset). Without a
+  rewarded-ad SDK the app has no provider, so both stay disabled under "광고
+  기능 준비 중" and nothing is sent.
 - No real ad provider is registered, and reward fulfilment remains disabled.
   This is unchanged by 작업 11 and is deliberate.
+
+---
+
+# Ad reward purpose and the general-account reset (2026-10-20)
+
+## Purpose of a verified completion
+
+`ad_reward_claims.purpose` (`AdRewardPurpose`: `funding` | `account_reset`,
+default `funding`; every earlier claim is a funding claim). The app chooses the
+purpose BEFORE the ad is shown; the verifier contract carries it both ways:
+
+- `AdRewardVerificationRequest.expectedPurpose` — the command the completion
+  must have been issued for (an adapter binds it, e.g. through server-side
+  verification custom data);
+- `AdRewardVerificationSuccess.purpose` — the purpose the provider event was
+  issued for. A completion for the other purpose is 422
+  `AD_REWARD_VERIFICATION_FAILED` and writes nothing.
+
+`UNIQUE (provider, providerEventId)` spans BOTH purposes: one completion
+redeems one command, once. A completion that paid a top-up is 409
+`AD_REWARD_EVENT_ALREADY_USED` on the reset route and vice versa; reusing one
+command's idempotency key for the other command is 409
+`AD_REWARD_IDEMPOTENCY_CONFLICT` (each command hashes its own versioned request:
+`ad-reward-claim:v1`, `general-account-reset:v1`).
+
+Until a real adapter ships, every fake verifier in the repository echoes
+`expectedPurpose`. A real adapter MUST NOT: it reports the purpose the
+provider's server-side verification bound to the completion (e.g. its custom
+data), so that a completion watched for a top-up can never verify as a reset.
+`UNIQUE (provider, providerEventId)` alone still guarantees one command per
+completion. The adapter needs its own contract test for this binding.
+
+An `account_reset` claim pays nothing itself: `rewardAmountKrw = 0` and no
+`walletTransactionId` (SQL CHECK `ad_reward_claims_reset_purpose_shape_check`).
+Daily count, daily amount and cooldown limit the TOP-UP only (granted funding
+claims); a reset neither uses nor is limited by them. `GET .../claims` lists
+both purposes with `purpose` in each row.
+
+Which refusals use up a completion (unchanged for the top-up): a top-up
+refused by its daily count, daily amount or cooldown AFTER verification is
+recorded as a `rejected` funding claim (작업 6), so that completion cannot be
+redeemed later. Every other refusal — disabled, no adapter, inactive account,
+failed verification, purpose mismatch, a blocked or unvaluable reset — writes
+nothing and leaves the completion unused. The app offers a top-up only while
+its eligibility allows one, so a user does not watch an ad into a limit.
+
+## GET .../account-reset/eligibility
+
+General accounts only (season and beginner: 409 `AD_REWARD_GENERAL_ACCOUNT_ONLY`;
+unknown or foreign: the same 404). Advisory, writes nothing. Structure first —
+the full general-account integrity and a continuous performance state, else a
+structured 500 — then:
+
+```json
+{
+  "tradingAccountId": "<id>",
+  "enabled": false,
+  "provider": null,
+  "eligible": false,
+  "reason": "AD_REWARD_DISABLED",
+  "blockers": [],
+  "targetKrwBalance": "10000000.00000000",
+  "resetCount": 0,
+  "lastResetAt": null
+}
+```
+
+`reason`: `AD_REWARD_DISABLED`, `AD_REWARD_PROVIDER_UNAVAILABLE`,
+`TRADING_ACCOUNT_NOT_ACTIVE`, `GENERAL_ACCOUNT_RESET_BLOCKED`,
+`GENERAL_ACCOUNT_RESET_UNAVAILABLE` (nothing blocks, but USD cash cannot be
+valued now — no current USD/KRW rate), or null. All of it is read on ONE
+RepeatableRead snapshot (as the portfolio reads), so the account's own
+top-up or reset committing in between cannot look like damage. `blockers` is
+always computed (the POST's 409 carries only the code; this list is where the
+reasons are):
+
+| blocker | while |
+| --- | --- |
+| `SPOT_HOLDINGS` | a Position has quantity or reserved quantity |
+| `FUTURES_POSITIONS` | a FuturesPosition is `open` |
+| `OPEN_ORDERS` | an Order is `submitted`, a LOC order `pending`, a Futures limit order `submitted` |
+| `ACTIVE_CONDITIONAL_ORDERS` | a conditional BUY/SELL or Futures conditional entry is `watching`/`triggered`, a Futures TP/SL `watching`/`triggered`, an entry TP/SL plan `pending`, a protection group `holding`/`active` |
+| `RESERVED_FUNDS` | any wallet has `reservedAmount > 0` |
+
+A reset never sells, closes or cancels anything on the user's behalf.
+
+## POST .../account-reset
+
+Body: the ad-command body of the top-up — `{ provider, proof (or
+verificationToken), idempotencyKey }`, all required. Nothing about the reset is
+client-decided. Order of work:
+
+1. authentication, ownership, general mode (season/beginner 409)
+2. lookup `(tradingAccountId, idempotencyKey)` → a stored reset is replayed
+   (`reset: false, duplicate: true`), whatever changed since; another command
+   under the key is 409 `AD_REWARD_IDEMPOTENCY_CONFLICT`
+3. account active, `AD_REWARD_ENABLED`, the configured provider, a registered
+   verifier (none in production → 503 `AD_REWARD_PROVIDER_UNAVAILABLE`)
+4. on one RepeatableRead snapshot: integrity + continuous performance state,
+   blockers (409 `GENERAL_ACCOUNT_RESET_BLOCKED`), and — with nothing
+   blocking — the closing valuation (503 `GENERAL_ACCOUNT_RESET_UNAVAILABLE`
+   when USD cash has no current rate) — all refused BEFORE a verification is
+   spent
+5. external verification for `account_reset` (outside any transaction)
+6. ONE transaction:
+   - `SELECT … FROM trading_accounts … FOR UPDATE` — the fence every order,
+     fill, FX, transfer, Futures, conditional, ad payout and daily-snapshot
+     path takes, so nothing is added between the checks and the reset
+   - raced key / same event (replay, or 409 for another account or purpose)
+   - integrity, continuous performance state and blockers again
+   - `resetAt = max(now, latest snapshot capturedAt + 1 ms)`
+   - the ended epoch is valued at `resetAt` (cash only; FX only with USD
+     cash; a missing/stale rate is 503 `GENERAL_ACCOUNT_RESET_UNAVAILABLE`)
+   - claim (`account_reset`, `verified`) → `GeneralAccountReset` row →
+     wallets and ledger → Position re-base → epoch origin → claim `granted`
+     with the stored response → the continuous state is re-read and must be
+     the new epoch at principal 10,000,000
+7. commit, respond (201):
+
+```json
+{
+  "reset": true,
+  "duplicate": false,
+  "resetId": "<id>",
+  "claimId": "<id>",
+  "sequence": 1,
+  "resetAt": "<UTC ISO>",
+  "totalAssetKrw": "10000000.00000000",
+  "wallets": [
+    { "walletScope": "securities", "currencyCode": "KRW", "balanceAmount": "10000000.00000000" },
+    { "walletScope": "securities", "currencyCode": "USD", "balanceAmount": "0.00000000" },
+    { "walletScope": "crypto_spot", "currencyCode": "USD", "balanceAmount": "0.00000000" },
+    { "walletScope": "crypto_futures", "currencyCode": "USD", "balanceAmount": "0.00000000" }
+  ]
+}
+```
+
+Any failure rolls back every row; a refused reset writes nothing and does not
+consume the completion. Concurrent identical commands converge on one reset
+(P2002 re-read on its own axis); different completions reset one after
+another (sequence 1, 2, 3 …).
+
+## Records written by a reset
+
+- **`general_account_resets`** — id, account, user, `ad_reward_claim_id`
+  (UNIQUE), `sequence` (UNIQUE per account, from 1), `reset_at`,
+  `target_krw_balance` (10,000,000), `lifetime_external_funding_krw` (verified
+  opening grant + granted ad rewards at the reset), the ended epoch's
+  `closing_total_asset_krw` / `closing_external_funding_krw` /
+  `closing_investment_pnl_krw` (CHECK: PnL = total − funding),
+  `wallets_before_json` (each wallet's balance and target) and
+  `positions_rebased_json`.
+- **Ledger** — one `account_reset` row per wallet that moved
+  (`referenceType = general_account_reset`, `referenceId` = reset id): credit
+  or debit of the exact difference, `balanceAfter` = the target,
+  `occurredAt = resetAt`. A wallet already at its target gets no row.
+  Partial unique `wallet_transactions_general_account_reset_wallet_unique`
+  (one row per wallet per reset) and CHECK
+  `wallet_transactions_account_reset_reference_check` (the type and the
+  reference only come together).
+- **Wallets** — Securities KRW 10,000,000; Securities USD, Crypto Spot USD and
+  Crypto Futures USD 0; reservations were already 0.
+- **Positions** — emptied spot Position aggregates keep their row (the next
+  buy reuses it) with `realizedPnl`/`realizedPnlKrw` re-based to 0; the values
+  they held are on the reset row. Orders, fills, FX, transfers, Futures
+  lifetimes, ad claims and every earlier ledger row are untouched.
+- **Epoch origin** — an EquitySnapshot `general_account_reset`: total =
+  principal = external-funding amount = 10,000,000, PnL 0, factor 1, stored
+  return 0, referencing the reset (the boundary unique admits one per reset).
+
+`TradingAccount` (id, owner, status, `initialCapitalKrw`) and the opening
+`initial_grant` row never change; the integrity gate still requires exactly
+that one grant.
+
+## Performance epochs
+
+Every standalone performance read is the CURRENT epoch:
+
+- epoch principal = target of the latest reset + (verified lifetime external
+  funding now − the lifetime recorded on that reset) — exactly the ad rewards
+  granted since, with no timestamp comparison (both writers hold the account
+  lock);
+- after a reset the latest snapshot must be at or after `resetAt`, i.e. the
+  epoch origin exists — else 500 `GENERAL_PERFORMANCE_INTEGRITY`;
+- `GET .../portfolio`: `initialFundingKrw` = the epoch's opening funding (the
+  reset target), `cumulativeAdRewardKrw` = rewards in this epoch,
+  `cumulativeExternalFundingKrw` = the epoch principal, `realizedPnlKrw` starts
+  at 0, and `summary.performanceEpoch = { sequence, startedAt }` (0 + openedAt
+  before any reset);
+- `GET .../portfolio/equity`: points from `max(range start, epoch start)`;
+  daily rows captured before the reset are not drawn;
+  `data.performanceEpoch` as above;
+- a top-up after a reset brackets the epoch principal as before.
+
+Right after a reset: total 10,000,000, PnL 0, return 0%.
+
+## Audit and deletion
+
+`pnpm trading-accounts:audit-general` compares the latest snapshot with the
+epoch principal, skips reset claims in the funding-only checks, and adds
+`GENERAL_ACCOUNT_RESET_CLAIM_INVALID`, `…_CLAIM_WITHOUT_RESET`,
+`…_ON_NON_GENERAL_ACCOUNT`, `…_EPOCH_ORIGIN_INVALID`,
+`…_WALLET_LEDGER_MISMATCH`, `…_LEDGER_WITHOUT_RESET` and `…_SEQUENCE_GAP`.
+Still read-only, no `--apply`. Self-service account deletion removes reset rows
+before the claims they reference.
+
+## Errors added
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| 409 | `GENERAL_ACCOUNT_RESET_BLOCKED` | something is held or pending (see blockers) |
+| 503 | `GENERAL_ACCOUNT_RESET_UNAVAILABLE` | the ended epoch could not be valued (USD cash without a current rate) |
+
+## Clock of the boundary snapshots
+
+A reset stamps `resetAt = max(now, latest snapshot capturedAt + 1 ms)`, and a
+top-up (2026-10-20) stamps its claim, ledger row and before/after pair with
+`max(now, latest snapshot capturedAt + 1 ms)` too: fills stamp snapshots with
+the database clock, and a pair sorted before the latest snapshot would break
+the account's performance continuity for good.
+
+## Operations (reset)
+
+Production stays at `AD_REWARD_ENABLED=false` with an empty verifier registry
+until a real adapter ships; no fake verifier is registered anywhere outside
+tests. Without a device provider the app sends nothing at all — not even the
+two eligibility reads.
+
+A reset is never performed for a user: holding something that can no longer
+be sold (e.g. a retired listing) blocks it until that holding is gone. Recommended values when enabling: `AD_REWARD_AMOUNT_KRW=5000000`, a
+daily count/amount (e.g. 3 / 15,000,000), `AD_REWARD_COOLDOWN_SECONDS`, and
+`AD_REWARD_DAY_TIME_ZONE=Asia/Seoul`.

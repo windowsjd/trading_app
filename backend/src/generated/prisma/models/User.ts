@@ -283,6 +283,7 @@ export type UserWhereInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
+  generalAccountResets?: Prisma.GeneralAccountResetListRelationFilter
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
@@ -318,6 +319,7 @@ export type UserOrderByWithRelationInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogOrderByRelationAggregateInput
   quotes?: Prisma.QuoteOrderByRelationAggregateInput
   adRewardClaims?: Prisma.AdRewardClaimOrderByRelationAggregateInput
+  generalAccountResets?: Prisma.GeneralAccountResetOrderByRelationAggregateInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestOrderByRelationAggregateInput
@@ -356,6 +358,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   operatorAuditLogs?: Prisma.OperatorAuditLogListRelationFilter
   quotes?: Prisma.QuoteListRelationFilter
   adRewardClaims?: Prisma.AdRewardClaimListRelationFilter
+  generalAccountResets?: Prisma.GeneralAccountResetListRelationFilter
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestListRelationFilter
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestListRelationFilter
@@ -429,6 +432,7 @@ export type UserCreateInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -464,6 +468,7 @@ export type UserUncheckedCreateInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -499,6 +504,7 @@ export type UserUpdateInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -534,6 +540,7 @@ export type UserUncheckedUpdateInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -903,6 +910,20 @@ export type UserUpdateOneRequiredWithoutAdRewardClaimsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAdRewardClaimsInput, Prisma.UserUpdateWithoutAdRewardClaimsInput>, Prisma.UserUncheckedUpdateWithoutAdRewardClaimsInput>
 }
 
+export type UserCreateNestedOneWithoutGeneralAccountResetsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedCreateWithoutGeneralAccountResetsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutGeneralAccountResetsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutGeneralAccountResetsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedCreateWithoutGeneralAccountResetsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutGeneralAccountResetsInput
+  upsert?: Prisma.UserUpsertWithoutGeneralAccountResetsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutGeneralAccountResetsInput, Prisma.UserUpdateWithoutGeneralAccountResetsInput>, Prisma.UserUncheckedUpdateWithoutGeneralAccountResetsInput>
+}
+
 export type UserCreateNestedOneWithoutQuotesInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutQuotesInput, Prisma.UserUncheckedCreateWithoutQuotesInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutQuotesInput
@@ -997,6 +1018,7 @@ export type UserCreateWithoutInquiriesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1031,6 +1053,7 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1081,6 +1104,7 @@ export type UserUpdateWithoutInquiriesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -1115,6 +1139,7 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -1149,6 +1174,7 @@ export type UserCreateWithoutInquiryAnswersInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1183,6 +1209,7 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1233,6 +1260,7 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -1267,6 +1295,7 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -1300,6 +1329,7 @@ export type UserCreateWithoutFriendshipsLowInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1334,6 +1364,7 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1373,6 +1404,7 @@ export type UserCreateWithoutFriendshipsHighInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1407,6 +1439,7 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1457,6 +1490,7 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -1491,6 +1525,7 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -1536,6 +1571,7 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -1570,6 +1606,7 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -1604,6 +1641,7 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1638,6 +1676,7 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1688,6 +1727,7 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -1722,6 +1762,7 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -1756,6 +1797,7 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1790,6 +1832,7 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1840,6 +1883,7 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -1874,6 +1918,7 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -1908,6 +1953,7 @@ export type UserCreateWithoutTradingAccountsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -1942,6 +1988,7 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -1992,6 +2039,7 @@ export type UserUpdateWithoutTradingAccountsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -2026,6 +2074,7 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -2060,6 +2109,7 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -2094,6 +2144,7 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -2144,6 +2195,7 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -2178,6 +2230,7 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -2212,6 +2265,7 @@ export type UserCreateWithoutUserBadgesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -2246,6 +2300,7 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -2296,6 +2351,7 @@ export type UserUpdateWithoutUserBadgesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -2330,6 +2386,7 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -2364,6 +2421,7 @@ export type UserCreateWithoutSeasonRewardsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -2398,6 +2456,7 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -2448,6 +2507,7 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -2482,6 +2542,7 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -2517,6 +2578,7 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
@@ -2551,6 +2613,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
@@ -2590,6 +2653,7 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
@@ -2624,6 +2688,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
@@ -2663,6 +2728,7 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
@@ -2697,6 +2763,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
@@ -2736,6 +2803,7 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -2770,6 +2838,7 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -2820,6 +2889,7 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
@@ -2854,6 +2924,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
@@ -2899,6 +2970,7 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
@@ -2933,6 +3005,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
@@ -2978,6 +3051,7 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
@@ -3012,6 +3086,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
@@ -3057,6 +3132,7 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -3091,6 +3167,7 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -3124,6 +3201,7 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -3158,6 +3236,7 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -3208,6 +3287,7 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -3242,6 +3322,163 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUncheckedUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUncheckedUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutGeneralAccountResetsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
+  id?: string
+  email: string
+  passwordHash: string
+  emailVerifiedAt?: Date | string | null
+  tokenVersion?: number
+  nickname: string
+  profileImageUrl?: string | null
+  portfolioPublic?: boolean
+  status?: $Enums.UserStatus
+  role?: $Enums.UserRole
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedCreateNestedManyWithoutUserInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedCreateNestedManyWithoutUserInput
+  userBadges?: Prisma.UserBadgeUncheckedCreateNestedManyWithoutUserInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
+  quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutCanceledByInput
+  inquiries?: Prisma.InquiryUncheckedCreateNestedManyWithoutUserInput
+  inquiryAnswers?: Prisma.InquiryAnswerUncheckedCreateNestedManyWithoutAnsweredByInput
+  pushDevices?: Prisma.PushDeviceUncheckedCreateNestedManyWithoutUserInput
+  notificationPreference?: Prisma.NotificationPreferenceUncheckedCreateNestedOneWithoutUserInput
+  pushNotifications?: Prisma.PushNotificationUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutGeneralAccountResetsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedCreateWithoutGeneralAccountResetsInput>
+}
+
+export type UserUpsertWithoutGeneralAccountResetsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedUpdateWithoutGeneralAccountResetsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedCreateWithoutGeneralAccountResetsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutGeneralAccountResetsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutGeneralAccountResetsInput, Prisma.UserUncheckedUpdateWithoutGeneralAccountResetsInput>
+}
+
+export type UserUpdateWithoutGeneralAccountResetsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
+  rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
+  rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
+  rewardFulfillmentsCanceled?: Prisma.RewardFulfillmentRequestUpdateManyWithoutCanceledByNestedInput
+  inquiries?: Prisma.InquiryUpdateManyWithoutUserNestedInput
+  inquiryAnswers?: Prisma.InquiryAnswerUpdateManyWithoutAnsweredByNestedInput
+  pushDevices?: Prisma.PushDeviceUpdateManyWithoutUserNestedInput
+  notificationPreference?: Prisma.NotificationPreferenceUpdateOneWithoutUserNestedInput
+  pushNotifications?: Prisma.PushNotificationUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  email?: Prisma.StringFieldUpdateOperationsInput | string
+  passwordHash?: Prisma.StringFieldUpdateOperationsInput | string
+  emailVerifiedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenVersion?: Prisma.IntFieldUpdateOperationsInput | number
+  nickname?: Prisma.StringFieldUpdateOperationsInput | string
+  profileImageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  portfolioPublic?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  status?: Prisma.EnumUserStatusFieldUpdateOperationsInput | $Enums.UserStatus
+  role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
+  friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
+  seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
+  tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
+  fxExecuteRequests?: Prisma.FxExecuteRequestUncheckedUpdateManyWithoutUserNestedInput
+  refreshTokenSessions?: Prisma.RefreshTokenSessionUncheckedUpdateManyWithoutUserNestedInput
+  userBadges?: Prisma.UserBadgeUncheckedUpdateManyWithoutUserNestedInput
+  seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
+  operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
+  quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
+  adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -3276,6 +3513,7 @@ export type UserCreateWithoutQuotesInput = {
   seasonRewards?: Prisma.SeasonRewardCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -3310,6 +3548,7 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedCreateNestedManyWithoutUserInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -3360,6 +3599,7 @@ export type UserUpdateWithoutQuotesInput = {
   seasonRewards?: Prisma.SeasonRewardUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -3394,6 +3634,7 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   seasonRewards?: Prisma.SeasonRewardUncheckedUpdateManyWithoutUserNestedInput
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -3428,6 +3669,7 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -3462,6 +3704,7 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -3512,6 +3755,7 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -3546,6 +3790,7 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -3581,6 +3826,7 @@ export type UserCreateWithoutPushDevicesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -3615,6 +3861,7 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -3665,6 +3912,7 @@ export type UserUpdateWithoutPushDevicesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -3699,6 +3947,7 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -3733,6 +3982,7 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -3767,6 +4017,7 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -3817,6 +4068,7 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -3851,6 +4103,7 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -3885,6 +4138,7 @@ export type UserCreateWithoutPushNotificationsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestCreateNestedManyWithoutProcessedByInput
@@ -3919,6 +4173,7 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedCreateNestedManyWithoutActorInput
   quotes?: Prisma.QuoteUncheckedCreateNestedManyWithoutUserInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedCreateNestedManyWithoutUserInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutUserInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutRequestedByInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedCreateNestedManyWithoutProcessedByInput
@@ -3969,6 +4224,7 @@ export type UserUpdateWithoutPushNotificationsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUpdateManyWithoutProcessedByNestedInput
@@ -4003,6 +4259,7 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   operatorAuditLogs?: Prisma.OperatorAuditLogUncheckedUpdateManyWithoutActorNestedInput
   quotes?: Prisma.QuoteUncheckedUpdateManyWithoutUserNestedInput
   adRewardClaims?: Prisma.AdRewardClaimUncheckedUpdateManyWithoutUserNestedInput
+  generalAccountResets?: Prisma.GeneralAccountResetUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentTargets?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutUserNestedInput
   rewardFulfillmentsRequested?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutRequestedByNestedInput
   rewardFulfillmentsProcessed?: Prisma.RewardFulfillmentRequestUncheckedUpdateManyWithoutProcessedByNestedInput
@@ -4030,6 +4287,7 @@ export type UserCountOutputType = {
   operatorAuditLogs: number
   quotes: number
   adRewardClaims: number
+  generalAccountResets: number
   rewardFulfillmentTargets: number
   rewardFulfillmentsRequested: number
   rewardFulfillmentsProcessed: number
@@ -4052,6 +4310,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   operatorAuditLogs?: boolean | UserCountOutputTypeCountOperatorAuditLogsArgs
   quotes?: boolean | UserCountOutputTypeCountQuotesArgs
   adRewardClaims?: boolean | UserCountOutputTypeCountAdRewardClaimsArgs
+  generalAccountResets?: boolean | UserCountOutputTypeCountGeneralAccountResetsArgs
   rewardFulfillmentTargets?: boolean | UserCountOutputTypeCountRewardFulfillmentTargetsArgs
   rewardFulfillmentsRequested?: boolean | UserCountOutputTypeCountRewardFulfillmentsRequestedArgs
   rewardFulfillmentsProcessed?: boolean | UserCountOutputTypeCountRewardFulfillmentsProcessedArgs
@@ -4152,6 +4411,13 @@ export type UserCountOutputTypeCountAdRewardClaimsArgs<ExtArgs extends runtime.T
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountGeneralAccountResetsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.GeneralAccountResetWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountRewardFulfillmentTargetsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.RewardFulfillmentRequestWhereInput
 }
@@ -4230,6 +4496,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   operatorAuditLogs?: boolean | Prisma.User$operatorAuditLogsArgs<ExtArgs>
   quotes?: boolean | Prisma.User$quotesArgs<ExtArgs>
   adRewardClaims?: boolean | Prisma.User$adRewardClaimsArgs<ExtArgs>
+  generalAccountResets?: boolean | Prisma.User$generalAccountResetsArgs<ExtArgs>
   rewardFulfillmentTargets?: boolean | Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs>
   rewardFulfillmentsRequested?: boolean | Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs>
   rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
@@ -4300,6 +4567,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   operatorAuditLogs?: boolean | Prisma.User$operatorAuditLogsArgs<ExtArgs>
   quotes?: boolean | Prisma.User$quotesArgs<ExtArgs>
   adRewardClaims?: boolean | Prisma.User$adRewardClaimsArgs<ExtArgs>
+  generalAccountResets?: boolean | Prisma.User$generalAccountResetsArgs<ExtArgs>
   rewardFulfillmentTargets?: boolean | Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs>
   rewardFulfillmentsRequested?: boolean | Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs>
   rewardFulfillmentsProcessed?: boolean | Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>
@@ -4328,6 +4596,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     operatorAuditLogs: Prisma.$OperatorAuditLogPayload<ExtArgs>[]
     quotes: Prisma.$QuotePayload<ExtArgs>[]
     adRewardClaims: Prisma.$AdRewardClaimPayload<ExtArgs>[]
+    generalAccountResets: Prisma.$GeneralAccountResetPayload<ExtArgs>[]
     rewardFulfillmentTargets: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
     rewardFulfillmentsRequested: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
     rewardFulfillmentsProcessed: Prisma.$RewardFulfillmentRequestPayload<ExtArgs>[]
@@ -4756,6 +5025,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   operatorAuditLogs<T extends Prisma.User$operatorAuditLogsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$operatorAuditLogsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$OperatorAuditLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   quotes<T extends Prisma.User$quotesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$quotesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$QuotePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   adRewardClaims<T extends Prisma.User$adRewardClaimsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$adRewardClaimsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AdRewardClaimPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  generalAccountResets<T extends Prisma.User$generalAccountResetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$generalAccountResetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$GeneralAccountResetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rewardFulfillmentTargets<T extends Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentTargetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rewardFulfillmentsRequested<T extends Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsRequestedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   rewardFulfillmentsProcessed<T extends Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$rewardFulfillmentsProcessedArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RewardFulfillmentRequestPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -5460,6 +5730,30 @@ export type User$adRewardClaimsArgs<ExtArgs extends runtime.Types.Extensions.Int
   take?: number
   skip?: number
   distinct?: Prisma.AdRewardClaimScalarFieldEnum | Prisma.AdRewardClaimScalarFieldEnum[]
+}
+
+/**
+ * User.generalAccountResets
+ */
+export type User$generalAccountResetsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the GeneralAccountReset
+   */
+  select?: Prisma.GeneralAccountResetSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the GeneralAccountReset
+   */
+  omit?: Prisma.GeneralAccountResetOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.GeneralAccountResetInclude<ExtArgs> | null
+  where?: Prisma.GeneralAccountResetWhereInput
+  orderBy?: Prisma.GeneralAccountResetOrderByWithRelationInput | Prisma.GeneralAccountResetOrderByWithRelationInput[]
+  cursor?: Prisma.GeneralAccountResetWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.GeneralAccountResetScalarFieldEnum | Prisma.GeneralAccountResetScalarFieldEnum[]
 }
 
 /**

@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import {
   AdRewardClaimStatus,
+  type AdRewardPurpose,
   CurrencyCode,
   Prisma,
   SnapshotReason,
@@ -27,6 +28,8 @@ export type StoredClaimForIntegrity = {
   id: string;
   userId: string;
   tradingAccountId: string;
+  /** Only funding claims reach the checks below (2026-10-20). */
+  purpose: AdRewardPurpose;
   status: AdRewardClaimStatus;
   rewardAmountKrw: Prisma.Decimal;
   grantedAt: Date | null;
