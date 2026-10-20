@@ -278,7 +278,10 @@ jobs:
           src/fx/fx.execute.integration.spec.ts
           src/portfolio/valuation-snapshot-consistency.integration.spec.ts
           src/mvp-flow.integration.spec.ts
+      # Own fresh database: runs even when an earlier suite failed, so one red
+      # suite cannot hide this result. The job still fails on any failed step.
       - name: Futures readiness and Last retention PostgreSQL safety
+        if: ${{ !cancelled() }}
         env:
           # Keep destructive retention fixtures separate from the financial suites.
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/futures_price_safety_test?schema=public
@@ -481,7 +484,12 @@ jobs:
           src/seasons/seasons.join.integration.spec.ts
           src/auth/auth.integration.spec.ts
           src/ops/ops-job-lock.integration.spec.ts
+      # The next four steps each create their own fresh database, so they run even
+      # when the shared-database suite above failed; the job still fails on any
+      # failed step. Repair/audit tools below read that shared database and keep
+      # the default condition.
       - name: Auth email and recovery PostgreSQL integration (mocked delivery)
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/auth_email_test?schema=public
         run: |
@@ -492,6 +500,7 @@ jobs:
       # results kept anonymously, races with trades/settlement/refresh/uploads,
       # rollback on failure. Object storage and email delivery are in memory.
       - name: Account deletion PostgreSQL integration (mocked storage and delivery)
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/account_deletion_test?schema=public
           ACCOUNT_DELETION_DB_INTEGRATION: "1"
@@ -500,6 +509,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/auth/account-deletion.integration.spec.ts
       - name: season0 launch, privacy and cleanup PostgreSQL integration
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/season0_launch_test?schema=public
           NODE_ENV: test
@@ -509,6 +519,7 @@ jobs:
           pnpm exec prisma migrate deploy
           pnpm run integration:launch-season
       - name: Active administrator concurrency PostgreSQL integration
+        if: ${{ !cancelled() }}
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/active_admin_race_test?schema=public
           ACTIVE_ADMIN_DB_INTEGRATION: "1"

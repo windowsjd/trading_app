@@ -19,10 +19,11 @@ export function authEmailFixture(prisma: PrismaService) {
       from: 'Trading Class <admin@nanghwa.com>',
       secret,
     }),
-    async send(email: string, purpose: EmailPurpose, code: string, id: string) {
-      if (fail) throw new Error('Fixture delivery failure');
+    send(email: string, purpose: EmailPurpose, code: string, id: string) {
+      if (fail) return Promise.reject(new Error('Fixture delivery failure'));
       codes.set(id, code);
       deliveries.push({ email, purpose });
+      return Promise.resolve();
     },
   };
   const verification = new EmailVerificationService(

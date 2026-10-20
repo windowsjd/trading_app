@@ -28,6 +28,7 @@
 2. 운영 DB에서 아래를 읽고 별도 접근 제한된 점검 파일에 저장한다. 개발 참가자/계정/지갑/원장/주문/포지션/랭킹 건수와 자금 합계도 보존 전후 비교용으로 기록한다. 모든 금융 조회는 해당 개발 participant의 **tradingAccountId**로 제한한다.
 3. 운영자 active admin/operator ID, 승인 테스트 사용자 ID, 허용 테스트 시간, 앱/API 버전, 기존 scheduler와 독립 금융 worker 구성을 확인한다.
 4. 백업 식별자/완료 시각/복구 가능한 시점과 절차를 실제 대시보드에서 확인한다. 암호화된 논리 백업을 선택하면 PG17 호환 `pg_dump`를 쓰고 종료 코드/목차/접근권한을 확인한다. 기존 백업의 복구 이력이 없으면 운영 적용을 보류하고 먼저 복구 계획을 검토한다. 이 작업에서는 복구 DB나 새 클라우드 DB를 만들지 않는다.
+5. Render 서비스 환경 변수는 이름과 불리언/숫자 값만 대조한다(비밀 값 출력 금지). 2026-10-20 기준 `SCHEDULER_RANKING_ENABLED`·`ENABLE_RANKING_SCHEDULER` 미설정(랭킹 자동 갱신 꺼짐), `SCHEDULER_SEASON_LIFECYCLE_ENABLED`·`SCHEDULER_SETTLEMENT_ENABLED`·`SCHEDULER_DAILY_SNAPSHOT_ENABLED`=true, `SCHEDULER_TICK_INTERVAL_MS` 미설정(60초). PITR은 Render API `GET /v1/postgres/{id}/recovery`의 `recoveryStatus`와 `startsAt`을 `--backup-ref` 근거로 기록한다.
 
 ```sql
 SELECT current_setting('TimeZone') AS database_timezone, clock_timestamp();
@@ -42,7 +43,48 @@ WHERE released_at IS NULL AND expires_at > clock_timestamp();
 
 새 마이그레이션 승인·적용 후에는 `launch_kind, launch_armed, suspended_at, trading_cutoff_at, launch_activated_at`도 확인한다. 출시 행 생성/arm은 마이그레이션이나 앱 시작에서 실행하지 않는다.
 
-Render 유료 PostgreSQL의 PITR은 복원 인스턴스를 만드는 절차다. 실제 복구 가능 창과 복원 연습 여부는 이 작업에서 확인하지 않았다. [Render 백업/복구 문서](https://render.com/docs/postgresql-backups)를 기준으로 승인 전 확인한다.
+보존 대조(읽기 전용, 로컬 스키마에서 실행 확인). 개발 시즌 행은 테스트 활성화 직후(cutoff 이후)와 stop/restore/cleanup apply 직전에 같아야 한다. 그 사이 개발 시즌은 동결되어 있다. 일반·초보 행은 정상 거래로 바뀌므로 `ledger_rows`가 줄지 않았는지와 cleanup 계획의 대상 계정에 포함되지 않았는지만 본다.
+
+```sql
+WITH acct AS (
+  SELECT a.id, CASE WHEN a.mode = 'season' THEN 'dev_season' ELSE a.mode::text END AS grp
+  FROM trading_accounts a
+  LEFT JOIN season_participants p ON p.trading_account_id = a.id
+  WHERE a.mode <> 'season' OR p.season_id = 'sea_2026_s1'
+)
+SELECT g.grp,
+  (SELECT count(*) FROM acct x WHERE x.grp = g.grp) AS accounts,
+  (SELECT md5(coalesce(string_agg(w.id || ':' || w.balance_amount || ':' || w.reserved_amount, ',' ORDER BY w.id), ''))
+     FROM cash_wallets w JOIN acct x ON x.id = w.trading_account_id WHERE x.grp = g.grp) AS wallets_md5,
+  (SELECT count(*) FROM wallet_transactions t JOIN acct x ON x.id = t.trading_account_id WHERE x.grp = g.grp) AS ledger_rows,
+  (SELECT md5(coalesce(string_agg(o.id || ':' || o.status, ',' ORDER BY o.id), ''))
+     FROM orders o JOIN acct x ON x.id = o.trading_account_id WHERE x.grp = g.grp) AS orders_md5,
+  (SELECT md5(coalesce(string_agg(s.id || ':' || s.quantity, ',' ORDER BY s.id), ''))
+     FROM positions s JOIN acct x ON x.id = s.trading_account_id WHERE x.grp = g.grp) AS positions_md5,
+  (SELECT md5(coalesce(string_agg(f.id || ':' || f.status || ':' || f.quantity || ':' || f.isolated_margin, ',' ORDER BY f.id), ''))
+     FROM futures_positions f JOIN acct x ON x.id = f.trading_account_id WHERE x.grp = g.grp) AS futures_md5
+FROM (SELECT DISTINCT grp FROM acct) g ORDER BY g.grp;
+```
+
+Render 유료 PostgreSQL의 PITR은 복원 인스턴스를 만드는 절차다. 2026-10-20 API 조회에서 `recoveryStatus=AVAILABLE`, 복구 가능 시작 2026-10-16T23:43:38Z, 논리 export 0건이었다. 복원 연습 여부는 확인하지 않았다. [Render 백업/복구 문서](https://render.com/docs/postgresql-backups)를 기준으로 승인 전 확인한다.
+
+## 랭킹 자동 갱신 운영 설정
+
+2026-10-20 읽기 전용 조회 기준 운영에는 `SCHEDULER_RANKING_ENABLED`(alias `ENABLE_RANKING_SCHEDULER`)가 없어 `season_ranking_generation`이 한 번도 실행되지 않았다. 발행은 시즌 계정의 현물 체결·환전·LOC·지정가 체결 직후 이벤트 갱신에서만 생기고 5분 자산 스냅숏은 만들어지지 않는다. 출시 시즌 랭킹을 기존 1분 주기로 운영하려면 별도 승인 후 다음을 따른다.
+
+1. Render 환경 변수 `SCHEDULER_RANKING_ENABLED=true`를 추가하고 재배포한다(환경 변수는 부팅 시 읽는다). `SCHEDULER_TICK_INTERVAL_MS`는 설정하지 않아 기본 60000을 유지한다. 테스트에서 자동 갱신을 검증하려면 테스트 활성화 전에 켠다. 켜면 현재 개발 시즌에도 분당 갱신과 5분 스냅숏이 시작된다.
+2. 반영 확인(읽기 전용):
+
+```sql
+SELECT status, count(*), max(started_at), max(duration_ms) FROM ops_job_runs
+WHERE job_name = 'season_ranking_generation' AND started_at > now() - interval '15 minutes' GROUP BY status;
+SELECT season_id, max(captured_at) FROM season_rankings GROUP BY season_id;
+SELECT count(*), max(captured_at) FROM equity_snapshots
+WHERE snapshot_reason = 'scheduled' AND captured_at > now() - interval '15 minutes';
+```
+
+기대값: 분당 1건 성공(이전 실행이 길면 잠금 skip 행), 공개 활성 시즌의 `captured_at`이 1~2분 이내, 5분 구간마다 참가자당 scheduled 스냅숏 1건. 실패가 이어져도 기존 순위는 유지되므로 `error_code`로 원인을 찾는다.
+3. 비용: refresh마다 참가자별 시즌 전체 스냅숏 이력을 읽는다. [측정](launch-season0-readiness-2026-10-21.md#참가자-수에-따른-비용-로컬-측정) 기준 21일차 참가자당 약 35ms(로컬 warm cache)이며 운영 PG에서는 더 느리다. `duration_ms`가 30초에 가까워지면 주기를 바꾸지 말고 별도 개선을 검토한다.
 
 ## 운영 명령의 공통 승인 경계
 
@@ -87,7 +129,7 @@ pnpm run season:launch --action stop-test --season-id "$TEST_SEASON_ID" \
   --actor-user-id "$OPERATOR_USER_ID" --out "$STOP_PLAN"
 ```
 
-7. **worker 중단·정리:** 기존 설정을 기록하고 Ops scheduler, 금융 매칭/조건/청산/LOC worker, push 발행/발송 worker를 중단·drain한다. HTTP의 test 쓰기는 이미 stop으로 차단되어 있어야 한다. **모든 살아 있는 Ops lease가 0**인지 확인한다. 아래 cleanup plan의 44개 테이블 건수/행 지문/참조·유지 대상을 검토한다. 예상에 없던 데이터/외부 효과/FK는 삭제하지 않고 원인을 보고한다.
+7. **worker 중단·정리:** 기존 설정을 기록하고 Ops scheduler, 금융 매칭/조건/청산/LOC worker, push 발행/발송 worker를 중단·drain한다. HTTP의 test 쓰기는 이미 stop으로 차단되어 있어야 한다. **모든 살아 있는 Ops lease가 0**인지 확인한다. 실제 끄는 방법과 한계는 [worker 중단·drain 실제 방법](#worker-중단drain-실제-방법)을 따른다. 아래 cleanup plan의 44개 테이블 건수/행 지문/참조·유지 대상을 검토한다. 예상에 없던 데이터/외부 효과/FK는 삭제하지 않고 원인을 보고한다.
 
 ```sh
 pnpm run season:launch --action cleanup-test --season-id "$TEST_SEASON_ID" \
@@ -117,6 +159,27 @@ pnpm run season:launch --action reschedule --season-id "$RELEASE_SEASON_ID" \
 - 시작 이후 lifecycle 실패는 dev cutoff를 유지한 채 원인을 해결하고 같은 기존 lifecycle/activate 경로로 재시도한다. 수동으로 active/ended/settled를 조작하지 않는다.
 - 테스트의 stop/cleanup 실패는 원장/잔액 직접 수정 없이 중단한다. cleanup 실패는 전체 롤백된다. 테스트를 중지 상태로 보관하고 필요 시 승인된 restore-development만 사용한다.
 - 정식 출시 후 장애는 거래를 임의로 개발 시즌에 재개시키지 않는다. 기존 운영 장애 절차로 중단·점검하고 백업 복원은 별도 사고 대응 승인으로 수행한다.
+- **코드 롤백 한계:** launch 행·개발 cutoff·중지 표식이 하나라도 생긴 뒤에는 season0 이전 백엔드로 롤백하지 않는다. 구 코드는 이 표식을 몰라 개발 시즌을 다시 공개·거래 가능하게 다루거나 활성 시즌 중복으로 lifecycle이 실패한다. 배포 후 prepare 전이면 롤백해도 안전하다.
+
+## worker 중단·drain 실제 방법
+
+`cleanup-test` apply는 같은 트랜잭션에서 `ops_job_locks`에 살아 있는 lease(`released_at IS NULL AND expires_at > clock_timestamp()`)가 하나라도 있으면 전체를 거부한다. lease를 잡는 구성과 끄는 방법은 다음과 같다.
+
+| 구성 | 끄는 방법 |
+| --- | --- |
+| Ops scheduler tick(lifecycle·정산·일일 스냅숏·랭킹·FX·캔들 sync/long sync/reconciliation·KRX compaction) | 켜져 있는 `SCHEDULER_*_ENABLED`, `KOSCOM_CENTRAL_CANDLES_ENABLED`, `CANDLE_RECONCILIATION_*_ENABLED`를 모두 false. 하나라도 true면 tick이 등록된다 |
+| 지정가 매칭(전용 interval) | `SCHEDULER_LIMIT_ORDER_MATCHING_ENABLED=false` |
+| 선물 청산 risk worker | `FUTURES_RISK_ENGINE_ENABLED=false` |
+| retention worker | `FUTURES_MARK_RETENTION_ENABLED=false`, `FUTURES_LAST_PRICE_RETENTION_ENABLED=false`(미설정이면 ingestion 플래그를 따라 켜짐), `ASSET_PRICE_SNAPSHOT_RETENTION_ENABLED=false`, `CRYPTO_ORDER_BOOK_RETENTION_ENABLED=false` |
+| push 발송 | `PUSH_NOTIFICATIONS_ENABLED`(운영 미설정 = 꺼짐) |
+| 조건·조건 매수·조건 매도·선물 지정가·선물 TP/SL·선물 조건 진입·LOC 정산 worker, 프로필 이미지 정리 | **끄는 환경 변수가 없다.** 공개 계정에 처리할 live 행(또는 정리 대기)이 있을 때만 tick 동안 lease를 잡는다 |
+
+선택지(각각 별도 승인):
+
+- **A. 서비스 중지(결정적):** Render 서비스를 suspend해 API와 모든 worker를 멈춘다. 운영자 환경에서 lease 0을 확인하고 apply한 뒤 resume한다. 그동안 앱 전체를 쓸 수 없다.
+- **B. 플래그 끄기 + 재배포:** 원래 값을 기록하고 위 표의 플래그를 끈 뒤 재배포한다. 비정상 종료로 남은 스케줄러 lease는 TTL(기본 600초)까지 기다린다. 1초 worker가 그 순간 lease를 잡으면 apply가 거부·롤백되므로 다시 시도한다. 이 동안 모든 계정의 선물 청산과 retention이 멈추므로 창을 짧게 잡고 끝나면 원래 값으로 재배포한다.
+- **C. 물리 삭제 보류:** `restore-development`만 승인한다. lease 조건이 없고, 테스트 시즌은 중지·비공개 상태로 데이터가 남는다. 나중에 A/B로 정리할 수 있다.
+
 
 ## cleanup 영향/삭제 순서와 방어
 
@@ -135,7 +198,21 @@ pnpm run season:launch --action reschedule --season-id "$RELEASE_SEASON_ID" \
 
 **삭제하지 않는 것:** 사용자, 개발·일반·초보 및 다른 시즌 계정/금융 행, 시장 종목/시세/FX/캔들 근거, 공통 Ops run/lease/worker checkpoint 및 운영자 감사 이력. 공유 실행의 JSON 진단에는 삭제한 테스트 ID가 남을 수 있으며 이는 테스트 금융 데이터가 아닌 의도적인 운영 흔적이다. 처리 중/완료된 외부 reward, push 전송/claim/delivery, 미완료 전용 batch가 있으면 자동 정리하지 않는다. `TRUNCATE`, reset, 임의 cascade, 날짜 기준 삭제를 사용하지 않는다.
 
+## 실제 앱 검증 (Android·iOS)
+
+beta 배지, cutoff 타이머·계정 목록 30초 갱신, `SEASON_TEST_ACCESS_DENIED` 문구는 새 앱 빌드에서만 보인다(EAS 빌드는 별도 승인). 서버 차단은 구버전 앱에도 적용된다. 승인된 테스트 계정과 비승인 계정 각 1개 이상으로 확인한다.
+
+- season0 참가와 초기 지급 10,000,000 KRW 1회, 새 시즌 계정·지갑 4개, 기존 개발 시즌 자산 미승계
+- 현물 시장가 1회 이상, 지정가 생성·취소, 환전, 선물 진입·종료
+- 계정 간 격리: 일반·초보 계정 잔액/주문 불변, 개발 시즌 계정이 목록에서 사라지고 직접 접근 시 not-found
+- 랭킹 자동 갱신(`SCHEDULER_RANKING_ENABLED` 켠 경우), 60초 재조회, 테스트 시즌 이름 `season0` + 회색 `beta`
+- 개발 시즌 계정을 선택한 채 cutoff를 넘길 때 선택 해제와 계정 선택 화면 복귀, 앱 재시작·재로그인 후 캐시 정상
+- 비승인 계정 참가 거부 문구, 테스트 종료(stop) 후 테스트 계정 숨김, 개발 복구 후 개발 계정 재표시·거래 가능
+- Android/iOS 각 기본 글꼴과 큰 글꼴, Light/Dark에서 홈 제목·배지·계정 변경 버튼 겹침 없음
+
 ## 검증과 배포
+
+후속 CI 분류·랭킹 운영 상태·재검증 결과는 [2차 보고서](launch-season0-readiness-2026-10-21.md)에 있다.
 
 로컬 실제 PG17, 전체 단위/앱 테스트, CLI와 브라우저 레이아웃 결과 및 미검증 범위는 [검증 보고서](launch-season0-validation-2026-10-21.md)에 기록한다. CI의 기존 core-account DB 작업에도 새 DB 로컬 fixture 단계만 추가하며 클라우드 DB를 만들지 않는다.
 

@@ -51,6 +51,7 @@ describe('public error presentation', () => {
       ['INSUFFICIENT_BALANCE', /잔액이 부족/],
       ['INSUFFICIENT_QUANTITY', /보유 수량이 부족/],
       ['MARKET_CLOSED', /지정가를 직접 선택/],
+      ['SEASON_TEST_ACCESS_DENIED', /승인된 테스트 계정만/],
     ] as const) assert.match(getErrorMessageFromCode(code), expected);
     const error = { response: { status: 409, data: { error: { code: 'QUOTE_EXPIRED', message: raw } } }, code: 'ERR_BAD_REQUEST' };
     assert.equal(getApiErrorCode(error), 'QUOTE_EXPIRED');

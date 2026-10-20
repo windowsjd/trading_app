@@ -379,6 +379,8 @@ export function getErrorMessageFromCode(
       return '이미 참가한 시즌입니다.';
     case ERROR_CODE.SEASON_NOT_FOUND:
       return '현재 시즌이 설정되지 않았습니다.';
+    case ERROR_CODE.SEASON_TEST_ACCESS_DENIED:
+      return '승인된 테스트 계정만 참가할 수 있는 시즌입니다.';
     case ERROR_CODE.MARKET_CLOSED:
       return '정규장 외에는 시장가 주문을 할 수 없습니다. 지정가를 직접 선택해주세요.';
     case ERROR_CODE.MARKET_CALENDAR_UNAVAILABLE:

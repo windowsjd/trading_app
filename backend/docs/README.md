@@ -6,6 +6,7 @@ First compare current implementation, tests and migrations with explicit current
 
 1. API contracts — the request/response contract for each surface:
    - `docs/launch-season0-operations.md` — season0 preparation, explicit arm/cutover, development suspension/visibility, allowlisted test cleanup; production apply requires separate approval
+   - `docs/launch-season0-readiness-2026-10-21.md` — season0 pre-launch follow-up: CI failure classification, production ranking-scheduler state (read-only), cleanup/worker-drain limits, approvals still required
    - `docs/auth-api-contract.md`
    - `docs/account-deletion-contract.md` — 2026-10-18: self-service account deletion (app password / web email proof), one-transaction purge, anonymous settled final results, receipts and status, durable profile image cleanup, web page requirements for nanghwa.com
    - `docs/data-retention.md` — 2026-10-21: automatic deletion of refresh sessions (90 days after they end), operator audit logs (1 year) and support inquiries (3 years after the answer or filing); settings, batching, first-deploy irreversible deletion, retention already enforced elsewhere

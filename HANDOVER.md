@@ -1,5 +1,15 @@
 # 프로젝트 인수인계서
 
+## 2026-10-21 (2차) — season0 CI 회귀 원인 분리·랭킹 자동 갱신 운영 상태 규명·출시 전 절차 확정 (main, `[skip render]`, 운영 미적용)
+
+- **기준:** 시작 clean HEAD = origin/main `d3e47823e20ab058d982617aabbd139ab1759586`. 운영 live 백엔드 `48ef6741`(5986d7f7·d3e47823 미배포). 근거·수치 전체는 [2차 보고서](backend/docs/launch-season0-readiness-2026-10-21.md), 절차는 [운영 절차](backend/docs/launch-season0-operations.md).
+- **CI:** 신규 실패는 Release-critical E2E 7건뿐. `test/app.e2e-spec.ts`가 owned 계정 조회 `where`를 시즌 커밋의 비공개 필터 없이 정확 비교했다(1차 검증이 `test:e2e`를 안 돌림). 새 계약으로 단언 보완, 필터 제거 변이 시 7건 FAIL 확인. 나머지는 기존 실패: Backend quality(`auth-email-fixture.ts` require-await, ddeb5576부터 — 뒤의 typecheck/build/unit/진단 게이트를 CI에서 건너뛰게 했으므로 수정), Core account(`krx-session-close-recovery` 2≠4, d61b027d부터), Limit order(`spot-wallet-transfer` 25001, 2e0a60ae부터), Futures 25(`EMAIL_UNAVAILABLE`, ddeb5576부터). 뒤 둘·krx는 미수정. 독립 fresh DB 단계 5개(season0 포함)는 `if: ${{ !cancelled() }}`로 앞 실패와 무관하게 실행(작업은 계속 FAIL).
+- **랭킹:** 운영 `SCHEDULER_RANKING_ENABLED`·`ENABLE_RANKING_SCHEDULER` 미설정 → `season_ranking_generation` 실행 0건, 발행은 시즌 체결 직후 이벤트 갱신뿐(마지막 10-20 13:41:44Z, 그 전 10-10), 5분 스냅숏 없음. 결정 기록 없는 설정 누락이며 코드 결함 아님(코드 무변경). 실패 시 기존 순위 유지, 앱 60초 재조회는 최신 발행본. 켜려면 승인 후 env 추가+재배포. refresh가 참가자별 시즌 전체 스냅숏 이력을 읽어 21일차 참가자당 ~35ms(로컬 PG17, 500명 17초) — 수백 명 이상이면 별도 개선 검토.
+- **재검증:** 전환 원자성·cutoff·금융 경로 공통 잠금·개발 시즌 비정산·정리 범위/FK/롤백을 코드와 로컬 PG16/PG17로 확인. 정리 apply의 "Ops lease 0" 조건은 끄는 env가 없는 1초 금융 worker 6개+LOC 때문에 서비스 중지 없이는 결정적으로 보장되지 않음 → 운영 절차에 A(서비스 suspend)/B(플래그+재배포 후 재시도)/C(`restore-development`만) 정리. 중지된 개발 시즌 선물은 청산이 멈추고 risk worker가 `SEASON_NOT_ACTIVE`를 기록(진단 소음).
+- **앱:** 서버 새 오류 `SEASON_TEST_ACCESS_DENIED`가 미매핑이라 비승인 사용자에게 "잠시 후 다시 시도해주세요."가 보였다 → 고정 문구 매핑(새 빌드부터).
+- **운영 조회(읽기 전용):** env 플래그 이름·불리언만, PG는 READ ONLY 세션+롤백. 미적용 마이그레이션은 `20261021020000_add_launch_season_control` 1건(확장형, 구 코드 호환). PITR AVAILABLE(2026-10-16T23:43:38Z부터), export 0건. launch 행/cutoff 생성 뒤에는 season0 이전 코드로 롤백 금지.
+- **미실행/미검증:** 운영 배포·migrate·env 변경·시즌 생성/arm/정리, EAS 빌드, 실기기, PITR 복원 연습.
+
 ## 2026-10-21 — season0 준비·개발 시즌 안전 전환·제한 테스트/정리 (main, 운영 미적용)
 
 - **기준:** 시작 clean HEAD/origin/main `5986d7f7111f6c8eb4f80f2a3eb1282c8f5b88e1`. 기존 병행 worktree/브랜치는 보존. 사용자 승인 범위에 따라 backend/frontend·기존 CI·문서 수정. [운영 절차](backend/docs/launch-season0-operations.md), [전체 검증/파일 보고](backend/docs/launch-season0-validation-2026-10-21.md).

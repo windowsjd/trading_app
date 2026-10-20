@@ -2,6 +2,7 @@ import { EmailVerificationService } from '../src/auth/email-verification.service
 import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
 import { createApiError } from '../src/common/api-error';
 import { SPOT_ASSET_WHERE } from '../src/providers/binance/binance-product-catalog';
+import { publicTradingAccountWhere } from '../src/seasons/season-availability.policy';
 jest.mock('../src/generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -3057,7 +3058,10 @@ describe('AppController (e2e)', () => {
       expect(prisma.tradingAccount.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { userId: user.id },
+          where: {
+            userId: user.id,
+            ...publicTradingAccountWhere(expect.any(Date) as Date),
+          },
           orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
         }),
       );
@@ -3102,7 +3106,10 @@ describe('AppController (e2e)', () => {
         expect(prisma.tradingAccount.findMany).toHaveBeenCalledTimes(1);
         expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
           expect.objectContaining({
-            where: { userId: user.id },
+            where: {
+              userId: user.id,
+              ...publicTradingAccountWhere(expect.any(Date) as Date),
+            },
             orderBy: [
               { openedAt: 'desc' },
               { createdAt: 'desc' },
@@ -3285,7 +3292,11 @@ describe('AppController (e2e)', () => {
       );
     expect(prisma.tradingAccount.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'other-users-account', userId: user.id },
+        where: {
+          id: 'other-users-account',
+          userId: user.id,
+          ...publicTradingAccountWhere(expect.any(Date) as Date),
+        },
       }),
     );
     expect(prisma.exchangeTransaction.findMany).not.toHaveBeenCalled();
@@ -3317,7 +3328,11 @@ describe('AppController (e2e)', () => {
 
     expect(prisma.tradingAccount.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'other-users-account', userId: user.id },
+        where: {
+          id: 'other-users-account',
+          userId: user.id,
+          ...publicTradingAccountWhere(expect.any(Date) as Date),
+        },
       }),
     );
   });
