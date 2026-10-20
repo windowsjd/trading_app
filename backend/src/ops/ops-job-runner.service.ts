@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import {
   HttpException,
   HttpStatus,
@@ -661,6 +662,7 @@ export class OpsJobRunnerService {
       async (context) => {
         const seasons = await this.prisma.season.findMany({
           where: {
+            ...publicSeasonWhere(),
             status: SeasonStatus.ended,
           },
           orderBy: [{ endAt: 'asc' }, { id: 'asc' }],
@@ -1284,6 +1286,7 @@ export class OpsJobRunnerService {
     const seasonId = this.optionalString(input.seasonId);
     const seasons = await this.prisma.season.findMany({
       where: {
+        ...publicSeasonWhere(),
         ...(seasonId ? { id: seasonId } : {}),
         status: SeasonStatus.active,
         startAt: { lte: now },

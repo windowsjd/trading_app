@@ -6,6 +6,7 @@ export type SeasonEffectiveMode = SeasonStatus;
 export interface CurrentSeasonDto {
   id: string;
   name: string;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   effectiveStatus?: SeasonStatus;
   effectiveMode?: SeasonEffectiveMode;

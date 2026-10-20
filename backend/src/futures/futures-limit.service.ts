@@ -9,6 +9,7 @@ import {
   type OwnedTradingAccount,
 } from '../trading-accounts/trading-account-access.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { reserveAvailableCash } from '../wallets/cash-wallet-atomic';
 import { createProtectionInTransaction } from '../conditional/conditional-registration';
 import { parseEntryTpSlDrafts } from '../conditional/entry-tp-sl-policy';
@@ -451,6 +452,12 @@ export class FuturesLimitService {
     const ended = await this.prisma.$transaction(async (tx) => {
       const locked = await this.lock(tx, account);
       const now = await this.futures.dbNow(tx);
+      if (
+        locked.mode === 'season' &&
+        locked.seasonParticipant &&
+        isSeasonSuspended(locked.seasonParticipant.season, now)
+      )
+        return 'paused' as const;
       if (conditionalTradable(locked, now)) return false;
       const reason = isStandaloneAccountMode(locked.mode)
         ? 'account_not_tradable'
@@ -466,6 +473,7 @@ export class FuturesLimitService {
       );
       return true;
     });
+    if (ended === 'paused') return { state: 'paused' };
     if (ended) return { state: 'canceled' };
     if (futuresTradingMode() !== 'ENABLED') return { state: 'paused' };
     await this.futures.execute(

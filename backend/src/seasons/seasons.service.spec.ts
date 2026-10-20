@@ -223,12 +223,22 @@ describe('SeasonsService', () => {
     expect(prisma.season.count).toHaveBeenCalledWith({
       where: {
         status: SeasonStatus.settled,
+        suspendedAt: null,
+        OR: [
+          { tradingCutoffAt: null },
+          { tradingCutoffAt: { gt: expect.any(Date) } },
+        ],
       },
     });
     expect(prisma.season.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           status: SeasonStatus.settled,
+          suspendedAt: null,
+          OR: [
+            { tradingCutoffAt: null },
+            { tradingCutoffAt: { gt: expect.any(Date) } },
+          ],
         },
         skip: 1,
         take: 2,

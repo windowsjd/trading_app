@@ -1,5 +1,8 @@
 # GET /api/v1/ranking API Contract
 
+Launch-season extension (2026-10-21): [season0 operations](launch-season0-operations.md) defines the shared whole-season visibility/cutoff policy and optional `displayBadge: "beta"` season metadata. Hidden season accounts are omitted/rejected by public reads; ordinary/beginner accounts retain their policies. Owned season DTOs additionally expose the optional scheduled `tradingCutoffAt`.
+
+
 ## F3 valuation (current)
 
 Current ranking uses the shared fresh Mark Futures UPNL component in total equity.

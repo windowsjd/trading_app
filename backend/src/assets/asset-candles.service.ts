@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import { isFuturesOnlyAsset } from '../providers/binance/binance-product-catalog';
 import { KoscomCandleReaderService } from './koscom-candle-reader.service';
 import { KoscomError } from '../providers/koscom/koscom.config';
@@ -1536,6 +1537,7 @@ export class AssetCandlesService {
     } as const;
     const currentByClock = await this.prisma.season.findFirst({
       where: {
+        ...publicSeasonWhere(now),
         startAt: {
           lte: now,
         },
@@ -1555,6 +1557,7 @@ export class AssetCandlesService {
 
     return this.prisma.season.findFirst({
       where: {
+        ...publicSeasonWhere(now),
         status: SeasonStatus.active,
       },
       orderBy: {

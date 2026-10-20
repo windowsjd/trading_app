@@ -35,6 +35,7 @@ import {
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { assertAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
@@ -1168,7 +1169,7 @@ export class FuturesService {
         'Season participant is not active.',
       );
     const season = participant.season;
-    if (season.status !== 'active')
+    if (isSeasonSuspended(season, now) || season.status !== 'active')
       futuresError('SEASON_NOT_ACTIVE', 'Season is not active.');
     if (now < season.startAt)
       futuresError('SEASON_NOT_STARTED', 'Season has not started.');

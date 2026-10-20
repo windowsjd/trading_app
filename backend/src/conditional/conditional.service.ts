@@ -1,3 +1,4 @@
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import { createApiError } from '../common/api-error';
 import { Injectable } from '@nestjs/common';
@@ -455,6 +456,12 @@ export class ConditionalService {
         accountId,
         tx,
       );
+      if (
+        account.mode === 'season' &&
+        account.seasonParticipant &&
+        isSeasonSuspended(account.seasonParticipant.season, now)
+      )
+        return { state: 'paused' };
       if (!conditionalTradable(account, now)) {
         const reason = isStandaloneAccountMode(account.mode)
           ? 'account_not_tradable'

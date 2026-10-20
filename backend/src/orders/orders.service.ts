@@ -1,4 +1,9 @@
 import {
+  publicSeasonWhere,
+  publicTradingAccountWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
+import {
   assertBeginnerLearningAccess,
   beginnerOrderAction,
 } from '../trading-accounts/beginner-learning-policy';
@@ -235,6 +240,8 @@ type OrdersState = 'available' | 'not_joined' | 'unavailable';
 type OrdersSeason = {
   id: string;
   name: string;
+  launchKind?: string | null;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -706,6 +713,9 @@ const ORDER_EXECUTION_SELECT = {
               id: true,
               name: true,
               status: true,
+              launchKind: true,
+              suspendedAt: true,
+              tradingCutoffAt: true,
               startAt: true,
               endAt: true,
               tradeFeeRate: true,
@@ -2967,11 +2977,17 @@ export class OrdersService {
     }
 
     const season = await this.prisma.season.findUnique({
-      where: { id: account.seasonParticipant.season.id },
+      where: {
+        ...publicSeasonWhere(),
+        id: account.seasonParticipant.season.id,
+      },
       select: {
         id: true,
         name: true,
         status: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         startAt: true,
         endAt: true,
         tradeFeeRate: true,
@@ -3117,7 +3133,7 @@ export class OrdersService {
     const order = await tx.order.findFirst({
       where: {
         id: orderId,
-        tradingAccount: { userId },
+        tradingAccount: { userId, ...publicTradingAccountWhere() },
       },
       select: ORDER_EXECUTION_SELECT,
     });
@@ -6650,7 +6666,10 @@ export class OrdersService {
     const order = await this.prisma.order.findFirst({
       where: {
         quoteId: input.quoteId,
-        tradingAccount: { userId: input.userId },
+        tradingAccount: {
+          userId: input.userId,
+          ...publicTradingAccountWhere(),
+        },
       },
       select: {
         ...IDEMPOTENT_CREATE_ORDER_SELECT,
@@ -6909,12 +6928,16 @@ export class OrdersService {
   private async findActiveSeason(): Promise<ActiveOrderSeason | null> {
     return this.prisma.season.findFirst({
       where: {
+        ...publicSeasonWhere(),
         status: SeasonStatus.active,
       },
       select: {
         id: true,
         name: true,
         status: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         startAt: true,
         endAt: true,
         tradeFeeRate: true,
@@ -7652,12 +7675,16 @@ export class OrdersService {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
         where: {
+          ...publicSeasonWhere(),
           status,
         },
         select: {
           id: true,
           name: true,
           status: true,
+          launchKind: true,
+          suspendedAt: true,
+          tradingCutoffAt: true,
           startAt: true,
           endAt: true,
         },
@@ -7675,12 +7702,16 @@ export class OrdersService {
   private async findSeasonById(seasonId: string): Promise<OrdersSeason | null> {
     return this.prisma.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: {
         id: true,
         name: true,
         status: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         startAt: true,
         endAt: true,
       },
@@ -7837,6 +7868,7 @@ export class OrdersService {
     return {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
       startAt: season.startAt.toISOString(),
       endAt: season.endAt.toISOString(),

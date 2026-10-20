@@ -15,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TradingAccountAccessService } from '../trading-accounts/trading-account-access.service';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { assertCashWalletTradingAccountScope } from './cash-wallet-scope';
 import { debitAvailableCash } from './cash-wallet-atomic';
 import { diagnoseCashWalletMutationFailure } from './cash-wallet-failure-diagnosis';
@@ -176,7 +177,10 @@ export class TradingAccountWalletTransferService {
               'PARTICIPANT_NOT_ACTIVE',
               'Season participant is not active.',
             );
-          if (season.status !== SeasonStatus.active)
+          if (
+            isSeasonSuspended(season, clock.now) ||
+            season.status !== SeasonStatus.active
+          )
             fail(
               HttpStatus.CONFLICT,
               'SEASON_NOT_ACTIVE',

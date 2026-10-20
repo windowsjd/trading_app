@@ -31,6 +31,7 @@ import {
   WalletTransactionType,
 } from '../generated/prisma/client';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeneralAccountPerformanceService } from '../portfolio/general-account-performance.service';
 import {
@@ -189,7 +190,14 @@ const EXEC_ORDER_SELECT = {
           participantStatus: true,
           tradingAccountId: true,
           season: {
-            select: { id: true, status: true, startAt: true, endAt: true },
+            select: {
+              id: true,
+              status: true,
+              startAt: true,
+              endAt: true,
+              suspendedAt: true,
+              tradingCutoffAt: true,
+            },
           },
         },
       },
@@ -374,6 +382,7 @@ export class LimitOrderExecutionService {
           );
         }
         if (
+          isSeasonSuspended(season, transactionNow) ||
           season.status !== SeasonStatus.active ||
           transactionNow < season.startAt ||
           transactionNow >= season.endAt

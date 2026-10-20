@@ -6,6 +6,23 @@ import {
   TradingAccountMode,
   TradingAccountStatus,
 } from '../generated/prisma/client';
+import {
+  isSeasonSuspended,
+  type SeasonAvailability,
+} from './season-availability.policy';
+
+export async function assertLockedSeasonAvailable(
+  tx: Pick<Prisma.TransactionClient, '$queryRaw'>,
+  season: SeasonAvailability,
+) {
+  if (!season.suspendedAt && !season.tradingCutoffAt) return;
+  const [clock] = await tx.$queryRaw<
+    { now: Date }[]
+  >`SELECT clock_timestamp() AS now`;
+  if (!clock?.now || isSeasonSuspended(season, clock.now)) {
+    fail(HttpStatus.CONFLICT, 'SEASON_NOT_ACTIVE', 'Season is not available.');
+  }
+}
 
 /**
  * Authorization locks only; season trades do not take the general TWR fence.
@@ -41,9 +58,17 @@ export async function lockSeasonTradingContext(
     );
   }
   const seasons = await tx.$queryRaw<
-    Array<{ id: string; status: SeasonStatus; startAt: Date; endAt: Date }>
+    Array<{
+      id: string;
+      status: SeasonStatus;
+      startAt: Date;
+      endAt: Date;
+      suspendedAt: Date | null;
+      tradingCutoffAt: Date | null;
+    }>
   >`
-    SELECT "id", "status", "start_at" AS "startAt", "end_at" AS "endAt"
+    SELECT "id", "status", "start_at" AS "startAt", "end_at" AS "endAt",
+           "suspended_at" AS "suspendedAt", "trading_cutoff_at" AS "tradingCutoffAt"
     FROM "seasons" WHERE "id" = ${target.seasonId} FOR SHARE
   `;
   const accounts = await tx.$queryRaw<
@@ -84,6 +109,7 @@ export async function lockSeasonTradingContext(
   if (!season) {
     fail(HttpStatus.CONFLICT, 'SEASON_NOT_ACTIVE', 'Season is not active.');
   }
+  await assertLockedSeasonAvailable(tx, season);
   if (!participant.tradingAccountId) {
     fail(
       HttpStatus.INTERNAL_SERVER_ERROR,

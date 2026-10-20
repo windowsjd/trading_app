@@ -1,3 +1,7 @@
+import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import {
   buildSelectionFailureEvidence,
@@ -72,6 +76,8 @@ type PositionsState = 'available' | 'not_joined' | 'unavailable';
 type PositionsSeason = {
   id: string;
   name: string;
+  launchKind?: string | null;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -1345,12 +1351,16 @@ export class PositionsService {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
         where: {
+          ...publicSeasonWhere(),
           status,
         },
         select: {
           id: true,
           name: true,
           status: true,
+          launchKind: true,
+          suspendedAt: true,
+          tradingCutoffAt: true,
           startAt: true,
           endAt: true,
         },
@@ -1370,12 +1380,16 @@ export class PositionsService {
   ): Promise<PositionsSeason | null> {
     return this.prisma.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: {
         id: true,
         name: true,
         status: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         startAt: true,
         endAt: true,
       },
@@ -1471,6 +1485,7 @@ export class PositionsService {
     return {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
       startAt: season.startAt.toISOString(),
       endAt: season.endAt.toISOString(),

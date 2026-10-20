@@ -56,6 +56,8 @@ export type ReturnRateMethod = 'cumulative_principal' | 'initial_capital';
 export interface TradingAccountSeasonDto {
   seasonId: string;
   seasonName: string;
+  displayBadge?: 'beta';
+  tradingCutoffAt?: string | null;
   seasonStatus: 'upcoming' | 'active' | 'ended' | 'settled';
   startAt: string;
   endAt: string;

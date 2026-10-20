@@ -1,6 +1,7 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { Prisma, TradingAccountMode } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 
 /**
  * Ownership-checked TradingAccount lookup shared by the trading-accounts API
@@ -38,6 +39,9 @@ const OWNED_ACCOUNT_SELECT = {
         select: {
           id: true,
           name: true,
+          launchKind: true,
+          suspendedAt: true,
+          tradingCutoffAt: true,
           status: true,
           startAt: true,
           endAt: true,
@@ -63,6 +67,7 @@ export class TradingAccountAccessService {
     const accounts = await this.prisma.tradingAccount.findMany({
       where: {
         userId,
+        ...publicTradingAccountWhere(),
       },
       orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       select: OWNED_ACCOUNT_SELECT,
@@ -92,6 +97,7 @@ export class TradingAccountAccessService {
       where: {
         id: accountId,
         userId,
+        ...publicTradingAccountWhere(),
       },
       select: OWNED_ACCOUNT_SELECT,
     });

@@ -1,5 +1,6 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import React from 'react';
-import { StyleSheet, Text } from '../../theme/native';
+import { StyleSheet } from '../../theme/native';
 import { TEST_IDS } from '../../constants/testIds';
 import type { SeasonBadge } from '../../features/record/seasonBadges';
 import StandingCard from '../ranking/StandingCard';
@@ -20,7 +21,7 @@ export default function SeasonBadgeCard({ badge }: { badge: SeasonBadge }) {
       figures={{ returnRate: badge.returnRate, totalAssetKrw: badge.totalAssetKrw }}
       figureLabels={{ rate: '최종 수익률', total: '최종 자산' }}
       header={(foreground) => (
-        <Text testID={`${prefix}-season`} style={[styles.seasonName, foreground]}>{badge.seasonName}</Text>
+        <SeasonTitle testID={`${prefix}-season`} style={[styles.seasonName, foreground]} name={badge.seasonName} displayBadge={badge.displayBadge} />
       )}
     />
   );

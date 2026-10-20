@@ -1,5 +1,6 @@
 import { SPOT_ASSET_WHERE } from '../providers/binance/binance-product-catalog';
 import { Injectable } from '@nestjs/common';
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import {
   AssetType,
   CurrencyCode,
@@ -123,6 +124,7 @@ export class LimitOrderCandidateRepository {
                 seasonParticipant: {
                   participantStatus: ParticipantStatus.active,
                   season: {
+                    ...publicSeasonWhere(now),
                     status: SeasonStatus.active,
                     startAt: { lte: now },
                     endAt: { gt: now },

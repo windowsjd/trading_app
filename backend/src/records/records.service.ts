@@ -1,4 +1,8 @@
 import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
+import {
   buildSelectionFailureEvidence,
   describeManualFallback,
 } from '../providers/source-selection-diagnostics';
@@ -129,6 +133,8 @@ type ValuationErrorCode =
 type RecordsSeason = {
   id: string;
   name: string;
+  launchKind?: string | null;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -524,6 +530,8 @@ type UserSeasonRecordSummaryResponse = {
     season: {
       id: string;
       name: string;
+      launchKind?: string | null;
+      displayBadge?: 'beta';
       status: SeasonStatus;
     };
     summary: {
@@ -552,6 +560,8 @@ type UserCurrentSeasonSummaryResponse = {
     season: {
       id: string;
       name: string;
+      launchKind?: string | null;
+      displayBadge?: 'beta';
       status: SeasonStatus;
       rank: number | null;
       provisionalTier: string | null;
@@ -699,9 +709,12 @@ export class RecordsService {
     const parsedQuery = this.parseMySeasonRecordsQuery(query);
     const where = {
       userId,
-      ...(parsedQuery.seasonStatus
-        ? { season: { status: parsedQuery.seasonStatus } }
-        : {}),
+      season: {
+        ...publicSeasonWhere(),
+        ...(parsedQuery.seasonStatus
+          ? { status: parsedQuery.seasonStatus }
+          : {}),
+      },
     };
     const total = await this.prisma.seasonParticipant.count({ where });
 
@@ -781,6 +794,7 @@ export class RecordsService {
           select: {
             id: true,
             name: true,
+            launchKind: true,
             status: true,
           },
         },
@@ -834,6 +848,7 @@ export class RecordsService {
           return {
             seasonId: participant.season.id,
             seasonName: participant.season.name,
+            ...seasonDisplayFields(participant.season),
             seasonStatus: participant.season.status,
             joinedAt: participant.joinedAt.toISOString(),
             participantStatus: participant.participantStatus,
@@ -1319,6 +1334,7 @@ export class RecordsService {
     const publicSeason = {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
     };
 
@@ -1451,6 +1467,7 @@ export class RecordsService {
           season: {
             id: season.id,
             name: season.name,
+            ...seasonDisplayFields(season),
             maxDrawdown: null,
             status: season.status,
             rank: null,
@@ -1481,6 +1498,7 @@ export class RecordsService {
           season: {
             id: season.id,
             name: season.name,
+            ...seasonDisplayFields(season),
             maxDrawdown: null,
             status: season.status,
             rank: null,
@@ -1578,7 +1596,7 @@ export class RecordsService {
           seasonId: season.id,
           tradingAccountId: participant.tradingAccountId,
           ...this.publicRankingParticipantWhere(),
-          season: { status: SeasonStatus.active },
+          season: { ...publicSeasonWhere(), status: SeasonStatus.active },
           tradingAccount: {
             id: participant.tradingAccountId,
             userId: parsedTargetUserId,
@@ -1616,6 +1634,7 @@ export class RecordsService {
         season: {
           id: season.id,
           name: season.name,
+          ...seasonDisplayFields(season),
           maxDrawdown: ranking
             ? this.formatDecimal(ranking.maxDrawdown, 8)
             : notQualifiedMetric
@@ -2838,12 +2857,16 @@ export class RecordsService {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
         where: {
+          ...publicSeasonWhere(),
           status,
         },
         select: {
           id: true,
           name: true,
           status: true,
+          launchKind: true,
+          suspendedAt: true,
+          tradingCutoffAt: true,
           startAt: true,
           endAt: true,
         },
@@ -2863,12 +2886,16 @@ export class RecordsService {
   ): Promise<RecordsSeason | null> {
     return this.prisma.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: {
         id: true,
         name: true,
         status: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         startAt: true,
         endAt: true,
       },
@@ -3183,6 +3210,7 @@ export class RecordsService {
     return {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
       startAt: season.startAt.toISOString(),
       endAt: season.endAt.toISOString(),

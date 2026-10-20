@@ -1,4 +1,5 @@
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { createApiError } from '../common/api-error';
 import { createHash } from 'node:crypto';
 import {
@@ -51,6 +52,7 @@ export function conditionalTradable(account: OwnedTradingAccount, now: Date) {
   const p = account.seasonParticipant;
   return (
     !!p &&
+    !isSeasonSuspended(p.season, now) &&
     p.participantStatus === 'active' &&
     p.season.status === 'active' &&
     p.season.startAt <= now &&

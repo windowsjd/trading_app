@@ -104,6 +104,7 @@ export function getTradingAccountCapabilities(
     season.seasonStatus === 'active' &&
     Date.parse(season.startAt) <= now &&
     now < Date.parse(season.endAt);
+  const beforeCutover = !season?.tradingCutoffAt || now < Date.parse(season.tradingCutoffAt);
 
   // Status is checked BEFORE mode so a closed general account reads as closed
   // rather than as "not implemented yet" — they are different situations and
@@ -112,7 +113,7 @@ export function getTradingAccountCapabilities(
     ? statusBlock
     : !isSeason
       ? null
-      : !seasonActive
+      : !seasonActive || !beforeCutover
         ? 'season_not_active'
         : season?.participantStatus === 'excluded'
           ? 'participant_excluded'
@@ -152,6 +153,7 @@ export function nextCapabilityBoundary(
   const boundaries = [
     Date.parse(account.season.startAt),
     Date.parse(account.season.endAt),
+    Date.parse(account.season.tradingCutoffAt ?? ''),
   ].filter((at) => Number.isFinite(at) && at > now);
   return boundaries.length ? Math.min(...boundaries) : null;
 }

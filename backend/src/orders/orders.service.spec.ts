@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import { emptyProtectionState } from '../../test/support/empty-protection-state';
 import {
   captureFinancialFailure,
@@ -3040,10 +3041,14 @@ describe('OrdersService', () => {
     expect(prisma.season.findUnique).toHaveBeenCalledWith({
       where: {
         id: 'season-1',
+        ...publicSeasonWhere(expect.any(Date) as Date),
       },
       select: {
         id: true,
         name: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         status: true,
         startAt: true,
         endAt: true,

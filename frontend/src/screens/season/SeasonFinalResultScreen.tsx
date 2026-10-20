@@ -1,3 +1,4 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import React, { useEffect } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from '../../theme/native';
 import { SafeAreaView } from '../../theme/safeArea';
@@ -109,7 +110,7 @@ export default function SeasonFinalResultScreen({ navigation, route }: SeasonFin
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
       <ScrollView testID={IDS.screen} style={styles.screen} contentContainerStyle={styles.content}>
-        <Text style={styles.seasonName}>{data.season.name}</Text>
+        <SeasonTitle style={styles.seasonName} containerStyle={{ justifyContent: 'center' }} name={data.season.name} displayBadge={data.season.displayBadge} />
         <ResultBody data={data} onRetry={() => void resultQuery.refetch()} />
         {view.isError ? (
           <View style={styles.viewError}>

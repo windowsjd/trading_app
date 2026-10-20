@@ -1,3 +1,4 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { semantic } from '../../theme/tokens';
 import { getScreenContentStyle } from '../../theme/screenLayout';
@@ -142,7 +143,7 @@ export default function RecordSeasonListScreen({ navigation }: Props) {
             }
           >
             <View style={styles.identity}>
-              <Text style={styles.itemTitle}>{item.seasonName}</Text>
+              <SeasonTitle style={styles.itemTitle} name={item.seasonName} displayBadge={item.displayBadge} />
               <Text style={styles.helper}>
                 참가 시각 {formatKstDateTime(item.joinedAt)}
               </Text>

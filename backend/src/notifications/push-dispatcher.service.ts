@@ -9,7 +9,11 @@ import {
 } from './expo-push.client';
 import { pushPriority } from './push-copy';
 import { preferenceEnabled } from './notification-preferences.service';
-import { parseSeasonEndingSourceKey } from './push-sources';
+import {
+  parseSeasonEndingSourceKey,
+  notificationAccountWhere,
+  notificationSeasonWhere,
+} from './push-sources';
 import type { PushNotificationsConfig } from './push-notifications.config';
 
 /** Android channel the app creates before asking for permission. */
@@ -454,6 +458,22 @@ export class PushDispatcher {
     now: Date,
   ): Promise<Set<string>> {
     const invalid = new Set<string>();
+    const scoped = claimed.filter(
+      (row) => typeof row.data.accountId === 'string',
+    );
+    if (scoped.length) {
+      const accounts = await this.prisma.tradingAccount.findMany({
+        where: {
+          ...notificationAccountWhere(now),
+          id: { in: scoped.map((row) => row.data.accountId as string) },
+        },
+        select: { id: true, userId: true },
+      });
+      const owners = new Map(accounts.map((a) => [a.id, a.userId]));
+      for (const row of scoped)
+        if (owners.get(row.data.accountId as string) !== row.userId)
+          invalid.add(row.id);
+    }
     const ofType = (type: PushNotificationType) =>
       claimed.filter((row) => row.type === type);
 
@@ -493,7 +513,7 @@ export class PushDispatcher {
       ];
       const [seasons, participants] = await Promise.all([
         this.prisma.season.findMany({
-          where: { id: { in: seasonIds } },
+          where: { ...notificationSeasonWhere(now), id: { in: seasonIds } },
           select: { id: true, status: true, endAt: true },
         }),
         this.prisma.seasonParticipant.findMany({
@@ -550,7 +570,7 @@ export class PushDispatcher {
         where: {
           seasonId: { in: seasonIds },
           userId: { in: finalRows.map((row) => row.userId) },
-          season: { status: 'settled' },
+          season: { ...notificationSeasonWhere(now), status: 'settled' },
           finalRank: { not: null },
           finalTier: { not: null },
           participantStatus: { not: 'excluded' },

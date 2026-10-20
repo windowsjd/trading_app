@@ -4,6 +4,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
@@ -127,6 +128,7 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     queryFn: getTradingAccounts,
     enabled: !!userId,
     staleTime: 30_000,
+    refetchInterval: (query) => query.state.data?.accounts.some((account) => account.mode === 'season' && account.season?.seasonStatus === 'active') ? 30_000 : false,
   });
 
   const accounts = useMemo(
@@ -203,6 +205,26 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     [queryClient, selection.accountId, userId],
   );
 
+  const previousAccounts = useRef<{ userId: string; ids: string[] } | null>(null);
+  useEffect(() => {
+    if (!userId || !accountsQuery.data) return;
+    const previous = previousAccounts.current;
+    previousAccounts.current = { userId, ids: accounts.map((account) => account.id) };
+    if (previous?.userId !== userId) return;
+    const removed = previous.ids.filter((id) => !accounts.some((account) => account.id === id));
+    if (!removed.length) return;
+    for (const id of removed) {
+      void queryClient.cancelQueries({ queryKey: ['tradingAccount'], predicate: (query) => query.queryKey.includes(id) });
+      queryClient.removeQueries({ queryKey: ['tradingAccount'], predicate: (query) => query.queryKey.includes(id) });
+    }
+    for (const key of [['season'], ['ranking'], ['record']]) void queryClient.resetQueries({ queryKey: key });
+    if (removed.includes(explicitAccountId ?? storedAccountId ?? '')) {
+      setExplicitAccountId(null);
+      setStoredAccountId(null);
+      void clearSelectedAccountId(userId);
+    }
+  }, [accounts, accountsQuery.data, userId, explicitAccountId, storedAccountId, queryClient]);
+
   const handleSelectedAccountMissing = useCallback(async () => {
     if (userId) {
       await clearSelectedAccountId(userId);
@@ -217,11 +239,21 @@ export function TradingAccountProvider({ children }: PropsWithChildren) {
     const boundary = nextCapabilityBoundary(selectedAccount, now);
     if (boundary === null) return;
     const timer = setTimeout(
-      () => setCapabilityRevision((revision) => revision + 1),
+      () => {
+        setCapabilityRevision((revision) => revision + 1);
+        const cutoff = selectedAccount?.season?.tradingCutoffAt;
+        if (cutoff && Date.now() >= Date.parse(cutoff)) {
+          for (const key of [['season'], ['ranking'], ['record']]) {
+            void queryClient.cancelQueries({ queryKey: key });
+            void queryClient.resetQueries({ queryKey: key });
+          }
+          void handleSelectedAccountMissing();
+        }
+      },
       Math.min(boundary - now, 2_147_483_647),
     );
     return () => clearTimeout(timer);
-  }, [selectedAccount, capabilityRevision]);
+  }, [selectedAccount, capabilityRevision, queryClient, handleSelectedAccountMissing]);
 
   const capabilityNow = Date.now();
   const value = useMemo<TradingAccountContextValue>(

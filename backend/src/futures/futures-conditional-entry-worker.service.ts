@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 import {
   Injectable,
   Logger,
@@ -50,7 +51,11 @@ export class FuturesConditionalEntryWorker
     let ownerId: string | undefined;
     try {
       const watches = await this.prisma.futuresConditionalEntry.findMany({
-        where: { ...liveFuturesConditionalEntry, id: { gt: this.cursor } },
+        where: {
+          tradingAccount: publicTradingAccountWhere(),
+          ...liveFuturesConditionalEntry,
+          id: { gt: this.cursor },
+        },
         orderBy: { id: 'asc' },
         take: 101,
         select: { id: true },

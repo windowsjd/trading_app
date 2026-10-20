@@ -1,0 +1,275 @@
+{
+  "nativeDevice": false,
+  "externalRequestsAllowed": false,
+  "sourceMainSha": "5986d7f7111f6c8eb4f80f2a3eb1282c8f5b88e1",
+  "seasonTitle": {
+    "nativeDevice": false,
+    "font": "Nanum Gothic full Korean TTF from google/fonts (browser fixture)",
+    "cases": 8,
+    "records": [
+      {
+        "width": 320,
+        "fontScale": 1,
+        "theme": "light",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 320,
+        "fontScale": 1,
+        "theme": "dark",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 320,
+        "fontScale": 2,
+        "theme": "light",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 320,
+        "fontScale": 2,
+        "theme": "dark",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 390,
+        "fontScale": 1,
+        "theme": "light",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 390,
+        "fontScale": 1,
+        "theme": "dark",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 390,
+        "fontScale": 2,
+        "theme": "light",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      },
+      {
+        "width": 390,
+        "fontScale": 2,
+        "theme": "dark",
+        "issues": [],
+        "sideways": false,
+        "fontLoaded": true,
+        "developmentBadge": false,
+        "generalBadge": false
+      }
+    ]
+  },
+  "actualHome": {
+    "nativeDevice": false,
+    "font": "Nanum Gothic full Korean TTF from google/fonts (browser fixture)",
+    "cases": 16,
+    "records": [
+      {
+        "width": 320,
+        "fontScale": 1,
+        "theme": "light",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 1,
+        "theme": "light",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 1,
+        "theme": "dark",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 1,
+        "theme": "dark",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 2,
+        "theme": "light",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 2,
+        "theme": "light",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 2,
+        "theme": "dark",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 320,
+        "fontScale": 2,
+        "theme": "dark",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 1,
+        "theme": "light",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 1,
+        "theme": "light",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 1,
+        "theme": "dark",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 1,
+        "theme": "dark",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 2,
+        "theme": "light",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 2,
+        "theme": "light",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 2,
+        "theme": "dark",
+        "long": 0,
+        "title": "season0",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      },
+      {
+        "width": 390,
+        "fontScale": 2,
+        "theme": "dark",
+        "long": 1,
+        "title": "Season 1 대한민국 모의투자 챔피언십",
+        "beta": "beta",
+        "overlap": false,
+        "outside": false,
+        "sideways": false
+      }
+    ]
+  }
+}

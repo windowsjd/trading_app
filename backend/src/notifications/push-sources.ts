@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import type { Prisma, PushNotificationType } from '../generated/prisma/client';
 import type { PrismaService } from '../prisma/prisma.service';
 import {
@@ -195,6 +196,7 @@ export async function readSpotFills(
 ): Promise<SourcePage> {
   const rows = await db.order.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: 'executed',
       AND: keysetWhere('executedAt', 'id', args),
     } as Prisma.OrderWhereInput,
@@ -266,6 +268,7 @@ export async function readFuturesFills(
 ): Promise<SourcePage> {
   const rows = await db.futuresExecution.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       AND: keysetWhere('executedAt', 'id', args),
     } as Prisma.FuturesExecutionWhereInput,
     orderBy: [{ executedAt: 'asc' }, { id: 'asc' }],
@@ -329,6 +332,7 @@ export async function readLiquidations(
 ): Promise<SourcePage> {
   const rows = await db.futuresLiquidation.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       AND: keysetWhere('executedAt', 'id', args),
     } as Prisma.FuturesLiquidationWhereInput,
     orderBy: [{ executedAt: 'asc' }, { id: 'asc' }],
@@ -412,6 +416,7 @@ export async function readLocFailures(
 ): Promise<SourcePage> {
   const rows = await db.limitOnCloseOrder.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: { in: ['unfilled', 'expired'] },
       AND: keysetWhere('decidedAt', 'orderId', args),
     } as Prisma.LimitOnCloseOrderWhereInput,
@@ -458,6 +463,7 @@ export async function readConditionalBuyFailures(
 ): Promise<SourcePage> {
   const rows = await db.conditionalBuyOrder.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: 'failed',
       AND: keysetWhere('endedAt', 'id', args),
     } as Prisma.ConditionalBuyOrderWhereInput,
@@ -499,6 +505,7 @@ export async function readConditionalSellFailures(
 ): Promise<SourcePage> {
   const rows = await db.conditionalSellOrder.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: 'failed',
       AND: keysetWhere('endedAt', 'id', args),
     } as Prisma.ConditionalSellOrderWhereInput,
@@ -544,6 +551,7 @@ export async function readFuturesConditionalEntryFailures(
 ): Promise<SourcePage> {
   const rows = await db.futuresConditionalEntry.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: 'failed',
       AND: keysetWhere('endedAt', 'id', args),
     } as Prisma.FuturesConditionalEntryWhereInput,
@@ -589,6 +597,7 @@ export async function readFuturesTpSlFailures(
 ): Promise<SourcePage> {
   const rows = await db.futuresTpSlSetting.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: 'failed',
       AND: keysetWhere('endedAt', 'id', args),
     } as Prisma.FuturesTpSlSettingWhereInput,
@@ -635,6 +644,7 @@ export async function readEntryPlanFailures(
 ): Promise<SourcePage> {
   const rows = await db.entryTpSlPlan.findMany({
     where: {
+      tradingAccount: notificationAccountWhere(args.now),
       status: 'failed',
       AND: keysetWhere('endedAt', 'id', args),
     } as Prisma.EntryTpSlPlanWhereInput,
@@ -771,11 +781,15 @@ export async function readSeasonFinalResults(
 ): Promise<SourcePage> {
   const seasons = await db.season.findMany({
     where: {
+      ...notificationSeasonWhere(args.now),
       status: 'settled',
       // A Season that ended long ago is never (re-)announced, e.g. when a
       // settlement re-run touches `updated_at` again.
       endAt: { gte: new Date(args.now.getTime() - FINAL_RESULT_MAX_AGE_MS) },
-      AND: keysetWhere('updatedAt', 'id', args),
+      AND: [
+        notificationSeasonWhere(args.now),
+        ...keysetWhere('updatedAt', 'id', args),
+      ],
     } as Prisma.SeasonWhereInput,
     orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
     take: SEASON_PAGE_SIZE,
@@ -850,6 +864,7 @@ export async function scanSeasonEndingSoon(
 > {
   const seasons = await db.season.findMany({
     where: {
+      ...notificationSeasonWhere(now),
       status: 'active',
       startAt: { lte: now },
       endAt: {
@@ -911,4 +926,24 @@ export function parseSeasonEndingSourceKey(
 ): { seasonId: string; endAtMs: number } | null {
   const match = /^season_ending:([^:]+):(\d+)$/.exec(sourceKey);
   return match ? { seasonId: match[1], endAtMs: Number(match[2]) } : null;
+}
+
+/** Test launches never create external pushes; hidden development is private. */
+export function notificationSeasonWhere(
+  now = new Date(),
+): Prisma.SeasonWhereInput {
+  return {
+    ...publicSeasonWhere(now),
+    AND: [{ OR: [{ launchKind: null }, { launchKind: 'release' }] }],
+  };
+}
+export function notificationAccountWhere(
+  now = new Date(),
+): Prisma.TradingAccountWhereInput {
+  return {
+    OR: [
+      { mode: { not: 'season' } },
+      { seasonParticipant: { is: { season: notificationSeasonWhere(now) } } },
+    ],
+  };
 }

@@ -298,3 +298,14 @@ describe('account display never shows a raw UUID and states the return meaning',
     assert.equal(getReturnRateMethodLabel('time_weighted' as never), '수익률');
   });
 });
+
+it('uses the armed server cutoff even while development status remains active', () => {
+  const input = account();
+  input.season!.tradingCutoffAt = '2026-05-15T00:01:00Z';
+  const cutoff = Date.parse(input.season!.tradingCutoffAt);
+  assert.equal(getTradingAccountCapabilities(input, cutoff - 1)?.canTrade, true);
+  assert.equal(nextCapabilityBoundary(input, cutoff - 1), cutoff);
+  assert.equal(getTradingAccountCapabilities(input, cutoff)?.tradeBlockReason, 'season_not_active');
+  assert.equal(getTradingAccountCapabilities(input, cutoff)?.canQuote, false);
+  assert.equal(getTradingAccountCapabilities(input, cutoff)?.canExchange, false);
+});

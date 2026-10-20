@@ -2,6 +2,12 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { Prisma, SeasonStatus } from '../generated/prisma/client';
 import { LimitOrderCancelService } from '../orders/limit-order-cancel.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { DEVELOPMENT_SEASON_ID } from '../seasons/season-availability.policy';
+import {
+  activateLaunchSeason,
+  lockSeasonAdministration,
+  seasonDatabaseNow,
+} from '../seasons/launch-season.operations';
 import type { BatchRunJobResponse } from './batch.types';
 import { BatchService } from './batch.service';
 import {
@@ -16,6 +22,9 @@ type LifecycleSeason = {
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
+  launchKind?: string | null;
+  launchArmed?: boolean;
+  tradingCutoffAt?: Date | null;
 };
 
 type LifecycleTransactionClient = PrismaService | Prisma.TransactionClient;
@@ -84,9 +93,16 @@ export class SeasonLifecycleTransitionJobService {
     }
 
     if (input.isLockOwned && !input.isLockOwned()) {
-      throw new Error('Ops job lock ownership was lost.');
+      throw /* @diagnosticSurface internal: Ops lease guard; existing BatchService records a failed run and rolls back its writes. */ new Error(
+        'Ops job lock ownership was lost.',
+      );
     }
     const transitioned = await this.prisma.$transaction(async (tx) => {
+      await lockSeasonAdministration(tx);
+      if (input.isLockOwned && !input.isLockOwned())
+        throw /* @diagnosticSurface internal: Ops lease guard; existing BatchService records a failed run and rolls back its writes. */ new Error(
+          'Ops job lock ownership was lost.',
+        );
       const refreshedCandidates = await this.findLifecycleCandidates(
         tx,
         input.now,
@@ -118,6 +134,20 @@ export class SeasonLifecycleTransitionJobService {
       }
 
       if (refreshedPlan.toActivate.length === 1) {
+        if (refreshedPlan.toActivate[0].launchKind) {
+          const activated = await activateLaunchSeason(
+            tx,
+            refreshedPlan.toActivate[0].id,
+            await seasonDatabaseNow(tx),
+          );
+          result.summary.activated = 1;
+          result.activatedSeasonIds = [activated.id];
+          if (input.isLockOwned && !input.isLockOwned())
+            throw /* @diagnosticSurface internal: Ops lease guard; existing BatchService records a failed run and rolls back its writes. */ new Error(
+              'Ops job lock ownership was lost.',
+            );
+          return result;
+        }
         const activateResult = await tx.season.updateMany({
           where: {
             id: refreshedPlan.toActivate[0].id,
@@ -138,6 +168,10 @@ export class SeasonLifecycleTransitionJobService {
           activateResult.count === 1 ? [refreshedPlan.toActivate[0].id] : [];
       }
 
+      if (input.isLockOwned && !input.isLockOwned())
+        throw /* @diagnosticSurface internal: Ops lease guard; existing BatchService records a failed run and rolls back its writes. */ new Error(
+          'Ops job lock ownership was lost.',
+        );
       return result;
     });
 
@@ -147,7 +181,9 @@ export class SeasonLifecycleTransitionJobService {
     // so leftovers from an earlier crashed run are healed automatically.
     if (this.limitOrderCancelService) {
       if (input.isLockOwned && !input.isLockOwned()) {
-        throw new Error('Ops job lock ownership was lost.');
+        throw /* @diagnosticSurface internal: Ops lease guard; existing BatchService records a failed run and rolls back its writes. */ new Error(
+          'Ops job lock ownership was lost.',
+        );
       }
       const cleanup =
         await this.limitOrderCancelService.cleanupEndedSeasonLimitReservations({
@@ -166,6 +202,16 @@ export class SeasonLifecycleTransitionJobService {
   ): Promise<LifecycleSeason[]> {
     return client.season.findMany({
       where: {
+        suspendedAt: null,
+        AND: [
+          {
+            OR: [
+              { launchKind: null },
+              { launchArmed: true },
+              { status: SeasonStatus.active },
+            ],
+          },
+        ],
         OR: [
           {
             status: SeasonStatus.active,
@@ -187,6 +233,9 @@ export class SeasonLifecycleTransitionJobService {
         status: true,
         startAt: true,
         endAt: true,
+        launchKind: true,
+        launchArmed: true,
+        tradingCutoffAt: true,
       },
     });
   }
@@ -199,9 +248,22 @@ export class SeasonLifecycleTransitionJobService {
     toActivate: LifecycleSeason[];
     toEnd: LifecycleSeason[];
   } {
+    const dueLaunches = candidates.filter(
+      (s) =>
+        s.status === 'upcoming' &&
+        s.launchKind &&
+        s.launchArmed &&
+        s.startAt <= now &&
+        now < s.endAt,
+    );
+    const source = candidates.find((s) => s.id === DEVELOPMENT_SEASON_ID);
+    const canReplaceDevelopment =
+      dueLaunches.length === 1 &&
+      source?.tradingCutoffAt?.getTime() === dueLaunches[0].startAt.getTime();
     const activeBlockingActivation = candidates.filter(
       (season) =>
         season.status === SeasonStatus.active &&
+        !(canReplaceDevelopment && season.id === DEVELOPMENT_SEASON_ID) &&
         now.getTime() < season.endAt.getTime(),
     );
     const toEnd = candidates.filter(
@@ -212,6 +274,7 @@ export class SeasonLifecycleTransitionJobService {
     const dueUpcoming = candidates.filter(
       (season) =>
         season.status === SeasonStatus.upcoming &&
+        (!season.launchKind || season.launchArmed) &&
         season.startAt.getTime() <= now.getTime() &&
         now.getTime() < season.endAt.getTime(),
     );

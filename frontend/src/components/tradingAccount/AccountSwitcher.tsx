@@ -1,3 +1,4 @@
+import SeasonTitle from './SeasonTitle';
 import BeginnerAccountEntry from './BeginnerAccountEntry';
 import ModeEntryCard from './ModeEntryCard';
 import { accountSheetMaxHeight } from './accountSheetLayout';
@@ -159,7 +160,7 @@ export default function AccountSwitcher({ compact = false, home = false, childre
       {home ? (
         <View style={styles.homeContext} testID={TEST_IDS.home.accountContext}>
           <View style={styles.homeContextRow}>
-            <Text testID="home-account-title" style={styles.homeTitle}>{display.title}</Text>
+            <SeasonTitle testID="home-account-title" containerStyle={{ flex: 1 }} style={styles.homeTitle} name={display.title} displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
             <ActionPressable
               style={styles.homeChange}
               // A compact 36dp mark keeps the 44dp touch target.
@@ -202,9 +203,7 @@ export default function AccountSwitcher({ compact = false, home = false, childre
           <View style={styles.triggerTextColumn}>
             <Text style={styles.triggerLabel}>투자 계정</Text>
             {/* Wraps up to three lines: a long season name stays readable. */}
-            <Text style={styles.triggerTitle} numberOfLines={3}>
-              {display.title}
-            </Text>
+            <SeasonTitle numberOfLines={3} style={styles.triggerTitle} name={display.title} displayBadge={selectedAccount.mode === 'season' ? selectedAccount.season?.displayBadge : undefined} />
             {!compact && display.subtitle ? (
               <Text style={styles.triggerSubtitle}>{display.subtitle}</Text>
             ) : null}
@@ -252,7 +251,7 @@ export default function AccountSwitcher({ compact = false, home = false, childre
 
           {seasonJoin.kind === 'available' ? (
             <View style={[styles.startRow, styles.seasonJoinBox]}>
-              <Text style={styles.rowTitle}>{seasonJoin.seasonName}</Text>
+              <SeasonTitle style={styles.rowTitle} name={seasonJoin.seasonName} displayBadge={seasonJoin.displayBadge} />
               <Text style={styles.rowSubtitle}>현재 진행 중인 시즌입니다.</Text>
               <Text style={styles.rowSubtitle}>아직 참가하지 않았습니다.</Text>
               <CTAButton
@@ -310,7 +309,7 @@ function AccountRow({
       <View style={styles.rowTextColumn}>
         {/* No numberOfLines: in the sheet there is room, and distinguishing
             two similar season names matters more than a tidy row height. */}
-        <Text style={styles.rowTitle}>{display.title}</Text>
+        <SeasonTitle style={styles.rowTitle} name={display.title} displayBadge={account.mode === 'season' ? account.season?.displayBadge : undefined} />
         {display.subtitle ? (
           <Text style={styles.rowSubtitle}>{display.subtitle}</Text>
         ) : null}
@@ -367,7 +366,7 @@ const styles = StyleSheet.create({
   },
   homeContextRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   // A long season name wraps beside the fixed change mark; nothing truncates.
-  homeTitle: { flex: 1, minWidth: 0, fontSize: 18, fontWeight: '700', lineHeight: 26 },
+  homeTitle: { minWidth: 0, fontSize: 18, fontWeight: '700', lineHeight: 26 },
   homeChange: {
     flexShrink: 0,
     width: 36,

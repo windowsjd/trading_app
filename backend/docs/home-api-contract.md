@@ -1,5 +1,8 @@
 # GET /api/v1/home API Contract
 
+Launch-season extension (2026-10-21): [season0 operations](launch-season0-operations.md) defines the shared whole-season visibility/cutoff policy and optional `displayBadge: "beta"` season metadata. Hidden season accounts are omitted/rejected by public reads; ordinary/beginner accounts retain their policies. Owned season DTOs additionally expose the optional scheduled `tradingCutoffAt`.
+
+
 ## Status
 
 - `GET /api/v1/home` read-only MVP is implemented.

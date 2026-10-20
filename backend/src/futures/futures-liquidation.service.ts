@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { assertAccountFinancialScopeIntegrity } from '../trading-accounts/trading-account-financial-integrity';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import { finishFuturesProtection } from '../conditional/conditional-state';
@@ -158,6 +159,7 @@ export class FuturesLiquidationService {
               !['active', 'excluded'].includes(
                 account.seasonParticipant!.participantStatus,
               ) ||
+              isSeasonSuspended(season, now) ||
               season.status !== 'active' ||
               now < season.startAt ||
               now >= season.endAt))

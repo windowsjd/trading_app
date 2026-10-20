@@ -1110,7 +1110,9 @@ describe('DailyPortfolioSnapshotJobService', () => {
 });
 
 function createPrismaMock() {
-  return {
+  const prisma = {
+    $transaction: jest.fn(),
+    $queryRaw: jest.fn(),
     season: {
       findUnique: jest.fn(),
     },
@@ -1135,6 +1137,16 @@ function createPrismaMock() {
       findFirst: jest.fn(),
     },
   };
+  prisma.$transaction.mockImplementation(
+    (callback: (tx: unknown) => Promise<unknown>) => callback(prisma),
+  );
+  prisma.$queryRaw.mockImplementation(async () => {
+    const season = await prisma.season.findUnique();
+    return season
+      ? [{ ...season, start_at: season.startAt, end_at: season.endAt }]
+      : [];
+  });
+  return prisma;
 }
 
 function createBatchServiceMock(startedAt: Date): BatchServiceMock {

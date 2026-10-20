@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -131,7 +132,10 @@ describe('TradingAccountsService.listTradingAccounts', () => {
 
     expect(prisma.tradingAccount.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { userId: 'user-1' },
+        where: {
+          userId: 'user-1',
+          ...publicTradingAccountWhere(expect.any(Date) as Date),
+        },
         orderBy: [{ openedAt: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }],
       }),
     );
@@ -273,7 +277,11 @@ describe('TradingAccountsService.getTradingAccount', () => {
 
     expect(prisma.tradingAccount.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'ta-season-1', userId: 'user-1' },
+        where: {
+          id: 'ta-season-1',
+          userId: 'user-1',
+          ...publicTradingAccountWhere(expect.any(Date) as Date),
+        },
       }),
     );
     expect(response.data).toMatchObject({

@@ -580,6 +580,16 @@ model Season {
   tradeFeeRate                     Decimal      @map("trade_fee_rate") @db.Decimal(10, 6)
   fxFeeRate                        Decimal      @map("fx_fee_rate") @db.Decimal(10, 6)
   rewardPolicyJson                 Json?        @map("reward_policy_json")
+  /// Explicit launch identity; NULL preserves every existing season policy.
+  launchKind                       String?      @map("launch_kind")
+  launchArmed                      Boolean      @default(false) @map("launch_armed")
+  launchTestUserIds                 String[]     @default([]) @map("launch_test_user_ids")
+  /// Entire-season pause + private archive, independent of final settlement.
+  suspendedAt                      DateTime?    @map("suspended_at")
+  /// Armed cutover fences development trading even if the scheduler is late.
+  tradingCutoffAt                   DateTime?    @map("trading_cutoff_at")
+  launchActivatedAt                DateTime?    @map("launch_activated_at")
+  launchSourceSnapshotJson          Json?        @map("launch_source_snapshot_json")
   /// Final-ranking eligibility (docs/season-final-ranking-eligibility.md).
   /// Both NULL = no rule: every normal participant is ranked, as before.
   /// Both set = only participants with at least this many distinct traded

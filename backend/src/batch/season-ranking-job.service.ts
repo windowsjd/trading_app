@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
   ParticipantStatus,
@@ -92,6 +93,7 @@ export class SeasonRankingJobService {
       this.parseSnapshotDate(input.snapshotDate);
     const season = await this.prisma.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: {

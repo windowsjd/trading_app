@@ -9,6 +9,7 @@ export interface HomeResponseDto {
   season: {
     id: string;
     name: string;
+    displayBadge?: 'beta';
     status: SeasonStatus;
     endAt: IsoDateTimeString;
   };

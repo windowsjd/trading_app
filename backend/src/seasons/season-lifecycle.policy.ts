@@ -1,4 +1,8 @@
 import { SeasonStatus } from '../generated/prisma/client';
+import {
+  isSeasonSuspended,
+  type SeasonAvailability,
+} from './season-availability.policy';
 
 export type SeasonLifecycleMode = 'upcoming' | 'active' | 'ended' | 'settled';
 
@@ -7,7 +11,7 @@ export type SeasonLifecycleErrorCode =
   | 'SEASON_NOT_STARTED'
   | 'SEASON_ENDED';
 
-export type SeasonLifecycleSeason = {
+export type SeasonLifecycleSeason = SeasonAvailability & {
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -50,6 +54,7 @@ export function isSeasonCurrentlyActive(
   now: Date,
 ): boolean {
   return (
+    !isSeasonSuspended(season, now) &&
     season.status === SeasonStatus.active &&
     season.startAt.getTime() <= now.getTime() &&
     now.getTime() < season.endAt.getTime()
@@ -81,6 +86,12 @@ function assertSeasonCurrentlyActive(
   season: SeasonLifecycleSeason,
   now: Date,
 ): void {
+  if (isSeasonSuspended(season, now)) {
+    throw /* @diagnosticSurface internal: Existing financial callers map this typed lifecycle error to the public SEASON_NOT_ACTIVE response. */ new SeasonLifecycleError(
+      'SEASON_NOT_ACTIVE',
+      'Season is not available for trading.',
+    );
+  }
   if (season.status !== SeasonStatus.active) {
     throw new SeasonLifecycleError(
       'SEASON_NOT_ACTIVE',

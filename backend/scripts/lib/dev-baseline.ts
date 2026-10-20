@@ -77,6 +77,7 @@ export async function ensureDevSeasonOpen(input: {
   apply: boolean;
 }): Promise<DevSeasonEnsureResult> {
   const { prisma, apply } = input;
+  if (apply) assertLocalDevBaselineWrite();
 
   const otherActive = await prisma.season.findMany({
     where: { status: SeasonStatus.active, id: { not: DEV_SEASON_ID } },
@@ -163,6 +164,7 @@ export async function ensureDevBaselineParticipant(input: {
   apply: boolean;
 }): Promise<DevBaselineResult> {
   const { prisma, apply } = input;
+  if (apply) assertLocalDevBaselineWrite();
   const notes: string[] = [];
 
   const existingUser = await prisma.user.findUnique({
@@ -371,4 +373,25 @@ export async function ensureDevBaselineParticipant(input: {
     accountLinkRepaired: false,
     notes,
   };
+}
+
+/** There is no production override: launch/restoration must use the audited CLI. */
+export function assertLocalDevBaselineWrite() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw && process.env.NODE_ENV === 'test') return; // isolated mock-only unit tests
+  let local = false;
+  try {
+    const target = new URL(raw ?? '');
+    local =
+      ['localhost', '127.0.0.1', '[::1]'].includes(target.hostname) &&
+      (target.pathname === '/trading_app' ||
+        /_(?:dev|test)$/.test(target.pathname));
+  } catch {
+    /* fail closed */
+  }
+  if (!local || process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'Development baseline writes are restricted to a loopback development/test database. Use the launch-season operator procedure.',
+    );
+  }
 }

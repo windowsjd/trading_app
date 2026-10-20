@@ -17,14 +17,19 @@ function harness(account: TradingAccountDto, beginnerModeEnabled?: boolean) {
   let stateIndex = 0,
     effectIndex = 0,
     queryIndex = 0,
+    refIndex = 0,
     stateUpdates = 0;
   let pending: Array<() => void> = [];
+  const refs: Array<{ current: unknown }> = [];
+  const resets: unknown[] = [];
   const h = { account };
+  const client = { cancelQueries: async () => {}, removeQueries: () => {}, resetQueries: async (args: unknown) => { resets.push(args); } };
   const provider = load(
     resolve('src/features/tradingAccount/TradingAccountContext.tsx'),
     {
       react: {
         ...React,
+        useRef: (initial: unknown) => { const index = refIndex++; return refs[index] ??= { current: initial }; },
         useState: (initial: unknown) => {
           const i = stateIndex++;
           if (!(i in state))
@@ -55,7 +60,7 @@ function harness(account: TradingAccountDto, beginnerModeEnabled?: boolean) {
         },
       },
       '@tanstack/react-query': {
-        useQueryClient: () => ({ cancelQueries: async () => {} }),
+        useQueryClient: () => client,
         useQuery: () => ({
           data:
             queryIndex++ === 0 ? { id: 'user-1' } : { accounts: [h.account], ...(beginnerModeEnabled === undefined ? {} : { beginnerModeEnabled }) },
@@ -74,12 +79,13 @@ function harness(account: TradingAccountDto, beginnerModeEnabled?: boolean) {
     },
   ).TradingAccountProvider;
   return {
+    resets,
     updateCount: () => stateUpdates,
     setAccount: (next: TradingAccountDto) => {
       h.account = next;
     },
     render: () => {
-      stateIndex = effectIndex = queryIndex = 0;
+      stateIndex = effectIndex = queryIndex = refIndex = 0;
       pending = [];
       const result = provider({ children: null });
       pending.forEach((fn) => fn());
@@ -173,3 +179,22 @@ for (const legacyFlag of [undefined, false, true]) {
     assert.equal(h.render().selectedAccountId, 'general');
   });
 }
+
+it('expires an armed development selection at the cutoff and refreshes public season caches', (t) => {
+  t.mock.timers.enable({ apis: ['Date', 'setTimeout'], now: start });
+  const h = harness({ ...account, season: { ...account.season!, tradingCutoffAt: new Date(start + 100).toISOString() } });
+  t.after(h.dispose);
+  assert.equal(h.render().capabilities?.canTrade, true);
+  t.mock.timers.tick(100);
+  assert.equal(h.render().capabilities?.canTrade, false);
+  assert.deepEqual(h.resets, [{ queryKey: ['season'] }, { queryKey: ['ranking'] }, { queryKey: ['record'] }]);
+});
+
+it('drops cached season projections when polling removes a private account', (t) => {
+  const h = harness(account);
+  t.after(h.dispose);
+  h.render();
+  h.setAccount({ ...account, id: 'general', mode: 'general', season: null });
+  assert.equal(h.render().selectedAccountId, 'general');
+  assert.deepEqual(h.resets, [{ queryKey: ['season'] }, { queryKey: ['ranking'] }, { queryKey: ['record'] }]);
+});

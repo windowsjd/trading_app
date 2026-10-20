@@ -1,7 +1,9 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import type { PortfolioValuationSourceReads } from '../portfolio/portfolio-valuation.service';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ParticipantStatus, SeasonStatus } from '../generated/prisma/client';
 import { buildDailyPortfolioSnapshotData } from '../portfolio/daily-portfolio-snapshot-generation';
+import { lockSeasonForWriteOrThrow } from '../ranking/season-write-lock';
 import {
   PortfolioValuationError,
   PortfolioValuationResult,
@@ -69,6 +71,7 @@ export class DailyPortfolioSnapshotJobService {
       this.parseSnapshotDate(input.snapshotDate);
     const season = await this.prisma.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: {
@@ -195,17 +198,21 @@ export class DailyPortfolioSnapshotJobService {
       }
 
       try {
-        const snapshot = await this.prisma.dailyPortfolioSnapshot.create({
-          data: buildDailyPortfolioSnapshotData({
-            valuation,
-            snapshotDate,
-            capturedAt,
-            dryRun: false,
-            tradingAccountId: participant.tradingAccountId,
-          }),
-          select: {
-            id: true,
-          },
+        const snapshot = await this.prisma.$transaction(async (tx) => {
+          const current = await lockSeasonForWriteOrThrow(tx, seasonId);
+          this.assertSeasonStatusAllowed(current.status);
+          return tx.dailyPortfolioSnapshot.create({
+            data: buildDailyPortfolioSnapshotData({
+              valuation,
+              snapshotDate,
+              capturedAt,
+              dryRun: false,
+              tradingAccountId: participant.tradingAccountId,
+            }),
+            select: {
+              id: true,
+            },
+          });
         });
 
         result.participants.created += 1;

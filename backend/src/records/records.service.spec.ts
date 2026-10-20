@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import { assertDiagnosticTriage } from '../../scripts/lib/diagnostic-quality';
 import { expectSafeFinancialDiagnostic } from '../../test/support/financial-diagnostics';
 import {
@@ -1029,6 +1030,7 @@ describe('RecordsService', () => {
       expect.objectContaining({
         where: {
           userId: 'user-1',
+          season: publicSeasonWhere(expect.any(Date) as Date),
         },
       }),
     );
@@ -1065,6 +1067,7 @@ describe('RecordsService', () => {
         userId: 'user-1',
         season: {
           status: SeasonStatus.settled,
+          ...publicSeasonWhere(expect.any(Date) as Date),
         },
       },
     });
@@ -1074,6 +1077,7 @@ describe('RecordsService', () => {
           userId: 'user-1',
           season: {
             status: SeasonStatus.settled,
+            ...publicSeasonWhere(expect.any(Date) as Date),
           },
         },
       }),
@@ -1927,7 +1931,10 @@ describe('RecordsService', () => {
               tradingAccountId: participantAccount.id,
               rankingHiddenAt: null,
               participantStatus: { not: ParticipantStatus.excluded },
-              season: { status: SeasonStatus.active },
+              season: {
+                ...publicSeasonWhere(expect.any(Date) as Date),
+                status: SeasonStatus.active,
+              },
               tradingAccount: expect.objectContaining({
                 status: 'active',
                 mode: 'season',

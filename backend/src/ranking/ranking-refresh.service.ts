@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import type { FuturesValuationComponents } from '../portfolio/portfolio-valuation.policy';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import { Injectable, Logger } from '@nestjs/common';
@@ -190,6 +191,7 @@ export class RankingRefreshService {
     try {
       const season = await this.prisma.season.findUnique({
         where: {
+          ...publicSeasonWhere(),
           id: seasonId,
         },
         select: {
@@ -330,6 +332,7 @@ export class RankingRefreshService {
   ) {
     const seasons = await this.prisma.season.findMany({
       where: {
+        ...publicSeasonWhere(),
         status: SeasonStatus.active,
         startAt: {
           lte: capturedAt,

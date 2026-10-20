@@ -32,6 +32,7 @@ import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGene
 
 type Props = {
   title?: string;
+  titleContent?: React.ReactNode;
   message: string;
   /** Called after the account exists and is selected. */
   onOpened: () => void;
@@ -45,6 +46,7 @@ type Props = {
 
 export default function AccountSetupPanel({
   title = '아직 투자 계정이 없습니다.',
+  titleContent,
   message,
   onOpened,
   seasonAction,
@@ -60,7 +62,7 @@ export default function AccountSetupPanel({
         testID={TEST_IDS.tradingAccount.setupPanel}
       >
         <View style={styles.card}>
-          <Text style={styles.title}>{title}</Text>
+          {titleContent ?? <Text style={styles.title}>{title}</Text>}
           <Text style={styles.message}>{message}</Text>
         </View>
 

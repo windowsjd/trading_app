@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 import {
   HttpException,
   Injectable,
@@ -43,7 +44,11 @@ export class FuturesLimitWorker implements OnModuleInit, OnModuleDestroy {
     try {
       // Remain operational for lifecycle cleanup when user feature is disabled.
       const groups = await this.prisma.futuresLimitOrder.findMany({
-        where: { status: 'submitted', id: { gt: this.cursor } },
+        where: {
+          tradingAccount: publicTradingAccountWhere(),
+          status: 'submitted',
+          id: { gt: this.cursor },
+        },
         orderBy: { id: 'asc' },
         take: ENTRIES_PER_CYCLE + 1,
         select: { id: true },

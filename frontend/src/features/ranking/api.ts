@@ -42,6 +42,7 @@ export interface RankingsResponseDto {
   season: {
     id: string;
     name: string;
+    displayBadge?: 'beta';
     status: SeasonStatus;
     startAt: IsoDateTimeString;
     endAt: IsoDateTimeString;
@@ -78,6 +79,7 @@ export interface UserSeasonSummaryDto {
   season: {
     id: string;
     name: string;
+    displayBadge?: 'beta';
     status: SeasonStatus;
     rank: number | null;
     provisionalTier: string | null;

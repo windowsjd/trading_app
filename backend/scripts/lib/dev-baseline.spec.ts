@@ -58,6 +58,7 @@ import {
   DEV_SEASON_PARTICIPANT_ID,
   DEV_USER_ID,
   ensureDevBaselineParticipant,
+  assertLocalDevBaselineWrite,
 } from './dev-baseline';
 
 const CAPITAL = '10000000.00000000';
@@ -216,5 +217,30 @@ describe('ensureDevBaselineParticipant trading-account link repair', () => {
 
     expect(result.accountLinkRepaired).toBe(false);
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
+  });
+});
+
+describe('development baseline production guard', () => {
+  const originalUrl = process.env.DATABASE_URL;
+  const originalNodeEnv = process.env.NODE_ENV;
+  afterEach(() => {
+    if (originalUrl === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = originalUrl;
+    process.env.NODE_ENV = originalNodeEnv;
+  });
+  it.each([
+    ['production', 'postgresql://user@127.0.0.1:5432/trading_app'],
+    ['test', 'postgresql://user@remote.example/trading_app_test'],
+    ['development', 'postgresql://user@127.0.0.1:5432/trading_app_fbbk'],
+  ])('refuses %s / %s before a development write', (mode, url) => {
+    process.env.NODE_ENV = mode;
+    process.env.DATABASE_URL = url;
+    expect(() => assertLocalDevBaselineWrite()).toThrow('restricted');
+  });
+  it('permits only explicit local development/test targets', () => {
+    process.env.NODE_ENV = 'development';
+    process.env.DATABASE_URL =
+      'postgresql://user@127.0.0.1:5432/trading_app_dev';
+    expect(() => assertLocalDevBaselineWrite()).not.toThrow();
   });
 });

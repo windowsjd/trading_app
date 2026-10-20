@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal } = jest.requireActual('@prisma/client/runtime/client');
 
@@ -356,10 +357,14 @@ describe('RankingService', () => {
     expect(prisma.season.findUnique).toHaveBeenCalledWith({
       where: {
         id: 'season-1',
+        ...publicSeasonWhere(expect.any(Date) as Date),
       },
       select: {
         id: true,
         name: true,
+        launchKind: true,
+        suspendedAt: true,
+        tradingCutoffAt: true,
         status: true,
         startAt: true,
         endAt: true,

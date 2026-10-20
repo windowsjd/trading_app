@@ -112,7 +112,10 @@ describe('LimitOrderCancelService', () => {
 
   const createPrisma = () => ({
     ...emptyProtectionState(),
-      futuresLimitOrder: { findFirst: jest.fn().mockResolvedValue(null), findMany: jest.fn().mockResolvedValue([]) },
+    futuresLimitOrder: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      findMany: jest.fn().mockResolvedValue([]),
+    },
     order: {
       findUnique: jest.fn(),
       findMany: jest.fn(),
@@ -126,12 +129,24 @@ describe('LimitOrderCancelService', () => {
     $transaction: jest.fn(),
     $executeRaw: jest.fn(),
     $queryRaw: jest.fn(),
+    $seasonQueryRaw: jest.fn().mockResolvedValue([]),
   });
 
   const createService = () => {
     const prisma = createPrisma();
     prisma.$transaction.mockImplementation(async (callback: never) =>
-      (callback as (tx: unknown) => Promise<unknown>)(prisma),
+      (callback as (tx: unknown) => Promise<unknown>)(
+        new Proxy(prisma, {
+          get(target, key) {
+            if (key === '$queryRaw')
+              return (sql: TemplateStringsArray, ...values: unknown[]) =>
+                sql.join('').includes('FROM seasons s')
+                  ? target.$seasonQueryRaw(sql, ...values)
+                  : target.$queryRaw(sql, ...values);
+            return Reflect.get(target, key);
+          },
+        }),
+      ),
     );
     const service = new LimitOrderCancelService(
       prisma as never,
@@ -684,6 +699,7 @@ describe('LimitOrderCancelService', () => {
               mode: 'season',
               seasonParticipant: {
                 season: {
+                  suspendedAt: null,
                   status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
                 },
               },

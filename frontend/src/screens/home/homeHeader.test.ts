@@ -54,10 +54,15 @@ for (const width of [320, 360, 390, 430]) for (const fontScale of [1, 1.5, 2]) f
     assert.equal(card.minHeight, undefined);
     assert.equal(card.height, undefined);
     assert.equal(card.flexDirection ?? 'column', 'column');
-    const title = h.renderer.root.findByProps({ testID: 'home-account-title' });
+    const titles = h.renderer.root.findAllByType('Text').filter(node => node.props.testID === 'home-account-title');
+    assert.equal(titles.length, 1);
+    const title = titles[0];
     assert.equal(title.props.numberOfLines, undefined);
     const titleStyle = flatten(title.props.style);
-    assert.equal(titleStyle.flex, 1);
+    assert.equal(titleStyle.flex === undefined, true, 'text keeps intrinsic width inside the wrapping title');
+    const groups = h.renderer.root.findAllByType('View').filter(node => node.props.accessible === true && node.props.accessibilityLabel === (mode === 'general' ? '일반모드' : LONG_SEASON));
+    assert.equal(groups.length, 1);
+    assert.equal(flatten(groups[0].props.style).flex, 1, 'the title container reserves the remaining width beside change');
     assert.equal(titleStyle.minWidth, 0);
     assert.equal(title.props.children, mode === 'general' ? '일반모드' : LONG_SEASON);
     const button = h.renderer.root.findByType('Pressable');

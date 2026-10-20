@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 import {
   Injectable,
   Logger,
@@ -49,7 +50,11 @@ export class ConditionalSellWorker implements OnModuleInit, OnModuleDestroy {
     let ownerId: string | undefined;
     try {
       const intents = await this.prisma.conditionalSellOrder.findMany({
-        where: { ...liveConditionalSell, id: { gt: this.cursor } },
+        where: {
+          tradingAccount: publicTradingAccountWhere(),
+          ...liveConditionalSell,
+          id: { gt: this.cursor },
+        },
         orderBy: { id: 'asc' },
         take: 101,
         select: { id: true },

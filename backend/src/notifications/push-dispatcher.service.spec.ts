@@ -24,8 +24,8 @@ function claimed(
     data: {
       v: 1,
       type: 'trade_fill',
-      uid: 'u1',
-      accountId: 'a1',
+      uid: overrides.userId ?? 'u1',
+      accountId: overrides.userId ? `account-${overrides.userId}` : 'a1',
       market: 'spot',
     },
     expiresAt: new Date(now.getTime() + 3_600_000),
@@ -55,6 +55,7 @@ function harness(
     seasons?: Array<{ id: string; status: string; endAt: Date }>;
     participants?: Array<{ seasonId: string; userId: string }>;
     notices?: Array<{ id: string }>;
+    accounts?: Array<{ id: string; userId: string }>;
   } = {},
 ) {
   const updates: Array<{ where: unknown; data: Record<string, unknown> }> = [];
@@ -98,6 +99,15 @@ function harness(
         deletedDevices.push(args);
         return { count: 1 };
       }),
+    },
+    tradingAccount: {
+      findMany: jest.fn(
+        async () =>
+          options.accounts ??
+          (options.rows ?? [claimed()])
+            .filter((row) => typeof row.data.accountId === 'string')
+            .map((row) => ({ id: row.data.accountId, userId: row.userId })),
+      ),
     },
     friendship: { findMany: jest.fn(async () => options.friendships ?? []) },
     season: { findMany: jest.fn(async () => options.seasons ?? []) },
@@ -216,6 +226,21 @@ describe('decideOutcome', () => {
 });
 
 describe('PushDispatcher.dispatch', () => {
+  it('drops an old financial notification whose season account is now private', async () => {
+    const h = harness({ accounts: [] });
+    await h.dispatcher.dispatch(now, config);
+    expect(h.sent).toHaveLength(0);
+    expect(statusOf(h, 'n1')).toMatchObject({ status: 'skipped' });
+    expect(h.prisma.tradingAccount.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: { in: ['a1'] },
+          OR: expect.any(Array),
+        }),
+      }),
+    );
+  });
+
   it('sends to every device of the recipient with the app payload', async () => {
     const h = harness({
       devices: [

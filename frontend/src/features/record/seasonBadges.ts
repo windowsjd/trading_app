@@ -3,6 +3,7 @@ import type { RecordSeasonListItemDto } from './api';
 export type SeasonBadge = {
   seasonId: string;
   seasonName: string;
+  displayBadge?: 'beta';
   finalRank: number;
   /** The ranking API's tier code (`gold`, `master`, …). */
   finalTier: string;
@@ -41,6 +42,7 @@ export function toSeasonBadges(items: readonly RecordSeasonListItemDto[]): Seaso
     bySeason.set(item.seasonId, {
       seasonId: item.seasonId,
       seasonName: item.seasonName,
+      ...(item.displayBadge === 'beta' ? { displayBadge: 'beta' as const } : {}),
       finalRank,
       finalTier,
       returnRate: item.latestReturnRate ?? null,

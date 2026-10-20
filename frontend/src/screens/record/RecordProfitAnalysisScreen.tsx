@@ -1,3 +1,4 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform, useWindowDimensions } from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
@@ -62,7 +63,7 @@ export default function RecordProfitAnalysisScreen({ route, navigation }: Record
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView refreshControl={refresh.refreshControl} testID={TEST_IDS.record.profitAnalysisScreen} contentContainerStyle={styles.content}>
-        <Text accessibilityRole="header" style={styles.title}>{season.name}</Text>
+        <SeasonTitle heading style={styles.title} name={season.name} displayBadge={season.displayBadge} />
         <View style={styles.card}>
           <Text style={styles.heading}>손익 요약</Text>
           <RecordMetric label="총 손익" value={available ? profitAnalysis.totalPnlKrw : null} prominent testID="record-profit-total" />

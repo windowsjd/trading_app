@@ -499,6 +499,15 @@ jobs:
           PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE account_deletion_test'
           pnpm exec prisma migrate deploy
           pnpm exec jest --runInBand --runTestsByPath src/auth/account-deletion.integration.spec.ts
+      - name: season0 launch, privacy and cleanup PostgreSQL integration
+        env:
+          DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/season0_launch_test?schema=public
+          NODE_ENV: test
+          SEASON0_DB_INTEGRATION: "1"
+        run: |
+          PGPASSWORD=trading_app_pw psql -h localhost -U trading_app -d postgres -v ON_ERROR_STOP=1 -c 'CREATE DATABASE season0_launch_test'
+          pnpm exec prisma migrate deploy
+          pnpm run integration:launch-season
       - name: Active administrator concurrency PostgreSQL integration
         env:
           DATABASE_URL: postgresql://trading_app:trading_app_pw@localhost:5432/active_admin_race_test?schema=public

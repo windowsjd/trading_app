@@ -1,3 +1,7 @@
+import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
 import { acceptedFriendUserWhere } from '../friends/friendship.policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import {
@@ -52,6 +56,8 @@ export type RankingQualificationQuery = {
 type RankingSeason = {
   id: string;
   name: string;
+  launchKind?: string | null;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -213,6 +219,9 @@ const RANKING_SEASON_SELECT = {
   id: true,
   name: true,
   status: true,
+  launchKind: true,
+  suspendedAt: true,
+  tradingCutoffAt: true,
   startAt: true,
   endAt: true,
   initialCapitalKrw: true,
@@ -888,6 +897,7 @@ export class RankingService {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await client.season.findFirst({
         where: {
+          ...publicSeasonWhere(),
           status,
         },
         select: RANKING_SEASON_SELECT,
@@ -908,6 +918,7 @@ export class RankingService {
   ): Promise<RankingSeason | null> {
     return client.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: RANKING_SEASON_SELECT,
@@ -1213,6 +1224,7 @@ export class RankingService {
     return {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
       startAt: season.startAt.toISOString(),
       endAt: season.endAt.toISOString(),

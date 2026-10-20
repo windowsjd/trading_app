@@ -1,3 +1,7 @@
+import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
 import { canonicalCashWalletSetIssue } from '../wallets/canonical-cash-wallets';
 import type { WalletScope } from '../generated/prisma/client';
 import {
@@ -67,6 +71,8 @@ type HomeMode =
 type CurrentSeasonRecord = {
   id: string;
   name: string;
+  launchKind?: string | null;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -1562,12 +1568,16 @@ export class HomeService {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
         where: {
+          ...publicSeasonWhere(),
           status,
         },
         select: {
           id: true,
           name: true,
           status: true,
+          launchKind: true,
+          suspendedAt: true,
+          tradingCutoffAt: true,
           startAt: true,
           endAt: true,
         },
@@ -1601,6 +1611,7 @@ export class HomeService {
     return {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
       startAt: season.startAt.toISOString(),
       endAt: season.endAt.toISOString(),

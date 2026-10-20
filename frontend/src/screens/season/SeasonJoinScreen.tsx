@@ -1,3 +1,4 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useState } from 'react';
 import {
@@ -250,6 +251,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     return (
       <BlockedState
         title={season.name}
+        titleContent={<SeasonTitle heading name={season.name} displayBadge={season.displayBadge} style={{ fontSize: 22, fontWeight: '700', textAlign: 'center' }} containerStyle={{ justifyContent: 'center', marginBottom: 8 }} />}
         message="시즌 시작 전입니다. 시작 시점이 되면 거래가 열립니다."
         actionLabel="홈으로 이동"
         onAction={resetToHome}
@@ -261,6 +263,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     return (
       <BlockedState
         title={season.name}
+        titleContent={<SeasonTitle heading name={season.name} displayBadge={season.displayBadge} style={{ fontSize: 22, fontWeight: '700', textAlign: 'center' }} containerStyle={{ justifyContent: 'center', marginBottom: 8 }} />}
         message="현재 시즌은 정산 중입니다. 홈에서 결과를 확인해주세요."
         actionLabel="홈으로 이동"
         onAction={resetToHome}
@@ -272,6 +275,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     return (
       <BlockedState
         title={season.name}
+        titleContent={<SeasonTitle heading name={season.name} displayBadge={season.displayBadge} style={{ fontSize: 22, fontWeight: '700', textAlign: 'center' }} containerStyle={{ justifyContent: 'center', marginBottom: 8 }} />}
         message="현재 시즌은 종료되었습니다. 홈으로 이동해주세요."
         actionLabel="홈으로 이동"
         onAction={resetToHome}
@@ -283,6 +287,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     return hasUsableAccount ? (
       <BlockedState
         title={season.name}
+        titleContent={<SeasonTitle heading name={season.name} displayBadge={season.displayBadge} style={{ fontSize: 22, fontWeight: '700', textAlign: 'center' }} containerStyle={{ justifyContent: 'center', marginBottom: 8 }} />}
         message="현재 시즌 참가가 마감되었거나 활성 상태가 아닙니다."
         actionLabel="시즌 정보 다시 확인"
         onAction={() => {
@@ -293,6 +298,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     ) : (
       <AccountSetupPanel
         title={season.name}
+        titleContent={<SeasonTitle heading name={season.name} displayBadge={season.displayBadge} style={{ fontSize: 22, fontWeight: '700', textAlign: 'center' }} containerStyle={{ justifyContent: 'center', marginBottom: 8 }} />}
         message="이번 시즌은 참가가 마감되었습니다. 일반 투자 계정을 열면 다음 시즌을 기다리는 동안에도 계정을 사용할 수 있습니다."
         onOpened={resetToHome}
       />
@@ -345,7 +351,7 @@ export default function SeasonJoinScreen({ navigation }: Props) {
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.container}>
       <View testID={TEST_IDS.season.joinScreen} style={styles.content}>
         <View style={styles.card}>
-          <Text style={styles.title}>{season.name}</Text>
+          <SeasonTitle style={styles.title} name={season.name} displayBadge={season.displayBadge} />
           <Text style={styles.helper}>
             시즌 기간: {formatKstDateTime(season.startAt)} ~{' '}
             {formatKstDateTime(season.endAt)}

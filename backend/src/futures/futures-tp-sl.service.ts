@@ -1,3 +1,4 @@
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { HttpStatus, Injectable } from '@nestjs/common';
 import { apiErrorCode } from '../common/api-error-code';
 import { setAdminDiagnosticContext } from '../common/admin-diagnostics';
@@ -380,6 +381,12 @@ export class FuturesTpSlService {
         accountId,
         tx,
       );
+      if (
+        account.mode === 'season' &&
+        account.seasonParticipant &&
+        isSeasonSuspended(account.seasonParticipant.season, now)
+      )
+        return { state: 'paused' };
       if (!conditionalTradable(account, now)) {
         await this.terminate(
           tx,

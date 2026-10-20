@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 import { emptyProtectionState } from '../../test/support/empty-protection-state';
 jest.mock('../generated/prisma/client', () => {
   const { Decimal, sqltag } = jest.requireActual<
@@ -1137,7 +1138,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             quoteId: 'quote-limit-1',
-            tradingAccount: { userId: 'user-1' },
+            tradingAccount: {
+              userId: 'user-1',
+              ...publicTradingAccountWhere(expect.any(Date) as Date),
+            },
           }) as never,
         }),
       );
@@ -1353,7 +1357,10 @@ describe('limit buy quote/create (phase 1: reservation only)', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             quoteId: 'quote-limit-1',
-            tradingAccount: { userId: 'user-1' },
+            tradingAccount: {
+              userId: 'user-1',
+              ...publicTradingAccountWhere(expect.any(Date) as Date),
+            },
           }) as never,
         }),
       );

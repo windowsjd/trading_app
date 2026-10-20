@@ -1,4 +1,5 @@
 import {
+  notificationAccountWhere,
   isSeasonEndCleanup,
   keysetWhere,
   parseSeasonEndingSourceKey,
@@ -213,7 +214,10 @@ describe('push sources', () => {
     const scan = await readFuturesFills(db, args);
     expect(
       (calls.futuresExecution[0] as { where: Record<string, unknown> }).where,
-    ).toEqual({ AND: [{ executedAt: { gte: window.from, lte: window.to } }] });
+    ).toEqual({
+      tradingAccount: notificationAccountWhere(window.to),
+      AND: [{ executedAt: { gte: window.from, lte: window.to } }],
+    });
     expect(scan.candidates.map((c) => c.copy.body.split(' · ')[1])).toEqual([
       '시장가',
       '지정가',

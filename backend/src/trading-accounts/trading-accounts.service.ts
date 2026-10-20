@@ -2,6 +2,7 @@ import { isStandaloneAccountMode } from './account-mode-policy';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { readGeneralTradeFeeRate } from '../orders/general-trading.config';
 import { readGeneralFxFeeRate } from '../fx/general-fx.config';
+import { seasonDisplayFields } from '../seasons/season-availability.policy';
 import {
   ParticipantStatus,
   SeasonStatus,
@@ -23,6 +24,8 @@ import {
 type TradingAccountSeasonView = {
   seasonId: string;
   seasonName: string;
+  displayBadge?: 'beta';
+  tradingCutoffAt?: string | null;
   seasonStatus: SeasonStatus;
   startAt: string;
   endAt: string;
@@ -122,6 +125,13 @@ export class TradingAccountsService {
         ? {
             seasonId: account.seasonParticipant.season.id,
             seasonName: account.seasonParticipant.season.name,
+            ...seasonDisplayFields(account.seasonParticipant.season),
+            ...(account.seasonParticipant.season.tradingCutoffAt
+              ? {
+                  tradingCutoffAt:
+                    account.seasonParticipant.season.tradingCutoffAt.toISOString(),
+                }
+              : {}),
             seasonStatus: account.seasonParticipant.season.status,
             startAt: account.seasonParticipant.season.startAt.toISOString(),
             endAt: account.seasonParticipant.season.endAt.toISOString(),

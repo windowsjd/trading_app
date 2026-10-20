@@ -1,5 +1,17 @@
 # 프로젝트 인수인계서
 
+## 2026-10-21 — season0 준비·개발 시즌 안전 전환·제한 테스트/정리 (main, 운영 미적용)
+
+- **기준:** 시작 clean HEAD/origin/main `5986d7f7111f6c8eb4f80f2a3eb1282c8f5b88e1`. 기존 병행 worktree/브랜치는 보존. 사용자 승인 범위에 따라 backend/frontend·기존 CI·문서 수정. [운영 절차](backend/docs/launch-season0-operations.md), [전체 검증/파일 보고](backend/docs/launch-season0-validation-2026-10-21.md).
+- **원인/설계:** 2000~2099 active 개발 시즌 때문에 기존 lifecycle의 중복 활성 검증과 충돌한다. ended로 바꾸면 자동 금융 정산에 포함되어 일시 복구와 기록 보존을 해친다. Season에 출시 식별/명시적 arm/시즌 전체 suspension/예약 cutoff/복구 소유권 등 7개 필드만 추가했다. 기존 네 상태/스케줄러 유지. 준비만 한 upcoming은 개발을 막지 않는다. arm 시 개발 cutoff를 저장해 scheduler가 늦어도 서버 DB 시각부터 거래를 닫고, 기존 lifecycle에서 dev 비공개/중단 + launch active를 원자적으로 처리한다. 원장/잔액/주문/포지션을 복구 명목으로 재작성하지 않는다.
+- **정책:** test/release 모두 이름 season0, 초기 1,000만 원·개발 수수료·정확히 504시간·최종 5종목 AND 인정 거래대금 300%. 개발에 소급 없음. 미사용 upcoming의 원래 시작 전만 날짜 변경, +21일 재계산, 기간 충돌 거부. DB CHECK/trigger도 보완. 공식 출시 날짜는 미정이며 운영 DB에 launch 행을 만들지 않았다.
+- **공개/거래:** 공통 시즌/계정 필터를 현재·목록·홈·계정·랭킹·전적·최종 결과·타인 조회·보상/배지·금융 읽기에 적용. 기존 Season 잠금과 잠금 후 DB 시각에서 신규 금융 쓰기를 거부한다. 중지된 개발 시즌은 자동 정산/예약 cleanup 대상에서 제외. 일반·초보 및 기존 일반 종료 시즌 replay/정산 계산 유지. dev seed/복구는 원격/production 쓰기 차단.
+- **운영 CLI:** `pnpm run season:launch`는 기본 strict read-only 계획(감사도 무쓰기), active admin/operator 전용, UTC DB 세션 필요. 검토 plan·DB/season 확인·백업 증거 참조를 갖춘 apply만 허용하며 기존 감사에 같은 TX 기록. 테스트 1~20명 allowlist, stop 후 worker drain. cleanup은 전용 시즌/계정의 44개 테이블만 명시 순서로 삭제하고 같은 TX에서 dev 표식을 복구한다. 전체 incoming FK·건수/행 지문·계정/JSON 참조·외부 전송/지급/과거 처리 흔적·활성 Ops lease를 검사하고 차이가 있으면 중단/전체 롤백. 보상/지급 요청의 nullable 순환 포인터만 대상 시즌 안에서 명시 해제하고 건수 검증한다. 사용자·공유 시세/FX·다른 계정·공통 Ops/감사는 보존. 테스트/출시는 새 ID, 활동한 시즌 날짜 재사용 금지.
+- **앱:** 서버 displayBadge만으로 회색 beta. 공통 SeasonTitle로 홈·참가/차단·계정 선택/전환·MY 배지·전적/최종 결과·타인 요약에 적용. 개발·일반·초보 미표시. 큰 글꼴 wrap/최소 높이, 기존 제목 clamp 유지. 계정 목록 30초 갱신·cutoff timer·비공개 계정 제거 시 이전 선택/관련 캐시 정리로 기존 참가 흐름을 사용한다.
+- **검증:** 프런트 `npm run check` 3,392/3,392 PASS(397 suites, skip0), 이후 홈 wrapper 폭 배분 보완 관련73·최종 typecheck/계정 lint 재검사 PASS. 백엔드 전체 5,790 PASS(358 suites, 기존 opt-in126 skip), 로컬 PG17 UTC 출시/정리57 assertions·기존 최종 자격/정산16 scenarios·금융 계정 scope2 suites PASS, CLI read-only/승인/감사/stale plan PASS. backend typecheck/build·계정 lint·신규/직접 변경 코드 lint·candle format·Prisma 재생성84파일 일치·migration drift 없음·양쪽 진단 게이트·diff check PASS. 실제 SeasonTitle RN-Web 8조합 + 실제 홈/계정 provider 16조합(320/390×글꼴1/2×Light/Dark×기본/긴 이름) 제목·beta·계정 변경 버튼 겹침/넘침 없음. 기존 전체 candle lint는 무변경 auth-email-fixture.ts:22 require-await 1건으로 FAIL; 검사/테스트를 약화하지 않았다.
+- **운영 실측/미검증:** Render read-only 조회 dev 참가 7·랭킹 19(과거 21과 다름), fee 각0.001, DB UTC. 로컬 PG의 KST 초기 세션이 추가 주문/FX 회귀를 만료시켜 UTC로 맞춰 재검증했고 운영 CLI에 비UTC 거부를 추가했다. 실제 백업/PITR 복구 창과 복원 연습·운영 앱 참가/거래·실기기/네이티브 UI는 미검증. 운영 apply 전에 절차에 따라 확인해야 한다.
+- **배포:** Render backend/main commit 자동 배포 및 build의 `prisma migrate deploy`를 확인했다. 이번 반영은 `[skip render]`; 운영 deploy/환경 변경/migrate/시즌 생성·전환·삭제는 미실행. 다음 커밋/수동 배포에는 skip이 적용되지 않으므로 다음 운영 배포의 schema 포함을 별도 승인해야 한다. 신규 클라우드 DB 생성 없음.
+
 ## 2026-10-20 — 내 순위·시즌 뱃지 카드 수익률 = 총자산 글자 · 선물 종목상세 전일대비(직전 UTC일 확정 일봉 종가 기준) (main, push)
 
 - **시작/범위:** origin/main = HEAD `48ef6741a87a9732ab01c3a2ee899e769b297d1d`(clean, GPT 조사 기준과 동일). `frontend/` + 인수인계서만. 백엔드·API·DB·운영 환경변수 무변경.

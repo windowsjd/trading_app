@@ -53,10 +53,10 @@ export type ModeSelectionGeneralOption<A extends SelectableAccount> =
   | { kind: 'start' };
 
 export type ModeSelectionSeasonJoin =
-  | { kind: 'available'; seasonId: string; seasonName: string }
+  | { kind: 'available'; seasonId: string; seasonName: string; displayBadge?: 'beta' }
   | { kind: 'none' };
 
-export type ModeSelectionSeasonRef = { seasonId: string; seasonName: string };
+export type ModeSelectionSeasonRef = { seasonId: string; seasonName: string; displayBadge?: 'beta' };
 
 export type ModeSelectionModel<A extends SelectableAccount> = {
   general: ModeSelectionGeneralOption<A>;
@@ -117,6 +117,7 @@ export function buildModeSelectionModel<A extends SelectableAccount>(
             kind: 'available',
             seasonId: currentSeason.id,
             seasonName: currentSeason.name,
+            ...(currentSeason.displayBadge === 'beta' ? { displayBadge: 'beta' as const } : {}),
           }
         : { kind: 'none' },
   };
@@ -163,7 +164,7 @@ function newestSeason(
     }
   }
   return newest
-    ? { seasonId: newest.season.seasonId, seasonName: newest.season.seasonName }
+    ? { seasonId: newest.season.seasonId, seasonName: newest.season.seasonName, ...(newest.season.displayBadge === 'beta' ? { displayBadge: 'beta' as const } : {}) }
     : null;
 }
 

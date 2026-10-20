@@ -21,6 +21,7 @@ import {
   monetaryScale,
 } from '../fx/fx-decimal-policy';
 import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertCashWalletTradingAccountScope } from '../wallets/cash-wallet-scope';
 import {
@@ -480,6 +481,8 @@ export class LimitOrderCreateService {
       seasonStatus: season.status,
       seasonStartAt: season.startAt,
       seasonEndAt: season.endAt,
+      suspendedAt: season.suspendedAt,
+      tradingCutoffAt: season.tradingCutoffAt,
       tradingAccountId: account.id,
       accountStatus: account.status,
     };
@@ -493,10 +496,19 @@ export class LimitOrderCreateService {
       seasonStatus: SeasonStatus;
       seasonStartAt: Date;
       seasonEndAt: Date;
+      suspendedAt?: Date | null;
+      tradingCutoffAt?: Date | null;
       accountStatus?: string;
     },
     transactionNow: Date,
   ): void {
+    if (isSeasonSuspended(context, transactionNow)) {
+      this.throwApiError(
+        HttpStatus.CONFLICT,
+        'SEASON_NOT_ACTIVE',
+        'Season is not available for trading.',
+      );
+    }
     if (context.participantStatus === ParticipantStatus.excluded) {
       this.throwApiError(
         HttpStatus.FORBIDDEN,

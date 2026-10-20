@@ -1,3 +1,4 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, Platform } from '../../theme/native';
 import { useQuery } from '@tanstack/react-query';
@@ -42,7 +43,7 @@ export default function RecordSeasonDetailScreen({ route, navigation }: RecordSe
     <SafeAreaView style={styles.container}>
       <ScrollView refreshControl={refresh.refreshControl} testID={TEST_IDS.record.seasonDetailScreen} contentContainerStyle={styles.content}>
         <View style={styles.context}>
-          <Text accessibilityRole="header" style={styles.title}>{season.name}</Text>
+          <SeasonTitle heading style={styles.title} name={season.name} displayBadge={season.displayBadge} />
           <Text style={styles.helper}>
             {formatKstDateTime(season.startAt).slice(0, 10)} ~ {formatKstDateTime(season.endAt).slice(0, 10)}
           </Text>

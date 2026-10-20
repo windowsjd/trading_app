@@ -8,6 +8,10 @@ import {
 import { createApiError } from '../common/api-error';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertSeasonRankingScopeForParticipant } from '../ranking/season-ranking-scope';
+import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
 
 /**
  * 시즌최종결과 (docs/records-api-contract.md): one participant's official
@@ -131,6 +135,7 @@ export class SeasonFinalResultService {
         season: {
           id: season.id,
           name: season.name,
+          ...seasonDisplayFields(season),
           status: season.status,
           startAt: season.startAt.toISOString(),
           endAt: season.endAt.toISOString(),
@@ -209,10 +214,11 @@ export class SeasonFinalResultService {
     return this.prisma.$transaction(
       async (tx) => {
         const season = await tx.season.findUnique({
-          where: { id: seasonId },
+          where: { ...publicSeasonWhere(), id: seasonId },
           select: {
             id: true,
             name: true,
+            launchKind: true,
             status: true,
             startAt: true,
             endAt: true,

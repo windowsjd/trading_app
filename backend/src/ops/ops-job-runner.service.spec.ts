@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 jest.mock('../generated/prisma/client', () => ({
   ...jest.requireActual('../generated/prisma/enums'),
   PrismaClient: class PrismaClient {},
@@ -601,6 +602,7 @@ describe('OpsJobRunnerService', () => {
       expect(f.prisma.season.findMany).toHaveBeenCalledWith({
         where: {
           status: 'active',
+          ...publicSeasonWhere(expect.any(Date) as Date),
           startAt: { lte: new Date() },
           endAt: { gt: new Date() },
         },

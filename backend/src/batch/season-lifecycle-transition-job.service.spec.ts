@@ -30,6 +30,7 @@ describe('SeasonLifecycleTransitionJobService', () => {
         updateMany: jest.fn(),
       },
       $transaction: jest.fn(),
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(prisma),

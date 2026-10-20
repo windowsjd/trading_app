@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -119,7 +120,11 @@ export class LimitOnCloseSettlementService {
   async hasDueWork(): Promise<boolean> {
     const now = await this.dbNow();
     const row = await this.prisma.limitOnCloseOrder.findFirst({
-      where: { status: 'pending', sessionCloseAt: { lte: now } },
+      where: {
+        status: 'pending',
+        sessionCloseAt: { lte: now },
+        tradingAccount: publicTradingAccountWhere(now),
+      },
       select: { orderId: true },
     });
     if (row) return true;
@@ -137,7 +142,11 @@ export class LimitOnCloseSettlementService {
     const config = input.config ?? readLimitOnCloseConfig();
     const now = await this.dbNow();
     const rows = await this.prisma.limitOnCloseOrder.findMany({
-      where: { status: 'pending', sessionCloseAt: { lte: now } },
+      where: {
+        status: 'pending',
+        sessionCloseAt: { lte: now },
+        tradingAccount: publicTradingAccountWhere(now),
+      },
       orderBy: [{ sessionCloseAt: 'asc' }, { orderId: 'asc' }],
       take: input.batchSize ?? DEFAULT_BATCH_SIZE,
       include: PENDING_INCLUDE,
@@ -504,6 +513,7 @@ export class LimitOnCloseSettlementService {
     const now = await this.dbNow();
     await this.prisma.limitOnCloseOrder.updateMany({
       where: {
+        tradingAccount: publicTradingAccountWhere(),
         orderId: { in: rows.map(({ row }) => row.orderId) },
         status: 'pending',
       },

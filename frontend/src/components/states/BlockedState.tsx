@@ -13,6 +13,7 @@ import ActionPressable from '../common/ActionPressable';
 
 interface BlockedStateProps {
   title?: string;
+  titleContent?: React.ReactNode;
   message: string;
   actionLabel?: string;
   onAction?: () => void;
@@ -20,6 +21,7 @@ interface BlockedStateProps {
 
 export default function BlockedState({
   title = '현재 진행할 수 없습니다.',
+  titleContent,
   message,
   actionLabel,
   onAction,
@@ -27,7 +29,7 @@ export default function BlockedState({
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.center}>
-        <Text style={styles.title}>{title}</Text>
+        {titleContent ?? <Text style={styles.title}>{title}</Text>}
         <Text style={styles.message}>{message}</Text>
 
         {actionLabel && onAction ? (

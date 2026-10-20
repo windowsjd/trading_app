@@ -30,6 +30,7 @@ import {
 export interface RecordSeasonListItemDto {
   seasonId: string;
   seasonName: string;
+  displayBadge?: 'beta';
   /** Present on `/records/me/seasons` (backend records contract). */
   seasonStatus?: 'upcoming' | 'active' | 'ended' | 'settled' | (string & {});
   participantStatus?: string;
@@ -77,6 +78,7 @@ export interface RecordSeasonDetailDto {
   season: {
     id: string;
     name: string;
+    displayBadge?: 'beta';
     status: string;
     startAt: IsoDateTimeString;
     endAt: IsoDateTimeString;
@@ -171,6 +173,7 @@ export interface SeasonFinalResultDto {
   season: {
     id: string;
     name: string;
+    displayBadge?: 'beta';
     status: 'upcoming' | 'active' | 'ended' | 'settled' | (string & {});
     startAt: IsoDateTimeString;
     endAt: IsoDateTimeString;

@@ -17,6 +17,10 @@ import { buildPagination, type Pagination } from '../common/pagination';
 import { PrismaService } from '../prisma/prisma.service';
 import { lockSeasonForWrite } from '../ranking/season-write-lock';
 import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from './season-availability.policy';
+import {
   assertSeasonJoinable,
   getEffectiveSeasonMode,
   SeasonLifecycleError,
@@ -29,6 +33,7 @@ type CurrentSeasonResponse = {
   data: {
     id: string;
     name: string;
+    displayBadge?: 'beta';
     status: SeasonStatus;
     effectiveStatus: SeasonStatus;
     effectiveMode: SeasonLifecycleMode;
@@ -61,6 +66,7 @@ type SeasonsListResponse = {
     seasons: Array<{
       id: string;
       name: string;
+      displayBadge?: 'beta';
       status: SeasonStatus;
       effectiveStatus: SeasonStatus;
       effectiveMode: SeasonLifecycleMode;
@@ -77,6 +83,7 @@ type SeasonsListResponse = {
 type CurrentSeasonRecord = {
   id: string;
   name: string;
+  launchKind?: string | null;
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -124,8 +131,9 @@ export class SeasonsService {
     const where: Prisma.SeasonWhereInput = parsedQuery.status
       ? {
           status: parsedQuery.status,
+          ...publicSeasonWhere(),
         }
-      : {};
+      : publicSeasonWhere();
     const [total, seasons] = await Promise.all([
       this.prisma.season.count({ where }),
       this.prisma.season.findMany({
@@ -136,6 +144,7 @@ export class SeasonsService {
         select: {
           id: true,
           name: true,
+          launchKind: true,
           status: true,
           startAt: true,
           endAt: true,
@@ -157,6 +166,7 @@ export class SeasonsService {
           return {
             id: season.id,
             name: season.name,
+            ...seasonDisplayFields(season),
             status: season.status,
             effectiveStatus: this.toSeasonStatus(effectiveMode),
             effectiveMode,
@@ -199,6 +209,7 @@ export class SeasonsService {
       data: {
         id: season.id,
         name: season.name,
+        ...seasonDisplayFields(season),
         status: season.status,
         effectiveStatus: this.toSeasonStatus(effectiveMode),
         effectiveMode,
@@ -261,6 +272,8 @@ export class SeasonsService {
             startAt: true,
             endAt: true,
             initialCapitalKrw: true,
+            launchKind: true,
+            launchTestUserIds: true,
           },
         });
 
@@ -269,6 +282,17 @@ export class SeasonsService {
             HttpStatus.NOT_FOUND,
             'SEASON_NOT_FOUND',
             'Season not found',
+          );
+        }
+
+        if (
+          season.launchKind === 'test' &&
+          !season.launchTestUserIds.includes(userId)
+        ) {
+          this.throwApiError(
+            HttpStatus.FORBIDDEN,
+            'SEASON_TEST_ACCESS_DENIED',
+            'This test season is limited to approved accounts.',
           );
         }
 
@@ -448,10 +472,12 @@ export class SeasonsService {
       const season = await this.prisma.season.findFirst({
         where: {
           status,
+          ...publicSeasonWhere(),
         },
         select: {
           id: true,
           name: true,
+          launchKind: true,
           status: true,
           startAt: true,
           endAt: true,

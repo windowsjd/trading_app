@@ -1,3 +1,4 @@
+import { publicTradingAccountWhere } from '../seasons/season-availability.policy';
 import {
   HttpException,
   Injectable,
@@ -42,7 +43,11 @@ export class ConditionalWorker implements OnModuleInit, OnModuleDestroy {
     try {
       // Remain operational for lifecycle cleanup when user feature is disabled.
       const groups = await this.prisma.protectionGroup.findMany({
-        where: { ...liveProtection, id: { gt: this.cursor } },
+        where: {
+          tradingAccount: publicTradingAccountWhere(),
+          ...liveProtection,
+          id: { gt: this.cursor },
+        },
         orderBy: { id: 'asc' },
         take: 101,
         select: { id: true },

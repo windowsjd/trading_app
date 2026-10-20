@@ -1,3 +1,4 @@
+import { isSeasonSuspended } from '../seasons/season-availability.policy';
 import {
   conditionalMarkets,
   conditionalOffSessionMarkets,
@@ -559,6 +560,12 @@ export class ConditionalSellService {
         accountId,
         tx,
       );
+      if (
+        account.mode === 'season' &&
+        account.seasonParticipant &&
+        isSeasonSuspended(account.seasonParticipant.season, now)
+      )
+        return { state: 'paused' };
       if (!conditionalTradable(account, now)) {
         await this.terminate(
           tx,

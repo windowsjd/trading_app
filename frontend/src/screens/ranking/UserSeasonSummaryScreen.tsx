@@ -2,6 +2,7 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { semantic } from '../../theme/tokens';
 import React, { useCallback, useEffect } from 'react';
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import {
   AppState,
   View,
@@ -138,9 +139,7 @@ export default function UserSeasonSummaryScreen({ route }: Props) {
           <ProfileAvatar profileImageUrl={user.profileImageUrl} size={56} />
           <Text style={[styles.title, styles.profileName]}>{user.nickname}</Text>
         </View>
-        <Text style={styles.helper}>
-          {season?.name ?? '현재 시즌 정보가 없습니다.'}
-        </Text>
+        <SeasonTitle style={styles.helper} name={season?.name ?? '현재 시즌 정보가 없습니다.'} displayBadge={season?.displayBadge} />
         <Text style={styles.helper}>
           현재 순위 {season?.rank ? `#${season.rank}` : '-'}
         </Text>

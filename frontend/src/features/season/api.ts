@@ -22,6 +22,7 @@ export type {
 export interface SeasonListItemDto {
   id: string;
   name: string;
+  displayBadge?: 'beta';
   status: SeasonStatus | string;
   effectiveStatus?: string;
   effectiveMode?: string;

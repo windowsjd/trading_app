@@ -1,5 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { Prisma, SeasonStatus } from '../generated/prisma/client';
+import { assertLockedSeasonAvailable } from '../seasons/season-trading-lock';
 
 /**
  * The shared serialization point for season joins, ranking publication
@@ -29,6 +30,8 @@ export type LockedSeason = {
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
+  suspendedAt?: Date | null;
+  tradingCutoffAt?: Date | null;
 };
 
 type SeasonLockClient = Pick<Prisma.TransactionClient, '$queryRaw'>;
@@ -50,9 +53,11 @@ export async function lockSeasonForWrite(
       status: SeasonStatus;
       start_at: Date;
       end_at: Date;
+      suspended_at?: Date | null;
+      trading_cutoff_at?: Date | null;
     }>
   >`
-    SELECT "id", "status", "start_at", "end_at"
+    SELECT "id", "status", "start_at", "end_at", "suspended_at", "trading_cutoff_at"
     FROM "seasons"
     WHERE "id" = ${seasonId}
     FOR UPDATE
@@ -62,12 +67,22 @@ export async function lockSeasonForWrite(
   if (!row) {
     return null;
   }
+  await assertLockedSeasonAvailable(tx, {
+    suspendedAt: row.suspended_at,
+    tradingCutoffAt: row.trading_cutoff_at,
+  });
 
   return {
     id: row.id,
     status: row.status,
     startAt: row.start_at,
     endAt: row.end_at,
+    ...(row.suspended_at !== undefined
+      ? { suspendedAt: row.suspended_at }
+      : {}),
+    ...(row.trading_cutoff_at !== undefined
+      ? { tradingCutoffAt: row.trading_cutoff_at }
+      : {}),
   };
 }
 

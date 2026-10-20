@@ -106,7 +106,10 @@ export class RewardsService {
       this.prisma.$queryRaw<CountRow[]>`
         SELECT COUNT(*)::int AS "count"
         FROM "season_rewards" sr
+        INNER JOIN "seasons" s ON s."id" = sr."season_id"
         WHERE sr."user_id" = ${userId}
+          AND s."suspended_at" IS NULL
+          AND (s."trading_cutoff_at" IS NULL OR s."trading_cutoff_at" > clock_timestamp())
       `,
       this.prisma.$queryRaw<RewardRow[]>`
         SELECT
@@ -123,6 +126,8 @@ export class RewardsService {
         INNER JOIN "seasons" s ON s."id" = sr."season_id"
         INNER JOIN "season_participants" sp ON sp."id" = sr."season_participant_id"
         WHERE sr."user_id" = ${userId}
+          AND s."suspended_at" IS NULL
+          AND (s."trading_cutoff_at" IS NULL OR s."trading_cutoff_at" > clock_timestamp())
         ORDER BY
           sr."granted_at" DESC,
           sr."created_at" DESC,
@@ -175,7 +180,10 @@ export class RewardsService {
       this.prisma.$queryRaw<CountRow[]>`
         SELECT COUNT(*)::int AS "count"
         FROM "user_badges" ub
+        INNER JOIN "seasons" s ON s."id" = ub."season_id"
         WHERE ub."user_id" = ${userId}
+          AND s."suspended_at" IS NULL
+          AND (s."trading_cutoff_at" IS NULL OR s."trading_cutoff_at" > clock_timestamp())
       `,
       this.prisma.$queryRaw<UserBadgeRow[]>`
         SELECT
@@ -193,6 +201,8 @@ export class RewardsService {
         INNER JOIN "badges" b ON b."id" = ub."badge_id"
         INNER JOIN "seasons" s ON s."id" = ub."season_id"
         WHERE ub."user_id" = ${userId}
+          AND s."suspended_at" IS NULL
+          AND (s."trading_cutoff_at" IS NULL OR s."trading_cutoff_at" > clock_timestamp())
         ORDER BY
           ub."awarded_at" DESC,
           ub."created_at" DESC,

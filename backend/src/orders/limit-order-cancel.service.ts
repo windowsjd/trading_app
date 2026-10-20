@@ -12,7 +12,10 @@ import {
   liveProtection,
   protectionOrderCanceled,
 } from '../conditional/conditional-state';
-import { lockSeasonTradingContext } from '../seasons/season-trading-lock';
+import {
+  lockSeasonTradingContext,
+  assertLockedSeasonAvailable,
+} from '../seasons/season-trading-lock';
 import {
   cancelLiveConditionalBuysInTransaction,
   liveConditionalBuy,
@@ -185,6 +188,7 @@ export class LimitOrderCancelService {
       evidence?: { id: string; closePrice: Prisma.Decimal } | null;
     },
   ): Promise<boolean> {
+    await this.lockAvailableOrderSeason(tx, input.orderId);
     await tx.$queryRaw`SELECT id FROM orders WHERE id = ${input.orderId} FOR UPDATE`;
     const order = await tx.order.findUnique({
       where: { id: input.orderId },
@@ -238,6 +242,23 @@ export class LimitOrderCancelService {
 
   private readonly logger = new Logger(LimitOrderCancelService.name);
 
+  /** A private development season is frozen; ordinary ended-season cancellation remains allowed. */
+  private async lockAvailableOrderSeason(
+    tx: CancelTransactionClient,
+    orderId: string,
+    userId?: string,
+  ) {
+    const rows = await tx.$queryRaw<
+      Array<{ suspendedAt: Date | null; tradingCutoffAt: Date | null }>
+    >`
+      SELECT s.suspended_at AS "suspendedAt", s.trading_cutoff_at AS "tradingCutoffAt"
+      FROM seasons s JOIN season_participants p ON p.season_id = s.id
+      JOIN trading_accounts a ON a.id = p.trading_account_id JOIN orders o ON o.trading_account_id = a.id
+      WHERE o.id = ${orderId} AND (${userId ?? null}::text IS NULL OR a.user_id = ${userId ?? null})
+      FOR SHARE OF s`;
+    if (rows[0]) await assertLockedSeasonAvailable(tx, rows[0]);
+  }
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly reservation: OrderReservationService,
@@ -262,6 +283,7 @@ export class LimitOrderCancelService {
     expectedTradingAccountId?: string;
   }): Promise<CancelLimitOrderResponse> {
     return this.prisma.$transaction(async (tx) => {
+      await this.lockAvailableOrderSeason(tx, input.orderId, input.userId);
       // Lock the order row first (Order → CashWallet lock order). The locking
       // statement enforces ONLY orderId + user ownership — deliberately not
       // the requested account. Account membership is classified afterwards
@@ -568,6 +590,7 @@ export class LimitOrderCancelService {
             mode: TradingAccountMode.season,
             seasonParticipant: {
               season: {
+                suspendedAt: null,
                 status: { in: [SeasonStatus.ended, SeasonStatus.settled] },
               },
             },
@@ -659,7 +682,7 @@ export class LimitOrderCancelService {
         tradingAccount: {
           mode: 'season',
           seasonParticipant: {
-            season: { status: { in: ['ended', 'settled'] } },
+            season: { suspendedAt: null, status: { in: ['ended', 'settled'] } },
           },
         },
       },
@@ -697,7 +720,7 @@ export class LimitOrderCancelService {
         tradingAccount: {
           mode: 'season',
           seasonParticipant: {
-            season: { status: { in: ['ended', 'settled'] } },
+            season: { suspendedAt: null, status: { in: ['ended', 'settled'] } },
           },
         },
       },
@@ -733,7 +756,7 @@ export class LimitOrderCancelService {
         tradingAccount: {
           mode: 'season',
           seasonParticipant: {
-            season: { status: { in: ['ended', 'settled'] } },
+            season: { suspendedAt: null, status: { in: ['ended', 'settled'] } },
           },
         },
       },
@@ -771,7 +794,7 @@ export class LimitOrderCancelService {
         tradingAccount: {
           mode: 'season',
           seasonParticipant: {
-            season: { status: { in: ['ended', 'settled'] } },
+            season: { suspendedAt: null, status: { in: ['ended', 'settled'] } },
           },
         },
       },
@@ -809,7 +832,7 @@ export class LimitOrderCancelService {
         tradingAccount: {
           mode: 'season',
           seasonParticipant: {
-            season: { status: { in: ['ended', 'settled'] } },
+            season: { suspendedAt: null, status: { in: ['ended', 'settled'] } },
           },
         },
       },
@@ -848,7 +871,7 @@ export class LimitOrderCancelService {
         tradingAccount: {
           mode: 'season',
           seasonParticipant: {
-            season: { status: { in: ['ended', 'settled'] } },
+            season: { suspendedAt: null, status: { in: ['ended', 'settled'] } },
           },
         },
       },

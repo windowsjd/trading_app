@@ -1,3 +1,7 @@
+import {
+  publicSeasonWhere,
+  seasonDisplayFields,
+} from '../seasons/season-availability.policy';
 import { isStandaloneAccountMode } from '../trading-accounts/account-mode-policy';
 import {
   canonicalCashWalletSetIssue,
@@ -36,6 +40,8 @@ type WalletsState = 'available' | 'not_joined' | 'unavailable';
 type WalletsSeason = {
   id: string;
   name: string;
+  launchKind?: string | null;
+  displayBadge?: 'beta';
   status: SeasonStatus;
   startAt: Date;
   endAt: Date;
@@ -764,12 +770,16 @@ export class WalletsService {
     for (const status of CURRENT_SEASON_STATUS_PRIORITY) {
       const season = await this.prisma.season.findFirst({
         where: {
+          ...publicSeasonWhere(),
           status,
         },
         select: {
           id: true,
           name: true,
           status: true,
+          launchKind: true,
+          suspendedAt: true,
+          tradingCutoffAt: true,
           startAt: true,
           endAt: true,
         },
@@ -803,6 +813,7 @@ export class WalletsService {
     return {
       id: season.id,
       name: season.name,
+      ...seasonDisplayFields(season),
       status: season.status,
       startAt: season.startAt.toISOString(),
       endAt: season.endAt.toISOString(),

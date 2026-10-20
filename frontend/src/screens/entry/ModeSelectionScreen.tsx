@@ -1,3 +1,4 @@
+import SeasonTitle from '../../components/tradingAccount/SeasonTitle';
 import BeginnerAccountEntry from '../../components/tradingAccount/BeginnerAccountEntry';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo } from 'react';
@@ -153,7 +154,7 @@ export default function ModeSelectionScreen({
     const { seasonId, seasonName } = model.seasonResult;
     seasonEntry = (
       <SeasonModeCard>
-        <Text style={styles.cardBody}>{seasonName}</Text>
+        <SeasonTitle style={styles.cardBody} name={seasonName} displayBadge={model.seasonResult.displayBadge} />
         <CTAButton
           testID={TEST_IDS.modeSelection.seasonResult}
           label="시즌결과 확인하기"
@@ -185,7 +186,7 @@ export default function ModeSelectionScreen({
   } else if (model.seasonJoin.kind === 'available') {
     seasonEntry = (
       <SeasonModeCard>
-        <Text style={styles.cardBody}>{model.seasonJoin.seasonName}</Text>
+        <SeasonTitle style={styles.cardBody} name={model.seasonJoin.seasonName} displayBadge={model.seasonJoin.displayBadge} />
         <CTAButton
           testID={TEST_IDS.modeSelection.seasonJoin}
           label="시즌참가하기"
@@ -197,10 +198,13 @@ export default function ModeSelectionScreen({
     seasonEntry = (
       <SeasonModeCard testID={TEST_IDS.modeSelection.seasonNone}>
         {model.seasonSettling ? (
-          <Text style={styles.cardBody}>
-            {model.seasonSettling.seasonName} 결과를 정산하고 있습니다. 정산이
-            끝나면 이곳에서 시즌결과를 확인할 수 있습니다.
-          </Text>
+          <View>
+            <SeasonTitle style={styles.cardBody} name={model.seasonSettling.seasonName} displayBadge={model.seasonSettling.displayBadge} />
+            <Text style={styles.cardBody}>
+              결과를 정산하고 있습니다. 정산이
+              끝나면 이곳에서 시즌결과를 확인할 수 있습니다.
+            </Text>
+          </View>
         ) : null}
         <CTAButton
           testID={TEST_IDS.modeSelection.seasonNextSoon}
@@ -222,7 +226,7 @@ export default function ModeSelectionScreen({
             creation still happen only on an explicit press of each card. */}
         {model.seasonContinue.map((account) => (
           <SeasonModeCard key={account.id} badge="참가중">
-            <Text style={styles.cardBody}>{account.season?.seasonName}</Text>
+            <SeasonTitle style={styles.cardBody} name={account.season?.seasonName ?? '시즌 계정'} displayBadge={account.season?.displayBadge} />
             <CTAButton
               testID={TEST_IDS.modeSelection.seasonContinue(account.id)}
               label="시즌모드"

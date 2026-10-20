@@ -1,3 +1,4 @@
+import { publicSeasonWhere } from '../seasons/season-availability.policy';
 import type { FuturesValuationComponents } from '../portfolio/portfolio-valuation.policy';
 import { futuresSnapshotValues } from '../portfolio/futures-snapshot-values';
 import { FuturesSeasonSettlementService } from '../futures/futures-season-settlement.service';
@@ -517,6 +518,7 @@ export class SeasonSettlementJobService {
   private async findSeasonOrThrow(seasonId: string): Promise<SettlementSeason> {
     const season = await this.prisma.season.findUnique({
       where: {
+        ...publicSeasonWhere(),
         id: seasonId,
       },
       select: {
