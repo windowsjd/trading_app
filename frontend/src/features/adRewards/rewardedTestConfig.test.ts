@@ -8,8 +8,18 @@ const require = createRequire(import.meta.url);
 const { adMobBuildConfig } = require('../../../config/admob.cjs');
 const app = require('../../../app.json');
 const eas = require('../../../eas.json');
+const dependencies = require('../../../package.json').dependencies;
+const sdkPackage = require('react-native-google-mobile-ads/package.json');
 const androidReal = 'ca-app-pub-7899930948413451/3165650506';
 const iosReal = 'ca-app-pub-7899930948413451/8170740188';
+
+test('native SDK stays on the exact Kotlin 2.1 compatible version verified by the build', () => {
+  // 16.4+ selects Google Ads 25.4, whose Kotlin 2.3 metadata failed our EAS
+  // :react-native-google-mobile-ads:compileReleaseKotlin step. No caret here.
+  assert.equal(dependencies['react-native-google-mobile-ads'], '16.3.4');
+  assert.equal(sdkPackage.version, '16.3.4');
+  assert.equal(sdkPackage.sdkVersions.android.googleMobileAds, '25.0.0');
+});
 
 test('development and preview force official platform test units even if the environment supplies real IDs', () => {
   for (const profile of ['development', 'preview']) {
