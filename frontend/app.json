@@ -5,7 +5,12 @@
   },
   "android": {
     "package": "com.leagueoftrading",
-    "blockedPermissions": ["com.google.android.gms.permission.AD_ID"],
+    "blockedPermissions": [
+      "com.google.android.gms.permission.AD_ID",
+      "android.permission.ACCESS_ADSERVICES_AD_ID",
+      "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
+      "android.permission.ACCESS_ADSERVICES_TOPICS"
+    ],
     "adaptiveIcon": {
       "foregroundImage": "./assets/icon/trading-class-android-foreground-432.png",
       "backgroundImage": "./assets/icon/trading-class-android-background-432.png"

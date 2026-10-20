@@ -72,5 +72,9 @@ test('native app IDs, existing plugins, package and build profiles are preserved
   const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
   assert.match(manifest, /APPLICATION_ID" android:value="ca-app-pub-7899930948413451~9002185139"/);
   assert.match(manifest, /DELAY_APP_MEASUREMENT_INIT" android:value="true"/);
-  assert.match(manifest, /com.google.android.gms.permission.AD_ID" tools:node="remove"/);
+  for (const permission of ['com.google.android.gms.permission.AD_ID', 'android.permission.ACCESS_ADSERVICES_AD_ID',
+    'android.permission.ACCESS_ADSERVICES_ATTRIBUTION', 'android.permission.ACCESS_ADSERVICES_TOPICS']) {
+    assert.equal(app.android.blockedPermissions.includes(permission), true);
+    assert.equal(manifest.includes(`android:name="${permission}" tools:node="remove"`), true);
+  }
 });
