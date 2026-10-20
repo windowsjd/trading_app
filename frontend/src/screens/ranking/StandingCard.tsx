@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, useWindowDimensions, type TextStyle } from '../../theme/native';
 import { semantic } from '../../theme/tokens';
-import { financial } from '../../theme/financialColors';
 import { useAppearance } from '../../theme/appearance';
 import { getRecordFinancialDisplay } from '../../features/record/financialDisplay';
 import { formatKrw } from '../../utils/format';
@@ -24,6 +23,11 @@ export function rankingFigureText(ranking: Figures | null) {
  * `header` (the profile, or the season's name), the rank, then the return
  * rate and total assets of the standing's ranking row. Without a known tier
  * the same column sits on a plain card. Ids are `${testIDPrefix}-…`.
+ *
+ * The return rate reads exactly as the total assets do — the card's own ink
+ * (the tier's foreground and halo on the art, the text color on the plain
+ * card), no direction color or surface: the rise/fall colors stay with the
+ * ranking rows and the TOP 3 podium.
  */
 export default function StandingCard({
   testIDPrefix, tier: tierCode, header, rankLabel, rank, settled = false, figures,
@@ -63,7 +67,7 @@ export default function StandingCard({
         accessibilityLabel={`${figureLabels.rate} ${rate.text}, ${figureLabels.total} ${total}`}>
         <View style={styles.figure}>
           <Text style={label}>{figureLabels.rate}</Text>
-          <RateValue testID={`${testIDPrefix}-return`} text={rate.text} color={rate.color} foreground={foreground} />
+          <Text testID={`${testIDPrefix}-return`} style={[styles.figureValue, foreground]}>{rate.text}</Text>
         </View>
         <View style={styles.figure}>
           <Text style={label}>{figureLabels.total}</Text>
@@ -82,33 +86,6 @@ export default function StandingCard({
         spotlight={spotlight}>
         {content}
       </TierCard>
-    </View>
-  );
-}
-
-/**
- * The return rate. On the plain card it takes the financial role colors, as
- * in the list. On tier art a rising or falling rate sits on its direction's
- * own surface: the art's facets (light mid-tones, Whale's navy) would
- * otherwise need the hue shaded until red and blue no longer read as red and
- * blue, while text and surface keep >= 4.5:1 in both appearances and both
- * palettes. Zero and unavailable rates keep the tier's foreground.
- */
-function RateValue({ testID, text, color, foreground }: {
-  testID: string;
-  text: string;
-  /** getRecordFinancialDisplay's decision: the rise/fall role, or neutral. */
-  color: string;
-  foreground: TextStyle | undefined;
-}) {
-  if (!foreground) return <Text testID={testID} style={[styles.figureValue, { color }]}>{text}</Text>;
-  if (color !== financial.rise && color !== financial.fall) {
-    return <Text testID={testID} style={[styles.figureValue, foreground]}>{text}</Text>;
-  }
-  const rising = color === financial.rise;
-  return (
-    <View testID={`${testID}-chip`} style={[styles.rateChip, { backgroundColor: rising ? financial.riseSurface : financial.fallSurface }]}>
-      <Text testID={testID} style={[styles.figureValue, { color: rising ? financial.rise : financial.fall }]}>{text}</Text>
     </View>
   );
 }
@@ -134,7 +111,6 @@ const styles = StyleSheet.create({
   // alone on its line it may still wrap, so it never runs into the emblem.
   figure: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 8, minWidth: 0 },
   figureValue: { flexShrink: 1, minWidth: 0, fontSize: 16, lineHeight: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
-  rateChip: { flexShrink: 1, minWidth: 0, borderRadius: 8, paddingHorizontal: 6 },
   tierCaption: { fontSize: 15, lineHeight: 22, fontWeight: '800', textAlign: 'center' },
   label: { fontSize: 13, color: semantic.secondary },
   settledText: { color: semantic.error, fontWeight: '700' },

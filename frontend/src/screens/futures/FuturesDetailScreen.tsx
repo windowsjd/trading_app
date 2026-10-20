@@ -16,11 +16,20 @@ import {
   DEFAULT_ASSET_CHART_TIMEFRAME,
   type AssetChartTimeframe,
 } from '../../features/asset/chartTimeframes';
-import { getFuturesInstruments, getFuturesPositions } from '../../features/futures/api';
 import {
-  futuresDayChange,
-  futuresDayChangeLabel,
+  FUTURES_CHART_REFRESH_MS,
+  getFuturesInstrumentCandles,
+  getFuturesInstruments,
+  getFuturesPositions,
+} from '../../features/futures/api';
+import {
+  FUTURES_PREVIOUS_DAY_RETRY_MS,
+  FUTURES_PREVIOUS_DAY_WINDOW,
   futuresKrwPrice,
+  futuresPreviousDayChange,
+  futuresPreviousDayChangeLabel,
+  futuresPreviousDayClose,
+  futuresPreviousUtcDayStart,
 } from '../../features/futures/detailDisplay';
 import { freshFuturesReference, futuresServerNow } from '../../features/futures/policy';
 import { useLearningAccess } from '../../features/quest/useLearningAccess';
@@ -44,7 +53,8 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  * A futures contract's detail in the asset detail's layout (종목 상세): the
  * contract's name with the contract picker, its USD badge and contract line,
  * the current Futures Last large with its won conversion and the $ | 원
- * switch, the contract's rolling 24h change, its chart with the 봉 시간
+ * switch, its 전일대비 (against its own settled 1d close of the previous UTC
+ * day, never the rolling 24h ticker), its chart with the 봉 시간
  * selector at the lower left, and 매도하기 / 매수하기 at the bottom. 매수하기
  * opens the order screen on a new 롱(Long) entry and 매도하기 on a new 숏(Short)
  * entry — never a reduce or close; with a position held, the order screen keeps
@@ -65,8 +75,8 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
   const [displayCurrency, setDisplayCurrency] = useState<'USD' | 'KRW'>('USD');
   const [timeframe, setTimeframe] = useState<AssetChartTimeframe>(DEFAULT_ASSET_CHART_TIMEFRAME);
   const [pickerOpen, setPickerOpen] = useState(false);
-  // The Last, the 24h change and the won rate are judged on the read's server
-  // clock — restarted on return, so nothing shows as fresh on an old clock.
+  // The Last, 전일대비's UTC day and the won rate are judged on the read's
+  // server clock — restarted on return, so nothing shows as fresh on an old clock.
   const [clock, setClock] = useState(() => Date.now());
   useEffect(() => {
     if (!focused) return undefined;
@@ -84,6 +94,24 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
     queryFn: ({ signal }) => getFuturesInstruments(accountId, signal),
     enabled: focused && bound,
     refetchInterval: focused && bound ? 2000 : false,
+    retry: false,
+  });
+  const data = instruments.data?.tradingAccountId === accountId ? instruments.data : undefined;
+  // A failed poll keeps the last list (its Last ages out by its own evidence).
+  const catalog = data?.instruments ?? [];
+  const instrument = catalog.find((item) => item.id === instrumentId);
+  const serverNow = futuresServerNow(data, clock);
+  // 전일대비's basis: this contract's settled 1d close of the previous UTC day
+  // (market data, the 1d chart's route). The day is in the key, so the basis
+  // never outlives its day; without it the read is retried sooner.
+  const daily = useQuery({
+    queryKey: QUERY_KEYS.futuresMarket.previousDayCandles(instrumentId, futuresPreviousUtcDayStart(serverNow)),
+    queryFn: ({ signal }) => getFuturesInstrumentCandles(instrumentId, FUTURES_PREVIOUS_DAY_WINDOW, signal),
+    enabled: focused && bound && !!instrument,
+    refetchInterval: (query) => (focused && bound
+      ? futuresPreviousDayClose(query.state.data, instrument, serverNow)
+        ? FUTURES_CHART_REFRESH_MS['1d'] : FUTURES_PREVIOUS_DAY_RETRY_MS
+      : false),
     retry: false,
   });
   // The wallet's USD/KRW read (same key as the wallet and holdings), re-read
@@ -116,12 +144,7 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
         <CTAButton label="마켓으로" onPress={() => navigation.navigate('Market')} />
       </View>
     );
-  const data = instruments.data?.tradingAccountId === accountId ? instruments.data : undefined;
-  // A failed poll keeps the last list (its Last ages out by its own evidence).
-  const catalog = data?.instruments ?? [];
-  const instrument = catalog.find((item) => item.id === instrumentId);
   const missing = !!data && !instrument;
-  const serverNow = futuresServerNow(data, clock);
   const last = instrument?.referencePrice ?? null;
   const lastFresh = !!last && freshFuturesReference(instrument?.referencePriceEvidence, serverNow);
   const decimals = instrument?.underlying.displayPriceDecimals;
@@ -132,7 +155,10 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
   const krwPrice = futuresKrwPrice({ last, lastFresh, fxRate: fx.isError ? null : fx.data, now: serverNow });
   const krwAvailable = krwPrice !== null;
   const useKrw = krwAvailable && displayCurrency === 'KRW';
-  const change = futuresDayChange(instrument?.marketStats, serverNow);
+  // In USD whatever the display currency: the won rate never moves it.
+  const change = futuresPreviousDayChange({
+    last, lastFresh, previousClose: futuresPreviousDayClose(daily.data, instrument, serverNow),
+  });
   const name = instrument?.underlying.name ?? '선물 상품';
   const open = (direction: 'long' | 'short') => navigation.navigate('Futures', { accountId, instrumentId, direction });
   const tradable = !!instrument;
@@ -195,7 +221,7 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
             </View>
             <Text testID="futures-day-change" style={[styles.change,
               change?.gt(0) ? styles.up : change?.lt(0) ? styles.down : null]}>
-              {futuresDayChangeLabel(change)}
+              {futuresPreviousDayChangeLabel(change)}
             </Text>
           </View>
           {instruments.isError ? (

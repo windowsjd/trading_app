@@ -3,9 +3,10 @@ import { createRequire } from 'node:module';
 import { it, type TestContext } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
 import { QUERY_KEYS } from '../../constants/queryKeys.ts';
+import { financial } from '../../theme/financialColors.ts';
 
 const require = createRequire(import.meta.url);
-const { interactionHarness, React, act } = require('../../../test/interactionTestHarness.cjs');
+const { interactionHarness, React, act, flatten } = require('../../../test/interactionTestHarness.cjs');
 const query = require('@tanstack/react-query');
 
 const IDS = TEST_IDS.seasonFinalResult;
@@ -99,6 +100,13 @@ it('shows a ranked result in order — emblem, tier, rank, return, assets, badge
   assert.equal(h.text('season-badge-season-1-return'), '+23.46%');
   assert.equal(h.text('season-badge-season-1-total'), '12,345,679원');
   assert.equal(h.hosts(IDS.noBadge).length, 0);
+  // On the badge card the return reads as its final assets (the tier's ink, no chip); the result's
+  // own 수익률 figure above keeps the financial role color.
+  const badgeReturn = flatten(h.hosts('season-badge-season-1-return')[0].props.style);
+  assert.deepEqual(badgeReturn, flatten(h.hosts('season-badge-season-1-total')[0].props.style));
+  assert.equal([financial.rise, financial.fall].includes(badgeReturn.color), false);
+  assert.equal(h.hosts('season-badge-season-1-return-chip').length, 0);
+  assert.equal(flatten(h.hosts(IDS.returnRate)[0].props.style).color, financial.rise);
 
   assert.equal(h.views, 1);
   assert.equal(h.resultViewedAt(), '2026-10-02T01:02:03.000Z');
@@ -116,6 +124,7 @@ it('keeps a not-qualified participant\'s settled assets and return, with no rank
   assert.equal(h.text(IDS.tierName), '최종 랭킹 자격 미충족');
   assert.equal(h.text(IDS.rank), '최종 랭킹 자격 미충족');
   assert.equal(h.text(IDS.returnRate), '-1.5%');
+  assert.equal(flatten(h.hosts(IDS.returnRate)[0].props.style).color, financial.fall);
   assert.equal(h.text(IDS.totalAsset), '10,200,000원');
   assert.equal(h.hosts('season-badge-season-1-card').length, 0);
   assert.match(h.text(IDS.noBadge), /뱃지가 없습니다/);

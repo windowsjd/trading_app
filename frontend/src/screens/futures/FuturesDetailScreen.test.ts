@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
+import { financial } from '../../theme/financialColors.ts';
 
 const require = createRequire(import.meta.url);
 const { futuresHarness, futuresCandlesFixture, deferred } = require('../../../test/futuresHarness.cjs');
@@ -14,6 +15,29 @@ const stats = (overrides: Record<string, unknown> = {}) => ({
   windowOpenTime: new Date(Date.now() - 86_400_000).toISOString(), windowCloseTime: new Date().toISOString(),
   receivedAt: new Date(Date.now() - 1_000).toISOString(), ...overrides,
 });
+const styleOf = (node: any) => Object.assign({}, ...[node.props.style].flat(Infinity).filter(Boolean));
+const DAY = 86_400_000;
+/** The clock the harness's server reads are taken on (the device clock + its offset). */
+const serverNow = (h: any) => Date.now() + (h.options.serverClockOffsetMs ?? 0);
+/**
+ * A contract's 1d read as the server answers the detail's `limit=2`: the
+ * previous UTC day settled at `close`, and today's open bucket (999, so a
+ * figure taken from it would show); `edit` changes the buckets.
+ */
+const dailyRead = (h: any, instrumentId: string, symbol: string, close: string, edit = (candles: any[]) => candles) => {
+  const today = Math.floor(serverNow(h) / DAY) * DAY;
+  const bucket = (openMs: number, price: string, provisional: boolean) => ({ time: new Date(openMs).toISOString(),
+    open: price, high: price, low: price, close: price, volume: '1.00000000', amount: '1.00000000', provisional });
+  const candles = edit([bucket(today - DAY, close, false), bucket(today, '999.00000000', true)]);
+  const fixture = futuresCandlesFixture(instrumentId, today, '1d');
+  return { ...fixture, instrument: { ...fixture.instrument, symbol }, candles,
+    source: { ...fixture.source, symbol, requestedCount: 2, returnedCount: candles.length, fetchedAt: new Date(serverNow(h) - 1_000).toISOString() } };
+};
+/** The chart's reads keep the fixture; 1d reads are answered by `daily`. */
+const withDaily = (h: any, daily: (instrumentId: string) => unknown) => {
+  h.futuresCandles = (instrumentId: string, interval: string) =>
+    interval === '1d' ? daily(instrumentId) : futuresCandlesFixture(instrumentId, Date.now(), interval);
+};
 
 describe('futures contract detail in the asset detail layout (market 선물 row → 종목 상세 → order screen)', () => {
   it('shows the name with the contract picker, USD badge, contract line, the Last large with its won line, and the chart', async (t) => {
@@ -26,10 +50,10 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     // The contract's own fresh Last (102), never Mark (101); 102 × 1,400 = 142,800원.
     assert.equal(words(h.node('futures-detail-primary-price')), '$102');
     assert.equal(words(h.node('futures-detail-secondary-price')), '142,800원');
-    // No 24h ticker in this read: an unknown change, never 0%.
-    assert.equal(words(h.node('futures-day-change')), '24시간 변동률 -');
-    // The contract's own Last candles at the asset detail's default 봉 시간.
-    assert.deepEqual(h.candleWindows, ['btc:5m:2d:600']);
+    // 전일대비: the Last against the fixture's settled previous UTC day (close 101).
+    assert.equal(words(h.node('futures-day-change')), '전일대비 +0.99%');
+    // The contract's own Last candles at the asset detail's default 봉 시간, and its 1d read (two buckets).
+    assert.deepEqual(h.candleWindows, ['btc:5m:2d:600', 'btc:1d:1y:2']);
     assert.equal(chart(h).props.viewportResetKey, 'btc:5m');
     assert.equal(chart(h).props.currentPrice, '102');
     assert.equal(h.node('asset-timeframe-selector') === undefined, false, 'the shared 봉 시간 selector');
@@ -88,23 +112,73 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(chart(stale).props.currentPrice, null);
   });
 
-  it("shows the contract's own rolling 24h change while its read is current, never as 전일 대비", async (t) => {
+  it("shows 전일대비: the fresh Last against the contract's own settled close of the previous UTC day, never the rolling 24h ticker", async (t) => {
+    // The 24h ticker says -9.87%; the Last 102 against the previous day's 100 is +2%.
     const rise = futuresHarness({ screen: 'detail' });
-    rise.catalogInstruments = (instrument: any) => [{ ...instrument, marketStats: stats() }];
+    rise.catalogInstruments = (instrument: any) => [{ ...instrument, marketStats: stats({ priceChangePercent: '-9.87' }) }];
+    withDaily(rise, (id) => dailyRead(rise, id, 'BTCUSDT', '100.00000000'));
     await rise.start(); t.after(rise.close);
-    assert.equal(words(rise.node('futures-day-change')), '24시간 변동률 +2.35%');
-    assert.equal(rise.text().includes('전일'), false);
+    assert.equal(words(rise.node('futures-day-change')), '전일대비 +2%');
+    assert.equal(styleOf(rise.node('futures-day-change')).color, financial.rise);
+    assert.equal(rise.text().includes('9.87') || rise.text().includes('24시간'), false);
+    assert.deepEqual(rise.candleWindows, ['btc:5m:2d:600', 'btc:1d:1y:2']);
+    // The won display never moves it: the contract's USD prices, not the USD/KRW rate.
+    await rise.press('futures-currency-krw');
+    assert.equal(words(rise.node('futures-detail-primary-price')), '142,800원');
+    assert.equal(words(rise.node('futures-day-change')), '전일대비 +2%');
 
     const fall = futuresHarness({ screen: 'detail' });
-    fall.catalogInstruments = (instrument: any) => [{ ...instrument, marketStats: stats({ priceChangePercent: '-0.5' }) }];
+    withDaily(fall, (id) => dailyRead(fall, id, 'BTCUSDT', '102.68000000'));
     await fall.start(); t.after(fall.close);
-    assert.equal(words(fall.node('futures-day-change')), '24시간 변동률 -0.5%');
+    assert.equal(words(fall.node('futures-day-change')), '전일대비 -0.66%');
+    assert.equal(styleOf(fall.node('futures-day-change')).color, financial.fall);
 
-    const old = futuresHarness({ screen: 'detail' });
-    old.catalogInstruments = (instrument: any) => [{ ...instrument,
-      marketStats: stats({ receivedAt: new Date(Date.now() - 120_000).toISOString() }) }];
-    await old.start(); t.after(old.close);
-    assert.equal(words(old.node('futures-day-change')), '24시간 변동률 -');
+    const flat = futuresHarness({ screen: 'detail' });
+    withDaily(flat, (id) => dailyRead(flat, id, 'BTCUSDT', '102.00000000'));
+    await flat.start(); t.after(flat.close);
+    assert.equal(words(flat.node('futures-day-change')), '전일대비 0%');
+    assert.equal([financial.rise, financial.fall].includes(styleOf(flat.node('futures-day-change')).color), false);
+  });
+
+  it('reads 전일대비 - (never 0%, never an older day) without a fresh Last, a settled previous day of this contract, or the read', async (t) => {
+    const down = () => Object.assign(new Error('down'), { response: { status: 503 } });
+    const cases: Array<[string, (h: any) => void, Record<string, unknown>?]> = [
+      ['a stale Last', (h) => withDaily(h, (id) => dailyRead(h, id, 'BTCUSDT', '100')), { expiredReference: true }],
+      ['the previous day not settled yet', (h) => withDaily(h, (id) => dailyRead(h, id, 'BTCUSDT', '100',
+        ([previous, today]) => [{ ...previous, provisional: true }, today]))],
+      ['the previous day missing (an older day never stands in)', (h) => withDaily(h, (id) => dailyRead(h, id, 'BTCUSDT', '100',
+        ([previous, today]) => [{ ...previous, time: new Date(Date.parse(previous.time) - DAY).toISOString() }, today]))],
+      ["another contract's series", (h) => withDaily(h, (id) => dailyRead(h, id, 'ETHUSDT', '100'))],
+      ['a failed read', (h) => withDaily(h, () => { throw down(); })],
+    ];
+    for (const [name, setup, options] of cases) {
+      const h = futuresHarness({ screen: 'detail', ...options });
+      setup(h);
+      await h.start(); t.after(h.close);
+      assert.equal(words(h.node('futures-day-change')), '전일대비 -', name);
+    }
+  });
+
+  it("at 00:00 UTC on the server clock the basis becomes the day that just closed; the previous day's figure never carries over", async (t) => {
+    const h = futuresHarness({ screen: 'detail' });
+    // The server's clock a minute before the next UTC midnight (the device clock stays as it is).
+    const midnight = Math.floor(Date.now() / DAY) * DAY + DAY;
+    h.options.serverClockOffsetMs = midnight - 60_000 - Date.now();
+    // The day before closed at 100; the day ending at midnight closes at 101.
+    const closes: Record<number, string> = { [midnight - 2 * DAY]: '100.00000000', [midnight - DAY]: '101.00000000' };
+    withDaily(h, (id) => dailyRead(h, id, 'BTCUSDT', closes[Math.floor(serverNow(h) / DAY) * DAY - DAY]));
+    await h.start(); t.after(h.close);
+    assert.equal(words(h.node('futures-day-change')), '전일대비 +2%');
+    // A minute past midnight; the new day's 1d read waits until released.
+    h.candleGates = { '1d': deferred() };
+    h.options.serverClockOffsetMs = midnight + 60_000 - Date.now();
+    await h.client.invalidateQueries({ queryKey: ['tradingAccount', 'futures', 'A', 'instruments'] });
+    await h.flush();
+    assert.equal(words(h.node('futures-day-change')), '전일대비 -');
+    h.candleGates['1d'].resolve();
+    await h.flush();
+    assert.equal(words(h.node('futures-day-change')), '전일대비 +0.99%');
+    assert.deepEqual(h.candleWindows.filter((read: string) => read.startsWith('btc:1d:')), ['btc:1d:1y:2', 'btc:1d:1y:2']);
   });
 
   it('the 봉 시간 selector reads that window of the contract, and a late answer for an earlier choice is never drawn', async (t) => {
@@ -125,7 +199,7 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(chart(h).props.viewportResetKey, 'btc:1h');
     const hour = futuresCandlesFixture('btc', Date.now(), '1h').candles.map((c: any) => c.time);
     assert.deepEqual(chart(h).props.candles.map((c: any) => c.time), hour);
-    assert.deepEqual(h.candleWindows, ['btc:5m:2d:600', 'btc:15m:3d:300', 'btc:1h:14d:350']);
+    assert.deepEqual(h.candleWindows, ['btc:5m:2d:600', 'btc:1d:1y:2', 'btc:15m:3d:300', 'btc:1h:14d:350']);
   });
 
   it('the name picker lists the verified contracts and changes the contract, leaving none of the previous one', async (t) => {
@@ -134,26 +208,35 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     h.catalogInstruments = (btc: any) => [{ ...btc, marketStats: stats() }, { ...btc, id: 'hype', referencePrice: '57.5',
       underlying: { ...btc.underlying, assetId: 'asset-hype', symbol: 'HYPEUSDT', name: 'Hyperliquid', displayPriceDecimals: 3 },
       marketStats: stats({ priceChangePercent: '-1.25' }) }];
+    // Each contract's own settled previous day: BTC 100 (+2%), HYPE 50 (+15%).
+    withDaily(h, (id) => (id === 'hype' ? dailyRead(h, id, 'HYPEUSDT', '50.00000000') : dailyRead(h, id, 'BTCUSDT', '100.00000000')));
     await h.start(); t.after(h.close);
-    assert.equal(words(h.node('futures-day-change')), '24시간 변동률 +2.35%');
+    assert.equal(words(h.node('futures-day-change')), '전일대비 +2%');
     await h.press('futures-currency-krw');
     await h.press('futures-name-selector');
     assert.equal(h.node('futures-instrument-sheet') === undefined, false);
     await h.press('futures-instrument-hype');
     assert.deepEqual(h.navigation, [['setParams', { instrumentId: 'hype' }]]);
-    // The navigator re-renders the route with the new params.
+    // The navigator re-renders the route with the new params; HYPE's 1d read is held back.
+    h.candleGates = { '1d': deferred() };
     await h.update();
+    // Until HYPE's own read arrives: no figure, never BTC's +2%.
+    assert.equal(words(h.node('futures-day-change')), '전일대비 -');
+    h.candleGates['1d'].resolve();
+    await h.flush();
     assert.equal(words(h.node('futures-detail-name')), 'Hyperliquid');
     assert.equal(words(h.node('futures-detail-contract')), 'HYPEUSDT · USDⓈ-M 무기한');
     assert.equal(words(h.node('futures-detail-primary-price')).includes('102'), false);
     assert.match(words(h.node('futures-detail-primary-price')), /^\$57\.5/);
     assert.equal(words(h.node('futures-detail-secondary-price')), '80,500원');
-    assert.equal(words(h.node('futures-day-change')), '24시간 변동률 -1.25%');
+    assert.equal(words(h.node('futures-day-change')), '전일대비 +15%');
     assert.equal(chart(h).props.currentPrice, '57.5');
     // A new contract starts from the defaults: USD, 5m, its own chart only.
     assert.equal(h.node('futures-currency-usd').props.accessibilityState.selected, true);
     assert.equal(chart(h).props.viewportResetKey, 'hype:5m');
-    assert.deepEqual(h.candleReads, ['btc', 'hype']);
+    // Each contract's chart and 1d reads, BTC's before the switch and HYPE's after.
+    assert.deepEqual([h.candleWindows.slice(0, 2).sort(), h.candleWindows.slice(2).sort()],
+      [['btc:1d:1y:2', 'btc:5m:2d:600'], ['hype:1d:1y:2', 'hype:5m:2d:600']]);
     assert.equal(h.node('futures-instrument-sheet') === undefined, true, 'the picker closed');
   });
 
@@ -241,6 +324,9 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     const missing = futuresHarness({ screen: 'detail', instrumentId: 'not-listed' });
     await missing.start(); t.after(missing.close);
     assert.equal(missing.node('futures-detail-missing') === undefined, false);
+    // No 전일대비 read for a contract outside the verified list.
+    assert.deepEqual([missing.candleWindows.some((read: string) => read.includes(':1d:')), words(missing.node('futures-day-change'))],
+      [false, '전일대비 -']);
     assert.deepEqual(missing.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => n.props.state), ['disabled', 'disabled']);
 
     const failed = futuresHarness({ screen: 'detail' });

@@ -2,7 +2,7 @@ import Decimal from 'decimal.js';
 import { isPreviewFxAvailable } from '../tradingAccount/indicativePreview.ts';
 import type { FxRateDto } from '../wallet/api';
 import { formatKrwDecimal, formatPercent } from '../../utils/format.ts';
-import type { FuturesMarketStats } from './api';
+import type { FuturesCandles, FuturesChartWindow, FuturesInstrument } from './api';
 
 /**
  * Display rules of the futures contract detail (2026-10-20), the asset detail's
@@ -10,42 +10,85 @@ import type { FuturesMarketStats } from './api';
  * or a settlement, and the contract keeps trading and settling in USD.
  */
 
-/** The server's own window for the 24h ticker (futures-market-data.ts). */
-export const FUTURES_DAY_CHANGE_MAX_AGE_MS = 60_000;
-const FUTURES_DAY_CHANGE_MAX_FUTURE_MS = 5_000;
+/** A futures day: 00:00 to 24:00 UTC, the grid of the contract's own 1d klines. */
+const UTC_DAY_MS = 86_400_000;
 
 /**
- * The contract's rolling 24h change (Binance's own ticker of THIS contract),
- * while the read that carried it is still current on the server clock. Never
- * labelled "전일 대비": it is a rolling 24 hours, not a session change.
+ * 전일대비's read: the contract's 1d chart route and window (the server's
+ * shared 1d cache), only its newest two buckets. A settled previous UTC day is
+ * always one of them — only today's bucket can follow it.
  */
-export function futuresDayChange(
-  stats: FuturesMarketStats | undefined,
+export const FUTURES_PREVIOUS_DAY_WINDOW: FuturesChartWindow = { interval: '1d', range: '1y', limit: 2 };
+/** How soon a detail still without that settled close asks again (with it: the 1d chart's cadence). */
+export const FUTURES_PREVIOUS_DAY_RETRY_MS = 15_000;
+
+/** Open of the UTC day before the one containing `serverNow` (that day's 1d kline time). */
+export function futuresPreviousUtcDayStart(serverNow: number): number {
+  return Math.floor(serverNow / UTC_DAY_MS) * UTC_DAY_MS - UTC_DAY_MS;
+}
+
+/**
+ * The close of THIS contract's own settled 1d kline (contract trade price,
+ * never Mark, Index or Spot) for the UTC day before `serverNow`, or null: a
+ * read of another contract or interval, a read not received after that day
+ * ended (its own `fetchedAt`), a provisional bucket, or no bucket for exactly
+ * that day (an older day never stands in) leaves 전일대비 unknown.
+ */
+export function futuresPreviousDayClose(
+  daily: FuturesCandles | undefined,
+  instrument: Pick<FuturesInstrument, 'id' | 'underlying'> | undefined,
   serverNow: number,
 ): Decimal | null {
-  if (stats?.state !== 'available') return null;
-  const received = Date.parse(stats.receivedAt);
-  const age = serverNow - received;
+  if (!daily || !instrument) return null;
+  const symbol = instrument.underlying.symbol;
   if (
-    !Number.isFinite(received) ||
-    age > FUTURES_DAY_CHANGE_MAX_AGE_MS ||
-    age < -FUTURES_DAY_CHANGE_MAX_FUTURE_MS
+    daily.instrument.id !== instrument.id ||
+    daily.instrument.symbol !== symbol ||
+    daily.source.symbol !== symbol ||
+    daily.interval !== '1d' ||
+    daily.priceBasis !== 'contract_last_trade' ||
+    daily.source.provider !== 'binance_usdm' ||
+    daily.source.contractType !== 'PERPETUAL'
   ) {
     return null;
   }
+  const dayStart = futuresPreviousUtcDayStart(serverNow);
+  if (!(Date.parse(daily.source.fetchedAt ?? '') >= dayStart + UTC_DAY_MS)) return null;
+  const day = daily.candles.filter((candle) => Date.parse(candle.time) === dayStart);
+  return day.length === 1 && day[0].provisional === false ? positiveDecimal(day[0].close) : null;
+}
+
+/**
+ * 전일대비 (%): the fresh Futures Last against the previous UTC day's settled
+ * close of the same contract, both in USD (a won display never mixes the
+ * USD/KRW rate in). Null — shown as `-`, never 0% — without either price.
+ * Never Binance's rolling 24h ticker.
+ */
+export function futuresPreviousDayChange(input: {
+  last: string | null;
+  lastFresh: boolean;
+  previousClose: Decimal | null;
+}): Decimal | null {
+  const last = input.lastFresh ? positiveDecimal(input.last) : null;
+  if (!last || !input.previousClose) return null;
+  return last.minus(input.previousClose).div(input.previousClose).times(100);
+}
+
+/** `전일대비 +2.35%` in the asset detail's words and percent format, or `전일대비 -` while unknown. */
+export function futuresPreviousDayChangeLabel(change: Decimal | null): string {
+  if (!change) return '전일대비 -';
+  const text = formatPercent(change.toString());
+  return `전일대비 ${change.gt(0) ? '+' : ''}${text}%`;
+}
+
+function positiveDecimal(value: string | null): Decimal | null {
+  if (!value) return null;
   try {
-    const value = new Decimal(stats.priceChangePercent);
-    return value.isFinite() ? value : null;
+    const parsed = new Decimal(value);
+    return parsed.isFinite() && parsed.gt(0) ? parsed : null;
   } catch {
     return null;
   }
-}
-
-/** `24시간 변동률 +2.35%`, or `24시간 변동률 -` while unknown. */
-export function futuresDayChangeLabel(change: Decimal | null): string {
-  if (!change) return '24시간 변동률 -';
-  const text = formatPercent(change.toString());
-  return `24시간 변동률 ${change.gt(0) ? '+' : ''}${text}%`;
 }
 
 /**

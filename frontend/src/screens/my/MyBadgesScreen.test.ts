@@ -90,13 +90,18 @@ it('asks only for settled seasons and shows one tier card per season with its ow
   assert.equal(h.node('season-badge-season-1-card').findAll((node: any) => node.props.testID === 'home-emblem-gold').length > 0, true);
   assert.equal(h.node('season-badge-season-3-card').findAll((node: any) => node.props.testID === 'home-emblem-whale').length > 0, true);
   assert.equal(h.has('season-badge-season-2-card') || h.has('season-badge-season-0-card'), false);
-  // The Ranking tab's labels for a final result, and its direction chip on the art (A-5).
+  // The Ranking tab's labels for a final result.
   const labels = h.node('season-badge-season-1-card').findAll((node: any) => node.type === 'Text').map((node: any) => strings(node).join(''));
   assert.equal(['최종 순위', '최종 수익률', '최종 자산'].every((label) => labels.includes(label)), true);
-  assert.deepEqual([flatten(h.node('season-badge-season-1-return').props.style).color,
-    flatten(h.node('season-badge-season-1-return-chip').props.style).backgroundColor], [financial.rise, financial.riseSurface]);
-  assert.deepEqual([flatten(h.node('season-badge-season-3-return').props.style).color,
-    flatten(h.node('season-badge-season-3-return-chip').props.style).backgroundColor], [financial.fall, financial.fallSurface]);
+  // A rising (Gold) and a falling (Whale) final return read exactly as the final assets beside them:
+  // the tier's ink and halo at 16/700, no direction color and no chip.
+  for (const id of ['season-1', 'season-3']) {
+    const ink = flatten(h.node(`season-badge-${id}-return`).props.style);
+    assert.deepEqual(ink, flatten(h.node(`season-badge-${id}-total`).props.style), id);
+    assert.deepEqual([ink.fontSize, ink.fontWeight, typeof ink.color], [16, '700', 'string'], id);
+    assert.equal([financial.rise, financial.fall].includes(ink.color), false, id);
+    assert.equal(h.has(`season-badge-${id}-return-chip`), false, id);
+  }
 });
 
 it('reads every page so an older season is never missing', async (t) => {

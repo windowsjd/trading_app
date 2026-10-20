@@ -44,7 +44,9 @@ function futuresCandlesFixture(instrumentId, now = Date.now(), interval = '4h') 
     state: 'available',
     instrument: { id: instrumentId, symbol: 'BTCUSDT', name: 'Bitcoin', productType: 'synthetic_perpetual', settlementCurrency: 'USD', isActive: true, displayPriceDecimals: 1 },
     priceBasis: 'contract_last_trade', range: INTERVAL_RANGE[interval], interval, candles,
-    source: { provider: 'binance_usdm', endpoint: '/fapi/v1/klines', symbol: 'BTCUSDT', contractType: 'PERPETUAL', requestedCount: 600, returnedCount: candles.length, provisionalUpdatedAt: new Date(now).toISOString() },
+    source: { provider: 'binance_usdm', endpoint: '/fapi/v1/klines', symbol: 'BTCUSDT', contractType: 'PERPETUAL', requestedCount: 600, returnedCount: candles.length, provisionalUpdatedAt: new Date(now).toISOString(),
+      // As the server answers: the stored 4h history, or klines read on demand (received at `now`).
+      delivery: interval === '4h' ? 'stored' : 'provider', fetchedAt: interval === '4h' ? null : new Date(now).toISOString(), stale: false },
   };
 }
 // What useFuturesOrderBook returns for one contract: its own USDⓈ-M ten-level
