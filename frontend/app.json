@@ -1,4 +1,5 @@
 {
+  "name": "트레이딩 클래스",
   "icon": "./assets/icon/trading-class-ios-icon-1024.png",
   "ios": {
     "bundleIdentifier": "com.leagueoftrading"
