@@ -1,4 +1,4 @@
-package com.leagueoftrading
+package com.nanghwa.tradingclass
 
 import android.os.Build
 import android.os.Bundle

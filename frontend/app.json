@@ -6,7 +6,7 @@
     "bundleIdentifier": "com.leagueoftrading"
   },
   "android": {
-    "package": "com.leagueoftrading",
+    "package": "com.nanghwa.tradingclass",
     "blockedPermissions": [
       "com.google.android.gms.permission.AD_ID",
       "android.permission.ACCESS_ADSERVICES_AD_ID",

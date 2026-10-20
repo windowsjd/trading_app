@@ -18,7 +18,7 @@
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 
-const PACKAGE = 'com.leagueoftrading';
+const PACKAGE = 'com.nanghwa.tradingclass';
 // AssetDetailScreen's order bar: paddingBottom = FOOTER_PADDING_DP + insets.bottom.
 const FOOTER_ID = 'asset-order-actions';
 const FOOTER_PADDING_DP = 8;

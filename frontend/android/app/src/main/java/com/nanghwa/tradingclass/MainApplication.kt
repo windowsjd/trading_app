@@ -1,4 +1,4 @@
-package com.leagueoftrading
+package com.nanghwa.tradingclass
 
 import android.app.Application
 import android.content.res.Configuration

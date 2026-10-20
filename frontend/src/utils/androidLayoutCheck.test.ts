@@ -9,7 +9,7 @@ const { parseNavigationBar, parseNodes, parseHierarchy, measureAction, measureFo
 
 // Android 14 (InsetsSource id=… type=navigationBars), 3-button bar 126 px at 2.625x.
 const ANDROID_14 = `
-  Window #3 Window{a1 u0 com.leagueoftrading/com.leagueoftrading.MainActivity}:
+  Window #3 Window{a1 u0 com.nanghwa.tradingclass/com.nanghwa.tradingclass.MainActivity}:
     mInsetsState=InsetsState: {mDisplayFrame=Rect(0, 0 - 1080, 2400), mSources= {
       InsetsSource: {id=1 mType=statusBars mFrame=[0,0][1080,63] mVisible=true}
       InsetsSource id=3 type=navigationBars frame=[0,2274][1080,2400] visible=true flags= sideHint=BOTTOM
@@ -27,7 +27,7 @@ const ANDROID_12 = `
       InsetsSource type=ITYPE_NAVIGATION_BAR frame=[0,2337][1080,2400] visible=true`;
 
 const node = (attrs: Record<string, string>) =>
-  `<node index="0" ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(' ')} class="android.view.ViewGroup" package="com.leagueoftrading">`;
+  `<node index="0" ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(' ')} class="android.view.ViewGroup" package="com.nanghwa.tradingclass">`;
 const DUMP = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">
   ${node({ 'resource-id': 'asset-order-actions', text: '', 'content-desc': '', clickable: 'false', bounds: '[0,2170][1080,2400]' })}
   ${node({ text: '', 'content-desc': '매도하기', clickable: 'true', bounds: '[36,2196][531,2346]' })}

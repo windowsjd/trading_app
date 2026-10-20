@@ -62,7 +62,7 @@ test('native app IDs, existing plugins, package and build profiles are preserved
   assert.equal(plugin.iosAppId, 'ca-app-pub-7899930948413451~7288069200');
   assert.equal(plugin.delayAppMeasurementInit, true);
   assert.equal(plugin.userTrackingUsageDescription === undefined, true, 'test ads do not request ATT');
-  assert.equal(app.android.package, 'com.leagueoftrading');
+  assert.equal(app.android.package, 'com.nanghwa.tradingclass');
   assert.equal(app.ios.bundleIdentifier, 'com.leagueoftrading');
   for (const name of ['expo-image-picker', 'expo-notifications']) assert.equal(app.plugins.some((p: unknown[]) => p[0] === name), true);
   assert.equal(eas.build.preview.android.buildType, 'apk');
@@ -76,5 +76,19 @@ test('native app IDs, existing plugins, package and build profiles are preserved
     'android.permission.ACCESS_ADSERVICES_ATTRIBUTION', 'android.permission.ACCESS_ADSERVICES_TOPICS']) {
     assert.equal(app.android.blockedPermissions.includes(permission), true);
     assert.equal(manifest.includes(`android:name="${permission}" tools:node="remove"`), true);
+  }
+});
+
+test('committed Android native sources use the Expo application identifier', () => {
+  const packageName = app.android.package;
+  const gradle = readFileSync('android/app/build.gradle', 'utf8');
+  assert.equal(gradle.includes(`namespace "${packageName}"`), true);
+  assert.equal(gradle.includes(`applicationId "${packageName}"`), true);
+  const sourceDir = `android/app/src/main/java/${packageName.replaceAll('.', '/')}`;
+  for (const name of ['MainApplication', 'MainActivity']) {
+    const source = readFileSync(`${sourceDir}/${name}.kt`, 'utf8');
+    assert.equal(source.startsWith(`package ${packageName}\n`), true);
+    const manifest = readFileSync('android/app/src/main/AndroidManifest.xml', 'utf8');
+    assert.equal(manifest.includes(`android:name=".${name}"`), true);
   }
 });
