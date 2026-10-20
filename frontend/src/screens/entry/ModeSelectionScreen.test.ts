@@ -12,13 +12,15 @@ const season = { id: 'season', mode: 'season', status: 'active', season: {
 } };
 const current = { id: 'current', name: 'Season 1', status: 'active', joined: false,
   startAt: '2020-01-01T00:00:00Z', endAt: '2099-01-01T00:00:00Z' };
+/** A fresh joinable current season (another season than the settled one). */
+const current0 = () => ({ ...current, id: 'season-2', name: 'Season 2' });
 function harness() {
   const h: any = { accounts: [general, season], loading: false, failed: false, retries: 0, opens: 0, beginnerOpens: 0,
     selections: [], navigation: [], season: { isSuccess: true, data: current }, open: { isPending: false, errorMessage: null } };
   const Screen = load(resolve('src/screens/entry/ModeSelectionScreen.tsx'), {
     react: { ...React, useMemo: fn => fn() },
     'react-native': { View: 'View', Text: 'Text', ScrollView: 'ScrollView', SafeAreaView: 'SafeAreaView', StyleSheet: { create: styles => styles } },
-    '@tanstack/react-query': { useQuery: () => ({ ...h.season, refetch: () => { h.retries++; } }) },
+    '@tanstack/react-query': { useQuery: (options) => { h.queryOptions = options; return { ...h.season, refetch: () => { h.retries++; } }; } },
     '../../features/season/api': { getCurrentSeason: () => {} },
     '../../features/tradingAccount/TradingAccountContext': { useTradingAccount: () => ({ accounts: h.accounts,
       isLoading: h.loading, isError: h.failed, refetchAccounts: () => { h.retries++; }, selectAccount: id => h.selections.push(id) }) },
@@ -55,8 +57,8 @@ it('simplifies owned general/joined season cards while retaining explicit local 
 it('unjoined and empty-account cards offer explicit start/join without a fabricated participation badge', () => {
   const h = harness(); h.accounts = [];
   const tree = h.render(); assert.doesNotMatch(text(tree), /참가중/);
-  assert.equal(find(tree, 'mode-selection-general-start').props.label, '일반모드');
-  assert.equal(find(tree, 'mode-selection-season-join').props.label, '시즌 참가하기'); assert.equal(h.opens, 0);
+  assert.equal(find(tree, 'mode-selection-general-start').props.label, '일반모드 계정만들기');
+  assert.equal(find(tree, 'mode-selection-season-join').props.label, '시즌참가하기'); assert.equal(h.opens, 0);
   find(tree, 'mode-selection-general-start').props.onPress(); assert.equal(h.opens, 1);
   find(tree, 'mode-selection-season-join').props.onPress(); assert.deepEqual(h.navigation, [['SeasonJoin']]);
 });
@@ -80,7 +82,8 @@ it('beginner entry is always available and creation requires an explicit press',
   assert.equal(find(h.render(), 'beginner-account-entry') !== undefined, true);
   const tree = h.render();
   assert.equal(h.beginnerOpens, 0);
-  assert.match(text(tree), /초보 계정 만들기/);
+  assert.match(text(tree), /초보모드 계정만들기/);
+  assert.doesNotMatch(text(tree), /초보 계정 만들기/);
   find(tree, 'beginner-account-start').props.onPress();
   assert.equal(h.beginnerOpens, 1);
   assert.equal(h.opens, 0);
@@ -107,28 +110,120 @@ it('beginner creation errors retain the original error for the shared diagnostic
   assert.equal(h.selections.length, 0);
 });
 
-it('lists 초보모드 first, then 일반모드, then 시즌모드, keeping past seasons reachable', () => {
-  const order = (tree) => elements(tree).map(node => node.props.testID).filter(id => typeof id === 'string' && (
-    id === 'beginner-account-entry' || id.startsWith('mode-selection-general-') || id.startsWith('mode-selection-season-')
-    || id.startsWith('mode-selection-past-season-')));
+const order = (tree) => elements(tree).map(node => node.props.testID).filter(id => typeof id === 'string' && (
+  id === 'beginner-account-entry' || id.startsWith('mode-selection-general-') || id.startsWith('mode-selection-season-')
+  || id.startsWith('mode-selection-past-season-')));
+/** A season account whose season was settled; `viewedAt` undefined = a server without the field. */
+const settledSeason = (viewedAt?: string | null, patch: Record<string, unknown> = {}) => ({ ...season, id: 'settled', status: 'closed',
+  season: { ...season.season, seasonId: 'season-0', seasonName: 'Season 0', seasonStatus: 'settled', participantStatus: 'finished',
+    endAt: '2026-09-01T00:00:00Z', ...(viewedAt === undefined ? {} : { finalResultViewedAt: viewedAt }), ...patch } });
+
+it('lists 시즌모드 first, then 일반모드, then 초보모드, keeping past seasons reachable', () => {
   const h = harness();
   h.accounts.push({ ...general, id: 'beginner', mode: 'beginner' });
-  assert.deepEqual(order(h.render()), ['beginner-account-entry', 'mode-selection-general-use', 'mode-selection-season-continue-season']);
+  assert.deepEqual(order(h.render()), ['mode-selection-season-continue-season', 'mode-selection-general-use', 'beginner-account-entry']);
   const fresh = harness(); fresh.accounts = [];
-  assert.deepEqual(order(fresh.render()), ['beginner-account-entry', 'mode-selection-general-start', 'mode-selection-season-join']);
+  assert.deepEqual(order(fresh.render()), ['mode-selection-season-join', 'mode-selection-general-start', 'beginner-account-entry']);
   const past = harness();
   past.accounts = [general, { ...season, status: 'closed', season: { ...season.season, seasonStatus: 'settled' } }];
   past.season = { isSuccess: true, data: null };
-  assert.deepEqual(order(past.render()), ['beginner-account-entry', 'mode-selection-general-use', 'mode-selection-season-none', 'mode-selection-past-season-season']);
+  assert.deepEqual(order(past.render()), ['mode-selection-season-none', 'mode-selection-season-next-soon', 'mode-selection-general-use',
+    'beginner-account-entry', 'mode-selection-past-season-season']);
+  const unseen = harness();
+  unseen.accounts = [general, settledSeason(null)];
+  assert.deepEqual(order(unseen.render()), ['mode-selection-season-result', 'mode-selection-general-use', 'beginner-account-entry',
+    'mode-selection-past-season-settled']);
   // Order only: nothing is selected or created by rendering.
-  assert.deepEqual([h.selections, h.opens, h.beginnerOpens, fresh.opens, fresh.beginnerOpens], [[], 0, 0, 0, 0]);
+  assert.deepEqual([h.selections, h.opens, h.beginnerOpens, fresh.opens, fresh.beginnerOpens, unseen.selections, unseen.navigation],
+    [[], 0, 0, 0, 0, [], []]);
+});
+
+it('a settled season whose result was not seen offers 시즌결과 확인하기 first, opening that season\'s result', () => {
+  const h = harness();
+  // Joinable current season too: the unseen result still comes first.
+  h.accounts = [general, settledSeason(null)];
+  const tree = h.render();
+  const button = find(tree, 'mode-selection-season-result');
+  assert.equal(button.props.label, '시즌결과 확인하기');
+  assert.equal(find(tree, 'mode-selection-season-join') === undefined, true);
+  assert.equal(find(tree, 'mode-selection-season-next-soon') === undefined, true);
+  assert.match(text(tree), /시즌모드 정해진 기간동안 가상투자로 수익률을 경쟁해보세요! Season 0/);
+  button.props.onPress();
+  assert.deepEqual(h.navigation, [['SeasonFinalResult', { seasonId: 'season-0' }]]);
+  assert.deepEqual([h.selections, h.opens, h.beginnerOpens], [[], 0, 0]);
+});
+
+it('after the result was seen: 시즌참가하기 when a season is joinable, otherwise a disabled 다음시즌이 곧 시작됩니다', () => {
+  const joinable = harness();
+  joinable.accounts = [general, settledSeason('2026-09-02T00:00:00Z')];
+  let tree = joinable.render();
+  assert.equal(find(tree, 'mode-selection-season-result') === undefined, true);
+  assert.equal(find(tree, 'mode-selection-season-join').props.label, '시즌참가하기');
+  find(tree, 'mode-selection-season-join').props.onPress();
+  assert.deepEqual(joinable.navigation, [['SeasonJoin']]);
+
+  for (const current of [null, { ...current0(), status: 'upcoming', effectiveMode: 'upcoming' },
+    { ...current0(), status: 'ended', effectiveMode: 'ended' }, { ...current0(), status: 'settled', effectiveMode: 'settled' },
+    { ...current0(), joined: true }]) {
+    const waiting = harness();
+    waiting.accounts = [general, settledSeason('2026-09-02T00:00:00Z')];
+    waiting.season = { isSuccess: true, data: current };
+    tree = waiting.render();
+    const soon = find(tree, 'mode-selection-season-next-soon');
+    assert.equal(soon.props.label, '다음시즌이 곧 시작됩니다');
+    assert.equal(soon.props.state, 'disabled');
+    assert.equal(soon.props.onPress === undefined, true);
+    assert.equal(find(tree, 'mode-selection-season-join') === undefined, true);
+    assert.equal(find(tree, 'mode-selection-season-result') === undefined, true);
+  }
+  // "No current season" (404) is an answer too: nothing to join yet.
+  const none = harness();
+  none.accounts = [settledSeason('2026-09-02T00:00:00Z')];
+  none.season = { isError: true, error: { response: { status: 404, data: { error: { code: 'SEASON_NOT_FOUND' } } } } };
+  assert.equal(find(none.render(), 'mode-selection-season-next-soon').props.state, 'disabled');
+});
+
+it('re-reads the current season only while waiting, so a season that opens later turns into 시즌참가하기', () => {
+  const h = harness();
+  h.accounts = [general, settledSeason('2026-09-02T00:00:00Z')];
+  h.season = { isSuccess: true, data: null };
+  h.render();
+  const interval = (data) => h.queryOptions.refetchInterval({ state: { data } });
+  assert.equal(interval(undefined), 60_000);
+  assert.equal(interval({ ...current0(), status: 'upcoming', effectiveMode: 'upcoming' }), 60_000);
+  assert.equal(interval(current0()), false, 'a joinable season stops the polling');
+  h.season = { isSuccess: true, data: current0() };
+  assert.equal(find(h.render(), 'mode-selection-season-join').props.label, '시즌참가하기');
+  // Never while an unseen result or a running season is on the card.
+  const unseen = harness(); unseen.accounts = [general, settledSeason(null)]; unseen.render();
+  assert.equal(unseen.queryOptions.refetchInterval({ state: { data: undefined } }), false);
+  const running = harness(); running.render();
+  assert.equal(running.queryOptions.refetchInterval({ state: { data: undefined } }), false);
+});
+
+it('an ended season awaiting settlement shows no result yet; a server without the view field never offers one', () => {
+  const settling = harness();
+  settling.accounts = [general, settledSeason(null, { seasonStatus: 'ended' })];
+  settling.season = { isSuccess: true, data: null };
+  let tree = settling.render();
+  assert.equal(find(tree, 'mode-selection-season-result') === undefined, true);
+  const sentences = elements(tree, 'Text').map(node => [node.props.children].flat().join('')).join(' ');
+  assert.match(sentences, /Season 0 결과를 정산하고 있습니다\. 정산이 끝나면 이곳에서 시즌결과를 확인할 수 있습니다\./);
+  assert.equal(find(tree, 'mode-selection-season-next-soon').props.state, 'disabled');
+
+  const older = harness();
+  older.accounts = [general, settledSeason(undefined)];
+  older.season = { isSuccess: true, data: null };
+  tree = older.render();
+  assert.equal(find(tree, 'mode-selection-season-result') === undefined, true);
+  assert.equal(find(tree, 'mode-selection-season-next-soon').props.label, '다음시즌이 곧 시작됩니다');
 });
 
 it('describes each account type directly under its title and no longer shows the old beginner note', () => {
   const copy = {
     beginner: '퀘스트를 따라 투자의 기초부터 다양한 거래 방법까지 단계별로 연습합니다.',
     general: '시즌 기간 제한 없이 자유롭게 가상 투자를 연습합니다.',
-    season: '정해진 기간 동안 같은 시작 자금으로 투자 성과를 경쟁합니다.',
+    season: '정해진 기간동안 가상투자로 수익률을 경쟁해보세요!',
   };
   const texts = tree => elements(tree, 'Text').map(node => [node.props.children].flat().join(''));
   // Owned general + joined season, then a fresh user offered start/join.
@@ -144,7 +239,8 @@ it('describes each account type directly under its title and no longer shows the
     const at = (value: string) => all.indexOf(value);
     assert.equal(at(copy.beginner), at('초보모드') + 1);
     assert.equal(at('일반모드') < at(copy.general) && at(copy.general) <= at('일반모드') + 2, true);
-    assert.equal(at(copy.general) < at('시즌모드'), true);
+    assert.equal(at(copy.season) < at('일반모드'), true, '시즌모드 is listed first');
+    assert.equal(at(copy.general) < at('초보모드'), true);
     assert.equal(at('시즌모드') < at(copy.season) && at(copy.season) < at(seasonName), true);
     assert.equal(all.filter(value => Object.values(copy).includes(value)).length, 3, 'one sentence per type');
   }

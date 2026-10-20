@@ -96,6 +96,25 @@ for (const state of ['loading', 'error', 'null', 'unknown', 'response-unavailabl
   });
 }
 
+it('a settled season without a final rank says so instead of 티어 미정, with no emblem', t => {
+  const h = setup(); t.after(h.close);
+  h.context.rankType = 'final';
+  h.context.rankingQuery.data = { state: 'available', myRanking: { state: 'unavailable', reason: 'FINAL_RANKING_NOT_QUALIFIED', message: '' } } as never;
+  h.update();
+  assert.equal(h.node('home-tier').props.children, '최종 랭킹 자격 미충족');
+  assert.ok(h.node('home-tier-neutral'));
+  assert.equal(h.node('home-tier-image') === undefined, true);
+  // Any other unavailable final standing keeps the old wording.
+  h.context.rankingQuery.data = { state: 'available', myRanking: { state: 'unavailable', reason: 'MY_RANKING_UNAVAILABLE', message: '' } } as never;
+  h.update();
+  assert.equal(h.node('home-tier').props.children, '티어 미정');
+  // A daily standing is never read as a final verdict.
+  h.context.rankType = 'daily';
+  h.context.rankingQuery.data = { state: 'available', myRanking: { state: 'unavailable', reason: 'FINAL_RANKING_NOT_QUALIFIED', message: '' } } as never;
+  h.update();
+  assert.equal(h.node('home-tier').props.children, '티어 미정');
+});
+
 it('unknown identifiers cannot select an inherited property or invent a tier', () => {
   for (const value of [null, undefined, '-', 'whale', 'Grandmaster', 'constructor', '__proto__', 'gold II']) assert.equal(getHomeTier(value, 'light'), null);
   assert.equal(getHomeTier('Master', 'dark')?.name, 'Whale');

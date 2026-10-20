@@ -60,7 +60,8 @@ import type { AssetType } from '../../features/market/api';
 type Props = {
   account: TradingAccountDto;
   capabilities: TradingAccountCapabilities | null;
-  onOpenReward: () => void;
+  /** A settled season's 시즌최종결과 (its official result, viewable again any time). */
+  onOpenFinalResult: (seasonId: string) => void;
   onOpenAsset: (assetId: string) => void;
   onOpenMarket: (assetType: AssetType) => void;
   accountContext: HomeAccountContextData;
@@ -70,7 +71,7 @@ type Props = {
 export default function SeasonAccountHome({
   account,
   capabilities,
-  onOpenReward,
+  onOpenFinalResult,
   onOpenAsset,
   onOpenMarket,
   accountContext,
@@ -239,8 +240,10 @@ export default function SeasonAccountHome({
       </View>
       <HomeHotMarket hot={hot} onOpenAsset={onOpenAsset} onOpenMarket={onOpenMarket} />
 
-      {isSettled ? (
-        <CTAButton label="보상 확인" onPress={onOpenReward} />
+      {/* Results, not rewards: 내 뱃지 and the reward history stay on MY. */}
+      {isSettled && season ? (
+        <CTAButton variant="neutral" label="시즌최종결과 보기"
+          onPress={() => onOpenFinalResult(season.seasonId)} />
       ) : null}
     </ScrollView>
   );

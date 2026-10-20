@@ -1,7 +1,16 @@
-import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { ScalarQueryPipe } from '../common/scalar-query.pipe';
 import { Request } from 'express';
 import { RecordsService } from './records.service';
+import { SeasonFinalResultService } from './season-final-result.service';
 import type {
   MySeasonEquityQuery,
   MySeasonExchangesQuery,
@@ -18,7 +27,10 @@ type AuthenticatedRequest = Request & {
 
 @Controller('api/v1')
 export class RecordsController {
-  constructor(private readonly recordsService: RecordsService) {}
+  constructor(
+    private readonly recordsService: RecordsService,
+    private readonly seasonFinalResultService: SeasonFinalResultService,
+  ) {}
 
   @Get('records')
   getRecords(
@@ -61,6 +73,31 @@ export class RecordsController {
     @Param('seasonId') seasonId: string,
   ) {
     return this.recordsService.getMySeasonRecordDetail(
+      this.extractUserId(request),
+      seasonId,
+    );
+  }
+
+  /** 시즌최종결과: settlement's stored result for me, and whether I saw it. */
+  @Get('records/me/seasons/:seasonId/final-result')
+  getMySeasonFinalResult(
+    @Req() request: AuthenticatedRequest,
+    @Param('seasonId') seasonId: string,
+  ) {
+    return this.seasonFinalResultService.getMyFinalResult(
+      this.extractUserId(request),
+      seasonId,
+    );
+  }
+
+  /** Records my first view of a shown final result; idempotent. */
+  @Post('records/me/seasons/:seasonId/final-result/view')
+  @HttpCode(200)
+  markMySeasonFinalResultViewed(
+    @Req() request: AuthenticatedRequest,
+    @Param('seasonId') seasonId: string,
+  ) {
+    return this.seasonFinalResultService.markMyFinalResultViewed(
       this.extractUserId(request),
       seasonId,
     );

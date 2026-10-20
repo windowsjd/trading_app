@@ -151,11 +151,8 @@ export default function HomeScreen({ navigation }: Props) {
             accountContext={accountContext}
             hot={hot}
             onOpenMarket={openMarket}
-            onOpenReward={() =>
-              rootNavigation.navigate('MainTabs', {
-                screen: 'MyTab',
-                params: { screen: 'Reward' },
-              })
+            onOpenFinalResult={(seasonId) =>
+              rootNavigation.navigate('SeasonFinalResult', { seasonId })
             }
             onOpenAsset={openAsset}
           />

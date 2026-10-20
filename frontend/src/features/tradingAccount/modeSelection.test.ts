@@ -3,7 +3,11 @@ import { describe, it } from 'node:test';
 
 import type { CurrentSeasonDto } from '../../models/dto/season.ts';
 import type { SelectableAccount } from './accountSelection.ts';
-import { buildModeSelectionModel, hasGeneralAccount } from './modeSelection.ts';
+import {
+  awaitsNextSeason,
+  buildModeSelectionModel,
+  hasGeneralAccount,
+} from './modeSelection.ts';
 
 /**
  * What the mode-selection screen may OFFER, per user shape (작업 13 §3·§13).
@@ -23,6 +27,9 @@ function seasonAccount(
     seasonStatus?: string;
     participantStatus?: string;
     openedAt?: string;
+    endAt?: string;
+    /** Omitted = a server that does not report final-result views. */
+    finalResultViewedAt?: string | null;
   } = {},
 ): SelectableAccount {
   return {
@@ -36,10 +43,13 @@ function seasonAccount(
       seasonName: `시즌 ${id}`,
       seasonStatus: (overrides.seasonStatus ?? 'active') as never,
       startAt: '2026-07-01T00:00:00.000Z',
-      endAt: '2026-09-30T00:00:00.000Z',
+      endAt: overrides.endAt ?? '2026-09-30T00:00:00.000Z',
       seasonParticipantId: `sp-${id}`,
       participantStatus: (overrides.participantStatus ?? 'active') as never,
       joinedAt: '2026-07-01T00:00:00.000Z',
+      ...('finalResultViewedAt' in overrides
+        ? { finalResultViewedAt: overrides.finalResultViewedAt }
+        : {}),
     },
   };
 }
@@ -316,5 +326,96 @@ describe('hasGeneralAccount', () => {
       hasGeneralAccount([generalAccount('g1', { status: 'closed' })]),
       true,
     );
+  });
+});
+
+describe('buildModeSelectionModel — 시즌최종결과 entry', () => {
+  const settled = (
+    id: string,
+    endAt: string,
+    finalResultViewedAt?: string | null,
+    extra: { participantStatus?: string; seasonStatus?: string } = {},
+  ) =>
+    seasonAccount(id, {
+      status: 'closed',
+      seasonId: `season-${id}`,
+      seasonStatus: extra.seasonStatus ?? 'settled',
+      participantStatus: extra.participantStatus ?? 'finished',
+      endAt,
+      ...(finalResultViewedAt === undefined ? {} : { finalResultViewedAt }),
+    });
+
+  it('offers the newest settled season whose result was not seen, whatever the current season says', () => {
+    const accounts = [
+      settled('old', '2026-03-31T00:00:00.000Z', null),
+      settled('new', '2026-06-30T00:00:00.000Z', null),
+      settled('seen', '2026-07-31T00:00:00.000Z', '2026-08-01T00:00:00.000Z'),
+    ];
+
+    for (const current of [null, currentSeason({ id: 'season-next' })]) {
+      const model = buildModeSelectionModel(accounts, current, NOW);
+      assert.deepEqual(model.seasonResult, {
+        seasonId: 'season-new',
+        seasonName: '시즌 new',
+      });
+    }
+  });
+
+  it('keeps every season to its own view: seen ones never hide or reveal another', () => {
+    const seen = settled('a', '2026-06-30T00:00:00.000Z', '2026-07-01T00:00:00.000Z');
+    const unseenOlder = settled('b', '2026-03-31T00:00:00.000Z', null);
+
+    assert.equal(
+      buildModeSelectionModel([seen], null, NOW).seasonResult,
+      null,
+    );
+    assert.equal(
+      buildModeSelectionModel([seen, unseenOlder], null, NOW).seasonResult
+        ?.seasonId,
+      'season-b',
+    );
+  });
+
+  it('includes an excluded participant (the result says so) but never an ended, unsettled season', () => {
+    const excluded = settled('x', '2026-06-30T00:00:00.000Z', null, {
+      participantStatus: 'excluded',
+    });
+    assert.equal(
+      buildModeSelectionModel([excluded], null, NOW).seasonResult?.seasonId,
+      'season-x',
+    );
+
+    const ended = settled('e', '2026-08-01T00:00:00.000Z', null, {
+      seasonStatus: 'ended',
+    });
+    const model = buildModeSelectionModel([ended], null, NOW);
+    assert.equal(model.seasonResult, null);
+    assert.deepEqual(model.seasonSettling, {
+      seasonId: 'season-e',
+      seasonName: '시즌 e',
+    });
+  });
+
+  it('treats an absent view field (older server) as unknown, never as unseen', () => {
+    const model = buildModeSelectionModel(
+      [settled('legacy', '2026-06-30T00:00:00.000Z')],
+      null,
+      NOW,
+    );
+    assert.equal(model.seasonResult, null);
+  });
+
+  it('waits for the next season only with nothing to see, run or join', () => {
+    const seen = settled('a', '2026-06-30T00:00:00.000Z', '2026-07-01T00:00:00.000Z');
+    const unseen = settled('b', '2026-06-30T00:00:00.000Z', null);
+    const wait = (accounts: SelectableAccount[], current: CurrentSeasonDto | null) =>
+      awaitsNextSeason(buildModeSelectionModel(accounts, current, NOW));
+
+    assert.equal(wait([], null), true);
+    assert.equal(wait([seen], null), true);
+    assert.equal(wait([seen], currentSeason({ status: 'upcoming', effectiveMode: 'upcoming' })), true);
+    assert.equal(wait([seen], currentSeason({ id: 'season-next' })), false);
+    assert.equal(wait([unseen], null), false);
+    assert.equal(wait([seasonAccount('running')], null), false);
   });
 });

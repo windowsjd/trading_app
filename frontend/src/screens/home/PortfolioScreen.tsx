@@ -63,6 +63,7 @@ import {
 } from '../../utils/format';
 import WhaleLoader from '../../components/states/WhaleLoader';
 import { openingFundingLabel, resetEpochNote } from '../../features/tradingAccount/performanceEpoch';
+import { FINAL_RANKING_NOT_QUALIFIED_LABEL } from '../../features/record/seasonFinalResult';
 
 type Props = PortfolioScreenProps;
 
@@ -581,6 +582,12 @@ function AccountSummaryCard({
         <Text style={styles.big}>{formatKrw(finalResult.totalAssetKrw)}원</Text>
         <Text style={styles.helper}>최종 수익률 {formatPercent(finalResult.returnRate)}%</Text>
         <Text style={styles.helper}>최종 순위 {finalResult.rank}위{finalResult.tier ? ` · ${finalResult.tier}` : ''}</Text>
+        <Text style={styles.footnote}>시즌 종료 기준 확정 결과 · {formatKstDateTime(finalResult.endAt)}</Text>
+      </> : finalResult.state === 'not_qualified' ? <>
+        {/* Settled totals stay final; there is no rank or tier to show. */}
+        <Text style={styles.big}>{formatKrw(finalResult.totalAssetKrw)}원</Text>
+        <Text style={styles.helper}>최종 수익률 {formatPercent(finalResult.returnRate)}%</Text>
+        <Text style={styles.helper}>최종 순위 · 티어: {FINAL_RANKING_NOT_QUALIFIED_LABEL}</Text>
         <Text style={styles.footnote}>시즌 종료 기준 확정 결과 · {formatKstDateTime(finalResult.endAt)}</Text>
       </> : <Text style={styles.helper}>확정된 최종 결과를 불러오지 못했습니다.</Text>}
     </View>;

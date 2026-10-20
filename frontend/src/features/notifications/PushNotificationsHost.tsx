@@ -18,8 +18,8 @@ import { emitOrderFillEvent } from '../order/fillEvents';
  * Root routes that are only reachable after sign-in and the mode choice: a tap
  * received while one of them is in front opens at once. Every root screen
  * opened from the main tabs belongs here (otherwise a tap waits until the user
- * leaves it); the entry routes and SeasonJoin (also opened before the mode
- * choice) do not.
+ * leaves it); the entry routes, SeasonJoin and SeasonFinalResult (also opened
+ * before the mode choice) do not.
  */
 export const MAIN_ROUTES: ReadonlySet<string> = new Set(['MainTabs', 'TradeHistory', 'OrderFailure', 'AssetChart', 'FuturesChart']);
 

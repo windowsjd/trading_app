@@ -124,13 +124,19 @@ describe('the styles long text depends on are present', () => {
     );
   });
 
-  it('AccountSwitcher: the start-general row wraps its copy and its error whole', () => {
+  it('AccountSwitcher: the 일반모드 offer is the 초보모드 card, its copy and error wrapping whole', () => {
     const source = read('components/tradingAccount/AccountSwitcher.tsx');
+    const card = read('components/tradingAccount/ModeEntryCard.tsx');
 
-    // The action row reuses the wrapping text column; the trailing action
-    // (spinner or "시작") sits on the non-shrinking badge track.
-    assert.match(source, /startRow:\s*\{[^}]*flexDirection:\s*'row'/s);
-    assert.match(source, /startError:\s*\{[^}]*lineHeight/s);
+    // One card for both offers: title, sentence, full-width CTA, original error.
+    assert.match(read('components/tradingAccount/BeginnerAccountEntry.tsx'), /<ModeEntryCard/);
+    assert.match(source, /<ModeEntryCard[\s\S]*?title="일반모드"[\s\S]*?actionLabel="일반모드 계정만들기"/);
+    assert.match(card, /body:\s*\{[^}]*lineHeight/s);
+    assert.match(card, /error:\s*\{[^}]*lineHeight/s);
+    assert.match(card, /<ErrorNotice error=\{error\}/);
+    assert.ok(!/numberOfLines=\{/.test(card), 'offer copy is never cut');
+    // The old trailing "시작" action and capability line are gone.
+    assert.doesNotMatch(source, /일반 투자 시작하기|매매 가능 · KRW↔USD 환전 가능|>시작</);
     // An offer, not an account: no synthetic id and no fake account row.
     assert.match(source, /switcherStartGeneral/);
     assert.ok(

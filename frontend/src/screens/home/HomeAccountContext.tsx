@@ -13,6 +13,7 @@ import SectionSkeleton from '../../components/states/SectionSkeleton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import ErrorNotice from '../../components/states/ErrorNotice';
 import { useAppearance } from '../../theme/appearance';
+import { FINAL_RANKING_NOT_QUALIFIED_LABEL } from '../../features/record/seasonFinalResult';
 import { getHomeTier } from './tierPresentation';
 import TierEmblem, { tierEmblemWidth } from './TierEmblem';
 
@@ -43,7 +44,12 @@ function readSeasonStanding(context: HomeAccountContextData, mode: 'light' | 'da
     rankingQuery.data?.state === 'available' && rankingQuery.data.myRanking.state === 'available'
     ? rankingQuery.data.myRanking : null;
   const tier = hasSeason ? getHomeTier(getRankingTier(myRanking, rankType), mode) : null;
-  const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패' : '티어 미정');
+  // Settlement's verdict, reported by the ranking API: no final rank or tier exists.
+  const notQualified = rankType === 'final' && !rankingQuery.isError && !loading &&
+    rankingQuery.data?.myRanking.state === 'unavailable' &&
+    rankingQuery.data.myRanking.reason === 'FINAL_RANKING_NOT_QUALIFIED';
+  const tierLabel = tier?.name ?? (loading ? '티어 확인 중' : rankingQuery.isError ? '티어 확인 실패'
+    : notQualified ? FINAL_RANKING_NOT_QUALIFIED_LABEL : '티어 미정');
   return { tier, tierLabel };
 }
 

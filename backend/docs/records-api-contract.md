@@ -4,7 +4,7 @@
 
 - `GET /api/v1/records` read-only MVP is implemented for the current unified exchange, wallet transaction, and order history view.
 - Season history APIs are implemented for authenticated user season lists, season detail, season equity history, season orders, season exchanges, and protected public user season summaries.
-- Records APIs read existing rows only. They do not create, update, delete, synthesize, or seed records.
+- Records APIs read existing rows only. They do not create, update, delete, synthesize, or seed records. The one write is `POST /api/v1/records/me/seasons/:seasonId/final-result/view`, which stores only the time the owner first saw a settled season's final result.
 - Provider ingestion, scheduler jobs, admin HTTP batch execution, and reward external fulfillment are not implemented here.
 
 ## Source Rules
@@ -220,6 +220,71 @@ If no snapshot or final ranking row exists, `performance.state = unavailable` an
 - `UNAUTHORIZED`
 - `INVALID_SEASON_ID`
 - `SEASON_NOT_FOUND`
+
+## GET /api/v1/records/me/seasons/:seasonId/final-result
+
+Authenticated user's official final result for one season (앱 `시즌최종결과`, 2026-10-21) and whether they have seen it. Every figure is settlement's stored result; nothing is revalued at current prices. The season, the participant and its final ranking row are read in one REPEATABLE READ snapshot, and the final row is scope-checked against the participant's account (`500` on a mis-scoped row).
+
+### Result States
+
+- Season not `settled` (including `ended`, awaiting settlement): `result.state = pending`, no figures.
+- Participant `excluded`: `result.state = excluded`, no figures.
+- `finalQualified = false`: `result.state = not_qualified` with the participant's settled `totalAssetKrw`/`returnRate` (the totals settlement stored beside the verdict, as the records list and the settled portfolio show them), `tradedInstrumentCount`, `recognizedTurnoverKrw`; no rank and no tier.
+- Ranked: `result.state = available` with `finalRank`/`finalTier` from the participant (the values `내 뱃지` shows) and `totalAssetKrw`/`returnRate`/`capturedAt` from the participant's latest `final` ranking row. The row's `rank` must equal `finalRank`.
+- Settled but none of the above holds (no final row, a disagreeing row rank, a blank tier, an unranked `registered` participant): `result.state = unavailable`, `reason = FINAL_RESULT_UNAVAILABLE`.
+- Not joined: `result.state = not_joined`, `participantStatus = null`, `viewedAt = null`.
+- Missing season: `404 SEASON_NOT_FOUND`.
+
+### Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "season": {
+      "id": "season-id",
+      "name": "Season 1",
+      "status": "settled",
+      "startAt": "2026-09-01T00:00:00.000Z",
+      "endAt": "2026-10-01T00:00:00.000Z"
+    },
+    "participantStatus": "finished",
+    "viewedAt": null,
+    "result": {
+      "state": "available",
+      "finalRank": 3,
+      "finalTier": "gold",
+      "totalAssetKrw": "12345678.90000000",
+      "returnRate": "23.45670000",
+      "capturedAt": "2026-10-01T00:00:05.000Z"
+    }
+  }
+}
+```
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_ID`
+- `SEASON_NOT_FOUND`
+
+## POST /api/v1/records/me/seasons/:seasonId/final-result/view
+
+Records that the owner saw the final result: `season_participants.final_result_viewed_at` (migration `20261021010000_add_season_participant_final_result_viewed_at`, nullable, no backfill). The app calls it only after the result screen rendered a result. It is a display acknowledgement per user and season, never a reward or payout state (`rewardGrantedAt` is unrelated).
+
+- Only `available`, `not_qualified` and `excluded` results are marked. `pending` or `unavailable` → `409 SEASON_FINAL_RESULT_UNAVAILABLE`, nothing stored. Not joined → `404 SEASON_NOT_JOINED`.
+- Idempotent: the update matches only a NULL column (`UPDATE … WHERE final_result_viewed_at IS NULL`, default isolation, so a concurrent first view matches no row instead of failing), then the stored instant is read back and returned. Repeated calls return the first instant.
+- `200 { "success": true, "data": { "seasonId": "season-id", "viewedAt": "2026-10-02T01:02:03.000Z" } }`.
+- The owned trading-account list (`GET /api/v1/trading-accounts`) carries the same instant as `season.finalResultViewedAt` (`null` until viewed) so account selection can choose between `시즌결과 확인하기` and the next-season action without another request.
+
+### Error Codes
+
+- `UNAUTHORIZED`
+- `INVALID_SEASON_ID`
+- `SEASON_NOT_FOUND`
+- `SEASON_NOT_JOINED`
+- `SEASON_FINAL_RESULT_UNAVAILABLE`
+- `SEASON_FINAL_RESULT_VIEW_FAILED` (500: the stored instant could not be read back)
 
 ## GET /api/v1/records/me/seasons/:seasonId/equity
 

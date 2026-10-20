@@ -248,16 +248,17 @@ describe('Home keeps exchange entry in Wallet', () => {
     { participantStatus: 'finished' },
     { endAt: '2026-09-09T00:00:00Z' },
   ]) {
-    it(`season trade restrictions and reward entry remain: ${JSON.stringify(change)}`, (t) => {
+    it(`season trade restrictions and the settled result entry: ${JSON.stringify(change)}`, (t) => {
       const h = createHomeHarness('season');
       t.after(h.close);
       h.account.season = { ...h.account.season, ...change };
       h.seed(h.account, fixture.season.data);
       const { tree } = h.render();
       const actions = elements(tree, 'CTAButton');
+      // 보상 확인 is gone; a settled season links its own final result instead.
       assert.deepEqual(
         actions.map((node) => node.props.label),
-        change.seasonStatus === 'settled' ? ['보상 확인'] : [],
+        change.seasonStatus === 'settled' ? ['시즌최종결과 보기'] : [],
       );
       const caps = h.getCapabilities();
       assert.doesNotMatch(texts(tree), /환전하기|환전 안내/);
@@ -268,7 +269,7 @@ describe('Home keeps exchange entry in Wallet', () => {
       if (change.seasonStatus === 'settled') {
         h.renderCta(actions[0]).props.onPress();
         assert.deepEqual(h.navigation, [
-          ['MainTabs', { screen: 'MyTab', params: { screen: 'Reward' } }],
+          ['SeasonFinalResult', { seasonId: h.account.season.seasonId }],
         ]);
       }
     });

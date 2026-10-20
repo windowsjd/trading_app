@@ -33,6 +33,7 @@ const OWNED_ACCOUNT_SELECT = {
       userId: true,
       participantStatus: true,
       joinedAt: true,
+      finalResultViewedAt: true,
       season: {
         select: {
           id: true,

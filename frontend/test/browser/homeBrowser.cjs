@@ -207,8 +207,11 @@ async function run() {
           assert.match(await id('trading-account-capability-notice').textContent(), /거래 제한/);
           if (state === 'settled') {
             assert.equal(await id('home-tier').textContent(), 'Gold');
-            await page.getByText('보상 확인', { exact: true }).click();
-            assert.deepEqual(await page.evaluate(() => window.fixture.navigation.calls.at(-1)), ['MainTabs', { screen: 'MyTab', params: { screen: 'Reward' } }]);
+            assert.equal(await page.getByText('보상 확인', { exact: true }).count(), 0);
+            await page.getByText('시즌최종결과 보기', { exact: true }).click();
+            const [route, params] = await page.evaluate(() => window.fixture.navigation.calls.at(-1));
+            assert.equal(route, 'SeasonFinalResult');
+            assert.equal(typeof params.seasonId, 'string');
           }
         }
       }

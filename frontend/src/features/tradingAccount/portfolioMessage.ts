@@ -34,7 +34,8 @@ export function getPortfolioNotice(
   }
 
   if (portfolio.finalResult) {
-    return portfolio.finalResult.state === 'available' ? {
+    // Ranked or not, stored final totals are final; only the breakdown is missing.
+    return portfolio.finalResult.state !== 'unavailable' ? {
       title: '최종 자산 비중 조회 불가',
       message: '최종 자산과 수익률은 확정값입니다. 자산 비중의 저장된 세부 내역을 불러오지 못했습니다.',
     } : {

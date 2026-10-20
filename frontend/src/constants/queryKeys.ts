@@ -273,6 +273,9 @@ export const QUERY_KEYS = {
       ['record', 'season-badges', limit] as const,
     seasonDetail: (seasonId: string) =>
       ['record', 'season-detail', seasonId] as const,
+    /** 시즌최종결과: my settled result for one season and whether I saw it. */
+    seasonFinalResult: (seasonId: string) =>
+      ['record', 'season-final-result', seasonId] as const,
     seasonEquity: (params: {
       seasonId: string;
       limit?: number;

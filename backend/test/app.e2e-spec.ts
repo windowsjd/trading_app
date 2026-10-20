@@ -4319,6 +4319,16 @@ describe('AppController (e2e)', () => {
       '/api/v1/records/me/seasons/season-1/exchanges',
     ],
     [
+      'GET /api/v1/records/me/seasons/:seasonId/final-result',
+      'get',
+      '/api/v1/records/me/seasons/season-1/final-result',
+    ],
+    [
+      'POST /api/v1/records/me/seasons/:seasonId/final-result/view',
+      'post',
+      '/api/v1/records/me/seasons/season-1/final-result/view',
+    ],
+    [
       'GET /api/v1/users/:userId/records/:seasonId',
       'get',
       '/api/v1/users/user-2/records/season-1',

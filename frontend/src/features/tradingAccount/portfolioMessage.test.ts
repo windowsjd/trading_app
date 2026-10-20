@@ -43,4 +43,21 @@ describe('portfolio user message', () => {
     assert.ok(!serialized.includes('f1bda54a'));
     assert.ok(!serialized.includes('effective_at_'));
   });
+
+  it('a settled result with or without a rank keeps its totals final; only an unreadable one is "조회 불가"', () => {
+    const settled = (finalResult: TradingAccountPortfolioDto['finalResult']): TradingAccountPortfolioDto => ({
+      ...unavailablePortfolio(), mode: 'season', status: 'closed', state: 'available', summary: null, finalResult,
+      sectionErrors: [{ section: 'allocation', code: 'FINAL_ALLOCATION_UNAVAILABLE', message: 'x' }],
+      reason: undefined, message: undefined,
+    });
+    const notQualified = getPortfolioNotice(settled({
+      state: 'not_qualified', reason: 'FINAL_RANKING_NOT_QUALIFIED', resultSource: 'season_participants',
+      totalAssetKrw: '1', returnRate: '0', returnRateMethod: 'initial_capital', rank: null, tier: null,
+      maxDrawdown: '0', totalFillCount: 0, reachedReturnAt: null, tradedInstrumentCount: 1,
+      recognizedTurnoverKrw: null, endAt: '2026-10-01T00:00:00.000Z', capturedAt: null,
+    }));
+    assert.equal(notQualified?.title, '최종 자산 비중 조회 불가');
+    const unreadable = getPortfolioNotice(settled({ state: 'unavailable', reason: 'FINAL_RANKING_UNAVAILABLE' }));
+    assert.equal(unreadable?.title, '최종 결과 조회 불가');
+  });
 });

@@ -1,8 +1,11 @@
 import BeginnerAccountEntry from './BeginnerAccountEntry';
+import ModeEntryCard from './ModeEntryCard';
+import { accountSheetMaxHeight } from './accountSheetLayout';
 import { semantic } from '../../theme/tokens';
 import React, { useState } from 'react';
 import Svg, { Path } from 'react-native-svg';
 import { useAppearance } from '../../theme/appearance';
+import { useSafeAreaInsets } from '../../theme/safeArea';
 import {
   ScrollView,
   StyleSheet,
@@ -23,6 +26,7 @@ import { getCurrentSeason } from '../../features/season/api';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
 import {
   buildModeSelectionModel,
+  GENERAL_MODE_DESCRIPTION,
   hasGeneralAccount,
 } from '../../features/tradingAccount/modeSelection';
 import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
@@ -80,6 +84,7 @@ export default function AccountSwitcher({ compact = false, home = false, childre
   const [open, setOpen] = useState(false);
   const rootNavigation = useRootNavigation();
   const { height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const seasonQuery = useQuery({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
@@ -95,7 +100,7 @@ export default function AccountSwitcher({ compact = false, home = false, childre
 
   // First doorway to 일반 투자 for a user who only ever joined seasons
   // (작업 13 §7): the sheet offers STARTING the general account when none
-  // exists. The row is an action, not an account — no synthetic id, no row
+  // exists. The card is an action, not an account — no synthetic id, no row
   // pretending to be a selectable account, and nothing financial is read
   // until the server has actually answered with the created account.
   const startGeneral = useOpenGeneralAccount({
@@ -221,7 +226,7 @@ export default function AccountSwitcher({ compact = false, home = false, childre
       <BottomSheetBackdrop visible={open} onClose={() => setOpen(false)}>
         <ScrollView
           testID={TEST_IDS.tradingAccount.switcherSheet}
-          style={{ maxHeight: Math.min(480, height * 0.7) }}
+          style={{ maxHeight: accountSheetMaxHeight(height, insets) }}
         >
           <Text style={styles.sheetTitle}>투자 계정 선택</Text>
           <Text style={styles.sheetHelp}>
@@ -239,7 +244,11 @@ export default function AccountSwitcher({ compact = false, home = false, childre
             />
           ))}
 
-          {!accounts.some(account => account.mode === 'beginner') ? <BeginnerAccountEntry onEntered={() => setOpen(false)} /> : null}
+          {!accounts.some(account => account.mode === 'beginner') ? (
+            <View style={styles.startBox}>
+              <BeginnerAccountEntry onEntered={() => setOpen(false)} />
+            </View>
+          ) : null}
 
           {seasonJoin.kind === 'available' ? (
             <View style={[styles.startRow, styles.seasonJoinBox]}>
@@ -257,45 +266,20 @@ export default function AccountSwitcher({ compact = false, home = false, childre
             </View>
           ) : null}
 
+          {/* The same card as 초보모드: title, its sentence, one full-width CTA. */}
           {!hasGeneralAccount(accounts) ? (
             <View style={styles.startBox}>
-              <ActionPressable
-                style={styles.startRow}
+              <ModeEntryCard
+                testID="general-account-entry"
+                title="일반모드"
+                description={GENERAL_MODE_DESCRIPTION}
+                actionTestID={TEST_IDS.tradingAccount.switcherStartGeneral}
+                actionLabel="일반모드 계정만들기"
+                pending={startGeneral.isPending}
                 onPress={startGeneral.start}
-                disabled={startGeneral.isPending}
-                accessibilityRole="button"
-                accessibilityState={{ busy: startGeneral.isPending }}
-                testID={TEST_IDS.tradingAccount.switcherStartGeneral}
-              >
-                <View style={styles.rowTextColumn}>
-                  <Text style={styles.rowTitle}>일반 투자 시작하기</Text>
-                  <Text style={styles.rowSubtitle}>
-                    시즌과 무관하게 유지되는 일반 투자 계정을 새로 만듭니다.
-                    초기 자금 10,000,000원, 누적 투자원금 대비 수익률로
-                    성과를 측정합니다.
-                  </Text>
-                  <Text style={styles.rowMeaning}>
-                    매매 가능 · KRW↔USD 환전 가능
-                  </Text>
-                </View>
-                <View style={styles.rowBadgeColumn}>
-                  {startGeneral.isPending ? (
-                    <WhaleLoader size={20} />
-                  ) : (
-                    <Text style={styles.startAction}>시작</Text>
-                  )}
-                </View>
-              </ActionPressable>
-              {startGeneral.errorMessage ? (
-                <Text
-                  style={styles.startError}
-                  testID={
-                    TEST_IDS.tradingAccount.switcherStartGeneralError
-                  }
-                >
-                  {startGeneral.errorMessage}
-                </Text>
-              ) : null}
+                error={startGeneral.error}
+                errorTestID={TEST_IDS.tradingAccount.switcherStartGeneralError}
+              />
             </View>
           ) : null}
         </ScrollView>
@@ -455,8 +439,8 @@ const styles = StyleSheet.create({
   badge: { paddingVertical: 3, paddingHorizontal: 8, borderRadius: 999 },
   badgeText: { fontSize: 11, fontWeight: '700' },
 
-  // The start-general action: visually an offer, not an owned account —
-  // dashed border, no status badge, no "선택됨" state it could ever be in.
+  // Offers, not owned accounts: the 초보모드/일반모드 cards (8dp apart, like
+  // the rows) and the dashed season-join box — no status badge, no "선택됨".
   startBox: { marginBottom: 8 },
   startRow: {
     flexDirection: 'row',
@@ -470,7 +454,6 @@ const styles = StyleSheet.create({
     borderColor: semantic.border,
     backgroundColor: semantic.infoSurface,
   },
-  startAction: { fontSize: 12, color: semantic.info, fontWeight: '700' },
   // Full-width copy and CTA grow vertically, even with large Android fonts.
   seasonJoinBox: {
     flexDirection: 'column',
@@ -479,6 +462,4 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 8,
   },
-  // Full message, wrapping: a Korean error must never be clipped to fit a row.
-  startError: { marginTop: 6, fontSize: 13, color: semantic.error, lineHeight: 20 },
 });

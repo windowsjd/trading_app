@@ -48,3 +48,33 @@ it('Portfolio shows immutable final summary and clearly labels live holdings as 
   assert.match(text(h.renderer), /현재 참고 정보/);
   assert.doesNotMatch(text(h.renderer), /수익률 정보를 준비 중/);
 });
+
+const notQualifiedResult = {
+  state: 'not_qualified', reason: 'FINAL_RANKING_NOT_QUALIFIED', resultSource: 'season_participants',
+  totalAssetKrw: '10200000', returnRate: '-1.5', returnRateMethod: 'initial_capital', rank: null, tier: null,
+  maxDrawdown: '3', totalFillCount: 4, reachedReturnAt: null, tradedInstrumentCount: 2, recognizedTurnoverKrw: '1500000',
+  endAt: '2026-10-08T03:00:00.000Z', capturedAt: '2026-10-08T03:07:00.000Z',
+};
+it('a participant who missed the final-ranking criteria still sees the settled final assets and return on Home', t => {
+  const h = interactionHarness();
+  const Hero = h.load('src/screens/home/HomeAssetHero.tsx').default;
+  const r = h.render(React.createElement(Hero, { settled: true, finalResult: notQualifiedResult, summary: null }));
+  t.after(() => act(() => r.unmount()));
+  assert.match(text(r), /10,200,000/); assert.match(text(r), /-1\.5/);
+  assert.doesNotMatch(text(r), /수익률을 계산할 수 없습니다/);
+});
+it('an unverifiable settled result still shows no figure', t => {
+  const h = interactionHarness();
+  const Hero = h.load('src/screens/home/HomeAssetHero.tsx').default;
+  const r = h.render(React.createElement(Hero, { settled: true, finalResult: { state: 'unavailable', reason: 'FINAL_RANKING_UNAVAILABLE' }, summary: { totalAssetKrw: '999999' } }));
+  t.after(() => act(() => r.unmount()));
+  assert.doesNotMatch(text(r), /999,999/);
+  assert.match(text(r), /수익률을 계산할 수 없습니다/);
+});
+it('Portfolio keeps a not-qualified final result with the eligibility note instead of a rank', async t => {
+  const h = setup('season', 0, 'portfolio', { portfolios: { season: { ...finalPortfolio, finalResult: notQualifiedResult } } });
+  t.after(h.close); await flush();
+  assert.match(text(h.renderer), /10,200,000/);
+  assert.match(text(h.renderer), /최종 랭킹 자격 미충족/);
+  assert.doesNotMatch(text(h.renderer), /확정된 최종 결과를 불러오지 못했습니다|null위/);
+});

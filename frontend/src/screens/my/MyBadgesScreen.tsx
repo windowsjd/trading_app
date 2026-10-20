@@ -9,14 +9,14 @@ import type { MyBadgesScreenProps } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { getMySeasonRecords } from '../../features/record/api';
-import { toSeasonBadges, type SeasonBadge } from '../../features/record/seasonBadges';
+import { toSeasonBadges } from '../../features/record/seasonBadges';
 
 import ActionPressable from '../../components/common/ActionPressable';
 import FullPageLoading from '../../components/states/FullPageLoading';
 import ErrorState from '../../components/states/ErrorState';
 import EmptyState from '../../components/states/EmptyState';
 import WhaleLoader from '../../components/states/WhaleLoader';
-import StandingCard from '../ranking/StandingCard';
+import SeasonBadgeCard from './SeasonBadgeCard';
 
 /** The records contract's largest page: one page holds any realistic season history. */
 const PAGE_LIMIT = 100;
@@ -24,7 +24,7 @@ const PAGE_LIMIT = 100;
 /**
  * 내 뱃지: one card per settled season with my official final result — the
  * season's name, final tier and emblem, final rank and final return rate —
- * on the Ranking tab's own 내 순위 card (StandingCard). Cards are read from
+ * on the Ranking tab's own 내 순위 card (SeasonBadgeCard). Cards are read from
  * settlement's result (toSeasonBadges); this screen stores nothing, so a new
  * season never replaces an old card and a correction shows on the next read.
  *
@@ -104,29 +104,10 @@ export default function MyBadgesScreen({ navigation }: MyBadgesScreenProps) {
   );
 }
 
-function SeasonBadgeCard({ badge }: { badge: SeasonBadge }) {
-  const prefix = TEST_IDS.badges.card(badge.seasonId);
-  return (
-    <StandingCard
-      testIDPrefix={prefix}
-      tier={badge.finalTier}
-      rankLabel="최종 순위"
-      rank={badge.finalRank}
-      figures={{ returnRate: badge.returnRate, totalAssetKrw: badge.totalAssetKrw }}
-      figureLabels={{ rate: '최종 수익률', total: '최종 자산' }}
-      header={(foreground) => (
-        <Text testID={`${prefix}-season`} style={[styles.seasonName, foreground]}>{badge.seasonName}</Text>
-      )}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: semantic.screen },
   content: { ...getScreenContentStyle(Platform.OS), padding: 16, paddingBottom: 24 },
   intro: { fontSize: 14, lineHeight: 21, color: semantic.secondary, marginBottom: 12 },
-  // The same size and weight as the profile name on the Ranking tab's card.
-  seasonName: { minWidth: 0, fontSize: 18, lineHeight: 26, fontWeight: '700' },
   footer: { gap: 12 },
   rewardRow: {
     borderWidth: 1,

@@ -30,6 +30,10 @@ export const TEST_IDS = {
     seasonContinue: (accountId: string) =>
       `mode-selection-season-continue-${accountId}`,
     seasonJoin: 'mode-selection-season-join',
+    /** 시즌결과 확인하기 (a settled season whose result was not seen yet). */
+    seasonResult: 'mode-selection-season-result',
+    /** 다음시즌이 곧 시작됩니다 (disabled): nothing to join right now. */
+    seasonNextSoon: 'mode-selection-season-next-soon',
     seasonNone: 'mode-selection-season-none',
     seasonError: 'mode-selection-season-error',
     pastSeason: (accountId: string) =>
@@ -179,6 +183,21 @@ export const TEST_IDS = {
     nicknameInput: 'my-nickname-input',
     nicknameCancel: 'my-nickname-cancel',
     saveNickname: 'my-save-nickname',
+  },
+
+  seasonFinalResult: {
+    screen: 'season-final-result-screen',
+    emblem: 'season-final-result-emblem',
+    tierName: 'season-final-result-tier-name',
+    rank: 'season-final-result-rank',
+    returnRate: 'season-final-result-return-rate',
+    totalAsset: 'season-final-result-total-asset',
+    badge: 'season-final-result-badge',
+    noBadge: 'season-final-result-no-badge',
+    status: 'season-final-result-status',
+    viewError: 'season-final-result-view-error',
+    viewRetry: 'season-final-result-view-retry',
+    done: 'season-final-result-done',
   },
 
   badges: {

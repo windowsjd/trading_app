@@ -137,6 +137,55 @@ export interface RecordSeasonDetailDto {
   message?: string;
 }
 
+/**
+ * 시즌최종결과 (backend records contract, final-result): settlement's stored
+ * result for me in one season. Figures are never revalued at current prices.
+ */
+export type SeasonFinalResultStateDto =
+  | {
+      state: 'available';
+      /** The participant's final rank and tier — the values 내 뱃지 shows. */
+      finalRank: number;
+      finalTier: string;
+      /** From the final ranking row (as the records list reads them). */
+      totalAssetKrw: MoneyString;
+      returnRate: RateString;
+      capturedAt: IsoDateTimeString;
+    }
+  | {
+      /** Settled without meeting the final-ranking criteria: totals, no rank or tier. */
+      state: 'not_qualified';
+      totalAssetKrw: MoneyString;
+      returnRate: RateString;
+      tradedInstrumentCount: number | null;
+      recognizedTurnoverKrw: MoneyString | null;
+    }
+  | { state: 'excluded' }
+  /** The season is not settled yet: no figure is final. */
+  | { state: 'pending' }
+  /** Settled, but the stored result could not be verified. */
+  | { state: 'unavailable'; reason: string }
+  | { state: 'not_joined' };
+
+export interface SeasonFinalResultDto {
+  season: {
+    id: string;
+    name: string;
+    status: 'upcoming' | 'active' | 'ended' | 'settled' | (string & {});
+    startAt: IsoDateTimeString;
+    endAt: IsoDateTimeString;
+  };
+  participantStatus: string | null;
+  /** My first view of this result; null until the screen showed it. */
+  viewedAt: IsoDateTimeString | null;
+  result: SeasonFinalResultStateDto;
+}
+
+export interface SeasonFinalResultViewDto {
+  seasonId: string;
+  viewedAt: IsoDateTimeString;
+}
+
 export interface RecordSeasonEquityPointDto {
   time: string;
   totalAssetKrw: string;
@@ -383,6 +432,25 @@ export async function getMySeasonRecordDetail(seasonId: string) {
   const response = await apiClient.get<
     ApiSuccessResponse<RecordSeasonDetailDto>
   >(`/records/me/seasons/${seasonId}`);
+  return response.data.data;
+}
+
+export async function getMySeasonFinalResult(seasonId: string) {
+  const response = await apiClient.get<
+    ApiSuccessResponse<SeasonFinalResultDto>
+  >(`/records/me/seasons/${encodeURIComponent(seasonId)}/final-result`);
+  return response.data.data;
+}
+
+/**
+ * Records that the result screen showed my final result (first view only;
+ * the server keeps the earliest instant). Called after a shown result, never
+ * on a failed or pending read.
+ */
+export async function markMySeasonFinalResultViewed(seasonId: string) {
+  const response = await apiClient.post<
+    ApiSuccessResponse<SeasonFinalResultViewDto>
+  >(`/records/me/seasons/${encodeURIComponent(seasonId)}/final-result/view`);
   return response.data.data;
 }
 

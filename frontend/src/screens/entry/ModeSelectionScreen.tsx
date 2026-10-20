@@ -22,7 +22,11 @@ import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 import { getCurrentSeason } from '../../features/season/api';
 import { getAccountDisplay } from '../../features/tradingAccount/accountDisplay';
-import { buildModeSelectionModel } from '../../features/tradingAccount/modeSelection';
+import {
+  awaitsNextSeason,
+  buildModeSelectionModel,
+  GENERAL_MODE_DESCRIPTION,
+} from '../../features/tradingAccount/modeSelection';
 import { useOpenGeneralAccount } from '../../features/tradingAccount/useOpenGeneralAccount';
 import { useTradingAccount } from '../../features/tradingAccount/TradingAccountContext';
 import type { TradingAccountDto } from '../../features/tradingAccount/api';
@@ -35,9 +39,12 @@ import { ERROR_CODE } from '../../models/enums/errorCode';
  * explicit press of each card.
  */
 const MODE_DESCRIPTIONS = {
-  general: '시즌 기간 제한 없이 자유롭게 가상 투자를 연습합니다.',
-  season: '정해진 기간 동안 같은 시작 자금으로 투자 성과를 경쟁합니다.',
+  general: GENERAL_MODE_DESCRIPTION,
+  season: '정해진 기간동안 가상투자로 수익률을 경쟁해보세요!',
 } as const;
+
+/** How often 다음시즌이 곧 시작됩니다 re-asks for an open season (read-only). */
+const NEXT_SEASON_POLL_MS = 60_000;
 
 /**
  * The question every fresh authentication must answer (작업 13 §2·§3):
@@ -55,9 +62,11 @@ const MODE_DESCRIPTIONS = {
  *     if not, the button issues the explicit POST — mounting this screen
  *     creates nothing, ever.
  *   - The season column tells the truth: a running season the user is in is
- *     "계속하기"; one they have not joined is "참가하기" (via SeasonJoin);
- *     no joinable season is said outright, with 일반 투자 still available.
- *     Finished seasons are reachable but never a default.
+ *     "계속하기"; a settled season whose final result they have not seen is
+ *     "시즌결과 확인하기" (SeasonFinalResult, which records the view); one
+ *     they have not joined is "시즌참가하기" (via SeasonJoin); otherwise the
+ *     disabled "다음시즌이 곧 시작됩니다", re-checked while shown, with 일반
+ *     투자 still available. Finished seasons are reachable but never a default.
  *   - A failure in one column never blocks the other: a season lookup error
  *     leaves 일반 투자 usable, and a general-open error leaves every season
  *     option usable.
@@ -81,6 +90,12 @@ export default function ModeSelectionScreen({
     queryKey: QUERY_KEYS.season.current,
     queryFn: getCurrentSeason,
     staleTime: 30_000,
+    // Only while the entry can say nothing but 다음시즌이 곧 시작됩니다: a season
+    // that opens later turns it into 시즌참가하기 without a manual refresh.
+    refetchInterval: (query) =>
+      awaitsNextSeason(buildModeSelectionModel(accounts, query.state.data))
+        ? NEXT_SEASON_POLL_MS
+        : false,
   });
 
   const openGeneral = useOpenGeneralAccount({
@@ -129,6 +144,72 @@ export default function ModeSelectionScreen({
   };
 
   const generalOption = model.general;
+  const hasContinue = model.seasonContinue.length > 0;
+
+  // One season entry under the running-season cards (작업 A-4): an unseen
+  // settled result first, then joining, then the honest "nothing to join".
+  let seasonEntry: React.ReactNode = null;
+  if (model.seasonResult) {
+    const { seasonId, seasonName } = model.seasonResult;
+    seasonEntry = (
+      <SeasonModeCard>
+        <Text style={styles.cardBody}>{seasonName}</Text>
+        <CTAButton
+          testID={TEST_IDS.modeSelection.seasonResult}
+          label="시즌결과 확인하기"
+          onPress={() => navigation.navigate('SeasonFinalResult', { seasonId })}
+        />
+      </SeasonModeCard>
+    );
+  } else if (seasonQuery.isLoading) {
+    seasonEntry = hasContinue ? null : (
+      <SeasonModeCard>
+        <Text style={styles.cardBody}>
+          현재 시즌 정보를 확인하는 중입니다…
+        </Text>
+      </SeasonModeCard>
+    );
+  } else if (seasonLookupFailed) {
+    seasonEntry = (
+      <SeasonModeCard testID={TEST_IDS.modeSelection.seasonError}>
+        <Text style={styles.errorText}>
+          시즌 정보를 불러오지 못했습니다. 일반 투자는 계속 진행할 수
+          있습니다.
+        </Text>
+        <CTAButton
+          variant="neutral" label="시즌 정보 다시 확인"
+          onPress={() => void seasonQuery.refetch()}
+        />
+      </SeasonModeCard>
+    );
+  } else if (model.seasonJoin.kind === 'available') {
+    seasonEntry = (
+      <SeasonModeCard>
+        <Text style={styles.cardBody}>{model.seasonJoin.seasonName}</Text>
+        <CTAButton
+          testID={TEST_IDS.modeSelection.seasonJoin}
+          label="시즌참가하기"
+          onPress={() => navigation.navigate('SeasonJoin')}
+        />
+      </SeasonModeCard>
+    );
+  } else if (!hasContinue) {
+    seasonEntry = (
+      <SeasonModeCard testID={TEST_IDS.modeSelection.seasonNone}>
+        {model.seasonSettling ? (
+          <Text style={styles.cardBody}>
+            {model.seasonSettling.seasonName} 결과를 정산하고 있습니다. 정산이
+            끝나면 이곳에서 시즌결과를 확인할 수 있습니다.
+          </Text>
+        ) : null}
+        <CTAButton
+          testID={TEST_IDS.modeSelection.seasonNextSoon}
+          label="다음시즌이 곧 시작됩니다"
+          state="disabled"
+        />
+      </SeasonModeCard>
+    );
+  }
 
   return (
     <SafeAreaView edges={['top', 'bottom', 'left', 'right']} style={styles.container}>
@@ -137,9 +218,19 @@ export default function ModeSelectionScreen({
         testID={TEST_IDS.modeSelection.screen}
       >
         <Text style={styles.title}>계정 선택하기</Text>
-        {/* Display order only: 초보모드 → 일반모드 → 시즌모드. Selection and
+        {/* Display order only: 시즌모드 → 일반모드 → 초보모드. Selection and
             creation still happen only on an explicit press of each card. */}
-        <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} />
+        {model.seasonContinue.map((account) => (
+          <SeasonModeCard key={account.id} badge="참가중">
+            <Text style={styles.cardBody}>{account.season?.seasonName}</Text>
+            <CTAButton
+              testID={TEST_IDS.modeSelection.seasonContinue(account.id)}
+              label="시즌모드"
+              onPress={() => startWithAccount(account)}
+            />
+          </SeasonModeCard>
+        ))}
+        {seasonEntry}
 
         {generalOption.kind === 'existing' ? (
           <GeneralExistingCard
@@ -152,11 +243,7 @@ export default function ModeSelectionScreen({
             <ModeDescription mode="general" />
             <CTAButton
               testID={TEST_IDS.modeSelection.generalStart}
-              label={
-                openGeneral.isPending
-                  ? '계정을 여는 중입니다...'
-                  : '일반모드'
-              }
+              label="일반모드 계정만들기"
               state={openGeneral.isPending ? 'loading' : 'enabled'}
               onPress={openGeneral.start}
             />
@@ -171,60 +258,7 @@ export default function ModeSelectionScreen({
           </View>
         )}
 
-        {model.seasonContinue.map((account) => {
-          return (
-            <View key={account.id} style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={[styles.cardTitle, styles.cardHeaderTitle]}>시즌모드</Text>
-                <View style={styles.badge}><Text style={styles.badgeText}>참가중</Text></View>
-              </View>
-              <ModeDescription mode="season" />
-              <Text style={styles.cardBody}>{account.season?.seasonName}</Text>
-              <CTAButton
-                testID={TEST_IDS.modeSelection.seasonContinue(account.id)}
-                label="시즌모드"
-                onPress={() => startWithAccount(account)}
-              />
-            </View>
-          );
-        })}
-
-        {seasonQuery.isLoading ? (
-          <View style={styles.card}>
-            <Text style={styles.cardBody}>
-              현재 시즌 정보를 확인하는 중입니다…
-            </Text>
-          </View>
-        ) : seasonLookupFailed ? (
-          <View style={styles.card} testID={TEST_IDS.modeSelection.seasonError}>
-            <Text style={styles.errorText}>
-              시즌 정보를 불러오지 못했습니다. 일반 투자는 계속 진행할 수
-              있습니다.
-            </Text>
-            <CTAButton
-              variant="neutral" label="시즌 정보 다시 확인"
-              onPress={() => void seasonQuery.refetch()}
-            />
-          </View>
-        ) : model.seasonJoin.kind === 'available' ? (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>시즌모드</Text>
-            <ModeDescription mode="season" />
-            <Text style={styles.cardBody}>{model.seasonJoin.seasonName}</Text>
-            <CTAButton
-              testID={TEST_IDS.modeSelection.seasonJoin}
-              label="시즌 참가하기"
-              onPress={() => navigation.navigate('SeasonJoin')}
-            />
-          </View>
-        ) : model.seasonContinue.length === 0 ? (
-          <View style={styles.card} testID={TEST_IDS.modeSelection.seasonNone}>
-            <Text style={styles.cardBody}>
-              현재 참가할 수 있는 시즌이 없습니다. 시즌이 열리면 이 화면과 홈에서
-              참가할 수 있습니다.
-            </Text>
-          </View>
-        ) : null}
+        <BeginnerAccountEntry onEntered={() => resetToHome(navigation)} />
 
         {model.seasonPast.length > 0 ? (
           <>
@@ -285,6 +319,32 @@ function GeneralExistingCard({
         label="일반모드"
         onPress={onStart}
       />
+    </View>
+  );
+}
+
+/** Every 시즌모드 card: the title (with a status badge when given), its sentence, then the caller's content. */
+function SeasonModeCard({
+  badge,
+  testID,
+  children,
+}: {
+  badge?: string;
+  testID?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.card} testID={testID}>
+      {badge ? (
+        <View style={styles.cardHeaderRow}>
+          <Text style={[styles.cardTitle, styles.cardHeaderTitle]}>시즌모드</Text>
+          <View style={styles.badge}><Text style={styles.badgeText}>{badge}</Text></View>
+        </View>
+      ) : (
+        <Text style={styles.cardTitle}>시즌모드</Text>
+      )}
+      <ModeDescription mode="season" />
+      {children}
     </View>
   );
 }

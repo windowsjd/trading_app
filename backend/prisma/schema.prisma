@@ -634,6 +634,11 @@ model SeasonParticipant {
   finalQualified             Boolean?          @map("final_qualified")
   finalTradedInstrumentCount Int?              @map("final_traded_instrument_count")
   finalRecognizedTurnoverKrw Decimal?          @map("final_recognized_turnover_krw") @db.Decimal(24, 8)
+  /// When the owner first saw this season's final result (시즌최종결과 화면).
+  /// Set once, only after settlement, by POST
+  /// /records/me/seasons/:seasonId/final-result/view. A display
+  /// acknowledgement only: not a reward or payout state (see rewardGrantedAt).
+  finalResultViewedAt        DateTime?         @map("final_result_viewed_at")
   // Canonical financial-account ownership link. Every season participant has
   // exactly one season-mode TradingAccount; season state remains here while
   // wallets/orders/positions/FX/snapshots are owned by that account.

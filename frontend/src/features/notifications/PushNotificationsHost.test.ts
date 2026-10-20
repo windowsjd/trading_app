@@ -181,7 +181,8 @@ describe('push notifications host', () => {
     // A root route added to RootNavigator without this decision makes taps wait while it is in front.
     const routes = harness(t).mainRoutes;
     const roots = [...readFileSync(resolve('src/app/navigation/RootNavigator.tsx'), 'utf8').matchAll(/<Stack\.Screen name="([A-Za-z]+)"/g)].map((match) => match[1]);
-    const entry = ['Splash', 'AuthStack', 'ModeSelection', 'SeasonJoin'];
+    // SeasonFinalResult also opens from mode selection, before an account is chosen.
+    const entry = ['Splash', 'AuthStack', 'ModeSelection', 'SeasonJoin', 'SeasonFinalResult'];
     assert.equal(roots.length > entry.length, true);
     assert.deepEqual(roots.filter((name) => !entry.includes(name) && !routes.has(name)), [], 'root screens a tap would wait behind');
     assert.deepEqual(entry.filter((name) => routes.has(name)), [], 'entry routes must keep a tap waiting');

@@ -300,6 +300,7 @@ export const SeasonParticipantScalarFieldEnum = {
   finalQualified: 'finalQualified',
   finalTradedInstrumentCount: 'finalTradedInstrumentCount',
   finalRecognizedTurnoverKrw: 'finalRecognizedTurnoverKrw',
+  finalResultViewedAt: 'finalResultViewedAt',
   tradingAccountId: 'tradingAccountId',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

@@ -167,15 +167,26 @@ reappears anywhere else. Mode selection is on that allowlist for exactly the
 계정으로 시작할 것인가?"** Its options come from the pure view-model
 `buildModeSelectionModel(accounts, currentSeason)`:
 
-- **일반 투자 — always offered.** With a general account (any status): use it.
-  Without one: "일반 투자 계정 시작하기", which fires the explicit
-  `POST /trading-accounts/general`. The card states the standing policy: 초기
-  자금 10,000,000원, 누적 투자원금 대비 수익률, 매매와 KRW↔USD 환전 가능.
-- **시즌 투자.** Season accounts the user is competing in ("시즌 투자
-  계속하기"), or — when the current season is effectively active, the server
-  says not joined, AND the owned list has no account for it — "시즌 참가하기"
-  into `SeasonJoin` (pushed, so back returns here). Otherwise the screen says
-  outright that no season is joinable, with 일반 투자 still available.
+Display order (2026-10-20): 시즌모드 → 일반모드 → 초보모드, then 지난 시즌 계정.
+
+- **시즌모드.** Season accounts the user is competing in ("시즌모드"), then one
+  entry: a SETTLED season whose final result the server says they have not
+  seen (`season.finalResultViewedAt === null`, newest first; an absent field
+  is unknown, never "not seen") → "시즌결과 확인하기" into `SeasonFinalResult`,
+  which records the first view on the server
+  (`POST /records/me/seasons/:id/final-result/view`) only after a shown result;
+  otherwise — when the current season is effectively active, the server says
+  not joined, AND the owned list has no account for it — "시즌참가하기" into
+  `SeasonJoin`; otherwise a disabled "다음시즌이 곧 시작됩니다" (the current
+  season is re-read every 60 s only in this state, so it turns into
+  시즌참가하기 by itself). An ended, unsettled season of theirs only says its
+  result is being settled. Description: "정해진 기간동안 가상투자로 수익률을
+  경쟁해보세요!".
+- **일반모드 — always offered.** With a general account (any status): use it.
+  Without one: "일반모드 계정만들기", which fires the explicit
+  `POST /trading-accounts/general`.
+- **초보모드.** "초보모드 계속하기" with a beginner account, otherwise
+  "초보모드 계정만들기" (explicit POST).
 - **지난 시즌 계정.** Finished/settled/excluded season accounts are reachable
   as history ("기록 보기") but are never a default and never look like a live
   start.
@@ -186,9 +197,9 @@ usable. Nothing is created on mount, by GET, or by navigation.
 
 ## Opening the general account (작업 11 · unified by 작업 13)
 
-Three surfaces offer "일반 투자 시작하기" — mode selection, the account
-switcher sheet (when no general account exists), and `AccountSetupPanel` (the
-in-app no-account landing). All three run the ONE flow in
+Three surfaces offer opening the general account — mode selection and the
+account switcher sheet ("일반모드 계정만들기", when no general account exists),
+and `AccountSetupPanel` (the in-app no-account landing). All three run the ONE flow in
 `useOpenGeneralAccount` / `completeGeneralAccountOpen`:
 
 1. `POST /trading-accounts/general` — on an explicit press only; `start()` is
@@ -198,10 +209,13 @@ in-app no-account landing). All three run the ONE flow in
    open from a replay — a double tap or retry lands on the same account);
 4. only then run the caller's `onOpened` (navigate home / close the sheet).
 
-The switcher's row is an ACTION, not an account: no synthetic id, no fake
-account row, and no financial read happens before the server has answered.
-On failure the sheet stays open with the full message and the season accounts
-remain selectable.
+The switcher's offer is an ACTION, not an account: the same card as 초보모드
+(`ModeEntryCard`: 제목, 설명, full-width CTA), no synthetic id, no fake account
+row, and no financial read happens before the server has answered. On failure
+the sheet stays open with the original error (ErrorNotice) and the season
+accounts remain selectable. The sheet scrolls inside up to about 85% of the
+window, never under the status bar or behind the navigation bar
+(`accountSheetMaxHeight`).
 
 ## Per-user persistence and logout
 

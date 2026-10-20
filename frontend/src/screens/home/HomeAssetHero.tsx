@@ -28,7 +28,9 @@ function performanceStyle(value: string | null | undefined) {
 }
 
 export default function HomeAssetHero({ summary, finalResult, settled = false, compactBottom = false, compactTop = false, unavailableMessage, aside }: Props) {
-  const result = settled ? (finalResult?.state === 'available' ? finalResult : null) : summary;
+  // A settled season shows its stored final totals, ranked or not (a
+  // participant who missed the final-ranking criteria keeps theirs too).
+  const result = settled ? (finalResult && finalResult.state !== 'unavailable' ? finalResult : null) : summary;
   const total = result ? `${formatKrw(result.totalAssetKrw)}원` : '';
   const unrealizedPnl = !settled && summary ? homeUnrealizedPnlKrw(summary) : null;
   // The emblem keeps its place beside the total, so the total has one column

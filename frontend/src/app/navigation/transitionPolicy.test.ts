@@ -27,7 +27,7 @@ test('all stacks share push policy and chart keeps fullscreen modal presentation
     assert.equal(/screenLayout=\{stackScreenLayout\}/.test(source), true, name);
   }
   const root = readFileSync(resolve('src/app/navigation/RootNavigator.tsx'), 'utf8');
-  assert.equal((root.match(/layout=\{pushedRootLayout\}/g) ?? []).length, 3, 'TradeHistory, OrderFailure and SeasonJoin pushes');
+  assert.equal((root.match(/layout=\{pushedRootLayout\}/g) ?? []).length, 4, 'TradeHistory, OrderFailure, SeasonJoin and SeasonFinalResult pushes');
   assert.match(root, /chartTransition\(reducedMotion, Platform\.OS\)/);
   assert.match(root, /rootTransition\(reducedMotion, Platform\.OS\)/);
   const tabs = readFileSync(resolve('src/app/navigation/MainTabs.tsx'), 'utf8');

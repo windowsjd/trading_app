@@ -29,6 +29,8 @@ type TradingAccountSeasonView = {
   seasonParticipantId: string;
   participantStatus: ParticipantStatus;
   joinedAt: string;
+  /** First view of the settled season's final result (시즌최종결과); null until then. */
+  finalResultViewedAt: string | null;
 };
 
 type TradingAccountView = {
@@ -126,6 +128,9 @@ export class TradingAccountsService {
             seasonParticipantId: account.seasonParticipant.id,
             participantStatus: account.seasonParticipant.participantStatus,
             joinedAt: account.seasonParticipant.joinedAt.toISOString(),
+            finalResultViewedAt:
+              account.seasonParticipant.finalResultViewedAt?.toISOString() ??
+              null,
           }
         : null,
     };

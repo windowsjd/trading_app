@@ -35,7 +35,18 @@ import {
  * NOTHING here decides for the user. The model deliberately has no notion of
  * a default or recommended option: on a new login the choice between 일반 and
  * 시즌 belongs to the person, which is the whole reason this screen exists.
+ *
+ * After a season ends (시즌최종결과): `seasonResult` is the newest SETTLED
+ * season of theirs whose final result the server says they have not seen
+ * (`finalResultViewedAt === null`) — the entry offers 시즌결과 확인하기 before
+ * anything else. A season that ended but is not settled yet has no result to
+ * show (`seasonSettling`), and an absent field (an older server) is unknown,
+ * never "not seen". Seen results leave the entry to `seasonJoin`, or to
+ * 다음시즌이 곧 시작됩니다 when nothing can be joined (`awaitsNextSeason`).
  */
+
+/** 일반모드's one sentence, wherever the mode is offered (계정 선택, 계정 변경). */
+export const GENERAL_MODE_DESCRIPTION = '시즌 기간 제한 없이 자유롭게 가상 투자를 연습합니다.';
 
 export type ModeSelectionGeneralOption<A extends SelectableAccount> =
   | { kind: 'existing'; account: A }
@@ -45,6 +56,8 @@ export type ModeSelectionSeasonJoin =
   | { kind: 'available'; seasonId: string; seasonName: string }
   | { kind: 'none' };
 
+export type ModeSelectionSeasonRef = { seasonId: string; seasonName: string };
+
 export type ModeSelectionModel<A extends SelectableAccount> = {
   general: ModeSelectionGeneralOption<A>;
   /** Season accounts in a running season the user is participating in. */
@@ -52,6 +65,10 @@ export type ModeSelectionModel<A extends SelectableAccount> = {
   /** Every other owned season account: ended, settled, excluded, closed. */
   seasonPast: A[];
   seasonJoin: ModeSelectionSeasonJoin;
+  /** The newest settled season whose final result was not seen yet. */
+  seasonResult: ModeSelectionSeasonRef | null;
+  /** The newest season of theirs that ended and awaits settlement. */
+  seasonSettling: ModeSelectionSeasonRef | null;
 };
 
 export function buildModeSelectionModel<A extends SelectableAccount>(
@@ -85,6 +102,15 @@ export function buildModeSelectionModel<A extends SelectableAccount>(
       : { kind: 'start' },
     seasonContinue,
     seasonPast,
+    seasonResult: newestSeason(
+      accounts,
+      (season) =>
+        season.seasonStatus === 'settled' && season.finalResultViewedAt === null,
+    ),
+    seasonSettling: newestSeason(
+      accounts,
+      (season) => season.seasonStatus === 'ended',
+    ),
     seasonJoin:
       joinable && currentSeason
         ? {
@@ -94,6 +120,51 @@ export function buildModeSelectionModel<A extends SelectableAccount>(
           }
         : { kind: 'none' },
   };
+}
+
+/**
+ * The season entry can only say 다음시즌이 곧 시작됩니다: no result to see, no
+ * running season of theirs and nothing joinable. The screen keeps re-reading
+ * the current season (read-only) while this holds, so the entry turns into
+ * 시즌참가하기 by itself once a season opens.
+ */
+export function awaitsNextSeason(
+  model: ModeSelectionModel<SelectableAccount>,
+): boolean {
+  return (
+    !model.seasonResult &&
+    model.seasonContinue.length === 0 &&
+    model.seasonJoin.kind === 'none'
+  );
+}
+
+/** Newest by season end (then most recently opened) among the owned season accounts that match. */
+function newestSeason(
+  accounts: readonly SelectableAccount[],
+  matches: (season: NonNullable<SelectableAccount['season']>) => boolean,
+): ModeSelectionSeasonRef | null {
+  let newest: { season: NonNullable<SelectableAccount['season']>; endAt: number; openedAt: number } | null = null;
+  for (const account of accounts) {
+    const season = account.season;
+    if (account.mode !== 'season' || !season || !matches(season)) continue;
+    const endAt = Date.parse(season.endAt);
+    const openedAt = Date.parse(account.openedAt);
+    const candidate = {
+      season,
+      endAt: Number.isFinite(endAt) ? endAt : -Infinity,
+      openedAt: Number.isFinite(openedAt) ? openedAt : -Infinity,
+    };
+    if (
+      !newest ||
+      candidate.endAt > newest.endAt ||
+      (candidate.endAt === newest.endAt && candidate.openedAt > newest.openedAt)
+    ) {
+      newest = candidate;
+    }
+  }
+  return newest
+    ? { seasonId: newest.season.seasonId, seasonName: newest.season.seasonName }
+    : null;
 }
 
 /**

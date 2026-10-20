@@ -54,6 +54,7 @@ const seasonAccountRow = (overrides: Record<string, unknown> = {}) => ({
     userId: 'user-1',
     participantStatus: 'active',
     joinedAt: new Date('2026-07-01T00:00:00.000Z'),
+    finalResultViewedAt: null,
     season: {
       id: 'season-1',
       name: 'Season 1',
@@ -157,6 +158,7 @@ describe('TradingAccountsService.listTradingAccounts', () => {
               seasonParticipantId: 'sp-1',
               participantStatus: 'active',
               joinedAt: '2026-07-01T00:00:00.000Z',
+              finalResultViewedAt: null,
             },
           },
           {
@@ -173,6 +175,33 @@ describe('TradingAccountsService.listTradingAccounts', () => {
         ],
       },
     });
+  });
+
+  it('serializes the first final-result view of a settled season', async () => {
+    const { prisma, service } = createServices();
+    const row = seasonAccountRow();
+    prisma.tradingAccount.findMany.mockResolvedValueOnce([
+      {
+        ...row,
+        seasonParticipant: {
+          ...row.seasonParticipant,
+          finalResultViewedAt: new Date('2026-09-02T03:04:05.000Z'),
+          season: { ...row.seasonParticipant.season, status: 'settled' },
+        },
+      },
+    ]);
+
+    const response = await service.listTradingAccounts('user-1');
+
+    expect(response.data.accounts[0].season?.finalResultViewedAt).toBe(
+      '2026-09-02T03:04:05.000Z',
+    );
+    const [query] = prisma.tradingAccount.findMany.mock.calls[0] as [
+      { select: { seasonParticipant: { select: Record<string, boolean> } } },
+    ];
+    expect(query.select.seasonParticipant.select.finalResultViewedAt).toBe(
+      true,
+    );
   });
 
   it('returns an empty list without fabricating a placeholder general account', async () => {

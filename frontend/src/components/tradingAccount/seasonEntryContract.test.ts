@@ -4,6 +4,7 @@ import { URL } from 'node:url';
 import { describe, it } from 'node:test';
 
 import { toSeasonJoinViewState } from '../../features/season/mapper.ts';
+import { accountSheetMaxHeight } from './accountSheetLayout.ts';
 import type { CurrentSeasonDto } from '../../models/dto/season.ts';
 
 // Like accountLayout.test.ts, these check screen wiring without adding a
@@ -27,12 +28,34 @@ describe('AccountSwitcher season entry wiring', () => {
   });
 
   it('scrolls the title and all rows within the viewport and gives the offer full-width wrapping text', () => {
-    assert.match(switcher, /<ScrollView\s*testID=\{TEST_IDS\.tradingAccount\.switcherSheet\}\s*style=\{\{ maxHeight: Math\.min\(480, height \* 0\.7\) \}\}/);
+    assert.match(switcher, /<ScrollView\s*testID=\{TEST_IDS\.tradingAccount\.switcherSheet\}\s*style=\{\{ maxHeight: accountSheetMaxHeight\(height, insets\) \}\}/);
+    assert.match(switcher, /const insets = useSafeAreaInsets\(\);/);
     const offer = switcher.slice(switcher.indexOf("{seasonJoin.kind === 'available'"), switcher.indexOf('{!hasGeneralAccount'));
     assert.doesNotMatch(offer, /numberOfLines|ellipsizeMode/);
     assert.match(offer, /현재 진행 중인 시즌입니다\./);
     assert.match(offer, /아직 참가하지 않았습니다\./);
     assert.match(switcher, /seasonJoinBox:\s*\{\s*flexDirection: 'column',\s*alignItems: 'stretch',\s*minWidth: 0/);
+  });
+});
+
+describe('account sheet height', () => {
+  it('uses about 85% of a roomy window, more than the old 480 / 70% cap', () => {
+    for (const [height, insets] of [[844, { top: 47, bottom: 34 }], [915, { top: 24, bottom: 48 }]] as const) {
+      const max = accountSheetMaxHeight(height, insets);
+      assert.ok(max > Math.min(480, height * 0.7), `${height}: ${max}`);
+      assert.ok(max <= height * 0.85);
+    }
+    assert.equal(accountSheetMaxHeight(1000, { top: 0, bottom: 0 }), 850);
+  });
+
+  it('never reaches under the status bar or behind the navigation bar, on small screens too', () => {
+    for (const [height, insets] of [[568, { top: 20, bottom: 0 }], [640, { top: 24, bottom: 48 }], [844, { top: 47, bottom: 34 }]] as const) {
+      const max = accountSheetMaxHeight(height, insets);
+      // Sheet = 20 top padding + content + at most 20 above the bottom inset; a 24dp backdrop strip stays tappable.
+      assert.ok(20 + max + 20 + insets.bottom + 24 + insets.top <= height, `${height}: ${max}`);
+      assert.ok(max > 0);
+    }
+    assert.equal(accountSheetMaxHeight(60, { top: 40, bottom: 40 }), 0);
   });
 });
 

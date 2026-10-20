@@ -102,7 +102,8 @@ mode simply has no general row (no placeholder is fabricated).
           "endAt": "<UTC ISO string>",
           "seasonParticipantId": "<string>",
           "participantStatus": "registered | active | excluded | finished | rewarded",
-          "joinedAt": "<UTC ISO string>"
+          "joinedAt": "<UTC ISO string>",
+          "finalResultViewedAt": "<UTC ISO string> | null"
         }
       }
     ]
@@ -110,7 +111,11 @@ mode simply has no general row (no placeholder is fabricated).
 }
 ```
 
-`season` is `null` for a general account.
+`season` is `null` for a general account. `season.finalResultViewedAt` is the
+owner's first view of the settled season's final result (`null` until then;
+written only by `POST /api/v1/records/me/seasons/:seasonId/final-result/view`,
+see [records contract](records-api-contract.md)). It is a display
+acknowledgement, not a reward state.
 
 ## Detail Response
 

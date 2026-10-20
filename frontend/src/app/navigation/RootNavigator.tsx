@@ -19,6 +19,7 @@ import MainTabs from './MainTabs';
 import SplashScreen from '../../screens/auth/SplashScreen';
 import ModeSelectionScreen from '../../screens/entry/ModeSelectionScreen';
 import SeasonJoinScreen from '../../screens/season/SeasonJoinScreen';
+import SeasonFinalResultScreen from '../../screens/season/SeasonFinalResultScreen';
 import ScreenErrorBoundary from '../../components/states/ScreenErrorBoundary';
 import OrderFillNotifier from '../../features/order/OrderFillNotifier';
 import PushNotificationsHost from '../../features/notifications/PushNotificationsHost';
@@ -78,6 +79,13 @@ export default function RootNavigator() {
           headerTintColor: colors.text,
         }} />
         <Stack.Screen name="SeasonJoin" component={SeasonJoinScreen} layout={pushedRootLayout} options={stackTransition(reducedMotion, Platform.OS)} />
+        <Stack.Screen name="SeasonFinalResult" component={SeasonFinalResultScreen} layout={pushedRootLayout} options={{
+          ...stackTransition(reducedMotion, Platform.OS),
+          headerShown: true,
+          title: '시즌최종결과',
+          headerStyle: { backgroundColor: colors.surface },
+          headerTintColor: colors.text,
+        }} />
         <Stack.Screen name="AssetChart" component={AssetChartScreen} options={chartTransition(reducedMotion, Platform.OS)} />
         <Stack.Screen name="FuturesChart" component={FuturesChartScreen} options={chartTransition(reducedMotion, Platform.OS)} />
       </Stack.Navigator>

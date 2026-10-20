@@ -26,7 +26,7 @@ for (const mode of ['light', 'dark'] as const) {
       '../../features/notifications/PushNotificationsHost': { default: 'PushNotificationsHost', __esModule: true },
     };
     for (const name of ['./AuthStack', './MainTabs', '../../screens/auth/SplashScreen',
-      '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/futures/FuturesChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen']) {
+      '../../screens/history/TradeHistoryScreen', '../../screens/history/OrderFailureScreen', '../../screens/asset/AssetChartScreen', '../../screens/futures/FuturesChartScreen', '../../screens/entry/ModeSelectionScreen', '../../screens/season/SeasonJoinScreen', '../../screens/season/SeasonFinalResultScreen']) {
       mocks[name] = { default: name, __esModule: true };
     }
     const Root = load(resolve('src/app/navigation/RootNavigator.tsx'), mocks).default;

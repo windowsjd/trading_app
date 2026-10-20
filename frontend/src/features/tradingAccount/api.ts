@@ -67,6 +67,12 @@ export interface TradingAccountSeasonDto {
     | 'finished'
     | 'rewarded';
   joinedAt: string;
+  /**
+   * The owner's first view of this settled season's final result
+   * (시즌최종결과); `null` until then. Absent from servers that predate the
+   * result screen: unknown, which is never read as "not seen yet".
+   */
+  finalResultViewedAt?: string | null;
 }
 
 export interface TradingAccountDto {
@@ -160,6 +166,27 @@ export interface TradingAccountPortfolioDto {
     reachedReturnAt: string | null;
     endAt: string;
     capturedAt: string;
+  } | {
+    /**
+     * Settled without meeting the final-ranking criteria: the totals are as
+     * final as anyone's (stored by settlement beside the verdict), but there
+     * is no rank and no tier.
+     */
+    state: 'not_qualified';
+    reason: 'FINAL_RANKING_NOT_QUALIFIED';
+    resultSource: 'season_participants';
+    totalAssetKrw: MoneyString;
+    returnRate: PercentString;
+    returnRateMethod: 'initial_capital';
+    rank: null;
+    tier: null;
+    maxDrawdown: PercentString;
+    totalFillCount: number;
+    reachedReturnAt: null;
+    tradedInstrumentCount: number | null;
+    recognizedTurnoverKrw: MoneyString | null;
+    endAt: string;
+    capturedAt: string | null;
   } | { state: 'unavailable'; reason: string };
   allocation: TradingAccountAllocationDto;
   sectionErrors: TradingAccountSectionErrorDto[];

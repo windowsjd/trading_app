@@ -148,6 +148,11 @@ export type RootStackParamList = {
   ModeSelection: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   SeasonJoin: undefined;
+  /**
+   * 시즌최종결과 of one season: settlement's stored result for me (never a
+   * current-price read). Showing a result records my first view of it.
+   */
+  SeasonFinalResult: { seasonId: string };
 };
 
 type RootScreenProps<RouteName extends keyof RootStackParamList> =
@@ -180,6 +185,8 @@ export type SignupScreenProps = NativeStackScreenProps<
 >;
 
 export type SeasonJoinScreenProps = RootScreenProps<'SeasonJoin'>;
+
+export type SeasonFinalResultScreenProps = RootScreenProps<'SeasonFinalResult'>;
 
 export type ModeSelectionScreenProps = RootScreenProps<'ModeSelection'>;
 
