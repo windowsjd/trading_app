@@ -29,6 +29,22 @@ describe('shared PositionAssetRow', () => {
     assert.equal(position.quantity, '10.000000');
   });
 
+  it("draws the market list's logo from the holding's own identity and shown name", () => {
+    const cases = [
+      [holding('btc', { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT' }), 'crypto', 'BINANCE', 'BTCUSDT'],
+      [holding('samsung'), 'domestic_stock', 'KRX', '005930'],
+      [holding('aapl', { assetType: 'us_stock', market: 'NAS', symbol: 'AAPL', name: 'Apple Inc.' }), 'us_stock', 'NAS', 'AAPL'],
+    ] as const;
+    for (const [position, assetType, market, symbol] of cases) {
+      const tree = Row({ position, testID: 'holding', onPress() {} });
+      const logo = find(tree, 'holding-logo');
+      assert.equal(logo !== undefined, true);
+      assert.deepEqual([logo.props.assetType, logo.props.market, logo.props.symbol], [assetType, market, symbol]);
+      // The name the row shows (a US listing's Korean name) marks a missing logo.
+      assert.equal(logo.props.name, find(tree, 'holding-name').props.children);
+    }
+  });
+
   for (const state of ['stale_cache', 'unavailable']) {
     it(`${state} preserves crypto quantity while preserving valuation semantics`, () => {
       const position = holding('btc', { assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', quantity: '0.00080500' });

@@ -1,4 +1,5 @@
 import {
+  BINANCE_REST_RECOVERY_RESERVE_WEIGHT,
   BinanceRestCoordinator,
   binanceUsedWeight,
   parseBinanceRetryAfter,
@@ -37,6 +38,37 @@ describe('Binance safe HTTP restriction metadata', () => {
     const calls = evalRedis.mock.calls as unknown[][];
     const args = calls[0][2] as string[];
     expect(args[1]).toBe(String(weight));
+  });
+
+  it('admits a request with a reserve only within budget − reserve (the Futures chart leaves Last/Mark recovery its weight)', async () => {
+    const original = process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
+    process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = '1200';
+    try {
+      const evalRedis = jest.fn().mockResolvedValue([1, 0, 0]);
+      jest
+        .spyOn(global, 'fetch')
+        .mockImplementation(() =>
+          Promise.resolve(new Response('[]', { status: 200 })),
+        );
+      const http = new ProviderHttpClient({ eval: evalRedis } as never);
+      const url = 'https://fapi.binance.com/fapi/v1/klines?limit=2';
+      await http.getJson(url, {
+        provider: 'binance',
+        timeoutMs: 1000,
+        binanceReserveWeight: BINANCE_REST_RECOVERY_RESERVE_WEIGHT,
+      });
+      await http.getJson(url, { provider: 'binance', timeoutMs: 1000 });
+      // ACQUIRE's 4th argument is the minute ceiling the request is held to.
+      const ceilings = (evalRedis.mock.calls as unknown[][])
+        .filter(([script]) => String(script).includes("redis.call('ZADD'"))
+        .map((call) => (call[2] as string[])[3]);
+      expect(BINANCE_REST_RECOVERY_RESERVE_WEIGHT).toBe(240);
+      expect(ceilings).toEqual(['960', '1200']);
+    } finally {
+      if (original === undefined)
+        delete process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE;
+      else process.env.BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE = original;
+    }
   });
 
   it.each([

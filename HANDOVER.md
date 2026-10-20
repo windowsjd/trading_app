@@ -1,5 +1,14 @@
 # 프로젝트 인수인계서
 
+## 2026-10-20 — Binance 선물 차트 호출 안전성·일반계정 초기화 손익 검증·종목검색 시트·로고 통일 (미커밋, 운영 미배포)
+
+- 기준 `824060a8`(origin/main 동일). Render 환경변수 조회·변경·배포 없음. 근거·수치: [보고서](docs/investigations/2026-10-20-chart-safety-reset-pnl-search-logo/report.md).
+- **A 차트 호출 안전성:** 운영 상한 120으로 병합·분당 제한(슬라이딩 60초, 초과 즉시 거절·재시도 없음)·10/20/30 시리즈·대기 응답(2초 stale/8초 503) 이상 없음(`market-candle-futures-provider.safety.spec.ts`). **실제 문제 1건:** 현물 캔들 수집(600)과 차트 콜드 버스트(상한 120×가중치 5)가 같은 1분이면 공유 예산 1200이 소진되어 Futures Last/Mark REST 복구가 15~18초 거절됨(실제 조정기+Redis 측정). **수정:** 차트 호출만 `budget − 240`(Last 40 + Mark 200 1분치, `BINANCE_REST_RECOVERY_RESERVE_WEIGHT`)까지 허용 — 기존 ACQUIRE 예산 인자로 전달, Lua·기본값 60·운영값 120·예산 1200 불변. 수정 후 같은 상황 거절 0, 최장 간격 3.5~3.7초. 측정 fixture `binance-rest-chart-coexistence.integration.spec.ts`(opt-in, CI 미포함, 약 6분). 이 호스트의 시계 역행 때문에 분 합계는 Redis 카운터로 판정.
+- **B 초기화 손익:** 코드 변경 없음. 리셋 통합 스크립트에 "초기화 뒤 같은 종목 재매매(손실) → 같은 포지션 행에 새 기간 실현손익만, 2차 초기화 행에 그것만, 과거 주문·원장·선물 실현손익 불변" 단언 추가, 로컬 PG16 통과.
+- **C 종목검색 시트:** 종목 상세 이름 ▼ → 주문 화면의 `OrderAssetSheet`를 그 자리에서 열고 선택 시 `setParams({assetId})`(선물 상세와 같은 방식). 마켓 탭 `종목 검색` 화면은 유지.
+- **D 로고:** `AssetLogo`를 `PositionAssetRow`(홈·지갑·포트폴리오·주문 다른 보유·친구 요약), `FuturesPositionRow`, 홈 HOT 행에 추가. 레이아웃 가드 불변.
+- **다음:** 다음 배포 때 백엔드가 먼저(824060a8의 마이그레이션·차트 공급자 포함). 배포 뒤 상한 120이 실제로 적용됐는지 확인 필요(부팅 시 1회 읽고 검증, 별도 로그 없음). 실기기 화면 확인 미실행.
+
 ## 2026-10-20 — 선물 상세 통일·선물 차트 5분~1일·일반계정 광고 보상/초기화 (프런트+백엔드, 운영 미배포)
 
 - 기준 HEAD/origin/main `256aee0d`(직전 UI·UX 14건). 그 커밋의 CI(run 39303008975/39303009131): Core account PG(`krx-session-close-recovery` 1건), Backend quality(Candle-layer lint `scripts/lib/auth-email-fixture.ts:22` require-await 1건 — 이 단계에서 멈춰 이후 format·account lint·typecheck·build·unit·진단 게이트가 CI에서 돌지 않음), Limit order PG(`spot-wallet-transfer` 1건), Futures 25 fixture 실패 — 모두 이번 변경 전부터. 그래서 멈춘 단계들을 로컬에서 전부 돌렸다(아래 검증).

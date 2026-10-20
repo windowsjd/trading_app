@@ -65,6 +65,27 @@ describe('BinanceCandleIngestionService', () => {
     expect(page.acceptedRows).toBe(1);
   });
 
+  it("passes a read's minute reserve to the transport, and nothing for reads without one", async () => {
+    const { service, fetchKlines } = createService([
+      [kline(MONDAY, DAY)],
+      [kline(MONDAY, DAY)],
+    ]);
+    const input = {
+      symbol: 'BTCUSDT',
+      interval: '1d' as const,
+      from: new Date(MONDAY),
+      to: new Date(MONDAY + DAY),
+      now: new Date(MONDAY + 2 * DAY),
+    };
+    await service.fetchKlinesPage({ ...input, reserveWeight: 240 });
+    await service.fetchKlinesPage(input);
+    const [first, second] = fetchKlines.mock.calls.map(
+      ([call]) => call as Record<string, unknown>,
+    );
+    expect(first.reserveWeight).toBe(240);
+    expect('reserveWeight' in second).toBe(false);
+  });
+
   it('pages forward with startTime and a 1000-row boundary, deduplicating openTimes', async () => {
     const from = MONDAY;
     const firstPage = Array.from({ length: 1000 }, (_, index) =>

@@ -76,6 +76,7 @@ export class BinanceCandleIngestionService {
       limit,
       startTime,
       endTime: toMs - 1,
+      ...(input.reserveWeight ? { reserveWeight: input.reserveWeight } : {}),
     });
     if (!Array.isArray(fetched.response)) {
       return emptyResult('malformed_response', false);

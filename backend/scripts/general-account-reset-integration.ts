@@ -216,6 +216,21 @@ async function rowCounts(accountId: string) {
   return { claims, resetRows, ledger, snapshots };
 }
 
+/** Every order and ledger row of the account as written, for "kept as it was". */
+async function pastHistory(accountId: string) {
+  const [orderRows, ledgerRows] = await Promise.all([
+    db.order.findMany({
+      where: { tradingAccountId: accountId },
+      orderBy: { id: 'asc' },
+    }),
+    db.walletTransaction.findMany({
+      where: { tradingAccountId: accountId },
+      orderBy: { id: 'asc' },
+    }),
+  ]);
+  return JSON.stringify({ orderRows, ledgerRows });
+}
+
 async function summary(userId: string, accountId: string) {
   const read = await portfolio.getPortfolio(userId, accountId);
   assert.ok(read.data.summary, 'portfolio summary is available');
@@ -691,6 +706,7 @@ async function run() {
   const ledgerBefore = await db.walletTransaction.count({
     where: { tradingAccountId: accountB },
   });
+  const historyBeforeReset = await pastHistory(accountB);
   const resetB = await resets.reset(ownerB, accountB, {
     provider: PROVIDER,
     proof: 'evt-b-reset-1',
@@ -720,10 +736,28 @@ async function run() {
   const rebased = resetRowB.positionsRebasedJson as Array<{
     positionId: string;
     realizedPnl: string;
+    realizedPnlKrw: string;
   }>;
   assert.deepEqual(
-    rebased.map((p) => [p.positionId, p.realizedPnl]),
-    [[closedPosition.id, closedPosition.realizedPnl.toFixed(8)]],
+    rebased.map((p) => [p.positionId, p.realizedPnl, p.realizedPnlKrw]),
+    [
+      [
+        closedPosition.id,
+        closedPosition.realizedPnl.toFixed(8),
+        closedPosition.realizedPnlKrw.toFixed(8),
+      ],
+    ],
+  );
+  // The ended epoch's realized PnL, as the portfolio showed it just before
+  // the reset, is exactly what the reset row keeps.
+  assert.equal(
+    money(
+      rebased.reduce(
+        (sum, p) => sum.add(p.realizedPnlKrw),
+        new Prisma.Decimal(0),
+      ),
+    ),
+    before.realizedPnlKrw,
   );
 
   const afterReset = await wallets(accountB);
@@ -848,6 +882,68 @@ async function run() {
     daily.data.points.at(-1)?.cumulativeExternalFundingKrw,
     money('15000000'),
   );
+  // Realized PnL across the reset: a round trip on the SAME asset reuses the
+  // position row the reset re-based, so the row carries this epoch's result
+  // only — a loss here, while the ended epoch's gain stays on the reset row.
+  await freshRate();
+  w = await wallets(accountB);
+  await transfer(ownerB, accountB, w.usd.id, w.spot.id, '300');
+  await price(asset, '120');
+  await marketOrder(ownerB, accountB, asset, 'buy', '240');
+  const reopened = await db.position.findUniqueOrThrow({
+    where: { id: closedPosition.id },
+  });
+  assert.equal(reopened.quantity.gt(0), true, 'the same row holds again');
+  assert.equal(reopened.realizedPnl.toFixed(8), '0.00000000');
+  assert.equal(reopened.realizedPnlKrw.toFixed(8), '0.00000000');
+  await price(asset, '100');
+  await marketOrder(
+    ownerB,
+    accountB,
+    asset,
+    'sell',
+    reopened.quantity.toFixed(8),
+  );
+  const epochSell = await db.order.findFirstOrThrow({
+    where: {
+      tradingAccountId: accountB,
+      assetId: asset,
+      side: 'sell',
+      status: 'executed',
+      submittedAt: { gt: new Date(resetB.data.resetAt) },
+    },
+  });
+  const epochRate = await db.fxRateSnapshot.findUniqueOrThrow({
+    where: { id: epochSell.fxRateSnapshotId! },
+  });
+  const halfUp = (value: Prisma.Decimal) =>
+    value.toDecimalPlaces(8, Prisma.Decimal.ROUND_HALF_UP);
+  const epochRealized = halfUp(
+    epochSell.netAmount!.sub(
+      halfUp(reopened.averageCost.mul(reopened.quantity)),
+    ),
+  );
+  const epochRealizedKrw = halfUp(epochRealized.mul(epochRate.rate));
+  const reclosed = await db.position.findUniqueOrThrow({
+    where: { id: closedPosition.id },
+  });
+  assert.equal(reclosed.quantity.isZero(), true);
+  assert.equal(epochRealized.lt(0), true, 'a losing round trip');
+  assert.equal(closedPosition.realizedPnl.gt(0), true, 'after a winning one');
+  assert.equal(reclosed.realizedPnl.toFixed(8), money(epochRealized));
+  assert.equal(reclosed.realizedPnlKrw.toFixed(8), money(epochRealizedKrw));
+  const traded2 = await summary(ownerB, accountB);
+  assert.equal(traded2.realizedPnlKrw, money(epochRealizedKrw));
+  assert.equal(traded2.performanceEpoch.sequence, 1);
+  // The ended epoch's record is untouched by the new epoch's trading.
+  assert.deepEqual(
+    (
+      await db.generalAccountReset.findUniqueOrThrow({
+        where: { id: resetRowB.id },
+      })
+    ).positionsRebasedJson,
+    resetRowB.positionsRebasedJson,
+  );
   // A second reset from a balance BELOW the target (credit) opens epoch 2.
   await exchange(ownerB, accountB, '5000000');
   w = await wallets(accountB);
@@ -857,6 +953,7 @@ async function run() {
     'balance below target',
   );
   await transfer(ownerB, accountB, w.usd.id, w.spot.id, '100');
+  const beforeSecond = await summary(ownerB, accountB);
   const second = await resets.reset(ownerB, accountB, {
     provider: PROVIDER,
     proof: 'evt-b-reset-2',
@@ -886,6 +983,73 @@ async function run() {
   assert.equal(afterSecond.totalAssetKrw, TEN_MILLION);
   assert.equal(afterSecond.returnRate, '0.00000000');
   assert.equal(afterSecond.performanceEpoch.sequence, 2);
+  // The second reset closes epoch 1 alone: its row keeps epoch 1's realized
+  // PnL (never epoch 0's again) and epoch 1's closing figures as the
+  // portfolio showed them; epoch 2 starts at 0.
+  assert.deepEqual(
+    (
+      secondRow.positionsRebasedJson as Array<{
+        positionId: string;
+        realizedPnl: string;
+        realizedPnlKrw: string;
+      }>
+    ).map((p) => [p.positionId, p.realizedPnl, p.realizedPnlKrw]),
+    [[closedPosition.id, money(epochRealized), money(epochRealizedKrw)]],
+  );
+  assert.equal(
+    secondRow.closingTotalAssetKrw.toFixed(8),
+    beforeSecond.totalAssetKrw,
+  );
+  assert.equal(
+    secondRow.closingExternalFundingKrw.toFixed(8),
+    beforeSecond.cumulativeExternalFundingKrw,
+  );
+  assert.equal(
+    secondRow.closingInvestmentPnlKrw.toFixed(8),
+    beforeSecond.investmentPnlKrw,
+  );
+  assert.equal(afterSecond.realizedPnlKrw, '0.00000000');
+  assert.equal(
+    (
+      await db.position.findUniqueOrThrow({ where: { id: closedPosition.id } })
+    ).realizedPnl.toFixed(8),
+    '0.00000000',
+  );
+  // Past results are kept as written: the first reset's record, the closed
+  // Futures lifetime, and every order and ledger row from before the first
+  // reset (compared as text, row by row, by id).
+  assert.deepEqual(
+    (
+      await db.generalAccountReset.findUniqueOrThrow({
+        where: { id: resetRowB.id },
+      })
+    ).positionsRebasedJson,
+    resetRowB.positionsRebasedJson,
+  );
+  assert.equal(
+    (
+      await db.futuresPosition.findUniqueOrThrow({
+        where: { id: futuresPosition.id },
+      })
+    ).realizedPnl.toFixed(8),
+    money('7'),
+  );
+  const historyThen = JSON.parse(historyBeforeReset) as {
+    orderRows: Array<{ id: string }>;
+    ledgerRows: Array<{ id: string }>;
+  };
+  const historyNow = JSON.parse(
+    await pastHistory(accountB),
+  ) as typeof historyThen;
+  for (const table of ['orderRows', 'ledgerRows'] as const) {
+    const then = new Set(historyThen[table].map((row) => row.id));
+    const kept = historyNow[table].filter((row) => then.has(row.id));
+    assert.equal(
+      JSON.stringify(kept) === JSON.stringify(historyThen[table]),
+      true,
+      `pre-reset ${table} are unchanged`,
+    );
+  }
 
   // ================================================================ 3
   // Ownership, mode, status, feature switch, registry, verification, purpose.
@@ -1094,7 +1258,7 @@ async function run() {
   );
 
   console.log(
-    'general account reset DB integration passed: fresh/used/repeated resets, blockers, rollback, ledger and epoch, history, purposes, idempotency, refusals, concurrency, daily job, audit',
+    'general account reset DB integration passed: fresh/used/repeated resets, blockers, rollback, ledger and epoch, history, realized PnL across epochs, purposes, idempotency, refusals, concurrency, daily job, audit',
   );
 }
 

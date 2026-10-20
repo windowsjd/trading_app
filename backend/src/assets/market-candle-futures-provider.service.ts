@@ -3,6 +3,7 @@ import { createApiError } from '../common/api-error';
 import type { BinanceCandleIngestionService } from '../providers/binance/binance-candle.ingestion.service';
 import type { CanonicalBinanceCandle } from '../providers/binance/binance-candle.types';
 import { BINANCE_USDM_CANDLE_INGESTION } from '../providers/binance/binance-kline-usdm.client';
+import { BINANCE_REST_RECOVERY_RESERVE_WEIGHT } from '../providers/binance/binance-rest-coordinator';
 import { ProviderHttpError } from '../providers/provider.types';
 import {
   FUTURES_CHART_WINDOWS,
@@ -32,7 +33,10 @@ import {
  *    is cached, and once when the cached copy has a missing bucket;
  *  - provider calls are capped per minute per process
  *    (FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE), on top of the shared
- *    Binance REST coordinator's weight budget and 418/429 cooldown;
+ *    Binance REST coordinator's weight budget and 418/429 cooldown; a chart
+ *    call is admitted only while the minute keeps
+ *    BINANCE_REST_RECOVERY_RESERVE_WEIGHT unspent, so however many charts
+ *    are read, Futures Last/Mark recovery still finds that much budget;
  *  - a failed key is not retried for a while; a 418/429 pauses every
  *    on-demand read (≥ 30 s or Retry-After), and the coordinator's own refusal
  *    (its shared minute budget spent, a recovery probe running) pauses them
@@ -266,6 +270,8 @@ export class FuturesCandleProviderService {
         to: new Date(bounds.toMs),
         now,
         limit: tailStart === null ? bounds.rows : tailRows,
+        // Never the minute's last weight: Futures Last/Mark recovery keeps it.
+        reserveWeight: BINANCE_REST_RECOVERY_RESERVE_WEIGHT,
       });
       if (
         page.stopReason === 'malformed_response' ||

@@ -6,7 +6,7 @@ import QuestTarget from '../../features/quest/QuestTarget';
 import { questGuideTarget } from '../../features/quest/questGuideBridge';
 import { useTradingGuideFacts } from '../../features/quest/useTradingGuideFacts';
 import { semantic } from '../../theme/tokens';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from '../../theme/native';
 import { SafeAreaView, useSafeAreaInsets } from '../../theme/safeArea';
 import type { AssetDetailScreenProps } from '../../app/navigation/types';
@@ -16,17 +16,38 @@ import { TEST_IDS } from '../../constants/testIds';
 import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import { AssetMarketChart } from './AssetChartScreen';
+import OrderAssetSheet from '../order/OrderAssetSheet';
 import { useIsFocused } from '@react-navigation/native';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
-  // Recreate the chart subscription and timeframe state when the pair changes.
-  return <AssetDetailContent key={props.route.params.assetId} {...props} />;
+  const { assetId } = props.route.params;
+  const focused = useIsFocused();
+  // The order screen's own asset sheet (domestic, US and crypto spot), as the
+  // futures detail reuses its contract picker: another asset is picked over
+  // this screen and the detail is rebuilt for it in place.
+  const [assetSheetOpen, setAssetSheetOpen] = useState(false);
+  // The sheet never stays over another screen.
+  useEffect(() => {
+    if (!focused) setAssetSheetOpen(false);
+  }, [focused]);
+  const selectAsset = (nextAssetId: string) => {
+    setAssetSheetOpen(false);
+    if (nextAssetId !== assetId) props.navigation.setParams({ assetId: nextAssetId });
+  };
+  return (
+    <>
+      {/* Recreate the chart subscription and timeframe state when the pair changes. */}
+      <AssetDetailContent key={assetId} {...props} onOpenAssetSheet={() => setAssetSheetOpen(true)} />
+      <OrderAssetSheet visible={assetSheetOpen && focused} onClose={() => setAssetSheetOpen(false)} onSelect={selectAsset} />
+    </>
+  );
 }
 
 export function AssetDetailContent({
   route,
   navigation,
-}: AssetDetailScreenProps) {
+  onOpenAssetSheet,
+}: AssetDetailScreenProps & { onOpenAssetSheet?: () => void }) {
   const { assetId } = route.params;
   const focused = useIsFocused();
   const { selectedAccountId, selectedAccount, isLoading } = useTradingAccount();
@@ -57,9 +78,7 @@ export function AssetDetailContent({
         <AssetMarketChart
           assetId={assetId}
           variant="detail"
-          onChangePair={() =>
-            navigation.navigate('MarketSearch', { returnToAsset: true })
-          }
+          onChangePair={onOpenAssetSheet}
           // Holdings, TP/SL and limit review live under the order screen (one place).
           footerContent={!isLoading && !accountId ? (
             <InlineEmptyState title="계정이 없습니다." message="계정을 개설하면 주문할 수 있습니다." />

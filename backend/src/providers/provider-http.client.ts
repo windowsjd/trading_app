@@ -18,6 +18,8 @@ export type ProviderHttpGetJsonOptions = {
   timeoutMs: number;
   secrets?: readonly string[];
   headers?: Record<string, string>;
+  /** Binance only: weight of the minute left to others (BinanceRestCoordinator.acquire). */
+  binanceReserveWeight?: number;
 };
 
 @Injectable()
@@ -44,7 +46,11 @@ export class ProviderHttpClient implements OnModuleDestroy {
       options.provider === 'binance'
         ? (this.binanceRest ??= new BinanceRestCoordinator(this.redis))
         : undefined;
-    const token = await coordinator?.acquire(url, options.timeoutMs);
+    const token = await coordinator?.acquire(
+      url,
+      options.timeoutMs,
+      options.binanceReserveWeight,
+    );
     let outcome: 'success' | 'failure' | 'limited' = 'failure';
     let retryAfterMs = 0;
     let status = 0;

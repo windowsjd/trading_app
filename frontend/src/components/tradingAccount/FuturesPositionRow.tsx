@@ -6,6 +6,7 @@ import { BUY_COLOR, SELL_COLOR } from '../../features/order/sideColors';
 import type { FuturesHolding } from '../../features/futures/api';
 import { getFuturesPositionDisplay } from '../../features/futures/positionDisplay';
 import ActionPressable from '../common/ActionPressable';
+import AssetLogo from '../../features/market/AssetLogo';
 
 type Props = { position: FuturesHolding; evaluatedAt: string; now: number; testID?: string; onPress?: () => void };
 export default function FuturesPositionRow({ position, evaluatedAt, now, testID, onPress }: Props) {
@@ -14,12 +15,16 @@ export default function FuturesPositionRow({ position, evaluatedAt, now, testID,
   const stacked = width / fontScale < 300;
   const content = <>
     <View style={[styles.columns, stacked && styles.stacked]}>
-      <View style={styles.identity}>
-        <View style={styles.heading}>
-          <Text testID={`${testID}-direction`} style={[styles.direction, { color: position.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>{display.direction}</Text>
-          <Text testID={`${testID}-name`} style={styles.name}>{display.name}</Text>
+      {/* The contract's underlying coin, as the market's futures list draws it. */}
+      <View style={styles.leading}>
+        <AssetLogo testID={`${testID}-logo`} assetType="crypto" market="BINANCE" symbol={position.symbol} name={display.name} />
+        <View style={styles.identity}>
+          <View style={styles.heading}>
+            <Text testID={`${testID}-direction`} style={[styles.direction, { color: position.direction === 'long' ? BUY_COLOR : SELL_COLOR }]}>{display.direction}</Text>
+            <Text testID={`${testID}-name`} style={styles.name}>{display.name}</Text>
+          </View>
+          <Text testID={`${testID}-margin`} style={styles.muted}>{display.margin}</Text>
         </View>
-        <Text testID={`${testID}-margin`} style={styles.muted}>{display.margin}</Text>
       </View>
       <View style={[styles.values, stacked && styles.stackedValues]}>
         <Text testID={`${testID}-notional`} accessibilityLabel={`포지션 규모 ${display.notional}`} style={styles.value}>{display.notional}</Text>
@@ -35,6 +40,7 @@ export default function FuturesPositionRow({ position, evaluatedAt, now, testID,
 const styles = StyleSheet.create({
   row: { minWidth: 0, paddingVertical: 8, gap: 4 },
   columns: { minWidth: 0, flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  leading: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 10 },
   identity: { flex: 1, minWidth: 0, gap: 3 },
   heading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', gap: 5 },
   direction: { fontSize: 12, lineHeight: 18, fontWeight: '700', flexShrink: 1 },

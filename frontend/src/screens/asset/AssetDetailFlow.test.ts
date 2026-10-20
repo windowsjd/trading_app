@@ -181,7 +181,8 @@ test('detail header keeps name, symbol, paired prices, change, chart and actions
   assert.equal(name.props.numberOfLines, undefined);
   assert.equal(h.node('asset-change-pair') === undefined, true);
   await h.press('asset-name-selector');
-  assert.deepEqual(h.navigation, [['MarketSearch', { returnToAsset: true }]]);
+  assert.equal(h.node('order-asset-sheet') !== undefined, true, 'the asset search opens as a sheet');
+  assert.deepEqual(h.navigation, [], 'no full-screen search route');
   assert.match(h.node('asset-detail-primary-price').props.children, /\$763\.79/);
   assert.equal(h.node('asset-detail-secondary-price').props.children, '1,054,259원');
   assert.match(h.node('asset-change-rate').props.children, /전일대비 \+0\.33%/);
@@ -190,6 +191,36 @@ test('detail header keeps name, symbol, paired prices, change, chart and actions
     ['asset-detail-primary-price', 'asset-change-rate'], ['asset-change-rate', 'CandlestickChart'],
     ['CandlestickChart', 'ChartTimeframeSelector'], ['ChartTimeframeSelector', 'asset-order-actions'],
   ]) assert.ok(screen.indexOf(before) < screen.indexOf(after), `${before} before ${after}`);
+});
+
+test('the name ▼ searches domestic, US and crypto spot in a sheet and swaps the detail in place', async (t) => {
+  const h = inlineTradingHarness();
+  await openDetail(h); t.after(h.close);
+  await h.press('asset-name-selector');
+  await h.flush();
+  assert.equal(h.node('order-asset-sheet') !== undefined, true);
+  assert.equal(h.node(TEST_IDS.assetDetail.screen) !== undefined, true, 'the detail stays behind the sheet');
+  // The order screen's search: every spot market, its scopes, live rows.
+  for (const scope of ['all', 'domestic_stock', 'us_stock', 'crypto']) {
+    assert.equal(h.node(`order-asset-scope-${scope}`) !== undefined, true, scope);
+  }
+  assert.equal(h.marketRequests.length, 1);
+  assert.equal(h.marketRequests[0].withPrice, true);
+  assert.equal(h.node(TEST_IDS.market.item('samsung')) !== undefined, true);
+  // Picking the current asset just closes the sheet.
+  await h.press(TEST_IDS.market.item('bnb'));
+  assert.equal(h.node('order-asset-sheet') === undefined, true);
+  assert.deepEqual(h.navigation, []);
+  // Another asset rebuilds this detail for it, without a new screen.
+  await h.press('asset-name-selector');
+  await h.flush();
+  await h.press(TEST_IDS.market.item('samsung'));
+  assert.deepEqual(h.navigation, [['setParams', { assetId: 'samsung' }]]);
+  await h.update();
+  assert.equal(h.node('order-asset-sheet') === undefined, true);
+  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 삼성전자/);
+  assert.equal(h.node('asset-detail-name').props.children, '삼성전자');
+  assert.equal(h.node('asset-currency-usd') === undefined, true, 'no USD pair carried over from BNB');
 });
 
 test('USD/KRW toggle swaps only the same display price pair', async (t) => {

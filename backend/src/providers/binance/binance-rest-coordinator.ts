@@ -13,6 +13,14 @@ export const BINANCE_REST_DEFAULT_WEIGHT_BUDGET = 600;
  * product per IP separately (Spot 6000, USDⓈ-M 2400 weight/min), so even a
  * budget spent entirely on one product stays at half of its own limit. */
 export const BINANCE_REST_MAX_WEIGHT_BUDGET = 1200;
+/**
+ * Weight of every minute the on-demand Futures chart leaves to Futures Last
+ * and Mark REST recovery (2026-10-20): one minute of Last re-confirmation
+ * (`/fapi/v2/ticker/price`, weight 2, at most every 3 s = 40) and of Mark
+ * recovery (`/fapi/v1/premiumIndex`, weight 10, at most every 3 s = 200).
+ * Chart traffic can then never be what refuses them.
+ */
+export const BINANCE_REST_RECOVERY_RESERVE_WEIGHT = 240;
 
 // All time and admission decisions are atomic and use the Redis server clock.
 const ACQUIRE = `
@@ -90,8 +98,18 @@ export class BinanceRestCoordinator {
     this.budget = budget;
   }
 
-  async acquire(url: string, timeoutMs: number): Promise<string> {
+  /**
+   * `reserveWeight` is weight of the minute this request must leave to
+   * others: it is admitted only while the shared minute weight stays within
+   * budget − reserveWeight (otherwise refused like a spent budget).
+   */
+  async acquire(
+    url: string,
+    timeoutMs: number,
+    reserveWeight = 0,
+  ): Promise<string> {
     const token = randomUUID();
+    const ceiling = Math.max(0, this.budget - Math.max(0, reserveWeight));
     const deadline = performance.now() + Math.min(1000, timeoutMs / 2);
     for (let attempt = 0; ; attempt++) {
       if (this.pendingRestriction) {
@@ -115,7 +133,7 @@ export class BinanceRestCoordinator {
             token,
             String(requestWeight(url)),
             String(timeoutMs + 5000),
-            String(this.budget),
+            String(ceiling),
             String(STATE_TTL_MS),
           ],
         );

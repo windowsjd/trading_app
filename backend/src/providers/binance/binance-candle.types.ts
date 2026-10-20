@@ -36,6 +36,8 @@ export type BinanceKlinesSource = {
     limit: number;
     startTime?: number;
     endTime?: number;
+    /** Weight of the minute this read leaves to others (Binance coordinator). */
+    reserveWeight?: number;
   }): Promise<{ response: unknown; receivedAt: Date }>;
 };
 
@@ -49,6 +51,8 @@ export type BinanceCandlePageInput = {
   cursor?: { startTime: number } | null;
   now?: Date;
   limit?: number;
+  /** Passed to the transport: weight of the minute left to others. */
+  reserveWeight?: number;
 };
 
 export type BinanceCandlePageStopReason =

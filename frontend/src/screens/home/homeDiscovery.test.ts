@@ -19,6 +19,7 @@ for (const mode of ['season', 'general']) {
     if (count) {
       assert.equal(h.rows()[0].props.testID, `home-position-item-${mode}-a0`);
       assert.equal(h.node(`home-position-item-${mode}-a0-value`).props.children, '$100');
+      assert.equal(h.node(`home-position-item-${mode}-a0-logo`) !== undefined, true, 'the market logo beside the holding');
     }
     if (count > 1) {
       let release; const gate = new Promise(resolve => { release = resolve; });
@@ -109,6 +110,10 @@ it('Crypto HOT renders the five rows verified by the backend writer-to-Assets co
   assert.deepEqual(h.hotRows().map(node => node.props.testID),
     ['ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'BTCUSDT'].map(id => `home-hot-item-${id}`));
   assert.equal(h.hotRows().length, 5);
+  // The market list's logo beside each name: here the bundled coin icon.
+  for (const id of ['ETHUSDT', 'ADAUSDT', 'XRPUSDT', 'SOLUSDT', 'BTCUSDT']) {
+    assert.equal(h.node(`home-hot-logo-${id}-image`) !== undefined, true, id);
+  }
   assert.ok(!h.renderer.root.findAllByType('InlineEmptyState').some(node => /거래대금/.test(node.props.message)));
   const query = h.client.getQueryCache().findAll().find(q => q.queryKey.includes('crypto'));
   assert.equal(query.state.data.sortSnapshot, 'snapshot-crypto');

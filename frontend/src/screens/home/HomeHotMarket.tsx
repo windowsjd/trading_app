@@ -7,6 +7,7 @@ import { getAssets, type AssetType } from '../../features/market/api';
 import { marketSortParams } from '../../features/market/marketSort';
 import { getMarketChangeDisplay, getMarketException } from '../../features/market/marketPresentation';
 import { getAssetNameDisplay, getAssetNameSubline, getAssetPriceText, getAssetSymbolMarketDisplay } from '../../utils/format';
+import AssetLogo from '../../features/market/AssetLogo';
 import ActionPressable from '../../components/common/ActionPressable';
 import SegmentedControl from '../../components/common/SegmentedControl';
 import AdminDiagnosticPanel from '../../components/states/AdminDiagnosticPanel';
@@ -77,9 +78,14 @@ export default function HomeHotMarket({ hot, onOpenAsset, onOpenMarket }: {
             onPress={() => onOpenAsset(item.id)}>
             <Text style={styles.rank}>{index + 1}</Text>
             <View style={styles.rowContent}>
-              <View style={styles.identity}>
-                <Text style={styles.name}>{name}</Text>
-                <Text style={styles.caption}>{caption}</Text>
+              {/* The market list's logo beside the same name. */}
+              <View style={styles.leading}>
+                <AssetLogo testID={`home-hot-logo-${item.id}`} assetType={item.assetType} market={item.market}
+                  symbol={item.symbol} name={name} />
+                <View style={styles.identity}>
+                  <Text style={styles.name}>{name}</Text>
+                  <Text style={styles.caption}>{caption}</Text>
+                </View>
               </View>
               <View style={styles.values}>
                 <Text style={styles.price}>{price}</Text>
@@ -107,7 +113,9 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, paddingVertical: 10, borderTopWidth: 1, borderTopColor: semantic.border, minHeight: 44 },
   rank: { fontSize: 14, lineHeight: 23, fontWeight: '700', color: semantic.secondary },
   rowContent: { flex: 1, minWidth: 0, flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' },
-  identity: { flexGrow: 1, flexShrink: 1, flexBasis: 100, minWidth: 0 },
+  // The logo's 40 + 10 beside the names' former 100 before the values wrap below.
+  leading: { flexDirection: 'row', alignItems: 'center', gap: 10, flexGrow: 1, flexShrink: 1, flexBasis: 150, minWidth: 0 },
+  identity: { flex: 1, minWidth: 0 },
   name: { fontSize: 15, lineHeight: 23, fontWeight: '600' },
   values: { flexGrow: 1, flexShrink: 1, minWidth: 0, maxWidth: '100%', alignItems: 'stretch' },
   price: { fontSize: 15, lineHeight: 23, fontWeight: '600', textAlign: 'right', fontVariant: ['tabular-nums'] },

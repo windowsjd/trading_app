@@ -38,6 +38,7 @@ export class BinanceUsdmKlineClient implements BinanceKlinesSource {
     limit: number;
     startTime?: number;
     endTime?: number;
+    reserveWeight?: number;
   }): Promise<{ response: unknown; receivedAt: Date }> {
     const url = new URL(BINANCE_USDM_KLINES_URL);
     url.searchParams.set('symbol', input.symbol.trim().toUpperCase());
@@ -52,6 +53,9 @@ export class BinanceUsdmKlineClient implements BinanceKlinesSource {
     const result = await this.httpClient.getJson<unknown>(url.toString(), {
       provider: 'binance',
       timeoutMs: USDM_KLINES_TIMEOUT_MS,
+      ...(input.reserveWeight
+        ? { binanceReserveWeight: input.reserveWeight }
+        : {}),
     });
     return { response: result.json, receivedAt: result.receivedAt };
   }

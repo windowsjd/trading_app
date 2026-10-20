@@ -73,10 +73,14 @@ for every listed contract, viewed or not.
   nothing usable is cached, and once when the cached copy has a missing bucket
   (a row the page parser refused); a bucket Binance itself never had is not
   re-read again.
-- At most `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` (default 60, 1..600)
-  provider calls per minute per process, on top of the shared Binance REST
-  coordinator (one weight budget, 418/429 cooldown, see
-  [binance-rest-limits.md](binance-rest-limits.md)). The app polls each viewed
+- At most `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` (default 60, 1..600;
+  production 120 since 2026-10-20) provider calls per minute per process, on
+  top of the shared Binance REST coordinator (one weight budget, 418/429
+  cooldown, see [binance-rest-limits.md](binance-rest-limits.md)). A chart
+  call is admitted only while the coordinator's minute keeps 240 weight
+  unspent (budget − 240 = 960 at 1200): that much of every minute stays for
+  Futures Last re-confirmation and Mark REST recovery, however many charts
+  are read; past it the chart pauses until the next minute. The app polls each viewed
   series at its freshness, so one continuously viewed 5m series costs ≈ 4
   calls a minute: beyond ≈ 15 such series per process the cap is reached and
   further series refresh less often (their charts show the stale note). Raise
@@ -95,7 +99,7 @@ for every listed contract, viewed or not.
 | provisional bucket | the bucket containing "now" is `provisional: true`; an open kline whose bucket has ended (a stale copy) is withheld, never shown as final |
 | provider failure, rate limit, cooldown, call cap, refresh queued > 2 s | the last good copy with `source.stale: true` and `source.fetchedAt`; the app notes "차트 갱신이 지연되고 있습니다." |
 | …and nothing cached yet (or queued > 8 s) | 503 `FUTURES_CANDLES_UNAVAILABLE`; the app shows the chart error with 다시 시도 |
-| retries after a failure | the key is not re-read for 15 s (3 s when the coordinator's slots were busy); a 418/429 from Binance (or the coordinator's cooldown after one) pauses every on-demand read for at least 30 s (or Retry-After); the coordinator's own refusal (its shared minute budget spent, a recovery probe running) pauses them only until it admits again (1–60 s) |
+| retries after a failure | the key is not re-read for 15 s (3 s when the coordinator's slots were busy); a 418/429 from Binance (or the coordinator's cooldown after one) pauses every on-demand read for at least 30 s (or Retry-After); the coordinator's own refusal (its shared minute budget spent or down to the 240 kept for Last/Mark recovery, a recovery probe running) pauses them only until it admits again (1–60 s) |
 
 Missing candles are never generated, interpolated, or borrowed from another
 series or interval.
@@ -114,7 +118,7 @@ needed for this change.
 | --- | --- |
 | a viewer on one contract and interval | ≈ 1 call per freshness window, weight 1 (tail) |
 | first view of a series in a process | 1 call, weight 2 (≤ 499 rows) or 5 (577–673 rows) |
-| every listed contract × interval viewed at once (worst case) | capped at 60 calls/min/process by default (≈ 60–300 weight), the rest served stale |
+| every listed contract × interval viewed at once (worst case) | capped at 60 calls/min/process by default (≈ 60–300 weight; 120 → ≈ 120–600), never past budget − 240, the rest served stale |
 | nobody viewing | 0 — nothing is collected in the background |
 
 Existing collection is untouched: the 4h upkeep stays ≈ 100 weight per run.

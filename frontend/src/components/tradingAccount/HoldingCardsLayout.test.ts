@@ -42,6 +42,10 @@ for (const platform of ['android', 'ios']) for (const mode of ['light', 'dark'])
         assert.equal(text.props.adjustsFontSizeToFit === true, false);
       }
       assert.equal(renderer.root.findAllByType('Pressable').length, 0, 'read-only portfolios expose no trading or navigation control');
+      // Both kinds of holding draw the market list's coin logo beside the name.
+      for (const id of ['spot-logo-image', 'future-logo-image']) {
+        assert.equal(renderer.root.findAll(n => typeof n.type === 'string' && n.props.testID === id).length, 1, id);
+      }
       assert.equal(flatten(node('future-direction').props.style).color, financial.buyAction);
       assert.equal(flatten(node('future-performance').props.style).color, financial.fall);
       for (const preference of ['red_blue', 'green_red']) {

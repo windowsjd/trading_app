@@ -46,6 +46,13 @@ Long-range 4h upkeep (2026-10-13) uses Spot `/api/v3/klines` interval `4h`
 backfill pages = 2, upkeep `limit<100` = 1), strictly sequentially with
 ≥ 150 ms between its own calls so Futures Last/Mark recovery keeps a slot
 ([long-range-4h-candles.md](long-range-4h-candles.md)).
+Recovery reserve (2026-10-20): an on-demand Futures chart read
+(`FuturesCandleProviderService`) is admitted only while the shared minute
+weight stays within budget − 240 (`BINANCE_REST_RECOVERY_RESERVE_WEIGHT`: one
+minute of Futures Last re-confirmation, 20 × 2, and of Mark REST recovery,
+20 × 10). Otherwise it is refused like a spent budget and every chart read
+pauses until the next minute. Chart traffic therefore never spends what
+Last/Mark recovery needs; other callers keep the full budget as before.
 This conservative budget is preventive, not a declaration of Binance's actual
 IP capacity. `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE` can set 20..1200 (unset =
 600; 2026-10-14 production target 1200, set explicitly); it must be
@@ -78,7 +85,7 @@ one ingesting process, live candles/ticker on WebSocket:
 | Crypto reconciliation (300 s, 1/asset; first run of a UTC day 2, of a week 9) | 200 (400 daily, 1800 weekly) | 40 | 200; weekly ≈ 400–600 for a few minutes |
 | Spot 4h upkeep (after each 4h close, 1/asset × 2) | 200 | ≈ 1 | 200 |
 | USDⓈ-M 4h upkeep (≈ 60–120 s, 1/contract, limit < 100 = 1) | 100 | 50–100 | 100 |
-| Futures chart 5m/15m/30m/1h/1d on demand (2026-10-20; only viewed series, one call at a time ≥ 150 ms apart, ≤ `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` = 60 calls/min/process) | 1 (tail) – 5 (cold window) | 0 when nobody views; ≈ 1 per viewed series per 15–120 s | ≤ 60–300 (all cold windows; tails ≤ 60) |
+| Futures chart 5m/15m/30m/1h/1d on demand (2026-10-20; only viewed series, one call at a time ≥ 150 ms apart, ≤ `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` calls/min/process — default 60, production 120 — and never past budget − 240) | 1 (tail) – 5 (cold window) | 0 when nobody views; ≈ 1 per viewed series per 15–120 s | ≤ 60–300 at 60, ≤ 120–600 at 120 (all cold windows; tails ≤ the cap) |
 | Futures Last re-confirmation (`/fapi/v2/ticker/price`, ≤ every 3 s) | 2 | 35–40 | 40 |
 | Futures Mark recovery (`premiumIndex`, only when Mark WS degrades) | 10 | 0 | 200 |
 | exchangeInfo (Spot 6 h, Futures 5 min) | 21 | < 1 | 21 |
@@ -91,6 +98,16 @@ degraded) ≈ 1340–1540, which still exceeds 1200: the excess is refused
 (`PROVIDER_RATE_LIMITED`) and the existing sync runs defer it, without retries
 or extra concurrency. The on-demand chart reads hold at most one of the two
 slots (one call at a time), and a refusal only marks the chart stale.
+
+Measured 2026-10-20 (`src/providers/binance/binance-rest-chart-coexistence.integration.spec.ts`,
+real coordinator on a local Redis, Binance mocked, budget 1200, chart cap 120):
+a cold burst of 150 chart series plus a Spot sync run (600) in one minute
+spent the whole 1200 before the reserve, and Futures Last/Mark REST recovery
+was refused for budget for 15–18 s until the minute rolled over (Mark's
+maximum age is 5 s). With the reserve the chart stops at 960 and recovery is
+never refused for budget. Slot contention (`BINANCE_REST_BUSY`) during a Spot
+sync run is unchanged and comes from the sync's two-asset fan-out, with or
+without charts.
 
 - At 600, one Spot sync run for 100 assets (600) can exhaust a whole minute,
   and Futures Last/Mark REST recovery is then refused until the minute rolls

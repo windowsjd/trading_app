@@ -5,6 +5,7 @@ import ActionPressable from '../common/ActionPressable';
 import { semantic } from '../../theme/tokens';
 import { financial } from '../../theme/financialColors';
 import { getPositionAssetDisplay, type SpotHoldingDisplay } from '../../features/position/assetDisplay';
+import AssetLogo from '../../features/market/AssetLogo';
 
 type Props = { position: SpotHoldingDisplay; onPress?: () => void; testID?: string; style?: StyleProp<ViewStyle>; accessibilityHint?: string };
 
@@ -14,12 +15,17 @@ export default function PositionAssetRow({ position, onPress, testID, style, acc
   const stacked = width / fontScale < 300;
   const content = <>
     <View style={[styles.columns, stacked && styles.stacked]}>
-      <View style={styles.identity}>
-        <Text testID={testID ? `${testID}-name` : undefined} style={styles.name}>{display.name}</Text>
-        {display.englishName ? (
-          <Text testID={testID ? `${testID}-english-name` : undefined} style={styles.quantity}>{display.englishName}</Text>
-        ) : null}
-        <Text testID={testID ? `${testID}-quantity` : undefined} style={styles.quantity}>{display.quantity}</Text>
+      {/* The market list's logo, beside the same name it shows. */}
+      <View style={styles.leading}>
+        <AssetLogo testID={testID ? `${testID}-logo` : undefined} assetType={position.assetType} market={position.market}
+          symbol={position.symbol} name={display.name} />
+        <View style={styles.identity}>
+          <Text testID={testID ? `${testID}-name` : undefined} style={styles.name}>{display.name}</Text>
+          {display.englishName ? (
+            <Text testID={testID ? `${testID}-english-name` : undefined} style={styles.quantity}>{display.englishName}</Text>
+          ) : null}
+          <Text testID={testID ? `${testID}-quantity` : undefined} style={styles.quantity}>{display.quantity}</Text>
+        </View>
       </View>
       <View testID={testID ? `${testID}-values` : undefined} style={[styles.values, stacked && styles.stackedValues]}>
         <Text testID={testID ? `${testID}-value` : undefined} style={styles.value}>{display.value}</Text>
@@ -47,6 +53,7 @@ const directionStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   row: { minWidth: 0, paddingVertical: 6, gap: 4 },
   columns: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, minWidth: 0 },
+  leading: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
   identity: { flex: 1, minWidth: 0, gap: 2 },
   name: { minWidth: 0, fontSize: 18, lineHeight: 27, fontWeight: '700' },
   quantity: { minWidth: 0, fontSize: 12, lineHeight: 18, color: semantic.secondary },

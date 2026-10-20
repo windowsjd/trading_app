@@ -38,6 +38,22 @@ describe('BinanceUsdmKlineClient', () => {
     expect(parsed.searchParams.get('interval')).toBe('4h');
     expect(parsed.searchParams.get('limit')).toBe('499');
     expect(options).toEqual({ provider: 'binance', timeoutMs: 5000 });
+    // A read that must leave weight to others (the on-demand chart) says so.
+    await client.fetchKlines({
+      symbol: 'BTCUSDT',
+      interval: '5m',
+      limit: 2,
+      reserveWeight: 240,
+    });
+    const [, reserved] = http.getJson.mock.calls[1] as unknown as [
+      string,
+      Record<string, unknown>,
+    ];
+    expect(reserved).toEqual({
+      provider: 'binance',
+      timeoutMs: 5000,
+      binanceReserveWeight: 240,
+    });
   });
 
   it('feeds the strict page parser, keeping the open contract bucket provisional', async () => {
