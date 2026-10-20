@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createRewardedTestRun, type RewardedTestSdk, type RewardedTestState, type TestAdEvent } from './rewardedTest.ts';
 import { GOOGLE_TEST_REWARDED_UNITS } from './rewardedTestConfig.ts';
+import { RewardedTestFailure } from './rewardedTestDiagnostics.ts';
 
 function fixture() {
   const states: RewardedTestState[] = [];
@@ -144,4 +145,69 @@ test('required privacy choices discard a prepared ad and require a fresh manual 
   await run.privacyOptions();
   assert.equal(h.privacy, 1); assert.equal(h.ads[0].disposals, 1); assert.equal(phase(), 'idle');
   await run.show(); assert.equal(h.ads[0].shows, 0);
+});
+
+test('diagnostics preserve preparation stages, creation failures and manual recovery; no detail without opt-in', async () => {
+  for (const diagnosticsEnabled of [true, false]) {
+    for (const stage of ['native-module', 'ump-consent', 'ump-eligibility', 'request-configuration', 'mobile-ads-initialization', 'ad-creation'] as const) {
+      const { h, sdk } = fixture();
+      let failing = true;
+      const error = new RewardedTestFailure(stage, { code: 'consent-update-failed', message: 'Publisher misconfiguration token=SECRET' });
+      const create = sdk.create;
+      if (stage === 'ad-creation') sdk.create = (unit) => { if (failing) throw error; return create(unit); };
+      else if (stage !== 'native-module') sdk.prepare = () => failing ? Promise.reject(error) : Promise.resolve({ privacyOptionsRequired: false });
+      const run = createRewardedTestRun({ unitId: GOOGLE_TEST_REWARDED_UNITS.android, diagnosticsEnabled,
+        loadSdk: () => stage === 'native-module' && failing ? Promise.reject(error) : Promise.resolve(sdk),
+        isCurrent: () => h.current, onState: (state) => h.states.push(state) });
+      try {
+        await run.load();
+        const failed = h.states.at(-1)!;
+        assert.equal(failed.phase, 'sdk-error');
+        assert.equal(failed.diagnostic?.stage, diagnosticsEnabled ? stage : undefined);
+        assert.equal(failed.diagnostic?.code, diagnosticsEnabled ? 'consent-update-failed' : undefined);
+        assert.doesNotMatch(JSON.stringify(failed), /SECRET/); assert.equal(h.ads.length, 0);
+        failing = false;
+        await run.load(); assert.equal(h.states.at(-1)?.phase, 'loading');
+        assert.equal(h.states.at(-1)?.diagnostic === undefined, true);
+        h.ads[0].emit('loaded'); await run.show(); h.ads[0].emit('opened'); h.ads[0].emit('earned'); h.ads[0].emit('closed');
+        assert.equal(h.states.at(-1)?.phase, 'closed');
+      } finally { run.dispose(); }
+    }
+  }
+});
+
+test('preparation timeout is distinct, late resolution cannot request an ad, and a manual retry succeeds', async () => {
+  const { h, sdk } = fixture();
+  let resolve!: (sdk: RewardedTestSdk) => void;
+  const pending = new Promise<RewardedTestSdk>((answer) => { resolve = answer; });
+  let attempts = 0;
+  const run = createRewardedTestRun({ unitId: GOOGLE_TEST_REWARDED_UNITS.android, diagnosticsEnabled: true,
+    timeoutMs: 10, loadSdk: () => ++attempts === 1 ? pending : Promise.resolve(sdk),
+    isCurrent: () => h.current, onState: (state) => h.states.push(state) });
+  try {
+    const loading = run.load();
+    await new Promise((answer) => setTimeout(answer, 30));
+    assert.equal(h.states.at(-1)?.phase, 'sdk-error');
+    assert.equal(h.states.at(-1)?.diagnostic?.stage, 'sdk-timeout');
+    assert.equal(h.states.at(-1)?.diagnostic?.code, 'DIAG_TIMEOUT');
+    assert.equal(h.states.at(-1)?.diagnostic?.codeSource, 'internal');
+    resolve(sdk); await loading; assert.equal(h.ads.length, 0);
+    await run.load(); assert.equal(h.states.at(-1)?.phase, 'loading'); assert.equal(h.ads.length, 1);
+  } finally { run.dispose(); }
+});
+
+test('load/show event errors retain their own stages and received codes', async () => {
+  for (const showing of [false, true]) {
+    const { h, sdk } = fixture();
+    const run = createRewardedTestRun({ unitId: GOOGLE_TEST_REWARDED_UNITS.android, diagnosticsEnabled: true,
+      loadSdk: () => Promise.resolve(sdk), isCurrent: () => true, onState: (state) => h.states.push(state) });
+    try {
+      await run.load(); if (showing) { h.ads[0].emit('loaded'); await run.show(); }
+      (h.ads[0].callback as (event: TestAdEvent, error: unknown) => void)('error', { code: 'googleMobileAds/network-error', message: 'Network error token=SECRET' });
+      assert.equal(h.states.at(-1)?.phase, showing ? 'show-error' : 'load-error');
+      assert.equal(h.states.at(-1)?.diagnostic?.stage, showing ? 'ad-show' : 'ad-load');
+      assert.equal(h.states.at(-1)?.diagnostic?.code, 'googleMobileAds/network-error');
+      assert.doesNotMatch(JSON.stringify(h.states), /SECRET/);
+    } finally { run.dispose(); }
+  }
 });

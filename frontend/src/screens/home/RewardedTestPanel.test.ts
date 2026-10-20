@@ -42,6 +42,10 @@ test('early close, load error, display error and SDK failure do not become finan
       if (kind === 'early') { await h.emitTest('opened'); await h.emitTest('closed'); }
     }
     assert.match(h.text(), kind === 'early' ? /시청 완료 전에 종료/ : kind === 'load' ? /불러오지 못했습니다/ : kind === 'show' ? /표시하지 못했습니다/ : /SDK를 준비하지 못했습니다/);
+    if (kind === 'sdk') {
+      assert.match(h.text(), /SDK 코드 없음 또는 안전하게 표시할 수 없음/);
+      assert.match(h.text(), /안전하게 표시할 수 있는 SDK 설명이 없습니다/);
+    }
     assert.equal(h.node('reward-done') === undefined, true);
     assert.equal(h.node('reward-funding') !== undefined, true, 'the normal sheet remains usable');
     assert.deepEqual(h.requests, []); assert.deepEqual(h.invalidations, []);
@@ -72,6 +76,7 @@ test('production/unsupported builds and season/beginner accounts do not expose t
     h.mode = mode;
     await h.start(); t.after(h.close);
     assert.equal(h.node('reward-test-panel') === undefined, true);
+    assert.equal(h.node('reward-test-diagnostic') === undefined, true);
     assert.equal(h.testImports, 0); assert.deepEqual(h.requests, []);
   }
 });
@@ -85,4 +90,17 @@ test('logout unmounts the test session; native callbacks after logout cannot iss
   await h.emitTest('earned'); await h.emitTest('closed');
   assert.deepEqual(h.requests, []); assert.deepEqual(h.invalidations, []);
   assert.equal(h.testAds[0].shows, 1);
+});
+
+test('preview errors display stage, actual safe code and detail without secrets or financial actions', async (t) => {
+  const h = rewardSheetHarness({ provider: null, testAds: true, testPrepareError: {
+    code: 'consent-update-failed', message: 'Publisher misconfiguration https://secret.test?token=SECRET user@example.com',
+  } });
+  await h.start(); t.after(h.close); await h.press('reward-test-load');
+  assert.equal(h.node('reward-test-diagnostic') !== undefined, true);
+  assert.match(h.text(), /광고 SDK 준비 실패/); assert.match(h.text(), /실패 단계: 광고 SDK 준비/);
+  assert.match(h.text(), /SDK 오류 코드: consent-update-failed/); assert.match(h.text(), /Publisher misconfiguration/);
+  assert.doesNotMatch(h.text(), /SECRET|user@example|https:/);
+  assert.equal(h.state('reward-test-load'), 'enabled'); assert.equal(h.state('reward-test-show'), 'disabled');
+  assert.deepEqual(h.requests, []); assert.deepEqual(h.reads, []); assert.deepEqual(h.invalidations, []);
 });

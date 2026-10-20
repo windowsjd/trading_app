@@ -5,6 +5,7 @@ import CTAButton from '../../components/common/CTAButton';
 import { createRewardedTestRun, type RewardedTestState } from '../../features/adRewards/rewardedTest';
 import { getRewardedTestUnit, loadRewardedTestSdk } from '../../features/adRewards/rewardedTestSdk';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
+import { REWARDED_TEST_STAGES } from '../../features/adRewards/rewardedTestDiagnostics';
 
 const messages: Record<RewardedTestState['phase'], string> = {
   idle: '테스트 광고를 불러와 준비되면 직접 시청할 수 있습니다.',
@@ -29,6 +30,7 @@ function RewardedTestRun({ unitId }: { unitId: string }) {
   useEffect(() => {
     const session = getSessionGeneration();
     const current = createRewardedTestRun({ unitId, loadSdk: loadRewardedTestSdk,
+      diagnosticsEnabled: getRewardedTestUnit() === unitId,
       onState: setState, isCurrent: () => isCurrentSession(session) });
     run.current = current;
     return () => { current.dispose(); run.current = null; };
@@ -39,6 +41,14 @@ function RewardedTestRun({ unitId }: { unitId: string }) {
       <Text style={styles.title} accessibilityRole="header">보상형 테스트 광고</Text>
       <Text style={styles.description}>Google 테스트 광고입니다. 시청해도 가상자금 지급이나 계정 초기화는 실행되지 않습니다.</Text>
       <Text testID="reward-test-status" style={styles.status} accessibilityLiveRegion="polite">{messages[state.phase]}</Text>
+      {getRewardedTestUnit() === unitId && state.diagnostic ? (
+        <View testID="reward-test-diagnostic" style={styles.diagnostic} accessibilityLiveRegion="polite">
+          <Text style={styles.title}>{state.phase === 'sdk-error' ? '광고 SDK 준비 실패' : '테스트 광고 실행 실패'}</Text>
+          <Text style={styles.status}>실패 단계: {REWARDED_TEST_STAGES[state.diagnostic.stage]}</Text>
+          <Text style={styles.status}>{state.diagnostic.codeSource === 'internal' ? '앱 내부 진단 코드' : 'SDK 오류 코드'}: {state.diagnostic.code}</Text>
+          <Text style={styles.status}>상세: {state.diagnostic.detail}</Text>
+        </View>
+      ) : null}
       <CTAButton testID="reward-test-load" label="테스트 광고 불러오기"
         state={busy ? 'disabled' : 'enabled'} onPress={() => void run.current?.load()} />
       <CTAButton testID="reward-test-show" label="테스트 광고 시청"
@@ -50,8 +60,9 @@ function RewardedTestRun({ unitId }: { unitId: string }) {
 }
 
 const styles = {
-  panel: { gap: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface },
+  panel: { minWidth: 0, alignSelf: 'stretch' as const, gap: 8, padding: 14, borderRadius: 14, borderWidth: 1, borderColor: semantic.border, backgroundColor: semantic.surface },
+  diagnostic: { minWidth: 0, gap: 6, paddingVertical: 8 },
   title: { fontSize: 17, lineHeight: 24, fontWeight: '700' as const, color: semantic.text },
   description: { fontSize: 14, lineHeight: 21, color: semantic.secondary },
-  status: { fontSize: 13, lineHeight: 20, color: semantic.text },
+  status: { flexShrink: 1, minWidth: 0, fontSize: 13, lineHeight: 20, color: semantic.text },
 };

@@ -24,7 +24,7 @@ function rewardSheetHarness(options = {}) {
   h.testAds = [];
   h.testImports = 0;
   const testSdk = {
-    prepare: () => Promise.resolve({ privacyOptionsRequired: false }),
+    prepare: () => options.testPrepareError ? Promise.reject(options.testPrepareError) : Promise.resolve({ privacyOptionsRequired: false }),
     create() {
       const ad = { callback: null, loads: 0, shows: 0, disposed: false,
         listen(callback) { this.callback = callback; },
