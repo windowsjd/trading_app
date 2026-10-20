@@ -129,7 +129,7 @@ export class OperatorSeasonModerationService {
     context: OperatorRequestContext = {},
   ) {
     const target = this.parseTarget(seasonId, seasonParticipantId);
-    const reason = this.parseOptionalText(body.reason, 120);
+    const reason = this.parseRequiredReason(body.reason, 120);
     const note = this.parseOptionalText(body.note, 1_000);
     this.assertOperator(actor);
 
@@ -254,7 +254,10 @@ export class OperatorSeasonModerationService {
   ) {
     const target = this.parseTarget(seasonId, seasonParticipantId);
     const hidden = this.parseHidden(body.hidden);
-    const reason = this.parseOptionalText(body.reason, 120);
+    // Hiding is a sanction and records why; unhiding keeps the reason optional.
+    const reason = hidden
+      ? this.parseRequiredReason(body.reason, 120)
+      : this.parseOptionalText(body.reason, 120);
     const note = this.parseOptionalText(body.note, 1_000);
     this.assertOperator(actor);
 
@@ -350,7 +353,7 @@ export class OperatorSeasonModerationService {
     const target = this.parseTarget(seasonId, seasonParticipantId);
     const finalRank = this.parseOptionalFinalRank(body.finalRank);
     const finalTier = this.parseOptionalFinalTier(body, 'finalTier');
-    const reason = this.parseOptionalText(body.reason, 120);
+    const reason = this.parseRequiredReason(body.reason, 120);
     const note = this.parseOptionalText(body.note, 1_000);
     this.assertOperator(actor);
 
@@ -970,6 +973,21 @@ export class OperatorSeasonModerationService {
 
     const text = value.trim();
     return text.length === 0 ? null : text.slice(0, maxLength);
+  }
+
+  /** Sanctions (exclusion, ranking hide, final result correction) record why.
+   * A missing or blank reason is refused before any audit or state change. */
+  private parseRequiredReason(value: unknown, maxLength: number): string {
+    const reason = this.parseOptionalText(value, maxLength);
+    if (reason === null) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_MODERATION_TEXT',
+        'A moderation reason is required.',
+      );
+    }
+
+    return reason;
   }
 
   private parseRequiredPathText(

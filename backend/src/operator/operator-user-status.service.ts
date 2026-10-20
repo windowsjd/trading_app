@@ -123,6 +123,20 @@ export class OperatorUserStatusService {
       );
     }
 
+    // A sanction (suspend/delete) records why; reactivation keeps it optional.
+    // Refused before the transaction: no audit row, no status change.
+    if (
+      (requestedStatus === UserStatus.suspended ||
+        requestedStatus === UserStatus.deleted) &&
+      reason === null
+    ) {
+      this.throwApiError(
+        HttpStatus.BAD_REQUEST,
+        'INVALID_MODERATION_TEXT',
+        'A moderation reason is required.',
+      );
+    }
+
     try {
       return await this.prisma.$transaction(
         async (tx) => {

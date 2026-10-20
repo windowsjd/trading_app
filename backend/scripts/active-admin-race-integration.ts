@@ -109,7 +109,7 @@ function command(
     : new OperatorUserStatusService(client, audit).updateUserStatus(
         actor,
         targetId,
-        { status: mode },
+        { status: mode, reason: 'active admin race' },
         { requestId },
       );
 }

@@ -53,6 +53,7 @@ describe('email retention maintenance boundary', () => {
   });
   it('uses the existing timer even without configured profile storage', async () => {
     const cleanup = { runIfDue: jest.fn().mockResolvedValue(undefined) };
+    const retention = { runIfDue: jest.fn().mockResolvedValue(undefined) };
     const images = { hasWork: jest.fn() };
     const worker = new ProfileImageCleanupWorker(
       { isConfigured: () => false } as never,
@@ -60,9 +61,16 @@ describe('email retention maintenance boundary', () => {
       {} as never,
       {} as never,
       cleanup as never,
+      retention as never,
     );
     await worker.tick();
     expect(cleanup.runIfDue).toHaveBeenCalledTimes(1);
+    // Data retention runs in the same tick, right after email retention.
+    expect(retention.runIfDue).toHaveBeenCalledTimes(1);
+    expect(
+      retention.runIfDue.mock.invocationCallOrder[0] >
+        cleanup.runIfDue.mock.invocationCallOrder[0],
+    ).toBe(true);
     expect(images.hasWork).not.toHaveBeenCalled();
   });
 });

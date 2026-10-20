@@ -1,5 +1,6 @@
 import { ERROR_CODE, type ErrorCode } from '../../models/enums/errorCode.ts';
 import type { AdminDiagnosticDto } from '../../models/dto/common.ts';
+import { BLOCKED_ACCOUNT_MESSAGES } from '../../constants/legal.ts';
 
 type ApiErrorLike = {
   response?: {
@@ -331,10 +332,12 @@ export function getErrorMessageFromCode(
       return '로그인 세션이 만료되었거나 유효하지 않습니다. 다시 로그인해주세요.';
     case ERROR_CODE.AUTH_SIGNUP_CONFLICT:
       return '회원가입을 완료하지 못했습니다. 입력 정보를 확인하고 다시 시도해주세요.';
+    case ERROR_CODE.AUTH_SIGNUP_CONSENT_REQUIRED:
+      return '가입을 진행하지 못했습니다. 만 16세 이상 확인에 체크하고, 계속되면 앱을 최신 버전으로 업데이트해주세요.';
     case ERROR_CODE.AUTH_CONFIGURATION_ERROR:
       return '로그인 또는 회원가입을 완료하지 못했습니다. 잠시 후 다시 시도해주세요.';
     case ERROR_CODE.USER_NOT_ACTIVE:
-      return '정지되었거나 삭제된 계정입니다. 고객센터에 문의해주세요.';
+      return BLOCKED_ACCOUNT_MESSAGES.unknown;
     case ERROR_CODE.ACCOUNT_DELETION_PASSWORD_MISMATCH:
       return '비밀번호가 일치하지 않습니다. 다시 확인해주세요.';
     case ERROR_CODE.ACCOUNT_DELETION_CONFIRMATION_REQUIRED:

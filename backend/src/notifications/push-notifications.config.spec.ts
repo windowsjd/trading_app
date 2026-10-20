@@ -1,6 +1,18 @@
 import { pushNotificationsConfig } from './push-notifications.config';
+import { FINAL_RESULT_MAX_AGE_MS } from './push-sources';
 
 describe('pushNotificationsConfig', () => {
+  it('keeps outbox rows longer than a final result can be announced', () => {
+    // Final-result rows are pruned like any other (§2.6). That is safe only
+    // while a Season leaves the 14-day final-result scan well before its row
+    // (created after the Season end) reaches retention.
+    const { retentionMs } = pushNotificationsConfig({});
+    expect(retentionMs).toBe(30 * 24 * 3_600_000);
+    expect(retentionMs - FINAL_RESULT_MAX_AGE_MS).toBeGreaterThanOrEqual(
+      7 * 24 * 3_600_000,
+    );
+  });
+
   it('is off, sending (not dry run) and 10 s by default', () => {
     const config = pushNotificationsConfig({});
     expect(config.enabled).toBe(false);

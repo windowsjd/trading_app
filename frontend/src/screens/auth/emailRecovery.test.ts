@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
+import { TERMS_VERSION } from '../../constants/legal.ts';
 const { interactionHarness, React, act } = createRequire(import.meta.url)('../../../test/interactionTestHarness.cjs');
 
 function deferred() {
@@ -117,11 +118,12 @@ describe('email ownership UI', () => {
     try {
       h.input('auth-signup-email-input', 'new@example.com'); h.input('auth-signup-nickname-input', 'new-user');
       h.input('auth-signup-password-input', 'new-password'); h.input('auth-signup-confirm-password-input', 'new-password');
+      await h.tap('auth-signup-age-checkbox');
       await h.tap('auth-signup-submit');
       assert.equal(h.calls.filter((c) => c.name === 'signup').length, 0);
       assert.equal(h.calls[0].payload[1], 'signup');
       h.input('email-verification-code', '123456'); await h.tap('email-verification-verify'); await h.tap('auth-signup-submit');
-      assert.deepEqual(h.calls.find((c) => c.name === 'signup')?.payload[0], { email: 'new@example.com', nickname: 'new-user', password: 'new-password', verificationToken: 'proof' });
+      assert.deepEqual(h.calls.find((c) => c.name === 'signup')?.payload[0], { email: 'new@example.com', nickname: 'new-user', password: 'new-password', verificationToken: 'proof', ageConfirmed: true, termsVersion: TERMS_VERSION });
       assert.deepEqual(h.routes, ['mode-selection']);
     } finally { h.close(); }
   });
@@ -134,6 +136,7 @@ for (const kind of ['Signup', 'PasswordReset']) {
     if (kind !== 'Signup') return;
     h.input(emailId, 'new@example.com'); h.input('auth-signup-nickname-input', 'new-user');
     h.input('auth-signup-password-input', 'new-password'); h.input('auth-signup-confirm-password-input', 'new-password');
+    act(() => h.node('auth-signup-age-checkbox').props.onPress());
   };
   it(`${kind}: initial failure retries, pending requests fence taps, accepted request removes the send action`, async () => {
     const h = harness(kind);

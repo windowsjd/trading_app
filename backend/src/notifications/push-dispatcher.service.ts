@@ -748,10 +748,11 @@ export class PushDispatcher {
     return result;
   }
 
-  /** Bounded deletion of outbox rows past retention (deliveries cascade).
-   * Final-result rows stay: one per participant and Season, they keep a
-   * re-run settlement (which touches `seasons.updated_at`) from announcing
-   * the same result again. */
+  /** Bounded deletion of outbox rows past retention (deliveries cascade),
+   * final-result rows included. A pruned final result is never announced
+   * again: only Seasons that ended within FINAL_RESULT_MAX_AGE_MS (14 days)
+   * are read, and the row is created after the Season end, so after 30 days
+   * even a re-run settlement (which touches `seasons.updated_at`) is skipped. */
   async prune(now: Date, config: PushNotificationsConfig): Promise<number> {
     const cutoff = new Date(now.getTime() - config.retentionMs);
     let deleted = 0;
@@ -761,7 +762,6 @@ export class PushDispatcher {
         WHERE "id" IN (
           SELECT "id" FROM "push_notifications"
           WHERE "created_at" < ${cutoff}
-            AND "type" <> 'season_final_result'
           ORDER BY "created_at"
           LIMIT ${config.retentionBatchSize}
         )`;

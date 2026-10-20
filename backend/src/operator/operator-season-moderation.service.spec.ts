@@ -320,7 +320,9 @@ describe('OperatorSeasonModerationService', () => {
       currentRank: null,
     });
 
-    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {
+      reason: 'abuse_detected',
+    });
 
     expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
     expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
@@ -359,7 +361,9 @@ describe('OperatorSeasonModerationService', () => {
       currentRank: null,
     });
 
-    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {
+      reason: 'abuse_detected',
+    });
 
     expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
     expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
@@ -381,7 +385,9 @@ describe('OperatorSeasonModerationService', () => {
     prisma.tradingAccount.findUnique.mockResolvedValueOnce(null);
 
     await expectErrorCode(
-      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {
+        reason: 'abuse_detected',
+      }),
       'TRADING_ACCOUNT_LINK_INTEGRITY',
     );
     expect(prisma.$executeRaw).not.toHaveBeenCalled();
@@ -402,7 +408,9 @@ describe('OperatorSeasonModerationService', () => {
     prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
 
     await expectErrorCode(
-      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {
+        reason: 'abuse_detected',
+      }),
       'TRADING_ACCOUNT_LINK_INTEGRITY',
     );
     // The mismatch aborts before any state change in the transaction.
@@ -506,7 +514,9 @@ describe('OperatorSeasonModerationService', () => {
       currentRank: null,
     });
 
-    await service.excludeParticipant(actor, 'season-1', 'sp-1', {});
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {
+      reason: 'abuse_detected',
+    });
 
     const statements = prisma.$queryRaw.mock.calls.map(([strings]) =>
       strings.join('?').replace(/\s+/g, ' ').trim(),
@@ -536,7 +546,9 @@ describe('OperatorSeasonModerationService', () => {
     prisma.seasonParticipant.findFirst.mockResolvedValueOnce(null);
 
     await expectErrorCode(
-      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {
+        reason: 'abuse_detected',
+      }),
       'SEASON_PARTICIPANT_NOT_FOUND',
     );
     expect(prisma.$queryRaw).toHaveBeenCalledTimes(1);
@@ -552,7 +564,9 @@ describe('OperatorSeasonModerationService', () => {
     );
 
     await expectErrorCode(
-      service.excludeParticipant(actor, 'season-1', 'sp-1', {}),
+      service.excludeParticipant(actor, 'season-1', 'sp-1', {
+        reason: 'abuse_detected',
+      }),
       'TRADING_ACCOUNT_LINK_INTEGRITY',
     );
     expect(prisma.tradingAccount.findUnique).not.toHaveBeenCalled();
@@ -631,6 +645,59 @@ describe('OperatorSeasonModerationService', () => {
         }),
       }),
     );
+  });
+
+  it.each([
+    ['missing', {}],
+    ['blank', { reason: ' \n ' }],
+    ['non-string', { reason: 42 }],
+  ])(
+    'refuses a sanction with a %s reason before any lock, change or audit',
+    async (_label, reasonBody: Record<string, unknown>) => {
+      const { prisma, service } = createService();
+      const sanctions = [
+        () => service.excludeParticipant(actor, 'season-1', 'sp-1', reasonBody),
+        () =>
+          service.setRankingVisibility(actor, 'season-1', 'sp-1', {
+            hidden: true,
+            ...reasonBody,
+          }),
+        () =>
+          service.correctFinalResult(actor, 'season-1', 'sp-1', {
+            finalRank: 2,
+            ...reasonBody,
+          }),
+      ];
+
+      for (const sanction of sanctions)
+        await expectErrorCode(sanction(), 'INVALID_MODERATION_TEXT');
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.seasonParticipant.update).not.toHaveBeenCalled();
+      expect(prisma.tradingAccount.update).not.toHaveBeenCalled();
+      expect(prisma.seasonRanking.update).not.toHaveBeenCalled();
+      expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('keeps the 120-character limit of a required reason', async () => {
+    const { prisma, service } = createService();
+    const participant = createParticipant();
+    prisma.seasonParticipant.findFirst.mockResolvedValueOnce(participant);
+    prisma.seasonParticipant.update.mockResolvedValueOnce({
+      ...participant,
+      participantStatus: ParticipantStatus.excluded,
+      excludedAt: now,
+      currentRank: null,
+    });
+
+    await service.excludeParticipant(actor, 'season-1', 'sp-1', {
+      reason: `  ${'r'.repeat(130)}  `,
+    });
+
+    const updates = prisma.seasonParticipant.update.mock
+      .calls as unknown as Array<[{ data: { excludedReason: string } }]>;
+    expect(updates[0][0].data.excludedReason).toBe('r'.repeat(120));
   });
 
   it('corrects final rank and tier for settled seasons and updates the final ranking row', async () => {

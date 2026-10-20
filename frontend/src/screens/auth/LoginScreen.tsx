@@ -24,6 +24,7 @@ import {
 } from '../../services/api/errorMapper';
 import { TEST_IDS } from '../../constants/testIds';
 import { ERROR_CODE } from '../../models/enums/errorCode';
+import { BLOCKED_ACCOUNT_MESSAGES } from '../../constants/legal';
 import type { AuthViewState } from '../../models/enums/viewState';
 import type { UserStatus } from '../../models/dto/user';
 
@@ -39,10 +40,10 @@ function getBlockedAuthState(status: UserStatus): AuthViewState | null {
 
 function getBlockedAuthMessage(state: AuthViewState | null) {
   if (state === 'auth_suspended') {
-    return '정지된 계정입니다. 고객센터에 문의해주세요.';
+    return BLOCKED_ACCOUNT_MESSAGES.suspended;
   }
   if (state === 'auth_deleted') {
-    return '삭제된 계정입니다. 고객센터에 문의해주세요.';
+    return BLOCKED_ACCOUNT_MESSAGES.deleted;
   }
   return getErrorMessageFromCode(ERROR_CODE.USER_NOT_ACTIVE);
 }
@@ -181,7 +182,8 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
         authState === 'auth_suspended' ||
         authState === 'auth_deleted') &&
       submitError ? (
-        <Text style={styles.errorText}>{submitError}</Text>
+        // Selectable: the support address can be long-pressed and copied.
+        <Text style={styles.errorText} selectable>{submitError}</Text>
       ) : null}
 
       <AuthSubmitBox scroll={scroll}>

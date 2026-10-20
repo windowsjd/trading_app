@@ -661,3 +661,28 @@ describe('PushDispatcher.checkReceipts', () => {
     expect(byIds('del-3')).toEqual({ receiptCheckedAt: now });
   });
 });
+
+describe('PushDispatcher.prune', () => {
+  it('deletes rows past retention of every type, final results included', async () => {
+    const statements: string[] = [];
+    const values: unknown[][] = [];
+    const counts = [config.retentionBatchSize, 3];
+    const prisma = {
+      $executeRaw: jest.fn((sql: TemplateStringsArray, ...args: unknown[]) => {
+        statements.push(sql.join('?'));
+        values.push(args);
+        return Promise.resolve(counts.shift() ?? 0);
+      }),
+    };
+    const dispatcher = new PushDispatcher(prisma as never, {} as never);
+    expect(await dispatcher.prune(now, config)).toBe(
+      config.retentionBatchSize + 3,
+    );
+    // A full batch continues; a short one ends the run.
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(2);
+    expect(statements[0]).toContain('"created_at" < ?');
+    expect(statements[0].includes('"type"')).toBe(false);
+    expect(statements[0].includes('season_final_result')).toBe(false);
+    expect(values[0][0]).toEqual(new Date(now.getTime() - config.retentionMs));
+  });
+});

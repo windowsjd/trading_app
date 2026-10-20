@@ -47,6 +47,9 @@ export type UserMinAggregateOutputType = {
   role: $Enums.UserRole | null
   createdAt: Date | null
   updatedAt: Date | null
+  termsVersion: string | null
+  termsAcceptedAt: Date | null
+  ageConfirmedAt: Date | null
 }
 
 export type UserMaxAggregateOutputType = {
@@ -62,6 +65,9 @@ export type UserMaxAggregateOutputType = {
   role: $Enums.UserRole | null
   createdAt: Date | null
   updatedAt: Date | null
+  termsVersion: string | null
+  termsAcceptedAt: Date | null
+  ageConfirmedAt: Date | null
 }
 
 export type UserCountAggregateOutputType = {
@@ -77,6 +83,9 @@ export type UserCountAggregateOutputType = {
   role: number
   createdAt: number
   updatedAt: number
+  termsVersion: number
+  termsAcceptedAt: number
+  ageConfirmedAt: number
   _all: number
 }
 
@@ -102,6 +111,9 @@ export type UserMinAggregateInputType = {
   role?: true
   createdAt?: true
   updatedAt?: true
+  termsVersion?: true
+  termsAcceptedAt?: true
+  ageConfirmedAt?: true
 }
 
 export type UserMaxAggregateInputType = {
@@ -117,6 +129,9 @@ export type UserMaxAggregateInputType = {
   role?: true
   createdAt?: true
   updatedAt?: true
+  termsVersion?: true
+  termsAcceptedAt?: true
+  ageConfirmedAt?: true
 }
 
 export type UserCountAggregateInputType = {
@@ -132,6 +147,9 @@ export type UserCountAggregateInputType = {
   role?: true
   createdAt?: true
   updatedAt?: true
+  termsVersion?: true
+  termsAcceptedAt?: true
+  ageConfirmedAt?: true
   _all?: true
 }
 
@@ -234,6 +252,9 @@ export type UserGroupByOutputType = {
   role: $Enums.UserRole
   createdAt: Date
   updatedAt: Date
+  termsVersion: string | null
+  termsAcceptedAt: Date | null
+  ageConfirmedAt: Date | null
   _count: UserCountAggregateOutputType | null
   _avg: UserAvgAggregateOutputType | null
   _sum: UserSumAggregateOutputType | null
@@ -272,6 +293,9 @@ export type UserWhereInput = {
   role?: Prisma.EnumUserRoleFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  termsVersion?: Prisma.StringNullableFilter<"User"> | string | null
+  termsAcceptedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  ageConfirmedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   friendshipsLow?: Prisma.FriendshipListRelationFilter
   friendshipsHigh?: Prisma.FriendshipListRelationFilter
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
@@ -308,6 +332,9 @@ export type UserOrderByWithRelationInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  termsVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  termsAcceptedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  ageConfirmedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   friendshipsLow?: Prisma.FriendshipOrderByRelationAggregateInput
   friendshipsHigh?: Prisma.FriendshipOrderByRelationAggregateInput
   seasonParticipants?: Prisma.SeasonParticipantOrderByRelationAggregateInput
@@ -347,6 +374,9 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   role?: Prisma.EnumUserRoleFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
+  termsVersion?: Prisma.StringNullableFilter<"User"> | string | null
+  termsAcceptedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  ageConfirmedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   friendshipsLow?: Prisma.FriendshipListRelationFilter
   friendshipsHigh?: Prisma.FriendshipListRelationFilter
   seasonParticipants?: Prisma.SeasonParticipantListRelationFilter
@@ -383,6 +413,9 @@ export type UserOrderByWithAggregationInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  termsVersion?: Prisma.SortOrderInput | Prisma.SortOrder
+  termsAcceptedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  ageConfirmedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
   _avg?: Prisma.UserAvgOrderByAggregateInput
   _max?: Prisma.UserMaxOrderByAggregateInput
@@ -406,6 +439,9 @@ export type UserScalarWhereWithAggregatesInput = {
   role?: Prisma.EnumUserRoleWithAggregatesFilter<"User"> | $Enums.UserRole
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
+  termsVersion?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
+  termsAcceptedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  ageConfirmedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
 }
 
 export type UserCreateInput = {
@@ -421,6 +457,9 @@ export type UserCreateInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -457,6 +496,9 @@ export type UserUncheckedCreateInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -493,6 +535,9 @@ export type UserUpdateInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -529,6 +574,9 @@ export type UserUncheckedUpdateInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -565,6 +613,9 @@ export type UserCreateManyInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
 }
 
 export type UserUpdateManyMutationInput = {
@@ -580,6 +631,9 @@ export type UserUpdateManyMutationInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type UserUncheckedUpdateManyInput = {
@@ -595,6 +649,9 @@ export type UserUncheckedUpdateManyInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
 }
 
 export type UserCountOrderByAggregateInput = {
@@ -610,6 +667,9 @@ export type UserCountOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  termsVersion?: Prisma.SortOrder
+  termsAcceptedAt?: Prisma.SortOrder
+  ageConfirmedAt?: Prisma.SortOrder
 }
 
 export type UserAvgOrderByAggregateInput = {
@@ -629,6 +689,9 @@ export type UserMaxOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  termsVersion?: Prisma.SortOrder
+  termsAcceptedAt?: Prisma.SortOrder
+  ageConfirmedAt?: Prisma.SortOrder
 }
 
 export type UserMinOrderByAggregateInput = {
@@ -644,6 +707,9 @@ export type UserMinOrderByAggregateInput = {
   role?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
+  termsVersion?: Prisma.SortOrder
+  termsAcceptedAt?: Prisma.SortOrder
+  ageConfirmedAt?: Prisma.SortOrder
 }
 
 export type UserSumOrderByAggregateInput = {
@@ -1007,6 +1073,9 @@ export type UserCreateWithoutInquiriesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1042,6 +1111,9 @@ export type UserUncheckedCreateWithoutInquiriesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -1093,6 +1165,9 @@ export type UserUpdateWithoutInquiriesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -1128,6 +1203,9 @@ export type UserUncheckedUpdateWithoutInquiriesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -1163,6 +1241,9 @@ export type UserCreateWithoutInquiryAnswersInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1198,6 +1279,9 @@ export type UserUncheckedCreateWithoutInquiryAnswersInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -1249,6 +1333,9 @@ export type UserUpdateWithoutInquiryAnswersInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -1284,6 +1371,9 @@ export type UserUncheckedUpdateWithoutInquiryAnswersInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -1319,6 +1409,9 @@ export type UserCreateWithoutFriendshipsLowInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
@@ -1354,6 +1447,9 @@ export type UserUncheckedCreateWithoutFriendshipsLowInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
@@ -1394,6 +1490,9 @@ export type UserCreateWithoutFriendshipsHighInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
@@ -1429,6 +1528,9 @@ export type UserUncheckedCreateWithoutFriendshipsHighInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
@@ -1480,6 +1582,9 @@ export type UserUpdateWithoutFriendshipsLowInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
@@ -1515,6 +1620,9 @@ export type UserUncheckedUpdateWithoutFriendshipsLowInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
@@ -1561,6 +1669,9 @@ export type UserUpdateWithoutFriendshipsHighInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
@@ -1596,6 +1707,9 @@ export type UserUncheckedUpdateWithoutFriendshipsHighInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
@@ -1631,6 +1745,9 @@ export type UserCreateWithoutOperatorAuditLogsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1666,6 +1783,9 @@ export type UserUncheckedCreateWithoutOperatorAuditLogsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -1717,6 +1837,9 @@ export type UserUpdateWithoutOperatorAuditLogsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -1752,6 +1875,9 @@ export type UserUncheckedUpdateWithoutOperatorAuditLogsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -1787,6 +1913,9 @@ export type UserCreateWithoutRefreshTokenSessionsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1822,6 +1951,9 @@ export type UserUncheckedCreateWithoutRefreshTokenSessionsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -1873,6 +2005,9 @@ export type UserUpdateWithoutRefreshTokenSessionsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -1908,6 +2043,9 @@ export type UserUncheckedUpdateWithoutRefreshTokenSessionsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -1943,6 +2081,9 @@ export type UserCreateWithoutTradingAccountsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -1978,6 +2119,9 @@ export type UserUncheckedCreateWithoutTradingAccountsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2029,6 +2173,9 @@ export type UserUpdateWithoutTradingAccountsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2064,6 +2211,9 @@ export type UserUncheckedUpdateWithoutTradingAccountsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2099,6 +2249,9 @@ export type UserCreateWithoutSeasonParticipantsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   tradingAccounts?: Prisma.TradingAccountCreateNestedManyWithoutUserInput
@@ -2134,6 +2287,9 @@ export type UserUncheckedCreateWithoutSeasonParticipantsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   tradingAccounts?: Prisma.TradingAccountUncheckedCreateNestedManyWithoutUserInput
@@ -2185,6 +2341,9 @@ export type UserUpdateWithoutSeasonParticipantsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUpdateManyWithoutUserNestedInput
@@ -2220,6 +2379,9 @@ export type UserUncheckedUpdateWithoutSeasonParticipantsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   tradingAccounts?: Prisma.TradingAccountUncheckedUpdateManyWithoutUserNestedInput
@@ -2255,6 +2417,9 @@ export type UserCreateWithoutUserBadgesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2290,6 +2455,9 @@ export type UserUncheckedCreateWithoutUserBadgesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2341,6 +2509,9 @@ export type UserUpdateWithoutUserBadgesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2376,6 +2547,9 @@ export type UserUncheckedUpdateWithoutUserBadgesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2411,6 +2585,9 @@ export type UserCreateWithoutSeasonRewardsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2446,6 +2623,9 @@ export type UserUncheckedCreateWithoutSeasonRewardsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2497,6 +2677,9 @@ export type UserUpdateWithoutSeasonRewardsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2532,6 +2715,9 @@ export type UserUncheckedUpdateWithoutSeasonRewardsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2567,6 +2753,9 @@ export type UserCreateWithoutRewardFulfillmentTargetsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2602,6 +2791,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentTargetsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2642,6 +2834,9 @@ export type UserCreateWithoutRewardFulfillmentsRequestedInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2677,6 +2872,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsRequestedInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2717,6 +2915,9 @@ export type UserCreateWithoutRewardFulfillmentsProcessedInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2752,6 +2953,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsProcessedInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2792,6 +2996,9 @@ export type UserCreateWithoutRewardFulfillmentsCanceledInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -2827,6 +3034,9 @@ export type UserUncheckedCreateWithoutRewardFulfillmentsCanceledInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -2878,6 +3088,9 @@ export type UserUpdateWithoutRewardFulfillmentTargetsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2913,6 +3126,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentTargetsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -2959,6 +3175,9 @@ export type UserUpdateWithoutRewardFulfillmentsRequestedInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -2994,6 +3213,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsRequestedInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3040,6 +3262,9 @@ export type UserUpdateWithoutRewardFulfillmentsProcessedInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3075,6 +3300,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsProcessedInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3121,6 +3349,9 @@ export type UserUpdateWithoutRewardFulfillmentsCanceledInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3156,6 +3387,9 @@ export type UserUncheckedUpdateWithoutRewardFulfillmentsCanceledInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3191,6 +3425,9 @@ export type UserCreateWithoutAdRewardClaimsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3226,6 +3463,9 @@ export type UserUncheckedCreateWithoutAdRewardClaimsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3277,6 +3517,9 @@ export type UserUpdateWithoutAdRewardClaimsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3312,6 +3555,9 @@ export type UserUncheckedUpdateWithoutAdRewardClaimsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3347,6 +3593,9 @@ export type UserCreateWithoutGeneralAccountResetsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3382,6 +3631,9 @@ export type UserUncheckedCreateWithoutGeneralAccountResetsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3433,6 +3685,9 @@ export type UserUpdateWithoutGeneralAccountResetsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3468,6 +3723,9 @@ export type UserUncheckedUpdateWithoutGeneralAccountResetsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3503,6 +3761,9 @@ export type UserCreateWithoutQuotesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3538,6 +3799,9 @@ export type UserUncheckedCreateWithoutQuotesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3589,6 +3853,9 @@ export type UserUpdateWithoutQuotesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3624,6 +3891,9 @@ export type UserUncheckedUpdateWithoutQuotesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3659,6 +3929,9 @@ export type UserCreateWithoutFxExecuteRequestsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3694,6 +3967,9 @@ export type UserUncheckedCreateWithoutFxExecuteRequestsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3745,6 +4021,9 @@ export type UserUpdateWithoutFxExecuteRequestsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3780,6 +4059,9 @@ export type UserUncheckedUpdateWithoutFxExecuteRequestsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3815,6 +4097,9 @@ export type UserCreateWithoutPushDevicesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -3850,6 +4135,9 @@ export type UserUncheckedCreateWithoutPushDevicesInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -3901,6 +4189,9 @@ export type UserUpdateWithoutPushDevicesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -3936,6 +4227,9 @@ export type UserUncheckedUpdateWithoutPushDevicesInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -3971,6 +4265,9 @@ export type UserCreateWithoutNotificationPreferenceInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -4006,6 +4303,9 @@ export type UserUncheckedCreateWithoutNotificationPreferenceInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -4057,6 +4357,9 @@ export type UserUpdateWithoutNotificationPreferenceInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4092,6 +4395,9 @@ export type UserUncheckedUpdateWithoutNotificationPreferenceInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4127,6 +4433,9 @@ export type UserCreateWithoutPushNotificationsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantCreateNestedManyWithoutUserInput
@@ -4162,6 +4471,9 @@ export type UserUncheckedCreateWithoutPushNotificationsInput = {
   role?: $Enums.UserRole
   createdAt?: Date | string
   updatedAt?: Date | string
+  termsVersion?: string | null
+  termsAcceptedAt?: Date | string | null
+  ageConfirmedAt?: Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedCreateNestedManyWithoutLowUserInput
   friendshipsHigh?: Prisma.FriendshipUncheckedCreateNestedManyWithoutHighUserInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedCreateNestedManyWithoutUserInput
@@ -4213,6 +4525,9 @@ export type UserUpdateWithoutPushNotificationsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUpdateManyWithoutUserNestedInput
@@ -4248,6 +4563,9 @@ export type UserUncheckedUpdateWithoutPushNotificationsInput = {
   role?: Prisma.EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  termsVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  termsAcceptedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  ageConfirmedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   friendshipsLow?: Prisma.FriendshipUncheckedUpdateManyWithoutLowUserNestedInput
   friendshipsHigh?: Prisma.FriendshipUncheckedUpdateManyWithoutHighUserNestedInput
   seasonParticipants?: Prisma.SeasonParticipantUncheckedUpdateManyWithoutUserNestedInput
@@ -4485,6 +4803,9 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  termsVersion?: boolean
+  termsAcceptedAt?: boolean
+  ageConfirmedAt?: boolean
   friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
   friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
   seasonParticipants?: boolean | Prisma.User$seasonParticipantsArgs<ExtArgs>
@@ -4522,6 +4843,9 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  termsVersion?: boolean
+  termsAcceptedAt?: boolean
+  ageConfirmedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -4537,6 +4861,9 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  termsVersion?: boolean
+  termsAcceptedAt?: boolean
+  ageConfirmedAt?: boolean
 }, ExtArgs["result"]["user"]>
 
 export type UserSelectScalar = {
@@ -4552,9 +4879,12 @@ export type UserSelectScalar = {
   role?: boolean
   createdAt?: boolean
   updatedAt?: boolean
+  termsVersion?: boolean
+  termsAcceptedAt?: boolean
+  ageConfirmedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "emailVerifiedAt" | "tokenVersion" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "email" | "passwordHash" | "emailVerifiedAt" | "tokenVersion" | "nickname" | "profileImageUrl" | "portfolioPublic" | "status" | "role" | "createdAt" | "updatedAt" | "termsVersion" | "termsAcceptedAt" | "ageConfirmedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   friendshipsLow?: boolean | Prisma.User$friendshipsLowArgs<ExtArgs>
   friendshipsHigh?: boolean | Prisma.User$friendshipsHighArgs<ExtArgs>
@@ -4620,6 +4950,18 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     role: $Enums.UserRole
     createdAt: Date
     updatedAt: Date
+    /**
+     * Terms version of the signup screen this member completed (null: joined before 2026-10-21).
+     */
+    termsVersion: string | null
+    /**
+     * When signup completed on the screen showing termsVersion and its notice ("가입하면 … 동의한 것으로 봅니다"). Not a checkbox consent: there is no terms checkbox.
+     */
+    termsAcceptedAt: Date | null
+    /**
+     * When signup completed with the required "만 16세 이상" box checked (the same server instant as termsAcceptedAt).
+     */
+    ageConfirmedAt: Date | null
   }, ExtArgs["result"]["user"]>
   composites: {}
 }
@@ -5076,6 +5418,9 @@ export interface UserFieldRefs {
   readonly role: Prisma.FieldRef<"User", 'UserRole'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly termsVersion: Prisma.FieldRef<"User", 'String'>
+  readonly termsAcceptedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly ageConfirmedAt: Prisma.FieldRef<"User", 'DateTime'>
 }
     
 

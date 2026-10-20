@@ -46,8 +46,10 @@ import {
 } from '../src/auth/account-deletion.purge';
 import { AccountDeletionService } from '../src/auth/account-deletion.service';
 import { AuthService } from '../src/auth/auth.service';
+import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
 import { ProfileImageCleanupService } from '../src/auth/profile-image-cleanup.service';
 import { EmailAuthCleanupService } from '../src/auth/email-auth-cleanup.service';
+import { DataRetentionCleanupService } from '../src/auth/data-retention-cleanup.service';
 import { ProfileImageCleanupWorker } from '../src/auth/profile-image-cleanup.worker';
 import { ProfileImageService } from '../src/auth/profile-image.service';
 import { ProfileImageStorageService } from '../src/auth/profile-image-storage.service';
@@ -1378,6 +1380,8 @@ async function fullMember() {
       password: PASSWORD,
       nickname: u.nickname,
       verificationToken: proof,
+      ageConfirmed: true,
+      termsVersion: CURRENT_TERMS_VERSION,
     },
     meta(),
   );
@@ -1987,6 +1991,7 @@ async function storageRaces() {
     new OpsJobLockService(db),
     new OpsJobRunService(db),
     new EmailAuthCleanupService(db),
+    new DataRetentionCleanupService(db),
   );
   await worker.tick();
   assert.equal(

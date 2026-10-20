@@ -28,6 +28,7 @@ import { AppClient } from './client';
 import { Actor, type Fixture, type FixtureActor } from './actor';
 import { preflight, verifyApi } from './preflight';
 import { parseFuturesContracts } from '../../src/futures/futures-instrument-coverage';
+import { CURRENT_TERMS_VERSION } from '../../src/auth/terms.constants';
 
 /** Complete the existing learning prerequisites through normal HTTP commands.
  * Keep every fee, order, acknowledgement and ledger leg in the full audit.
@@ -339,6 +340,8 @@ export async function prepare(
                 email,
                 password: c.userPassword,
                 nickname: `load-${index}-${m.runId.slice(-6)}`,
+                ageConfirmed: true,
+                termsVersion: CURRENT_TERMS_VERSION,
               },
               false,
             );

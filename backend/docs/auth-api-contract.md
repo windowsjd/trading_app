@@ -13,7 +13,7 @@ final signup (`201`). Bodies and responses use the existing success/data envelop
 | --- | --- | --- |
 | `/email/request` | `{ email, purpose: "signup", "password_reset" or "account_deletion" }` | `{ challengeId, expiresAt, resendAt, serverTime, message }` |
 | `/email/verify` | `{ email, purpose, challengeId, code }` | `{ verificationToken, expiresAt, serverTime }` |
-| `/signup` | `{ email, nickname, password, verificationToken }` | Existing user/tokens envelope |
+| `/signup` | `{ email, nickname, password, verificationToken, ageConfirmed: true, termsVersion }` | Existing user/tokens envelope |
 | `/password/reset` | `{ email, password, verificationToken }` | `{ changed: true }` (no login tokens) |
 
 One challenge table stores all supported purposes, delivery status, attempts and a
@@ -44,6 +44,27 @@ inactive and delivery-failed reset requests have identical envelopes and a
 minimum response duration exceeding the bounded provider timeout, with jitter.
 There is no email/nickname conflict check before valid signup proof; the existing
 409 conflict codes remain available to the verified email owner at completion.
+
+Signup consent (2026-10-21). `ageConfirmed` must be exactly `true` (the app's only
+checkbox, the required "[필수] 만 16세 이상입니다") and `termsVersion` must equal the
+server's `CURRENT_TERMS_VERSION` (`src/auth/terms.constants.ts`, currently
+`2026-10-20`); anything else — missing, `false`, the string `"true"`, another
+version — is `400 AUTH_SIGNUP_CONSENT_REQUIRED` (one code for both). It is checked
+with the other body fields, before the IP completion budget and before the email
+proof is consumed: a refused request creates nothing and keeps its proof. There is
+no birth date and no server-side age check. In the signup transaction the server
+stores `users.terms_version`, `terms_accepted_at` and `age_confirmed_at`, both
+timestamps from one server clock reading (never a client time). `terms_accepted_at`
+means "signup completed on the screen that showed this terms version and the
+notice 가입하면 이용약관과 개인정보처리방침에 동의한 것으로 봅니다" — there is no
+terms checkbox. Members created earlier keep NULL (no backfill, no re-consent
+gate). None of the three is returned by signup, login or `me`; account deletion
+removes them with the user row. When the terms change, raise
+`CURRENT_TERMS_VERSION` and the app's `TERMS_VERSION`
+(`frontend/src/constants/legal.ts`) together: a server ahead of an app refuses that
+app's signups (its error copy asks to update the app), an app ahead of the server
+is refused until the server ships. Older apps that send neither field are refused
+too, so the app ships before (or with) the server.
 
 Password reset locks the target user, checks active status and issuance-time
 token version, updates only passwordHash/emailVerifiedAt/tokenVersion, consumes

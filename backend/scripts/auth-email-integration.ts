@@ -6,6 +6,7 @@ import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import { AuthService } from '../src/auth/auth.service';
+import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
 import { AccessTokenGuard } from '../src/auth/access-token.guard';
 import {
   EmailAuthCleanupService,
@@ -27,6 +28,8 @@ const v = fixture.verification;
 const suffix = `auth-email-${randomUUID()}`;
 const email = (name: string) => `${name}-${suffix}@example.com`;
 const password = 'Original-password-123!';
+// The signup screen's required 16+ check and its terms version.
+const consent = { ageConfirmed: true, termsVersion: CURRENT_TERMS_VERSION };
 const nextPassword = 'Changed-password-456!';
 const jwt = new JwtService();
 const config = new ConfigService({
@@ -278,7 +281,7 @@ async function main() {
     const signupEmail = email('signup');
     await rejects(
       auth.signup(
-        { email: signupEmail, nickname: signupEmail, password },
+        { email: signupEmail, nickname: signupEmail, password, ...consent },
         fixture.metadata,
       ),
       'EMAIL_VERIFICATION_REQUIRED',
@@ -320,6 +323,7 @@ async function main() {
             password,
             nickname: signupEmail,
             verificationToken: proof,
+            ...consent,
           },
           fixture.metadata,
         ),
@@ -518,6 +522,7 @@ async function main() {
           password,
           nickname: old.email,
           verificationToken: oldProof,
+          ...consent,
         },
         fixture.metadata,
       ),
@@ -688,6 +693,7 @@ async function main() {
           nickname: signupEmail,
           password,
           verificationToken: collisionProof,
+          ...consent,
         },
         fixture.metadata,
       ),
@@ -701,6 +707,7 @@ async function main() {
           nickname: collisionEmail,
           password,
           verificationToken: collisionProof,
+          ...consent,
         },
         fixture.metadata,
       ),

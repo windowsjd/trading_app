@@ -26,6 +26,8 @@ export type SignupRequestBody = {
   email?: unknown;
   password?: unknown;
   nickname?: unknown;
+  ageConfirmed?: unknown;
+  termsVersion?: unknown;
 };
 
 export type LoginRequestBody = {

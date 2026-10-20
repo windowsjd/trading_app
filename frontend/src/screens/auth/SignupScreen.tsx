@@ -1,8 +1,9 @@
 import { useEmailVerification } from '../../features/auth/useEmailVerification';
 import EmailVerificationPanel from './EmailVerificationPanel';
+import AuthCheckbox from './AuthCheckbox';
 import { semantic } from '../../theme/tokens';
 import React, { useMemo, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from '../../theme/native';
+import { View, Text, StyleSheet, Linking } from '../../theme/native';
 import { useFocusedInputScroll } from '../../hooks/useFocusedInputScroll';
 import AuthFormLayout, { AuthField, AuthSubmitBox } from './AuthFormLayout';
 import ActionPressable from '../../components/common/ActionPressable';
@@ -25,6 +26,13 @@ import {
 } from '../../services/api/errorMapper';
 import { TEST_IDS } from '../../constants/testIds';
 import { ERROR_CODE } from '../../models/enums/errorCode';
+import {
+  AGE_CONFIRMATION_LABEL,
+  BLOCKED_ACCOUNT_MESSAGES,
+  LEGAL_LINKS,
+  SIGNUP_LEGAL_NOTICE,
+  TERMS_VERSION,
+} from '../../constants/legal';
 import type { AuthViewState } from '../../models/enums/viewState';
 import type { UserStatus } from '../../models/dto/user';
 
@@ -40,10 +48,10 @@ function getBlockedAuthState(status: UserStatus): AuthViewState | null {
 
 function getBlockedAuthMessage(state: AuthViewState | null) {
   if (state === 'auth_suspended') {
-    return '정지된 계정입니다. 고객센터에 문의해주세요.';
+    return BLOCKED_ACCOUNT_MESSAGES.suspended;
   }
   if (state === 'auth_deleted') {
-    return '삭제된 계정입니다. 고객센터에 문의해주세요.';
+    return BLOCKED_ACCOUNT_MESSAGES.deleted;
   }
   return getErrorMessageFromCode(ERROR_CODE.USER_NOT_ACTIVE);
 }
@@ -57,6 +65,9 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  // Required and never pre-checked: the only checkbox on this screen.
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -156,6 +167,11 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       return;
     }
 
+    if (!ageConfirmed) {
+      setFieldError('만 16세 이상 확인에 체크해주세요.');
+      return;
+    }
+
     if (!verification.verificationToken) {
       if (verification.hasRequested) return;
       void verification.request();
@@ -167,7 +183,19 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
       email,
       nickname: nickname.trim(),
       password,
+      ageConfirmed: true,
+      termsVersion: TERMS_VERSION,
     });
+  };
+
+  // The terms and the privacy policy open in the external browser.
+  const openLegalLink = async (url: string) => {
+    setLinkError(null);
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setLinkError('링크를 열지 못했습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -219,6 +247,26 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         style={styles.input}
       />
 
+      <AuthCheckbox
+        testID={TEST_IDS.auth.signupAgeCheckbox}
+        label={AGE_CONFIRMATION_LABEL}
+        checked={ageConfirmed}
+        disabled={signupMutation.isPending}
+        onChange={setAgeConfirmed}
+      />
+
+      <Text testID={TEST_IDS.auth.signupLegalNotice} style={styles.notice}>
+        {SIGNUP_LEGAL_NOTICE.map((part, index) => typeof part === 'string' ? part : (
+          <Text key={index} accessibilityRole="link" style={styles.noticeLink}
+            testID={part.link === 'terms' ? TEST_IDS.auth.signupTermsLink : TEST_IDS.auth.signupPrivacyLink}
+            onPress={() => void openLegalLink(LEGAL_LINKS[part.link])}>
+            {part.label}
+          </Text>
+        ))}
+      </Text>
+
+      {linkError ? <Text style={styles.errorText}>{linkError}</Text> : null}
+
       {authState === 'auth_invalid_input' && fieldError ? (
         <Text style={styles.errorText}>{fieldError}</Text>
       ) : null}
@@ -227,7 +275,8 @@ export default function SignupScreen({ navigation }: SignupScreenProps) {
         authState === 'auth_suspended' ||
         authState === 'auth_deleted') &&
       submitError ? (
-        <Text style={styles.errorText}>{submitError}</Text>
+        // Selectable: the support address can be long-pressed and copied.
+        <Text style={styles.errorText} selectable>{submitError}</Text>
       ) : null}
 
       <EmailVerificationPanel verification={verification} scroll={scroll} disabled={signupMutation.isPending || verification.busy} />
@@ -312,5 +361,15 @@ const styles = StyleSheet.create({
   errorText: {
     color: semantic.error,
     fontSize: 14,
+  },
+  notice: {
+    color: semantic.secondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  noticeLink: {
+    color: semantic.secondaryActionForeground,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });

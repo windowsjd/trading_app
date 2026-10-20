@@ -1,4 +1,5 @@
 import { EmailVerificationService } from '../src/auth/email-verification.service';
+import { CURRENT_TERMS_VERSION } from '../src/auth/terms.constants';
 import { createApiError } from '../src/common/api-error';
 import { SPOT_ASSET_WHERE } from '../src/providers/binance/binance-product-catalog';
 jest.mock('../src/generated/prisma/client', () => {
@@ -1349,6 +1350,8 @@ describe('AppController (e2e)', () => {
         email: 'user@example.com',
         password: 'Password123!',
         nickname: 'traderKim',
+        ageConfirmed: true,
+        termsVersion: CURRENT_TERMS_VERSION,
       })
       .expect(400)
       .expect((response) =>
@@ -1363,6 +1366,37 @@ describe('AppController (e2e)', () => {
       );
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.user.update).not.toHaveBeenCalled();
+    expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
+  });
+
+  it('apps without the 16+ check or the current terms version cannot sign up and keep the proof', async () => {
+    const { consume } = app.get<
+      EmailVerificationService,
+      { consume: jest.Mock }
+    >(EmailVerificationService);
+    for (const consent of [
+      {},
+      { ageConfirmed: true },
+      { ageConfirmed: 'true', termsVersion: CURRENT_TERMS_VERSION },
+      { ageConfirmed: true, termsVersion: '2020-01-01' },
+    ])
+      await request(app.getHttpServer())
+        .post('/api/v1/auth/signup')
+        .send({
+          email: 'user@example.com',
+          password: 'Password123!',
+          nickname: 'traderKim',
+          verificationToken: 'verified-signup-proof',
+          ...consent,
+        })
+        .expect(400)
+        .expect((response) =>
+          expect(
+            (response.body as { error: { code: string } }).error.code,
+          ).toBe('AUTH_SIGNUP_CONSENT_REQUIRED'),
+        );
+    expect(consume).not.toHaveBeenCalled();
+    expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
   });
 
@@ -1385,6 +1419,8 @@ describe('AppController (e2e)', () => {
         password: 'Password123!',
         nickname: 'traderKim',
         verificationToken: 'verified-signup-proof',
+        ageConfirmed: true,
+        termsVersion: CURRENT_TERMS_VERSION,
       })
       .expect(201)
       .expect((response) => {
@@ -1413,6 +1449,9 @@ describe('AppController (e2e)', () => {
               email: user.email,
               passwordHash: 'hashed-password',
               role: 'user',
+              termsVersion: CURRENT_TERMS_VERSION,
+              termsAcceptedAt: expect.any(Date) as Date,
+              ageConfirmedAt: expect.any(Date) as Date,
             }),
           }),
         );

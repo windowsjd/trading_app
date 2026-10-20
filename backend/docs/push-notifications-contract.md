@@ -164,11 +164,15 @@ rank, tier and eligibility verdict) by `updated_at`, and per participant
 hidden from the ranking. Not-qualified participants (`final_qualified =
 false`) cannot hold a rank or tier (SQL CHECK) and are not told anything. An
 `ended` Season (not settled) or provisional values are never announced. Key
-`season_final:<seasonId>` — once per user and Season: these outbox rows are
-exempt from retention, and only Seasons that ended within the last 14 days are
-read, so a re-run settlement (which touches `updated_at`) never announces a
-result twice. Right before sending the participant must still hold both
-values. A later operator correction is not re-announced.
+`season_final:<seasonId>` — once per user and Season. Only Seasons that ended
+within the last 14 days (`FINAL_RESULT_MAX_AGE_MS`) are read, and the outbox row
+is created after the Season end, so it follows the normal 30-day retention
+(§5, since 2026-10-21): by the time it is pruned the Season is never read
+again, and a re-run settlement (which touches `updated_at`) never announces a
+result twice — within the 14 days the unique key absorbs it, afterwards the
+age filter does. Retention must stay longer than that window (a config test
+pins it). Right before sending the participant must still hold both values. A
+later operator correction is not re-announced.
 
 ### 2.7 Season ending soon (`season_ending_soon`)
 
@@ -260,7 +264,7 @@ Every `PUSH_NOTIFICATIONS_INTERVAL_MS` (default 10 s, 2–300 s) under the lease
    batches of 1000 (`receipt_ok` / `receipt_error` + code); a ticket without a
    receipt after 24 h is `receipt_missing`.
 5. **Retention** (hourly): outbox rows older than 30 days are deleted in
-   batches of 1000 (final-result rows are kept, §2.6); deliveries cascade.
+   batches of 1000, final-result rows included (§2.6); deliveries cascade.
 
 Expiry after the event: fills 2 h, liquidations/failures 6 h, friend requests
 3 days, notices 24 h, final results 3 days, ending-soon at `end_at`.

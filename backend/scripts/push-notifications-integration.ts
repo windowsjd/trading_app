@@ -1036,6 +1036,76 @@ async function run() {
     'deliveries go with their notification',
   );
 
+  // Final results follow the same retention (§2.6). A Season that ended more
+  // than 14 days ago is never read again, so its pruned row is not announced
+  // a second time — not even after a re-run settlement touches `updated_at`.
+  const ended = await db.season.create({
+    data: {
+      name: `push-ended-${tag}`,
+      status: 'settled',
+      startAt: new Date(start.getTime() - 47 * 24 * HOUR),
+      endAt: new Date(start.getTime() - 40 * 24 * HOUR),
+      initialCapitalKrw: '10000000',
+      tradeFeeRate: '0.001',
+      fxFeeRate: '0.001',
+    },
+  });
+  created.seasons.push(ended.id);
+  const endedAccount = await account(alice.id, 'season', ended.startAt);
+  await db.seasonParticipant.create({
+    data: {
+      seasonId: ended.id,
+      userId: alice.id,
+      tradingAccountId: endedAccount.id,
+      participantStatus: 'finished',
+      joinedAt: ended.startAt,
+      initialCapitalKrw: '10000000',
+      totalAssetKrw: '10000000',
+      totalReturnRate: '0',
+      maxDrawdown: '0',
+      finalRank: 1,
+      finalTier: 'gold',
+    },
+  });
+  const announcedAt = new Date(ended.endAt.getTime() + HOUR);
+  const announced = await db.pushNotification.create({
+    data: {
+      userId: alice.id,
+      type: 'season_final_result',
+      sourceKey: `season_final:${ended.id}`,
+      tradingAccountId: endedAccount.id,
+      title: 't',
+      body: 'b',
+      data: { v: 1 },
+      status: 'sent',
+      sentAt: announcedAt,
+      eventAt: announcedAt,
+      expiresAt: new Date(announcedAt.getTime() + 3 * 24 * HOUR),
+      nextAttemptAt: announcedAt,
+      createdAt: announcedAt,
+    },
+  });
+  check(
+    (await dispatcher.prune(start, config)) >= 1 &&
+      (await db.pushNotification.findUnique({
+        where: { id: announced.id },
+      })) === null,
+    'retention prunes a final-result row past 30 days',
+  );
+  await db.season.update({
+    where: { id: ended.id },
+    data: { updatedAt: new Date(heldAt.getTime() + 3_000) },
+  });
+  const rescan = await scanner.scan(new Date(heldAt.getTime() + 4_000), config);
+  check(
+    rescan.created.season_final_results === 0 &&
+      !rescan.failedSources.includes('season_final_results') &&
+      (await db.pushNotification.count({
+        where: { userId: alice.id, sourceKey: `season_final:${ended.id}` },
+      })) === 0,
+    'a pruned final result of an old Season is never announced again',
+  );
+
   // Database CHECKs back the state machine.
   await assert.rejects(
     db.pushNotification.create({

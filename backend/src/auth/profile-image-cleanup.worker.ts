@@ -9,6 +9,7 @@ import { OpsJobRunService } from '../ops/ops-job-run.service';
 import { ProfileImageCleanupService } from './profile-image-cleanup.service';
 import { ProfileImageStorageService } from './profile-image-storage.service';
 import { EmailAuthCleanupService } from './email-auth-cleanup.service';
+import { DataRetentionCleanupService } from './data-retention-cleanup.service';
 
 const LOCK_KEY = 'account_deletion_cleanup:current';
 const LOCK_TTL_SECONDS = 120;
@@ -23,7 +24,8 @@ const INTERVAL_MS = 60_000;
  * queued rows wait. A run is recorded only when there was work: `failed` if
  * a storage delete failed or a deletion is past its 7-day target. No object
  * key, user id or provider message is logged. The same timer also invokes
- * bounded email retention hourly, independently of storage configuration.
+ * bounded email retention and then data retention (sessions, operator audit
+ * logs, inquiries) hourly, independently of storage configuration.
  */
 @Injectable()
 export class ProfileImageCleanupWorker
@@ -40,6 +42,7 @@ export class ProfileImageCleanupWorker
     private readonly locks: OpsJobLockService,
     private readonly runs: OpsJobRunService,
     private readonly emailCleanup: EmailAuthCleanupService,
+    private readonly dataRetention: DataRetentionCleanupService,
   ) {}
 
   onModuleInit() {
@@ -64,6 +67,7 @@ export class ProfileImageCleanupWorker
   async tick() {
     // Independent of storage configuration and failures in profile cleanup.
     await this.emailCleanup.runIfDue();
+    await this.dataRetention.runIfDue();
     if (this.running || !this.storage.isConfigured()) return;
     this.running = true;
     let ownerId: string | undefined;

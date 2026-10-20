@@ -34,6 +34,7 @@ import type {
   SignupRequestBody,
   UpdateProfileRequestBody,
 } from './auth.types';
+import { CURRENT_TERMS_VERSION } from './terms.constants';
 
 type JwtTtlUnit = 's' | 'm' | 'h' | 'd' | 'w';
 type JwtExpiresIn = `${number}${JwtTtlUnit}`;
@@ -42,6 +43,7 @@ type ParsedSignupRequest = {
   email: string;
   password: string;
   nickname: string;
+  termsVersion: string;
 };
 
 type ParsedLoginRequest = {
@@ -117,6 +119,9 @@ export class AuthService implements OnModuleInit {
             'NICKNAME_ALREADY_EXISTS',
             'Nickname already exists.',
           );
+        // One server instant: signup completed on the screen that showed this
+        // terms version's notice, with the required 16+ box checked.
+        const consentAt = new Date();
         const createdUser = await tx.user.create({
           data: {
             email: request.email,
@@ -125,6 +130,9 @@ export class AuthService implements OnModuleInit {
             nickname: request.nickname,
             role: UserRole.user,
             status: UserStatus.active,
+            termsVersion: request.termsVersion,
+            termsAcceptedAt: consentAt,
+            ageConfirmedAt: consentAt,
           },
           select: {
             id: true,
@@ -578,12 +586,34 @@ export class AuthService implements OnModuleInit {
     const email = this.parseEmail(body.email);
     const password = this.parsePassword(body.password);
     const nickname = this.parseNickname(body.nickname);
+    const termsVersion = this.parseSignupConsent(body);
 
     return {
       email,
       password,
       nickname,
+      termsVersion,
     };
+  }
+
+  /**
+   * The required 만 16세 이상 check and the terms version of the signup screen
+   * (exactly `true` and the current version). Checked with the other fields,
+   * before the email proof is consumed: a refused request (an old app, an
+   * outdated screen) creates nothing and keeps its proof.
+   */
+  private parseSignupConsent(body: SignupRequestBody) {
+    if (
+      body.ageConfirmed !== true ||
+      body.termsVersion !== CURRENT_TERMS_VERSION
+    ) {
+      this.throwBadRequest(
+        'AUTH_SIGNUP_CONSENT_REQUIRED',
+        'Age confirmation and the current terms version are required.',
+      );
+    }
+
+    return CURRENT_TERMS_VERSION;
   }
 
   private parseLoginRequest(body: LoginRequestBody): ParsedLoginRequest {

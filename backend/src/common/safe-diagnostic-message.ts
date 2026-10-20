@@ -209,6 +209,7 @@ const SAFE_MESSAGES = new Set<string>([
   'Trading fees could not be verified. Please try again.',
   'Transfer would spend isolated Futures collateral.',
   '/fx execute write path is not implemented yet.',
+  'A moderation reason is required.',
   'Admin cannot change their own role.',
   'Admin cannot change their own status.',
   'Admin role is required.',

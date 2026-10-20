@@ -29,6 +29,7 @@ import {
   UserStatus,
 } from '../generated/prisma/client';
 import { AuthService } from './auth.service';
+import { CURRENT_TERMS_VERSION } from './terms.constants';
 import * as argon2 from 'argon2';
 
 const mockedArgon2 = jest.mocked(argon2);
@@ -108,17 +109,24 @@ describe('AuthService', () => {
         return undefined;
       }),
     };
+    const verification = {
+      limit: jest.fn(),
+      consume: jest.fn().mockResolvedValue({ verifiedAt: createdAt }),
+    };
     const service = new AuthService(
       prisma as never,
       jwtService as never,
       configService as never,
-      {
-        limit: jest.fn(),
-        consume: jest.fn().mockResolvedValue({ verifiedAt: createdAt }),
-      } as never,
+      verification as never,
     );
 
-    return { configService, jwtService, prisma, service };
+    return { configService, jwtService, prisma, service, verification };
+  };
+
+  /** The signup screen's required 16+ check and its terms version. */
+  const consent = {
+    ageConfirmed: true,
+    termsVersion: CURRENT_TERMS_VERSION,
   };
 
   const hashToken = (token: string) =>
@@ -183,10 +191,12 @@ describe('AuthService', () => {
       status: activeUser.status,
     });
 
+    const before = Date.now();
     const response = await service.signup({
       email: 'USER@example.com ',
       password: 'Password123!',
       nickname: ' traderKim ',
+      ...consent,
     });
 
     expect(mockedArgon2.hash).toHaveBeenCalledWith('Password123!');
@@ -199,9 +209,22 @@ describe('AuthService', () => {
           nickname: 'traderKim',
           role: UserRole.user,
           status: UserStatus.active,
+          termsVersion: CURRENT_TERMS_VERSION,
+          termsAcceptedAt: expect.any(Date) as Date,
+          ageConfirmedAt: expect.any(Date) as Date,
         },
       }),
     );
+    // One server instant for both, never a client-supplied time.
+    const createCalls = prisma.user.create.mock.calls as unknown as Array<
+      [{ data: { termsAcceptedAt: Date; ageConfirmedAt: Date } }]
+    >;
+    const stored = createCalls[0][0].data;
+    expect(stored.ageConfirmedAt.getTime()).toBe(
+      stored.termsAcceptedAt.getTime(),
+    );
+    expect(stored.termsAcceptedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(stored.termsAcceptedAt.getTime()).toBeLessThanOrEqual(Date.now());
     expect(jwtService.signAsync).toHaveBeenCalledWith(
       { sub: activeUser.id, tv: 0 },
       { secret: 'test-secret', expiresIn: '15m' },
@@ -242,6 +265,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: 'Password123!',
         nickname: 'traderKim',
+        ...consent,
       }),
       HttpStatus.CONFLICT,
       'EMAIL_ALREADY_EXISTS',
@@ -261,6 +285,7 @@ describe('AuthService', () => {
         email: 'user@example.com',
         password: 'Password123!',
         nickname: 'traderKim',
+        ...consent,
       }),
       HttpStatus.CONFLICT,
       'NICKNAME_ALREADY_EXISTS',
@@ -268,6 +293,42 @@ describe('AuthService', () => {
     expect(prisma.user.create).not.toHaveBeenCalled();
     expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ['without the age confirmation', { termsVersion: CURRENT_TERMS_VERSION }],
+    ['with an unchecked age box', { ...consent, ageConfirmed: false }],
+    ['with a non-boolean "true"', { ...consent, ageConfirmed: 'true' }],
+    ['with a non-boolean 1', { ...consent, ageConfirmed: 1 }],
+    ['without the terms version', { ageConfirmed: true }],
+    ['with another terms version', { ...consent, termsVersion: '2020-01-01' }],
+    [
+      'with a padded terms version',
+      { ...consent, termsVersion: ` ${CURRENT_TERMS_VERSION}` },
+    ],
+  ])(
+    'refuses signup %s before the email proof or anything else is used',
+    async (_label, fields: Record<string, unknown>) => {
+      const { prisma, service, verification } = createService();
+
+      await expectHttpError(
+        service.signup({
+          email: 'user@example.com',
+          password: 'Password123!',
+          nickname: 'traderKim',
+          verificationToken: 'proof',
+          ...fields,
+        }),
+        HttpStatus.BAD_REQUEST,
+        'AUTH_SIGNUP_CONSENT_REQUIRED',
+      );
+      expect(verification.limit).not.toHaveBeenCalled();
+      expect(verification.consume).not.toHaveBeenCalled();
+      expect(mockedArgon2.hash).not.toHaveBeenCalled();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.user.create).not.toHaveBeenCalled();
+      expect(prisma.refreshTokenSession.create).not.toHaveBeenCalled();
+    },
+  );
 
   it('updates my public profile fields and ignores internal body fields', async () => {
     const { prisma, service } = createService();

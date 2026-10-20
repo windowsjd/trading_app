@@ -208,6 +208,7 @@ describe('OperatorUserStatusService', () => {
 
     const response = await service.updateUserStatus(adminActor, 'target-1', {
       status: UserStatus.deleted,
+      reason: 'policy violation',
     });
 
     expect(prisma.user.update).toHaveBeenCalledWith(
@@ -273,6 +274,7 @@ describe('OperatorUserStatusService', () => {
     await expectHttpError(
       service.updateUserStatus(adminActor, 'admin-2', {
         status: UserStatus.deleted,
+        reason: 'policy violation',
       }),
       HttpStatus.CONFLICT,
       'LAST_ADMIN_STATUS_CHANGE_FORBIDDEN',
@@ -339,6 +341,64 @@ describe('OperatorUserStatusService', () => {
             afterRole: UserRole.user,
           }),
         }),
+      }),
+    );
+  });
+
+  it.each([
+    [UserStatus.suspended, undefined],
+    [UserStatus.suspended, '   '],
+    [UserStatus.deleted, ''],
+    [UserStatus.deleted, 42],
+  ])(
+    'refuses %s without a reason (%p) before any audit or change',
+    async (status, reason) => {
+      const { prisma, service } = createService();
+
+      await expectHttpError(
+        service.updateUserStatus(adminActor, 'target-1', { status, reason }),
+        HttpStatus.BAD_REQUEST,
+        'INVALID_MODERATION_TEXT',
+      );
+
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      expect(prisma.user.update).not.toHaveBeenCalled();
+      expect(prisma.refreshTokenSession.updateMany).not.toHaveBeenCalled();
+      expect(prisma.operatorAuditLog.create).not.toHaveBeenCalled();
+    },
+  );
+
+  it('stores a sanction reason trimmed to 500 characters', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValueOnce(userRecord());
+    prisma.user.update.mockResolvedValueOnce(
+      userRecord({ status: UserStatus.suspended }),
+    );
+
+    const response = await service.updateUserStatus(adminActor, 'target-1', {
+      status: UserStatus.suspended,
+      reason: ` ${'r'.repeat(510)} `,
+    });
+
+    expect(response.data.statusChange.reason).toBe('r'.repeat(500));
+  });
+
+  it('keeps the reason optional when restoring a deleted user', async () => {
+    const { prisma, service } = createService();
+    prisma.user.findUnique.mockResolvedValueOnce(
+      userRecord({ status: UserStatus.deleted }),
+    );
+    prisma.user.update.mockResolvedValueOnce(userRecord());
+
+    const response = await service.restoreUser(adminActor, 'target-1', {});
+
+    expect(response.data.restore.reason).toBe(null);
+    expect(prisma.operatorAuditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'operator.user_restore',
+          result: OperatorAuditResult.success,
+        }) as Record<string, unknown>,
       }),
     );
   });

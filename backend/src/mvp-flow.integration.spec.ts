@@ -79,6 +79,7 @@ import { TradingAccountAccessService } from './src/trading-accounts/trading-acco
 import { GeneralAccountPerformanceService } from './src/portfolio/general-account-performance.service';
 import { GeneralExternalFundingService } from './src/portfolio/general-external-funding.service';
 import { AuthService } from './src/auth/auth.service';
+import { CURRENT_TERMS_VERSION } from './src/auth/terms.constants';
 import { authEmailFixture } from './scripts/lib/auth-email-fixture';
 import { SeasonsService } from './src/seasons/seasons.service';
 import { WalletsService } from './src/wallets/wallets.service';
@@ -236,6 +237,8 @@ async function signupUser() {
       verificationToken: await emailFixture.proof(scenario.email, 'signup'),
       password,
       nickname: scenario.nickname,
+      ageConfirmed: true,
+      termsVersion: CURRENT_TERMS_VERSION,
     },
     metadata(),
   );

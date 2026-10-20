@@ -10,6 +10,10 @@ export const TEST_IDS = {
     signupNicknameInput: 'auth-signup-nickname-input',
     signupPasswordInput: 'auth-signup-password-input',
     signupConfirmPasswordInput: 'auth-signup-confirm-password-input',
+    signupAgeCheckbox: 'auth-signup-age-checkbox',
+    signupLegalNotice: 'auth-signup-legal-notice',
+    signupTermsLink: 'auth-signup-terms-link',
+    signupPrivacyLink: 'auth-signup-privacy-link',
     signupSubmit: 'auth-signup-submit',
   },
 

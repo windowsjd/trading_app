@@ -360,6 +360,12 @@ model User {
   role            UserRole   @default(user)
   createdAt       DateTime   @default(now()) @map("created_at")
   updatedAt       DateTime   @updatedAt @map("updated_at")
+  /// Terms version of the signup screen this member completed (null: joined before 2026-10-21).
+  termsVersion    String?    @map("terms_version") @db.VarChar(32)
+  /// When signup completed on the screen showing termsVersion and its notice ("가입하면 … 동의한 것으로 봅니다"). Not a checkbox consent: there is no terms checkbox.
+  termsAcceptedAt DateTime?  @map("terms_accepted_at")
+  /// When signup completed with the required "만 16세 이상" box checked (the same server instant as termsAcceptedAt).
+  ageConfirmedAt  DateTime?  @map("age_confirmed_at")
 
   friendshipsLow              Friendship[]               @relation("FriendshipLow")
   friendshipsHigh             Friendship[]               @relation("FriendshipHigh")

@@ -34,6 +34,10 @@ export interface SignupRequestDto {
   email: string;
   nickname: string;
   password: string;
+  /** The checked "[필수] 만 16세 이상입니다" box. */
+  ageConfirmed: true;
+  /** TERMS_VERSION of the screen the member signed up on. */
+  termsVersion: string;
 }
 
 export type EmailPurpose = 'signup' | 'password_reset';

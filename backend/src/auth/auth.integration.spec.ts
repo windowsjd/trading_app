@@ -54,6 +54,7 @@ import { JwtService } from '@nestjs/jwt';
 import { RefreshTokenSessionStatus, UserRole, UserStatus } from './src/generated/prisma/client';
 import { PrismaService } from './src/prisma/prisma.service';
 import { AuthService } from './src/auth/auth.service';
+import { CURRENT_TERMS_VERSION } from './src/auth/terms.constants';
 import { authEmailFixture } from './scripts/lib/auth-email-fixture';
 import { AccessTokenGuard } from './src/auth/access-token.guard';
 import * as argon2 from 'argon2';
@@ -100,11 +101,38 @@ async function main() {
     await cleanup();
 
     const verificationToken = await emailFixture.proof(activeEmail, 'signup');
+    // Without the 16+ check or with other terms: nothing is created and the
+    // proof stays usable (the signup below spends the same proof).
+    for (const refused of [
+      { termsVersion: CURRENT_TERMS_VERSION },
+      { ageConfirmed: false, termsVersion: CURRENT_TERMS_VERSION },
+      { ageConfirmed: 'true', termsVersion: CURRENT_TERMS_VERSION },
+      { ageConfirmed: true },
+      { ageConfirmed: true, termsVersion: '2020-01-01' },
+    ]) {
+      try {
+        await authService.signup({
+          verificationToken,
+          email: activeEmail,
+          password,
+          nickname: activeNickname,
+          ...refused,
+        });
+        throw new Error('Expected signup without consent to fail');
+      } catch (error) {
+        assert.ok(error instanceof HttpException);
+        assert.equal(error.getStatus(), 400);
+        assert.equal(error.getResponse().error.code, 'AUTH_SIGNUP_CONSENT_REQUIRED');
+      }
+    }
+    assert.equal(await prisma.user.count({ where: { email: activeEmail } }), 0);
     const signupResponse = await authService.signup({
       verificationToken,
       email: activeEmail,
       password,
       nickname: activeNickname,
+      ageConfirmed: true,
+      termsVersion: CURRENT_TERMS_VERSION,
     });
     assert.equal(signupResponse.success, true);
     assert.equal(signupResponse.data.user.email, activeEmail);
@@ -119,6 +147,10 @@ async function main() {
     });
     assert.notEqual(activeUser.passwordHash, password);
     assert.equal(activeUser.role, UserRole.user);
+    assert.equal(activeUser.termsVersion, CURRENT_TERMS_VERSION);
+    assert.ok(activeUser.termsAcceptedAt instanceof Date);
+    assert.equal(activeUser.ageConfirmedAt?.getTime(), activeUser.termsAcceptedAt.getTime());
+    assert.equal(/terms|ageConfirmed/.test(JSON.stringify(signupResponse)), false);
     assert.equal(await argon2.verify(activeUser.passwordHash, password), true);
     const signupRefreshSession = await prisma.refreshTokenSession.findUniqueOrThrow({
       where: {
@@ -235,6 +267,7 @@ async function main() {
     assert.equal(meResponse.data.email, activeEmail);
     assert.equal(meResponse.data.status, UserStatus.active);
     assert.equal(JSON.stringify(meResponse).includes('passwordHash'), false);
+    assert.equal(/terms|ageConfirmed/.test(JSON.stringify(meResponse)), false);
 
     const suspendedHash = await argon2.hash(password);
     const suspendedUser = await prisma.user.create({

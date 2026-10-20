@@ -188,6 +188,7 @@ All routes in this section require a valid Bearer access token and `role=operato
 Common policy:
 
 - Uses the existing operator guard and `OperatorAuditLog`.
+- Sanction reason (2026-10-21): exclusion, hiding (`hidden: true`) and final result correction require a non-blank `reason` (trimmed; at most 120 characters are kept). A missing, blank or non-string `reason` returns `400 INVALID_MODERATION_TEXT` before any lock, state change or audit row. Unhiding (`hidden: false`) keeps `reason` optional. Notifying the member (reason and how to appeal: admin@nanghwa.com) is a manual operator email; no API sends it.
 - Success and handled failure outcomes write safe audit metadata.
 - Responses and audit metadata do not expose private ledgers, raw provider payloads, tokens, secrets, password hashes, or refresh-token hashes.
 - These APIs do not mutate order, FX, wallet, position, cash-wallet, reward, or reward-fulfillment rows.
@@ -197,7 +198,7 @@ Common policy:
 
 Purpose: exclude a season participant from further season activity after abuse review.
 
-Body:
+Body (`reason` required, `note` optional):
 
 ```json
 {
@@ -233,6 +234,7 @@ Policy:
 
 Errors include:
 
+- `400 INVALID_MODERATION_TEXT` (missing, blank or non-string `reason`; non-string `note`)
 - `401 UNAUTHORIZED`
 - `403 OPERATOR_FORBIDDEN`
 - `404 SEASON_PARTICIPANT_NOT_FOUND`
@@ -253,7 +255,7 @@ Body:
 }
 ```
 
-Set `"hidden": false` to unhide.
+Set `"hidden": false` to unhide. `reason` is required when hiding and optional when unhiding.
 
 Success:
 
@@ -281,7 +283,7 @@ Policy:
 
 Purpose: correct verified final season result display fields after review.
 
-Body:
+Body (`reason` required, `note` optional):
 
 ```json
 {
@@ -457,7 +459,7 @@ Body:
 ```json
 {
   "status": "active | suspended | deleted",
-  "reason": "optional string"
+  "reason": "required for suspended/deleted, optional for active"
 }
 ```
 
@@ -494,6 +496,7 @@ Validation:
 - Invalid status returns `INVALID_USER_STATUS`.
 - Target not found returns `TARGET_USER_NOT_FOUND`.
 - Admin cannot change their own status: `CANNOT_CHANGE_OWN_STATUS`.
+- Sanction reason (2026-10-21): `suspended` and `deleted` require a non-blank `reason` (trimmed; at most 500 characters are kept). A missing, blank or non-string `reason` returns `400 INVALID_MODERATION_TEXT` after the admin, status and own-status checks and before the transaction: no audit row, no status change. Reactivation (`active`) keeps `reason` optional. Notifying the member is a manual operator email.
 - Last active admin cannot be suspended or deleted: `LAST_ADMIN_STATUS_CHANGE_FORBIDDEN`.
 - Last-admin protection counts only `status=active AND role=admin`; suspension/deletion shares the role-change reduction lock. Ordinary user status changes do not acquire that shared lock. Restore locks only its target. User, refresh-session revocation and success audit writes remain in the same transaction.
 - Same-status request returns `USER_STATUS_ALREADY_ASSIGNED`.
@@ -510,7 +513,7 @@ Status update and success audit are written in the same transaction. If success 
 
 Purpose: admin-only deleted user restore.
 
-Body:
+Body (`reason` stays optional: restoring lifts a sanction):
 
 ```json
 {

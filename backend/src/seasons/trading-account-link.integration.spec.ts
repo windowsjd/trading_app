@@ -571,7 +571,7 @@ async function testExclusionSuspendsAccount() {
         { userId: operator.id, role: 'operator' },
         season.id,
         participantId,
-        {},
+        { reason: 'integration-test' },
       );
     } catch (error) {
       conflict = error;
@@ -698,7 +698,7 @@ async function testExclusionRollsBackTogether(failingModel, failingMethod) {
         { userId: operator.id, role: 'operator' },
         season.id,
         participantId,
-        {},
+        { reason: 'integration-test' },
       );
     } catch (error) {
       failure = error;
@@ -760,7 +760,7 @@ async function testExclusionRollsBackOnLimitCancelFailure() {
         { userId: operator.id, role: 'operator' },
         season.id,
         participantId,
-        {},
+        { reason: 'integration-test' },
       );
     } catch (error) {
       failure = error;
