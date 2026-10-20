@@ -184,14 +184,17 @@ export function AssetMarketChart({
       {detailView ? (
         <View style={styles.detailHeader}>
           <View style={styles.assetNameRow}>
+            {/* No picker (and no ▼) until the detail names the asset's market: loading or failed. */}
             <ActionPressable testID="asset-name-selector" style={styles.nameSelector}
               accessibilityRole="button"
               accessibilityLabel={`종목 변경, 현재 ${asset ? getAssetNameDisplay(asset).primary : '종목'}`}
+              disabled={!onChangePair}
+              accessibilityState={{ disabled: !onChangePair }}
               onPress={onChangePair}>
               <Text testID="asset-detail-name" style={styles.assetName}>
                 {asset ? getAssetNameDisplay(asset).primary : '종목'}
               </Text>
-              <DisclosureTriangle direction="down" />
+              {onChangePair ? <DisclosureTriangle direction="down" /> : null}
             </ActionPressable>
             {asset ? <Text testID="asset-settlement-currency" style={styles.settlementBadge}>
               {asset.settlementCurrency}

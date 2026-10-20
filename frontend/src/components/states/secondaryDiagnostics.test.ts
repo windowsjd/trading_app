@@ -94,18 +94,42 @@ it('Settings hides details if its /me query fails, including cached admin role',
   await h.start(); assert.equal(h.panels().length, 0);
 });
 
-for (const role of ['user','operator','admin']) it(`Settings nickname and privacy mutations: ${role}, recovery and separate errors`, async t => {
-  const h = harness('settings', role); t.after(h.close); await h.start();
+// Nickname editing lives on MY (MyProfileEditor); the privacy switch stays in Settings.
+for (const role of ['user','operator','admin']) it(`MY nickname mutation: ${role}, recovery and separate errors`, async t => {
+  const h = harness('my', role); t.after(h.close); await h.start();
   h.failures['PATCH /me'] = failure('nickname-request');
+  await h.press(p => p.testID === 'my-nickname-edit');
   const nickname = h.renderer.root.findAllByType('TextInput')[0]; act(() => nickname.props.onChangeText('새닉네임'));
   await h.press(p => String(p.testID).includes('save-nickname')); await h.expand();
   assert.equal(h.panels().length, role === 'admin' ? 1 : 0);
+  assert.equal(h.text().includes('nickname-request'), role === 'admin');
   assert.ok(h.alerts.some((alert: string[]) => alert[0] === '저장 실패'));
   delete h.failures['PATCH /me']; await h.press(p => String(p.testID).includes('save-nickname'));
   assert.equal(h.panels().length, 0);
+});
+
+it('MY with a failing rank read keeps its page through a nickname save (the failed rank is not re-read)', async t => {
+  const h = harness('my'); t.after(h.close);
+  h.failures['/ranking'] = failure('ranking-request');
+  await h.start();
+  const rankReads = () => h.requests.filter((key: string) => key === '/ranking').length;
+  const before = rankReads();
+  assert.ok(before >= 1);
+  await h.press(p => p.testID === 'my-nickname-edit');
+  act(() => h.renderer.root.findAllByType('TextInput')[0].props.onChangeText('새닉네임'));
+  await h.press(p => String(p.testID).includes('save-nickname'));
+  assert.ok(h.alerts.some((alert: string[]) => alert[0] === '저장 완료'));
+  assert.equal(rankReads(), before);
+  assert.equal(h.renderer.root.findAll((n: any) => n.type === 'FullPageLoading').length, 0);
+  assert.equal(h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === 'my-nickname-edit').length, 1);
+});
+
+for (const role of ['user','operator','admin']) it(`Settings privacy mutation: ${role}, separate error`, async t => {
+  const h = harness('settings', role); t.after(h.close); await h.start();
   h.failures['PATCH /me'] = failure('privacy-request');
   act(() => h.renderer.root.findAllByType('Switch').find((n: any) => n.props.testID === 'settings-portfolio-public').props.onValueChange(true)); await h.flush(); await h.expand();
   assert.equal(h.panels().length, role === 'admin' ? 1 : 0);
+  assert.equal(h.text().includes('privacy-request'), role === 'admin');
 });
 
 for (const role of ['user', 'operator', 'admin']) it(`Friends mutation preserves Alert and clears diagnostic on success for ${role}`, async t => {

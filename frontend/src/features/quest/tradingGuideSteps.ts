@@ -4,7 +4,7 @@ export type TradingQuestKey = Exclude<BeginnerQuestKey, 'exchange' | 'transfer'>
 export type TradingGuideStep = { screen: TradeGuideScreen; target: QuestGuideTargetId; title: string; body: string; next?: boolean };
 const market: TradingGuideStep = { screen: 'market', target: 'market-assets', title: '종목 선택', body: '목록에서 현재 거래 가능한 종목을 선택해 주세요. 시세와 차트는 언제든 확인할 수 있어요.' };
 const price: TradingGuideStep = { screen: 'asset', target: 'asset-price', title: '현재가', body: '암호화폐의 현재 가격은 여기에 표시돼요.', next: true };
-const buy: TradingGuideStep = { screen: 'asset', target: 'asset-buy', title: '구매하기', body: '구매하기를 눌러 실제 주문 화면으로 이동해 주세요.' };
+const buy: TradingGuideStep = { screen: 'asset', target: 'asset-buy', title: '매수하기', body: '매수하기를 눌러 실제 주문 화면으로 이동해 주세요.' };
 const marketType: TradingGuideStep = { screen: 'order', target: 'order-type', title: '시장가 주문', body: '시장가 주문은 가격을 직접 지정하지 않고, 주문이 체결되는 시점에 시장에서 거래 가능한 가격으로 매수하는 방식이에요.', next: true };
 const amount: TradingGuideStep = { screen: 'order', target: 'order-input', title: '금액과 수량', body: '사용 가능한 잔액 안에서 실습할 금액이나 수량을 입력해 주세요. 수수료도 필요해요.', next: true };
 const preview: TradingGuideStep = { screen: 'order', target: 'order-preview', title: '금액과 수수료 확인', body: '예상 금액과 거래 수수료를 확인해 주세요. 시장가의 최종 가격과 수수료는 실행 시 확정돼요.', next: true };
@@ -34,7 +34,7 @@ export const TRADING_GUIDE_STEPS: Record<TradingQuestKey, TradingGuideStep[]> = 
     { screen: 'order', target: 'protection-submit', title: '등록하기', body: '가격과 수량을 확인한 뒤 등록하기를 눌러 주세요. 등록이 확정되면 완료되며 발동까지 기다리지 않아요.' },
   ],
   marketSell: [
-    { screen: 'asset', target: 'asset-sell', title: '판매하기', body: '판매하기를 눌러 매도 화면으로 이동해 주세요.' },
+    { screen: 'asset', target: 'asset-sell', title: '매도하기', body: '매도하기를 눌러 매도 화면으로 이동해 주세요.' },
     { ...holdings, body: '주문 화면 아래 보유종목에서 매도 가능한 수량을 확인해 주세요. 수량이 없으면 정상 시장가 매수로 다시 준비할 수 있어요. 보호 주문과 충돌하면 기존 보호를 취소한 뒤 진행해 주세요.' },
     { ...marketType, body: '시장가로 매도해요. 보유 위험을 줄이는 매도는 학습 진행도와 관계없이 사용할 수 있어요.' }, amount,
     { ...preview, body: '미실현손익은 아직 보유한 자산의 평가 변화예요. 매도가 체결되면 실현손익이 확정돼요. 매도 수수료와 예상 수령액도 확인해 주세요.' }, submit,

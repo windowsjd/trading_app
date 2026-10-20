@@ -463,6 +463,8 @@ function prepareAccountScreens(h: ReturnType<typeof createHarness>) {
   h.mockLocal('components/tradingAccount/AccountSetupPanel', { __esModule: true, default: () => null });
   h.mockLocal('features/auth/useLogout', { useLogout: () => () => Promise.resolve() });
   h.mockLocal('components/charts', { DonutChart: () => null, LineChart: () => null });
+  // MY's photo/nickname editor (native picker, mutations) has its own tests.
+  h.mockLocal('screens/my/MyProfileEditor', { __esModule: true, default: () => null });
   h.queries.set('me', h.ready({ nickname: 'trader-2', email: 'trader-2@example.com' }));
   h.queries.set('record', h.ready({
     items: [],

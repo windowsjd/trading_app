@@ -82,7 +82,7 @@ module.exports=async function({page,open,id,tab,out,errors,expectSteady}){
  assert.equal(await page.getByTestId('holding-protection-BTC').count(),0,'no TP/SL button on the holdings card');
  await id('sell-take-profit-toggle').click();await id('sell-take-profit-trigger-price').fill('120');await id('sell-take-profit-ratio-50').click();
  await next();await id('sell-intent-submit').click();await finish('protection');
- // 판매하기 on the detail, then holdings below the sell form, then the form steps.
+ // 매도하기 on the detail, then holdings below the sell form, then the form steps.
  await start('marketSell');await id('asset-detail-open-sell-order').click();await next();await marketDefault();await next();
  await id('order-quantity-input').fill('1');await next();await next();await id('order-execute-submit').click();await finish('marketSell');
  await buy('limitBuy','BTC');

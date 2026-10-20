@@ -13,8 +13,18 @@ export async function applyProfileImageResponse(client: QueryClient, me: MeDto, 
     current?.id === me.id ? { ...current, profileImageUrl: me.profileImageUrl } : current,
   );
   if (client.getQueryData<MeDto>(QUERY_KEYS.me)?.id !== me.id) return;
-  // All ranking list shapes include identity, as does this user's summary.
-  // Friends DTOs exclude the viewer; records list/detail contain no avatar.
-  void client.invalidateQueries({ queryKey: ['ranking', 'list'] });
-  void client.invalidateQueries({ queryKey: QUERY_KEYS.ranking.userSeasonSummary(me.id), exact: true });
+  invalidateIdentityViews(client, me.id);
+}
+
+/**
+ * Re-read what shows this user's photo or nickname besides /me: every ranking
+ * list shape and the user's own season summary (friends DTOs exclude the
+ * viewer; records list/detail carry no identity). A ranking entry with nothing
+ * shown yet (a failed read) is left alone: re-reading it only puts it back to
+ * loading, and on MY (whose own rank is such an entry) that is the whole
+ * screen's loader, which would drop the profile editor mid-edit.
+ */
+export function invalidateIdentityViews(client: QueryClient, userId: string) {
+  void client.invalidateQueries({ queryKey: ['ranking', 'list'], predicate: (query) => query.state.data !== undefined });
+  void client.invalidateQueries({ queryKey: QUERY_KEYS.ranking.userSeasonSummary(userId), exact: true });
 }

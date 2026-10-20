@@ -1,7 +1,7 @@
 # 한국주식·암호화폐 공통 호가창
 
 `AssetOrderBook`은 Provider와 주문 처리에 독립된 표시 계약이다.
-현재 `AssetDetailScreen`은 가격·전일대비·차트를 표시한다. 판매하기/구매하기로 진입하는 `OrderScreen`이 좌측 `OrderPanel`, 우측 `AssetOrderLadder`의 Binance 10+10호가 또는 주식 현재가, 하단 `AccountHoldings`를 표시한다. 전체화면 `AssetChartScreen`도 유지한다. 화면 흐름은 [종목 상세와 주문 화면](asset-detail-order-flow.md)을 참고한다.
+현재 `AssetDetailScreen`은 가격·전일대비·차트를 표시한다. 매도하기/매수하기로 진입하는 `OrderScreen`이 좌측 `OrderPanel`, 우측 `AssetOrderLadder`의 Binance 10+10호가 또는 주식 현재가, 하단 `AccountHoldings`를 표시한다. 전체화면 `AssetChartScreen`도 유지한다. 화면 흐름은 [종목 상세와 주문 화면](asset-detail-order-flow.md)을 참고한다.
 `AssetOrderBookCard`는 공통 카드의 개발 harness/렌더 테스트용으로 남아 있다.
 Backend 계약과 검증 기록은 [order-book-api-contract.md](../../backend/docs/order-book-api-contract.md)를 참고한다.
 

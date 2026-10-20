@@ -63,8 +63,8 @@ createRoot(document.getElementById('root')).render(
             {[
               ['motion-probe', semantic.selected, semantic.onAccent, '선택 버튼'],
               ['motion-surface', semantic.surface, semantic.text, '밝은/어두운 표면'],
-              ['motion-buy', financial.buyAction, semantic.onAccent, '구매하기'],
-              ['motion-sell', financial.sellAction, semantic.onAccent, '판매하기'],
+              ['motion-buy', financial.buyAction, semantic.onAccent, '매수하기'],
+              ['motion-sell', financial.sellAction, semantic.onAccent, '매도하기'],
             ].map(([testID, backgroundColor, color, label]) => <ActionPressable key={testID} testID={testID} onPress={() => {}} style={{ backgroundColor, borderRadius: 12, padding: 20 }}>
               <Text style={{ color }}>{label}</Text>
             </ActionPressable>)}

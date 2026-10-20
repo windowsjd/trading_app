@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { TEST_IDS } from '../../constants/testIds.ts';
 import { ASSET_CHART_TIMEFRAMES } from '../../features/asset/chartTimeframes.ts';
 
-const { inlineTradingHarness, act } = createRequire(import.meta.url)(
+const { inlineTradingHarness, act, deferred } = createRequire(import.meta.url)(
   '../../../test/inlineTradingHarness.cjs',
 );
 const text = (h: any) => JSON.stringify(h.renderer.toJSON());
@@ -193,34 +193,152 @@ test('detail header keeps name, symbol, paired prices, change, chart and actions
   ]) assert.ok(screen.indexOf(before) < screen.indexOf(after), `${before} before ${after}`);
 });
 
-test('the name ▼ searches domestic, US and crypto spot in a sheet and swaps the detail in place', async (t) => {
+const listed = (h: any, id: string) => h.node(TEST_IDS.market.item(id)) !== undefined;
+const marked = (h: any, id: string) => h.node(`market-selected-${id}`) !== undefined;
+const sheetTitle = (h: any) => h.renderer.root.findAll((n: any) => n.type === 'Text' && n.props.accessibilityRole === 'header')
+  .map((n: any) => [n.props.children].flat().join('')).find((title: string) => title.endsWith('종목 선택'));
+
+test('the name ▼ searches only this asset\'s market in a sheet, marks the asset, and swaps the detail in place', async (t) => {
   const h = inlineTradingHarness();
   await openDetail(h); t.after(h.close);
   await h.press('asset-name-selector');
   await h.flush();
   assert.equal(h.node('order-asset-sheet') !== undefined, true);
   assert.equal(h.node(TEST_IDS.assetDetail.screen) !== undefined, true, 'the detail stays behind the sheet');
-  // The order screen's search: every spot market, its scopes, live rows.
+  // Crypto spot (BNB) only: no market choice, every read scoped to crypto, live rows.
   for (const scope of ['all', 'domestic_stock', 'us_stock', 'crypto']) {
-    assert.equal(h.node(`order-asset-scope-${scope}`) !== undefined, true, scope);
+    assert.equal(h.node(`order-asset-scope-${scope}`) === undefined, true, scope);
   }
+  assert.equal(sheetTitle(h), '암호화폐 종목 선택');
   assert.equal(h.marketRequests.length, 1);
-  assert.equal(h.marketRequests[0].withPrice, true);
-  assert.equal(h.node(TEST_IDS.market.item('samsung')) !== undefined, true);
+  assert.deepEqual([h.marketRequests[0].assetType, h.marketRequests[0].withPrice], ['crypto', true]);
+  assert.deepEqual([listed(h, 'bnb'), listed(h, 'btc'), listed(h, 'samsung')], [true, true, false]);
+  // The asset on screen is marked; the others are not.
+  assert.deepEqual([marked(h, 'bnb'), marked(h, 'btc')], [true, false]);
+  assert.equal(h.node(TEST_IDS.market.item('bnb')).props.accessibilityState.selected, true);
+  // A search stays in the market: another market's asset is never offered.
+  await h.input('order-asset-search-input', 'SAMSUNG'); await h.flush();
+  assert.equal(h.marketRequests.at(-1).assetType, 'crypto');
+  assert.equal(listed(h, 'samsung'), false);
+  assert.equal(h.node('order-asset-sheet-empty') !== undefined, true);
+  await h.input('order-asset-search-input', ''); await h.flush();
   // Picking the current asset just closes the sheet.
   await h.press(TEST_IDS.market.item('bnb'));
   assert.equal(h.node('order-asset-sheet') === undefined, true);
   assert.deepEqual(h.navigation, []);
-  // Another asset rebuilds this detail for it, without a new screen.
+  // Another asset rebuilds this detail for it, without a new screen …
   await h.press('asset-name-selector');
   await h.flush();
-  await h.press(TEST_IDS.market.item('samsung'));
-  assert.deepEqual(h.navigation, [['setParams', { assetId: 'samsung' }]]);
+  await h.press(TEST_IDS.market.item('btc'));
+  assert.deepEqual(h.navigation, [['setParams', { assetId: 'btc' }]]);
   await h.update();
   assert.equal(h.node('order-asset-sheet') === undefined, true);
-  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 삼성전자/);
-  assert.equal(h.node('asset-detail-name').props.children, '삼성전자');
-  assert.equal(h.node('asset-currency-usd') === undefined, true, 'no USD pair carried over from BNB');
+  assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 BTC/);
+  assert.equal(h.node('asset-detail-name').props.children, 'BTC');
+  // … whose orders are for it (same account), and whose sheet marks it.
+  await h.press(TEST_IDS.assetDetail.openBuyOrder);
+  assert.deepEqual(h.navigation.at(-1), ['Order', { assetId: 'btc', accountId: 'general', side: 'buy' }]);
+  await h.press('asset-name-selector');
+  await h.flush();
+  assert.deepEqual([marked(h, 'btc'), marked(h, 'bnb')], [true, false]);
+});
+
+test('the detail\'s sheet closes by its button, the backdrop or Android back and leaves the detail as it was', async (t) => {
+  const h = inlineTradingHarness();
+  await openDetail(h); t.after(h.close);
+  const closes = [
+    () => h.press('order-asset-sheet-close'),
+    () => h.press('order-asset-sheet-backdrop'),
+    () => act(async () => h.node('order-asset-sheet-modal').props.onRequestClose()),
+  ];
+  for (const close of closes) {
+    await h.press('asset-name-selector'); await h.flush();
+    assert.equal(h.node('order-asset-sheet') !== undefined, true);
+    await close(); await h.flush();
+    assert.equal(h.node('order-asset-sheet') === undefined, true);
+    assert.match(h.node('asset-name-selector').props.accessibilityLabel, /현재 BNB/);
+  }
+  assert.deepEqual(h.navigation, []);
+});
+
+test('a domestic or US detail searches only its own market, Korean names included', async (t) => {
+  for (const [assetType, title, korean] of [['domestic_stock', '국내주식 종목 선택', '삼성전자'], ['us_stock', '미국주식 종목 선택', '애플']]) {
+    const h = inlineTradingHarness();
+    h.assetId = 'samsung';
+    if (assetType === 'us_stock') {
+      Object.assign(h.assets.samsung, { name: 'Apple Inc.', symbol: 'AAPL', market: 'NAS', assetType: 'us_stock',
+        priceCurrency: 'USD', settlementCurrency: 'USD' });
+    }
+    await openDetail(h); t.after(h.close);
+    await h.press('asset-name-selector');
+    await h.flush();
+    assert.equal(sheetTitle(h), title);
+    assert.equal(h.node('order-asset-scope-all') === undefined, true, assetType);
+    assert.deepEqual(h.marketRequests.map((request: any) => request.assetType), [assetType]);
+    assert.deepEqual([listed(h, 'samsung'), listed(h, 'bnb'), listed(h, 'btc')], [true, false, false], assetType);
+    assert.equal(marked(h, 'samsung'), true);
+    await h.input('order-asset-search-input', korean); await h.flush();
+    assert.equal(listed(h, 'samsung'), true, `${assetType}: ${korean}`);
+    assert.deepEqual([...new Set(h.marketRequests.map((request: any) => request.assetType))], [assetType]);
+    assert.deepEqual([listed(h, 'bnb'), listed(h, 'btc')], [false, false]);
+  }
+});
+
+test('the detail\'s sheet keeps the shared loading, error and empty states, with no other market to suggest', async (t) => {
+  const emptyState = (h: any) => h.renderer.root.findAll((n: any) => n.type === 'InlineEmptyState')[0]?.props;
+  const loading = inlineTradingHarness();
+  loading.marketGates = { '': deferred() };
+  await openDetail(loading); t.after(loading.close);
+  await loading.press('asset-name-selector'); await loading.flush();
+  assert.equal(loading.node('order-asset-sheet-loading') !== undefined, true);
+  assert.match(text(loading), /종목 목록을 불러오는 중입니다/);
+  await act(async () => loading.marketGates[''].resolve()); await loading.flush();
+  assert.equal(listed(loading, 'bnb'), true);
+
+  const failed = inlineTradingHarness();
+  failed.marketFailure = Object.assign(new Error('down'), { response: { status: 503 } });
+  await openDetail(failed); t.after(failed.close);
+  await failed.press('asset-name-selector'); await failed.flush();
+  assert.equal(failed.node('order-asset-sheet-error') !== undefined, true);
+  assert.match(text(failed), /종목 목록을 불러오지 못했습니다/);
+  failed.marketFailure = null;
+  await act(async () => failed.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '다시 시도')[0].props.onPress());
+  await failed.flush();
+  assert.equal(listed(failed, 'bnb'), true, 'a retry lists the market');
+  assert.deepEqual([...new Set(failed.marketRequests.map((request: any) => request.assetType))], ['crypto']);
+
+  const empty = inlineTradingHarness();
+  empty.marketEmpty = true;
+  await openDetail(empty); t.after(empty.close);
+  await empty.press('asset-name-selector'); await empty.flush();
+  assert.deepEqual([emptyState(empty)?.title, emptyState(empty)?.message], ['표시할 종목이 없습니다.', '잠시 후 다시 확인해주세요.']);
+  await empty.input('order-asset-search-input', 'ZZZ'); await empty.flush();
+  assert.deepEqual([emptyState(empty)?.title, emptyState(empty)?.message], ['검색 결과가 없습니다.', '다른 종목명 또는 심볼로 다시 검색해주세요.']);
+});
+
+test('until the asset\'s market is known (detail loading or failed), the name ▼ is unavailable and opens nothing', async (t) => {
+  for (const state of ['pending', 'failed'] as const) {
+    const h = inlineTradingHarness();
+    if (state === 'pending') h.detailPending = true;
+    else h.detailFailure = Object.assign(new Error('down'), { response: { status: 503 } });
+    await openDetail(h); t.after(h.close);
+    const selector = h.node('asset-name-selector');
+    assert.deepEqual([selector.props.onPress === undefined, selector.props.disabled, selector.props.accessibilityState?.disabled],
+      [true, true, true], state);
+    assert.equal(h.renderer.root.findAll((n: any) => n.type?.name === 'DisclosureTriangle').length, 0, `${state}: no ▼`);
+    await h.flush();
+    assert.equal(h.node('order-asset-sheet') === undefined, true);
+    assert.deepEqual(h.marketRequests, []);
+    // Once it answers, the same selector opens that market's sheet.
+    h.detailPending = false; h.detailFailure = null;
+    await h.update();
+    assert.equal(h.node('asset-name-selector').props.disabled, false, state);
+    assert.equal(h.renderer.root.findAll((n: any) => n.type?.name === 'DisclosureTriangle').length, 1, `${state}: ▼ back`);
+    await h.press('asset-name-selector');
+    await h.flush();
+    assert.equal(h.node('order-asset-sheet') !== undefined, true);
+    assert.deepEqual(h.marketRequests.map((request: any) => request.assetType), ['crypto']);
+  }
 });
 
 test('USD/KRW toggle swaps only the same display price pair', async (t) => {

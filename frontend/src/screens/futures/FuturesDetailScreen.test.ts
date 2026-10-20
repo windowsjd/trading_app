@@ -34,7 +34,7 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(chart(h).props.currentPrice, '102');
     assert.equal(h.node('asset-timeframe-selector') === undefined, false, 'the shared 봉 시간 selector');
     const actions = h.renderer.root.findAll((n: any) => n.type === 'CTAButton').map((n: any) => [n.props.label, n.props.state]);
-    assert.deepEqual(actions, [['판매하기', 'enabled'], ['구매하기', 'enabled']]);
+    assert.deepEqual(actions, [['매도하기', 'enabled'], ['매수하기', 'enabled']]);
   });
 
   it('says no more than the asset detail: the basis, provisional-candle, Mark and entry notes and the chart icon are gone', async (t) => {
@@ -59,7 +59,7 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(words(h.node('futures-detail-secondary-price')), '$102');
     assert.equal(h.node('futures-currency-krw').props.accessibilityState.selected, true);
     // The order still opens on the contract (USD), nothing else changes.
-    const button = h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '구매하기')[0];
+    const button = h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '매수하기')[0];
     button.props.onPress();
     assert.deepEqual(h.navigation, [['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'long' }]]);
     await h.press('futures-currency-usd');
@@ -157,6 +157,24 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     assert.equal(h.node('futures-instrument-sheet') === undefined, true, 'the picker closed');
   });
 
+  it('the picker lists futures contracts only, marks the one on screen, and picking it again only closes', async (t) => {
+    const h = futuresHarness({ screen: 'detail', futuresOnly: true });
+    h.catalogInstruments = (btc: any) => [btc, { ...btc, id: 'hype',
+      underlying: { ...btc.underlying, assetId: 'asset-hype', symbol: 'HYPEUSDT', name: 'Hyperliquid' } }];
+    await h.start(); t.after(h.close);
+    await h.press('futures-name-selector');
+    const rows = h.renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.accessibilityRole === 'radio'
+      && String(n.props.testID).startsWith('futures-instrument-')).map((n: any) => n.props.testID);
+    assert.deepEqual(rows, ['futures-instrument-btc', 'futures-instrument-hype']);
+    assert.deepEqual(['btc', 'hype'].map((id) => h.node(`futures-instrument-${id}`).props.accessibilityState.selected), [true, false]);
+    assert.equal(h.node('futures-instrument-sheet').props.pointerEvents, 'auto');
+    await h.press('futures-instrument-btc');
+    assert.deepEqual(h.navigation, []);
+    // Closed: it takes no touches while it slides away, and the contract stays.
+    assert.equal(h.node('futures-instrument-sheet').props.pointerEvents, 'none', 'the picker closed');
+    assert.equal(words(h.node('futures-detail-contract')), 'BTCUSDT · USDⓈ-M 무기한');
+  });
+
   it('a failed poll keeps the contract on screen; a failed rate re-read drops the won figure, never the last rate', async (t) => {
     const h = futuresHarness({ screen: 'detail' });
     await h.start(); t.after(h.close);
@@ -184,29 +202,29 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     const h = beginnerOn();
     await h.start(); t.after(h.close);
     const button = (label: string) => h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === label)[0];
-    assert.equal(typeof button('판매하기').props.learningHint, 'string');
-    assert.equal(button('구매하기').props.learningHint, null, 'the long practice is open');
-    button('판매하기').props.onPress();
+    assert.equal(typeof button('매도하기').props.learningHint, 'string');
+    assert.equal(button('매수하기').props.learningHint, null, 'the long practice is open');
+    button('매도하기').props.onPress();
     assert.deepEqual(h.navigation, [], 'the lock stays on the detail');
     assert.equal(h.alerts.length, 1);
-    button('구매하기').props.onPress();
+    button('매수하기').props.onPress();
     assert.deepEqual(h.navigation, [['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'long' }]]);
 
     // A position on the contract: the order screen shows its terms and decides.
     const held = beginnerOn({ position: true });
     await held.start(); t.after(held.close);
-    const heldButton = held.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '판매하기')[0];
+    const heldButton = held.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '매도하기')[0];
     assert.equal(heldButton.props.learningHint, null);
     heldButton.props.onPress();
     assert.deepEqual(held.navigation, [['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'short' }]]);
   });
 
-  it('구매하기 opens a new long entry and 판매하기 a new short entry on the order screen', async (t) => {
+  it('매수하기 opens a new long entry and 매도하기 a new short entry on the order screen', async (t) => {
     const h = futuresHarness({ screen: 'detail' });
     await h.start(); t.after(h.close);
     const button = (label: string) => h.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === label)[0];
-    button('구매하기').props.onPress();
-    button('판매하기').props.onPress();
+    button('매수하기').props.onPress();
+    button('매도하기').props.onPress();
     assert.deepEqual(h.navigation, [
       ['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'long' }],
       ['Futures', { accountId: 'A', instrumentId: 'btc', direction: 'short' }],
@@ -218,7 +236,7 @@ describe('futures contract detail in the asset detail layout (market 선물 row 
     moved.accountId = 'B';
     await moved.start(); t.after(moved.close);
     assert.match(moved.text(), /선택한 계정이 변경되었습니다/);
-    assert.equal(moved.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '구매하기').length, 0);
+    assert.equal(moved.renderer.root.findAll((n: any) => n.type === 'CTAButton' && n.props.label === '매수하기').length, 0);
 
     const missing = futuresHarness({ screen: 'detail', instrumentId: 'not-listed' });
     await missing.start(); t.after(missing.close);

@@ -48,3 +48,24 @@ it('on a dark screen a stock logo is the provider\'s dark variant; coins keep th
   act(() => renderer.update(React.createElement(AssetLogo, { testID: 'logo', assetType: 'crypto', market: 'BINANCE', symbol: 'BTCUSDT', name: 'Bitcoin' })));
   assert.equal(node('logo-image').props.source.uri.endsWith('/crypto-logos/btc.png'), true);
 });
+
+it('a listing whose provider logo is blurred shows its initial and asks the provider for nothing; its sister keeps its logo', (t) => {
+  const h = interactionHarness();
+  const AssetLogo = h.load('src/features/market/AssetLogo.tsx').default;
+  const element = (props: Record<string, unknown>) => React.createElement(AssetLogo, { testID: 'logo', ...props });
+  const renderer = h.render(element({ assetType: 'domestic_stock', market: 'KRX', symbol: '009150', name: '삼성전기' }));
+  t.after(() => act(() => renderer.unmount()));
+  const node = (id: string) => renderer.root.findAll((n: any) => typeof n.type === 'string' && n.props.testID === id)[0];
+  const images = () => renderer.root.findAll((n: any) => n.type === 'Image').length;
+  for (const [symbol, name, initial] of [['009150', '삼성전기', '삼'], ['086520', '에코프로', '에'], ['066570', 'LG전자', 'L']]) {
+    act(() => renderer.update(element({ assetType: 'domestic_stock', market: 'KRX', symbol, name })));
+    assert.equal(images(), 0, symbol);
+    assert.equal(node('logo-monogram').children.join(''), initial);
+    assert.equal(flatten(node('logo').props.style).borderRadius, 20, 'the fallback circle');
+  }
+  act(() => renderer.update(element({ assetType: 'domestic_stock', market: 'KRX', symbol: '373220', name: 'LG에너지솔루션' })));
+  assert.equal(images(), 1, 'the count above sees provider images');
+  assert.match(node('logo-image').props.source.uri, /\/isin\/KR7373220003\?token=pk_fixture&/);
+  act(() => renderer.update(element({ assetType: 'domestic_stock', market: 'KRX', symbol: '247540', name: '에코프로비엠' })));
+  assert.match(node('logo-image').props.source.uri, /\/isin\/KR7247540008\?/);
+});

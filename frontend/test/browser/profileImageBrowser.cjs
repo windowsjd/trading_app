@@ -1,4 +1,4 @@
-// Real Expo Web picker/manipulator, FormData, Settings, ProfileAvatar and query cache.
+// Real Expo Web picker/manipulator, FormData, MY's profile editor, ProfileAvatar and query cache.
 // Existing account/navigation fixtures; only local HTTP, no production storage.
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), assert = require('node:assert/strict');
 const { randomUUID } = require('node:crypto');
@@ -26,7 +26,7 @@ async function main() {
     } }], logLevel: 'warning',
   });
   let me = { id: 'home-user', nickname: '사진 테스트', email: 'fixture@example.test', role: 'user', status: 'active', portfolioPublic: true, createdAt: '2026-10-06T00:00:00Z', profileImageUrl: null };
-  const objects = new Map(), uploads = [], layouts = [], failures = [];
+  const objects = new Map(), uploads = [], layouts = [], failures = [], patches = [];
   let failNext = false, nextMutationGate = null;
   const server = http.createServer(async (req, res) => {
     const reply = (status, data) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(data)); };
@@ -52,7 +52,7 @@ async function main() {
       me = { ...me, profileImageUrl: null }; return reply(200, { success: true, data: me });
     }
     if (req.url === '/api/v1/me') {
-      if (req.method === 'PATCH') { const chunks = []; for await (const chunk of req) chunks.push(chunk); me = { ...me, ...JSON.parse(Buffer.concat(chunks).toString()) }; }
+      if (req.method === 'PATCH') { const chunks = []; for await (const chunk of req) chunks.push(chunk); const body = JSON.parse(Buffer.concat(chunks).toString()); patches.push(body); me = { ...me, ...body }; }
       return reply(200, { success: true, data: me });
     }
     if (objects.has(req.url)) { res.writeHead(200, { 'Content-Type': 'image/jpeg' }); return res.end(objects.get(req.url)); }
@@ -69,29 +69,32 @@ async function main() {
     page.on('pageerror', error => { failures.push(error.message); console.error('pageerror:', error.message); });
     await page.route('**/*', route => route.request().url().startsWith(base) || route.request().url().startsWith('blob:') || route.request().url().startsWith('data:') ? route.continue() : route.abort());
     const id = name => page.getByTestId(name);
-    const open = async (scale = 1) => { await page.goto(`${base}/?screen=settings&fontScale=${scale}`); await id('settings-profile-image-select').waitFor(); };
+    const open = async (scale = 1) => { await page.goto(`${base}/?screen=my&fontScale=${scale}`); await id('my-profile-image-select').waitFor(); };
     const select = async file => {
-      const chooser = page.waitForEvent('filechooser'); await id('settings-profile-image-select').click();
+      const chooser = page.waitForEvent('filechooser'); await id('my-profile-image-select').click();
       await (await chooser).setFiles(file);
     };
-    const checkBounds = async (control, label) => {
-      const bounds = await id(control).evaluate(element => {
+    // `vertical: false` for a scrolling screen, whose lower text is legitimately below its box.
+    const checkBounds = async (control, label, { vertical = true } = {}) => {
+      const bounds = await id(control).evaluate((element, vertical) => {
         const box = element.getBoundingClientRect(), issues = [];
         const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
         while (walker.nextNode()) {
           const range = document.createRange(); range.selectNodeContents(walker.currentNode);
-          for (const glyph of range.getClientRects()) if (glyph.left < box.left - 1 || glyph.right > box.right + 1 || glyph.top < box.top - 1 || glyph.bottom > box.bottom + 1) issues.push(walker.currentNode.textContent);
+          for (const glyph of range.getClientRects()) if (glyph.left < box.left - 1 || glyph.right > box.right + 1 || (vertical && (glyph.top < box.top - 1 || glyph.bottom > box.bottom + 1))) issues.push(walker.currentNode.textContent);
         }
         return { issues, left: box.left, right: box.right, width: innerWidth };
-      });
+      }, vertical);
       assert.deepEqual(bounds.issues, [], `${label}/${control}`);
       assert.ok(bounds.left >= 0 && bounds.right <= bounds.width);
     };
     await open();
-    const canceled = page.waitForEvent('filechooser'); await id('settings-profile-image-select').click();
+    // One label whether or not a photo exists (the first registration included).
+    assert.equal((await id('my-profile-image-select').innerText()).trim(), '프로필 사진 변경');
+    const canceled = page.waitForEvent('filechooser'); await id('my-profile-image-select').click();
     await canceled;
     await page.locator('input[type="file"]').dispatchEvent('cancel');
-    await page.waitForFunction(() => document.querySelector('[data-testid="settings-profile-image-select"]').getAttribute('aria-disabled') !== 'true');
+    await page.waitForFunction(() => document.querySelector('[data-testid="my-profile-image-select"]').getAttribute('aria-disabled') !== 'true');
     assert.equal(uploads.length, 0); assert.equal(me.profileImageUrl, null);
     const source = await page.evaluate(() => {
       const canvas = document.createElement('canvas'); canvas.width = 1600; canvas.height = 900;
@@ -101,8 +104,9 @@ async function main() {
       return canvas.toDataURL('image/png').split(',')[1];
     });
     const photo = { name: 'landscape.png', mimeType: 'image/png', buffer: Buffer.from(source, 'base64') };
-    await select(photo); await id('settings-profile-avatar-image').waitFor();
+    await select(photo); await id('my-profile-avatar-image').waitFor();
     assert.equal(uploads.length, 1); assert.ok(uploads[0].size < 100000);
+    assert.equal((await id('my-profile-image-select').innerText()).trim(), '프로필 사진 변경');
     const firstUrl = me.profileImageUrl;
     const output = await page.evaluate(async url => {
       const image = new Image(); image.src = url; await image.decode();
@@ -114,14 +118,20 @@ async function main() {
       await page.evaluate(screen => window.fixture.setScreen(screen), screen); await id(avatar).waitFor();
       assert.equal(await id(avatar).locator('img').getAttribute('src'), firstUrl);
     }
-    await page.evaluate(() => window.fixture.setScreen('settings')); await id('settings-profile-image-select').waitFor();
-    failNext = true; await select(photo); await id('settings-profile-image-error').waitFor();
-    assert.equal(me.profileImageUrl, firstUrl); assert.match(await id('settings-profile-image-error').innerText(), /업로드하지 못했습니다/);
+    // Settings no longer edits the profile.
+    await page.evaluate(() => window.fixture.setScreen('settings')); await id('settings-screen').waitFor();
+    for (const gone of ['settings-profile-image-select', 'settings-profile-image-delete', 'settings-nickname-input', 'settings-save-nickname']) {
+      assert.equal(await id(gone).count(), 0, gone);
+    }
+    await page.evaluate(() => window.fixture.setScreen('my')); await id('my-profile-image-select').waitFor();
+    failNext = true; await select(photo); await id('my-profile-image-error').waitFor();
+    assert.equal(me.profileImageUrl, firstUrl); assert.match(await id('my-profile-image-error').innerText(), /업로드하지 못했습니다/);
     await select(photo); await page.waitForFunction(previous => window.fixture.client.getQueryData(['me']).profileImageUrl !== previous, firstUrl);
     assert.equal(uploads.length, 2); assert.notEqual(me.profileImageUrl, firstUrl);
-    await page.reload(); await id('settings-profile-avatar-image').waitFor();
-    await id('settings-profile-image-delete').click(); await id('settings-profile-avatar-fallback').waitFor();
-    assert.equal(me.profileImageUrl, null); assert.match(await id('settings-profile-image-select').innerText(), /사진 추가/);
+    await page.reload(); await id('my-profile-avatar-image').waitFor();
+    await id('my-profile-image-delete').click(); await id('my-profile-avatar-fallback').waitFor();
+    assert.equal(me.profileImageUrl, null); assert.equal((await id('my-profile-image-select').innerText()).trim(), '프로필 사진 변경');
+    assert.equal(await id('my-profile-image-delete').count(), 0);
 
     // EXIF orientation 6: a landscape JPEG must render as an oriented portrait
     // before the center crop. Normalized uploads must not preserve its EXIF.
@@ -164,31 +174,52 @@ async function main() {
         let release;
         nextMutationGate = new Promise(resolve => { release = resolve; });
         const previous = me.profileImageUrl;
-        if (action === 'upload') await select(photo); else await id('settings-profile-image-delete').click();
+        if (action === 'upload') await select(photo); else await id('my-profile-image-delete').click();
         await page.getByText(action === 'upload' ? '업로드 중...' : '삭제 중...', { exact: true }).waitFor();
-        for (const control of ['settings-profile-image-select', 'settings-profile-image-delete']) {
+        for (const control of ['my-profile-image-select', 'my-profile-image-delete']) {
           assert.equal(await id(control).getAttribute('aria-disabled'), 'true');
           await checkBounds(control, `${appearance}/320/2/${action}`);
         }
-        await page.screenshot({ path: path.join(out, `settings-${appearance}-320-2-${action}.png`) });
+        await page.screenshot({ path: path.join(out, `my-${appearance}-320-2-${action}.png`) });
         pendingLayouts.push({ appearance, width: 320, fontScale: 2, action });
         release();
         await page.waitForFunction(old => window.fixture.client.getQueryData(['me']).profileImageUrl !== old, previous);
       }
-      await select(photo); await id('settings-profile-avatar-image').waitFor();
+      await select(photo); await id('my-profile-avatar-image').waitFor();
     }
+
+    // Nickname: edited in place under MY's own nickname (one PATCH, /me refreshed, field closed).
+    const longNickname = '아주긴닉네임을가진사용자LongNicknameForLayout';
+    await page.setViewportSize({ width: 390, height: 900 }); await open(1);
+    assert.equal(await id('my-nickname-input').count(), 0);
+    await id('my-nickname-edit').click(); await id('my-nickname-input').waitFor();
+    assert.equal(await id('my-nickname-input').inputValue(), me.nickname);
+    await id('my-nickname-input').fill('   '); await id('my-save-nickname').click();
+    assert.equal(patches.length, 0, 'an empty nickname is never sent');
+    await id('my-nickname-input').fill(`  ${longNickname}  `); await id('my-save-nickname').click();
+    await id('my-nickname-input').waitFor({ state: 'detached' });
+    assert.deepEqual(patches, [{ nickname: longNickname }]); assert.equal(me.nickname, longNickname);
+    await page.getByText(longNickname, { exact: true }).first().waitFor();
+    assert.equal(await page.evaluate(() => window.fixture.client.getQueryData(['me']).nickname), longNickname);
 
     for (const appearance of ['light', 'dark']) for (const width of [320, 360, 390, 430]) for (const scale of [1, 1.5, 2]) {
       await page.setViewportSize({ width, height: 900 }); await open(scale);
       await page.evaluate(value => window.fixture.appearance.setPreference(value), appearance);
-      for (const control of ['settings-profile-image-select', 'settings-profile-image-delete']) {
+      for (const control of ['my-profile-image-select', 'my-profile-image-delete', 'my-nickname-edit']) {
         await checkBounds(control, `${appearance}/${width}/${scale}`);
       }
+      // The long nickname wraps inside the screen; the open field and its buttons fit too.
+      await checkBounds('my-screen', `${appearance}/${width}/${scale}/screen`, { vertical: false });
+      await id('my-nickname-edit').click(); await id('my-nickname-input').waitFor();
+      for (const control of ['my-nickname-input', 'my-nickname-cancel', 'my-save-nickname']) {
+        await checkBounds(control, `${appearance}/${width}/${scale}/editing`);
+      }
       layouts.push({ appearance, width, fontScale: scale });
-      if (scale === 2 || (width === 390 && scale === 1)) await page.screenshot({ path: path.join(out, `settings-${appearance}-${width}-${scale}.png`) });
+      if (scale === 2 || (width === 390 && scale === 1)) await page.screenshot({ path: path.join(out, `my-${appearance}-${width}-${scale}.png`) });
+      await id('my-nickname-cancel').click(); await id('my-nickname-input').waitFor({ state: 'detached' });
     }
     assert.deepEqual(failures, []);
-    const report = { status: 'PASS', layouts: layouts.length, pendingLayouts, uploads, normalized: output, smallImageSide: small, flows: ['real Web file chooser', 'picker cancel event', 'PNG to square JPEG', 'EXIF orientation and removal', 'upload', 'replace', 'failure preserves URL', 'delete fallback', 'reload persistence', 'Home/My/Ranking propagation'], native: 'NOT_RUN' };
+    const report = { status: 'PASS', layouts: layouts.length, pendingLayouts, uploads, normalized: output, smallImageSide: small, flows: ['real Web file chooser', 'picker cancel event', 'PNG to square JPEG', 'EXIF orientation and removal', 'upload', 'replace', 'failure preserves URL', 'delete fallback', 'reload persistence', 'Home/My/Ranking propagation', 'Settings has no profile editor', 'MY nickname edit (empty refused, trimmed save, long nickname)'], native: 'NOT_RUN' };
     fs.writeFileSync(path.join(out, 'report.json'), JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report));
   } finally { await browser?.close(); await new Promise(resolve => server.close(resolve)); }

@@ -173,7 +173,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
   const markSeen = useRef({ instrumentId: "", at: clock, renderedAt: clock });
   const [selectedId, setSelectedId] = useState(route.params.instrumentId ?? "");
   const [instrumentSheetOpen, setInstrumentSheetOpen] = useState(false);
-  // The detail's 구매하기 / 판매하기 open a new long / short entry; long otherwise.
+  // The detail's 매수하기 / 매도하기 open a new long / short entry; long otherwise.
   const [direction, setDirection] = useState<Direction>(route.params.direction ?? "long");
   const [marginMode, setMarginMode] = useState<MarginMode>("isolated");
   const [leverage, setLeverage] = useState("1");
@@ -845,7 +845,7 @@ export function BoundFuturesScreen({ route, navigation }: FuturesScreenProps) {
                       방향·레버리지·증거금 모드는 전량 종료 후 새 포지션에서
                       선택할 수 있습니다.
                     </Text>
-                    {/* Asked for the other side (detail's 구매하기/판매하기): one-way, so say why
+                    {/* Asked for the other side (detail's 매수하기/매도하기): one-way, so say why
                         instead of turning the request into a reduce or close. */}
                     {route.params.direction && route.params.direction !== position.direction ? (
                       <Text testID="futures-direction-held" style={styles.helper}>

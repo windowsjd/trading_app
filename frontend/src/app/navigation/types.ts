@@ -37,7 +37,7 @@ export type WalletStackParamList = {
 };
 
 export type MarketStackParamList = {
-  /** `direction`: the new entry the detail's 구매하기 (long) / 판매하기 (short) asked for. */
+  /** `direction`: the new entry the detail's 매수하기 (long) / 매도하기 (short) asked for. */
   Futures: { accountId: string; instrumentId?: string; direction?: 'long' | 'short' };
   FuturesDetail: { accountId: string; instrumentId: string };
   Market: { assetType?: import('../../features/market/api').AssetType } | undefined;

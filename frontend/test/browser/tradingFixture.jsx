@@ -47,7 +47,7 @@ function App() {
     if (params.assetId) state.assetId = params.assetId;
     if (params.side) state.side = params.side;
     if (params.instrumentId) state.instrumentId = params.instrumentId;
-    // 구매하기 / 판매하기 on the futures detail open the order on that side.
+    // 매수하기 / 매도하기 on the futures detail open the order on that side.
     state.direction = params.direction;
     setScreen(
       next === 'Futures' ? 'futures' : next === 'FuturesDetail' ? 'futuresDetail' : next === 'Order'

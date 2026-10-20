@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Measures on a connected Android device (adb) whether bottom actions sit above
 // the system navigation bar, in the device's own pixel coordinates. Open the
-// screen on the device first (by default 종목 상세 with 판매하기/구매하기).
+// screen on the device first (by default 종목 상세 with 매도하기/매수하기).
 //
 //   node scripts/android-layout-check.cjs [--adb <path>] [--serial <id>]
-//        [--labels 판매하기,구매하기] [--footer asset-order-actions] [--screenshot <file.png>]
+//        [--labels 매도하기,매수하기] [--footer asset-order-actions] [--screenshot <file.png>]
 //
 // Prints the device, its navigation mode, the installed app (version, install
 // time — match it with the EAS build list and MY › 설정 › 앱 정보), the
@@ -106,7 +106,7 @@ function main() {
     return index >= 0 && args[index + 1] ? args[index + 1] : fallback;
   };
   const adbPath = option('adb', process.env.ADB || 'adb');
-  const labels = option('labels', '판매하기,구매하기').split(',').map((label) => label.trim()).filter(Boolean);
+  const labels = option('labels', '매도하기,매수하기').split(',').map((label) => label.trim()).filter(Boolean);
   const screenshot = option('screenshot', null);
   let serial = option('serial', process.env.ANDROID_SERIAL || null);
   const adb = (commandArgs, binary = false) => execFileSync(adbPath, [...(serial ? ['-s', serial] : []), ...commandArgs], {

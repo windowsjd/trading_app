@@ -139,6 +139,16 @@ NYS; `otherHolding=us` adds a Microsoft holding): the Korean name with
 row and the holding row, at 320/360/390/430px × Light/Dark × font scales
 1/1.5/2 (120 screens), with no line outside its row or over another text.
 
+The asset detail search sheet (2026-10-20) uses `assetSearchSheetBrowser.cjs`
+on the trading fixture (`BROWSER_EXECUTABLE_PATH`; `ASSET_SHEET_QUICK=1` = 320
+only): from a crypto, KRX and US detail, the name ▼ sheet is titled for that
+market, offers no market choice, reads `/assets` with that `assetType` only
+(the fixture's `/assets` now filters by it like the server), marks the asset on
+screen, closes on picking it and swaps the detail for another one, whose 매수하기
+orders it; 매도하기/매수하기 on the spot and futures details stay one line, at
+320/360/390/430px × Light/Dark × font scales 1/2, with no text outside its root
+or over another text.
+
 Reproduce the provided-source preparation with:
 
 ```sh
@@ -420,11 +430,13 @@ iOS/Android component tests cover the role gate, unrestricted line wrapping and
 font scaling; physical-device text measurement is a separate check.
 
 `profileImageBrowser.cjs` runs the actual Expo Web image picker/manipulator,
-Settings, multipart FormData and ProfileAvatar against a local HTTP fixture.
-Run with esbuild/Playwright on NODE_PATH as above. It verifies file chooser and
-cancel, nonsquare PNG → 512px JPEG, small-image no-upscale, add/replace/delete,
-failed-upload preservation, reload persistence, Home/My/Ranking propagation,
-and Settings button glyph bounds at 320/360/390/430px × font scale 1/1.5/2 ×
+MY's profile editor, multipart FormData and ProfileAvatar against a local HTTP
+fixture. Run with esbuild/Playwright on NODE_PATH as above. It verifies file
+chooser and cancel, nonsquare PNG → 512px JPEG, small-image no-upscale,
+add/replace/delete, failed-upload preservation, reload persistence,
+Home/My/Ranking propagation, that Settings has no profile editor, the MY
+nickname edit (empty refused, trimmed save, long nickname), and MY button,
+field and screen glyph bounds at 320/360/390/430px × font scale 1/1.5/2 ×
 Light/Dark. Separate held HTTP responses verify upload/delete pending labels and
 disabled neighboring buttons at 320px/font scale 2 in both themes. EXIF rotation
 and metadata removal are checked with an oriented JPEG. The backend JPEG validator

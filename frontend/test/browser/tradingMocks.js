@@ -360,10 +360,12 @@ export const apiClient = {
       return response({ id: 'fixture-user', role: state.role, nickname: '투자자', email: 'fixture@example.test', profileImageUrl: null, portfolioPublic: true });
     if (parts[1] === 'assets') {
       if (!parts[2]) {
+        // Like the server: one market when `assetType` is given, then the search text.
         const filtered = assets.filter(
           (a) =>
-            !u.searchParams.get('search') ||
-            a.symbol.includes(u.searchParams.get('search')),
+            (!u.searchParams.get('assetType') || a.assetType === u.searchParams.get('assetType')) &&
+            (!u.searchParams.get('search') ||
+              a.symbol.includes(u.searchParams.get('search'))),
         );
         return response({
           assets: filtered,

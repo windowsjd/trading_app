@@ -11,7 +11,8 @@
  *    (EXPO_PUBLIC_LOGO_DEV_KEY; registering for it is the operator's
  *    decision). US listings by ticker (US tickers are unique across US
  *    exchanges), KRX common shares by ISIN. A miss answers 404 and the row
- *    keeps its monogram.
+ *    keeps its monogram, as do the KRX listings whose provider image is
+ *    blurred (KRX_LOGO_EXCLUDED: never requested).
  *  - Anything else: no logo; the row shows a monogram.
  */
 
@@ -36,6 +37,26 @@ const US_MARKETS = new Set(['NAS', 'NYS']);
 const LOGO_DEV_IMAGE_ORIGIN = 'https://img.logo.dev';
 /** Share classes written with a dot (`BRK.B`) collide with Logo.dev's exchange-suffix syntax. */
 const US_LISTING_ISIN: Readonly<Record<string, string>> = { 'NYS:BRK.B': 'US0846707026' };
+/**
+ * KRX listings (6-digit code, market KRX, domestic_stock) whose provider image
+ * is blurred at row size: they keep the monogram and request nothing. Only the
+ * logo: the listing, its quotes and orders are untouched, and a sister listing
+ * (삼성전자 005930, 에코프로비엠 247540, LG에너지솔루션 373220) keeps its own.
+ * 2026-10-20: the first seven by review; LG전자 after its alternatives were
+ * compared — its ISIN serves lge.co.kr's blurred symbol, lg.com's sharp one has
+ * transparent face strokes (≈ 2:1 on a dark row; no dark variant) and lge.com
+ * an app tile, while LG's own artwork may not be redistributed.
+ */
+export const KRX_LOGO_EXCLUDED: ReadonlySet<string> = new Set([
+  '009150', // 삼성전기
+  '006400', // 삼성SDI
+  '036930', // 주성엔지니어링
+  '010120', // LS ELECTRIC
+  '086520', // 에코프로
+  '007660', // 이수페타시스
+  '090710', // 휴림로봇
+  '066570', // LG전자
+]);
 
 declare const process: { env: { EXPO_PUBLIC_LOGO_DEV_KEY?: string } } | undefined;
 // Static dot notation, so babel-preset-expo inlines it (see constants/env.ts).
@@ -99,6 +120,7 @@ export function resolveAssetLogo(asset: LogoAsset, { logoDevKey = LOGO_DEV_KEY, 
     return /^[A-Z]{1,5}$/.test(symbol) ? { kind: 'remote', uri: logoDevUri(`ticker/${symbol}`, logoDevKey, theme) } : null;
   }
   if (asset.assetType === 'domestic_stock' && market === 'KRX') {
+    if (KRX_LOGO_EXCLUDED.has(symbol)) return null;
     const isin = krxCommonShareIsin(symbol);
     return isin ? { kind: 'remote', uri: logoDevUri(`isin/${isin}`, logoDevKey, theme) } : null;
   }

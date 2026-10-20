@@ -45,8 +45,8 @@ export default function FuturesDetailScreen(props: FuturesDetailScreenProps) {
  * contract's name with the contract picker, its USD badge and contract line,
  * the current Futures Last large with its won conversion and the $ | 원
  * switch, the contract's rolling 24h change, its chart with the 봉 시간
- * selector at the lower left, and 판매하기 / 구매하기 at the bottom. 구매하기
- * opens the order screen on a new 롱(Long) entry and 판매하기 on a new 숏(Short)
+ * selector at the lower left, and 매도하기 / 매수하기 at the bottom. 매수하기
+ * opens the order screen on a new 롱(Long) entry and 매도하기 on a new 숏(Short)
  * entry — never a reduce or close; with a position held, the order screen keeps
  * that position's terms (one-way) and says why the other side waits. The full-
  * screen chart is opened from the order screen's chart button, as for stocks.
@@ -209,14 +209,14 @@ function FuturesDetailContent({ route, navigation }: FuturesDetailScreenProps) {
         </ScrollView>
         <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="futures-detail-actions">
           <View style={styles.action}>
-            <CTAButton testID="futures-detail-short" label="판매하기" state={tradable ? 'enabled' : 'disabled'}
+            <CTAButton testID="futures-detail-short" label="매도하기" state={tradable ? 'enabled' : 'disabled'}
               accessibilityHint="숏(Short) 신규 진입 주문을 엽니다."
               learningHint={shortGate?.locked ? shortGate.message : null}
               onPress={() => (shortGate ? shortGate.guard(() => open('short')) : open('short'))}
               style={{ ...styles.actionButton, backgroundColor: SELL_COLOR }} />
           </View>
           <View style={styles.action}>
-            <CTAButton testID="futures-detail-long" label="구매하기" state={tradable ? 'enabled' : 'disabled'}
+            <CTAButton testID="futures-detail-long" label="매수하기" state={tradable ? 'enabled' : 'disabled'}
               accessibilityHint="롱(Long) 신규 진입 주문을 엽니다."
               learningHint={longGate?.locked ? longGate.message : null}
               onPress={() => (longGate ? longGate.guard(() => open('long')) : open('long'))}

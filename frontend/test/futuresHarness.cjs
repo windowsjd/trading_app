@@ -184,7 +184,7 @@ function futuresHarness(options = {}) {
   } : loaded.default;
   // The market list's sort/refresh are owned by MarketScreen; tests drive them.
   h.sort = 'turnover_desc'; h.refreshVersion = 0;
-  // `options.routeDirection`: the detail's 구매하기 (long) / 판매하기 (short) request on the futures
+  // `options.routeDirection`: the detail's 매수하기 (long) / 매도하기 (short) request on the futures
   // screen (`options.direction` is the fixture position's own side).
   const params = () => options.screen === 'chart' ? { accountId: h.routeAccountId, ...h.chart }
     : options.screen === 'detail' ? { accountId: h.routeAccountId, instrumentId: options.instrumentId ?? 'btc' }

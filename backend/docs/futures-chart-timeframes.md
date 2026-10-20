@@ -73,18 +73,26 @@ for every listed contract, viewed or not.
   nothing usable is cached, and once when the cached copy has a missing bucket
   (a row the page parser refused); a bucket Binance itself never had is not
   re-read again.
-- At most `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` (default 60, 1..600;
-  production 120 since 2026-10-20) provider calls per minute per process, on
-  top of the shared Binance REST coordinator (one weight budget, 418/429
-  cooldown, see [binance-rest-limits.md](binance-rest-limits.md)). A chart
-  call is admitted only while the coordinator's minute keeps 240 weight
-  unspent (budget − 240 = 960 at 1200): that much of every minute stays for
-  Futures Last re-confirmation and Mark REST recovery, however many charts
-  are read; past it the chart pauses until the next minute. The app polls each viewed
-  series at its freshness, so one continuously viewed 5m series costs ≈ 4
-  calls a minute: beyond ≈ 15 such series per process the cap is reached and
-  further series refresh less often (their charts show the stale note). Raise
-  the cap only together with the coordinator budget.
+- At most `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` provider calls per
+  minute per process: **120 in production** (set 2026-10-20; unset, the code
+  default is 60, allowed 1..600), on top of the shared Binance REST
+  coordinator (one weight budget — `BINANCE_REST_WEIGHT_BUDGET_PER_MINUTE`
+  1,200 in production — and the 418/429 cooldown, see
+  [binance-rest-limits.md](binance-rest-limits.md)). A chart call is admitted
+  only while the coordinator's minute keeps 240 weight unspent (budget − 240
+  = 960 at 1,200): that much of every minute stays for Futures Last
+  re-confirmation and Mark REST recovery, however many charts are read; past
+  it the chart pauses until the next minute. The app polls each viewed series
+  at its freshness, so one continuously viewed 5m series costs ≈ 4 calls a
+  minute (one per 15 s): at 120 the cap is reached beyond ≈ 30 such series
+  per process (≈ 15 at the default 60), and further series refresh less often
+  (their charts show the stale note). That ≈ 30 is a simple ceiling — every
+  chart refreshing exactly every 15 s with a weight-1 tail read — not a
+  guaranteed capacity: the calls actually made also depend on what the other
+  callers spend of the shared minute budget (and its 240 reserve), on each
+  call's weight (a first or full-window read costs 2–5) and on the
+  one-at-a-time queue (150 ms apart, 2 s / 8 s waits), so fewer series may
+  refresh on time. Raise the cap only together with the coordinator budget.
 - At most 200 contract/interval series are cached per process
   (least-recently-read eviction), and a series nobody has read for 10 minutes
   is dropped. The route's own 5-second answer cache drops expired answers on
@@ -118,7 +126,7 @@ needed for this change.
 | --- | --- |
 | a viewer on one contract and interval | ≈ 1 call per freshness window, weight 1 (tail) |
 | first view of a series in a process | 1 call, weight 2 (≤ 499 rows) or 5 (577–673 rows) |
-| every listed contract × interval viewed at once (worst case) | capped at 60 calls/min/process by default (≈ 60–300 weight; 120 → ≈ 120–600), never past budget − 240, the rest served stale |
+| every listed contract × interval viewed at once (worst case) | capped at 120 calls/min/process in production (≈ 120–600 weight; the default 60 → ≈ 60–300), never past budget − 240, the rest served stale |
 | nobody viewing | 0 — nothing is collected in the background |
 
 Existing collection is untouched: the 4h upkeep stays ≈ 100 weight per run.
@@ -137,5 +145,5 @@ the chart.
 
 Backend first (an older backend answers 400 to the new intervals; an older app
 only ever asks for 4h, unchanged), then the app. No migration, no flag, no
-backfill. Optional: set `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE` if the
-default 60 should change.
+backfill. Production sets `FUTURES_CANDLE_PROVIDER_MAX_CALLS_PER_MINUTE=120`
+(2026-10-20); an environment without it uses the default 60.

@@ -58,7 +58,7 @@ test('a passed practice waits for every quest; a pending Futures position must c
  assert.equal(early.access.gate('krStockMarketBuy').message,'공통 기초 퀘스트를 모두 완료하면 한국주식 매수 퀘스트에서 사용할 수 있어요.');
  assert.equal(early.access.gate('cryptoMarketBuy').message,'암호화폐 시장가 매수 퀘스트에서 사용할 수 있어요.');
 });
-test('an entry gate opens while any of its actions is open (구매하기 at QUEST 06 leads to the limit BUY)',()=>{
+test('an entry gate opens while any of its actions is open (매수하기 at QUEST 06 leads to the limit BUY)',()=>{
  const h=harness('beginner',questProgress(5));
  assert.equal(h.access.gate('cryptoMarketBuy').allowed,false);
  assert.equal(h.access.gate(['cryptoMarketBuy','cryptoLimitBuy']).allowed,true);

@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { it } from 'node:test';
 import { runInNewContext } from 'node:vm';
-import { assetMonogram, BUNDLED_CRYPTO_LOGOS, cryptoBaseAsset, krxCommonShareIsin, resolveAssetLogo } from './assetLogoSource.ts';
+import { assetMonogram, BUNDLED_CRYPTO_LOGOS, cryptoBaseAsset, krxCommonShareIsin, KRX_LOGO_EXCLUDED, resolveAssetLogo } from './assetLogoSource.ts';
+import { KR_STOCK_KOREAN_NAMES } from '../../utils/krStockKoreanNames.ts';
 
 const key = 'pk_test key';
 const assets = path.join(process.cwd(), 'src', 'assets', 'crypto-logos');
@@ -62,6 +63,34 @@ it('stocks get a provider logo only with a key, by an identifier unique to their
   }
 });
 
+it('blurred KRX logos are never requested: exactly these listings by code, market and type; sister listings keep theirs', () => {
+  // The listing (code, KRX name in the app, English name in the backend fixed universe) each exclusion means.
+  const excluded: Record<string, [string, string]> = {
+    '009150': ['삼성전기', 'Samsung Electro-Mechanics'],
+    '006400': ['삼성SDI', 'Samsung SDI'],
+    '036930': ['주성엔지니어링', 'Jusung Engineering'],
+    '010120': ['LS ELECTRIC', 'LS ELECTRIC'],
+    '086520': ['에코프로', 'Ecopro'],
+    '007660': ['이수페타시스', 'ISU Petasys'],
+    '090710': ['휴림로봇', 'Hyulim Robot'],
+    '066570': ['LG전자', 'LG Electronics'],
+  };
+  assert.deepEqual([...KRX_LOGO_EXCLUDED].sort(), Object.keys(excluded).sort());
+  const universe = readFileSync(path.join(process.cwd(), '..', 'backend', 'src', 'providers', 'kis', 'kis-fixed-asset-universe.ts'), 'utf8');
+  for (const [code, [korean, english]] of Object.entries(excluded)) {
+    assert.equal(KR_STOCK_KOREAN_NAMES[code], korean, code);
+    assert.ok(universe.includes(`{ symbol: '${code}', kisSymbol: '${code}', name: '${english}', market: 'KRX', assetType: 'domestic_stock', currencyCode: 'KRW' }`), code);
+    assert.equal(resolveAssetLogo({ assetType: 'domestic_stock', market: 'KRX', symbol: code }, { logoDevKey: key }), null, code);
+    assert.equal(resolveAssetLogo({ assetType: 'domestic_stock', market: 'krx', symbol: ` ${code} ` }, { logoDevKey: key, theme: 'dark' }), null, code);
+  }
+  // Same group or similar names, other listings: still their own provider logo.
+  for (const [code, isin] of [['005930', 'KR7005930003'], ['247540', 'KR7247540008'], ['373220', 'KR7373220003'],
+    ['051910', 'KR7051910008'], ['011070', 'KR7011070000']]) {
+    const source = resolveAssetLogo({ assetType: 'domestic_stock', market: 'KRX', symbol: code }, { logoDevKey: key });
+    assert.match(source?.kind === 'remote' ? source.uri : '', new RegExp(`^https://img\\.logo\\.dev/isin/${isin}\\?`), code);
+  }
+});
+
 it('a release build carries the key it was built with, and a build without one requests no provider logos', () => {
   // The Metro release transform itself (babel-preset-expo, isDev false), not a
   // runtime read: on device process.env holds no EXPO_PUBLIC_ value, so the
@@ -100,7 +129,8 @@ it('a release build carries the key it was built with, and a build without one r
 
 it('computes KRX common-share ISINs (published examples)', () => {
   for (const [code, isin] of [['005930', 'KR7005930003'], ['000660', 'KR7000660001'], ['035720', 'KR7035720002'],
-    ['373220', 'KR7373220003'], ['086520', 'KR7086520004'], ['035420', 'KR7035420009'], ['005380', 'KR7005380001']]) {
+    ['373220', 'KR7373220003'], ['086520', 'KR7086520004'], ['035420', 'KR7035420009'], ['005380', 'KR7005380001'],
+    ['066570', 'KR7066570003'], ['006400', 'KR7006400006']]) {
     assert.equal(krxCommonShareIsin(code), isin, code);
   }
   for (const code of ['', '5930', '0059300', 'A05930']) assert.equal(krxCommonShareIsin(code), null, code);

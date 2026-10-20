@@ -1,6 +1,6 @@
 # 종목 상세와 주문 화면
 
-현재 마켓 흐름은 `Market` → `AssetDetail` → `Order`다. 마켓에서 종목을 선택하면 상세 화면에 기존 종목명/pair 정책의 제목, 기존 `selectDisplayPrice` 현재가와 전일대비, `CandlestickChart`, `ChartTimeframeSelector`가 표시된다. 하단 판매하기/구매하기는 각각 빨강/초록이고 선택된 계정이 있을 때만 주문 화면을 연다. 계정이 없으면 안내와 비활성 버튼을 표시한다.
+현재 마켓 흐름은 `Market` → `AssetDetail` → `Order`다. 마켓에서 종목을 선택하면 상세 화면에 기존 종목명/pair 정책의 제목, 기존 `selectDisplayPrice` 현재가와 전일대비, `CandlestickChart`, `ChartTimeframeSelector`가 표시된다. 하단 매도하기/매수하기(2026-10-20 이전 문구 판매하기/구매하기)는 각각 빨강/초록이고 선택된 계정이 있을 때만 주문 화면을 연다. 계정이 없으면 안내와 비활성 버튼을 표시한다.
 
 `AssetDetailScreen`과 전체화면 `AssetChartScreen`은 `AssetMarketChart`의 같은 종목 상세 쿼리, candle REST/live 병합, timeframe, 오류/관리자 진단, viewport reset 경로를 사용한다. 종목별 key와 assetId/interval 검사로 이전 종목·시간봉의 ticker/live candle을 표시하지 않는다. 실시간 구독은 기존 앱의 shared WebSocket manager를 사용한다.
 
@@ -34,7 +34,7 @@ adapter is activated on the server; the existing display book is not one.
 ## 2026-10-15 — detail bottom bar inset, SELL 손절가/익절가 설정
 
 **Detail bottom bar.** `MainTabs` hides the tab bar while `AssetDetail` is
-focused, so 판매하기/구매하기 is the only bottom-anchored bar in the app that
+focused, so 매도하기/매수하기 is the only bottom-anchored bar in the app that
 must clear the system navigation area itself (every other screen ends at the
 tab bar, which pads itself with `useSafeAreaInsets().bottom`). It relied on
 the native `SafeAreaView` bottom edge (Fabric state update inside an animated

@@ -30,10 +30,10 @@ const node = (attrs: Record<string, string>) =>
   `<node index="0" ${Object.entries(attrs).map(([key, value]) => `${key}="${value}"`).join(' ')} class="android.view.ViewGroup" package="com.leagueoftrading">`;
 const DUMP = `<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><hierarchy rotation="0">
   ${node({ 'resource-id': 'asset-order-actions', text: '', 'content-desc': '', clickable: 'false', bounds: '[0,2170][1080,2400]' })}
-  ${node({ text: '', 'content-desc': '판매하기', clickable: 'true', bounds: '[36,2196][531,2346]' })}
-  ${node({ text: '판매하기', 'content-desc': '', clickable: 'false', bounds: '[220,2250][347,2293]' })}</node></node>
-  ${node({ text: '', 'content-desc': '구매하기, 학습 제한. 퀘스트를 먼저 완료해주세요.', clickable: 'true', bounds: '[549,2196][1044,2346]' })}
-  ${node({ text: '구매하기', 'content-desc': '', clickable: 'false', bounds: '[733,2250][860,2293]' })}</node></node>
+  ${node({ text: '', 'content-desc': '매도하기', clickable: 'true', bounds: '[36,2196][531,2346]' })}
+  ${node({ text: '매도하기', 'content-desc': '', clickable: 'false', bounds: '[220,2250][347,2293]' })}</node></node>
+  ${node({ text: '', 'content-desc': '매수하기, 학습 제한. 퀘스트를 먼저 완료해주세요.', clickable: 'true', bounds: '[549,2196][1044,2346]' })}
+  ${node({ text: '매수하기', 'content-desc': '', clickable: 'false', bounds: '[733,2250][860,2293]' })}</node></node>
 </hierarchy>`;
 
 describe('Android bottom-action check (adb)', () => {
@@ -48,13 +48,13 @@ describe('Android bottom-action check (adb)', () => {
     const nodes = parseNodes(DUMP);
     assert.deepEqual(nodes.map((n: { id: string }) => n.id), ['asset-order-actions', '', '', '', ''], 'the order bar and the four action nodes');
     const bar = parseNavigationBar(ANDROID_14);
-    const sell = measureAction(nodes, '판매하기', bar, 420);
+    const sell = measureAction(nodes, '매도하기', bar, 420);
     assert.deepEqual([sell.found, sell.clickable, sell.bounds.join(','), sell.gapPx, sell.gapDp, sell.overlaps],
       [true, true, '36,2196,531,2346', -72, -27.4, true]);
     // A learning-locked button is still found by its label.
-    const buy = measureAction(nodes, '구매하기', parseNavigationBar(ANDROID_12), 420);
+    const buy = measureAction(nodes, '매수하기', parseNavigationBar(ANDROID_12), 420);
     assert.deepEqual([buy.clickable, buy.gapPx, buy.overlaps], [true, -9, true]);
-    const above = measureAction(nodes, '판매하기', { left: 0, top: 2360, right: 1080, bottom: 2400 }, 420);
+    const above = measureAction(nodes, '매도하기', { left: 0, top: 2360, right: 1080, bottom: 2400 }, 420);
     assert.deepEqual([above.gapPx, above.gapDp, above.overlaps], [14, 5.3, false]);
     assert.deepEqual(measureAction(nodes, '없는 버튼', bar, 420), { label: '없는 버튼', found: false });
   });
@@ -62,7 +62,7 @@ describe('Android bottom-action check (adb)', () => {
   it('reads the bottom inset the app applied from the order bar and names what went wrong', () => {
     const nodes = parseNodes(DUMP);
     const bar = parseNavigationBar(ANDROID_14);
-    const actions = ['판매하기', '구매하기'].map((label) => measureAction(nodes, label, bar, 420));
+    const actions = ['매도하기', '매수하기'].map((label) => measureAction(nodes, label, bar, 420));
     // 54px under the actions at 2.625x = 20.6dp = 8dp + a 12.6dp inset, against a 48dp bar.
     const footer = measureFooter(nodes, 'asset-order-actions', actions, bar, 420);
     assert.deepEqual([footer.found, footer.bounds.join(','), footer.paddingBelowActionsDp, footer.appBottomInsetDp, footer.navigationBarDp, footer.overrunPx],
@@ -75,7 +75,7 @@ describe('Android bottom-action check (adb)', () => {
     assert.equal(diagnose(actions, { ...footer, appBottomInsetDp: 48, overrunPx: 63 }), 'screen reaches 63px past the display bottom');
     // Actions ending above the bar: clear, whatever the bar's padding.
     const above = { left: 0, top: 2360, right: 1080, bottom: 2400 };
-    assert.equal(diagnose(['판매하기', '구매하기'].map((label) => measureAction(nodes, label, above, 420)), footer), 'clear');
+    assert.equal(diagnose(['매도하기', '매수하기'].map((label) => measureAction(nodes, label, above, 420)), footer), 'clear');
     assert.deepEqual(measureFooter(nodes, 'missing-bar', actions, bar, 420), { id: 'missing-bar', found: false });
   });
 });

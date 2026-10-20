@@ -57,7 +57,7 @@ test('review steps below the order form ignore the form side/type check',()=>{
   const view=resolveGuideView(session,'order',{wallet:null,fx:null,transfer:null,practice:{order:orderForm({side:'sell',orderType:'limit'}),holdings:{screen:'holdings',accountId:account,assetId:'crypto-1',holdingsVisible:true}}});
   assert.equal(view.kind,'spotlight');if(view.kind==='spotlight')assert.deepEqual(view.targets,['asset-holdings']);
 });
-test('marketSell: 판매하기 on the detail, then holdings and the sell form on the order screen',()=>{
+test('marketSell: 매도하기 on the detail, then holdings and the sell form on the order screen',()=>{
   const session=startGuideSession(5,account,'marketSell',questProgress(4))!;
   assert.equal(session.step,0);
   const sell=resolveGuideView(session,'asset',{wallet:null,fx:null,transfer:null,practice:{asset:{screen:'asset',accountId:account,assetId:'crypto-1',assetType:'crypto'}}});

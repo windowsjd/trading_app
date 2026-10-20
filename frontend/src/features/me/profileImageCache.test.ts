@@ -7,7 +7,7 @@ import { getSessionGeneration, startSessionInstall, isCurrentSession } from '../
 import type { MeDto } from './api.ts';
 
 const require = createRequire(import.meta.url);
-const { QueryClient } = require('@tanstack/react-query');
+const { QueryClient, QueryObserver } = require('@tanstack/react-query');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
 const { applyProfileImageResponse } = load(resolve('src/features/me/profileImageCache.ts'), {
   '../../constants/queryKeys': { QUERY_KEYS },
@@ -31,6 +31,26 @@ describe('profile image cache propagation', () => {
     for (const key of unrelated) assert.equal(client.getQueryState(key).isInvalidated, false);
     await applyProfileImageResponse(client, me, getSessionGeneration());
     assert.equal(client.getQueryData(QUERY_KEYS.me).profileImageUrl, null);
+  });
+
+  it('re-reads ranking entries that show rows, never one that shows nothing (a failed read): that would only reset it to loading', async t => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } }); t.after(() => client.clear());
+    const reads = { shown: 0, failed: 0 };
+    // Active readers, as on screen (a failed read is already flagged invalid by the library, so count re-reads).
+    const observe = (queryKey: readonly unknown[], queryFn: () => Promise<unknown>) => {
+      const observer = new QueryObserver(client, { queryKey, queryFn });
+      t.after(observer.subscribe(() => {}));
+    };
+    observe(QUERY_KEYS.ranking.list({ scope: 'all', seasonId: 'season-1', limit: 3 }), async () => { reads.shown++; return { rankings: [] }; });
+    const failed = QUERY_KEYS.ranking.list({ scope: 'all', seasonId: 'season-1', limit: 1 });
+    observe(failed, async () => { reads.failed++; throw new Error('ranking down'); });
+    await new Promise((done) => setTimeout(done, 0));
+    assert.deepEqual(reads, { shown: 1, failed: 1 });
+    client.setQueryData(QUERY_KEYS.me, me);
+    await applyProfileImageResponse(client, { ...me, profileImageUrl: 'https://cdn.example.test/new.jpg' }, getSessionGeneration());
+    await new Promise((done) => setTimeout(done, 0));
+    assert.deepEqual(reads, { shown: 2, failed: 1 });
+    assert.equal(client.getQueryState(failed).status, 'error');
   });
 
   it('preserves concurrent nickname and privacy changes', async t => {

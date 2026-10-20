@@ -17,19 +17,34 @@ import CTAButton from '../../components/common/CTAButton';
 import InlineEmptyState from '../../components/states/InlineEmptyState';
 import { AssetMarketChart } from './AssetChartScreen';
 import OrderAssetSheet from '../order/OrderAssetSheet';
+import type { AssetType } from '../../features/market/api';
 import { useIsFocused } from '@react-navigation/native';
 
 export default function AssetDetailScreen(props: AssetDetailScreenProps) {
   const { assetId } = props.route.params;
   const focused = useIsFocused();
-  // The order screen's own asset sheet (domestic, US and crypto spot), as the
-  // futures detail reuses its contract picker: another asset is picked over
-  // this screen and the detail is rebuilt for it in place.
+  // The order screen's own asset sheet, as the futures detail reuses its
+  // contract picker: another asset is picked over this screen and the detail
+  // is rebuilt for it in place. It searches this asset's market only
+  // (domestic, US or crypto spot), read from the detail's own cached answer
+  // (the content below loads it), with this asset marked.
+  const assetType = useQuery({
+    queryKey: QUERY_KEYS.asset.detail(assetId),
+    queryFn: () => getAssetDetail(assetId),
+    enabled: false,
+  }).data?.asset.assetType;
   const [assetSheetOpen, setAssetSheetOpen] = useState(false);
+  // The market the sheet opened in, kept while it closes over the next asset.
+  const [sheetScope, setSheetScope] = useState<AssetType | null>(null);
   // The sheet never stays over another screen.
   useEffect(() => {
     if (!focused) setAssetSheetOpen(false);
   }, [focused]);
+  // Until the market is known there is nothing to pick within.
+  const openAssetSheet = assetType ? () => {
+    setSheetScope(assetType);
+    setAssetSheetOpen(true);
+  } : undefined;
   const selectAsset = (nextAssetId: string) => {
     setAssetSheetOpen(false);
     if (nextAssetId !== assetId) props.navigation.setParams({ assetId: nextAssetId });
@@ -37,8 +52,11 @@ export default function AssetDetailScreen(props: AssetDetailScreenProps) {
   return (
     <>
       {/* Recreate the chart subscription and timeframe state when the pair changes. */}
-      <AssetDetailContent key={assetId} {...props} onOpenAssetSheet={() => setAssetSheetOpen(true)} />
-      <OrderAssetSheet visible={assetSheetOpen && focused} onClose={() => setAssetSheetOpen(false)} onSelect={selectAsset} />
+      <AssetDetailContent key={assetId} {...props} onOpenAssetSheet={openAssetSheet} />
+      {sheetScope ? (
+        <OrderAssetSheet visible={assetSheetOpen && focused} scope={sheetScope} selectedAssetId={assetId}
+          onClose={() => setAssetSheetOpen(false)} onSelect={selectAsset} />
+      ) : null}
     </>
   );
 }
@@ -56,7 +74,7 @@ export function AssetDetailContent({
   const detail = useQuery({ queryKey: QUERY_KEYS.asset.detail(assetId), queryFn: () => getAssetDetail(assetId) });
   const learning = useLearningAccess(accountId);
   const insets = useSafeAreaInsets();
-  // 구매하기 leads to every BUY of this market: open while any of them is (a
+  // 매수하기 leads to every BUY of this market: open while any of them is (a
   // crypto limit BUY at QUEST 06, a stock market BUY at its own quest).
   const assetType = detail.data?.asset.assetType;
   const buyGate = learning.gate(assetType === 'crypto' ? ['cryptoMarketBuy', 'cryptoLimitBuy']
@@ -88,14 +106,14 @@ export function AssetDetailContent({
       <View style={{ ...styles.footer, paddingBottom: styles.footer.paddingBottom + insets.bottom }} testID="asset-order-actions">
         <QuestTarget id="asset-sell" style={{ flex: 1 }}><CTAButton
           testID={TEST_IDS.assetDetail.openSellOrder}
-          label="판매하기"
+          label="매도하기"
           state={accountId ? 'enabled' : 'disabled'}
           onPress={() => openOrder('sell')}
           style={{ ...styles.action, backgroundColor: SELL_COLOR }}
         /></QuestTarget>
         <QuestTarget id="asset-buy" style={{ flex: 1 }}><CTAButton
           testID={TEST_IDS.assetDetail.openBuyOrder}
-          label="구매하기"
+          label="매수하기"
           state={accountId ? 'enabled' : 'disabled'}
           learningHint={buyGate.locked ? buyGate.message : null}
           onPress={() => buyGate.guard(() => openOrder('buy'))}

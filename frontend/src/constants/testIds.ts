@@ -167,6 +167,14 @@ export const TEST_IDS = {
     screen: 'my-screen',
     badgeMenu: 'my-badge-menu',
     logoutMenu: 'my-logout-menu',
+    // Profile editing (moved from Settings, 2026-10-20).
+    profileImageSelect: 'my-profile-image-select',
+    profileImageDelete: 'my-profile-image-delete',
+    profileImageError: 'my-profile-image-error',
+    nicknameEdit: 'my-nickname-edit',
+    nicknameInput: 'my-nickname-input',
+    nicknameCancel: 'my-nickname-cancel',
+    saveNickname: 'my-save-nickname',
   },
 
   badges: {
@@ -185,9 +193,7 @@ export const TEST_IDS = {
 
   settings: {
     screen: 'settings-screen',
-    nicknameInput: 'settings-nickname-input',
     appearance: (value: 'system' | 'light' | 'dark') => `settings-appearance-${value}`,
-    saveNickname: 'settings-save-nickname',
     logout: 'settings-logout',
     membershipDeletion: 'settings-membership-deletion',
   },

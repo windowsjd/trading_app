@@ -61,6 +61,8 @@ function createRecordCacheHarness(total = 23) {
       '../../components/states/' + n, { default: n, __esModule: true },
     ])),
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
+    // MY's photo/nickname editor (picker, mutations) has its own tests.
+    './MyProfileEditor': { default: 'MyProfileEditor', __esModule: true },
   };
   const screens = {
     my: load(resolve(__dirname, '../src/screens/my/MyScreen.tsx'), mocks).default,

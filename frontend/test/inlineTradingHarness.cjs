@@ -376,6 +376,11 @@ function inlineTradingHarness() {
         if (scope === 'asset' && resource === 'candles' && h.realCandles) return query.useQuery(options);
         if (scope === 'asset' && resource !== 'detail' && h.candleFailure)
           return { ...base, isError: true, error: h.candleFailure, data: undefined };
+        // The asset detail not answered yet, or failed.
+        if (scope === 'asset' && resource === 'detail' && h.detailPending)
+          return { ...base, isLoading: true, isPending: true, data: undefined };
+        if (scope === 'asset' && resource === 'detail' && h.detailFailure)
+          return { ...base, isError: true, error: h.detailFailure, data: undefined };
         if (scope === 'asset')
           return {
             ...base,
@@ -583,7 +588,8 @@ function inlineTradingHarness() {
       if (gate) await gate.promise;
       if (h.marketFailure) throw h.marketFailure;
       const search = params.search?.toUpperCase();
-      const rows = Object.values(h.assets).filter((asset) =>
+      // `h.marketEmpty`: a market with nothing listed right now.
+      const rows = h.marketEmpty ? [] : Object.values(h.assets).filter((asset) =>
         (!params.assetType || asset.assetType === params.assetType) &&
         (!search || asset.symbol.toUpperCase().includes(search) || asset.name.toUpperCase().includes(search)));
       const offset = params.offset ?? 0;

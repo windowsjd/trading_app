@@ -6,7 +6,7 @@ import { useTradingAccount } from '../tradingAccount/TradingAccountContext';
 import { learningLockMessage, QUEST_LOCK_CAPTION, type LearningAction } from './questProgress';
 
 /** Server evidence only. Unknown/error is a refresh state, not a learning lock.
- * An array gates an entry that leads to any of its actions (e.g. 구매하기).
+ * An array gates an entry that leads to any of its actions (e.g. 매수하기).
  * `caption` is the visible line under a locked control: the quest lock's
  * fixed copy, or a screen-derived lock's own reason. */
 export function useLearningAccess(accountId?: string | null) {

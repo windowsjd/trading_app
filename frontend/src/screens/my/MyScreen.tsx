@@ -13,6 +13,7 @@ import { getScreenContentStyle } from '../../theme/screenLayout';
 import ProfileAvatar from '../../components/common/ProfileAvatar';
 import ActionPressable from '../../components/common/ActionPressable';
 import LogoutButton from '../../components/common/LogoutButton';
+import MyProfileEditor from './MyProfileEditor';
 import { useQuery } from '@tanstack/react-query';
 
 import type { MyScreenProps } from '../../app/navigation/types';
@@ -198,6 +199,8 @@ export default function MyScreen({ navigation }: Props) {
             <ProfileAvatar profileImageUrl={me.profileImageUrl} size={64} testID="my-profile-avatar" />
             <Text style={styles.title}>{me.nickname}</Text>
           </View>
+          {/* Photo and nickname editing under the avatar and nickname they change. */}
+          <MyProfileEditor key={me.id} me={me} />
           <Text style={styles.helper}>이메일 {me.email}</Text>
           {ranking ? (
             <>

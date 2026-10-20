@@ -166,7 +166,7 @@ async function run() {
       await step('Wallet → TradeHistory', id('wallet-orders'), 'record-order-list-screen', null, condition); await back();
       await step('Wallet → Overall tab', page.getByRole('tab', { name: 'MY', exact: true }), 'overall-Record', 'overall-Record', condition);
       await step('Overall → MY', id('overall-My'), 'my-screen', 'my-profile-avatar', condition); await back();
-      await step('Overall → Settings', id('overall-Settings'), 'settings-screen', 'settings-save-nickname', condition);
+      await step('Overall → Settings', id('overall-Settings'), 'settings-screen', 'settings-appearance-system', condition);
       await step('Settings → Back', page.locator('[aria-label$="back"]:visible').first(), 'overall-Settings', 'overall-Settings', condition);
       await step('Overall → Record', id('overall-Record'), 'record-season-item-record-0', 'record-season-item-record-0', condition);
       await step('Record → SeasonDetail', id('record-season-item-record-0'), 'record-season-detail-screen', 'record-detail-return', condition);

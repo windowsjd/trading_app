@@ -1,11 +1,10 @@
 import { semantic } from '../../theme/tokens';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
-  TextInput,
   Alert,
   ScrollView,
   Switch,
@@ -21,12 +20,8 @@ import type { MyStackParamList } from '../../app/navigation/types';
 import { QUERY_KEYS } from '../../constants/queryKeys';
 import { TEST_IDS } from '../../constants/testIds';
 
-import { deleteProfileImage, getMe, updateMe, uploadProfileImage, type MeDto } from '../../features/me/api';
-import { selectProfileImage } from '../../features/me/profileImage';
-import { ProfileImageSelectionError } from '../../features/me/profileImageTypes';
-import { applyProfileImageResponse } from '../../features/me/profileImageCache';
+import { getMe, updateMe, type MeDto } from '../../features/me/api';
 import { getSessionGeneration, isCurrentSession } from '../../services/api/sessionOwnership';
-import ProfileAvatar from '../../components/common/ProfileAvatar';
 import { useLogout } from '../../features/auth/useLogout';
 import { useAppearance } from '../../theme/appearance';
 
@@ -51,79 +46,10 @@ export default function SettingsScreen({ navigation }: Props) {
     refetchOnMount: 'always',
   });
 
-  const [nickname, setNickname] = useState('');
   const switchTrackColor = { false: colors.border, true: colors.secondaryActionSurface };
   // RN Web selects the active thumb through a separate prop; native uses thumbColor.
   const activeSwitchColor = Platform.OS === 'web' ? { activeThumbColor: colors.secondaryActionForeground } : {};
   const privacyRequestInFlight = useRef(false);
-  const photoRequestInFlight = useRef(false);
-  const [photoAction, setPhotoAction] = useState<'select' | 'upload' | 'delete' | null>(null);
-  const [photoError, setPhotoError] = useState<string | null>(null);
-  const [photoFailure, setPhotoFailure] = useState<unknown>(null);
-  const mounted = useRef(true);
-
-  useEffect(() => {
-    mounted.current = true;
-    return () => { mounted.current = false; };
-  }, []);
-
-  const photoMutation = useMutation({
-    mutationFn: (image: Awaited<ReturnType<typeof selectProfileImage>>) =>
-      image ? uploadProfileImage(image) : deleteProfileImage(),
-  });
-
-  const runPhotoAction = async (remove: boolean) => {
-    if (photoRequestInFlight.current || !meQuery.data) return;
-    photoRequestInFlight.current = true;
-    const owner = getSessionGeneration();
-    const userId = meQuery.data.id;
-    const ownsUser = () => isCurrentSession(owner) && queryClient.getQueryData<MeDto>(QUERY_KEYS.me)?.id === userId;
-    const current = () => mounted.current && ownsUser();
-    setPhotoError(null);
-    setPhotoFailure(null);
-    setPhotoAction(remove ? 'delete' : 'select');
-    let image: Awaited<ReturnType<typeof selectProfileImage>> = null;
-    try {
-      image = remove ? null : await selectProfileImage();
-      if (!current() || (!remove && !image)) return;
-      setPhotoAction(remove ? 'delete' : 'upload');
-      const me = await photoMutation.mutateAsync(image);
-      if (ownsUser()) await applyProfileImageResponse(queryClient, me, owner);
-    } catch (error) {
-      if (current()) {
-        if (!(error instanceof ProfileImageSelectionError)) setPhotoFailure(error);
-        setPhotoError(error instanceof ProfileImageSelectionError && error.reason === 'permission'
-          ? '사진 접근 권한이 필요합니다. 기기 설정에서 사진 접근을 허용해주세요.'
-          : error instanceof ProfileImageSelectionError && error.reason === 'too_large'
-            ? '사진이 너무 큽니다. 더 작은 사진을 선택해주세요.'
-            : error instanceof ProfileImageSelectionError && error.reason === 'processing'
-              ? '사진을 처리하지 못했습니다. 다른 사진을 선택해주세요.'
-              : remove ? '사진을 삭제하지 못했습니다. 다시 시도해주세요.'
-                : '사진을 업로드하지 못했습니다. 다시 시도해주세요.');
-      }
-    } finally {
-      if (Platform.OS === 'web' && image?.uri.startsWith('blob:')) URL.revokeObjectURL(image.uri);
-      photoRequestInFlight.current = false;
-      if (mounted.current) setPhotoAction(null);
-    }
-  };
-
-  const savedNickname = meQuery.data?.nickname;
-  useEffect(() => {
-    if (savedNickname !== undefined) setNickname(savedNickname);
-  }, [savedNickname]);
-
-  const updateMutation = useMutation({
-    mutationFn: updateMe,
-    onMutate: () => ({ userId: meQuery.data?.id, generation: getSessionGeneration() }),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEYS.me });
-      Alert.alert('저장 완료', '닉네임이 변경되었습니다.');
-    },
-    onError: () => {
-      Alert.alert('저장 실패', '닉네임 변경에 실패했습니다.');
-    },
-  });
 
   const privacyMutation = useMutation({
     mutationFn: (portfolioPublic: boolean) => updateMe({ portfolioPublic }),
@@ -188,17 +114,6 @@ export default function SettingsScreen({ navigation }: Props) {
     privacyMutation.mutate(value);
   };
 
-  const onSaveNickname = () => {
-    if (!nickname.trim()) {
-      Alert.alert('입력 확인', '닉네임을 입력해주세요.');
-      return;
-    }
-
-    updateMutation.mutate({
-      nickname: nickname.trim(),
-    });
-  };
-
   // One shared implementation (작업 10 §B-12): it clears the WHOLE query cache,
   // not just the account-scoped keys, so no legacy financial entry survives
   // into the next user's session.
@@ -224,57 +139,7 @@ export default function SettingsScreen({ navigation }: Props) {
         testID={TEST_IDS.settings.screen}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>프로필 사진</Text>
-          <ProfileAvatar profileImageUrl={meQuery.data.profileImageUrl} size={72}
-            testID="settings-profile-avatar" accessibilityLabel="현재 프로필 사진" />
-          <View style={styles.photoActions}>
-            <ActionPressable primary testID="settings-profile-image-select"
-              style={[styles.primaryButton, styles.photoButton]}
-              disabled={photoAction !== null} accessibilityState={{ disabled: photoAction !== null, busy: photoAction !== null }}
-              onPress={() => void runPhotoAction(false)}>
-              <Text style={styles.primaryButtonText}>
-                {photoAction === 'upload' ? '업로드 중...' : photoAction === 'select' ? '사진 준비 중...' : meQuery.data.profileImageUrl ? '사진 변경' : '사진 추가'}
-              </Text>
-            </ActionPressable>
-            {meQuery.data.profileImageUrl ? (
-              <ActionPressable feedback="button" testID="settings-profile-image-delete"
-                style={[styles.photoDeleteButton, styles.photoButton]}
-                disabled={photoAction !== null} accessibilityState={{ disabled: photoAction !== null, busy: photoAction === 'delete' }}
-                onPress={() => void runPhotoAction(true)}>
-                <Text style={styles.photoDeleteText}>{photoAction === 'delete' ? '삭제 중...' : '사진 삭제'}</Text>
-              </ActionPressable>
-            ) : null}
-          </View>
-          {photoError ? <Text testID="settings-profile-image-error" accessibilityRole="alert" style={styles.photoError}>{photoError}</Text> : null}
-          {photoFailure ? <AdminDiagnosticPanel error={photoFailure} /> : null}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>닉네임 변경</Text>
-
-          <TextInput
-            testID={TEST_IDS.settings.nicknameInput}
-            style={styles.input}
-            value={nickname}
-            onChangeText={setNickname}
-            placeholder="닉네임 입력"
-          />
-
-          <ActionPressable
-            testID={TEST_IDS.settings.saveNickname}
-            primary
-            style={styles.primaryButton}
-            onPress={onSaveNickname}
-            disabled={updateMutation.isPending}
-          >
-            <Text style={styles.primaryButtonText}>
-              {updateMutation.isPending ? '저장 중...' : '저장'}
-            </Text>
-          </ActionPressable>
-          {updateMutation.isError && updateMutation.context?.userId === meQuery.data.id && isCurrentSession(updateMutation.context.generation) ? <AdminDiagnosticPanel error={updateMutation.error} /> : null}
-        </View>
-
+        {/* Profile photo and nickname are edited on MY (MyProfileEditor). */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>화면 모드</Text>
           <View style={styles.modeChoices} accessibilityRole="radiogroup">
@@ -376,15 +241,6 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: { fontSize: 18, fontWeight: '700' },
-  input: {
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    backgroundColor: semantic.input,
-    fontSize: 16,
-  },
   modeChoices: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   modeChoice: {
     backgroundColor: semantic.raised, minHeight: 44, minWidth: 78, paddingHorizontal: 12, borderRadius: 10,
@@ -396,25 +252,6 @@ const styles = StyleSheet.create({
   switchLabel: { flex: 1, minWidth: 0, lineHeight: 27 },
   helper: { fontSize: 14, color: semantic.secondary, lineHeight: 20 },
   attribution: { minHeight: 44, justifyContent: 'center' },
-  photoActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  photoButton: { flexGrow: 1, flexBasis: 130, minHeight: 48, paddingHorizontal: 12 },
-  photoError: { fontSize: 14, color: semantic.error, lineHeight: 21 },
-  primaryButton: {
-    backgroundColor: semantic.selected,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryButtonText: { color: semantic.onAccent, fontWeight: '700' },
-  photoDeleteButton: {
-    backgroundColor: semantic.errorSurface,
-    borderWidth: 1,
-    borderColor: semantic.border,
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  photoDeleteText: { color: semantic.error, fontWeight: '700' },
   membershipDeletion: { minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingVertical: 8 },
   membershipDeletionText: { fontSize: 14, color: semantic.secondary, textDecorationLine: 'underline', textAlign: 'center' },
 });

@@ -6,16 +6,12 @@ import { QUERY_KEYS } from '../../constants/queryKeys.ts';
 import { TEST_IDS } from '../../constants/testIds.ts';
 import type { MeDto, UpdateMeRequestDto } from '../../features/me/api.ts';
 import type { QueryClient as QueryClientType } from '@tanstack/react-query';
-import { ProfileImageSelectionError, type ProfileImageUpload } from '../../features/me/profileImageTypes.ts';
 
 const require = createRequire(import.meta.url);
 const React = require('react');
 const { act, create } = require('react-test-renderer');
 const { QueryClient, QueryClientProvider } = require('@tanstack/react-query');
 const { load } = require('../../../test/ledgerTestHarness.cjs');
-const photoCache = load(resolve('src/features/me/profileImageCache.ts'), {
-  '../../constants/queryKeys': { QUERY_KEYS },
-});
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 function deferred() {
@@ -49,12 +45,7 @@ function settingsHarness(portfolioPublic = true, constants?: unknown) {
     renderer: null as any,
     patchFailure: false,
     appearanceChoices: [] as string[],
-    selection: null as ProfileImageUpload | null,
-    selectionError: null as Error | null,
-    selections: 0,
-    pickerGate: null as ReturnType<typeof deferred> | null,
-    photoGate: null as ReturnType<typeof deferred> | null,
-    photoFailure: false,
+    // Photo transport stays mocked only to prove Settings never calls it.
     photoRequests: [] as string[],
     navigations: [] as unknown[][],
   };
@@ -86,28 +77,9 @@ function settingsHarness(portfolioPublic = true, constants?: unknown) {
         h.nextResponse = null;
         return { ...h.serverMe };
       },
-      uploadProfileImage: async () => {
-        h.photoRequests.push('upload');
-        if (h.photoGate) await h.photoGate.promise;
-        if (h.photoFailure) throw new Error('private storage error');
-        h.serverMe = { ...h.serverMe, profileImageUrl: 'https://cdn.example.test/new.jpg' };
-        return { ...h.serverMe };
-      },
-      deleteProfileImage: async () => {
-        h.photoRequests.push('delete');
-        if (h.photoGate) await h.photoGate.promise;
-        if (h.photoFailure) throw new Error('private storage error');
-        h.serverMe = { ...h.serverMe, profileImageUrl: null };
-        return { ...h.serverMe };
-      },
+      uploadProfileImage: async () => { h.photoRequests.push('upload'); return { ...h.serverMe }; },
+      deleteProfileImage: async () => { h.photoRequests.push('delete'); return { ...h.serverMe }; },
     },
-    '../../features/me/profileImage': { selectProfileImage: async () => {
-      h.selections++;
-      if (h.pickerGate) await h.pickerGate.promise;
-      if (h.selectionError) throw h.selectionError;
-      return h.selection;
-    } },
-    '../../features/me/profileImageCache': photoCache,
     '../../theme/appearance': { useAppearance: () => {
       const [preference, select] = React.useState('system');
       const [financialPreference, setFinancialPreference] = React.useState('red_blue');
@@ -337,7 +309,7 @@ describe('Settings portfolio privacy switch', () => {
     assert.equal(x.client.getQueryData(QUERY_KEYS.me), undefined);
   });
 
-  it('refetches persisted /me on reentry and keeps nickname editing', async (t) => {
+  it('refetches persisted /me on reentry', async (t) => {
     const x = settingsHarness(true);
     t.after(x.close);
     await x.mount();
@@ -346,17 +318,39 @@ describe('Settings portfolio privacy switch', () => {
     await x.mount();
     await x.flush();
     assert.equal(x.node('settings-portfolio-public').props.value, false);
+    assert.deepEqual(x.h.patches, []);
+  });
 
-    await act(async () =>
-      x.node(TEST_IDS.settings.nicknameInput).props.onChangeText('새 이름'),
-    );
-    await act(async () =>
-      x.node(TEST_IDS.settings.saveNickname).props.onPress(),
-    );
+  it('keeps a photo changed meanwhile (on MY) when an earlier privacy PATCH answers later', async (t) => {
+    const x = settingsHarness(true);
+    t.after(x.close);
+    await x.mount();
+    x.h.patchGate = deferred();
+    // The late answer still carries the photo from before the change.
+    x.h.nextResponse = { ...x.h.serverMe, portfolioPublic: false, profileImageUrl: null };
+    await x.change(false);
+    await act(async () => x.client.setQueryData<MeDto>(QUERY_KEYS.me, (me) => ({ ...me!, profileImageUrl: 'https://cdn.example.test/new.jpg' })));
+    await act(async () => x.h.patchGate?.resolve());
     await x.flush();
-    assert.deepEqual(x.h.patches, [{ nickname: '새 이름' }]);
-    assert.equal(x.h.serverMe.nickname, '새 이름');
-    assert.deepEqual(x.h.alerts, [['저장 완료', '닉네임이 변경되었습니다.']]);
+    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, 'https://cdn.example.test/new.jpg');
+    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.portfolioPublic, false);
+  });
+});
+
+describe('Settings without profile editing', () => {
+  it('has no photo or nickname editor (both live on MY); its other sections stay', async (t) => {
+    const x = settingsHarness(); t.after(x.close); await x.mount();
+    assert.equal(x.h.renderer.root.findAllByType('TextInput').length, 0);
+    assert.equal(x.h.renderer.root.findAllByType('ProfileAvatar').length, 0);
+    for (const id of ['settings-profile-image-select', 'settings-profile-image-delete', 'settings-nickname-input', 'settings-save-nickname']) {
+      assert.equal(x.node(id) === undefined, true, id);
+    }
+    assert.doesNotMatch(x.text(), /프로필 사진|닉네임 변경|사진 추가|사진 변경|사진 삭제/);
+    for (const copy of [/화면 모드/, /금융 색상/, /친구에게 포트폴리오 공개/, /앱 정보/]) assert.match(x.text(), copy);
+    for (const id of ['settings-portfolio-public', TEST_IDS.settings.logout, TEST_IDS.settings.membershipDeletion]) {
+      assert.equal(x.node(id) === undefined, false, id);
+    }
+    assert.equal(x.h.renderer.root.findAll((item: any) => item.type === 'NotificationSettingsSection').length, 1);
   });
 });
 
@@ -389,119 +383,6 @@ describe('Settings financial palette preference', () => {
     await act(async () => x.node('settings-financial-red_blue').props.onPress());
     assert.equal(x.node('settings-financial-red_blue').props.accessibilityState.selected, true);
     assert.deepEqual(x.h.patches, []);
-  });
-});
-
-const selectedPhoto: ProfileImageUpload = { uri: 'file:///normalized.jpg', name: 'profile.jpg', type: 'image/jpeg' };
-
-describe('Settings profile image management', () => {
-  it('offers add with no image and change/delete with an existing image', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount();
-    assert.match(x.text(), /사진 추가/); assert.equal(x.node('settings-profile-image-delete') === undefined, true);
-    await act(async () => x.client.setQueryData<MeDto>(QUERY_KEYS.me, me => ({ ...me!, profileImageUrl: 'https://legacy.example.test/avatar.jpg' })));
-    await x.flush(); assert.match(x.text(), /사진 변경/); assert.ok(x.node('settings-profile-image-delete'));
-  });
-
-  it('cancels selection without an upload or cache change', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount();
-    const before = x.client.getQueryData(QUERY_KEYS.me);
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    assert.equal(x.h.selections, 1); assert.deepEqual(x.h.photoRequests, []);
-    assert.deepEqual(x.client.getQueryData(QUERY_KEYS.me), before); assert.equal(x.node('settings-profile-image-select').props.disabled, false);
-  });
-
-  it('shows safe permission/manipulation errors and keeps the prior photo', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount();
-    for (const [reason, copy] of [['permission', /사진 접근 권한/], ['processing', /사진을 처리하지 못했습니다/], ['too_large', /사진이 너무 큽니다/]] as const) {
-      x.h.selectionError = new ProfileImageSelectionError(reason);
-      await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-      assert.match(x.text(), copy); assert.deepEqual(x.h.photoRequests, []);
-      assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, null);
-    }
-  });
-
-  it('blocks rapid selection, replacement and deletion until upload completes', async t => {
-    const x = settingsHarness(); t.after(x.close); x.h.serverMe.profileImageUrl = 'https://legacy.example.test/avatar.jpg'; await x.mount();
-    x.h.selection = selectedPhoto; x.h.pickerGate = deferred(); x.h.photoGate = deferred();
-    await act(async () => {
-      const add = x.node('settings-profile-image-select').props.onPress;
-      add(); add(); x.node('settings-profile-image-delete').props.onPress();
-    }); await x.flush();
-    assert.equal(x.h.selections, 1); assert.deepEqual(x.h.photoRequests, []);
-    assert.equal(x.node('settings-profile-image-select').props.disabled, true); assert.equal(x.node('settings-profile-image-delete').props.disabled, true);
-    await act(async () => x.h.pickerGate!.resolve()); await x.flush();
-    assert.match(x.text(), /업로드 중/); assert.deepEqual(x.h.photoRequests, ['upload']);
-    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, 'https://legacy.example.test/avatar.jpg');
-    await act(async () => x.h.photoGate!.resolve()); await x.flush();
-    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, 'https://cdn.example.test/new.jpg');
-    const avatar = x.h.renderer.root.findByType('ProfileAvatar');
-    assert.equal(avatar.props.profileImageUrl, 'https://cdn.example.test/new.jpg');
-    assert.equal(x.node('settings-profile-image-select').props.disabled, false);
-  });
-
-  it('keeps current photo on upload/delete failure and allows retry', async t => {
-    const x = settingsHarness(); t.after(x.close); x.h.serverMe.profileImageUrl = 'https://legacy.example.test/avatar.jpg'; await x.mount();
-    x.h.selection = selectedPhoto; x.h.photoFailure = true;
-    for (const [id, copy] of [['settings-profile-image-select', /사진을 업로드하지 못했습니다/], ['settings-profile-image-delete', /사진을 삭제하지 못했습니다/]] as const) {
-      await act(async () => x.node(id).props.onPress()); await x.flush();
-      assert.match(x.text(), copy); assert.doesNotMatch(x.text(), /private storage error/);
-      assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, 'https://legacy.example.test/avatar.jpg');
-    }
-    x.h.photoFailure = false;
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    assert.equal(x.node('settings-profile-image-error') === undefined, true);
-  });
-
-  it('blocks concurrent delete actions then immediately restores the default avatar', async t => {
-    const x = settingsHarness(); t.after(x.close); x.h.serverMe.profileImageUrl = 'https://cdn.example.test/current.jpg'; await x.mount();
-    x.h.photoGate = deferred();
-    await act(async () => {
-      const remove = x.node('settings-profile-image-delete').props.onPress;
-      remove(); remove(); x.node('settings-profile-image-select').props.onPress();
-    }); await x.flush();
-    assert.deepEqual(x.h.photoRequests, ['delete']); assert.equal(x.h.selections, 0);
-    assert.match(x.text(), /삭제 중/); assert.equal(x.node('settings-profile-image-select').props.disabled, true);
-    await act(async () => x.h.photoGate!.resolve()); await x.flush();
-    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, null);
-    assert.equal(x.h.renderer.root.findByType('ProfileAvatar').props.profileImageUrl, null);
-    assert.match(x.text(), /사진 추가/); assert.equal(x.node('settings-profile-image-delete') === undefined, true);
-  });
-
-  it('preserves unsaved nickname input when a photo changes', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount(); x.h.selection = selectedPhoto;
-    await act(async () => x.node(TEST_IDS.settings.nicknameInput).props.onChangeText('작성 중 이름'));
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    assert.equal(x.node(TEST_IDS.settings.nicknameInput).props.value, '작성 중 이름');
-  });
-
-  it('keeps a new photo when an earlier privacy PATCH finishes later', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount(); x.h.patchGate = deferred();
-    x.h.nextResponse = { ...x.h.serverMe, portfolioPublic: false, profileImageUrl: null };
-    await x.change(false); x.h.selection = selectedPhoto;
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    await act(async () => x.h.patchGate!.resolve()); await x.flush();
-    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, 'https://cdn.example.test/new.jpg');
-    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.portfolioPublic, false);
-  });
-
-  it('updates the same session cache when navigating away during an upload', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount(); x.h.selection = selectedPhoto; x.h.photoGate = deferred();
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    await act(async () => x.h.renderer.unmount());
-    await act(async () => x.h.photoGate!.resolve()); await x.flush();
-    assert.equal(x.client.getQueryData<MeDto>(QUERY_KEYS.me)?.profileImageUrl, 'https://cdn.example.test/new.jpg');
-  });
-
-  it('does not send a selected photo after unmount or restore a late response after logout', async t => {
-    const x = settingsHarness(); t.after(x.close); await x.mount(); x.h.selection = selectedPhoto; x.h.pickerGate = deferred();
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    await act(async () => x.h.renderer.unmount()); x.client.removeQueries({ queryKey: QUERY_KEYS.me, exact: true });
-    await act(async () => x.h.pickerGate!.resolve()); await x.flush(); assert.deepEqual(x.h.photoRequests, []);
-    x.h.pickerGate = null; await x.mount(); x.h.photoGate = deferred();
-    await act(async () => x.node('settings-profile-image-select').props.onPress()); await x.flush();
-    await act(async () => x.h.renderer.unmount()); x.client.removeQueries({ queryKey: QUERY_KEYS.me, exact: true });
-    await act(async () => x.h.photoGate!.resolve()); await x.flush();
-    assert.equal(x.client.getQueryData(QUERY_KEYS.me), undefined);
   });
 });
 
