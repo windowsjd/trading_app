@@ -8,11 +8,10 @@
  * never decides that an ad was completed: it forwards the provider's opaque
  * proof, and the server verifies it.
  *
- * NO REWARDED-AD SDK IS INTEGRATED YET. `getRewardedAdProvider` therefore
- * returns null, the reward sheet shows "광고 기능 준비 중", and no completion —
- * real or fabricated — can be produced on a device. Integrating an SDK means
- * returning its adapter from `getRewardedAdProvider`; the claim/reset flow,
- * its idempotency and its result handling stay as they are.
+ * The SDK's development/preview test runner is deliberately NOT a provider
+ * here. Its local earned-reward event has no server-verifiable proof.
+ * `getRewardedAdProvider` stays null until AdMob SSV is implemented; the
+ * claim/reset flow, its idempotency and its result handling stay disabled.
  */
 
 export type RewardedAdPurpose = 'funding' | 'account_reset';

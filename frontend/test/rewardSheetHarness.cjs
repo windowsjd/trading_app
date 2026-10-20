@@ -21,6 +21,22 @@ function resetEligibility(overrides = {}) {
 function rewardSheetHarness(options = {}) {
   const h = { requests: [], reads: [], invalidations: [], shows: [], funding: eligibility(options.funding),
     reset: resetEligibility(options.reset), failures: [], adOutcome: { status: 'completed', proof: 'proof-1' } };
+  h.testAds = [];
+  h.testImports = 0;
+  const testSdk = {
+    prepare: () => Promise.resolve({ privacyOptionsRequired: false }),
+    create() {
+      const ad = { callback: null, loads: 0, shows: 0, disposed: false,
+        listen(callback) { this.callback = callback; },
+        load() { this.loads++; },
+        show() { this.shows++; return options.showTestFailure ? Promise.reject(new Error('show failed')) : Promise.resolve(); },
+        dispose() { this.disposed = true; },
+        emit(event) { this.callback?.(event); },
+      };
+      h.testAds.push(ad); return ad;
+    },
+    showPrivacyOptions: () => Promise.resolve(),
+  };
   const client = new query.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const invalidate = client.invalidateQueries.bind(client);
   client.invalidateQueries = (config) => { h.invalidations.push(config?.queryKey ?? []); return invalidate(config); };
@@ -48,15 +64,24 @@ function rewardSheetHarness(options = {}) {
     '../../features/tradingAccount/api': api,
     '../../components/common/CTAButton': { default: 'CTAButton', __esModule: true },
     '../../components/states/ErrorNotice': { default: 'ErrorNotice', __esModule: true },
+    '../../features/adRewards/rewardedTestSdk': {
+      getRewardedTestUnit: () => options.testAds ? 'ca-app-pub-3940256099942544/5224354917' : null,
+      loadRewardedTestSdk: () => {
+        h.testImports++;
+        return options.testInitFailure ? Promise.reject(new Error('SDK unavailable')) : Promise.resolve(testSdk);
+      },
+    },
   });
   const provider = options.provider === null ? null : {
     key: 'test-ads',
     show: async (input) => { h.shows.push(input); return h.adOutcome; },
   };
   h.visible = true;
+  h.accountId = 'G';
+  h.mode = 'general';
   h.closed = 0;
   const tree = () => React.createElement(query.QueryClientProvider, { client },
-    React.createElement(sheet.default, { visible: h.visible, account: { id: 'G', mode: 'general', status: 'active' },
+    React.createElement(sheet.default, { visible: h.visible, account: { id: h.accountId, mode: h.mode, status: 'active' },
       onClose: () => { h.closed += 1; }, provider }));
   h.flush = async () => { await act(async () => { await new Promise((r) => setTimeout(r, 20)); }); };
   h.start = async () => { await act(async () => { h.renderer = create(tree()); }); await h.flush(); };
@@ -68,6 +93,8 @@ function rewardSheetHarness(options = {}) {
     .filter((v) => typeof v === 'string' || typeof v === 'number').join('')).join(' ');
   // Home hides the sheet (blur, account change) by re-rendering it invisible.
   h.setVisible = async (visible) => { h.visible = visible; await act(async () => h.renderer.update(tree())); await h.flush(); };
+  h.update = async () => { await act(async () => h.renderer.update(tree())); await h.flush(); };
+  h.emitTest = async (event, index = h.testAds.length - 1) => { await act(async () => h.testAds[index].emit(event)); await h.flush(); };
   // The sheet's own close (backdrop, back, 닫기) as InlineBottomSheet calls it.
   h.dismiss = async () => {
     const sheetNode = h.renderer.root.find((n) => typeof n.type !== 'string' && n.props.testID === 'home-reward-sheet');

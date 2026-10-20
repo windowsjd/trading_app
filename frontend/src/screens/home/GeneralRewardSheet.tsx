@@ -34,6 +34,7 @@ import {
   type RewardAttempt,
 } from '../../features/adRewards/rewardFlow';
 import { createIdempotencyKey } from '../../utils/idempotency';
+import RewardedTestPanel from './RewardedTestPanel';
 
 /** The general home's header entry to the 보상 sheet (gift icon + 보상). */
 export function HomeRewardButton({ onPress }: { onPress: () => void }) {
@@ -69,10 +70,10 @@ type Step =
  * idempotency key, and an answer that never arrived is re-checked with the
  * same key and proof (never re-paid, never reset twice).
  *
- * Without a rewarded-ad SDK (today) there is no provider: both actions stay
- * disabled under "광고 기능 준비 중" and nothing is sent — not even the
- * eligibility reads. The server also refuses every claim and reset while no
- * verifier is registered.
+ * The separate development/preview SDK test panel never supplies a provider
+ * proof. Both financial actions stay disabled under "광고 기능 준비 중" and
+ * nothing is sent — not even eligibility reads. The server also refuses every
+ * claim and reset while no verifier is registered.
  *
  * An attempt whose answer never arrived survives closing the sheet (it is
  * re-checked with the same key when reopened, and the caches it may have
@@ -87,7 +88,7 @@ export default function GeneralRewardSheet({
   visible: boolean;
   account: TradingAccountDto;
   onClose: () => void;
-  /** The device's rewarded-ad provider; null while no SDK is integrated. */
+  /** A server-verifiable provider; null until SSV exists. Never the test SDK. */
   provider?: RewardedAdProvider | null;
 }) {
   const accountId = account.id;
@@ -176,6 +177,7 @@ export default function GeneralRewardSheet({
         dismissible={!busy} onClose={close}>
         <ScrollView style={styles.scroll} bounces={false}>
           <View style={styles.body}>
+            {visible && account.mode === 'general' ? <RewardedTestPanel key={accountId} /> : null}
             {step.kind === 'done' ? (
               <View testID="reward-done" style={styles.result}>
                 <Text accessibilityRole="header" style={styles.resultTitle}>

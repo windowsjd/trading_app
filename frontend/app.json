@@ -1,7 +1,11 @@
 {
   "icon": "./assets/icon/trading-class-ios-icon-1024.png",
+  "ios": {
+    "bundleIdentifier": "com.leagueoftrading"
+  },
   "android": {
     "package": "com.leagueoftrading",
+    "blockedPermissions": ["com.google.android.gms.permission.AD_ID"],
     "adaptiveIcon": {
       "foregroundImage": "./assets/icon/trading-class-android-foreground-432.png",
       "backgroundImage": "./assets/icon/trading-class-android-background-432.png"
@@ -15,6 +19,12 @@
   },
   "owner": "mycroft7947",
   "plugins": [
+    ["react-native-google-mobile-ads", {
+      "androidAppId": "ca-app-pub-7899930948413451~9002185139",
+      "iosAppId": "ca-app-pub-7899930948413451~7288069200",
+      "delayAppMeasurementInit": true,
+      "skAdNetworkItems": ["cstr6suwn9.skadnetwork"]
+    }],
     ["expo-image-picker", {
       "photosPermission": "프로필 사진을 선택하려면 사진 접근 권한이 필요합니다.",
       "cameraPermission": false,

@@ -21,10 +21,13 @@ describe('build identification (MY › 설정 › 앱 정보)', () => {
     const saved = keys.map((key) => process.env[key]);
     try {
       for (const key of keys) delete process.env[key];
-      assert.deepEqual(withAppConfig({ config: base }).extra, { eas: { projectId: 'project' } });
+      const unstamped = withAppConfig({ config: base }).extra;
+      assert.deepEqual(unstamped.eas, { projectId: 'project' });
+      assert.equal(unstamped.build === undefined, true);
       Object.assign(process.env, { EAS_BUILD_GIT_COMMIT_HASH: 'abcdef1234567', EAS_BUILD_PROFILE: 'preview', EAS_BUILD_ID: 'build-1' });
       const stamped = withAppConfig({ config: base });
-      assert.deepEqual(stamped.extra, { eas: { projectId: 'project' }, build: { commit: 'abcdef1234567', profile: 'preview', id: 'build-1' } });
+      assert.deepEqual(stamped.extra.eas, { projectId: 'project' });
+      assert.deepEqual(stamped.extra.build, { commit: 'abcdef1234567', profile: 'preview', id: 'build-1' });
       assert.equal(describeBuild(stamped.extra.build), '빌드 abcdef12 · preview');
     } finally {
       keys.forEach((key, index) => {

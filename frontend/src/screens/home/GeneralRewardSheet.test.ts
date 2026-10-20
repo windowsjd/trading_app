@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const { rewardSheetHarness } = require('../../../test/rewardSheetHarness.cjs');
 
 describe('general home 보상 sheet (자금 관리)', () => {
-  it('without a rewarded-ad SDK both rewards stay disabled under 광고 기능 준비 중 and nothing is sent', async (t) => {
+  it('without a server-verifiable provider both rewards stay disabled under 광고 기능 준비 중 and nothing is sent', async (t) => {
     const h = rewardSheetHarness({ provider: null });
     await h.start(); t.after(h.close);
     assert.equal(h.node('reward-ad-notice') === undefined, false);

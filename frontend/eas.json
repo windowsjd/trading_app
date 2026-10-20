@@ -5,10 +5,13 @@
   },
   "build": {
     "development": {
+      "environment": "development",
+      "env": { "ADMOB_BUILD_PROFILE": "development" },
       "developmentClient": true,
       "distribution": "internal"
     },
     "preview": {
+      "env": { "ADMOB_BUILD_PROFILE": "preview" },
       "environment": "preview",
       "distribution": "internal",
       "android": {
@@ -16,6 +19,7 @@
       }
     },
     "production": {
+      "env": { "ADMOB_BUILD_PROFILE": "production" },
       "environment": "production",
       "autoIncrement": true
     }

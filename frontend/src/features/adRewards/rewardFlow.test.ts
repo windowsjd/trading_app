@@ -19,8 +19,8 @@ const reset = (overrides: Record<string, unknown> = {}) => ({
   targetKrwBalance: '10000000.00000000', resetCount: 0, lastResetAt: null, ...overrides,
 }) as never;
 
-describe('rewarded ads are not wired into the app yet', () => {
-  it('has no provider, so no ad completion can be produced on a device', () => {
+describe('rewarded ads cannot authorize financial commands before SSV', () => {
+  it('has no proof-producing financial provider, including after SDK test integration', () => {
     assert.equal(getRewardedAdProvider(), null);
   });
 
