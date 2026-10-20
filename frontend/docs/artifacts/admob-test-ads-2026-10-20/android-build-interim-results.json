@@ -1,0 +1,68 @@
+{
+  "nativeDevice": false,
+  "realGoogleAd": false,
+  "build": {
+    "id": "49ff1a33-7d03-428a-8558-e8100797c56b",
+    "status": "FINISHED",
+    "sourceCommit": "3a0408a5e78258bb40d15cdbe087e247220b0a15",
+    "completedAt": "2026-10-20T09:50:40.616Z",
+    "apkUrl": "https://expo.dev/artifacts/eas/G4n6m2ZRS2120ivlGoNaNEHPBO5nTGc__mky5jiMWUg.apk"
+  },
+  "inspection": {
+    "apkSha256": "3028ce14887d00de67a72390c11b3b2029f21f756d1d84b4021a2f64e134f799",
+    "package": "com.leagueoftrading",
+    "adsMetadata": {
+      "com.google.android.gms.ads.APPLICATION_ID": "ca-app-pub-7899930948413451~9002185139",
+      "com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT": true,
+      "com.google.android.gms.ads.flag.OPTIMIZE_INITIALIZATION": true,
+      "com.google.android.gms.ads.flag.OPTIMIZE_AD_LOADING": true
+    },
+    "permissions": [
+      "android.permission.INTERNET",
+      "android.permission.SYSTEM_ALERT_WINDOW",
+      "android.permission.VIBRATE",
+      "android.permission.READ_EXTERNAL_STORAGE",
+      "android.permission.WRITE_EXTERNAL_STORAGE",
+      "android.permission.WAKE_LOCK",
+      "android.permission.ACCESS_NETWORK_STATE",
+      "android.permission.RECEIVE_BOOT_COMPLETED",
+      "android.permission.POST_NOTIFICATIONS",
+      "android.permission.ACCESS_ADSERVICES_AD_ID",
+      "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
+      "android.permission.ACCESS_ADSERVICES_TOPICS",
+      "com.google.android.c2dm.permission.RECEIVE",
+      "android.permission.FOREGROUND_SERVICE",
+      "com.leagueoftrading.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+      "com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE",
+      "com.sec.android.provider.badge.permission.READ",
+      "com.sec.android.provider.badge.permission.WRITE",
+      "com.htc.launcher.permission.READ_SETTINGS",
+      "com.htc.launcher.permission.UPDATE_SHORTCUT",
+      "com.sonyericsson.home.permission.BROADCAST_BADGE",
+      "com.sonymobile.home.permission.PROVIDER_INSERT_BADGE",
+      "com.anddoes.launcher.permission.UPDATE_COUNT",
+      "com.majeur.launcher.permission.UPDATE_BADGE",
+      "com.huawei.android.launcher.permission.CHANGE_BADGE",
+      "com.huawei.android.launcher.permission.READ_SETTINGS",
+      "com.huawei.android.launcher.permission.WRITE_SETTINGS",
+      "android.permission.READ_APP_BADGE",
+      "com.oppo.launcher.permission.READ_SETTINGS",
+      "com.oppo.launcher.permission.WRITE_SETTINGS",
+      "me.everything.badger.permission.BADGE_COUNT_READ",
+      "me.everything.badger.permission.BADGE_COUNT_WRITE"
+    ],
+    "adMob": {
+      "mode": "test",
+      "profile": "preview",
+      "rewardedUnits": {
+        "android": "ca-app-pub-3940256099942544/5224354917",
+        "ios": "ca-app-pub-3940256099942544/1712485313"
+      }
+    },
+    "build": {
+      "commit": "3a0408a5e78258bb40d15cdbe087e247220b0a15",
+      "profile": "preview",
+      "id": "49ff1a33-7d03-428a-8558-e8100797c56b"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "nativeDevice": false,
+  "realGoogleAd": false,
+  "font": "Nanum Gothic Google Fonts UI subset (browser fixture)",
+  "cases": 8,
+  "records": [
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "light",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 320,
+      "fontScale": 1,
+      "theme": "dark",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "light",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 320,
+      "fontScale": 2,
+      "theme": "dark",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "light",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 390,
+      "fontScale": 1,
+      "theme": "dark",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "light",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    },
+    {
+      "width": 390,
+      "fontScale": 2,
+      "theme": "dark",
+      "fontFamily": "FixtureKorean, sans-serif",
+      "fontLoaded": true,
+      "issues": [],
+      "financialCalls": 0,
+      "sideways": false
+    }
+  ]
+}

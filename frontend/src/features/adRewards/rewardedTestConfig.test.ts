@@ -14,7 +14,7 @@ const androidReal = 'ca-app-pub-7899930948413451/3165650506';
 const iosReal = 'ca-app-pub-7899930948413451/8170740188';
 
 test('native SDK stays on the exact Kotlin 2.1 compatible version verified by the build', () => {
-  // 16.4+ selects Google Ads 25.4, whose Kotlin 2.3 metadata failed our EAS
+  // 16.5.0 selects Google Ads 25.4, whose Kotlin 2.3 metadata failed our EAS
   // :react-native-google-mobile-ads:compileReleaseKotlin step. No caret here.
   assert.equal(dependencies['react-native-google-mobile-ads'], '16.3.4');
   assert.equal(sdkPackage.version, '16.3.4');

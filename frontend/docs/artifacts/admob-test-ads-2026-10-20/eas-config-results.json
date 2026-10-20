@@ -1,0 +1,50 @@
+{
+  "development": {
+    "adMob": {
+      "mode": "test",
+      "profile": "development",
+      "rewardedUnits": {
+        "android": "ca-app-pub-3940256099942544/5224354917",
+        "ios": "ca-app-pub-3940256099942544/1712485313"
+      }
+    },
+    "androidPackage": "com.leagueoftrading",
+    "iosBundleIdentifier": "com.leagueoftrading"
+  },
+  "androidPreview": {
+    "adMob": {
+      "mode": "test",
+      "profile": "preview",
+      "rewardedUnits": {
+        "android": "ca-app-pub-3940256099942544/5224354917",
+        "ios": "ca-app-pub-3940256099942544/1712485313"
+      }
+    },
+    "androidPackage": "com.leagueoftrading",
+    "iosBundleIdentifier": "com.leagueoftrading"
+  },
+  "iosPreview": {
+    "adMob": {
+      "mode": "test",
+      "profile": "preview",
+      "rewardedUnits": {
+        "android": "ca-app-pub-3940256099942544/5224354917",
+        "ios": "ca-app-pub-3940256099942544/1712485313"
+      }
+    },
+    "androidPackage": "com.leagueoftrading",
+    "iosBundleIdentifier": "com.leagueoftrading"
+  },
+  "production": {
+    "adMob": {
+      "mode": "disabled",
+      "profile": "production",
+      "rewardedUnits": {
+        "android": "ca-app-pub-7899930948413451/3165650506",
+        "ios": "ca-app-pub-7899930948413451/8170740188"
+      }
+    },
+    "androidPackage": "com.leagueoftrading",
+    "iosBundleIdentifier": "com.leagueoftrading"
+  }
+}

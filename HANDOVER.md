@@ -1,5 +1,16 @@
 # 프로젝트 인수인계서
 
+## 2026-10-20 — AdMob 보상형 테스트 광고 SDK (main, 실광고·금융 보상 차단)
+
+- **시작/범위:** HEAD/fetch한 origin/main `6fe9b6ce23442616261cd0b09025aa9a1bb54b8b`, clean. 사용자 지시로 main에서 작업, 기존 worktree 보존. 프런트와 인수인계서만 수정했다. 최종 SDK/권한 소스 `dfbf7b4164b7dd6902dba5b2c6e59d20ff7891f8`.
+- **SDK 선택:** `react-native-google-mobile-ads` **16.3.4 정확히 고정**. Expo 55.0.17/RN 0.83.6/React 19.2.0 보존. 최신 17.3.0은 RN >=0.86 peer로 제외. 처음 검토한 16.5.0은 실제 EAS에서 GMA 25.4.0 Kotlin metadata 2.3/기존 Kotlin 2.1 충돌로 실패했다. maintainer의 16.3.4 권고와 실제 SDK 버전을 확인하고 내렸다(GMA Android 25.0.0/iOS 13.1.0). 컴파일러 업그레이드·검사 우회 없음.
+- **설정:** Plugin에 사용자의 Android/iOS 앱 ID를 등록하고, Git 관리 AndroidManifest에도 동일 metadata를 반영했다. iOS Bundle ID는 사용자 승인으로 `com.leagueoftrading` 최초 설정. 기존 Plugin·패키지·EAS 프로필·커밋 스탬프 보존. AD_ID 및 SDK가 자동 병합한 AdServices 광고 ID/기여도/관심사 권한 3개 제거, 측정 초기화 지연, UMP 동의 후 SDK 초기화/NPA 요청. ATT 권한은 추가하지 않았다.
+- **환경:** development/preview는 Google 공식 플랫폼별 Rewarded 테스트 단위로 강제한다. production은 항상 disabled이며, 향후 운영 단위 2개만 EAS production 프로젝트 환경에 저장했다. 명시 프로필 env는 실제 EAS CLI의 worker-placeholder 평가 차이를 해소한다. SDK 진입점에서도 프로필·정확한 테스트 단위를 재검사한다. Expo Go/웹/구 APK 실패가 앱 시작·거래를 차단하지 않는다.
+- **UI/경계:** 일반모드 보상 시트에 수동 불러오기→준비→수동 표시→OPENED→보상 이벤트→닫기/조기 종료를 구분하는 테스트 패널을 추가했다. 준비/로딩/표시 오류·45초 제한·연속 클릭·구독/계정/로그아웃 정리·표시 잠금을 처리한다. 자동 재시도 없음. 완료는 `테스트 광고 시청 완료`이며 proof를 만들지 않는다. 금융용 provider는 계속 null: eligibility/claim/reset/원장·잔액·성과 변경·금융 캐시 무효화 요청 0을 통합 테스트했다. 서버/DB/검증기 변경 없음.
+- **검증:** 관련 광고/보상/상세/시트 회귀 89개, 타입·accounts/guide lint·진단 게이트 PASS. 전체 check는 메모리 한도 조정 후 테스트 2,890개에서 600초 제한(exit 124); 프로세스 종료 확인 후 취소된 36파일만 실행해 434개 PASS → 전체 파일 3,324개 검증, skip/단언 실패 없음(단일 명령 성공으로 표현하지 않음). Android/iOS 실제 EAS config 평가·Expo introspect·격리 iOS prebuild·Android Hermes/Web export PASS. 작은 화면/큰 글꼴/라이트·다크 RN-Web 8개 PASS(네이티브 검증 아님). 최종 Android EAS Preview `062b84f1-6f9d-48f6-a346-fd877d3d458f`/소스 `dfbf7b41` **FINISHED**, 기존 keystore로 APK 생성. APK binary manifest/app.config에서도 앱 ID·네 광고 권한 부재·공식 테스트 단위·빌드 스탬프 확인. 권한 정리 후 회귀 7개·타입·introspect도 PASS. EAS Doctor의 기존 네이티브 config 동기화/Expo 계열 patch 불일치 경고(18/20)는 남아 있다.
+- **실기기/후속:** Android/iOS 연결 기기 없음, 실제 Google 광고 표시·네이티브 시스템 바/Safe Area NOT_RUN. iOS EAS는 기존 내부 배포 서명 credentials가 없어 빌드 생성 전 중단, 원격 buildNumber만 1로 최초 초기화. Apple 팀/App ID/기기/프로비저닝 준비 후 `cd frontend && eas build -p ios --profile preview`. SSV·재생 방지·사용자/일반계정/목적 결합 후에만 금융 provider 연결 가능. UMP 메시지·개인정보처리방침·Play Data safety·Apple App Privacy/ATT/암호화 분류와 운영 광고 검증은 후속 작업이며 준수 완료로 판정하지 않았다.
+- **Git/배포:** 모든 커밋 `[skip render]`. 승인한 Render `league of trading`의 trading_app은 backend/main commit 자동 배포이며 live `9ed671c2`를 읽기 전용 확인했다. 이 태그는 Render 자동 배포만 건너뛴다. 운영 배포·EAS Update·스토어 제출 없음. 전체 diff 및 테스트 대형 객체 출력/검증 삭제 위험을 검토했다. [상세 설정·검증 결과·실기기 절차](frontend/docs/admob-test-ads-2026-10-20.md).
+
 ## 2026-10-20 — 국내·미국주식/암호화폐 현물 상세 Android 하단 CTA 높이 수정 (실기기 미검증)
 
 - **시작:** fetch한 origin/main = HEAD `26dbe0ab12e44a71d8ab67c281224908b170d324`, 작업 트리 clean. 기존 병행 worktree 보존. 작업 브랜치 `fix/asset-detail-android-footer-20261020`.

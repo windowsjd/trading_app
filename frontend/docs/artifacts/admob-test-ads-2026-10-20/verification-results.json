@@ -1,0 +1,85 @@
+{
+  "typecheck": "PASS",
+  "accountsLint": "PASS",
+  "guideLint": "PASS",
+  "diagnosticGate": "PASS",
+  "relatedTests": {
+    "passed": 89,
+    "failed": 0,
+    "skipped": 0
+  },
+  "fullCheck": {
+    "firstAttempt": {
+      "heapMiB": 768,
+      "result": "ESLint heap exhausted; process exit confirmed"
+    },
+    "boundedAttempt": {
+      "heapMiB": 1536,
+      "timeLimitSeconds": 600,
+      "exitCode": 124,
+      "passed": 2890,
+      "failed": 0,
+      "cancelledFiles": 36
+    },
+    "cancelledFilesRerun": {
+      "passed": 434,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "verifiedCasesAcrossAllFiles": 3324,
+    "singleCommandSucceeded": false,
+    "cancelledFiles": [
+      "src/screens/order/orderWalletFunding.test.ts",
+      "src/screens/order/orderWarningUx.test.ts",
+      "src/screens/order/quantityRatio.test.ts",
+      "src/screens/order/quantityRatioNative.test.ts",
+      "src/screens/order/sellIntentFlows.test.ts",
+      "src/screens/order/sellLimitFlows.test.ts",
+      "src/screens/order/stockOrderCard.test.ts",
+      "src/screens/order/stockOrderSummary.test.ts",
+      "src/screens/quest/BeginnerLearningScreen.test.ts",
+      "src/screens/quest/BeginnerQuestList.test.ts",
+      "src/screens/ranking/RankingInsightSlot.test.ts",
+      "src/screens/ranking/RankingRows.test.ts",
+      "src/screens/record/recordPresentation.test.ts",
+      "src/screens/wallet/WalletFxSheet.test.ts",
+      "src/screens/wallet/WalletScreen.test.ts",
+      "src/screens/wallet/WalletTransferSheet.test.ts",
+      "src/screens/wallet/walletQuestGuide.test.ts",
+      "src/screens/wallet/walletRefresh.test.ts",
+      "src/services/api/diagnosticSafety.test.ts",
+      "src/services/api/errorMapper.test.ts",
+      "src/services/api/sessionExpiry.test.ts",
+      "src/services/ws/realtimeSocketManager.test.ts",
+      "src/theme/appearance.test.ts",
+      "src/theme/financialColors.test.ts",
+      "src/theme/native.test.ts",
+      "src/theme/screenLayout.test.ts",
+      "src/theme/useReducedMotion.test.ts",
+      "src/utils/androidLayoutCheck.test.ts",
+      "src/utils/assetPriceFormat.test.ts",
+      "src/utils/buildInfo.test.ts",
+      "src/utils/displayDecimalCoverage.test.ts",
+      "src/utils/displayPolicyContract.test.ts",
+      "src/utils/format.test.ts",
+      "src/utils/krStockKoreanNames.test.ts",
+      "src/utils/priceDisplay.test.ts",
+      "src/utils/usStockKoreanNames.test.ts"
+    ]
+  },
+  "permissionChangeRegression": {
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0,
+    "typecheck": "PASS",
+    "expoIntrospect": "PASS"
+  },
+  "webExport": "PASS",
+  "androidHermesExport": "PASS",
+  "iosIsolatedPrebuild": "PASS",
+  "iosNativeBuild": "BLOCKED: no existing internal distribution signing credentials",
+  "nativeDeviceValidation": "NOT_RUN: no Android/iOS device or emulator",
+  "financialApisCalledByTestAdFlow": 0,
+  "financialApiVerificationScope": "UI integration harness observations; no live financial API/DB verification"
+}
